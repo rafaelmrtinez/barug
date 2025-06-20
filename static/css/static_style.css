@@ -1,0 +1,37 @@
+/* General Styles */
+* {
+    font-family: var(--bs-font-sans-serif);
+}
+
+/* Form Styling */
+.form-floating .form-control {
+    border: 2px solid black;
+    border-radius: 24px;
+}
+
+.form-floating label {
+    font-size: 14px;
+    color: gray;
+}
+
+.form-floating .form-control:focus {
+    border-color: var(--bs-danger-text-emphasis);
+    box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+    outline: none;
+}
+
+/* Submit Button */
+.btn-submit {
+    padding-inline: 20px;
+    border-radius: 18px;
+    background-color: var(--bs-danger-text-emphasis);
+    color: var(--bs-white);
+    border: 2px solid var(--bs-danger-text-emphasis);
+    font-weight: 500;
+}
+
+.btn-submit:hover {
+    border: 2px solid var(--bs-danger-text-emphasis);
+    color: black;
+    font-weight: 500;
+}
