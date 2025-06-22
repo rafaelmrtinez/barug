@@ -13,7 +13,7 @@ class ResidentProfileform(forms.Form) :
     }),
         label= 'Resident ID',
     )
-    # BASIC PERSONAL INFORMATION
+    # PERSONAL INFORMATION
     last_name = forms.CharField(
         widget=forms.TextInput(attrs={
             'id' : 'last_name',
@@ -124,14 +124,6 @@ class ResidentProfileform(forms.Form) :
         label= 'Mobile Number',
         required= True,
     )
-    res_img = forms.ImageField(
-        widget=forms.ClearableFileInput(attrs={
-            'id' : 'res_img',
-            'class' : 'form-control',
-    }),
-        label= 'Image',
-        required= True,
-    )
     # SOCIOECONOMIC INFORMATION
     educational_attainment = forms.ChoiceField(
         choices= [], 
@@ -177,4 +169,21 @@ class ResidentProfileform(forms.Form) :
     }),
         label= 'Goverment Program',
         required= True,
+    )
+    # SUPPORTING DOCUMENTS
+    res_img = forms.ImageField(
+        widget=forms.ClearableFileInput(attrs={
+            'id' : 'res_img',
+            'class' : 'form-control',
+    }),
+        label= 'Resident Image',
+        required= False, #correct if wrong
+    )
+    proof_img = forms.ImageField(
+        widget=forms.ClearableFileInput(attrs={
+            'id' : 'proof_img',
+            'class' : 'form-control',
+    }),
+        label= 'Proof of Residency',
+        required= False, #correct if wrong
     )
