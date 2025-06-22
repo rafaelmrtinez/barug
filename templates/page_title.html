@@ -1,0 +1,21 @@
+{% load bootstrap_icons %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+    <div class="page-title align-items-center ps-3 pe-3 pt-1" style="border-bottom: 2px solid;">
+        <div class="d-flex gap-2">
+            {% bs_icon 'folder2-open' color='black' size='1em' %}
+            <small class="mb-0">{{ page_path }}</small>
+        </div>
+        <div class="gap-2 pt-0">
+            {% bs_icon 'arrow-return-right' color='black' size='1em' %}
+            <large class="mb-0" style="font-weight: 500;">{{ page_title }}</large>
+        </div>
+    </div>
+</body>
+</html>

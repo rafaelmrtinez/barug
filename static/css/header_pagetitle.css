@@ -1,0 +1,20 @@
+header {
+    height: 50px;
+    background-color: var(--bs-danger-text-emphasis);
+    font-weight: 500;
+    position: sticky;
+    top: 0;
+    z-index: 9999;
+}
+
+.navbar-text {
+    font-size: 0.9rem;
+}
+
+.page-title {
+    position: fixed;
+    top: auto;
+    width: 100%;
+    z-index: 9997;
+    background-color: #fff;
+}

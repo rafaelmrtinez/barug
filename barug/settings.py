@@ -39,7 +39,9 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django_bootstrap5",
+    "django_bootstrap_icons",
     "authentication",
+    "resident",
 ]
 
 MIDDLEWARE = [
@@ -60,6 +62,7 @@ TEMPLATES = [
         "DIRS": [
             BASE_DIR / "templates",
             BASE_DIR / "authentication/templates/authentication",
+            BASE_DIR / "resident/templates/resident",
         ],
         "APP_DIRS": True,
         "OPTIONS": {
@@ -125,6 +128,7 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
     os.path.join(BASE_DIR, "authentication/static/authentication"),
+    os.path.join(BASE_DIR, "resident/static/resident"),
 ]
 
 # Default primary key field type

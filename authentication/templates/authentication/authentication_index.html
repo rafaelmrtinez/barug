@@ -45,15 +45,15 @@
 
                         <div class="form-floating mb-3">
                             {{ form.username }}
-                            <label>Username</label>
+                            <label for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
                         </div>
                         
                         <div class="form-floating mb-3">
                             {{ form.password }}
-                            <label>Password</label>
+                            <label for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
                             <button type="button" 
                                 class="btn toggle-password position-absolute top-50 end-0 translate-middle-y me-3 p-0" 
-                                data-target="toggle_password" 
+                                data-target="password" 
                                 style="background: none; border: none; cursor: pointer;">
                                 <small>Show</small>
                             </button>
