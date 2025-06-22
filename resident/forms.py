@@ -13,6 +13,33 @@ class ResidentProfileform(forms.Form) :
     }),
         label= 'Resident ID',
     )
+    res_status = forms.ChoiceField(
+        widget=forms.Select(attrs={
+            'id' : 'res_status',
+            'class' : 'form-select',
+    }),
+        label= 'Resident Status',
+        required= True,
+    )
+    reg_date = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'type' : 'date',
+            'id' : 'reg_date',
+            'class' : 'form-control',
+            'placeholder' : 'Registration Date',
+    }),
+        label= 'Registration Date',
+        required= True,
+    )
+    added_by = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'added_by',
+            'class' : 'form-control',
+            'placeholder' : 'Addedd by'
+    }),
+        label= 'Added by',
+        required= True,
+    )
     # PERSONAL INFORMATION
     last_name = forms.CharField(
         widget=forms.TextInput(attrs={

@@ -25,19 +25,19 @@
             <div class="d-flex align-items-center gap-2">
                 <div>
                     <button class="btn pe-0">
-                        {% bs_icon 'bell' color='white' size='1.3em' %}
+                        {% bs_icon 'bell-fill' color='white' size='1.2em' %}
                     </button>
                     
                     <button class="btn">
-                        {% bs_icon 'person' color='white' size='1.3em' %}
+                        {% bs_icon 'person-fill' color='white' size='1.3em' %}
                     </button>
                 </div>
                 <div class="user text-end">
-                    <span class="navbar-text">lname, fname mname</span>
+                    <span class="navbar-text">{{ user_fullname }}</span>
                 </div>
                 <span class="navbar-text d-none d-sm-inline"> - </span>
                 <div class="user-type text-end">
-                    <span class="navbar-text">role</span>
+                    <span class="navbar-text">{{ user_role }}</span>
                 </div>
                 <div class="d-flex align-items-center">
                     <form action="" method="post" class="m-0 p-0">

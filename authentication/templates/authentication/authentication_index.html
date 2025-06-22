@@ -11,9 +11,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <link rel="stylesheet" href="{% static 'css/static_style.css' %}">
-    <link rel="stylesheet" href="{% static 'authentication/css/authentication_style.css' %}">
 
-    <script src="{% static 'authentication/js/password_toggle.js' %}" defer></script>
+    <script src="{% static 'js/password_toggle.js' %}" defer></script>
 
     <link rel="icon" type="image/x-icon" href="{% static 'images/brgy-sto-nino.png' %}">
     <title>Login</title>
@@ -60,7 +59,7 @@
                         </div> 
 
                         <div class="mb-3 text-end">
-                            <a href="{% url 'authentication:forgot_password' %}" class="forgot-pass">Forgot Password?</a>
+                            <a href="{% url 'authentication:forgot_password' %}" class="forgot-pass" style="color: black; font-weight: 500;">Forgot Password?</a>
                         </div>       
 
                         <div class="input-group mb-3">

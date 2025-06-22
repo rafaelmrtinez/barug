@@ -29,7 +29,8 @@
     font-weight: 500;
 }
 
-.btn-submit {
+.btn-submit,
+.btn-icon {
     padding-inline: 20px;
     border-radius: 18px;
     background-color: var(--bs-danger-text-emphasis);
@@ -38,7 +39,8 @@
 }
 
 .btn-submit:hover,
-.btn-reset:hover {
+.btn-reset:hover,
+.btn-icon:hover {
     border: 2px solid var(--bs-danger-text-emphasis);
     color: black;
 }
@@ -55,4 +57,18 @@
     display: flex;
     gap: 10px;
     padding-bottom: 10px;
+}
+
+/* Table */
+
+.table{
+    font-size: 0.9rem;
+}
+
+.table thead {
+    border: 2px solid;
+}
+
+.table-row-height {
+    vertical-align: middle;
 }
