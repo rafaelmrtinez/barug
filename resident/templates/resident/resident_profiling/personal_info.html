@@ -10,14 +10,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <link rel="stylesheet" href="{% static 'css/static_style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/form.css' %}">
+    <link rel="stylesheet" href="{% static 'css/button.css' %}">
 
-    <title>Register Resident</title>
+    <title>{{ page_title }}</title>
 </head>
-<body>
-    <div class="container-fluid pt-3" style="margin-top: 50px;">
+<body class="d-flex flex-column min-vh-100">
+    <div class="container-fluid pt-3 d-flex flex-column flex-grow-1" style="margin-top: 50px;">
 
-        <form method="post">
+        <form method="post" class="d-flex flex-column flex-grow-1">
             {% csrf_token %}
 
             <h5>Personal Information</h5>
@@ -121,73 +122,10 @@
                 </div>
 
             </div>
-
-            <h5>Socioeconomic Information</h5>
-            <div class="row">
-
-                <div class="col-lg-3 col-md-6 col-sm-12">
-                    <div class="form-floating mb-3">
-                        {{form.educational_attainment}}
-                        <label for="{{ form.educational_attainment.id_for_label }}">{{ form.educational_attainment.label }}</label>
-                    </div>
-                </div>
-
-                <div class="col-lg-3 col-md-6 col-sm-12">
-                    <div class="form-floating mb-3">
-                        {{form.employment_status}}
-                        <label for="{{ form.employment_status.id_for_label }}">{{ form.employment_status.label }}</label>
-                    </div>   
-                </div>
-
-                <div class="col-lg-3 col-md-6 col-sm-12">
-                    <div class="form-floating mb-3">
-                        {{form.occupation}}
-                        <label for="{{ form.occupation.id_for_label }}">{{ form.occupation.label }}</label>
-                    </div>   
-                </div>
-
-                <div class="col-lg-3 col-md-6 col-sm-12">
-                    <div class="form-floating mb-3">
-                        {{form.monthly_personal_income}}
-                        <label for="{{ form.monthly_personal_income.id_for_label }}">{{ form.monthly_personal_income.label }}</label>
-                    </div>   
-                </div>
-
-            </div>
-
-            <div class="row">
-
-                <div class="col-lg-3 col-md-6 col-sm-12">
-                    <div class="form-floating mb-3">
-                        {{form.gov_program}}
-                        <label for="{{ form.gov_program.id_for_label }}">{{ form.gov_program.label }}</label>
-                    </div>
-                </div>
-
-            </div>
-
-            <h5>Supporting Documents</h5>
-            <div class="row">
-
-                <div class="col-lg-3 col-md-6 col-sm-12">
-                    <div class="form-floating mb-3">
-                        {{form.res_img}}
-                        <label for="{{ form.res_img.id_for_label }}">{{ form.res_img.label }}</label>
-                    </div>
-                </div>
-
-                <div class="col-lg-3 col-md-6 col-sm-12">
-                    <div class="form-floating mb-3">
-                        {{form.proof_img}}
-                        <label for="{{ form.proof_img.id_for_label }}">{{ form.proof_img.label }}</label>
-                    </div>
-                </div>
-
-            </div>
-
-            <div class="button-container justify-content-end mb-2">
-                <button type="reset" id="reset" name="reset" class="btn btn-reset">Clear</button>
-                <button type="submit" id="submit" name="submit" class="btn btn-submit">Save</button>
+            
+            <div class="mt-auto button-container justify-content-end mb-2">
+                <button class="btn btn-reset">Clear</button>
+                <a class="btn btn-submit" href="{% url 'resident:socioeconomic_info' %}">Continue</a>
             </div>
 
         </form>

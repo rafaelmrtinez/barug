@@ -1,10 +1,10 @@
 header {
     height: 50px;
     background-color: var(--bs-danger-text-emphasis);
-    font-weight: 500;
-    position: sticky;
+    position: fixed;
     top: 0;
     z-index: 9999;
+    width: 100%;
 }
 
 .navbar-text {
@@ -12,9 +12,12 @@ header {
 }
 
 .page-title {
-    position: fixed;
-    top: auto;
-    width: 100%;
+    position: sticky;
+    top: 100px;
     z-index: 9997;
     background-color: #fff;
+    padding: 0.5rem 1rem;
+    border-bottom: 2px solid black;
+    margin-top: 0;
+    padding-top: 0; 
 }

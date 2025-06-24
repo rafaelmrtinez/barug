@@ -9,11 +9,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-
-    <link rel="stylesheet" href="{% static 'css/static_style.css' %}">
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resident Records</title>
+
+    <link rel="stylesheet" href="{% static 'css/table.css' %}">
+    <link rel="stylesheet" href="{% static 'css/button.css' %}">
+
+    <title>{{ page_title }}</title>
 </head>
 <body>
     <div class="container-fluid pt-3" style="margin-top: 50px;">
@@ -46,7 +47,7 @@
                                 </td>
                             </tr>
                             <tr>
-                                <td colspan="4" class="text-center text-muted">No residents found.</td>
+                                <td colspan="4" class="text-center text-muted">No resident records found.</td>
                             </tr>
                         </tbody>
                     </table>

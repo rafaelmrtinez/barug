@@ -1,0 +1,13 @@
+/* Table */
+
+.table{
+    font-size: 0.9rem;
+}
+
+.table thead {
+    border: 2px solid;
+}
+
+.table-row-height {
+    vertical-align: middle;
+}

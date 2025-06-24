@@ -8,18 +8,19 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <link rel="stylesheet" href="{% static 'css/static_style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/form.css' %}">
+    <link rel="stylesheet" href="{% static 'css/button.css' %}">
 
     <script src="{% static 'js/update_button.js' %}"></script>
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resident : {{res_id}}</title>
+    <title>{{ page_title }}</title>
 </head>
-<body>
-    <div class="container-fluid pt-3" style="margin-top: 50px;">
+<body class="d-flex flex-column min-vh-100">
+    <div class="container-fluid pt-3 d-flex flex-column flex-grow-1" style="margin-top: 50px;">
 
-        <form method="post">
+        <form method="post" class="d-flex flex-column flex-grow-1">
             {% csrf_token %}
 
             <h5>Personal Information</h5>
@@ -228,7 +229,7 @@
 
             </div>
 
-            <div class="button-container justify-content-end mb-2">
+            <div class="mt-auto button-container justify-content-end mb-2">
                 <button type="reset" id="reset" name="reset" class="btn btn-reset d-none">Clear</button>
                 <button type="submit" id="submit" name="submit" class="btn btn-submit d-none">Update</button>
                 <button type="button" id="enable-edit-btn" name="enable-edit-btn" class="btn btn-submit">Update Resident Information</button>

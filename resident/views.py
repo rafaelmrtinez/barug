@@ -6,14 +6,44 @@ user_fullname = 'lname, fname mname suffix'
 user_role = 'User'
 
 # Create your views here.
-def profile_resident(request) :
-    form = ResidentProfileform()
-
-    return render(request, "resident_profiling/profile_resident.html", {
+def register_resident(request) :
+    return render(request, "resident_profiling/register_resident.html", {
         'user_fullname' : user_fullname,
         'user_role' : user_role,
         'page_path' : f'{user_role} / Resident Management / Register Resident',
-        'page_title' : 'Register Resident',
+        'page_title' : 'Register Resident'
+    })
+
+def personal_info(request) :
+    form = ResidentProfileform()
+
+    return render(request, "resident_profiling/personal_info.html", {
+        'user_fullname' : user_fullname,
+        'user_role' : user_role,
+        'page_path' : f'{user_role} / Resident Management / Register Resident / Personal Information',
+        'page_title' : 'Personal Information',
+        'form' : form,
+    })
+
+def socioeconomic_info(request) :
+    form = ResidentProfileform()
+
+    return render(request, "resident_profiling/socioeconomic_info.html", {
+        'user_fullname' : user_fullname,
+        'user_role' : user_role,
+        'page_path' : f'{user_role} / Resident Management / Register Resident / Socioeconomic Information',
+        'page_title' : 'Socioeconomic Information',
+        'form' : form,
+    })
+
+def supporting_documents(request) :
+    form = ResidentProfileform()
+
+    return render(request, "resident_profiling/supporting_documents.html", {
+        'user_fullname' : user_fullname,
+        'user_role' : user_role,
+        'page_path' : f'{user_role} / Resident Management / Register Resident / Supporting Documents',
+        'page_title' : 'Supporting Documents',
         'form' : form,
     })
 
@@ -37,6 +67,5 @@ def resident_record(request, res_id) :
         'user_role' : user_role,
         'page_path' : f'{user_role} / Resident Management / Resident Records / Resident : {res_id}',
         'page_title' : f'Resident : {res_id}',
-        'res_id' : res_id,
         'form' : form,
     })
