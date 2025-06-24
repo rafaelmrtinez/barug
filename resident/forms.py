@@ -183,7 +183,7 @@ class ResidentProfileform(forms.Form) :
         widget=forms.TextInput(attrs={
             'id' : 'monthtly_personal_income',
             'class' : 'form-control',
-            'placeholder' : 'Monhly Personal Income',
+            'placeholder' : 'Monthly Personal Income',
     }),
         label= 'Monthly Personal Income',
         required= True,

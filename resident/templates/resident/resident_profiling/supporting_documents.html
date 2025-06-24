@@ -1,52 +1,38 @@
-{% include 'header.html' %}
-{% include 'account_management/clerk.html' %}
-{% include 'page_title.html' %}
+{% extends 'base.html' %}
 
 {% load static %}
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% block content %}
+<div class="container-fluid pt-3 d-flex flex-column flex-grow-1" style="margin-top: 50px;">
 
-    <link rel="stylesheet" href="{% static 'css/form.css' %}">
-    <link rel="stylesheet" href="{% static 'css/button.css' %}">
+    <form method="post" class="d-flex flex-column flex-grow-1">
+        {% csrf_token %}
 
-    <title>{{page_title}}</title>
-</head>
-<body class="d-flex flex-column min-vh-100">
-    <div class="container-fluid pt-3 d-flex flex-column flex-grow-1" style="margin-top: 50px;">
+        <h5>Supporting Documents</h5>
+        <div class="row">
 
-        <form method="post" class="d-flex flex-column flex-grow-1">
-            {% csrf_token %}
-
-            <h5>Supporting Documents</h5>
-            <div class="row">
-
-                <div class="col-lg-3 col-md-6 col-sm-12">
-                    <div class="form-floating mb-3">
-                        {{form.res_img}}
-                        <label for="{{ form.res_img.id_for_label }}">{{ form.res_img.label }}</label>
-                    </div>
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.res_img}}
+                    <label for="{{ form.res_img.id_for_label }}">{{ form.res_img.label }}</label>
                 </div>
-
-                <div class="col-lg-3 col-md-6 col-sm-12">
-                    <div class="form-floating mb-3">
-                        {{form.proof_img}}
-                        <label for="{{ form.proof_img.id_for_label }}">{{ form.proof_img.label }}</label>
-                    </div>
-                </div>
-
             </div>
 
-            <div class="mt-auto button-container justify-content-end mb-2">
-                <button class="btn btn-reset">Clear</button>
-                <a class="btn btn-submit" href="">Continue</a>
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.proof_img}}
+                    <label for="{{ form.proof_img.id_for_label }}">{{ form.proof_img.label }}</label>
+                </div>
             </div>
 
-        </form>
+        </div>
 
-    </div>
-</body>
-</html>
+        <div class="mt-auto button-container justify-content-end mb-2">
+            <button class="btn btn-reset">Clear</button>
+            <a class="btn btn-submit" href="">Continue</a>
+        </div>
+
+    </form>
+
+</div>
+{% endblock %}

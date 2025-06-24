@@ -1,22 +1,11 @@
-{% include 'header.html' %}
-{% include 'account_management/clerk.html' %}
-{% include 'page_title.html' %}
+{% extends 'base.html' %}
 
 {% load static %}
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% block content %}
+<div class="d-flex flex-column min-vh-100">
 
-    <link rel="stylesheet" href="{% static 'css/form.css' %}">
-    <link rel="stylesheet" href="{% static 'css/button.css' %}">
-
-    <title>{{ page_title }}</title>
-</head>
-<body class="d-flex flex-column min-vh-100">
-    <div class="container-fluid pt-3 d-flex flex-column flex-grow-1" style="margin-top: 50px;">
+    <div class="container-fluid pt-3 d-flex flex-column flex-grow-1" style="margin-top: 40px;">
 
         <form method="post" class="d-flex flex-column flex-grow-1">
             {% csrf_token %}
@@ -131,5 +120,6 @@
         </form>
 
     </div>
-</body>
-</html>
+    
+</div>
+{% endblock %}

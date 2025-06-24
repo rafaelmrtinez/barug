@@ -16,8 +16,5 @@ header {
     top: 100px;
     z-index: 9997;
     background-color: #fff;
-    padding: 0.5rem 1rem;
     border-bottom: 2px solid black;
-    margin-top: 0;
-    padding-top: 0; 
 }
