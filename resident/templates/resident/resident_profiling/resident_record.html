@@ -2,11 +2,39 @@
 
 {% load static %}
 
+{% block css %}
+    <link rel="stylesheet" href="{% static 'css/form.css' %}">
+    <link rel="stylesheet" href="{% static 'css/button.css' %}">
+    
+    <script src="{% static 'js/update_button.js' %}"></script>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid pt-3 d-flex flex-column flex-grow-1" style="margin-top: 40px;">
 
     <form method="post" class="d-flex flex-column flex-grow-1">
         {% csrf_token %}
+
+        <h5>Residential Information</h5>
+        <div class="row">
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.res_code}}
+                    <label for="{{ form.res_code.id_for_label }}">{{ form.res_code.label }}</label>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.res_status}}
+                    <label for="{{ form.res_status.id_for_label }}">{{ form.res_status.label }}</label>
+                </div>
+            </div>
+
+        </div>
+
+        <hr>
 
         <h5>Personal Information</h5>
         <div class="row">
@@ -89,13 +117,6 @@
 
             <div class="col-lg-3 col-md-6 col-sm-12">
                 <div class="form-floating mb-3">
-                    {{form.address}}
-                    <label for="{{ form.address.id_for_label }}">{{ form.address.label }}</label>
-                </div>   
-            </div>
-
-            <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
                     {{form.email}}
                     <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
                 </div>   
@@ -109,6 +130,41 @@
             </div>
 
         </div>
+
+        <small class="text-muted" style="font-size: 1rem; font-weight: 500;">Home Address</small>
+        <div class="row">
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.street}}
+                    <label for="{{ form.street.id_for_label }}">{{ form.street.label }}</label>
+                </div>  
+            </div>
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.purok_sitio}}
+                    <label for="{{ form.purok_sitio.id_for_label }}">{{ form.purok_sitio.label }}</label>
+                </div>   
+            </div>
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.barangay}}
+                    <label for="{{ form.barangay.id_for_label }}">{{ form.barangay.label }}</label>
+                </div>   
+            </div>
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.city}}
+                    <label for="{{ form.city.id_for_label }}">{{ form.city.label }}</label>
+                </div>   
+            </div>
+
+        </div>
+
+        <hr>
 
         <h5>Socioeconomic Information</h5>
         <div class="row">
@@ -154,48 +210,59 @@
 
         </div>
 
+        <hr>
+
         <h5>Supporting Documents</h5>
         <div class="row">
 
             <div class="col-lg-3 col-md-6 col-sm-12">
-                <!-- change the image dynamically -->
-                <div class="mb-2"> 
-                    <img src="{% static 'images/brgy-sto-nino.png' %}" alt="Resident Image" class="img-fluid" style="max-height: 100px;">
-                </div>
                 <div class="form-floating mb-3">
                     {{form.res_img}}
                     <label for="{{ form.res_img.id_for_label }}">{{ form.res_img.label }}</label>
                 </div>
+                <!-- change the image dynamically -->
+                <div class="mb-2"> 
+                    <img src="{% static 'images/brgy-sto-nino.png' %}" alt="Resident Image" class="img-fluid" style="max-height: 100px;">
+                </div>
             </div>
 
             <div class="col-lg-3 col-md-6 col-sm-12">
-                <!-- change the image dynamically -->
-                <div class="mb-2"> 
-                    <img src="{% static 'images/brgy-sto-nino.png' %}" alt="Proof of Residency" class="img-fluid" style="max-height: 100px;">
+                <div class="form-floating mb-3">
+                    {{form.type_of_doc}}
+                    <label for="{{ form.type_of_doc.id_for_label }}">{{ form.type_of_doc.label }}</label>
                 </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
                 <div class="form-floating mb-3">
                     {{form.proof_img}}
                     <label for="{{ form.proof_img.id_for_label }}">{{ form.proof_img.label }}</label>
+                </div>
+                <!-- change the image dynamically -->
+                <div class="mb-2"> 
+                    <img src="{% static 'images/brgy-sto-nino.png' %}" alt="Proof of Residency" class="img-fluid" style="max-height: 100px;">
                 </div>
             </div>
 
         </div>
 
-        <h5>Residential Information</h5>
+        <hr>
+
+        <h5>Registration Information</h5>
         <div class="row">
 
             <div class="col-lg-3 col-md-6 col-sm-12">
                 <div class="form-floating mb-3">
-                    {{form.res_code}}
-                    <label for="{{ form.res_code.id_for_label }}">{{ form.res_code.label }}</label>
-                </div>
+                    {{form.acc_status}}
+                    <label for="{{ form.acc_status.id_for_label }}">{{ form.acc_status.label }}</label>
+                </div>   
             </div>
 
             <div class="col-lg-3 col-md-6 col-sm-12">
                 <div class="form-floating mb-3">
-                    {{form.res_status}}
-                    <label for="{{ form.res_status.id_for_label }}">{{ form.res_status.label }}</label>
-                </div>
+                    {{form.reg_method}}
+                    <label for="{{ form.reg_method.id_for_label }}">{{ form.reg_method.label }}</label>
+                </div>   
             </div>
 
             <div class="col-lg-3 col-md-6 col-sm-12">

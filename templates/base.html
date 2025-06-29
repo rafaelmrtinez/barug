@@ -14,9 +14,8 @@
     <link rel="stylesheet" href="{% static 'css/static_style.css' %}">
     <link rel="stylesheet" href="{% static 'css/header_pagetitle.css' %}">
     <link rel="stylesheet" href="{% static 'css/navbar.css' %}">
-    <link rel="stylesheet" href="{% static 'css/button.css' %}">
-    <link rel="stylesheet" href="{% static 'css/form.css' %}">
-    <link rel="stylesheet" href="{% static 'css/table.css' %}">
+
+    {% block css %}{% endblock %}
 
     <link rel="icon" type="image/x-icon" href="{% static 'images/brgy-sto-nino.png' %}">
     <title>{{ page_title }}</title>

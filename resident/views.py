@@ -8,7 +8,7 @@ user_role = 'Clerk'
 user_role_template = user_role.lower().replace(' ', '_')
 
 # Create your views here.
-def register_resident(request) :
+def register_resident(request):
     return render(request, "resident_profiling/register_resident.html", {
         'user_fullname' : user_fullname,
         'user_role' : user_role,
@@ -17,7 +17,7 @@ def register_resident(request) :
         'user_role_template' : user_role_template,
     })
 
-def personal_info(request) :
+def personal_info(request):
     form = ResidentProfileform()
 
     return render(request, "resident_profiling/personal_info.html", {
@@ -29,7 +29,7 @@ def personal_info(request) :
         'form' : form,
     })
 
-def socioeconomic_info(request) :
+def socioeconomic_info(request):
     form = ResidentProfileform()
 
     return render(request, "resident_profiling/socioeconomic_info.html", {
@@ -41,7 +41,7 @@ def socioeconomic_info(request) :
         'form' : form,
     })
 
-def supporting_documents(request) :
+def supporting_documents(request):
     form = ResidentProfileform()
 
     return render(request, "resident_profiling/supporting_documents.html", {
@@ -53,7 +53,16 @@ def supporting_documents(request) :
         'form' : form,
     })
 
-def resident_records(request) :
+def review_info(request):
+    return render(request, "resident_profiling/review_information.html", {
+        'user_fullname' : user_fullname,
+        'user_role' : user_role,
+        'page_path' : f'{user_role} / Resident Management / Register Resident / Supporting Documents',
+        'page_title' : 'Supporting Documents',
+        'user_role_template' : user_role_template,
+    })
+
+def resident_records(request):
     return render(request, 'resident_profiling/resident_records.html', {
         'user_fullname' : user_fullname,
         'user_role' : user_role,
@@ -62,7 +71,7 @@ def resident_records(request) :
         'user_role_template' : user_role_template,
     })
 
-def resident_record(request, res_id) :
+def resident_record(request, res_id):
     form = ResidentProfileform()
 
     for field in form.fields.values():

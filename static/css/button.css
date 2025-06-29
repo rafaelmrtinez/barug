@@ -30,3 +30,15 @@
     gap: 10px;
     justify-content: flex-end;
 }
+
+.fixed-bottom-end {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    width: 100%;
+    background: white; /* Optional: ensures it doesn’t overlap */
+    z-index: 999;
+    padding-right: 1rem;
+    padding-bottom: 0.5rem;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05); /* Optional subtle shadow */
+}

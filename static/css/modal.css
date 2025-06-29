@@ -1,0 +1,9 @@
+.modal-dialog {
+    margin-top: 100px;
+    padding-top: 80px;
+}
+
+.btn-close:focus {
+    outline: none;
+    box-shadow: none;
+}
