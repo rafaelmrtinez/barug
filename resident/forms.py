@@ -1,12 +1,6 @@
 from django import forms
 
-class ResidentProfileform(forms.Form) :
-    res_id = forms.IntegerField(
-        widget=forms.HiddenInput(attrs={
-            'id' : 'res_id',
-    }),
-        # required= False,
-    )
+class ResidentProfileform(forms.Form):
     res_code = forms.CharField(
         widget=forms.TextInput(attrs={
             'id' : 'res_code',
@@ -72,9 +66,9 @@ class ResidentProfileform(forms.Form) :
         widget=forms.TextInput(attrs={
             'id' : 'added_by',
             'class' : 'form-control',
-            'placeholder' : 'Addedd by'
+            'placeholder' : 'Addedd By'
     }),
-        label= 'Added by',
+        label= 'Added By',
         # required= False,
     )
     # PERSONAL INFORMATION
@@ -173,24 +167,6 @@ class ResidentProfileform(forms.Form) :
         label= 'Home Address',
         required= True
     )
-    email = forms.EmailField(
-        widget=forms.EmailInput(attrs={
-            'id' : 'email',
-            'class' : 'form-control',
-            'placeholder' : 'Email Address',
-    }),
-        label= 'Email Address',
-        required= True,
-    )
-    mob_num = forms.CharField(
-        widget=forms.TextInput(attrs={
-            'id' : 'mob_num',
-            'class' : 'form-control',
-            'placeholder' : 'Mobile Number',
-    }),
-        label= 'Mobile Number',
-        required= True,
-    )
     street = forms.CharField(
         widget=forms.TextInput(attrs={
             'id' : 'street',
@@ -200,10 +176,11 @@ class ResidentProfileform(forms.Form) :
         label= 'Street',
         required= True,
     )
-    purok_sitio = forms.CharField(widget=forms.TextInput(attrs={
-        'id' : 'purok_sitio',
-        'class' : 'form-control',
-        'placeholder' : 'Purok / Sition',
+    purok_sitio = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'purok_sitio',
+            'class' : 'form-control',
+            'placeholder' : 'Purok / Sitio',
     }),
         label= 'Purok / Sitio',
         required= True,
@@ -226,6 +203,24 @@ class ResidentProfileform(forms.Form) :
             'readonly' : 'readonly',
     }),
         label= 'City',
+        required= True,
+    )
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={
+            'id' : 'email',
+            'class' : 'form-control',
+            'placeholder' : 'Email Address',
+    }),
+        label= 'Email Address',
+        required= True,
+    )
+    mob_num = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'mob_num',
+            'class' : 'form-control',
+            'placeholder' : 'Mobile Number',
+    }),
+        label= 'Mobile Number',
         required= True,
     )
     # SOCIOECONOMIC INFORMATION
@@ -299,4 +294,181 @@ class ResidentProfileform(forms.Form) :
     }),
         label= 'Proof of Residency',
         required= False, #correct if wrong
+    )
+
+class HouseholdProfileForm(forms.Form):
+    household_num = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'hh_num',
+            'class' : 'form-control',
+            'placeholder' : 'Household Number',
+    }),
+        label= 'Household Number',
+        required= True,
+    )
+    home_address = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'home_address',
+            'class' : 'form-control',
+            'placeholder' : 'Home Address',
+    }),
+        label= 'Home Address',
+        required= True
+    )
+    house_num = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'house_num',
+            'class' : 'form-control',
+            'placeholder' : 'House Number',
+    }),
+        label= 'House Number',
+        required= True,
+    )
+    street = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'street',
+            'class' : 'form-control',
+            'placeholder' : 'Street',
+    }),
+        label= 'Street',
+        required= True,
+    )
+    purok_sitio = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'purok_sitio',
+            'class' : 'form-control',
+            'placeholder' : 'Purok / Sitio',
+    }),
+        label= 'Purok / Sitio',
+        required= True,
+    )
+    barangay = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'barangay',
+            'class' : 'form-control',
+            'placeholder' : 'Barangay',
+    }),
+        label= 'Barangay',
+        required= True,
+    )
+    city = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'city',
+            'class' : 'form-control',
+            'placeholder' : 'City',
+    }),
+        label= 'City',
+        required= True,
+    )
+    household_head = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'hh_head',
+            'class' : 'form-control',
+            'placeholder' : 'Household Head',
+    }),
+        label= 'Household Head',
+        required= True,
+    )
+    house_type = forms.ChoiceField(
+        choices= [],
+        widget=forms.Select(attrs={
+            'id' : 'house_type',
+            'class' : 'form-select',
+    }),
+        label= 'House Type',
+        required= True,
+    )
+    house_ownership = forms.ChoiceField(
+        choices= [],
+        widget=forms.Select(attrs={
+            'id' : 'house_ownership',
+            'class' : 'form-select',
+    }),
+        label= 'House Ownership',
+        required= True,
+    )
+    date_created = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'type' : 'date',
+            'id' : 'date_created',
+            'class' : 'form-control',
+            'placeholder' : 'Date Created',
+    }),
+        label= 'Date Created',
+        # required= True,
+    )
+    added_by = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'added_by',
+            'class' : 'form-control',
+            'placeholder' : 'Added By',
+    }),
+        label= 'Added By',
+        # required= True,
+    )
+
+class FamilyProfileForm(forms.Form):
+    family_num = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'family_num',
+            'class' : 'form-control',
+            'placeholder' : 'Family Number',
+    }),
+        label= 'Family Number',
+        required= True,
+    )
+    nhts_status = forms.ChoiceField(
+        choices= [],
+        widget=forms.RadioSelect(attrs={
+            'id' : 'nhts_status',
+            'class' : 'form-check-input',
+    }),
+        label= 'NHST Status',
+        required= True,
+    )
+    indigent_status = forms.ChoiceField(
+        choices= [],
+        widget=forms.RadioSelect(attrs={
+            'id' : 'indigent_status',
+            'class' : 'form-check-input',
+    }),
+        label= 'Indigent Status',
+        required= True,
+    )
+    income_source = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'income_source',
+            'class' : 'form-control',
+            'placeholder' : 'Source of Income',
+    }),
+        label= 'Source of Income',
+        required= True,
+    )
+    monthly_income = forms.CharField(
+        widget=forms.Textarea(attrs={
+            'id' : 'monthly_income',
+            'class' : 'form-control',
+            'placeholder' : 'Family Monthly Income'
+    }),
+        label= 'Family Monthly Income',
+        required= True,
+    )
+    date_created = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'type' : 'date',
+            'id' : 'date_created',
+            'class' : 'form-control',
+            'placeholder' : 'Date Created',
+    }),
+        label= 'Date Created',
+        # required= True,
+    )
+    added_by = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'added_by',
+            'class' : 'form-control',
+            'placeholder' : 'Added By',
+    }),
+        label= 'Added By',
+        # required= True,
     )
