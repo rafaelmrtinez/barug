@@ -26,7 +26,7 @@
         </div>
     </div>
 
-    <form method="post" class="d-flex flex-column flex-grow-1">
+    <form method="post" class="d-flex flex-column flex-grow-1" style="min-height: 0;">
         {% csrf_token %}
 
         <h5>Socioeconomic Information</h5>
@@ -72,8 +72,8 @@
             </div>
 
         </div>
-        
-        <div class="mt-auto button-container justify-content-end mb-2">
+
+        <div class="mt-auto button-container">
             <button class="btn btn-reset">Clear</button>
             <a class="btn btn-submit" href="{% url 'resident:supporting_documents' %}">Continue</a>
         </div>

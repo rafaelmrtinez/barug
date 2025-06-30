@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block css %}
+    <link rel="stylesheet" href="{% static 'css/form.css' %}">
+    <link rel="stylesheet" href="{% static 'css/button.css' %}">
+    <link rel="stylesheet" href="{% static 'css/progress_bar.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3 d-flex flex-column flex-grow-1" style="margin-top: 40px;">
+
+    <div class="step-progress mb-2">
+        <div class="step completed">
+            <div class="circle">1</div>
+            <div class="label">Household Information</div>
+        </div>
+        <div class="step active">
+            <div class="circle">2</div>
+            <div class="label">Family Information</div>
+        </div>
+        <div class="step">
+            <div class="circle">3</div>
+            <div class="label">Household Members</div>
+        </div>
+    </div>
+
+    <form method="post" class="d-flex flex-column flex-grow-1">
+        {% csrf_token %}
+
+        <h5>Household Information</h5>
+        <div class="row">
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.family_num}}
+                    <label for="{{ form.family_num.id_for_label }}">{{ form.family_num.label }}</label>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="mb-3">
+                    <p class="form-label d-block">{{ form.nhts_status.label }}</p>
+                    {% for radio in form.nhts_status %}
+                    <div class="form-check form-check-inline">
+                        {{ radio.tag }}
+                        <label for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="mb-3">
+                    <p class="form-label d-block">{{ form.indigent_status.label }}</p>
+                    {% for radio in form.indigent_status %}
+                    <div class="form-check form-check-inline">
+                        {{ radio.tag }}
+                        <label for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.income_source}}
+                    <label for="{{ form.income_source.id_for_label }}">{{ form.income_source.label }}</label>
+                </div>   
+            </div>
+
+        </div>
+
+        <div class="row">
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.monthly_income}}
+                    <label for="{{ form.monthly_income.id_for_label }}">{{ form.monthly_income.label }}</label>
+                </div>
+            </div>
+
+        </div>
+        
+        <div class="mt-auto button-container">
+            <button class="btn btn-reset">Clear</button>
+            <a class="btn btn-submit" href="{% url 'resident:supporting_documents' %}">Continue</a>
+        </div>
+
+    </form>
+
+</div>
+{% endblock %}

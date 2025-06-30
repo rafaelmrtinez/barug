@@ -311,6 +311,8 @@ class HouseholdProfileForm(forms.Form):
             'id' : 'home_address',
             'class' : 'form-control',
             'placeholder' : 'Home Address',
+            'data-bs-toggle' : 'modal',
+            'data-bs-target' : '#address_modal',
     }),
         label= 'Home Address',
         required= True
