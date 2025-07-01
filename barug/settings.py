@@ -135,3 +135,8 @@ STATICFILES_DIRS = [
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+SUPABASE_URL = "https://ywexlcwuvnxliiwmsues.supabase.co"
+SUPABASE_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3ZXhsY3d1dm54bGlpd21zdWVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2MDI1MTAsImV4cCI6MjA2NjE3ODUxMH0.osH-QElg1Qf5MUUfu7IycAcCAUz-Tjilp6y74e0XW6k"
+SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3ZXhsY3d1dm54bGlpd21zdWVzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MDYwMjUxMCwiZXhwIjoyMDY2MTc4NTEwfQ.nMa3v4hgX4b3R7ifaZHLNcGk3W6D9pSNxRny9XHYQrU"
