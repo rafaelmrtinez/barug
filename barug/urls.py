@@ -23,5 +23,6 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("", auth_view.login, name="login"),
     path("authentication/", include("authentication.urls", namespace="authentication")),
+    path("event_logs/", include("event_logs.urls", namespace="event_logs")),
     path("resident/", include("resident.urls", namespace="resident")),
 ]

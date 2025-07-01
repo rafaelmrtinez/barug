@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "django_bootstrap5",
     "django_bootstrap_icons",
     "authentication",
+    "event_logs",
     "resident",
 ]
 
@@ -62,6 +63,7 @@ TEMPLATES = [
         "DIRS": [
             BASE_DIR / "templates",
             BASE_DIR / "authentication/templates/authentication",
+            BASE_DIR / "event_logs/templates/event_logs",
             BASE_DIR / "resident/templates/resident",
         ],
         "APP_DIRS": True,
@@ -128,6 +130,7 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
     os.path.join(BASE_DIR, "authentication/static/authentication"),
+    os.path.join(BASE_DIR, "event_logs/static/event_logs"),
     os.path.join(BASE_DIR, "resident/static/resident"),
 ]
 

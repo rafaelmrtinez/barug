@@ -1,13 +1,13 @@
 from django import forms
 
-class LoginForm(forms.Form) :
-    username = forms.CharField(
+class LoginForm(forms.Form):
+    email_username = forms.CharField(
         widget=forms.TextInput(attrs={
             'id' : 'username',
             'class' : 'form-control', 
-            'placeholder' : 'Username',
+            'placeholder' : 'Email or Username',
     }),
-        label= 'Username',
+        label= 'Email or Username',
         required= True,
     )
     password = forms.CharField(
@@ -22,7 +22,7 @@ class LoginForm(forms.Form) :
     
 # ---------------------------------------------------------------------------------------------------------
 
-class ForgotPasswordForm(forms.Form) :
+class ForgotPasswordForm(forms.Form):
     email = forms.EmailField(
         widget=forms.EmailInput(attrs={
             'id' : 'email',
@@ -35,7 +35,7 @@ class ForgotPasswordForm(forms.Form) :
 
 # ---------------------------------------------------------------------------------------------------------
 
-class NewPasswordForm(forms.Form) :
+class NewPasswordForm(forms.Form):
     new_pass = forms.CharField(
         widget=forms.PasswordInput(attrs={
             'id' : 'new_password',
