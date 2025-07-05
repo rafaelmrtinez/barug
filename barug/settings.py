@@ -38,8 +38,16 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    
+    #bootstrap
     "django_bootstrap5",
     "django_bootstrap_icons",
+
+    # Third-party apps
+    'rest_framework',           # Django REST Framework
+    # 'corsheaders',              # CORS for API access (mobile/web)
+
+    # Project Apps
     "authentication",
     "event_logs",
     "resident",
@@ -82,6 +90,10 @@ WSGI_APPLICATION = "barug.wsgi.application"
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 DATABASES = {
     "default": {
@@ -138,8 +150,3 @@ STATICFILES_DIRS = [
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
-
-SUPABASE_URL = "https://ywexlcwuvnxliiwmsues.supabase.co"
-SUPABASE_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3ZXhsY3d1dm54bGlpd21zdWVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2MDI1MTAsImV4cCI6MjA2NjE3ODUxMH0.osH-QElg1Qf5MUUfu7IycAcCAUz-Tjilp6y74e0XW6k"
-SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3ZXhsY3d1dm54bGlpd21zdWVzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MDYwMjUxMCwiZXhwIjoyMDY2MTc4NTEwfQ.nMa3v4hgX4b3R7ifaZHLNcGk3W6D9pSNxRny9XHYQrU"
