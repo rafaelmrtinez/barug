@@ -2,9 +2,12 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
-from .serializers import ResidentSerializer
-from .models import Resident
 from supabase_client import supabase
+    
+# Add here
+from .serializers import ResidentSerializer
+
+
 
 class ResidentRegisterAPIView(APIView):
     def post(self, request):
