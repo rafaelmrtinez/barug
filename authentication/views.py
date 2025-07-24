@@ -3,6 +3,7 @@ from .forms import LoginForm
 from .forms import ForgotPasswordForm
 from .forms import NewPasswordForm
 
+# TESTING PHASE
 #need back-end for proper assignment
 user_fullname = 'lname, fname mname suffix'
 user_role = 'Clerk'
@@ -22,8 +23,7 @@ def forgot_password(request):
 
     return render(request, "forgot_password.html", {
         'form': form,
-        'message': message,
-        'error': error,
+
     })
 
 def new_password(request):

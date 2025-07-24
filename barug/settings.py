@@ -13,6 +13,29 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 
+# DATA FROM .env
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+# SEND GRID SMTP
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+SENDGRID_FROM_EMAIL = 'raphaelbellosillo1230@gmail.com' # Your verified sender email
+SENDGRID_FROM_NAME = 'BaRUG'  # Name displayed in inbox
+
+# GMAIL SMTP
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = "raphaelbellosillo1230@gmail.com"
+EMAIL_HOST_PASSWORD = "sfpa gadp dpnj licq"
+
+
+# LOCALHOST URL USED
+TESTING_URL_USED = 'http://192.168.1.2:8000'
+
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -26,8 +49,7 @@ SECRET_KEY = "django-insecure-_&rs=&x9thq+*#q_(013+n5gv68^@0^c7_h6q^t%m&=1s1vsck
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ['192.168.1.2']
 
 # Application definition
 
@@ -45,7 +67,7 @@ INSTALLED_APPS = [
 
     # Third-party apps
     'rest_framework',           # Django REST Framework
-    # 'corsheaders',              # CORS for API access (mobile/web)
+    # 'corsheaders',             # CORS for API access (mobile/web)
 
     # Project Apps
     "authentication",
@@ -62,6 +84,11 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [],
+}
+
 
 ROOT_URLCONF = "barug.urls"
 
@@ -90,10 +117,6 @@ WSGI_APPLICATION = "barug.wsgi.application"
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 DATABASES = {
     "default": {

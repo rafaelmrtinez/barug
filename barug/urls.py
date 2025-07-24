@@ -31,4 +31,6 @@ urlpatterns = [
 
     # API v1
     path('api/v1/residents/', include('resident.api_urls')),
+
+    path('api/auth/', include('authentication.api_urls')),
 ]
