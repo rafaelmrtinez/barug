@@ -14,6 +14,8 @@ class ResidentRegisterAPIView(APIView):
     """
     Resident Registration API (Online)
     """
+    permission_classes = [AllowAny]
+
     def post(self, request):
         try:
             data = request.data
@@ -22,29 +24,24 @@ class ResidentRegisterAPIView(APIView):
             password = data.get('password')
 
             if not email or not password:
-                return Response(
-                    {"error": "Email and password are required."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({"error": "Email and password are required."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # ✅ Upload file to Supabase Storage (if provided)
+            # ✅ Upload ID photo (optional)
             file_url = None
             id_photo = request.FILES.get('id_photo')
             if id_photo:
                 file_path = f"residents/{email}/{id_photo.name}"
                 supabase.storage.from_("residents-photos").upload(file_path, id_photo)
-                file_url = (
-                    f"{settings.SUPABASE_URL}/storage/v1/object/public/residents-photos/{file_path}"
-                )
+                file_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/residents-photos/{file_path}"
 
-            # ✅ Step 1: Call Supabase stored procedure (DB registration first)
+            # ✅ Step 1: Call stored procedure (initial DB registration)
             rpc_payload = {
-                "p_added_by_id": None,  # Staff ID if applicable
+                "p_added_by_id": None,
                 "p_barangay": data.get('barangay'),
                 "p_birthdate": data.get('date_of_birth'),
                 "p_city": data.get('city'),
                 "p_civil_status_id": data.get('civil_status_id'),
-                "p_credential_id": None,  # Auth not yet created
+                "p_credential_id": None,
                 "p_doc_file_path": None,
                 "p_doc_type_id": data.get('id_type_id'),
                 "p_education_id": data.get('education_level_id'),
@@ -60,76 +57,62 @@ class ResidentRegisterAPIView(APIView):
                 "p_mobile_num": data.get('mobile_number'),
                 "p_nationality_id": data.get('nationality_id'),
                 "p_occupation_id": data.get('occupation_id'),
-                "p_password": password,  # Raw password (hashed in DB)
+                "p_password": password,
                 "p_person_img": file_url,
                 "p_religion_id": data.get('religion_id'),
                 "p_sex_id": data.get('sex_id'),
                 "p_sitio_purok": data.get('purok'),
                 "p_street": data.get('street'),
                 "p_suffix": data.get('suffix'),
-                "p_username": "temporary",  # Placeholder username
+                "p_username": "temporary",
                 "p_verification_status_id": None,
                 "p_verified_by_id": None,
             }
-            
+
             rpc_response = supabase.rpc("register_resident_with_verification", rpc_payload).execute()
-
             if not rpc_response.data:
-                return Response(
-                    {"error": "This email address is already in use by a registered person."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({"error": "This email is already registered."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # ✅ Stored procedure returned person_code as plain string
-            resident_code = rpc_response.data  # e.g., "P08-N004"
+            resident_code = rpc_response.data
 
-            # ✅ Fetch person_id using resident_code
+            # ✅ Step 2: Get person_id
             person_query = supabase.from_("person").select("person_id").eq("person_code", resident_code).single().execute()
-
             if not person_query.data:
-                return Response(
-                    {"error": "Could not find resident in database."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({"error": "Resident created but not found."}, status=status.HTTP_400_BAD_REQUEST)
 
             person_id = person_query.data["person_id"]
 
-            # ✅ Step 2: Supabase Auth Sign Up (after DB success)
-            auth_response = supabase.auth.sign_up({
-                "email": email,
-                "password": password
-            })
+            # ✅ Step 3: Auth sign-up
+            try:
+                auth_response = supabase.auth.sign_up({"email": email, "password": password})
+                auth_user_id = auth_response.user.id
+            except Exception as auth_error:
+                # ⚠ Rollback DB insert if Auth signup fails
+                supabase.from_("person").delete().eq("person_id", person_id).execute()
+                return Response({"error": "Failed to create user in Supabase Auth. DB rollback completed."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            auth_user_id = auth_response.user.id  # Supabase UUID
-
-            # ✅ Step 3: Update person_credential with real values
+            # ✅ Step 4: Update person_credential
             update_response = supabase.table("person_credential").update({
                 "credential_id": auth_user_id,
-                "username": email,  # Set username as email
+                "username": email
             }).eq("person_id", person_id).execute()
 
             if update_response.data is None:
-                return Response(
-                    {"error": "Failed to update person credential record."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                # ⚠ Rollback both: delete DB person + Auth user
+                supabase.from_("person").delete().eq("person_id", person_id).execute()
+                supabase.auth.admin.delete_user(auth_user_id)  # Requires service role
+                return Response({"error": "Failed to finalize resident credential. Rollback performed."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            # ✅ Success
-            return Response(
-                {
-                    "message": "Resident registered successfully.",
-                    "resident_code": resident_code,
-                    "id_photo_url": file_url,
-                },
-                status=status.HTTP_201_CREATED,
-            )
+            # ✅ All steps successful
+            return Response({
+                "message": "Resident registered successfully.",
+                "resident_code": resident_code,
+                "id_photo_url": file_url
+            }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
             print("Registration error:", e)
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ResidentProfileAPIView(APIView):
