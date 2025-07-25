@@ -14,6 +14,7 @@ from django.http import JsonResponse
 # For Google SMTP
 from django.core.mail import send_mail, BadHeaderError
 
+from authentication.utils.email_helpers import send_signup_confirmation_link
 
 # SendGrid API, Verified sender Email, Name displayed in inbox
 SENDGRID_API_KEY = settings.SENDGRID_API_KEY
@@ -247,84 +248,103 @@ class EmailConfirmedAPIView(APIView):
 
 class ResendVerificationEmailAPIView(APIView):
     """
-    Resend the email verification for a user
-    by generating a new confirmation link and sending it via Gmail SMTP.
+    Resend the email verification for a user using shared logic.
     """
     def post(self, request):
-        try:
-            # ✅ Step 1: Parse request
-            email = request.data.get("email")
-            if not email:
-                return Response(
-                    {"error": "Email is required."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            # [DEBUG] print(f"📥 Parsed email: {email}")
-
-            # ✅ Step 2: Generate confirmation link from Supabase
-            generate_link_url = f"{SUPABASE_URL}/auth/v1/admin/generate_link"
-            headers = {
-                "apikey": SUPABASE_SERVICE_ROLE_KEY,
-                "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}"
-            }
-            payload = {
-                "type": "signup",
-                "email": email
-            }
-            generate_resp = requests.post(generate_link_url, headers=headers, json=payload)
-            # [DEBUG] print("Supabase generate_link response status:", generate_resp.status_code)
-
-            if generate_resp.status_code not in [200, 201]:
-                return Response(
-                    {"error": "Failed to generate confirmation link."},
-                    status=generate_resp.status_code
-                )
-
-            result = generate_resp.json()
-            action_link = result.get("action_link", "").replace("\\u0026", "&")
-            # [DEBUG] print(f"🔗 Fixed Action Link: {action_link}")
-
-            if not action_link:
-                return Response(
-                    {"error": "No confirmation link was generated."},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-
-            # ✅ Step 3: Send email via Django's send_mail (Gmail SMTP)
-            subject = "Confirm Your BaRUG Account"
-            message = ""
-            html_message = f"""
-                <h1>Confirm Your Account</h1>
-                <p>Hello,</p>
-                <p>Click the button below to confirm your email address and activate your BaRUG account:</p>
-                <p><a href="{action_link}" style="padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Confirm Email</a></p>
-                <p>If you didn’t request this, you can safely ignore it.</p>
-            """
-
-            send_mail(
-                subject,
-                message,  # Plain text fallback (empty here)
-                'raphaelbellosillo1230@gmail.com',  # From email (your Gmail)
-                [email],  # To email
-                fail_silently=False,
-                html_message=html_message
-            )
-            # [DEBUG] print("✅ Email sent via Gmail SMTP.")
-
+        email = request.data.get("email")
+        if not email:
             return Response(
-                {
-                    "message": "Verification email sent successfully.",
-                    "action_link": action_link  # For debugging
-                },
-                status=status.HTTP_200_OK
+                {"error": "Email is required."},
+                status=status.HTTP_400_BAD_REQUEST
             )
 
-        except Exception as e:
-            # [DEBUG] print("❌ Resend verification error:", str(e))
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        success = send_signup_confirmation_link(email)
+        if success:
+            return Response({"message": "Verification email sent successfully."}, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "Failed to send verification email."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        
+# class ResendVerificationEmailAPIView(APIView):
+#     """
+#     Resend the email verification for a user
+#     by generating a new confirmation link and sending it via Gmail SMTP.
+#     """
+#     def post(self, request):
+#         try:
+#             # ✅ Step 1: Parse request
+#             email = request.data.get("email")
+#             if not email:
+#                 return Response(
+#                     {"error": "Email is required."},
+#                     status=status.HTTP_400_BAD_REQUEST
+#                 )
+#             # [DEBUG] print(f"📥 Parsed email: {email}")
+
+#             # ✅ Step 2: Generate confirmation link from Supabase
+#             generate_link_url = f"{SUPABASE_URL}/auth/v1/admin/generate_link"
+#             headers = {
+#                 "apikey": SUPABASE_SERVICE_ROLE_KEY,
+#                 "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}"
+#             }
+#             payload = {
+#                 "type": "signup",
+#                 "email": email
+#             }
+#             generate_resp = requests.post(generate_link_url, headers=headers, json=payload)
+#             # [DEBUG] print("Supabase generate_link response status:", generate_resp.status_code)
+
+#             if generate_resp.status_code not in [200, 201]:
+#                 return Response(
+#                     {"error": "Failed to generate confirmation link."},
+#                     status=generate_resp.status_code
+#                 )
+
+#             result = generate_resp.json()
+#             action_link = result.get("action_link", "").replace("\\u0026", "&")
+#             # [DEBUG] print(f"🔗 Fixed Action Link: {action_link}")
+
+#             if not action_link:
+#                 return Response(
+#                     {"error": "No confirmation link was generated."},
+#                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#                 )
+
+#             # ✅ Step 3: Send email via Django's send_mail (Gmail SMTP)
+#             subject = "Confirm Your BaRUG Account"
+#             message = ""
+#             html_message = f"""
+#                 <h1>Confirm Your Account</h1>
+#                 <p>Hello,</p>
+#                 <p>Click the button below to confirm your email address and activate your BaRUG account:</p>
+#                 <p><a href="{action_link}" style="padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Confirm Email</a></p>
+#                 <p>If you didn’t request this, you can safely ignore it.</p>
+#             """
+
+#             send_mail(
+#                 subject,
+#                 message,  # Plain text fallback (empty here)
+#                 'EMAIL_HOST_USER',  # From email (your Gmail)
+#                 [email],  # To email
+#                 fail_silently=False,
+#                 html_message=html_message
+#             )
+#             # [DEBUG] print("✅ Email sent via Gmail SMTP.")
+
+#             return Response(
+#                 {
+#                     "message": "Verification email sent successfully.",
+#                     "action_link": action_link  # For debugging
+#                 },
+#                 status=status.HTTP_200_OK
+#             )
+
+#         except Exception as e:
+#             # [DEBUG] print("❌ Resend verification error:", str(e))
+#             return Response(
+#                 {"error": str(e)},
+#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#             )
 
 
 class ForgotPasswordAPIView(APIView):
