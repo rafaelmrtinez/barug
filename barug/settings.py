@@ -34,6 +34,7 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = "raphaelbellosillo1230@gmail.com"
 EMAIL_HOST_PASSWORD = "sfpa gadp dpnj licq"
 
+API_VERSION = "v1"  # API version for event logs
 
 # LOCALHOST URL USED
 TESTING_URL_USED = 'http://192.168.1.2:8000'
@@ -65,6 +66,7 @@ ALLOWED_HOSTS = ['192.168.1.2', "*"]
 # Application definition
 
 INSTALLED_APPS = [
+    "metrics.apps.MetricsConfig",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",

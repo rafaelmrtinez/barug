@@ -18,6 +18,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from authentication import views as auth_view
+from django.conf import settings
 
 urlpatterns = [
     # Admin
@@ -33,4 +34,5 @@ urlpatterns = [
     path('api/v1/residents/', include('resident.api_urls')),
 
     path('api/auth/', include('authentication.api_urls')),
+    path(f'api/{settings.API_VERSION}/', include('metrics.urls', namespace='metrics')),
 ]
