@@ -51,7 +51,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-_&rs=&x9thq+*#q_(013+n5gv68^@0^c7_h6q^t%m&=1s1vsck"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# PLEASE DO NOT REMOVE OR MODIFY!!!!
+# PLEASE DO NOT REMOVE OR MODIFY UNLESS REQUIRED!!!!
+# THIS IS USED BY THE WEB APP TO DETERMINE DEPLOYMENT AND DEVELOPMENT ENVIRONMENTS
 isProduction = os.getenv("PRODUCTION")
 print("isProduction: ", isProduction)
 if isProduction != None and isProduction == "True":
@@ -183,6 +184,10 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "resident/static/resident"),
 ]
 
+# By practice the API should not server static files in production.
+# Instead, a web server like Nginx or Apache should be used to serve static files
+# However, exceptions can be made especially when deploying on platforms that do not support custom web servers.
+# THIS LINE SHOULD NOT BE REMOVED UNLESS YOU KNOW WHAT YOU ARE DOING
 if not DEBUG:
     STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'

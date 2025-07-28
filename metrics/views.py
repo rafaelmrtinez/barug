@@ -9,15 +9,11 @@ class HealthCheckView(APIView):
     """
     DO NOT REMOVE THIS VIEW.
     
-    This view is used to ensure that the api is up and running.
-    It is not intended to be used for any other purpose.
-    It is a placeholder for future metrics-related functionality.
+    This view is used to check the responsiveness of this web API. This does not gaurantee that 
+    the API is functioning correctly, however, it only provides insights of wether the API
+    is up and running or not.
     
-    If further test are needed to fully verify the API's functionality please add them to the test suite.
-    
-    PLEASE AVOID EXPOSING SENSITIVE INFORMATION ABOUT THE API'S INTERNALS.
-    
-    DO NOT REMOVE THIS VIEW.
+    NOTE: PLEASE AVOID EXPOSING SENSITIVE INFORMATION ABOUT THE API'S INTERNALS THROUGH METRICS.
     
     By: raffa
     """ 
