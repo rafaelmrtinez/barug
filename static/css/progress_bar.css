@@ -1,0 +1,89 @@
+.step-progress {
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+  counter-reset: step;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  flex: 1;
+  color: #cfd8dc;
+}
+
+.step .circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #cfd8dc;
+  background-color: white;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.step.completed .circle {
+  background-color: var(--bs-danger-text-emphasis); 
+  border-color: var(--bs-danger-text-emphasis);
+  color: white;
+}
+
+.step.active .circle {
+  border-color: var(--bs-danger-text-emphasis);
+  color: var(--bs-danger-text-emphasis);
+}
+
+.step .label {
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.step.completed .label,
+.step.active .label {
+  color: var(--bs-danger-text-emphasis);
+}
+
+/* Progress bar */
+/* Progress background line (gray full line) */
+.step-progress::before {
+  content: '';
+  position: absolute;
+  top: 13px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: #cfd8dc;
+  z-index: 1;
+}
+
+/* Red progress line for completed steps (full width) */
+.step.completed::after {
+  content: '';
+  position: absolute;
+  top: 13px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: var(--bs-danger-text-emphasis);
+  z-index: 1;
+}
+
+/* Red progress line before active step (only half width) */
+.step.active::after {
+  content: '';
+  position: absolute;
+  top: 13px;
+  left: 0;
+  width: 50%;
+  height: 2px;
+  background-color: var(--bs-danger-text-emphasis);
+  z-index: 1;
+}

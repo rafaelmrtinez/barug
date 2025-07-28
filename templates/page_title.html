@@ -1,0 +1,24 @@
+{% load bootstrap_icons %}
+
+<div class="page-title align-items-center ps-3 pe-3 pt-2" style="border-bottom: 2px solid;">
+    
+    <div class="row">
+        <div class="col-auto px-0">
+            <a href="javascript:history.back()" class="btn btn-sm d-flex align-items-center px-0">
+                {% bs_icon 'arrow-left-circle' color='black' size='2em' %}
+            </a>
+        </div>
+
+        <div  class="col d-flex flex-column">
+            <div class="d-flex gap-2">
+                {% bs_icon 'folder2-open' color='black' size='1em' %}
+                <small class="mb-0">{{ page_path }}</small>
+            </div>
+            <div class="gap-2 pt-0">
+                {% bs_icon 'arrow-return-right' color='black' size='1em' %}
+                <large class="mb-0" style="font-weight: 500;">{{ page_title }}</large>
+            </div>
+        </div>
+    </div>
+
+</div>

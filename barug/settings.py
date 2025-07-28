@@ -11,6 +11,34 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# DATA FROM .env
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+# SEND GRID SMTP
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+SENDGRID_FROM_EMAIL = 'raphaelbellosillo1230@gmail.com' # Your verified sender email
+SENDGRID_FROM_NAME = 'BaRUG'  # Name displayed in inbox
+
+# GMAIL SMTP
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = "raphaelbellosillo1230@gmail.com"
+EMAIL_HOST_PASSWORD = "sfpa gadp dpnj licq"
+
+API_VERSION = "v1"  # API version for event logs
+
+# LOCALHOST URL USED
+TESTING_URL_USED = 'http://192.168.1.2:8000'
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,24 +51,47 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-_&rs=&x9thq+*#q_(013+n5gv68^@0^c7_h6q^t%m&=1s1vsck"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# PLEASE DO NOT REMOVE OR MODIFY UNLESS REQUIRED!!!!
+# THIS IS USED BY THE WEB APP TO DETERMINE DEPLOYMENT AND DEVELOPMENT ENVIRONMENTS
+isProduction = os.getenv("PRODUCTION")
+print("isProduction: ", isProduction)
+if isProduction != None and isProduction == "True":
+    print("Production mode enabled")
+    DEBUG = False
+else:
+    print("Development mode enabled")
+    DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ['192.168.1.2', "*"]
 
 # Application definition
 
 INSTALLED_APPS = [
+    "metrics.apps.MetricsConfig",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    
+    #bootstrap
+    "django_bootstrap5",
+    "django_bootstrap_icons",
+
+    # Third-party apps
+    'rest_framework',           # Django REST Framework
+    # 'corsheaders',             # CORS for API access (mobile/web)
+
+    # Project Apps
+    "authentication",
+    "event_logs",
+    "resident",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -49,12 +100,22 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [],
+}
+
+
 ROOT_URLCONF = "barug.urls"
 
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [
+            BASE_DIR / "templates",
+            BASE_DIR / "authentication/templates/authentication",
+            BASE_DIR / "event_logs/templates/event_logs",
+            BASE_DIR / "resident/templates/resident",
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -115,6 +176,21 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
+
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, "static"),
+    os.path.join(BASE_DIR, "authentication/static/authentication"),
+    os.path.join(BASE_DIR, "event_logs/static/event_logs"),
+    os.path.join(BASE_DIR, "resident/static/resident"),
+]
+
+# By practice the API should not server static files in production.
+# Instead, a web server like Nginx or Apache should be used to serve static files
+# However, exceptions can be made especially when deploying on platforms that do not support custom web servers.
+# THIS LINE SHOULD NOT BE REMOVED UNLESS YOU KNOW WHAT YOU ARE DOING
+if not DEBUG:
+    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

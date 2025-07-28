@@ -1,0 +1,212 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block css %}
+    <link rel="stylesheet" href="{% static 'css/form.css' %}">
+    <link rel="stylesheet" href="{% static 'css/button.css' %}">
+    <link rel="stylesheet" href="{% static 'css/modal.css' %}">
+    <link rel="stylesheet" href="{% static 'css/progress_bar.css' %}">
+    <link rel="stylesheet" href="{% static 'css/map_registration.css' %}">
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"/>
+
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+    <script src="{% static 'js/map_registration.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3 d-flex flex-column flex-grow-1" style="margin-top: 40px;">
+
+    <div class="step-progress mb-2">
+        <div class="step active">
+            <div class="circle">1</div>
+            <div class="label">Personal Information</div>
+        </div>
+        <div class="step">
+            <div class="circle">2</div>
+            <div class="label">Socioeconomic Information</div>
+        </div>
+        <div class="step">
+            <div class="circle">3</div>
+            <div class="label">Supporting Documents</div>
+        </div>
+    </div>
+
+
+    <form method="post" class="d-flex flex-column flex-grow-1">
+        {% csrf_token %}
+
+        <h5>Personal Information</h5>
+        <div class="row">
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.last_name}}
+                    <label for="{{ form.last_name.id_for_label }}">{{ form.last_name.label }}</label>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.first_name}}
+                    <label for="{{ form.first_name.id_for_label }}">{{ form.first_name.label }}</label>
+                </div>   
+            </div>
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.middle_name}}
+                    <label for="{{ form.middle_name.id_for_label }}">{{ form.middle_name.label }}</label>
+                </div>   
+            </div>
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.suffix}}
+                    <label for="{{ form.suffix.id_for_label }}">{{ form.suffix.label }}</label>
+                </div>   
+            </div>
+
+        </div>
+
+        <div class="row">
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="mb-3">
+                    <p class="form-label d-block">{{ form.sex.label }}</p>
+                    {% for radio in form.sex %}
+                    <div class="form-check form-check-inline">
+                        {{ radio.tag }}
+                        <label for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.dob}}
+                    <label for="{{ form.dob.id_for_label }}">{{ form.dob.label }}</label>
+                </div>   
+            </div>
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.civil_status}}
+                    <label for="{{ form.civil_status.id_for_label }}">{{ form.civil_status.label }}</label>
+                </div>   
+            </div>
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.nationality}}
+                    <label for="{{ form.nationality.id_for_label }}">{{ form.nationality.label }}</label>
+                </div>   
+            </div>
+
+        </div>
+
+        <div class="row">
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.religion}}
+                    <label for="{{ form.religion.id_for_label }}">{{ form.religion.label }}</label>
+                </div>  
+            </div>
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.home_address}}
+                    <label for="{{ form.home_address.id_for_label }}">{{ form.home_address.label }}</label>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.email}}
+                    <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+                </div>   
+            </div>
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.mob_num}}
+                    <label for="{{ form.mob_num.id_for_label }}">{{ form.mob_num.label }}</label>
+                </div>   
+            </div>
+
+        </div>
+
+        <div class="modal fade" id="address_modal" tabindex="-1" aria-labelledby="home_address" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="home_address">Home Address</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col">
+                                <div class="map-container">
+                                    <div id="map"></div>
+                                    <div class="control">
+                                        <select id="style-selector">
+                                            <option value="mapbox/streets-v11">Streets</option>
+                                            <option value="mapbox/satellite-streets-v11">Satellite Streets</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col">
+                                <div class="col-lg-12 col-md-12 col-sm-12">
+                                    <div class="form-floating mb-3">
+                                        {{form.street}}
+                                        <label for="{{ form.street.id_for_label }}">{{ form.street.label }}</label>
+                                    </div>  
+                                </div>
+
+                                <div class="col-lg-12 col-md-12 col-sm-12">
+                                    <div class="form-floating mb-3">
+                                        {{form.purok_sitio}}
+                                        <label for="{{ form.purok_sitio.id_for_label }}">{{ form.purok_sitio.label }}</label>
+                                    </div>   
+                                </div>
+
+                                <div class="col-lg-12 col-md-12 col-sm-12">
+                                    <div class="form-floating mb-3">
+                                        {{form.barangay}}
+                                        <label for="{{ form.barangay.id_for_label }}">{{ form.barangay.label }}</label>
+                                    </div>   
+                                </div>
+
+                                <div class="col-lg-12 col-md-12 col-sm-12">
+                                    <div class="form-floating mb-3">
+                                        {{form.city}}
+                                        <label for="{{ form.city.id_for_label }}">{{ form.city.label }}</label>
+                                    </div>   
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button class="btn btn-reset">Clear</button>
+                        <button type="button" class="btn btn-submit" onclick="fill_home_address()" data-bs-dismiss="modal">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-auto button-container">
+            <button class="btn btn-reset">Clear</button>
+            <a class="btn btn-submit" href="{% url 'resident:socioeconomic_info' %}">Continue</a>
+        </div>
+
+    </form>
+
+
+</div>
+{% endblock %}

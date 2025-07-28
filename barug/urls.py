@@ -16,8 +16,23 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from authentication import views as auth_view
+from django.conf import settings
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    # Admin
+    path('admin/', admin.site.urls),
+
+    # Web URLs (HTML)
+    path("", auth_view.login, name="login"),
+    path("authentication/", include("authentication.urls", namespace="authentication")),
+    path("event_logs/", include("event_logs.urls", namespace="event_logs")),
+    path("resident/", include("resident.urls", namespace="resident")),
+
+    # API v1
+    path('api/v1/residents/', include('resident.api_urls')),
+
+    path('api/auth/', include('authentication.api_urls')),
+    path(f'api/{settings.API_VERSION}/', include('metrics.urls', namespace='metrics')),
 ]

@@ -1,0 +1,76 @@
+{% load static %}
+{% load django_bootstrap5 %}
+{% bootstrap_css %}
+{% bootstrap_javascript %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{% static 'css/static_style.css' %}">
+    <link rel="icon" type="image/x-icon" href="{% static 'images/brgy-sto-nino.png' %}">
+    <title>Email Confirmed</title>
+</head>
+
+<body>
+    <div class="container d-flex justify-content-center align-items-center min-vh-100">
+        <div class="row border rounded-5 p-3 bg-white shadow box-area">
+            <div class="col-md-12 right-box">
+                <div class="align-items-center">
+                    <div class="header-text mb-3 text-start mt-3 align-items-center justify-content-between">
+                        <h4>Email Address Verification</h4>
+                        <p id="verification-message" class="text-muted mb-2" style="font-size: 0.9rem;">
+                            Verifying your email address, please wait...
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Extract token from fragment
+        const fragment = window.location.hash;
+        const params = new URLSearchParams(fragment.substring(1)); // remove "#"
+        const accessToken = params.get("access_token");
+
+        const verificationMessage = document.getElementById("verification-message");
+
+        if (accessToken) {
+            // POST token to the backend
+            fetch("/api/auth/email-confirmed/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ access_token: accessToken })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message) {
+                    verificationMessage.innerHTML = `
+                        The email address <b>${data.email}</b> has been verified successfully!<br>
+                        You may now <a href="{% url 'authentication:login' %}" style="color: black">login</a>.
+                    `;
+                } else {
+                    verificationMessage.innerHTML = `
+                        <span style="color: red;">Failed to verify email: ${data.error || "Unknown error."}</span>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error("Error verifying email:", error);
+                verificationMessage.innerHTML = `
+                    <span style="color: red;">An error occurred while verifying your email.</span>
+                `;
+            });
+        } else {
+            verificationMessage.innerHTML = `
+                <span style="color: red;">No access token found in the URL.</span>
+            `;
+        }
+    </script>
+</body>
+
+</html>

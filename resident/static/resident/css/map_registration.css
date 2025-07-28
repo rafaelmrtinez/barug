@@ -1,0 +1,25 @@
+#map {
+    position: relative;
+    height: 100%;
+    width: 100%;
+}
+
+#style-selector {
+    border: 0;
+    background-color: transparent;
+    padding: 4px 8px;
+    font-size: 0.9rem;
+    outline: none;
+    border-radius: 12px;
+    background-color: white;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.control {
+   position: absolute;
+    bottom: 25px;
+    left: 25px;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+}

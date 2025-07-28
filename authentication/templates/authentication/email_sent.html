@@ -1,0 +1,48 @@
+{% load static %}
+
+{% load django_bootstrap5 %}
+{% bootstrap_css %}
+{% bootstrap_javascript %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{% static 'css/static_style.css' %}">
+
+    <link rel="icon" type="image/x-icon" href="{% static 'images/brgy-sto-nino.png' %}">
+    <title>Email Sent</title>
+</head>
+<body>
+    <div class="container d-flex justify-content-center align-items-center min-vh-100">
+        
+        <div class="row border rounded-5 p-3 bg-white shadow box-area">
+
+            <div class="col-md-12 right-box">
+
+                <div class="align-items-center">
+
+                    <div class="header-text mb-3 text-start mt-3 align-items-center justify-content-between">
+                        <h4>Check your email</h4>
+                        <p class="text-muted mb-2" style="font-size: 0.9rem;">
+                            A password reset link has been sent to (replace with real email). <br>
+                            Please follow the instructions in the email to set a new password.
+                        </p>
+                        <p class="text-muted mb-2" style="font-size: 0.9rem;">
+                            If the message does not arrive shortly, please check your spam folder or 
+                            <a href="" style="color: black">
+                                request another email.
+                            </a>
+                        </p>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>
