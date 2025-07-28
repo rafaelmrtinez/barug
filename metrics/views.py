@@ -17,5 +17,12 @@ class HealthCheckView(APIView):
     
     By: raffa
     """ 
+    def get(self, request: Request) -> Response:
+        return Response(status=200)
+    
+    def head(self, request: Request) -> Response:
+        return Response(status=204) 
+
     def get(self, request: Request):
         return Response({"status": "success", "message": "Metrics retrieved successfully"}, status=200)
+
