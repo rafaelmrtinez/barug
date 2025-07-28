@@ -4,6 +4,7 @@
 staticfiles/
 *.http
 
+
 ### Database ###
 *.accdb
 *.db
