@@ -1,9 +1,11 @@
-from src.infra.contracts.llm import ILLM
+from src.core.contracts.llm import ILLM
+from dependency_injector.wiring import Provide, inject
 
 
 class LLMService:
-    
-    def __init__(self, chat: ILLM):
+
+    @inject
+    def __init__(self, chat: ILLM) -> None:
         self.chat = chat
 
     def chat_with_llm(self, prompt: str, **kwargs) -> str:

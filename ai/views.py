@@ -5,7 +5,8 @@ from rest_framework.response import Response
 
 from ai.serializers.chat import ChatSerializer
 from src.app.services.llm import LLMService
-from src.infra.services.groq import GroqService
+from dependency_injector.wiring import inject, Provide
+from src.app.bootstrap.app_containers import AppContainer
 
 # Create your views here.
 class AIChatView(APIView):
@@ -24,23 +25,14 @@ class AIChatView(APIView):
         "message": "I'm doing well, thank you!"
     }
     """
-    
-    def post(self, request: Request) -> Response:
-        
+    @inject
+    def post(self, request: Request, llm_service: LLMService = Provide[AppContainer.llm_service]) -> Response:
+
         serializer = ChatSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
         
-        services = LLMService(
-            chat=GroqService(
-                api_key=settings.AI_API_KEY,
-                model=settings.AI_MODEL,
-            )
-        )
-        
-        response = services.chat_with_llm(
-            prompt=serializer.validated_data['prompt']
-        )
+        response = llm_service.chat_with_llm(serializer.validated_data['prompt'])
         
         # Logic for processing the chat message and generating a response goes here
         return Response({"message": response}, status=200)

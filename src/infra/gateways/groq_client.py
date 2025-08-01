@@ -1,10 +1,10 @@
-from src.infra.contracts.llm import ILLM
+from src.core.contracts.llm import ILLM
 
 from groq import Groq
 
 from src.infra.exceptions.general_infra_exception import InfrastructureException
 
-class GroqService(ILLM):
+class GroqClient(ILLM):
     
     def __init__(self, api_key: str, model: str):
         self._api_key = api_key
