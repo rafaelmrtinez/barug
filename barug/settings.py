@@ -16,6 +16,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+AI_API_KEY = os.getenv("AI_API_KEY")
+AI_MODEL = os.getenv("AI_MODEL")
+
 # DATA FROM .env
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
@@ -67,6 +70,7 @@ ALLOWED_HOSTS = ['192.168.1.2', "*"]
 # Application definition
 
 INSTALLED_APPS = [
+    "ai.apps.AiConfig",
     "metrics.apps.MetricsConfig",
     "django.contrib.admin",
     "django.contrib.auth",
