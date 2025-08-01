@@ -20,7 +20,7 @@ class HFEmbeddingTestCase(TestCase):
         
     @inject
     def test_generate_embedding(self, hf_embedding: IEmbedding = Provide[InfraContainer.hf_embedding]):
-        text = "This is a test."
+        text = "123"
         embedding = hf_embedding.generate_embedding(text)
         
         print(f"Generated embedding for '{text}': {embedding}")
