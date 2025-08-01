@@ -35,4 +35,5 @@ urlpatterns = [
 
     path('api/auth/', include('authentication.api_urls')),
     path(f'api/{settings.API_VERSION}/', include('metrics.urls', namespace='metrics')),
+    path(f'api/{settings.API_VERSION}/ai/', include('ai.urls', namespace='ai')),
 ]
