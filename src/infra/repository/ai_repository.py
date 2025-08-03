@@ -14,7 +14,8 @@ class AIRepository(IAIRepository):
         func_name: str, 
         embedding: list[float], 
         threshold: float, 
-        top_k: int
+        top_k: int,
+        doc_id: str
     ) -> list[dict]:
         """
         Executes a function call with the given name and parameters.
@@ -23,7 +24,8 @@ class AIRepository(IAIRepository):
             params = {
             'query_embedding': embedding,
             'match_threshold': threshold,
-            'match_count': top_k
+            'match_count': top_k,
+            'target_document_id': doc_id
             }
             return self.supabase_adapter.rpc(func_name, params).execute().data
         except Exception as e:
