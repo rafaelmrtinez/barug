@@ -1,5 +1,6 @@
 from dependency_injector import containers, providers
 
+from src.app.pipelines.rag_pipeline import RAGPipeline
 from src.app.services.llm import LLMService
 
 
@@ -8,9 +9,16 @@ class AppContainer(containers.DeclarativeContainer):
     
     config = providers.Configuration()
     
-    infra = providers.DependenciesContainer()
+    infra  = providers.DependenciesContainer()
+    
+    rag_pipeline = providers.Factory(
+        RAGPipeline,
+        repos=infra.ai_repository,
+        embedding=infra.hf_embedding,
+        llm=infra.groq_client
+    )
     
     llm_service = providers.Factory(
         LLMService,
-        chat=infra.groq_client
+        rag_pipeline=rag_pipeline
     )

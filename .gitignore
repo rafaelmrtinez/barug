@@ -3,6 +3,7 @@
 
 staticfiles/
 *.http
+supabase_client_dev.py
 
 
 ### Database ###
