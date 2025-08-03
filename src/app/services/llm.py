@@ -4,7 +4,7 @@ class LLMService:
 
     def __init__(self, rag_pipeline: RAGPipeline) -> None:
         self.rag_pipeline = rag_pipeline
-
+    
     def chat(self, prompt: str) -> str:
         """
         Interact with the LLM to generate a response based on the provided prompt.

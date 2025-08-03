@@ -15,7 +15,8 @@ class AppContainer(containers.DeclarativeContainer):
         RAGPipeline,
         repos=infra.ai_repository,
         embedding=infra.hf_embedding,
-        llm=infra.groq_client
+        llm=infra.groq_client,
+        doc_repo=infra.document_repository
     )
     
     llm_service = providers.Factory(

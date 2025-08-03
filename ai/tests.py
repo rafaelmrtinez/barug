@@ -3,14 +3,36 @@ from django.test import TestCase
 from django.conf import settings
 
 from src.app.dto.semantic_search import SemanticSearchDTO
+from src.core.contracts.document_repository import IDocumentRepository
 from src.core.contracts.embedding import IEmbedding
 from src.infra.bootstrap.infra_containers import InfraContainer
 from dependency_injector.wiring import inject, Provide
 from src.infra.adapter.supabase_adapter import SupabaseAdapter
 from src.infra.repository.ai_repository import AIRepository
+from src.infra.repository.document_repository import DocumentRepository
 
 
 # Create your tests here.
+class DocumentRepositoryTestCase(TestCase):
+    
+    def setUp(self):
+        from supabase_client_dev import supabase
+        self.infra = InfraContainer()
+        self.infra.config.from_dict({
+            'HF_PROVIDER': settings.HF_PROVIDER,
+            'HF_API_KEY': settings.HF_API_KEY,
+            'HF_MODEL': settings.HF_MODEL
+        })
+        self.infra.supabase_adapter.override(SupabaseAdapter(client=supabase))
+        self.infra.wire(modules=['ai.tests'])
+        
+    @inject
+    def test_get_faq_document_id_order_by_date(
+        self, 
+        repo: (IDocumentRepository | DocumentRepository ) = Provide[InfraContainer.document_repository]) -> int:
+        id = repo.get_faq_document_id_order_by_date()
+        self.assertIsNotNone(id)
+
 class RAGPipelineTestCase(TestCase):
 
     def setUp(self):
@@ -48,7 +70,7 @@ class RAGPipelineTestCase(TestCase):
         
         for i in range(len(self.test_dto)):
             context_str += f"Top {i+1} Result\n- Question: {self.test_dto[i].question}\n- Answer: {self.test_dto[i].answer}\n\n"
-        print(context_str)
+        # print(context_str)
         
         path = 'src/app/pipelines/prompts/prompt.txt'
         result = None
@@ -57,7 +79,7 @@ class RAGPipelineTestCase(TestCase):
             template = file.read()
             result = template.format(query=query, context=context_str)
 
-        print(f"Template content: {result}")
+        # print(f"Template content: {result}")
 
     def test_rag_pipeline_utils_extract_top_k_content(self):
         from src.app.utils.rag_pipeline_utils import RAGPipelineUtils

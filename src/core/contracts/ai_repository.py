@@ -10,7 +10,8 @@ class IAIRepository(ABC):
     def exec_semantic_search(func_name: str,
     embedding: list[float],
     threshold: float,
-    top_k: int) -> list[dict]:
+    top_k: int,
+    doc_id: str) -> list[dict]:
         """
         Executes a function call with the given name and parameters.
         """
