@@ -4,6 +4,7 @@
 staticfiles/
 *.http
 supabase_client_dev.py
+test_data.xlsx
 
 
 ### Database ###
