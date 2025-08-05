@@ -1,48 +1,70 @@
 from io import BytesIO
 import os
 from pprint import pprint
+from pydoc import text
 from typing import List, Set
 from django.test import TestCase
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.conf import settings
-from faq_ingestion.serializers.faq_doc import FAQDocumentSerializer
 from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.core.files.uploadedfile import SimpleUploadedFile
+import requests
 
+from faq_ingestion.serializers.faq_doc import FAQDocumentSerializer
 from src.core.enums.faq_doc_extensions import FAQDocExtensions
+from src.infra.gateways.hf_embedding import HuggingFaceClient
 
 
 # Create your tests here.
 class FAQIngestionEmbeddingTestCase(TestCase):
     def setUp(self):
-        self.max_file_size_mb = 5
-        self.file_max_size = self.max_file_size_mb * 1024 * 1024
-        self.allowed_mimes = [
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'application/vnd.ms-excel',
-        ]
-        self.allowed_extensions = [ext.value for ext in FAQDocExtensions]
-        self.fake_file_path = os.path.join(settings.BASE_DIR, 'test_data.xlsx')
-        self.fake_file_bytes: BytesIO = None
-        self.fake_file_name = 'test_data.xlsx'
-        self.fake_content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        with open(self.fake_file_path, 'rb') as f:
-            self.fake_file_bytes = BytesIO(f.read())
-        self.fake_file = InMemoryUploadedFile(
-            file=self.fake_file_bytes,
-            field_name='file',
-            name=self.fake_file_name,
-            content_type=self.fake_content_type,
-            size=1024 * 1024,
-            charset=None
-        )
-
-    def test_generate_batch_embedding(self) -> list[list[float]]:
-
-        texts: List[Set] = [
+        self.faq_pairs: List[tuple[str, str]] = [
             ("Sample question 1", "Sample answer 1"),
             ("Sample question 2", "Sample answer 2"),
             ("Sample question 3", "Sample answer 3")
-            ]
+        ]
+        
+        self.embeddings = [
+            'Sample embedding 1',
+            'Sample embedding 2',
+            'Sample embedding 3'
+        ]
+        
+        self.client: HuggingFaceClient = HuggingFaceClient(
+            provider=settings.HF_PROVIDER,
+            api_key=settings.HF_API_KEY,
+            model=settings.HF_MODEL,
+            url=settings.HF_URL
+        )
+        
+    # DO NOT UNCOMMENT UNLESS YOU NEED TO TEST THE ACTUAL API CALL!
+    # IT IS ADVISABLE TO MOCK THE API CALLS IN UNIT TESTS.  
+    # def test_hf_client(self):
+    #     payload = [i[1] for i in self.faq_pairs]
+    #     # print(f"Payload: {payload}")
+    #     result = self.client.generate_batch_embedding(payload)
+        
+    #     for i in range(len(payload)):
+    #         self.faq_pairs[i] = (self.faq_pairs[i][0], self.faq_pairs[i][1], result[i])
+
+    #     print(f"\n\n\nFAQ Pairs: {self.faq_pairs}")
+
+    def test_generate_batch_embedding(self) -> list[list[float]]:
+        if not self.embeddings or not isinstance(self.embeddings, list):
+            self.fail("Invalid response format from Hugging Face API.")
+            
+        faq_entries = [
+            {
+                "question": question,
+                "answer": answer,
+                "embedding": embedding
+            }
+            for (question, answer), embedding in zip(self.faq_pairs, self.embeddings)
+        ]
+        
+        self.assertGreater(len(faq_entries), 0, "No valid FAQ entries found.")
+        self.assertTrue(all(isinstance(entry, dict) for entry in faq_entries), "All entries should be dictionaries.")
+        self.assertTrue(all("question" in entry for entry in faq_entries), "All entries should have a 'question' key.")
+        self.assertTrue(all("answer" in entry for entry in faq_entries), "All entries should have an 'answer' key.")
 
 
 class FAQDocumentDomainTestCase(TestCase):
@@ -115,7 +137,6 @@ class FAQDocumentDomainTestCase(TestCase):
             faq_pair.append(pair)
             
         self.assertGreater(len(faq_pair), 0, "No valid FAQ pairs found in the file.")
-        print(f"Valid FAQ pairs: {faq_pair}")
             
     def test_openpyxl_xlsxl_file(self):
         from openpyxl import load_workbook

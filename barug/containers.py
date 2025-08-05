@@ -13,6 +13,7 @@ infra.config.from_dict({
     'HF_PROVIDER': settings.HF_PROVIDER,
     'HF_API_KEY': settings.HF_API_KEY,
     'HF_MODEL': settings.HF_MODEL,
+    'HF_URL': settings.HF_URL
 })
 
 infra.supabase_adapter.override(SupabaseAdapter(client=supabase))

@@ -34,7 +34,8 @@ class InfraContainer(containers.DeclarativeContainer):
         HuggingFaceClient,
         provider=config.HF_PROVIDER,
         api_key=config.HF_API_KEY,
-        model=config.HF_MODEL
+        model=config.HF_MODEL,
+        url=config.HF_URL
     )
 
     groq_client: providers.Singleton[ILLM] = providers.Singleton(

@@ -1,5 +1,6 @@
-from io import BytesIO
 import pandas as pd
+from io import BytesIO
+from typing import List, Tuple
 
 from src.core.contracts.document import IDocument
 from src.core.enums.faq_doc_extensions import FAQDocExtensions
@@ -15,11 +16,11 @@ class FAQDocument(IDocument):
     ALLOWED_MIMES = FAQDocMimeTypes.get_allowed_mimes()
     REQUIRED_HEADERS = ['question', 'answer']
 
-    def process_content(self):
+    def process_content(self)  -> List[Tuple[str, str]]:
         self.__file_validation()
         return self.__data_extractor()
 
-    def __data_extractor(self):
+    def __data_extractor(self)  -> List[Tuple[str, str]]:
         bytes_data = BytesIO(self.file.read())
         df = pd.read_excel(bytes_data, engine='openpyxl')
         headers = df.columns.str.lower().tolist()
@@ -27,17 +28,16 @@ class FAQDocument(IDocument):
         self.__header_validation(df, self.REQUIRED_HEADERS, headers, missing_headers)
         return self.__content_validation(df)
     
-    def __content_validation(self, df: pd.DataFrame) -> list[set]:
-        pair = set()
-        faqs = []
+    def __content_validation(self, df: pd.DataFrame) -> List[Tuple[str, str]]:
+        faq_pair = []
         for i, row in df.iterrows():
             question = str(row.get('question', '')).strip()
             answer = str(row.get('answer', '')).strip()
             self.__has_content_validation(i, question, answer)
             pair = (question, answer)
             self.__row_level_validation(i, row, question, answer)
-            faqs.append(pair)
-        return faqs
+            faq_pair.append(pair)
+        return faq_pair
 
     def __row_level_validation(self, i, row, question, answer):
         if len(question) > 300:

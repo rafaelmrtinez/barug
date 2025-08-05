@@ -11,6 +11,6 @@ class IEmbedding(ABC):
         pass
 
     @abstractmethod
-    def generate_batch_embedding(self, texts: list[str]) -> list[list[float]]:
+    def generate_batch_embedding(self, payload: list[str]) -> list[list[float]]:
         """Generate embeddings for a batch of texts."""
         pass

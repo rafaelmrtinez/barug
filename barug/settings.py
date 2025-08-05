@@ -22,6 +22,7 @@ AI_MODEL = os.getenv("AI_MODEL")
 HF_PROVIDER = os.getenv("HF_PROVIDER")
 HF_API_KEY = os.getenv("HF_API_KEY")
 HF_MODEL = os.getenv("HF_MODEL")
+HF_URL = os.getenv("HF_URL")
 
 # DATA FROM .env
 SUPABASE_URL = os.getenv("SUPABASE_URL")
