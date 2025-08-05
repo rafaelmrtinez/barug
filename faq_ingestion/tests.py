@@ -8,13 +8,114 @@ from django.conf import settings
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 import requests
+from src.infra.repository.document_repository import DocumentRepository
+from src.infra.repository.faq_entries_repository import FAQEntriesRepository
+from supabase_client_dev import supabase
 
 from faq_ingestion.serializers.faq_doc import FAQDocumentSerializer
 from src.core.enums.faq_doc_extensions import FAQDocExtensions
+from src.infra.adapter.supabase_adapter import SupabaseAdapter
 from src.infra.gateways.hf_embedding import HuggingFaceClient
+from postgrest.exceptions import APIError as PostgrestAPIError
 
 
 # Create your tests here.
+class FAQIngestionServiceTestCase(TestCase):
+
+    def setUp(self):
+        self.fake_file_bytes = None
+        with open(os.path.join(settings.BASE_DIR, 'test_data.xlsx'), 'rb') as f:
+            self.fake_file_bytes = BytesIO(f.read())
+
+        self.file: InMemoryUploadedFile = InMemoryUploadedFile(
+            file=self.fake_file_bytes,
+            field_name='file',
+            name='test_data.xlsx',
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            size=self.fake_file_bytes.getbuffer().nbytes,
+            charset=None
+        )
+
+    def test_exec_faq_ingestion(self):
+        from src.core.entities.faq_document import FAQDocument
+        domain = FAQDocument(
+            name=self.file.name,
+            file=self.file,
+            created_at='2023-10-01T00:00:00Z'
+        )
+        result = domain.process_content()
+        hf_client = HuggingFaceClient(
+            provider=settings.HF_PROVIDER,
+            api_key=settings.HF_API_KEY,
+            model=settings.HF_MODEL,
+            url=settings.HF_URL
+        )
+        embeddings = hf_client.generate_batch_embedding([i[1] for i in result])
+        faq_entries = [
+            {
+                "question": question,
+                "answer": answer,
+                "embedding": embedding
+            }
+            for (question, answer), embedding in zip(result, embeddings)
+        ]
+        faq_entries_repo = FAQEntriesRepository(supabase_adapter=supabase)
+        doc_repo = DocumentRepository(supabase_adapter=supabase)
+        repo_result = doc_repo.insert_faq_document(
+            file_name=self.file.name,
+            total_faqs=len(faq_entries),
+            uploader="padre@galaxy.com"
+            )
+        faq_entry_result = faq_entries_repo.insert_bulk_faq_entries(faq_entries)
+        print(f"Document Insert Result: {repo_result}")
+        print(f"FAQ Entries Insert Result: {faq_entry_result}")
+
+class FAQIngestionFAQEntryUploadTestCase(TestCase):
+
+    def setUp(self):
+        pass
+
+    # def test_faq_entry_repo(self):
+
+    #     # print(self.mock_data[0])
+    #     # print(self.mock_data[0][0])
+    #     # print(self.mock_data[0][1])
+    #     # print(self.mock_data[0][2])
+
+    #     try:
+    #         response = self.supabase_adapter.table('faq_entry').insert(self.mock_data).execute()
+    #         print(f"Response: {response.data}")
+
+    #     except PostgrestAPIError as e:
+    #         print(f"Error: {e}")
+
+
+class FAQIngestionRepositoryTestCase(TestCase):
+
+    def setUp(self):
+        with open(os.path.join(settings.BASE_DIR, 'test_data.xlsx'), 'rb') as f:
+            self.file: InMemoryUploadedFile = InMemoryUploadedFile(
+                file=f,
+                field_name='file',
+                name='test_data.xlsx',
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                size=os.path.getsize(os.path.join(
+                    settings.BASE_DIR, 'test_data.xlsx')),
+                charset=None
+            )
+        self.uploader = "test@test.com"
+
+    # def test_repo(self):
+    #     client = supabase
+    #     resp = client.table('faq_document').insert({
+    #         "title": self.file.name,
+    #         "total_faqs": int(self.file.size / 2),
+    #         "uploaded_by": self.uploader
+    #     }).execute()
+
+    #     print(f"Response: {resp}")
+
+
 class FAQIngestionEmbeddingTestCase(TestCase):
     def setUp(self):
         self.faq_pairs: List[tuple[str, str]] = [
@@ -22,36 +123,42 @@ class FAQIngestionEmbeddingTestCase(TestCase):
             ("Sample question 2", "Sample answer 2"),
             ("Sample question 3", "Sample answer 3")
         ]
-        
+
         self.embeddings = [
             'Sample embedding 1',
             'Sample embedding 2',
             'Sample embedding 3'
         ]
-        
+
         self.client: HuggingFaceClient = HuggingFaceClient(
             provider=settings.HF_PROVIDER,
             api_key=settings.HF_API_KEY,
             model=settings.HF_MODEL,
             url=settings.HF_URL
         )
-        
+
     # DO NOT UNCOMMENT UNLESS YOU NEED TO TEST THE ACTUAL API CALL!
-    # IT IS ADVISABLE TO MOCK THE API CALLS IN UNIT TESTS.  
+    # IT IS ADVISABLE TO MOCK THE API CALLS IN UNIT TESTS.
     # def test_hf_client(self):
     #     payload = [i[1] for i in self.faq_pairs]
     #     # print(f"Payload: {payload}")
     #     result = self.client.generate_batch_embedding(payload)
-        
-    #     for i in range(len(payload)):
-    #         self.faq_pairs[i] = (self.faq_pairs[i][0], self.faq_pairs[i][1], result[i])
 
-    #     print(f"\n\n\nFAQ Pairs: {self.faq_pairs}")
+    #     faq_entries = [
+    #         {
+    #             "question": question,
+    #             "answer": answer,
+    #             "embedding": embedding
+    #         }
+    #         for (question, answer), embedding in zip(self.faq_pairs, result)
+    #     ]
+
+    #     print(f"\n\n\nFAQ Pairs: {faq_entries}\n\n\n")
 
     def test_generate_batch_embedding(self) -> list[list[float]]:
         if not self.embeddings or not isinstance(self.embeddings, list):
             self.fail("Invalid response format from Hugging Face API.")
-            
+
         faq_entries = [
             {
                 "question": question,
@@ -60,11 +167,14 @@ class FAQIngestionEmbeddingTestCase(TestCase):
             }
             for (question, answer), embedding in zip(self.faq_pairs, self.embeddings)
         ]
-        
+
         self.assertGreater(len(faq_entries), 0, "No valid FAQ entries found.")
-        self.assertTrue(all(isinstance(entry, dict) for entry in faq_entries), "All entries should be dictionaries.")
-        self.assertTrue(all("question" in entry for entry in faq_entries), "All entries should have a 'question' key.")
-        self.assertTrue(all("answer" in entry for entry in faq_entries), "All entries should have an 'answer' key.")
+        self.assertTrue(all(isinstance(entry, dict)
+                        for entry in faq_entries), "All entries should be dictionaries.")
+        self.assertTrue(all("question" in entry for entry in faq_entries),
+                        "All entries should have a 'question' key.")
+        self.assertTrue(all("answer" in entry for entry in faq_entries),
+                        "All entries should have an 'answer' key.")
 
 
 class FAQDocumentDomainTestCase(TestCase):
@@ -133,11 +243,12 @@ class FAQDocumentDomainTestCase(TestCase):
 
             if isinstance(row['question'], float) or isinstance(row['answer'], float):
                 self.fail(f"Row {i+2}: FAQ contains invalid numeric values.")
-                
+
             faq_pair.append(pair)
-            
-        self.assertGreater(len(faq_pair), 0, "No valid FAQ pairs found in the file.")
-            
+
+        self.assertGreater(
+            len(faq_pair), 0, "No valid FAQ pairs found in the file.")
+
     def test_openpyxl_xlsxl_file(self):
         from openpyxl import load_workbook
 
