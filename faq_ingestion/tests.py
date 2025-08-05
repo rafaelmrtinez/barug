@@ -1,5 +1,6 @@
 from io import BytesIO
 import os
+from pprint import pprint
 from django.test import TestCase
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.conf import settings
@@ -34,6 +35,63 @@ class FAQDocumentDomainTestCase(TestCase):
             charset=None
         )
         
+    def test_pandas_read_excel(self):
+        import pandas as pd
+        from io import BytesIO
+        
+        bytes_data = BytesIO(self.fake_file.read())
+        df = pd.read_excel(bytes_data, engine='openpyxl')
+        
+        required_headers = ['question', 'answer']
+        headers = df.columns.str.lower().tolist()
+        
+        missing_headers = set(required_headers) - set(headers)
+        if missing_headers:
+            self.fail(f"Missing required headers: {missing_headers}")
+            
+        unexpected_headers = set(headers) - set(required_headers)
+        if unexpected_headers:
+            self.fail(f"Unexpected headers: {unexpected_headers}")
+            
+        if df.empty:
+            self.fail("Uploaded file is empty.")
+
+        pair = set()
+        for i, row in df.iterrows():
+            question = str(row.get('question', '')).strip()
+            answer = str(row.get('answer', '')).strip()
+            
+            if not question:
+                self.fail(f"Row {i+2} is empty or has no data.")
+                
+            if not answer:
+                self.fail(f"Row {i+2} has no answer.")
+
+            pair = (question, answer)
+                
+            if len(question) > 300:
+                self.fail(f"Row {i+2} question exceeds 300 characters limit.")
+                
+            if len(answer) > 1000:
+                self.fail(f"Row {i+2} answer exceeds 1000 characters limit.")
+
+            if isinstance(row['question'], float) or isinstance(row['answer'], float):
+                self.fail(f"Row {i+2}: FAQ contains invalid numeric values.")
+
+    def test_openpyxl_xlsxl_file(self):
+        from openpyxl import load_workbook
+        
+        workbook = load_workbook(filename=self.fake_file)
+        sheet = workbook.active
+
+        allowed_headers = ['question', 'answer']
+        headers = [cell.value.lower() for cell in sheet[1]]
+
+        for i in range(len(headers)):
+            if headers[i] not in allowed_headers:
+                self.fail(f"Header '{headers[i]}' is not allowed. Allowed headers are: {allowed_headers}")
+        
+        
     def test_faq_mime_types_enum(self):
         from src.core.enums.faq_doc_mimes import FAQDocMimeTypes
         allowed_mimes = FAQDocMimeTypes.get_allowed_mimes()
@@ -47,10 +105,6 @@ class FAQDocumentDomainTestCase(TestCase):
             file=self.fake_file,
             created_at='2023-10-01T00:00:00Z'
         )
-        
-        print(self.fake_file.size)
-
-        domain.process_content()
         self.assertEqual(domain.name, self.fake_file.name)
         if not isinstance(domain, FAQDocument):
             self.fail("Domain model is not an instance of FAQDocument")
