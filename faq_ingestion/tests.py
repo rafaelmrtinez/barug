@@ -90,7 +90,7 @@ class FAQDocumentDomainTestCase(TestCase):
         if df.empty:
             self.fail("Uploaded file is empty.")
 
-        pair = set()
+        faq_pair = []
         for i, row in df.iterrows():
             question = str(row.get('question', '')).strip()
             answer = str(row.get('answer', '')).strip()
@@ -111,7 +111,12 @@ class FAQDocumentDomainTestCase(TestCase):
 
             if isinstance(row['question'], float) or isinstance(row['answer'], float):
                 self.fail(f"Row {i+2}: FAQ contains invalid numeric values.")
-
+                
+            faq_pair.append(pair)
+            
+        self.assertGreater(len(faq_pair), 0, "No valid FAQ pairs found in the file.")
+        print(f"Valid FAQ pairs: {faq_pair}")
+            
     def test_openpyxl_xlsxl_file(self):
         from openpyxl import load_workbook
 
