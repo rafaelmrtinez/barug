@@ -34,6 +34,12 @@ class FAQDocumentDomainTestCase(TestCase):
             charset=None
         )
         
+    def test_faq_mime_types_enum(self):
+        from src.core.enums.faq_doc_mimes import FAQDocMimeTypes
+        allowed_mimes = FAQDocMimeTypes.get_allowed_mimes()
+        
+        self.assertIsNotNone(allowed_mimes)
+        
     def test_domain_model_initialization(self):
         from src.core.entities.faq_document import FAQDocument
         domain = FAQDocument(
