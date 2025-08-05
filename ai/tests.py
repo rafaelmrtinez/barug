@@ -153,8 +153,9 @@ class AIRepositoryTestCase(TestCase):
     ):
         word = "how can i get barangay clearance?"
         embedding = hf_embedding.generate_embedding(word)
+        sample_uuid = '51e3b214-3ce1-451e-8442-59eb83a071d7'
         top_res = repo.exec_semantic_search(
-            'match_faq_entries', embedding, 0.7, 3)
+            'match_faq_entries', embedding, 0.7, 3, sample_uuid)
         # pprint(f"Generated embedding for '{word}': {embedding}")
         # pprint(f"Top results: {top_res}")
 
