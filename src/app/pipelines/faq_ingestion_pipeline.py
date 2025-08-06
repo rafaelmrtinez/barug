@@ -3,7 +3,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 
 from src.core.contracts.embedding import IEmbedding
 from src.core.entities.faq_document import FAQDocument
-from src.core.contracts.faq_repo import IFAQEntriesRepository
+from src.core.contracts.faq_repo import IFAQIngestionRepository
 from src.infra.repository.document_repository import IDocumentRepository
 
 
@@ -12,7 +12,7 @@ class FAQIngestionPipeline:
     def __init__(
         self, 
         doc_repo: IDocumentRepository, 
-        faq_entry_repo: IFAQEntriesRepository,
+        faq_entry_repo: IFAQIngestionRepository,
         embedding: IEmbedding
         ):
         

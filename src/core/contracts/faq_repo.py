@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 
-class IFAQEntriesRepository(ABC):
+class IFAQIngestionRepository(ABC):
     
     @abstractmethod
     def insert_bulk_faq_entries(self, entries: list[dict]) -> None:

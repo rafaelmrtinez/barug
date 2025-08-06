@@ -9,7 +9,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 import requests
 from src.infra.repository.document_repository import DocumentRepository
-from src.infra.repository.faq_entries_repository import FAQEntriesRepository
+from src.infra.repository.faq_ingestion_repository import FAQEntriesRepository
 from supabase_client_dev import supabase
 
 from faq_ingestion.serializers.faq_doc import FAQDocumentSerializer
