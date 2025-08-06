@@ -22,13 +22,32 @@ class FAQIngestionPipeline:
         
         
     def exec(self, file: InMemoryUploadedFile, time: str):
-        domain = FAQDocument(
-            name=file.name,
-            file=file,
-            created_at=time
-        )
-        result = domain.process_content()
-        embeddings = self._embedding.generate_batch_embedding([i[1] for i in result])
+        result = self.__faq_entry_business_logic(file, time)
+        embeddings = self.__generate_batch_embeddings(result)
+        faq_entries = self.__generate_faq_entries(result, embeddings)
+        repo_result = self.__doc_insertion(file, faq_entries)
+        self.__entries_doc_id_insertion(faq_entries, repo_result)
+        document_id = self.__entries_insertion(faq_entries)
+        return document_id
+
+    def __entries_insertion(self, faq_entries):
+        document_id = self._faq_entry_repo.insert_bulk_faq_entries(faq_entries)
+        return document_id
+
+    def __entries_doc_id_insertion(self, faq_entries, repo_result):
+        for entry in faq_entries:
+            entry['document_id'] = repo_result
+
+    def __doc_insertion(self, file, faq_entries):
+        repo_result = self._doc_repo.insert_faq_document(
+            file_name=file.name,
+            total_faqs=len(faq_entries),
+            uploader="padre@galaxy.com"
+            ).data[0]['id']
+            
+        return repo_result
+
+    def __generate_faq_entries(self, result, embeddings):
         faq_entries = [
             {
                 "question": question,
@@ -38,12 +57,19 @@ class FAQIngestionPipeline:
             }
             for (question, answer), embedding in zip(result, embeddings)
         ]
-        repo_result = self._doc_repo.insert_faq_document(
-            file_name=file.name,
-            total_faqs=len(faq_entries),
-            uploader="padre@galaxy.com"
-            ).data[0]['id']
-        for entry in faq_entries:
-            entry['document_id'] = repo_result
-        document_id = self._faq_entry_repo.insert_bulk_faq_entries(faq_entries)
-        return document_id
+        
+        return faq_entries
+
+    def __generate_batch_embeddings(self, result):
+        payload = [i[1] for i in result]
+        embeddings = self._embedding.generate_batch_embedding(payload=payload)
+        return embeddings
+
+    def __faq_entry_business_logic(self, file, time):
+        domain = FAQDocument(
+            name=file.name,
+            file=file,
+            created_at=time
+        )
+        result = domain.process_content()
+        return result
