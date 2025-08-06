@@ -17,6 +17,7 @@ Django==5.2.3
 django-bootstrap-icons==0.9.0
 django-bootstrap5==25.1
 djangorestframework==3.16.0
+et_xmlfile==2.0.0
 filelock==3.18.0
 frozenlist==1.7.0
 fsspec==2025.7.0
@@ -35,7 +36,10 @@ idna==3.10
 iniconfig==2.1.0
 multidict==6.5.0
 numpy==2.3.2
+odfpy==1.4.1
+openpyxl==3.1.5
 packaging==25.0
+pandas==2.3.1
 pluggy==1.6.0
 postgrest==1.0.2
 propcache==0.3.2
@@ -46,8 +50,11 @@ Pygments==2.19.2
 PyJWT==2.10.1
 pytest==8.4.1
 pytest-mock==3.14.1
+python-calamine==0.4.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.1
+pytz==2025.2
+pyxlsb==1.0.10
 PyYAML==6.0.2
 realtime==2.4.3
 requests==2.32.4
@@ -65,4 +72,6 @@ tzdata==2025.2
 urllib3==2.5.0
 websockets==14.2
 whitenoise==6.9.0
+xlrd==2.0.2
+xlsxwriter==3.2.5
 yarl==1.20.1
