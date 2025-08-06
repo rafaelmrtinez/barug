@@ -1,7 +1,9 @@
+from postgrest.exceptions import APIError
+
+
 from src.core.contracts.rag_repository import IRAGRepository
 from src.infra.adapter.supabase_adapter import SupabaseAdapter
 from src.infra.exceptions.data_access_exception import DataAccessException
-from postgrest.exceptions import APIError
 
 
 class RAGRepository(IRAGRepository):

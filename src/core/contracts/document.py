@@ -1,7 +1,7 @@
-from abc import ABC, abstractmethod
+from abc import ABC
+from typing import Optional
 from dataclasses import dataclass
 from django.core.files.uploadedfile import InMemoryUploadedFile
-from typing import Optional
 
 
 @dataclass

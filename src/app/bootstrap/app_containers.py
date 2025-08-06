@@ -1,8 +1,9 @@
 from dependency_injector import containers, providers
 
-from src.app.pipelines.faq_ingestion_pipeline import FAQIngestionPipeline
-from src.app.pipelines.rag_pipeline import RAGPipeline
+
 from src.app.services.llm import LLMService
+from src.app.pipelines.rag_pipeline import RAGPipeline
+from src.app.pipelines.faq_ingestion_pipeline import FAQIngestionPipeline
 
 
 class AppContainer(containers.DeclarativeContainer):

@@ -1,5 +1,6 @@
 from src.app.pipelines.rag_pipeline import RAGPipeline
 
+
 class LLMService:
 
     def __init__(self, rag_pipeline: RAGPipeline) -> None:

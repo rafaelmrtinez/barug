@@ -1,5 +1,6 @@
 from typing import List
-from pprint import pprint
+
+
 from src.app.dto.semantic_search import SemanticSearchDTO
 
 

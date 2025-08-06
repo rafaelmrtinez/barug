@@ -1,13 +1,14 @@
 from dependency_injector import containers, providers
 
-from src.core.contracts.rag_repository import IRAGRepository
-from src.core.contracts.document_repository import IDocumentRepository
-from src.core.contracts.embedding import IEmbedding
-from src.core.contracts.faq_repo import IFAQIngestionRepository
+
 from src.core.contracts.llm import ILLM
+from src.core.contracts.embedding import IEmbedding
 from src.infra.gateways.groq_client import GroqClient
+from src.core.contracts.rag_repository import IRAGRepository
 from src.infra.gateways.hf_embedding import HuggingFaceClient
 from src.infra.repository.rag_repository import RAGRepository
+from src.core.contracts.faq_repo import IFAQIngestionRepository
+from src.core.contracts.document_repository import IDocumentRepository
 from src.infra.repository.document_repository import DocumentRepository
 from src.infra.repository.faq_ingestion_repository import FAQIngestionRepository
 

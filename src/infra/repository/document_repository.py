@@ -1,7 +1,8 @@
-from src.core.contracts.document_repository import IDocumentRepository
-from src.infra.adapter.supabase_adapter import SupabaseAdapter
-from src.infra.exceptions.data_access_exception import DataAccessException
 from postgrest.exceptions import APIError
+
+
+from src.infra.adapter.supabase_adapter import SupabaseAdapter
+from src.core.contracts.document_repository import IDocumentRepository
 
 
 class DocumentRepository(IDocumentRepository):

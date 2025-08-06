@@ -1,7 +1,10 @@
 
-from dataclasses import dataclass
 from supabase import Client
+from dataclasses import dataclass
+
+
 from src.infra.exceptions.general_infra_exception import InfrastructureException
+
 
 @dataclass(frozen=True)
 class SupabaseAdapter:

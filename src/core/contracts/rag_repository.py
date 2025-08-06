@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from ast import List
 
+
 class IRAGRepository(ABC):
     """
     Interface for AI repository operations.

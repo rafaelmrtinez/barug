@@ -4,7 +4,6 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 from src.core.contracts.embedding import IEmbedding
 from src.core.entities.faq_document import FAQDocument
 from src.core.contracts.faq_repo import IFAQIngestionRepository
-from src.infra.repository.document_repository import IDocumentRepository
 
 
 class FAQIngestionPipeline:

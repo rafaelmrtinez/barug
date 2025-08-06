@@ -1,8 +1,12 @@
 import requests
-from src.core.contracts.embedding import IEmbedding
+
+
 from huggingface_hub import InferenceClient
 
+
+from src.core.contracts.embedding import IEmbedding
 from src.infra.exceptions.general_infra_exception import InfrastructureException
+
 
 class HuggingFaceClient(IEmbedding):
     """Hugging Face client for generating embeddings."""

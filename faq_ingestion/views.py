@@ -2,12 +2,17 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.request import Request
 from rest_framework.response import Response
-from dependency_injector.wiring import inject, Provide
 from rest_framework.parsers import MultiPartParser, FormParser
 
-from faq_ingestion.serializers.faq_doc import FAQDocumentSerializer
+
+from dependency_injector.wiring import inject, Provide
+
+
 from src.app.bootstrap.app_containers import AppContainer
 from src.app.pipelines.faq_ingestion_pipeline import FAQIngestionPipeline
+
+
+from faq_ingestion.serializers.faq_doc import FAQDocumentSerializer
 
 
 # Create your views here.
