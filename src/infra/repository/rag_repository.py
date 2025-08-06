@@ -19,7 +19,14 @@ class RAGRepository(IRAGRepository):
             response = self.supabase_adapter.table('faq_document').select('id').order(
                 'uploaded_at', desc=True
                 ).execute()
-            return response.data[0]['id'] if response.data else None
+            
+            if not response.data:
+                raise DataAccessException("No documents found.")
+            
+            if not response.data[0].get('id'):
+                raise DataAccessException("Document ID not found.")
+            
+            return response.data[0]['id']
         except APIError as e:
             raise DataAccessException(f"Failed to retrieve document: {str(e)}")
 
@@ -41,6 +48,15 @@ class RAGRepository(IRAGRepository):
             'match_count': top_k,
             'target_document_id': doc_id
             }
-            return self.supabase_adapter.rpc(func_name, params).execute().data
+            
+            response = self.supabase_adapter.rpc(func_name, params).execute()
+            
+            if response.error:
+                raise DataAccessException(f"Error executing semantic search: {response.error.message}")
+            
+            if not response.data:
+                raise DataAccessException("No results found for the semantic search.")
+
+            return response.data
         except Exception as e:
             raise DataAccessException(f"Failed to execute semantic search: {str(e)}")

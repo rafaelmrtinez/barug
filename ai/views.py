@@ -2,14 +2,19 @@ from rest_framework.views import APIView
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from ai.serializers.chat import ChatSerializer
-from src.app.services.llm import LLMService
+
 from dependency_injector.wiring import inject, Provide
+
+
+from ai.serializers.chat import ChatSerializer
+
+
+from src.app.services.llm import LLMService
 from src.app.bootstrap.app_containers import AppContainer
+from src.infra.exceptions.general_infra_exception import InfrastructureException
+
 
 # Create your views here.
-
-
 class AIChatView(APIView):
     """
     AI Chat View for handling chat interactions.
@@ -61,7 +66,10 @@ class AIChatView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
 
-        response = llm_service.chat(serializer.validated_data['prompt'])
-
+        try:
+            response = llm_service.chat(serializer.validated_data['prompt'])
+        except InfrastructureException as e:
+            return Response({"error": str(e)}, status=e.status_code)
+            
         # Logic for processing the chat message and generating a response goes here
         return Response({"message": response}, status=200)

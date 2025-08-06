@@ -17,7 +17,14 @@ class FAQIngestionRepository(IFAQIngestionRepository):
                 "total_faqs": total_faqs,
                 "uploaded_by": uploader
             }).execute()
-            return response.data[0]['id'] if response.data else None
+            
+            if not response.data:
+                raise DataAccessException("No data returned from insert operation.")
+            
+            if 'id' not in response.data[0]:
+                raise DataAccessException("Inserted data does not contain 'id'.")
+            
+            return response.data[0]['id']
         except APIError as e:
             raise DataAccessException(f"Failed to insert FAQ document: {str(e)}")
     
@@ -28,6 +35,13 @@ class FAQIngestionRepository(IFAQIngestionRepository):
         """
         try:
             response = self.supabase_adapter.table('faq_entry').insert(entries).execute()
-            return response.data[0]['document_id'] if response.data else None
+            
+            if not response.data:
+                raise DataAccessException("No data returned from bulk insert operation.")
+            
+            if 'document_id' not in response.data[0]:
+                raise DataAccessException("Inserted data does not contain 'document_id'.")
+            
+            return response.data[0]['document_id']
         except APIError as e:
             raise DataAccessException(f"API error occurred: {str(e)}")

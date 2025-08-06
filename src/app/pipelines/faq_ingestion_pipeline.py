@@ -20,7 +20,7 @@ class FAQIngestionPipeline:
     def exec(self, file: InMemoryUploadedFile, time: str):
         result = self.__faq_entry_business_logic(file, time)
         embeddings = self.__generate_batch_embeddings(result)
-        faq_entries = self.__generate_faq_entries(result, embeddings)
+        faq_entries = self.__build_faq_entries(result, embeddings)
         repo_result = self.__doc_insertion(file, faq_entries)
         self.__entries_doc_id_insertion(faq_entries, repo_result)
         document_id = self.__entries_insertion(faq_entries)
@@ -42,7 +42,7 @@ class FAQIngestionPipeline:
             )
         return repo_result
 
-    def __generate_faq_entries(self, result, embeddings):
+    def __build_faq_entries(self, result, embeddings):
         faq_entries = [
             {
                 "question": question,

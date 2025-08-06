@@ -62,4 +62,4 @@ class HuggingFaceClient(IEmbedding):
         if not isinstance(embeddings, list):
             raise InfrastructureException("Expected a list of embeddings from Hugging Face API.", status_code=500)
 
-        return embeddings
+        return embeddings 
