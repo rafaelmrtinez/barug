@@ -21,5 +21,6 @@ infra.supabase_adapter.override(SupabaseAdapter(client=supabase))
 app = AppContainer(infra=infra)
 
 app.wire(modules=[
-    'ai.views'
+    'ai.views',
+    'faq_ingestion.views',
 ])

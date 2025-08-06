@@ -45,4 +45,5 @@ class FAQIngestionPipeline:
             ).data[0]['id']
         for entry in faq_entries:
             entry['document_id'] = repo_result
-        faq_entry_result = self._faq_entry_repo.insert_bulk_faq_entries(faq_entries)
+        document_id = self._faq_entry_repo.insert_bulk_faq_entries(faq_entries)
+        return document_id

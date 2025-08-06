@@ -2,7 +2,6 @@ from dependency_injector import containers, providers
 
 from src.app.pipelines.faq_ingestion_pipeline import FAQIngestionPipeline
 from src.app.pipelines.rag_pipeline import RAGPipeline
-from src.app.services.document_service import DocumentService
 from src.app.services.llm import LLMService
 
 
@@ -18,11 +17,6 @@ class AppContainer(containers.DeclarativeContainer):
         doc_repo=infra.document_repository , 
         faq_entry_repo=infra.faq_entries_repository ,
         embedding=infra.embedding
-    )
-    
-    document_service = providers.Factory(
-        DocumentService,
-        faq_ingestion_pipeline=faq_ingestion_pipeline
     )
     
     rag_pipeline = providers.Factory(

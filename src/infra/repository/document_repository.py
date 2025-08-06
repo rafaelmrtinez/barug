@@ -11,7 +11,7 @@ class DocumentRepository(IDocumentRepository):
     
     def insert_faq_document(self, file_name: str, total_faqs: int, uploader: str) -> None:
         try:
-            return self.supabase_adapter.table('faq_document').insert({
+            return self.supabase_adapter.get_client().table('faq_document').insert({
                 "title": file_name,
                 "total_faqs": total_faqs,
                 "uploaded_by": uploader

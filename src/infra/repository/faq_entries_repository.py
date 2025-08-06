@@ -14,7 +14,7 @@ class FAQEntriesRepository(IFAQEntriesRepository):
         Each entry should be a dict with keys: question, answer, embedding, document_id
         """
         try:
-            response = self.supabase_adapter.table('faq_entry').insert(entries).execute()
-            return response.data
+            response = self.supabase_adapter.get_client().table('faq_entry').insert(entries).execute()
+            return response.data[0]['document_id']
         except APIError as e:
             raise DataAccessException(f"API error occurred: {str(e)}")
