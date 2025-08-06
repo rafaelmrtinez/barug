@@ -1,63 +1,52 @@
+from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.request import Request
 from rest_framework.response import Response
-
 
 from dependency_injector.wiring import inject, Provide
 
 
 from ai.serializers.chat import ChatSerializer
-
+from barug.constants import INTENAL_ERROR
 
 from src.app.services.llm import LLMService
 from src.app.bootstrap.app_containers import AppContainer
+from src.app.exceptions.prompt_file_exception import PromptFileException
+from src.infra.exceptions.data_access_exception import DataAccessException
 from src.infra.exceptions.general_infra_exception import InfrastructureException
 
 
 # Create your views here.
 class AIChatView(APIView):
+    
     """
-    AI Chat View for handling chat interactions.
+        Handles chat interactions with the AI LLM service.
 
-    This view is responsible for processing chat messages and returning AI-generated responses.
-    When using this API in the frontend, please make sure to include the DOMAIN in the request URL.
-    
-    Example URL: http://api-domain.com/api/v1/ai/c/
-    
-    Please ensure that correct headers are set for requests, especially for JSON content type and JWT.
-    The method expects a POST request with a JSON body containing the 'prompt' field.
-        
-    For fetch API:
-    fetch('http://localhost:8000/api/v1/ai/c/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer YOUR_JWT_TOKEN'
-        },
-        body: JSON.stringify({ prompt: 'Your question here' })
-    })
-    
-    For axios:
-    axios.post('http://localhost:8000/api/v1/ai/c/', {
-        prompt: 'Your question here'
-    }, {
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer YOUR_JWT_TOKEN'
-        }
-    })
+        POST this endpoint with a JSON payload containing a "prompt" key.
 
-    Example Usage:
-    POST /api/v1/ai/c/
-    {
-        "prompt": "How to request a barangay clearance?"
-    }
+        Example Request Body:
+            {
+                "prompt": "How can I report a drug abuse?"
+            }
 
-    Example Response:
-    {
-        "message": "To request a Barangay Clearance, you can follow these steps:\n\n1. Visit the Barangay Hall in your area, as this is where you can initiate the process.\n2. Once you're at the Barangay Hall, fill out the application form provided by the staff.\n \n- Required documents typically include:\n  - A valid ID for identification purposes\n  - Proof of residence to confirm you live in the barangay\n  - Sometimes, a community tax certificate (cedula) may also be required\n\n3. After completing the form and gathering the necessary documents, proceed to pay the required fee.\n4. Submit your application along with the supporting documents and wait for the clearance to be processed.\n\nPlease note that requirements might vary slightly depending on the barangay, so it's a good idea to call ahead or check with the Barangay Hall staff to confirm what you need to bring."
-    }
+        Example Response:
+            {
+                "message": "To report drug abuse, you can contact your local authorities or a helpline."
+            }
+
+        Frontend Integration:
+            Use fetch or axios to POST to this endpoint.
+
+            fetch('/api/chat/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: 'Hello!' })
+            })
+
+            axios.post('/api/chat/', { prompt: 'Hello!' })
+                .then(res => console.log(res.data))
     """
+
     @inject
     def post(self, request: Request, llm_service: LLMService = Provide[AppContainer.llm_service]) -> Response:
 
@@ -66,10 +55,24 @@ class AIChatView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
 
+        response = None
+        
         try:
             response = llm_service.chat(serializer.validated_data['prompt'])
-        except InfrastructureException as e:
-            return Response({"error": str(e)}, status=e.status_code)
             
-        # Logic for processing the chat message and generating a response goes here
+            # I WILL REPLACE THIS WITH THE ACTUAL IMPLEMENTATION OF LOGGING.
+            # FOR NOW, INTERNAL MATTERS WILL BE LOGGED USING PRINT STATEMENTS.
+        except PromptFileException as e:
+            print(f"Prompt file error: {e}")
+            return Response({"error": INTENAL_ERROR}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except DataAccessException as e:
+            print(f"Data access error: {e}")
+            return Response({"error": INTENAL_ERROR}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except InfrastructureException as e:
+            print(f"Infrastructure error: {e}")
+            return Response({"error": INTENAL_ERROR}, status=e.status_code)
+
+        if not response:
+            return Response({"error": "No response generated."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         return Response({"message": response}, status=200)

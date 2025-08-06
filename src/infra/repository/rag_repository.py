@@ -51,10 +51,7 @@ class RAGRepository(IRAGRepository):
             
             response = self.supabase_adapter.rpc(func_name, params).execute()
             
-            if response.error:
-                raise DataAccessException(f"Error executing semantic search: {response.error.message}")
-            
-            if not response.data:
+            if not response.data[0]['id']:
                 raise DataAccessException("No results found for the semantic search.")
 
             return response.data

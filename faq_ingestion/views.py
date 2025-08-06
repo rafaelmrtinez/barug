@@ -13,6 +13,7 @@ from src.app.pipelines.faq_ingestion_pipeline import FAQIngestionPipeline
 from src.infra.exceptions.data_access_exception import DataAccessException
 from src.infra.exceptions.general_infra_exception import InfrastructureException
 
+from barug.constants import INTENAL_ERROR
 from faq_ingestion.serializers.faq_doc import FAQDocumentSerializer
 
 
@@ -33,10 +34,15 @@ class FAQIngestionView(APIView):
                 file=serializer.validated_data['file'],
                 time=serializer.validated_data['created_at']
             )
+            
+            # I WILL REPLACE THIS WITH THE ACTUAL IMPLEMENTATION OF LOGGING.
+            # FOR NOW, INTERNAL MATTERS WILL BE LOGGED USING PRINT STATEMENTS.
         except DataAccessException as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            print(f"DataAccessException: {str(e)}")
+            return Response({"error": INTENAL_ERROR}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except InfrastructureException as e:
-            return Response({"error": str(e)}, status=e.status_code)
+            print(f"InfrastructureException: {str(e)}")
+            return Response({"error": INTENAL_ERROR}, status=e.status_code)
         
         if not result:
             return Response({"error": "Failed to ingest FAQ document"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

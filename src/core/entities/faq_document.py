@@ -2,7 +2,7 @@ import pandas as pd
 from io import BytesIO
 from typing import List, Tuple
 
-from src.core.contracts.document import IDocument
+from src.core.contracts.domain.document import IDocument
 from src.core.enums.faq_doc_extensions import FAQDocExtensions
 from src.core.enums.faq_doc_mimes import FAQDocMimeTypes
 from src.core.exceptions.domain_exceptions import DomainException

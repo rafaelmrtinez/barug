@@ -8,8 +8,6 @@ from src.core.contracts.rag_repository import IRAGRepository
 from src.infra.gateways.hf_embedding import HuggingFaceClient
 from src.infra.repository.rag_repository import RAGRepository
 from src.core.contracts.faq_repo import IFAQIngestionRepository
-from src.core.contracts.document_repository import IDocumentRepository
-from src.infra.repository.document_repository import DocumentRepository
 from src.infra.repository.faq_ingestion_repository import FAQIngestionRepository
 
 
@@ -22,13 +20,6 @@ class InfraContainer(containers.DeclarativeContainer):
     faq_entries_repository: providers.Factory[IFAQIngestionRepository] = providers.Factory(
         FAQIngestionRepository,
         supabase_adapter=supabase_adapter
-    )
-
-    document_repository: providers.Factory[
-        IDocumentRepository
-        ] = providers.Factory(
-            DocumentRepository,
-            supabase_adapter=supabase_adapter
     )
 
     rag_repository: providers.Factory[IRAGRepository] = providers.Factory(
