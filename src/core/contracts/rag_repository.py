@@ -1,10 +1,17 @@
 from abc import ABC, abstractmethod
 from ast import List
 
-class IAIRepository(ABC):
+class IRAGRepository(ABC):
     """
     Interface for AI repository operations.
     """
+    
+    @abstractmethod
+    def get_faq_document_id_order_by_date(self) -> int:
+        """
+        Retrieve the most recent FAQ document ID ordered by upload date.
+        """
+        pass
     
     @abstractmethod
     def exec_semantic_search(func_name: str,

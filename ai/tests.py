@@ -8,7 +8,7 @@ from src.core.contracts.embedding import IEmbedding
 from src.infra.bootstrap.infra_containers import InfraContainer
 from dependency_injector.wiring import inject, Provide
 from src.infra.adapter.supabase_adapter import SupabaseAdapter
-from src.infra.repository.ai_repository import AIRepository
+from src.infra.repository.rag_repository import AIRepository
 from src.infra.repository.document_repository import DocumentRepository
 
 

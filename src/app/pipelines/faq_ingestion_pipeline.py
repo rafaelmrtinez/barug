@@ -11,12 +11,9 @@ class FAQIngestionPipeline:
     
     def __init__(
         self, 
-        doc_repo: IDocumentRepository, 
         faq_entry_repo: IFAQIngestionRepository,
         embedding: IEmbedding
         ):
-        
-        self._doc_repo = doc_repo
         self._faq_entry_repo = faq_entry_repo
         self._embedding = embedding
         
@@ -39,12 +36,11 @@ class FAQIngestionPipeline:
             entry['document_id'] = repo_result
 
     def __doc_insertion(self, file, faq_entries):
-        repo_result = self._doc_repo.insert_faq_document(
+        repo_result = self._faq_entry_repo.insert_faq_document(
             file_name=file.name,
             total_faqs=len(faq_entries),
             uploader="padre@galaxy.com"
-            ).data[0]['id']
-            
+            )
         return repo_result
 
     def __generate_faq_entries(self, result, embeddings):

@@ -1,13 +1,25 @@
-from typing import List
-from src.core.contracts.ai_repository import IAIRepository
+from src.core.contracts.rag_repository import IRAGRepository
 from src.infra.adapter.supabase_adapter import SupabaseAdapter
 from src.infra.exceptions.data_access_exception import DataAccessException
+from postgrest.exceptions import APIError
 
 
-class AIRepository(IAIRepository):
+class RAGRepository(IRAGRepository):
 
     def __init__(self, supabase_adapter: SupabaseAdapter):
         self.supabase_adapter = supabase_adapter.client
+        
+    def get_faq_document_id_order_by_date(self) -> int:
+        """
+        Retrieve a document by its ID.
+        """
+        try:
+            response = self.supabase_adapter.table('faq_document').select('id').order(
+                'uploaded_at', desc=True
+                ).execute()
+            return response.data[0]['id'] if response.data else None
+        except APIError as e:
+            raise DataAccessException(f"Failed to retrieve document: {str(e)}")
 
     def exec_semantic_search(
         self, 

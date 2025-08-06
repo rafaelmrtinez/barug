@@ -1,15 +1,13 @@
 from dependency_injector import containers, providers
 
-from src.core.contracts.ai_repository import IAIRepository
+from src.core.contracts.rag_repository import IRAGRepository
 from src.core.contracts.document_repository import IDocumentRepository
 from src.core.contracts.embedding import IEmbedding
 from src.core.contracts.faq_repo import IFAQIngestionRepository
 from src.core.contracts.llm import ILLM
-from src.infra.adapter.supabase_adapter import SupabaseAdapter
 from src.infra.gateways.groq_client import GroqClient
 from src.infra.gateways.hf_embedding import HuggingFaceClient
-from src.infra.repository.ai_repository import AIRepository
-from src.infra.repository.ai_repository import AIRepository
+from src.infra.repository.rag_repository import RAGRepository
 from src.infra.repository.document_repository import DocumentRepository
 from src.infra.repository.faq_ingestion_repository import FAQIngestionRepository
 
@@ -32,8 +30,8 @@ class InfraContainer(containers.DeclarativeContainer):
             supabase_adapter=supabase_adapter
     )
 
-    ai_repository: providers.Factory[IAIRepository] = providers.Factory(
-        AIRepository,
+    rag_repository: providers.Factory[IRAGRepository] = providers.Factory(
+        RAGRepository,
         supabase_adapter=supabase_adapter,
     )
 
@@ -45,7 +43,7 @@ class InfraContainer(containers.DeclarativeContainer):
         url=config.HF_URL
     )
 
-    groq_client: providers.Singleton[ILLM] = providers.Singleton(
+    llm_client: providers.Singleton[ILLM] = providers.Singleton(
         GroqClient,
         api_key=config.AI_API_KEY,
         model=config.AI_MODEL

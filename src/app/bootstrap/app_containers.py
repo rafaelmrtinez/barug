@@ -14,17 +14,15 @@ class AppContainer(containers.DeclarativeContainer):
     
     faq_ingestion_pipeline = providers.Factory(
         FAQIngestionPipeline,
-        doc_repo=infra.document_repository , 
         faq_entry_repo=infra.faq_entries_repository ,
         embedding=infra.embedding
     )
     
     rag_pipeline = providers.Factory(
         RAGPipeline,
-        repos=infra.ai_repository,
+        repos=infra.rag_repository,
         embedding=infra.embedding,
-        llm=infra.groq_client,
-        doc_repo=infra.document_repository
+        llm=infra.llm_client,
     )
     
     llm_service = providers.Factory(
