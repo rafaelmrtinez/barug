@@ -26,7 +26,7 @@ class DocumentRepository(IDocumentRepository):
         Retrieve a document by its ID.
         """
         try:
-            return self.supabase_adapter.table('faq_document').select('id').order('uploaded_at', desc=True).execute().data[0]['id']
+            return self.supabase_adapter.get_client().table('faq_document').select('id').order('uploaded_at', desc=True).execute().data[0]['id']
         except Exception as e:
             raise DataAccessException(f"Failed to retrieve document: {str(e)}")
 

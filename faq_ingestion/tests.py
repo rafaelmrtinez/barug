@@ -55,20 +55,25 @@ class FAQIngestionServiceTestCase(TestCase):
             {
                 "question": question,
                 "answer": answer,
-                "embedding": embedding
+                "embedding": embedding,
+                "document_id": None
             }
             for (question, answer), embedding in zip(result, embeddings)
         ]
-        faq_entries_repo = FAQEntriesRepository(supabase_adapter=supabase)
         doc_repo = DocumentRepository(supabase_adapter=supabase)
+        faq_entries_repo = FAQEntriesRepository(supabase_adapter=supabase)
         repo_result = doc_repo.insert_faq_document(
             file_name=self.file.name,
             total_faqs=len(faq_entries),
             uploader="padre@galaxy.com"
-            )
+            ).data[0]['id']
+        
+        for entry in faq_entries:
+            entry['document_id'] = repo_result
+        
+        pprint(f"Document ID: {repo_result}")
         faq_entry_result = faq_entries_repo.insert_bulk_faq_entries(faq_entries)
         print(f"Document Insert Result: {repo_result}")
-        print(f"FAQ Entries Insert Result: {faq_entry_result}")
 
 class FAQIngestionFAQEntryUploadTestCase(TestCase):
 

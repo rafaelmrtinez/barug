@@ -3,6 +3,7 @@ from dependency_injector import containers, providers
 from src.core.contracts.ai_repository import IAIRepository
 from src.core.contracts.document_repository import IDocumentRepository
 from src.core.contracts.embedding import IEmbedding
+from src.core.contracts.faq_repo import IFAQEntriesRepository
 from src.core.contracts.llm import ILLM
 from src.infra.adapter.supabase_adapter import SupabaseAdapter
 from src.infra.gateways.groq_client import GroqClient
@@ -10,6 +11,7 @@ from src.infra.gateways.hf_embedding import HuggingFaceClient
 from src.infra.repository.ai_repository import AIRepository
 from src.infra.repository.ai_repository import AIRepository
 from src.infra.repository.document_repository import DocumentRepository
+from src.infra.repository.faq_entries_repository import FAQEntriesRepository
 
 
 class InfraContainer(containers.DeclarativeContainer):
@@ -17,6 +19,11 @@ class InfraContainer(containers.DeclarativeContainer):
     config = providers.Configuration()
 
     supabase_adapter = providers.Object(None)
+    
+    faq_entries_repository: providers.Factory[IFAQEntriesRepository] = providers.Factory(
+        FAQEntriesRepository,
+        supabase_adapter=supabase_adapter
+    )
 
     document_repository: providers.Factory[
         IDocumentRepository
@@ -30,7 +37,7 @@ class InfraContainer(containers.DeclarativeContainer):
         supabase_adapter=supabase_adapter,
     )
 
-    hf_embedding: providers.Singleton[IEmbedding] = providers.Singleton(
+    embedding: providers.Singleton[IEmbedding] = providers.Singleton(
         HuggingFaceClient,
         provider=config.HF_PROVIDER,
         api_key=config.HF_API_KEY,
