@@ -41,6 +41,7 @@ class GroqClient(ILLM):
             response = self._client.chat.completions.create(
                 messages=[self.__message_template(prompt)],
                 model=self._model,
+                temperature=0.7
             )
             
             return response.choices[0].message.content
