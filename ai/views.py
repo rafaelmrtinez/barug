@@ -3,12 +3,18 @@ from rest_framework.views import APIView
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+
+from django_ratelimit.decorators import ratelimit
+from django.utils.decorators import method_decorator
+from django_ratelimit.exceptions import Ratelimited
+
 from dependency_injector.wiring import inject, Provide
 
 
 from ai.serializers.chat import ChatSerializer
-from barug.constants import INTENAL_ERROR
+from barug.constants import INTERNAL_ERROR
 
+from barug.utils.rate_limiter import CustomRateLimiter
 from src.app.services.llm import LLMService
 from src.app.bootstrap.app_containers import AppContainer
 from src.app.exceptions.prompt_file_exception import PromptFileException
@@ -24,17 +30,17 @@ class AIChatView(APIView):
 
         POST this endpoint with a JSON payload containing a "prompt" key.
 
-        Example Request Body:
+        EXAMPLE REQUEST USING WEB BROWSER OR BROWSABLE API:
             {
                 "prompt": "How can I report a drug abuse?"
             }
 
-        Example Response:
+        EXAMPLE RESPONSE USING WEB BROWSER OR BROWSABLE API:
             {
                 "message": "To report drug abuse, you can contact your local authorities or a helpline."
             }
 
-        Frontend Integration:
+        FRONTEND INTEGRATION:
             Use fetch or axios to POST to this endpoint.
 
             fetch('/api/chat/', {
@@ -45,10 +51,21 @@ class AIChatView(APIView):
 
             axios.post('/api/chat/', { prompt: 'Hello!' })
                 .then(res => console.log(res.data))
+                
+        IF THE ABOVE METHODS ARE NOT WORKING, YOU CAN TRY THIS, CALL USING THE COMPLETE URL:
+            fetch('http://localhost:8000/api/chat/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: 'Hello!' })
+            })
     """
-
+    
+    @method_decorator(ratelimit(key='user_or_ip', rate='10/s', block=False))
     @inject
     def post(self, request: Request, llm_service: LLMService = Provide[AppContainer.llm_service]) -> Response:
+        
+        if CustomRateLimiter.is_ratelimited(request=request):
+            return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
 
         serializer = ChatSerializer(data=request.data)
 
@@ -59,19 +76,22 @@ class AIChatView(APIView):
         
         try:
             response = llm_service.chat(serializer.validated_data['prompt'])
-            
+
             # I WILL REPLACE THIS WITH THE ACTUAL IMPLEMENTATION OF LOGGING.
             # FOR NOW, INTERNAL MATTERS WILL BE LOGGED USING PRINT STATEMENTS.
         except PromptFileException as e:
             print(f"Prompt file error: {e}")
-            return Response({"error": INTENAL_ERROR}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": INTERNAL_ERROR}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except DataAccessException as e:
             print(f"Data access error: {e}")
-            return Response({"error": INTENAL_ERROR}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": INTERNAL_ERROR}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except InfrastructureException as e:
             print(f"Infrastructure error: {e}")
-            return Response({"error": INTENAL_ERROR}, status=e.status_code)
-
+            return Response({"error": INTERNAL_ERROR}, status=e.status_code)
+        except Ratelimited as e:
+            print(f"Rate limit exceeded: {e}")
+            return Response({"error": "Too many request. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        print("Response from LLM service: ", response)
         if not response:
             return Response({"error": "No response generated."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

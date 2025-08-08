@@ -117,6 +117,34 @@ REST_FRAMEWORK = {
     ]
 }
 
+# PLEASE READ THIS!!!!
+# 
+# The purpose of this cache is to implement rate limiting for the API.
+# I recommend that this will be reviewed by other members including the team lead
+# to ensure that this is the best approach for rate limiting.
+# 
+# An efficient alternative is to use DATABASE CACHING since we have a good database
+# server. 
+# 
+# LocMemCache is used because it is simple and does not require any additional setup.
+# It is suitable for development and testing, but not recommended for production.
+# To cache the entire site is to add 
+# 'django.middleware.cache.UpdateCacheMiddleware' and 'django.middleware.cache.FetchFromCacheMiddleware' to MIDDLEWARE.
+# 
+# PLEASE READ THIS!!!!
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake'
+    },
+    'cache-for-ratelimiting': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'rate-limit-cache'
+    },
+}
+# PLEASE READ THIS!!!!
+
+RATELIMIT_USE_CACHE = 'cache-for-ratelimiting'
 
 ROOT_URLCONF = "barug.urls"
 

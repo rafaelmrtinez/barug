@@ -13,12 +13,33 @@ from src.app.pipelines.faq_ingestion_pipeline import FAQIngestionPipeline
 from src.infra.exceptions.data_access_exception import DataAccessException
 from src.infra.exceptions.general_infra_exception import InfrastructureException
 
-from barug.constants import INTENAL_ERROR
+from barug.constants import INTERNAL_ERROR
 from faq_ingestion.serializers.faq_doc import FAQDocumentSerializer
 
 
 # Create your views here.
 class FAQIngestionView(APIView):
+
+    """
+        Handles the ingestion of FAQ documents.
+        Only type of excel files are supported.
+        
+        To be able to use this endpoint, make sure
+        that Question and Answer columns are present
+        in the excel file as headers.
+        
+        POST this endpoint with a file payload containing the FAQ document.
+        
+        You can use the following parameters when making a POST request:
+        - file: The FAQ document to be ingested (must be an Excel file).
+        - created_at: The timestamp when the document was created (optional, defaults to current time).
+        
+    Returns:
+        _type_: Response
+        - 200: If the ingestion is successful.
+        - 400: If the request data is invalid.
+        - 500: If there is an internal server error.
+    """
 
     parser_classes = [MultiPartParser, FormParser]
     
@@ -39,10 +60,10 @@ class FAQIngestionView(APIView):
             # FOR NOW, INTERNAL MATTERS WILL BE LOGGED USING PRINT STATEMENTS.
         except DataAccessException as e:
             print(f"DataAccessException: {str(e)}")
-            return Response({"error": INTENAL_ERROR}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": INTERNAL_ERROR}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except InfrastructureException as e:
             print(f"InfrastructureException: {str(e)}")
-            return Response({"error": INTENAL_ERROR}, status=e.status_code)
+            return Response({"error": INTERNAL_ERROR}, status=e.status_code)
         
         if not result:
             return Response({"error": "Failed to ingest FAQ document"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
