@@ -3,7 +3,7 @@
 
 staticfiles/
 *.http
-supabase_client_dev.py
+# supabase_client_dev.py
 test_data.xlsx
 
 
