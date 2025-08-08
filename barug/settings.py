@@ -16,6 +16,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+AI_API_KEY = os.getenv("AI_API_KEY")
+AI_MODEL = os.getenv("AI_MODEL")
+
+EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER")
+EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
+EMBEDDING_URL = os.getenv("EMBEDDING_URL")
+
 # DATA FROM .env
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
@@ -67,6 +75,8 @@ ALLOWED_HOSTS = ['192.168.1.2', "*"]
 # Application definition
 
 INSTALLED_APPS = [
+    "faq_ingestion.apps.FaqIngestionConfig",
+    "ai.apps.AiConfig",
     "metrics.apps.MetricsConfig",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -102,8 +112,39 @@ MIDDLEWARE = [
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+    ]
 }
 
+# PLEASE READ THIS!!!!
+# 
+# The purpose of this cache is to implement rate limiting for the API.
+# I recommend that this will be reviewed by other members including the team lead
+# to ensure that this is the best approach for rate limiting.
+# 
+# An efficient alternative is to use DATABASE CACHING since we have a good database
+# server. 
+# 
+# LocMemCache is used because it is simple and does not require any additional setup.
+# It is suitable for development and testing, but not recommended for production.
+# To cache the entire site is to add 
+# 'django.middleware.cache.UpdateCacheMiddleware' and 'django.middleware.cache.FetchFromCacheMiddleware' to MIDDLEWARE.
+# 
+# PLEASE READ THIS!!!!
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake'
+    },
+    'cache-for-ratelimiting': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'rate-limit-cache'
+    },
+}
+# PLEASE READ THIS!!!!
+
+RATELIMIT_USE_CACHE = 'cache-for-ratelimiting'
 
 ROOT_URLCONF = "barug.urls"
 
