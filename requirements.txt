@@ -14,6 +14,7 @@ dependency-injector==4.48.1
 deprecation==2.1.0
 distro==1.9.0
 Django==5.2.3
+django-ratelimit==4.1.0
 django-bootstrap-icons==0.9.0
 django-bootstrap5==25.1
 djangorestframework==3.16.0
