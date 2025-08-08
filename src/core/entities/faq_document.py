@@ -1,3 +1,4 @@
+import zipfile
 import pandas as pd
 from io import BytesIO
 from typing import List, Tuple
@@ -22,6 +23,10 @@ class FAQDocument(IDocument):
 
     def __data_extractor(self)  -> List[Tuple[str, str]]:
         bytes_data = BytesIO(self.file.read())
+
+        if not zipfile.is_zipfile(bytes_data):
+            raise DomainException("Uploaded file is not a zip file.")
+
         df = pd.read_excel(bytes_data, engine='openpyxl')
         headers = df.columns.str.lower().tolist()
         missing_headers = set(self.REQUIRED_HEADERS) - set(headers)
