@@ -29,10 +29,10 @@ class InfraContainer(containers.DeclarativeContainer):
 
     embedding: providers.Singleton[IEmbedding] = providers.Singleton(
         HuggingFaceClient,
-        provider=config.HF_PROVIDER,
-        api_key=config.HF_API_KEY,
-        model=config.HF_MODEL,
-        url=config.HF_URL
+        provider=config.EMBEDDING_PROVIDER,
+        api_key=config.EMBEDDING_API_KEY,
+        model=config.EMBEDDING_MODEL,
+        url=config.EMBEDDING_URL
     )
 
     llm_client: providers.Singleton[ILLM] = providers.Singleton(

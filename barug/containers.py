@@ -9,10 +9,10 @@ infra = InfraContainer()
 infra.config.from_dict({
     'AI_API_KEY': settings.AI_API_KEY,
     'AI_MODEL': settings.AI_MODEL,
-    'HF_PROVIDER': settings.HF_PROVIDER,
-    'HF_API_KEY': settings.HF_API_KEY,
-    'HF_MODEL': settings.HF_MODEL,
-    'HF_URL': settings.HF_URL
+    'EMBEDDING_PROVIDER': settings.EMBEDDING_PROVIDER,
+    'EMBEDDING_API_KEY': settings.EMBEDDING_API_KEY,
+    'EMBEDDING_MODEL': settings.EMBEDDING_MODEL,
+    'EMBEDDING_URL': settings.EMBEDDING_URL
 })
 
 infra.supabase_adapter.override(SupabaseAdapter(client=supabase))

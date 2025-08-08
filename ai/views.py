@@ -15,7 +15,7 @@ from ai.serializers.chat import ChatSerializer
 from barug.constants import INTERNAL_ERROR
 
 from barug.utils.rate_limiter import CustomRateLimiter
-from src.app.services.llm import LLMService
+from src.core.contracts.app.pipeline import IPipeline
 from src.app.bootstrap.app_containers import AppContainer
 from src.app.exceptions.prompt_file_exception import PromptFileException
 from src.infra.exceptions.data_access_exception import DataAccessException
@@ -62,7 +62,7 @@ class AIChatView(APIView):
     
     @method_decorator(ratelimit(key='user_or_ip', rate='10/s', block=False))
     @inject
-    def post(self, request: Request, llm_service: LLMService = Provide[AppContainer.llm_service]) -> Response:
+    def post(self, request: Request, pipeline: IPipeline = Provide[AppContainer.rag_pipeline]) -> Response:
         
         if CustomRateLimiter.is_ratelimited(request=request):
             return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
@@ -75,7 +75,7 @@ class AIChatView(APIView):
         response = None
         
         try:
-            response = llm_service.chat(serializer.validated_data['prompt'])
+            response = pipeline.exec(serializer.validated_data['prompt'])
 
             # I WILL REPLACE THIS WITH THE ACTUAL IMPLEMENTATION OF LOGGING.
             # FOR NOW, INTERNAL MATTERS WILL BE LOGGED USING PRINT STATEMENTS.
@@ -91,7 +91,7 @@ class AIChatView(APIView):
         except Ratelimited as e:
             print(f"Rate limit exceeded: {e}")
             return Response({"error": "Too many request. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
-        print("Response from LLM service: ", response)
+
         if not response:
             return Response({"error": "No response generated."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

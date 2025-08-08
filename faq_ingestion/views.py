@@ -9,7 +9,7 @@ from dependency_injector.wiring import inject, Provide
 
 
 from src.app.bootstrap.app_containers import AppContainer
-from src.app.pipelines.faq_ingestion_pipeline import FAQIngestionPipeline
+from src.core.contracts.app.pipeline import IPipeline
 from src.infra.exceptions.data_access_exception import DataAccessException
 from src.infra.exceptions.general_infra_exception import InfrastructureException
 
@@ -44,7 +44,7 @@ class FAQIngestionView(APIView):
     parser_classes = [MultiPartParser, FormParser]
     
     @inject
-    def post(self, request: Request, pipeline: FAQIngestionPipeline = Provide[AppContainer.faq_ingestion_pipeline]) -> Response:
+    def post(self, request: Request, pipeline: IPipeline = Provide[AppContainer.faq_ingestion_pipeline]) -> Response:
         serializer = FAQDocumentSerializer(data=request.data)
         
         if not serializer.is_valid():

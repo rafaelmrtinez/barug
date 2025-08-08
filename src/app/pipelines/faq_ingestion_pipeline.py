@@ -2,11 +2,11 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 
 
 from src.core.contracts.embedding import IEmbedding
+from src.core.contracts.app.pipeline import IPipeline
 from src.core.entities.faq_document import FAQDocument
 from src.core.contracts.faq_repo import IFAQIngestionRepository
 
-
-class FAQIngestionPipeline:
+class FAQIngestionPipeline(IPipeline):
     
     def __init__(
         self, 

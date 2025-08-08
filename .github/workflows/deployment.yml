@@ -27,7 +27,14 @@ jobs:
       EMAIL_HOST_USER: ${{ secrets.EMAIL_HOST_USER }}
       EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
       PRODUCTION: ${{ secrets.PRODUCTION }}
-
+      SUPABASE_TESTING_URL: ${{ secrets.SUPABASE_TESTING_URL }}
+      SUPABASE_TEST_ANON_KEY: ${{ secrets.SUPABASE_TEST_ANON_KEY }}
+      AI_API_KEY: ${{ secrets.AI_API_KEY }}
+      AI_MODEL: ${{ secrets.AI_MODEL }}
+      EMBEDDING_PROVIDER: ${{ secrets.EMBEDDING_PROVIDER }}
+      EMBEDDING_API_KEY: ${{ secrets.EMBEDDING_API_KEY }}
+      EMBEDDING_MODEL: ${{ secrets.EMBEDDING_MODEL }}
+      EMBEDDING_URL: ${{ secrets.EMBEDDING_URL }}
     steps:
       - uses: actions/checkout@v4
 

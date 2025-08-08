@@ -1,8 +1,8 @@
 from dependency_injector import containers, providers
 
 
-from src.app.services.llm import LLMService
 from src.app.pipelines.rag_pipeline import RAGPipeline
+from src.core.contracts.app.pipeline import IPipeline
 from src.app.pipelines.faq_ingestion_pipeline import FAQIngestionPipeline
 
 
@@ -13,20 +13,15 @@ class AppContainer(containers.DeclarativeContainer):
     
     infra  = providers.DependenciesContainer()
     
-    faq_ingestion_pipeline = providers.Factory(
+    faq_ingestion_pipeline: providers.Factory[IPipeline] = providers.Factory(
         FAQIngestionPipeline,
         faq_entry_repo=infra.faq_entries_repository ,
         embedding=infra.embedding
     )
     
-    rag_pipeline = providers.Factory(
+    rag_pipeline: providers.Factory[IPipeline] = providers.Factory(
         RAGPipeline,
         repos=infra.rag_repository,
         embedding=infra.embedding,
         llm=infra.llm_client,
-    )
-    
-    llm_service = providers.Factory(
-        LLMService,
-        rag_pipeline=rag_pipeline
     )
