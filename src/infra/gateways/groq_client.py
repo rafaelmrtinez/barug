@@ -56,6 +56,4 @@ class GroqClient(ILLM):
         """
         return {
             "model_name": self._client.model_name,
-            "version": self._client.version,
-            "api_key": self._api_key
         }
