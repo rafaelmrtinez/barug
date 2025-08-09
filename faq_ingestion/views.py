@@ -5,15 +5,22 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 
 
+from django_ratelimit.decorators import ratelimit
+from django.utils.decorators import method_decorator
 from dependency_injector.wiring import inject, Provide
 
 
-from src.app.bootstrap.app_containers import AppContainer
 from src.core.contracts.app.pipeline import IPipeline
+from src.app.bootstrap.app_containers import AppContainer
+from src.core.exceptions.domain_exceptions import DomainException
 from src.infra.exceptions.data_access_exception import DataAccessException
 from src.infra.exceptions.general_infra_exception import InfrastructureException
 
+
 from barug.constants import INTERNAL_ERROR
+from barug.utils.rate_limiter import CustomRateLimiter
+
+
 from faq_ingestion.serializers.faq_doc import FAQDocumentSerializer
 
 
@@ -43,8 +50,13 @@ class FAQIngestionView(APIView):
 
     parser_classes = [MultiPartParser, FormParser]
     
+    @method_decorator(ratelimit(key='user_or_ip', rate='10/s', block=False))
     @inject
     def post(self, request: Request, pipeline: IPipeline = Provide[AppContainer.faq_ingestion_pipeline]) -> Response:
+        
+        if CustomRateLimiter.is_ratelimited(request=request):
+            return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        
         serializer = FAQDocumentSerializer(data=request.data)
         
         if not serializer.is_valid():
@@ -58,6 +70,9 @@ class FAQIngestionView(APIView):
             
             # I WILL REPLACE THIS WITH THE ACTUAL IMPLEMENTATION OF LOGGING.
             # FOR NOW, INTERNAL MATTERS WILL BE LOGGED USING PRINT STATEMENTS.
+        except DomainException as e:
+            print(f"DomainException: {str(e)}")
+            return Response({"error": INTERNAL_ERROR}, status=status.HTTP_400_BAD_REQUEST)
         except DataAccessException as e:
             print(f"DataAccessException: {str(e)}")
             return Response({"error": INTERNAL_ERROR}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

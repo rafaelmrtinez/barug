@@ -5,17 +5,18 @@ from rest_framework.response import Response
 
 
 from django_ratelimit.decorators import ratelimit
-from django.utils.decorators import method_decorator
 from django_ratelimit.exceptions import Ratelimited
+from django.utils.decorators import method_decorator
 
 from dependency_injector.wiring import inject, Provide
 
 
-from ai.serializers.chat import ChatSerializer
 from barug.constants import INTERNAL_ERROR
+from ai.serializers.chat import ChatSerializer
 
-from barug.utils.rate_limiter import CustomRateLimiter
+
 from src.core.contracts.app.pipeline import IPipeline
+from barug.utils.rate_limiter import CustomRateLimiter
 from src.app.bootstrap.app_containers import AppContainer
 from src.app.exceptions.prompt_file_exception import PromptFileException
 from src.infra.exceptions.data_access_exception import DataAccessException
