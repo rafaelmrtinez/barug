@@ -119,4 +119,8 @@ def family_info(request):
         'page_title' : 'Resident Records',
         'user_role_template' : user_role_template,
         'form' : form,
+<<<<<<< HEAD
     })
+=======
+    })
+>>>>>>> b910daa1f305ba4e34ee46579bd1c7883f32bbb9

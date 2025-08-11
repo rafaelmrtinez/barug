@@ -9,6 +9,7 @@ import requests
 from authentication.utils.email_helpers import send_signup_confirmation_link
 from authentication.utils.supabase_auth import delete_supabase_user
 
+<<<<<<< HEAD
 from resident.verification.ocr_utils import validate_doc_from_images
 from PIL import Image, UnidentifiedImageError
 
@@ -41,6 +42,11 @@ JWT_ALGORITHM = "HS256"
 
 import os, uuid, tempfile
 from rest_framework.parsers import MultiPartParser, FormParser
+=======
+JWT_SECRET = settings.SECRET_KEY
+JWT_ALGORITHM = "HS256"
+
+>>>>>>> b910daa1f305ba4e34ee46579bd1c7883f32bbb9
 
 class ResidentRegisterAPIView(APIView):
     def post(self, request):
@@ -230,6 +236,7 @@ class ResidentProfileAPIView(APIView):
         except jwt.ExpiredSignatureError:
             return Response({"error": "Token expired."}, status=401)
         except jwt.InvalidTokenError:
+<<<<<<< HEAD
             return Response({"error": "Invalid token."}, status=401)
 
 
@@ -418,3 +425,6 @@ class PersonVerificationRequestAPIView(APIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+=======
+            return Response({"error": "Invalid token."}, status=401)
+>>>>>>> b910daa1f305ba4e34ee46579bd1c7883f32bbb9

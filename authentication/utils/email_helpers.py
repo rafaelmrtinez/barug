@@ -19,7 +19,11 @@ def send_signup_confirmation_link(email: str) -> bool:
     }
 
     generate_resp = requests.post(generate_link_url, headers=headers, json=payload)
+<<<<<<< HEAD
     print(generate_resp.json())
+=======
+
+>>>>>>> b910daa1f305ba4e34ee46579bd1c7883f32bbb9
     if generate_resp.status_code not in [200, 201]:
         print("❌ Failed to generate confirmation link.")
         return False

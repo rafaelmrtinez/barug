@@ -16,6 +16,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+AI_API_KEY = os.getenv("AI_API_KEY")
+AI_MODEL = os.getenv("AI_MODEL")
+
+EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER")
+EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
+EMBEDDING_URL = os.getenv("EMBEDDING_URL")
+
 # DATA FROM .env
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
@@ -27,16 +35,17 @@ SENDGRID_FROM_EMAIL = 'raphaelbellosillo1230@gmail.com' # Your verified sender e
 SENDGRID_FROM_NAME = 'BaRUG'  # Name displayed in inbox
 
 # GMAIL SMTP
-EMAIL_BACKEND = os.getenv("EMAIL_BACKEND")
-EMAIL_HOST = os.getenv("EMAIL_HOST")
-EMAIL_PORT = os.getenv("EMAIL_PORT")
-EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS")
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = "raphaelbellosillo1230@gmail.com"
+EMAIL_HOST_PASSWORD = "sfpa gadp dpnj licq"
 
+API_VERSION = "v1"  # API version for event logs
 
 # LOCALHOST URL USED
-TESTING_URL_USED = 'http://192.168.1.6:8000'
+TESTING_URL_USED = 'http://192.168.1.2:8000'
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -50,13 +59,26 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-_&rs=&x9thq+*#q_(013+n5gv68^@0^c7_h6q^t%m&=1s1vsck"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# PLEASE DO NOT REMOVE OR MODIFY UNLESS REQUIRED!!!!
+# THIS IS USED BY THE WEB APP TO DETERMINE DEPLOYMENT AND DEVELOPMENT ENVIRONMENTS
+isProduction = os.getenv("PRODUCTION")
+print("isProduction: ", isProduction)
+if isProduction != None and isProduction == "True":
+    print("Production mode enabled")
+    DEBUG = False
+else:
+    print("Development mode enabled")
+    DEBUG = True
 
 ALLOWED_HOSTS = ['192.168.1.6']
+ALLOWED_HOSTS = ['192.168.1.2', "*"]
 
 # Application definition
 
 INSTALLED_APPS = [
+    "faq_ingestion.apps.FaqIngestionConfig",
+    "ai.apps.AiConfig",
+    "metrics.apps.MetricsConfig",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -80,6 +102,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -90,8 +113,39 @@ MIDDLEWARE = [
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+    ]
 }
 
+# PLEASE READ THIS!!!!
+# 
+# The purpose of this cache is to implement rate limiting for the API.
+# I recommend that this will be reviewed by other members including the team lead
+# to ensure that this is the best approach for rate limiting.
+# 
+# An efficient alternative is to use DATABASE CACHING since we have a good database
+# server. 
+# 
+# LocMemCache is used because it is simple and does not require any additional setup.
+# It is suitable for development and testing, but not recommended for production.
+# To cache the entire site is to add 
+# 'django.middleware.cache.UpdateCacheMiddleware' and 'django.middleware.cache.FetchFromCacheMiddleware' to MIDDLEWARE.
+# 
+# PLEASE READ THIS!!!!
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake'
+    },
+    'cache-for-ratelimiting': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'rate-limit-cache'
+    },
+}
+# PLEASE READ THIS!!!!
+
+RATELIMIT_USE_CACHE = 'cache-for-ratelimiting'
 
 ROOT_URLCONF = "barug.urls"
 
@@ -171,6 +225,14 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "event_logs/static/event_logs"),
     os.path.join(BASE_DIR, "resident/static/resident"),
 ]
+
+# By practice the API should not server static files in production.
+# Instead, a web server like Nginx or Apache should be used to serve static files
+# However, exceptions can be made especially when deploying on platforms that do not support custom web servers.
+# THIS LINE SHOULD NOT BE REMOVED UNLESS YOU KNOW WHAT YOU ARE DOING
+if not DEBUG:
+    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
