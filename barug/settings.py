@@ -36,7 +36,7 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 
 
 # LOCALHOST URL USED
-TESTING_URL_USED = 'http://192.168.1.2:8000'
+TESTING_URL_USED = 'http://192.168.1.6:8000'
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -52,7 +52,7 @@ SECRET_KEY = "django-insecure-_&rs=&x9thq+*#q_(013+n5gv68^@0^c7_h6q^t%m&=1s1vsck
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['192.168.1.2']
+ALLOWED_HOSTS = ['192.168.1.6']
 
 # Application definition
 
