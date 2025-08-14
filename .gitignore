@@ -1,6 +1,7 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python,django,node,database
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,django,node,database
 
+integration/
 staticfiles/
 *.http
 # supabase_client_dev.py
