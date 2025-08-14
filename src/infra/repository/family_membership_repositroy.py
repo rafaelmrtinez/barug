@@ -1,5 +1,9 @@
+from postgrest.exceptions import APIError
+
+
 from src.infra.adapter.supabase_adapter import SupabaseAdapter
 from src.core.contracts.infra.family_membership import IFamilyMembershipRepository
+from src.infra.exceptions.data_access_exception import DataAccessException
 
 
 class FamilyMembershipRepository(IFamilyMembershipRepository):
@@ -60,12 +64,19 @@ class FamilyMembershipRepository(IFamilyMembershipRepository):
         Returns:
             str: The ID of the newly created family unit.
         """
-        query = (
-            self.client.rpc('join_existing_family_unit', params=data)
+        try:
+            query = (
+            self.client
+            .rpc('join_existing_family_unit', params=data)
+            .execute()
         )
-        if not query:
-            return None
-        return query.data['v_housemember_req_id']
+            if not query:
+                return None
+            print(query.data)
+            return query['v_housemember_req_id']
+        except APIError as e:
+            raise DataAccessException(str(e.message))
+            
         
     def get_family_unit_id(self, id: str) -> str:
         """Retrieves the family unit ID for a given resident ID.
