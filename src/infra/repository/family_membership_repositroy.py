@@ -1,9 +1,14 @@
+from unittest import result
 from postgrest.exceptions import APIError
 
 
 from src.infra.adapter.supabase_adapter import SupabaseAdapter
 from src.core.contracts.infra.family_membership import IFamilyMembershipRepository
 from src.infra.exceptions.data_access_exception import DataAccessException
+from src.infra.exceptions.supabase_sdk.family_member_exist import FamilyMemberAlreadyExistException
+from src.infra.exceptions.supabase_sdk.foreign_key import ForeignKeyException
+from src.infra.exceptions.supabase_sdk.missing_response import MissingResponseException
+from src.infra.exceptions.supabase_sdk.pending_join_family_request import PendingFamilyRequestException
 
 
 class FamilyMembershipRepository(IFamilyMembershipRepository):
@@ -13,47 +18,60 @@ class FamilyMembershipRepository(IFamilyMembershipRepository):
     
     def get_family_active_status(self, id: str) -> bool:
         """Retrieves the current status of the family"""
-        query = (
-            self.client
-            .table('family_unit')
-            .select('is_active')
-            .eq('family_id', id)
-            .maybe_single()
-            .execute()
-        )
-        return bool(query.data['is_active'])
+        try:
+            query = (
+                self.client
+                .table('family_unit')
+                .select('is_active')
+                .eq('family_id', id)
+                .maybe_single()
+                .execute()
+            )
+            if not query:
+                raise DataAccessException("Family unit not found.")
+            return bool(query.data['is_active'])
+        except APIError as e:
+            if str(e.code) == '204' and str(e.message) == 'Missing response':
+                raise MissingResponseException("Data source returned a 204 No Content — possibly empty dataset.")
+            raise e
     
     def find_resident_per_household(self, id: str) -> int:
         """Searched every household if a resident already a member or not"""
-        query = (
-            self.client
-            .table('house_member')
-            .select('person_id', count='exact')
-            .eq('person_id', id)
-            .maybe_single()
-            .execute()
-        )
-        
-        if not query:
-            return None
-        
-        return  int(query.data['count'])
+        try:
+            query = (
+                self.client
+                .table('house_member')
+                .select('person_id', count='exact')
+                .eq('person_id', id)
+                .maybe_single()
+                .execute()
+            )
+            if not query:
+                return None
+            return  int(query.data['count'])
+        except APIError as e:
+            if str(e.code) == '204' and str(e.message) == 'Missing response':
+                raise MissingResponseException("Data source returned a 204 No Content — possibly empty dataset.")
+            raise e
         
     def get_household_id(self, id: str) -> str:
         """Fetches the ID of the household"""
-        query = (
-            self.client
-            .table('household_info')
-            .select('household_id')
-            .eq('household_id', id)
-            .maybe_single()
-            .execute()
-        )
-        
-        if not query:
-            return None
-        
-        return str(query.data['household_id'])
+        try:
+            query = (
+                self.client
+                .table('household_info')
+                .select('household_id')
+                .eq('household_id', id)
+                .maybe_single()
+                .execute()
+            )
+            if not query:
+                return None
+            return str(query.data['household_id'])
+        except APIError as e:
+            if str(e.code) == '204' and str(e.message) == 'Missing response':
+                raise MissingResponseException("Data source returned a 204 No Content — possibly empty dataset.")
+            raise e
         
     def join_family_unit(self, data) -> str:
         """Join a resident to a family unit.
@@ -72,10 +90,15 @@ class FamilyMembershipRepository(IFamilyMembershipRepository):
         )
             if not query:
                 return None
-            print(query.data)
-            return query['v_housemember_req_id']
+            return query.data
         except APIError as e:
-            raise DataAccessException(str(e.message))
+            if getattr(e, 'code') == '23503' and str(e.message).__contains__('violates foreign key constraint'):
+                raise ForeignKeyException(str(e.message).upper())
+            if getattr(e, 'code') == 'P5035' and getattr(e, 'message') == 'You already have a pending request to join a household.':
+                raise PendingFamilyRequestException(str(e.message).upper())
+            if getattr(e, 'code') == '22P02' and getattr(e, 'message') == 'invalid input syntax for type integer: "You are already a member of this family unit."':
+                raise FamilyMemberAlreadyExistException(str(e.message).upper())
+            raise e
             
         
     def get_family_unit_id(self, id: str) -> str:
@@ -87,17 +110,21 @@ class FamilyMembershipRepository(IFamilyMembershipRepository):
         Returns:
             str: is_active
         """
-        query = (
-            self.client
-            .table('family_unit')
-            .select('family_id')
-            .eq('family_id', id)
-            .maybe_single()
-            .execute()
-        )
-        if not query:
-            return None
-        return str(query['family_id'])
+        try:
+            query = (
+                self.client
+                .table('family_unit')
+                .select('family_id')
+                .eq('family_id', id)
+                .maybe_single()
+                .execute()
+            )
+            if not query:
+                return None
+            return str(query['family_id'])
+        except APIError as e:
+            if getattr(e, 'code') == '204' and getattr(e, 'message') == 'Missing response':
+                raise MissingResponseException("Data source returned a 204 No Content — possibly empty dataset.")
 
     def get_household_active_status(self, id: str) -> bool:
         """
@@ -106,16 +133,20 @@ class FamilyMembershipRepository(IFamilyMembershipRepository):
         :param id: The household  ID.
         :return: The household ID as a string.
         """
-        query = (
-            self.client
-            .table('household_info')
-            .select('is_active')
-            .eq('household_id', id)
-            .maybe_single()
-            .execute())
-        if not query:
-            return False
-        return bool(query.data['is_active'])
+        try:
+            query = (
+                self.client
+                .table('household_info')
+                .select('is_active')
+                .eq('household_id', id)
+                .maybe_single()
+                .execute())
+            if not query:
+                return False
+            return bool(query.data['is_active'])
+        except APIError as e:
+            if getattr(e, 'code', None) == '204' and getattr(e, 'message') == 'Missing response':
+                raise MissingResponseException(e)
 
     def get_resident_id(self, id: str) -> str:
         """
@@ -124,14 +155,17 @@ class FamilyMembershipRepository(IFamilyMembershipRepository):
         :param id: The resident ID.
         :return: The household ID as a string.
         """
-        query = (
+        try:
+            query = (
             self.client
             .table('person')
             .select('person_id')
             .eq('person_id', id)
             .maybe_single()
             .execute())
-        print(query)
-        if not query:
-            return None
-        return str(query.data['person_id'])
+            if not query:
+                return None
+            return str(query.data['person_id'])
+        except APIError as e:
+            if getattr(e, 'code', None) == '204' and getattr(e, 'message') == 'Missing response':
+                raise MissingResponseException("Data source returned a 204 No Content — possibly empty dataset.")

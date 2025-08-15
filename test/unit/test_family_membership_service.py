@@ -36,6 +36,9 @@ class FamilyMembershipServiceTestCase(TestCase):
             )
         return ctx
     
+    def test_resident_already_exist_in_family(self):
+        pass
+    
     def test_join_family_unit_none_returned(self):
         self.repo.join_family_unit.return_value = None
         ctx = self.__service_template()
