@@ -21,7 +21,12 @@ class FamilyMembershipRepositoryTestCase(TestCase):
                 client=supabase
             )
         )
-    
+        
+    def test_get_resident_full_details_invalid_params(self):
+        with self.assertRaises(MissingResponseException) as e:
+            self.repository.get_resident_basic_info('a')
+        self.assertRaises(MissingResponseException)
+
     def test_get_family_active_status_invalid_data(self):
         with self.assertRaises(MissingResponseException) as mre:
             self.repository.get_family_active_status('a')

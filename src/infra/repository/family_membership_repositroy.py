@@ -16,6 +16,24 @@ class FamilyMembershipRepository(IFamilyMembershipRepository):
     def __init__(self, client: SupabaseAdapter):
         self.client = client.client
     
+    def get_resident_basic_info(self, id: str) -> set:
+        try:
+            query = (
+                self.client
+                .table('person')
+                .select('person_id, residential_status_id, person_status_id, residency_period')
+                .eq('person_id', id)
+                .maybe_single()
+                .execute()
+            )
+            if not query:
+                return None
+            return query.data
+        except APIError as e:
+            if str(e.code) == '204' and str(e.message) == 'Missing response':
+                raise MissingResponseException("Data source returned a 204 No Content — possibly empty dataset.")
+            raise e
+        
     def get_family_active_status(self, id: str) -> bool:
         """Retrieves the current status of the family"""
         try:
