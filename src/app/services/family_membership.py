@@ -1,22 +1,23 @@
-# from src.core.contracts.infra.family_membership import IFamilyMembershipRepository
-from src.infra.repository.family_membership_repositroy import FamilyMembershipRepository
+from src.core.contracts.infra.family_membership import IFamilyMembershipRepository
+from src.core.value_objects.family_membership import FamilyMembership
+
 
 class FamilyMembershipService:
-    
-    def __init__(self, repository: FamilyMembershipRepository):
+
+    def __init__(self, repository: IFamilyMembershipRepository):
         self.repository = repository
-        
+
     def execute(
-        self, 
-        resident_id: str, 
-        household_id: str, 
-        family_id: str,
-        household_head_relationship: int, 
-        family_head_relationship: int, 
-        residency_period: int) -> str:
-        self.__validate_resident_existence(resident_id)
-        self.__validate_household_and_family_unit_integrity(household_id, family_id)
-        self.__validate_resident_membership(resident_id)
+            self,
+            resident_id: int,
+            household_id: int,
+            family_id: int,
+            household_head_relationship: int,
+            family_head_relationship: int,
+            residency_period: int) -> str:
+        data = self.__retrieve_resident_data(resident_id, household_id, family_id)
+        membership = FamilyMembership(**data)
+        membership.validate_membership_request()
         request_id = self.repository.join_family_unit({
             'p_requester_id': resident_id,
             'p_family_id': family_id,
@@ -26,31 +27,23 @@ class FamilyMembershipService:
         })
         if not request_id:
             raise ValueError("Unable to join family at the moment.")
+
         return "OK"
 
-    def __validate_resident_membership(self, resident_id):
-        _resident_membership = self.repository.find_resident_per_household(resident_id)
-        if _resident_membership > 0:
-            raise ValueError('Unable to proceed request, dual membership found.')
-
-    def __validate_household_and_family_unit_integrity(self, household_id, family_id):
-        _household_id = self.repository.get_household_id(household_id)
-        if not _household_id:
-            raise ValueError("Household does not exist.")
-
-        is_household_active = self.repository.get_household_active_status(household_id)
-        if not is_household_active:
-            raise ValueError("Household is no longer active.")
-        
-        _family_id = self.repository.get_family_unit_id(family_id)
-        if not _family_id:
-            raise ValueError('Family does not exist.')
-
+    def __retrieve_resident_data(self, resident_id, household_id, family_id):
+        membership_count = self.repository.find_resident_per_household(
+            resident_id)
+        household_id = self.repository.get_household_id(household_id)
+        is_household_active = self.repository.get_household_active_status(
+            household_id)
+        family_id = self.repository.get_family_unit_id(family_id)
         is_family_active = self.repository.get_family_active_status(family_id)
-        if not is_family_active:
-            raise ValueError('Family unit is no longer active.')
-
-    def __validate_resident_existence(self, resident_id):
-        _resident_id = self.repository.get_resident_id(resident_id)
-        if not _resident_id:
-            raise ValueError("Resident does not exist")
+        resident_id = self.repository.get_resident_id(resident_id)
+        return {
+            "resident_id": resident_id,
+            "household_id": household_id,
+            "family_id": family_id,
+            "is_household_active": is_household_active,
+            "is_family_active": is_family_active,
+            "membership_count": membership_count
+        }
