@@ -3,9 +3,12 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.parsers import JSONParser
 from dependency_injector.wiring import inject, Provide
+from django_ratelimit.decorators import ratelimit
+from django.utils.decorators import method_decorator
 from rest_framework import status
 from django.conf import settings
 from barug.utils.claims import Claims
+from barug.utils.rate_limiter import CustomRateLimiter
 from resident.serializers.membership import MembershipSerializer
 from barug.constants import INTERNAL_ERROR
 from src.app.bootstrap.app_containers import AppContainer
@@ -58,8 +61,12 @@ class FamilyMembership(APIView):
 
     parser_classes = [JSONParser]
     
+    @method_decorator(ratelimit(key='user_or_ip', rate='10/s', block=False))
     @inject
     def post(self, request: Request, service: IFamilyMembershipService = Provide[AppContainer.family_membership]) -> Response:
+        
+        if CustomRateLimiter.is_ratelimited(request=request):
+            return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
 
         user = Claims.verify_jwt_token(request.headers.get("Authorization"))
 
