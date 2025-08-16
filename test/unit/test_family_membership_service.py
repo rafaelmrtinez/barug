@@ -12,34 +12,34 @@ from src.app.services.family_membership import FamilyMembershipService
 class FamilyMembershipServiceTestCase(TestCase):
 
     def setUp(self):
-        self.repo: FamilyMembershipRepository = Mock(spec=FamilyMembershipRepository)
-        self.service: FamilyMembershipService = FamilyMembershipService(repository=self.repo)
+        stub_repo = Mock(spec=FamilyMembershipRepository)
+        self.service = FamilyMembershipService(repository=stub_repo)
         
-        # self.service._FamilyMembershipService__retrieve_resident_data.return_value = {
-        #     "resident_id": 'fake-data',
-        #     "household_id": 'fake-data',
-        #     "family_id": 'fake-data',
-        #     "is_household_active": 'fake-data',
-        #     "is_family_active": 'fake-data',
-        #     "membership_count": 'fake-data'
-        # }
+        stub_repo.get_resident_basic_info.return_value = {
+            "residential_status_id": 1,
+            "person_status_id": 1,
+            "residency_period": 12
+        }
+        stub_repo.find_resident.return_value = 1
+        stub_repo.get_household_status.return_value = True
+        stub_repo.get_family_unit_status.return_value = True
+
+
+    def test_data_retrieval(self):
         
-    @patch.object(FamilyMembershipService, '_FamilyMembershipService__retrieve_resident_data', return_value={
-            "resident_id": 'fake-data',
-            "household_id": 'fake-data',
-            "family_id": 'fake-data',
-            "is_household_active": 'fake-data',
-            "is_family_active": 'fake-data',
-            "membership_count": 'fake-data'
-        })
-    def test_invalid_exec_data_types_params(self):
-        with self.assertRaises(TypeError):
-            self.service.execute(
-                resident_id='fake-data',  # Invalid type
-                household_id='fake-data',
-                family_id='fake-data',
-                household_head_relationship='fake-data',
-                family_head_relationship='fake-data',
-                residency_period='fake-data'  # Invalid type
-            )
-        self.service._FamilyMembershipService__retrieve_resident_data.assert_not_called()
+        result = self.service._FamilyMembershipService__retrieve_resident_data(1, 1, 1)
+        
+        expected_data = {
+            "resident_id": 1,
+            "household_id": 1,
+            "family_id": 1,
+            "is_household_active": True,
+            "is_family_active": True,
+            "membership_count": 1,
+            "residential_status": 1,
+            "person_status": 1,
+            "residency_period": 12
+        }
+        
+        self.assertEqual(result, expected_data)
+

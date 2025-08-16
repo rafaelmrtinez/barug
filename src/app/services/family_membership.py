@@ -18,7 +18,7 @@ class FamilyMembershipService:
         data = self.__retrieve_resident_data(resident_id, household_id, family_id)
         membership = FamilyMembership(**data)
         membership.validate_membership_request()
-        request_id = self.repository.join_family_unit({
+        request_id = self.repository.insert_membership({
             'p_requester_id': resident_id,
             'p_family_id': family_id,
             'p_relationship_to_hholdhead_id': household_head_relationship,
@@ -30,20 +30,19 @@ class FamilyMembershipService:
 
         return "OK"
 
-    def __retrieve_resident_data(self, resident_id, household_id, family_id):
-        membership_count = self.repository.find_resident_per_household(
-            resident_id)
-        household_id = self.repository.get_household_id(household_id)
-        is_household_active = self.repository.get_household_active_status(
-            household_id)
-        family_id = self.repository.get_family_unit_id(family_id)
-        is_family_active = self.repository.get_family_active_status(family_id)
-        resident_id = self.repository.get_resident_id(resident_id)
+    def __retrieve_resident_data(self, resident_id: int, household_id: int, family_id: int):
+        resident_data  = self.repository.get_resident_basic_info(resident_id)
+        membership_count = self.repository.find_resident(resident_id)
+        is_household_active = self.repository.get_household_status(household_id)
+        is_family_active = self.repository.get_family_unit_status(family_id)
         return {
             "resident_id": resident_id,
             "household_id": household_id,
             "family_id": family_id,
             "is_household_active": is_household_active,
             "is_family_active": is_family_active,
-            "membership_count": membership_count
+            "membership_count": membership_count,
+            "residential_status": resident_data['residential_status_id'],
+            "person_status": resident_data['person_status_id'],
+            "residency_period": resident_data['residency_period']
         }
