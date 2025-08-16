@@ -1,9 +1,11 @@
 from rest_framework.views import APIView
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.parsers import JSONParser
 from dependency_injector.wiring import inject, Provide
 from rest_framework import status
 from django.conf import settings
+from barug.utils.claims import Claims
 from resident.serializers.membership import MembershipSerializer
 from barug.constants import INTERNAL_ERROR
 from src.app.bootstrap.app_containers import AppContainer
@@ -44,7 +46,6 @@ class FamilyMembership(APIView):
 
         Example Request:
             {
-                "resident_id": 1,
                 "household_id": 1,
                 "family_id": 1,
                 "household_head_relationship": 1,
@@ -55,12 +56,29 @@ class FamilyMembership(APIView):
             - HTTP 200 OK on success.
     """
 
+    parser_classes = [JSONParser]
     
     @inject
     def post(self, request: Request, service: IFamilyMembershipService = Provide[AppContainer.family_membership]) -> Response:
-        serializer = MembershipSerializer(data=request.data)
+
+        user = Claims.verify_jwt_token(request.headers.get("Authorization"))
+
+        if not user:
+            return Response({"error": "Unauthorized Access."}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        print(request.data)
+        print(user)
+        serializer = MembershipSerializer(
+            data={
+                **request.data,
+                "resident_id": user["user_id"],
+                "username": user["username"],
+                "role": user["role"]
+            })
+
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
         validated_data = serializer.validated_data
         try:
             is_success: bool = service.execute(
@@ -85,6 +103,7 @@ class FamilyMembership(APIView):
 
         if not is_success:
             return Response({"error": "Unable to join family at the moment."}, status=status.HTTP_400_BAD_REQUEST)
+        
         return Response(status=status.HTTP_200_OK)
 
 class ResidentRegisterAPIView(APIView):

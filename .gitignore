@@ -2,6 +2,7 @@
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,django,node,database
 
 # integration/
+test.js
 staticfiles/
 *.http
 # supabase_client_dev.py
