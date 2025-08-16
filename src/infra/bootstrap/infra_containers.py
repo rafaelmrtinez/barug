@@ -18,21 +18,22 @@ class InfraContainer(containers.DeclarativeContainer):
 
     config = providers.Configuration()
 
-    supabase_adapter = providers.Object(None)
+    supabase_adapter_dev = providers.Object(None)
+    database = providers.Object(None)
     
     family_membership_repository : providers.Factory[IFamilyMembershipRepository] = providers.Factory(
         FamilyMembershipRepository,
-        client=supabase_adapter
+        client=database
     )
     
     faq_entries_repository: providers.Factory[IFAQIngestionRepository] = providers.Factory(
         FAQIngestionRepository,
-        supabase_adapter=supabase_adapter
+        supabase_adapter=supabase_adapter_dev
     )
 
     rag_repository: providers.Factory[IRAGRepository] = providers.Factory(
         RAGRepository,
-        supabase_adapter=supabase_adapter,
+        supabase_adapter=supabase_adapter_dev,
     )
 
     embedding: providers.Singleton[IEmbedding] = providers.Singleton(

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 
 from src.core.enums.person_status import PersonStatus
+from src.core.enums.relationship import Relationships
 from src.core.enums.resident_status import ResidentStatus
 from src.core.exceptions.domain_exceptions import DomainException
 from src.core.exceptions.membership_exception import InvalidMembershipException
@@ -47,14 +48,26 @@ class FamilyMembership:
     residential_status: int
     person_status: int
     residency_period: int
+    household_head_relation: int
+    family_head_relation: int
     
     def validate_membership_request(self):
-        self.__person_status_validity()
         self.__validate_resident_existence()
+        self.__person_status_validity()
         self.__resident_status_validity()
         self.__residency_period_validity()
         self.__validate_household_and_family_unit_integrity()
         self.__validate_resident_membership()
+        self.__relationship_validity()
+
+    def __relationship_validity(self):
+        allowed_relationships = [relationship.value for relationship in Relationships.get_all_relationships()]
+
+        if self.household_head_relation not in allowed_relationships:
+            raise DomainException(f"Invalid relationship to household")
+
+        if self.family_head_relation not in allowed_relationships:
+            raise DomainException(f"Invalid relationship to family")
 
     def __residency_period_validity(self):
         if self.residency_period < 1:
@@ -67,13 +80,13 @@ class FamilyMembership:
     def __resident_status_validity(self):
         allowed_status = [ResidentStatus.TRANSIENT.value, ResidentStatus.RESIDENT.value]
         if self.residential_status not in allowed_status:
-            raise DomainException(f"Residency requirement is not met, only {ResidentStatus.RESIDENT.name.title()} and {ResidentStatus.TRANSIENT.name.title()} Residents are allowed.")
+            raise DomainException(f"Residency requirement is not met, only Registered {ResidentStatus.RESIDENT.name.title()} and {ResidentStatus.TRANSIENT.name.title()} Residents are allowed.")
 
     def __validate_resident_membership(self):
-        if self.membership_count > 1:
+        if self.membership_count > 0:
             raise DomainException("This resident is already registered in this family or another family record exists for them.")
 
-        if self.membership_count < 1:
+        if self.membership_count < 0:
             raise InvalidMembershipException('Unable to proceed request, invalid membership found.')
 
     def __validate_household_and_family_unit_integrity(self):

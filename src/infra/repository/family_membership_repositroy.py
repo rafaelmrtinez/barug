@@ -28,11 +28,11 @@ class FamilyMembershipRepository(IFamilyMembershipRepository):
                 .execute()
             )
             if not query:
-                return -1
+                return 0
             return  int(query.count)
         except APIError as e:
             if str(e.code) == '204' and str(e.message) == 'Missing response':
-                raise MissingResponseException("Data source returned a 204 No Content — possibly empty dataset.")
+                raise MissingResponseException(f"Find Resident - {str(e.message)}")
             raise e
         
     def insert_membership(self, data) -> str:
@@ -47,11 +47,11 @@ class FamilyMembershipRepository(IFamilyMembershipRepository):
             return query.data
         except APIError as e:
             if getattr(e, 'code') == '23503' and str(e.message).__contains__('violates foreign key constraint'):
-                raise ForeignKeyException(str(e.message).upper())
+                raise ForeignKeyException(f'Insert Members - {str(e.message).upper()}')
             if getattr(e, 'code') == 'P5035' and getattr(e, 'message') == 'You already have a pending request to join a household.':
-                raise PendingFamilyRequestException(str(e.message).upper())
+                raise PendingFamilyRequestException(f'Insert Member - {str(e.message).upper()}')
             if getattr(e, 'code') == '22P02' and getattr(e, 'message') == 'invalid input syntax for type integer: "You are already a member of this family unit."':
-                raise FamilyMemberAlreadyExistException(str(e.message).upper())
+                raise FamilyMemberAlreadyExistException(f'Insert Member - {str(e.message).upper()}')
             raise e
         
     def get_family_unit_status(self, id: int) -> bool:
@@ -59,15 +59,20 @@ class FamilyMembershipRepository(IFamilyMembershipRepository):
             query = (
                 self.client
                 .table('family_unit')
-                .select('is_active')
+                .select('family_id, is_active')
                 .eq('family_id', id)
                 .maybe_single()
                 .execute()
             )
-            return query.data['is_active'] if query.data else None
+            if not query:
+                return {
+                    "family_id": None,
+                    "is_active": None
+                }
+            return query.data
         except APIError as e:
             if str(e.code) == '204' and str(e.message) == 'Missing response':
-                raise MissingResponseException("Data source returned a 204 No Content — possibly empty dataset.")
+                raise MissingResponseException(f"Get Family Status - {str(e.message)}")
             raise e
         
     def get_household_status(self, id: int) -> bool:
@@ -75,17 +80,20 @@ class FamilyMembershipRepository(IFamilyMembershipRepository):
             query = (
                 self.client
                 .table('household_info')
-                .select('is_active')
+                .select('household_id, is_active')
                 .eq('household_id', id)
                 .maybe_single()
                 .execute()
             )
             if not query:
-                return None
-            return query.data['is_active']
+                return {
+                    "household_id": None,
+                    "is_active": None
+                }
+            return query.data
         except APIError as e:
             if str(e.code) == '204' and str(e.message) == 'Missing response':
-                raise MissingResponseException("Data source returned a 204 No Content — possibly empty dataset.")
+                raise MissingResponseException(f"Get Household Status - {str(e.message)}")
             raise e
     
     def get_resident_basic_info(self, id: int) -> dict:
@@ -93,15 +101,20 @@ class FamilyMembershipRepository(IFamilyMembershipRepository):
             query = (
                 self.client
                 .table('person')
-                .select('residential_status_id, person_status_id, residency_period')
+                .select('person_id, residential_status_id, person_status_id, residency_period')
                 .eq('person_id', id)
                 .maybe_single()
                 .execute()
             )
             if not query:
-                return None
+                return {
+                    "person_id": None,
+                    "residential_status_id": None,
+                    "person_status_id": None,
+                    "residency_period": None
+                }
             return query.data
         except APIError as e:
             if str(e.code) == '204' and str(e.message) == 'Missing response':
-                raise MissingResponseException("Data source returned a 204 No Content — possibly empty dataset.")
+                raise MissingResponseException(f"Get Resident Basic Info - {str(e.message)}")
             raise e

@@ -1,7 +1,18 @@
 from rest_framework.views import APIView
+from rest_framework.request import Request
 from rest_framework.response import Response
+from dependency_injector.wiring import inject, Provide
 from rest_framework import status
 from django.conf import settings
+from resident.serializers.membership import MembershipSerializer
+from barug.constants import INTERNAL_ERROR
+from src.app.bootstrap.app_containers import AppContainer
+from src.core.contracts.app.family_service import IFamilyMembershipService
+from src.core.exceptions.domain_exceptions import DomainException
+from src.infra.exceptions.supabase_sdk.family_member_exist import FamilyMemberAlreadyExistException
+from src.infra.exceptions.supabase_sdk.foreign_key import ForeignKeyException
+from src.infra.exceptions.supabase_sdk.missing_response import MissingResponseException
+from src.infra.exceptions.supabase_sdk.pending_join_family_request import PendingFamilyRequestException
 from supabase_client import supabase  # Your Supabase client
 import jwt
 from rest_framework.permissions import AllowAny
@@ -12,6 +23,62 @@ from authentication.utils.supabase_auth import delete_supabase_user
 JWT_SECRET = settings.SECRET_KEY
 JWT_ALGORITHM = "HS256"
 
+
+class FamilyMembership(APIView):
+    """
+
+    Description:
+        To be able to use this API you need to ensure the following conditions are met.
+        
+        - Authenticate
+        - Provide valid resident, household, and family IDs.
+        
+        
+        To make a requet using the Web API view built in Rest Framework do the following:
+        
+        {
+            "resident_id": 1,
+            "household_id": 1,
+            "family_id": 1,
+            "household_head_relationship": 1,
+            "family_head_relationship": 1,
+            "residency_period": 1
+        }
+        
+    Returns:
+        _type_: _description_
+    """
+    
+    @inject
+    def post(self, request: Request, service: IFamilyMembershipService = Provide[AppContainer.family_membership]) -> Response:
+        serializer = MembershipSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        validated_data = serializer.validated_data
+        try:
+            is_success: bool = service.execute(
+                resident_id=validated_data["resident_id"],
+                household_id=validated_data["household_id"],
+                family_id=validated_data["family_id"],
+                household_head_relationship=validated_data["household_head_relationship"],
+                family_head_relationship=validated_data["family_head_relationship"],
+            )
+        except DomainException as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except MissingResponseException as e:
+            print(f"Missing response exception: {str(e)}")
+            return Response({"error": INTERNAL_ERROR}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except ForeignKeyException as e:
+            print(f"Foreign key exception: {str(e)}")
+            return Response({"error": INTERNAL_ERROR}, status=status.HTTP_400_BAD_REQUEST)
+        except PendingFamilyRequestException as e:
+            return Response({"error": str(e.message)}, status=status.HTTP_400_BAD_REQUEST)
+        except FamilyMemberAlreadyExistException as e:
+            return Response({"error": str(e.message)}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not is_success:
+            return Response({"error": "Unable to join family at the moment."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_200_OK)
 
 class ResidentRegisterAPIView(APIView):
     def post(self, request):

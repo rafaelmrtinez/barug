@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 
-class FamilyMembershipService(ABC):
+class IFamilyMembershipService(ABC):
 
     @abstractmethod
     def execute(
@@ -11,8 +11,7 @@ class FamilyMembershipService(ABC):
         family_id: int,
         household_head_relationship: int,
         family_head_relationship: int,
-        residency_period: int
-    ) -> str:
+    ) -> bool:
         """This method is used to execute and perform orchestration
         at the application level to different repositories and domain
         to enforce business rules and CRUD operations.
