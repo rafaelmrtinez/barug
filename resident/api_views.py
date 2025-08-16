@@ -26,28 +26,35 @@ JWT_ALGORITHM = "HS256"
 
 class FamilyMembership(APIView):
     """
+        Description:
+            API View for handling the process of joining a family unit.
+            
+        Request Data Types:
+            - resident_id (int): Unique identifier of the resident.
+            - household_id (int): Unique identifier of the household.
+            - family_id (int): Unique identifier of the family.
+            - household_head_relationship (int): Relationship of the resident to the household head.
+            - family_head_relationship (int): Relationship of the resident to the family head.
 
-    Description:
-        To be able to use this API you need to ensure the following conditions are met.
-        
-        - Authenticate
-        - Provide valid resident, household, and family IDs.
-        
-        
-        To make a requet using the Web API view built in Rest Framework do the following:
-        
-        {
-            "resident_id": 1,
-            "household_id": 1,
-            "family_id": 1,
-            "household_head_relationship": 1,
-            "family_head_relationship": 1,
-            "residency_period": 1
-        }
-        
-    Returns:
-        _type_: _description_
+        Note:
+            - Only JSON request bodies are accepted. Ensure the request header includes:
+            "Content-Type: application/json".
+            - JWT authentication is required. Include the token in requests made via fetch API,
+            Axios, or other HTTP clients. Requests without authentication will be rejected.
+
+        Example Request:
+            {
+                "resident_id": 1,
+                "household_id": 1,
+                "family_id": 1,
+                "household_head_relationship": 1,
+                "family_head_relationship": 1
+            }
+
+        Returns:
+            - HTTP 200 OK on success.
     """
+
     
     @inject
     def post(self, request: Request, service: IFamilyMembershipService = Provide[AppContainer.family_membership]) -> Response:
