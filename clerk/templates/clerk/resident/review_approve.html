@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <div class="container-fluid pt-3 page-main" style="margin-top: 40px;">
+    <div class="row">
+      <div>
+
+        <div class="col-md-4 ms-auto">
+            <form method="post">
+              {% csrf_token %}
+
+              <div class="form-floating mb-3">
+                  {{ form.search }}
+                  <label for="{{ form.search.id_for_label }}">{{ form.search.label }}</label>
+              </div>
+          </form>
+        </div>
+        
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Date & Time Submitted</th>
+              <th scope="col">Status</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+              <tr class="table-row-height">
+                <td></td>
+                <td></td>
+                <td></td>
+                <td>
+                  <div class="d-flex gap-1">
+                    <a class="btn btn-icon" title="View Resident Record"
+                       href="{% url 'clerk:person_details' req_id='RBSN00000' %}">
+                      {% bs_icon 'person-lines-fill' size='1em' %}
+                    </a>
+                  </div>
+                </td>
+              </tr>
+              <tr><td colspan="4" class="text-center">No pending for records</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div class="page-pagination"> 
+      {% include 'paginator.html' %}
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

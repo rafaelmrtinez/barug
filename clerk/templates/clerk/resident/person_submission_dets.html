@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/submission_dets.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container pt-5 px-0" style="margin-top:40px; margin-bottom:20px;">
+  <div class="row justify-content-center">
+    <div class="col-12">
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
+        <h4><strong>Raphael H. Bellosillo</strong></h4>
+        <div class="meta d-flex gap-4">
+          <div>
+            <div class="section-title mb-1">Date Submitted</div>
+            <div>{% bs_icon 'calendar-event-fill' size='1em' %} 
+              <b>August 16, 2025</b>
+            </div>
+          </div>
+          <div>
+            <div class="section-title mb-1">Status</div>
+            <div>{% bs_icon 'reception-2' size='1.2em' %} 
+              <b>Pending</b>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row g-4">
+            <!-- Personal Information -->
+            <div class="col-md-6">
+            <div class="section-title mb-2">Personal Information</div>
+            <div class="kv">
+                <div class="kv-item"><span class="kv-key">Last Name</span><span class="kv-val">Bellosillo</span></div>
+                <div class="kv-item"><span class="kv-key">First Name</span><span class="kv-val">Raphael</span></div>
+                <div class="kv-item"><span class="kv-key">Middle Name</span><span class="kv-val">Hernandez</span></div>
+                <div class="kv-item"><span class="kv-key">Suffix</span><span class="kv-val">Jr.</span></div>
+                <div class="kv-item"><span class="kv-key">Sex</span><span class="kv-val">Male</span></div>
+                <div class="kv-item"><span class="kv-key">Date of Birth</span><span class="kv-val">March 14, 1995</span></div>
+                <div class="kv-item"><span class="kv-key">Civil Status</span><span class="kv-val">Single</span></div>
+                <div class="kv-item"><span class="kv-key">Nationality</span><span class="kv-val">Filipino</span></div>
+                <div class="kv-item"><span class="kv-key">Religion</span><span class="kv-val">Roman Catholic</span></div>
+                <div class="kv-item"><span class="kv-key">Home Address</span><span class="kv-val">Purok 3, Sitio San Roque, Brgy Sto. Niño</span></div>
+                <div class="kv-item"><span class="kv-key">Email Address</span><span class="kv-val">raphael.bellosillo@email.com</span></div>
+                <div class="kv-item"><span class="kv-key">Mobile Number</span><span class="kv-val">+63 912 345 6789</span></div>
+            </div>
+            </div>
+
+            <!-- Socioeconomic Information -->
+            <div class="col-md-6">
+                <div class="section-title mb-2">Socioeconomic Information</div>
+                <div class="kv">
+                    <div class="kv-item"><span class="kv-key">Educational Attainment</span><span class="kv-val">Undergraduate Studies</span></div>
+                    <div class="kv-item"><span class="kv-key">Employment Status</span><span class="kv-val">Employed</span></div>
+                    <div class="kv-item"><span class="kv-key">Occupation</span><span class="kv-val">Software Developer</span></div>
+                    <div class="kv-item"><span class="kv-key">Monthly Personal Income</span><span class="kv-val">₱35,000</span></div>
+                    <div class="kv-item"><span class="kv-key">Government Program</span><span class="kv-val">PhilHealth, SSS</span></div>
+                </div>
+
+                <div class="section-title mb-2 pt-4">Supporting Document</div>
+                <div class="kv">
+                    <div class="kv-item"><span class="kv-key">ID Type</span><span class="kv-val">15 years</span></div>
+                    <div class="doc-carousel carousel slide" id="docCarousel" data-bs-ride="false" aria-label="Supporting documents">
+                        <div class="carousel-inner">
+                        <div class="carousel-item active">
+                            <div class="img-wrap">
+                            <img src="{% static 'images/login-logo.png' %}" class="doc-img" alt="Front of ID">
+                            </div>
+                            <small class="text-muted d-block text-center mt-2">Front of ID</small>
+                        </div>
+                        <div class="carousel-item">
+                            <div class="img-wrap">
+                            <img src="{% static 'images/login-logo.png' %}" class="doc-img" alt="Back of ID">
+                            </div>
+                            <small class="text-muted d-block text-center mt-2">Back of ID</small>
+                        </div>
+                        <div class="carousel-item">
+                            <div class="img-wrap">
+                            <img src="{% static 'images/brgy-sto-nino.png' %}" class="doc-img" alt="Selfie holding the ID">
+                            </div>
+                            <small class="text-muted d-block text-center mt-2">Selfie w/ ID</small>
+                        </div>
+                        </div>
+
+                        <!-- Controls placed OUTSIDE the image bounds -->
+                        <button class="carousel-control-prev doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="prev" aria-label="Previous">
+                        <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
+                        </button>
+                        <button class="carousel-control-next doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="next" aria-label="Next">
+                        <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="mt-auto button-container justify-content-end mb-2">
+        <button type="reset" class="btn btn-reset">Decline</button>
+        <button type="button" class="btn btn-submit">Approve</button>
+    </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

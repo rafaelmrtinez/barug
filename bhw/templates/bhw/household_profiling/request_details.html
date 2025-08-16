@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+
 {% load static %}
 {% load bootstrap_icons %}
 
@@ -78,11 +79,11 @@
                           Family Head: <b>{{ family.head_name }}</b> &middot; Family No: <b>{{ family.family_num }}</b>
                         </div>
                         <div class="family-badges mt-1"> 
-                          <span class="badge text-bg-light">Type: Nuclear</span> 
-                          <span class="badge text-bg-light">NHTS: No</span> 
-                          <span class="badge text-bg-light">Indigent: No</span> 
-                          <span class="badge text-bg-light">Income: ₱25k–₱35k</span> 
-                          <span class="badge text-bg-light">Source of Income: Tricyle Driving</span> 
+                          <span class="badge text-bg-light">Type: {{family.type}}</span> 
+                          <span class="badge text-bg-light">NHTS: {{family.nhts}}</span> 
+                          <span class="badge text-bg-light">Indigent: {{family.indigent}}</span> 
+                          <span class="badge text-bg-light">Monthly Income: {{family.monthly_income}}</span> 
+                          <span class="badge text-bg-light">Source of Income: {{family.source_income}}</span> 
                         </div>
                       </div>
                     </div>
