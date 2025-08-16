@@ -238,3 +238,78 @@ if not DEBUG:
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+LOG_LEVEL = os.getenv("DJANGO_LOG_LEVEL", "INFO")
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "file_all": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(BASE_DIR, "barug/system_info", "app.log"),
+            "maxBytes": 5 * 1024 * 1024,
+            "backupCount": 5,
+            "level": LOG_LEVEL,
+            "formatter": "verbose",
+        },
+        "file_errors": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(BASE_DIR, "barug/system_info", "error.log"),
+            "maxBytes": 5 * 1024 * 1024,
+            "backupCount": 5,
+            "level": "ERROR",
+            "formatter": "verbose",
+        },
+        "file_sql": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(BASE_DIR, "barug/system_info", "sql.log"),
+            "maxBytes": 10 * 1024 * 1024,
+            "backupCount": 3,
+            "level": os.getenv("SQL_LOG_LEVEL", "ERROR"),
+            "formatter": "sql",
+        },
+        "console": {
+            "class": "logging.StreamHandler",
+            "level": LOG_LEVEL,
+            "formatter": "simple",
+        },
+    },
+    "loggers": {
+        "": {
+            "handlers": ["file_all", "file_errors", "console"],
+            "level": "DEBUG",
+            "propagate": True,
+        },
+
+        "django": {
+            "handlers": ["file_all", "file_errors", "console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["file_errors", "console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "django.db.backends": {
+            "handlers": ["file_sql"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+    },
+    "formatters": {
+        "verbose": {
+            "format": "{asctime} [{levelname}] {name} | {message} (pid:{process:d} tid:{thread:d})",
+            "style": "{",
+        },
+        "simple": {
+            "format": "[{levelname}] {message}",
+            "style": "{",
+        },
+        "sql": {
+            "format": "{asctime} [SQL] {duration:.3f}s | {message}",
+            "style": "{",
+        },
+    },
+}
