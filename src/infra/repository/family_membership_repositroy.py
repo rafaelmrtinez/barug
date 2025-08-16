@@ -49,7 +49,7 @@ class FamilyMembershipRepository(IFamilyMembershipRepository):
             if getattr(e, 'code') == '23503' and str(e.message).__contains__('violates foreign key constraint'):
                 raise ForeignKeyException(f'Insert Members - {str(e.message).upper()}')
             if getattr(e, 'code') == 'P5035' and getattr(e, 'message') == 'You already have a pending request to join a household.':
-                raise PendingFamilyRequestException(f'Insert Member - {str(e.message).upper()}')
+                raise PendingFamilyRequestException(f'{str(e.message).title()}')
             if getattr(e, 'code') == '22P02' and getattr(e, 'message') == 'invalid input syntax for type integer: "You are already a member of this family unit."':
                 raise FamilyMemberAlreadyExistException(f'Insert Member - {str(e.message).upper()}')
             raise e

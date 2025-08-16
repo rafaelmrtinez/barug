@@ -7,7 +7,7 @@ from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
 from rest_framework import status
 from django.conf import settings
-from barug.utils.claims import Claims
+from src.infra.authentication.claims import Claims
 from barug.utils.rate_limiter import CustomRateLimiter
 from resident.serializers.membership import MembershipSerializer
 from barug.constants import INTERNAL_ERROR
@@ -64,17 +64,11 @@ class FamilyMembership(APIView):
     @method_decorator(ratelimit(key='user_or_ip', rate='10/s', block=False))
     @inject
     def post(self, request: Request, service: IFamilyMembershipService = Provide[AppContainer.family_membership]) -> Response:
-        
         if CustomRateLimiter.is_ratelimited(request=request):
             return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
-
         user = Claims.verify_jwt_token(request.headers.get("Authorization"))
-
         if not user:
             return Response({"error": "Unauthorized Access."}, status=status.HTTP_401_UNAUTHORIZED)
-        
-        print(request.data)
-        print(user)
         serializer = MembershipSerializer(
             data={
                 **request.data,
@@ -82,32 +76,16 @@ class FamilyMembership(APIView):
                 "username": user["username"],
                 "role": user["role"]
             })
-
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
         validated_data = serializer.validated_data
-        try:
-            is_success: bool = service.execute(
+        is_success: bool = service.execute(
                 resident_id=validated_data["resident_id"],
                 household_id=validated_data["household_id"],
                 family_id=validated_data["family_id"],
                 household_head_relationship=validated_data["household_head_relationship"],
                 family_head_relationship=validated_data["family_head_relationship"],
             )
-        except DomainException as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except MissingResponseException as e:
-            print(f"Missing response exception: {str(e)}")
-            return Response({"error": INTERNAL_ERROR}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        except ForeignKeyException as e:
-            print(f"Foreign key exception: {str(e)}")
-            return Response({"error": INTERNAL_ERROR}, status=status.HTTP_400_BAD_REQUEST)
-        except PendingFamilyRequestException as e:
-            return Response({"error": str(e.message)}, status=status.HTTP_400_BAD_REQUEST)
-        except FamilyMemberAlreadyExistException as e:
-            return Response({"error": str(e.message)}, status=status.HTTP_400_BAD_REQUEST)
-
         if not is_success:
             return Response({"error": "Unable to join family at the moment."}, status=status.HTTP_400_BAD_REQUEST)
         

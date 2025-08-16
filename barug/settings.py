@@ -114,7 +114,8 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [],
     'DEFAULT_PARSER_CLASSES': [
         'rest_framework.parsers.JSONParser',
-    ]
+    ],
+    "EXCEPTION_HANDLER": "src.infra.exceptions.handlers.custom_exception_handler.custom_exception_handler",
 }
 
 # PLEASE READ THIS!!!!

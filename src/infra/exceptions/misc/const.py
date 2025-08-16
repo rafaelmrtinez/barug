@@ -1,0 +1,1 @@
+FRIENDLY_ERROR = "Uh oh! Something went wrong with our service. We thank you for you patience, we'll be back shortly!"
