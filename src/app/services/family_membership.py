@@ -2,7 +2,7 @@ from src.core.contracts.infra.family_membership import IFamilyMembershipReposito
 from src.core.value_objects.family_membership import FamilyMembership
 
 
-class FamilyMembershipService:
+class FamilyMembershipService(IApplicationService):
 
     def __init__(self, repository: IFamilyMembershipRepository):
         self.repository = repository
