@@ -25,10 +25,8 @@ class HouseholdSearchRepository(IHouseholdSearchRepository):
         """
         try:
             result = self.client.rpc('search_households', {'p_search': key}).execute()
-            
             if not result.data:
                 return {}
-            
             return result.data
         except APIError as e:
             raise DataAccessException("Error occurred while searching households") from e

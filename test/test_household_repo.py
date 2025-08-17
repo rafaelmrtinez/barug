@@ -3,7 +3,7 @@ from django.test import TestCase
 
 from src.infra.adapter.supabase_adapter import SupabaseAdapter
 
-from src.infra.repository.household_repository import HouseholdSearchRepository
+from src.infra.repository.household_search_repository import HouseholdSearchRepository
 from supabase_client import supabase
 
 class HouseholdRepositoryTestCase(TestCase):
