@@ -1,6 +1,7 @@
 from dependency_injector import containers, providers
 
 
+
 from src.core.contracts.infra.family_membership import IFamilyMembershipRepository
 from src.core.contracts.infra.repository.household_search_repository import IHouseholdSearchRepository
 from src.core.contracts.llm import ILLM
@@ -22,6 +23,7 @@ class InfraContainer(containers.DeclarativeContainer):
     supabase_adapter_dev = providers.Object(None)
     database = providers.Object(None)
     
+
     household_search_repository : providers.Factory[IHouseholdSearchRepository] = providers.Factory(
         HouseholdSearchRepository,
         client=database

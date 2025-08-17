@@ -7,8 +7,10 @@ from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
 from rest_framework import status
 from django.conf import settings
+
 from resident.serializers.membership_search import MembershipSearch
 from src.core.contracts.app.service import IService
+
 from src.infra.authentication.claims import Claims
 from barug.utils.rate_limiter import CustomRateLimiter
 from resident.serializers.membership import MembershipSerializer
@@ -29,8 +31,9 @@ JWT_SECRET = settings.SECRET_KEY
 JWT_ALGORITHM = "HS256"
 
 
+
 class HouseholdMembershipSearch(APIView):
-    
+  
     parser_classes = [JSONParser]
     
     @method_decorator(ratelimit(key='user_or_ip', rate='10/s', block=False))
@@ -54,8 +57,6 @@ class HouseholdMembershipSearch(APIView):
         if not result:
             return Response({'message': 'No results found'},status=status.HTTP_200_OK)
         return Response({'message': result}, status=status.HTTP_200_OK)
-
-
 
 class FamilyMembership(APIView):
     """
