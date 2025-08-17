@@ -3,6 +3,7 @@ from django.test import TestCase
 
 from src.infra.adapter.supabase_adapter import SupabaseAdapter
 
+from src.infra.repository.household_repository import HouseholdSearchRepository
 from supabase_client import supabase
 
 class HouseholdRepositoryTestCase(TestCase):
@@ -11,13 +12,10 @@ class HouseholdRepositoryTestCase(TestCase):
     
     def setUp(self):
         
-        self.repo = HouseholdRepository(
+        self.repo = HouseholdSearchRepository(
             client=SupabaseAdapter(client=supabase)
         )
         
     def test_find_household_by_household_head(self):
-        print(self.repo.find_household_by_household_head('x'))
-        
-    def test_find_household_by_household_number(self):
-        result = self.repo.find_household_by_household_number(' '.strip())
+        print(self.repo.find("<>"))
         

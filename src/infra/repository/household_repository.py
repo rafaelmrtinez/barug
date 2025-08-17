@@ -1,23 +1,34 @@
-from src.core.contracts.infra.repository.household_repository import IHouseholdRepository
+from postgrest.exceptions import APIError
+
+
+from src.core.contracts.infra.repository.household_search_repository import IHouseholdSearchRepository
 from src.infra.adapter.supabase_adapter import SupabaseAdapter
+from src.infra.exceptions.data_access_exception import DataAccessException
 
 
-class HouseholdRepository(IHouseholdRepository):
+class HouseholdSearchRepository(IHouseholdSearchRepository):
     
     def __init__(self, client: SupabaseAdapter):
-        self.client = client
+        self.client = client.client
+        
+    def find(self, key: str) -> dict:
+        """This method will find every household information by household number or head.
 
-    def find_household_by_household_number(self, household_number: str) -> dict:
-        """This method is used to search for household information to be used
-        for search.
         Args:
-            household_number (str): The household number to search for.
+            key (str): The household number or head to search for.
+
+        Returns:
+            dict: The return data will consist of
+            - Household Head Full Name (str)
+            - Household Number (str)
+            - Active Status (boolean)
         """
-        pass
-    
-    def find_household_by_household_head(self, head: str) -> dict:
-        """This method is used to search for household information by household head.
-        Args:
-            head (str): The name of the household head to search for.
-        """
-        pass
+        try:
+            result = self.client.rpc('search_households', {'p_search': key}).execute()
+            
+            if not result.data:
+                return {}
+            
+            return result.data
+        except APIError as e:
+            raise DataAccessException("Error occurred while searching households") from e
