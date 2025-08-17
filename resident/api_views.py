@@ -35,7 +35,7 @@ class FamilyUnitSelection(APIView):
     
     parser_classes = [JSONParser]
     
-    @method_decorator(ratelimit(key='user_or_ip', rate='10/s', block=False))
+    @method_decorator(ratelimit(key='user_or_ip', rate='5/s', block=False))
     @inject
     def get(self, request: Request, service: IService = Provide[AppContainer.family_selection]) -> Response:
         if CustomRateLimiter.is_ratelimited(request=request):
