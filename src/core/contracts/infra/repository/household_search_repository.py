@@ -6,6 +6,19 @@ class IHouseholdSearchRepository(ABC):
     """
     Interface for household repository
     """
+    
+    @abstractmethod
+    def get(self, household_id) -> dict:
+        """This method will get the family data and address information
+        by household ID.
+
+        Args:
+            household_id: The ID of the household to retrieve data for.
+
+        Returns:
+            dict: A dictionary containing family data and address data.
+        """
+        pass
 
     @abstractmethod
     def find(self, key: str) -> dict:

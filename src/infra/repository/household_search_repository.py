@@ -11,6 +11,34 @@ class HouseholdSearchRepository(IHouseholdSearchRepository):
     def __init__(self, client: SupabaseAdapter):
         self.client = client.client
         
+    def get(self, household_id) -> dict:
+        try:
+            result = (
+                self.client
+                .table('family_unit')
+                .select('family_id, person(first_name, last_name, middle_name, suffix), family_num, is_active')
+                .eq('household_id', household_id)
+                .execute()
+            )
+            
+            address = (
+                self.client
+                .table('household_info')
+                .select('addresss(street(street_name, purok_sitio(purok_sitio_code, purok_sitio_name), barangay(barangay_name), city(city_name)))')
+                .eq('household_id', household_id)
+                .execute()
+            )
+            
+            if not result.data or not address.data:
+                return {}
+
+            return {
+                "family_data": result.data,
+                "address_data": address.data
+            }
+        except APIError as e:
+            raise DataAccessException(str(e)) from e
+
     def find(self, key: str) -> dict:
         """This method will find every household information by household number or head.
 

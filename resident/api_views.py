@@ -7,7 +7,7 @@ from django_ratelimit.decorators import ratelimit
 from django.utils.decorators import method_decorator
 from rest_framework import status
 from django.conf import settings
-
+from resident.serializers.family_selection import FamilySelectionSerializer
 from resident.serializers.membership_search import MembershipSearch
 from src.core.contracts.app.service import IService
 
@@ -31,9 +31,37 @@ JWT_SECRET = settings.SECRET_KEY
 JWT_ALGORITHM = "HS256"
 
 
+class FamilyUnitSelection(APIView):
+    
+    parser_classes = [JSONParser]
+    
+    @method_decorator(ratelimit(key='user_or_ip', rate='5/s', block=False))
+    @inject
+    def get(self, request: Request, service: IService = Provide[AppContainer.family_selection]) -> Response:
+        if CustomRateLimiter.is_ratelimited(request=request):
+            return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        user = Claims.verify_jwt_token(request.headers.get("Authorization"))
+        if not user:
+            return Response({"error": RESOURCE_ACCESS_DENIED}, status=status.HTTP_401_UNAUTHORIZED)
+        household_id = request.query_params.get("q", None)
+        serializer = FamilySelectionSerializer(data={
+                'household_id': household_id,
+                "resident_id": user["user_id"],
+                "username": user["username"],
+                "role": user["role"]
+            })
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        result = service.execute(household_id=serializer.validated_data['household_id'])
+        if not result:
+            return Response({'message': 'No results found'},status=status.HTTP_200_OK)
+        return Response({'message': result}, status=status.HTTP_200_OK)
+
 
 class HouseholdMembershipSearch(APIView):
-  
+    """
+    API View for searching household memberships.
+    """
     parser_classes = [JSONParser]
     
     @method_decorator(ratelimit(key='user_or_ip', rate='10/s', block=False))
