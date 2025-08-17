@@ -15,7 +15,6 @@ class HouseholdRepository(IHouseholdRepository):
         """
         pass
     
-    @abstractmethod
     def find_household_by_household_head(self, head: str) -> dict:
         """This method is used to search for household information by household head.
         Args:
