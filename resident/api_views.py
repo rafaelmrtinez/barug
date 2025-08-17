@@ -1,7 +1,23 @@
 from rest_framework.views import APIView
+from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.parsers import JSONParser
+from dependency_injector.wiring import inject, Provide
+from django_ratelimit.decorators import ratelimit
+from django.utils.decorators import method_decorator
 from rest_framework import status
 from django.conf import settings
+from src.infra.authentication.claims import Claims
+from barug.utils.rate_limiter import CustomRateLimiter
+from resident.serializers.membership import MembershipSerializer
+from barug.constants import INTERNAL_ERROR
+from src.app.bootstrap.app_containers import AppContainer
+from src.core.contracts.app.family_service import IFamilyMembershipService
+from src.core.exceptions.domain_exceptions import DomainException
+from src.infra.exceptions.supabase_sdk.family_member_exist import FamilyMemberAlreadyExistException
+from src.infra.exceptions.supabase_sdk.foreign_key import ForeignKeyException
+from src.infra.exceptions.supabase_sdk.missing_response import MissingResponseException
+from src.infra.exceptions.supabase_sdk.pending_join_family_request import PendingFamilyRequestException
 from supabase_client import supabase  # Your Supabase client
 import jwt
 from rest_framework.permissions import AllowAny
@@ -12,6 +28,68 @@ from authentication.utils.supabase_auth import delete_supabase_user
 JWT_SECRET = settings.SECRET_KEY
 JWT_ALGORITHM = "HS256"
 
+
+class FamilyMembership(APIView):
+    """
+        Description:
+            API View for handling the process of joining a family unit.
+            
+        Request Data Types:
+            - resident_id (int): Unique identifier of the resident.
+            - household_id (int): Unique identifier of the household.
+            - family_id (int): Unique identifier of the family.
+            - household_head_relationship (int): Relationship of the resident to the household head.
+            - family_head_relationship (int): Relationship of the resident to the family head.
+
+        Note:
+            - Only JSON request bodies are accepted. Ensure the request header includes:
+            "Content-Type: application/json".
+            - JWT authentication is required. Include the token in requests made via fetch API,
+            Axios, or other HTTP clients. Requests without authentication will be rejected.
+
+        Example Request:
+            {
+                "household_id": 1,
+                "family_id": 1,
+                "household_head_relationship": 1,
+                "family_head_relationship": 1
+            }
+
+        Returns:
+            - HTTP 200 OK on success.
+    """
+
+    parser_classes = [JSONParser]
+    
+    @method_decorator(ratelimit(key='user_or_ip', rate='10/s', block=False))
+    @inject
+    def post(self, request: Request, service: IFamilyMembershipService = Provide[AppContainer.family_membership]) -> Response:
+        if CustomRateLimiter.is_ratelimited(request=request):
+            return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        user = Claims.verify_jwt_token(request.headers.get("Authorization"))
+        if not user:
+            return Response({"error": "Unauthorized Access."}, status=status.HTTP_401_UNAUTHORIZED)
+        serializer = MembershipSerializer(
+            data={
+                **request.data,
+                "resident_id": user["user_id"],
+                "username": user["username"],
+                "role": user["role"]
+            })
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        validated_data = serializer.validated_data
+        is_success: bool = service.execute(
+                resident_id=validated_data["resident_id"],
+                household_id=validated_data["household_id"],
+                family_id=validated_data["family_id"],
+                household_head_relationship=validated_data["household_head_relationship"],
+                family_head_relationship=validated_data["family_head_relationship"],
+            )
+        if not is_success:
+            return Response({"error": "Unable to join family at the moment."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response(status=status.HTTP_200_OK)
 
 class ResidentRegisterAPIView(APIView):
     def post(self, request):

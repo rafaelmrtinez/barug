@@ -2,7 +2,8 @@ from src.app.bootstrap.app_containers import AppContainer
 from src.infra.adapter.supabase_adapter import SupabaseAdapter
 from src.infra.bootstrap.infra_containers import InfraContainer
 from django.conf import settings
-from supabase_client_dev import supabase
+from supabase_client_dev import supabase_dev
+from supabase_client import supabase
 
 infra = InfraContainer()
 
@@ -15,11 +16,13 @@ infra.config.from_dict({
     'EMBEDDING_URL': settings.EMBEDDING_URL
 })
 
-infra.supabase_adapter.override(SupabaseAdapter(client=supabase))
+infra.supabase_adapter_dev.override(SupabaseAdapter(client=supabase_dev))
+infra.database.override(SupabaseAdapter(client=supabase))
 
 app = AppContainer(infra=infra)
 
 app.wire(modules=[
     'ai.views',
     'faq_ingestion.views',
+    'resident.api_views'
 ])

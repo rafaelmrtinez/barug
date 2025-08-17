@@ -23,4 +23,4 @@ load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_TESTING_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_TEST_ANON_KEY")
 
-supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+supabase_dev = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
