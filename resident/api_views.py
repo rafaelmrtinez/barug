@@ -10,6 +10,7 @@ from django.conf import settings
 from resident.serializers.family_selection import FamilySelectionSerializer
 from resident.serializers.membership_search import MembershipSearch
 from src.core.contracts.app.service import IService
+
 from src.infra.authentication.claims import Claims
 from barug.utils.rate_limiter import CustomRateLimiter
 from resident.serializers.membership import MembershipSerializer
@@ -28,6 +29,7 @@ from authentication.utils.supabase_auth import delete_supabase_user
 
 JWT_SECRET = settings.SECRET_KEY
 JWT_ALGORITHM = "HS256"
+
 
 class FamilyUnitSelection(APIView):
     
@@ -83,8 +85,6 @@ class HouseholdMembershipSearch(APIView):
         if not result:
             return Response({'message': 'No results found'},status=status.HTTP_200_OK)
         return Response({'message': result}, status=status.HTTP_200_OK)
-
-
 
 class FamilyMembership(APIView):
     """

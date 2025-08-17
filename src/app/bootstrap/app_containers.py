@@ -27,7 +27,7 @@ class AppContainer(containers.DeclarativeContainer):
         HouseholdSearchService,
         repository=infra.household_search_repository
     )
-    
+
     family_membership: providers.Factory[
         IFamilyMembershipService
         ] = providers.Factory(
