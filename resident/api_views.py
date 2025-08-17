@@ -33,7 +33,7 @@ class HouseholdMembershipSearch(APIView):
     
     parser_classes = [JSONParser]
     
-    @method_decorator(ratelimit(key='user_or_ip', rate='10/s', block=True))
+    @method_decorator(ratelimit(key='user_or_ip', rate='10/s', block=False))
     @inject
     def get(self, request: Request, service: IService = Provide[AppContainer.household_search_service]) -> Response:
         if CustomRateLimiter.is_ratelimited(request=request):
