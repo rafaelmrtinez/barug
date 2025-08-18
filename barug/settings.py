@@ -45,7 +45,7 @@ EMAIL_HOST_PASSWORD = "sfpa gadp dpnj licq"
 API_VERSION = "v1"  # API version for event logs
 
 # LOCALHOST URL USED
-TESTING_URL_USED = 'http://192.168.1.2:8000'
+TESTING_URL_USED = 'http://192.168.1.4:8000'
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -70,6 +70,7 @@ else:
     print("Development mode enabled")
     DEBUG = True
 
+ALLOWED_HOSTS = ['192.168.1.4']
 ALLOWED_HOSTS = ['192.168.1.2', "*"]
 
 # Application definition
@@ -97,6 +98,8 @@ INSTALLED_APPS = [
     "authentication",
     "event_logs",
     "resident",
+    "bhw",
+    "clerk",
 ]
 
 MIDDLEWARE = [
@@ -157,6 +160,8 @@ TEMPLATES = [
             BASE_DIR / "authentication/templates/authentication",
             BASE_DIR / "event_logs/templates/event_logs",
             BASE_DIR / "resident/templates/resident",
+            BASE_DIR / "bhw/templates/bhw",
+            BASE_DIR / "clerk/templates/clerk",
         ],
         "APP_DIRS": True,
         "OPTIONS": {
@@ -224,6 +229,8 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "authentication/static/authentication"),
     os.path.join(BASE_DIR, "event_logs/static/event_logs"),
     os.path.join(BASE_DIR, "resident/static/resident"),
+    os.path.join(BASE_DIR, "bhw/static/bhw"),
+    os.path.join(BASE_DIR, "clerk/static/clerk"),
 ]
 
 # By practice the API should not server static files in production.
