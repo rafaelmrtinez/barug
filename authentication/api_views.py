@@ -3,6 +3,7 @@ import jwt, datetime, requests, json
 # import requests
 # import json
 from django.conf import settings
+from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -29,6 +30,9 @@ JWT_ALGORITHM = "HS256"
 
 
 class ResidentLoginView(APIView):
+
+    permission_classes = [AllowAny]
+    authentication_classes = []   # avoid CSRF via SessionAuthentication
     """
     Resident login API view
     """
@@ -264,88 +268,6 @@ class ResendVerificationEmailAPIView(APIView):
         else:
             return Response({"error": "Failed to send verification email."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
-        
-# class ResendVerificationEmailAPIView(APIView):
-#     """
-#     Resend the email verification for a user
-#     by generating a new confirmation link and sending it via Gmail SMTP.
-#     """
-#     def post(self, request):
-#         try:
-#             # ✅ Step 1: Parse request
-#             email = request.data.get("email")
-#             if not email:
-#                 return Response(
-#                     {"error": "Email is required."},
-#                     status=status.HTTP_400_BAD_REQUEST
-#                 )
-#             # [DEBUG] print(f"📥 Parsed email: {email}")
-
-#             # ✅ Step 2: Generate confirmation link from Supabase
-#             generate_link_url = f"{SUPABASE_URL}/auth/v1/admin/generate_link"
-#             headers = {
-#                 "apikey": SUPABASE_SERVICE_ROLE_KEY,
-#                 "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}"
-#             }
-#             payload = {
-#                 "type": "signup",
-#                 "email": email
-#             }
-#             generate_resp = requests.post(generate_link_url, headers=headers, json=payload)
-#             # [DEBUG] print("Supabase generate_link response status:", generate_resp.status_code)
-
-#             if generate_resp.status_code not in [200, 201]:
-#                 return Response(
-#                     {"error": "Failed to generate confirmation link."},
-#                     status=generate_resp.status_code
-#                 )
-
-#             result = generate_resp.json()
-#             action_link = result.get("action_link", "").replace("\\u0026", "&")
-#             # [DEBUG] print(f"🔗 Fixed Action Link: {action_link}")
-
-#             if not action_link:
-#                 return Response(
-#                     {"error": "No confirmation link was generated."},
-#                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
-#                 )
-
-#             # ✅ Step 3: Send email via Django's send_mail (Gmail SMTP)
-#             subject = "Confirm Your BaRUG Account"
-#             message = ""
-#             html_message = f"""
-#                 <h1>Confirm Your Account</h1>
-#                 <p>Hello,</p>
-#                 <p>Click the button below to confirm your email address and activate your BaRUG account:</p>
-#                 <p><a href="{action_link}" style="padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Confirm Email</a></p>
-#                 <p>If you didn’t request this, you can safely ignore it.</p>
-#             """
-
-#             send_mail(
-#                 subject,
-#                 message,  # Plain text fallback (empty here)
-#                 'EMAIL_HOST_USER',  # From email (your Gmail)
-#                 [email],  # To email
-#                 fail_silently=False,
-#                 html_message=html_message
-#             )
-#             # [DEBUG] print("✅ Email sent via Gmail SMTP.")
-
-#             return Response(
-#                 {
-#                     "message": "Verification email sent successfully.",
-#                     "action_link": action_link  # For debugging
-#                 },
-#                 status=status.HTTP_200_OK
-#             )
-
-#         except Exception as e:
-#             # [DEBUG] print("❌ Resend verification error:", str(e))
-#             return Response(
-#                 {"error": str(e)},
-#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
-#             )
-
 
 class ForgotPasswordAPIView(APIView):
     """
@@ -543,199 +465,72 @@ class ResetPasswordAPIView(APIView):
 
 
 
-# SEND GRID SMTP
-    # class ResendVerificationEmailAPIView(APIView):
-    #     """
-    #     Resend the email verification for a user
-    #     by generating a new confirmation link and sending it via SendGrid API.
-    #     """
-    #     def post(self, request):
-    #         try:
-    #             # ✅ Step 1: Parse request
-    #             email = request.data.get("email")
-    #             if not email:
-    #                 return Response(
-    #                     {"error": "Email is required."},
-    #                     status=status.HTTP_400_BAD_REQUEST
-    #                 )
-    #             # [DEBUG] print(f"📥 Parsed email: {email}")
-
-    #             # ✅ Step 2: Generate confirmation link
-    #             generate_link_url = f"{SUPABASE_URL}/auth/v1/admin/generate_link"
-    #             headers = {
-    #                 "apikey": SUPABASE_SERVICE_ROLE_KEY,
-    #                 "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}"
-    #             }
-    #             payload = {
-    #                 "type": "signup",
-    #                 "email": email
-    #             }
-    #             generate_resp = requests.post(generate_link_url, headers=headers, json=payload)
-    #             # [DEBUG] print("Supabase generate_link response status:", generate_resp.status_code)
-
-    #             if generate_resp.status_code not in [200, 201]:
-    #                 return Response(
-    #                     {"error": "Failed to generate confirmation link."},
-    #                     status=generate_resp.status_code
-    #                 )
-
-    #             result = generate_resp.json()
-    #             action_link = result.get("action_link", "").replace("\\u0026", "&")
-    #             # [DEBUG] print(f"🔗 Fixed Action Link: {action_link}")
-
-    #             if not action_link:
-    #                 return Response(
-    #                     {"error": "No confirmation link was generated."},
-    #                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
-    #                 )
-
-    #             # ✅ Step 3: Send email via SendGrid API
-    #             sendgrid_url = "https://api.sendgrid.com/v3/mail/send"
-    #             sendgrid_headers = {
-    #                 "Authorization": f"Bearer {SENDGRID_API_KEY}",
-    #                 "Content-Type": "application/json"
-    #             }
-    #             sendgrid_payload = {
-    #                 "personalizations": [
-    #                     {
-    #                         "to": [{"email": email}],
-    #                         "subject": "Confirm Your BaRUG Account"
-    #                     }
-    #                 ],
-    #                 "from": {
-    #                     "email": SENDGRID_FROM_EMAIL,
-    #                     "name": SENDGRID_FROM_NAME
-    #                 },
-    #                 "content": [
-    #                     {
-    #                         "type": "text/html",
-    #                         "value": f"""
-    #                         <h1>Confirm Your Account</h1>
-    #                         <p>Hello,</p>
-    #                         <p>Click the button below to confirm your email address and activate your BaRUG account:</p>
-    #                         <p><a href="{action_link}" style="padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Confirm Email</a></p>
-    #                         <p>If you didn’t request this, you can safely ignore it.</p>
-    #                         """
-    #                     }
-    #                 ]
-    #             }
-    #             sendgrid_resp = requests.post(sendgrid_url, headers=sendgrid_headers, json=sendgrid_payload)
-    #             # [DEBUG] print("SendGrid API response status:", sendgrid_resp.status_code)
-
-    #             if sendgrid_resp.status_code not in [200, 202]:
-    #                 # [DEBUG] print("❌ SendGrid error:", sendgrid_resp.text)
-    #                 return Response(
-    #                     {"error": "Failed to send email via SendGrid."},
-    #                     status=sendgrid_resp.status_code
-    #                 )
-
-    #             return Response(
-    #                 {
-    #                     "message": "Verification email sent successfully.",
-    #                     "action_link": action_link  # For debugging
-    #                 },
-    #                 status=status.HTTP_200_OK
-    #             )
-
-    #         except Exception as e:
-    #             # [DEBUG] print("❌ Resend verification error:", str(e))
-    #             return Response(
-    #                 {"error": str(e)},
-    #                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
-    #             )
+def _extract_staff_id(data):
+    """
+    Handles common Supabase RPC shapes:
+      4
+      "4"
+      {"submit_bhw_credenttial": 4}
+      [{"submit_bhw_credenttial": 4}]
+    """
+    if isinstance(data, (int, float)):
+        return int(data)
+    if isinstance(data, str) and data.isdigit():
+        return int(data)
+    if isinstance(data, dict):
+        v = data.get("submit_bhw_credenttial")
+        if isinstance(v, (int, float)) or (isinstance(v, str) and v.isdigit()):
+            return int(v)
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        v = data[0].get("submit_bhw_credenttial")
+        if isinstance(v, (int, float)) or (isinstance(v, str) and v.isdigit()):
+            return int(v)
+    return None
 
 
-    # class ResetPasswordAPIView(APIView):
-    #     """
-    #     Handles password reset:
-    #     - GET: Render new_password.html form
-    #     - POST: Reset user password using Supabase recovery token
-    #     """
+class BHWFieldVisitLoginAPIView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []   # avoid CSRF via SessionAuthentication
+    """
+    BHW field login -> returns only staff_id from submit_bhw_credenttial
+    """
 
-    #     def get(self, request):
-    #         access_token = request.GET.get("access_token")
+    def post(self, request):
+        username = (request.data.get('username') or '').strip()
+        password = request.data.get('password') or ''
 
-    #         # 🟢 Allow page to render even if token missing (frontend JS will handle)
-    #         if not access_token:
-    #             print("⚠️ No access_token in query params. Frontend will attempt to extract from URL hash.")
+        # Basic validation
+        if not username or not password:
+            return Response(
+                {"error": "Username and password are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-    #         return render(request, "authentication/forgot_password/new_password.html")
+        try:
+            # Call Supabase stored procedure submit_bhw_credenttial()
+            resp = supabase.rpc("submit_bhw_credenttial", {
+                "p_username": username,
+                "p_password": password
+            }).execute()
 
-    #     def post(self, request):
-    #         token = request.data.get("access_token") or request.POST.get("access_token")
-    #         new_password = request.data.get("new_password") or request.POST.get("new_pass")
-    #         confirm_password = request.data.get("confirm_password") or request.POST.get("confirm_pass")
+            staff_id = _extract_staff_id(resp.data)
 
-    #         if not token or not new_password or not confirm_password:
-    #             return JsonResponse(
-    #                 {"error": "All fields are required."},
-    #                 status=status.HTTP_400_BAD_REQUEST
-    #             )
-    #         if new_password != confirm_password:
-    #             return JsonResponse(
-    #                 {"error": "Passwords do not match."},
-    #                 status=status.HTTP_400_BAD_REQUEST
-    #             )
+            if not staff_id:
+                return Response(
+                    {"error": "Invalid username or password."},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
 
-    #         try:
-    #             # 🟢 Step 1: Reset password in Supabase Auth
-    #             supabase_url = f"{SUPABASE_URL}/auth/v1/user"
-    #             headers = {
-    #                 "apikey": SUPABASE_SERVICE_ROLE_KEY,
-    #                 "Authorization": f"Bearer {token}"
-    #             }
-    #             payload = {"password": new_password}
+            return Response({"staff_id": staff_id}, status=status.HTTP_200_OK)
 
-    #             response = requests.put(supabase_url, headers=headers, json=payload)
-    #             if response.status_code not in [200, 201]:
-    #                 return JsonResponse(
-    #                     {"error": "Failed to reset password. Link may be expired."},
-    #                     status=response.status_code
-    #                 )
+        except Exception as e:
+            # If Supabase error dict is passed in e.args[0]
+            if hasattr(e, 'args') and e.args and isinstance(e.args[0], dict):
+                err = e.args[0]
+                return Response(
+                    {"message": err.get("message"), "code": err.get("code")},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-    #             # 🟢 Step 2: Get the user info to extract auth user ID
-    #             user_info_url = f"{SUPABASE_URL}/auth/v1/user"
-    #             user_response = requests.get(user_info_url, headers=headers)
-    #             if user_response.status_code != 200:
-    #                 return JsonResponse(
-    #                     {"error": "Failed to fetch user information."},
-    #                     status=user_response.status_code
-    #                 )
-    #             user_data = user_response.json()
-    #             auth_user_id = user_data.get("id")  # Supabase auth user ID
-    #             print(f"✅ Auth user ID: {auth_user_id}")
-
-    #             # 🟢 Step 3: Hash the password (use bcrypt to match existing hashes)
-    #             import bcrypt
-    #             hashed_pw = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-
-    #             # 🟢 Step 4: Update person_credential table in Supabase
-    #             supabase_db_url = f"{SUPABASE_URL}/rest/v1/person_credential?credential_id=eq.{auth_user_id}"
-    #             db_headers = {
-    #                 "apikey": SUPABASE_SERVICE_ROLE_KEY,
-    #                 "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
-    #                 "Content-Type": "application/json",
-    #                 "Prefer": "return=representation"
-    #             }
-    #             db_payload = {
-    #                 "passwordd": hashed_pw,
-    #                 "password_status": "CHANGED"
-    #             }
-
-    #             db_response = requests.patch(supabase_db_url, headers=db_headers, json=db_payload)
-    #             if db_response.status_code not in [200, 204]:
-    #                 return JsonResponse(
-    #                     {"error": "Password reset but failed to update person_credential table."},
-    #                     status=db_response.status_code
-    #                 )
-
-    #             return JsonResponse(
-    #                 {"message": "Password has been reset successfully."},
-    #                 status=status.HTTP_200_OK
-    #             )
-
-    #         except Exception as e:
-    #             return JsonResponse(
-    #                 {"error": f"Error resetting password: {str(e)}"},
-    #                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
-    #             )
+            # Generic fallback error
+            return Response({"message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

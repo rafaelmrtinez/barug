@@ -1,4 +1,4 @@
-# verification/ocr_utils.py
+# resident/verification/ocr_utils.py
 import re
 from typing import Optional, Tuple, Dict
 import pytesseract
@@ -27,13 +27,26 @@ def _preprocess_for_ocr(img: Image.Image) -> Image.Image:
     return g
 
 def extract_text_from_file(file_obj) -> str:
+    """
+    Open the image, run OCR, and then rewind the file object so callers
+    can reuse the stream (e.g., for upload).
+    """
     try:
         img = Image.open(file_obj)
     except UnidentifiedImageError:
+        try:
+            file_obj.seek(0)
+        except Exception:
+            pass
         return ""
     img = _preprocess_for_ocr(img)
-    # psm 6: block of text; oem 3: default LSTM
     text = pytesseract.image_to_string(img, lang="eng", config="--oem 3 --psm 6")
+
+    # Rewind so subsequent code (uploads) can read from the start
+    try:
+        file_obj.seek(0)
+    except Exception:
+        pass
     return text or ""
 
 def is_document_type_valid(ocr_text: str, doc_type_key: str) -> bool:
@@ -56,7 +69,12 @@ def _tokenize_name_part(s: str):
 def _any_token_found(haystack_norm: str, tokens) -> bool:
     return any(t in haystack_norm for t in tokens)
 
-def is_name_match_loose(ocr_text: str, first_name: str, last_name: str, middle_name: str = "") -> Tuple[bool, Dict[str, bool]]:
+def is_name_match_loose(
+    ocr_text: str,
+    first_name: str,
+    last_name: str,
+    middle_name: str = ""
+) -> Tuple[bool, Dict[str, bool]]:
     """
     Loose rule:
       - Pass if LAST name appears AND (FIRST or MIDDLE) appears anywhere.
@@ -70,7 +88,6 @@ def is_name_match_loose(ocr_text: str, first_name: str, last_name: str, middle_n
     last_tokens   = _tokenize_name_part(last_name or "")
     middle_tokens = _tokenize_name_part(middle_name or "")
 
-    # if we have no last name, we can't safely match
     if not last_tokens:
         return False, {"first": False, "middle": False, "last": False}
 
@@ -120,12 +137,10 @@ def validate_doc_from_images(
     if not doc_type_ok:
         reason = "Document text does not match expected ID type."
     elif name_ok is False:
-        # be explicit about which part failed
         if name_hits:
             missing = []
             if not name_hits.get("last"):
                 missing.append("last name")
-            # only require (first OR middle); mention both if missing
             if not (name_hits.get("first") or name_hits.get("middle")):
                 missing.append("first or middle name")
             reason = "Name not fully detected: " + ", ".join(missing)
@@ -136,7 +151,7 @@ def validate_doc_from_images(
         "ok": ok,
         "doc_type_ok": doc_type_ok,
         "name_ok": name_ok,
-        "name_hits": name_hits,          # NEW: detail which parts matched
+        "name_hits": name_hits,
         "text_front": text_front,
         "text_back": text_back,
         "which_matched": "front" if len(text_front) >= len(text_back) else "back",

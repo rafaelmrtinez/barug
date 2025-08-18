@@ -45,7 +45,7 @@ EMAIL_HOST_PASSWORD = "sfpa gadp dpnj licq"
 API_VERSION = "v1"  # API version for event logs
 
 # LOCALHOST URL USED
-TESTING_URL_USED = 'http://192.168.1.2:8000'
+TESTING_URL_USED = 'http://192.168.1.4:8000'
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -70,7 +70,7 @@ else:
     print("Development mode enabled")
     DEBUG = True
 
-ALLOWED_HOSTS = ['192.168.1.6']
+ALLOWED_HOSTS = ['192.168.1.4']
 ALLOWED_HOSTS = ['192.168.1.2', "*"]
 
 # Application definition
