@@ -1,35 +1,57 @@
-/* Layout wrapper */
+/* You already have these; keep them as-is */
 .page-wrap{
-  min-height: 100vh;     /* span full viewport */
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
-
-/* Main content grows naturally */
-
-/* Dual behavior:
-   - Short page -> pushed to bottom-right (looks fixed)
-   - Long page  -> sits after the table */
 .page-pagination{
-  margin-top: auto;        /* push to bottom when space remains */
+  margin-top: auto;         /* pushes to bottom when there's space */
   padding: 12px 20px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-end; /* RIGHT aligned, not centered */
 }
 
-/* Red variant (your styles) */
-.custom-pagination .page-link {
-  color: var(--bs-danger-text-emphasis);
+/* New compact pager visuals (like the 2nd image) */
+.pager{
+  display: flex;
+  justify-content: space-between; /* results left, buttons right */
+  align-items: center;
+  width: 100%; /* span the row */
+  gap: 12px;
+  font-size: 0.95rem;
+}
+
+.pager-btn{
+  display: inline-block;
+  padding: 6px 14px;
   border: 1px solid var(--bs-danger-text-emphasis);
+  border-radius: 6px;
+  text-decoration: none;
+  line-height: 1.2;
+  user-select: none;
+  transition: background-color .15s ease, color .15s ease, border-color .15s ease;
+  color: var(--bs-body-color, #212529);
+  background: transparent;
 }
-.custom-pagination .page-link:hover {
-  background-color: #a52a2a; color:#fff;
-}
-.custom-pagination .active .page-link {
-  background-color: var(--bs-danger-text-emphasis);
-  border-color: var(--bs-danger-text-emphasis);
+.pager-btn:hover{
+  background: var(--bs-danger-text-emphasis);
   color: #fff;
 }
-.custom-pagination .disabled .page-link {
-  color: #d3d3d3; border-color:#d3d3d3;
+.pager-btn.is-disabled{
+  opacity: .55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.pager-label{
+  opacity: .9;
+  white-space: nowrap;
+  padding-left: 5;
+  padding-right: 5;
+}
+
+/* Optional: make sure it doesn't wrap awkwardly on small screens */
+@media (max-width: 480px){
+  .pager{ gap: 8px; font-size: .9rem; }
+  .pager-btn{ padding: 5px 10px; }
 }

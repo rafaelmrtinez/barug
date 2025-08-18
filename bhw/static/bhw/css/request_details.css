@@ -1,6 +1,6 @@
 :root{ --muted:#6c757d; --line:#e9ecef; --pill:#f8f9fa; --pill-hover:#eef1f3; --subcard:#ffffff; }
 
-.meta{font-size:.95rem;color:var(--muted)}
+/* .meta{font-size:.95rem;color:var(--muted)} */
 .divider{height:1px;background:var(--line);margin:.875rem 0 1.25rem}
 .section-title{color:var(--muted);font-weight:600;font-size:.95rem}
 

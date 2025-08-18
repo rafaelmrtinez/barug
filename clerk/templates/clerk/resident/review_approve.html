@@ -16,7 +16,7 @@
     <div class="row">
       <div>
 
-        <div class="col-md-4 ms-auto">
+        <div class="col-md-2 ms-auto">
             <form method="post">
               {% csrf_token %}
 
@@ -43,7 +43,7 @@
                 <td></td>
                 <td>
                   <div class="d-flex gap-1">
-                    <a class="btn btn-icon" title="View Resident Record"
+                    <a class="btn btn-icon"
                        href="{% url 'clerk:person_details' req_id='RBSN00000' %}">
                       {% bs_icon 'person-lines-fill' size='1em' %}
                     </a>

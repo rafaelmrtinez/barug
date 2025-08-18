@@ -8,4 +8,5 @@ class SearchVerificationRequest(forms.Form):
             'placeholder' : 'Search',
     }),
         label= 'Search',
+        # required= False,
     )

@@ -31,7 +31,7 @@
       </div>
 
       <div class="divider"></div>
-      <span class="section-title mb-2">Details</span>
+      <!-- <span class="section-title mb-2">Details</span> -->
 
       <div class="row g-4">
         <!-- Household -->
@@ -53,8 +53,10 @@
               <span class="text-muted small">{{ families|length }} Families</span>
             </div>
 
+            {% if families and families|length > 0 %}
             <div id="familiesCarousel" class="carousel slide family-carousel" data-bs-ride="false" data-bs-touch="true">
               <!-- Indicators with labels -->
+               {% if families|length > 1 %}
                 <div class="carousel-indicators">
                   {% for family in families %}
                     <button
@@ -66,6 +68,7 @@
                     </button>
                   {% endfor %}
                 </div>
+                {% endif %}
 
               <div class="carousel-inner">
                 {% for family in families %}
@@ -88,24 +91,35 @@
                       </div>
                     </div>
                     <strong class="d-block mb-2">Members</strong>
+                    {% if family.members and family.members|length > 0 %}
                     <div class="member-grid" data-bs-toggle="modal" data-bs-target="#memberModal">
                       {% for member in family.members %}
                         <button type="button" class="btn member-pill">{{ member }}</button>
                       {% endfor %}
                     </div>
+                    {% else %}
+                    <div class="text-muted fst-italic">There is no family member in this family.</div>
+                    {% endif %}
                   </div>
                 </div>
                 {% endfor %}
               </div>
               
-              <!-- Controls -->
-              <button class="carousel-control-prev" type="button" data-bs-target="#familiesCarousel" data-bs-slide="prev" aria-label="Previous family">
-                <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
-              </button>
-              <button class="carousel-control-next" type="button" data-bs-target="#familiesCarousel" data-bs-slide="next" aria-label="Next family">
-                <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
-              </button>
+              {% if families|length > 1 %}
+                <!-- Controls -->
+                <button class="carousel-control-prev" type="button" data-bs-target="#familiesCarousel" data-bs-slide="prev" aria-label="Previous family">
+                  <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
+                </button>
+                <button class="carousel-control-next" type="button" data-bs-target="#familiesCarousel" data-bs-slide="next" aria-label="Next family">
+                  <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
+                </button>
+              {% endif %}
             </div>
+            {% else %}
+            <div class="text-muted fst-italic text-center">0 family in this household.</div>
+            {% endif %}
+
+            
             <!-- Member Details Modal -->
             <div class="modal fade" id="memberModal" tabindex="-1" aria-labelledby="memberModalLabel" aria-hidden="true">
               <div class="modal-dialog modal-dialog-centered">
@@ -143,6 +157,13 @@
               </div>
             </div>
          </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="mt-auto button-container justify-content-end mb-2">
+        <button type="reset" class="btn btn-reset">Decline</button>
+        <button type="button" class="btn btn-submit">Approve</button>
       </div>
     </div>
   </div>
