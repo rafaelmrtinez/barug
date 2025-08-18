@@ -29,6 +29,8 @@ urlpatterns = [
     path("authentication/", include("authentication.urls", namespace="authentication")),
     path("event_logs/", include("event_logs.urls", namespace="event_logs")),
     path("resident/", include("resident.urls", namespace="resident")),
+    path("bhw/", include("bhw.urls", namespace="bhw")),
+    path("clerk/", include("clerk.urls", namespace="clerk")),
 
     # API v1
     path('api/v1/residents/', include('resident.api_urls')),

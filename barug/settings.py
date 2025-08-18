@@ -98,6 +98,8 @@ INSTALLED_APPS = [
     "authentication",
     "event_logs",
     "resident",
+    "bhw",
+    "clerk",
 ]
 
 MIDDLEWARE = [
@@ -158,6 +160,8 @@ TEMPLATES = [
             BASE_DIR / "authentication/templates/authentication",
             BASE_DIR / "event_logs/templates/event_logs",
             BASE_DIR / "resident/templates/resident",
+            BASE_DIR / "bhw/templates/bhw",
+            BASE_DIR / "clerk/templates/clerk",
         ],
         "APP_DIRS": True,
         "OPTIONS": {
@@ -225,6 +229,8 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "authentication/static/authentication"),
     os.path.join(BASE_DIR, "event_logs/static/event_logs"),
     os.path.join(BASE_DIR, "resident/static/resident"),
+    os.path.join(BASE_DIR, "bhw/static/bhw"),
+    os.path.join(BASE_DIR, "clerk/static/clerk"),
 ]
 
 # By practice the API should not server static files in production.

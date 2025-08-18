@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+    <link rel="stylesheet" href="{% static 'css/button.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3" style="margin-top: 40px;">
+
+    <div class="row">
+
+        <div class="col-lg-12">
+
+            <div>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Household Name?</th>
+                            <th scope="col">Address</th>
+                            <th scope="col">Date Submitted</th>
+                            <th scope="col">Reason</th>
+                            <th scope="col">Schedule</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="table-row-height">
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td>
+                                <div>
+                                    <a href="{% url 'bhw:request_details' %}" type="button" class="btn btn-icon">
+                                        {% bs_icon 'card-text' size='1em' %}
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">No requests found.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}
