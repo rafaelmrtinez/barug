@@ -431,7 +431,6 @@ class ResidentRegisterBHWAPIView(APIView):
             return Response({"error": str(e)}, status=500)
 
 
-
 class FamilyUnitSelection(APIView):
     
     parser_classes = [JSONParser]
@@ -486,6 +485,7 @@ class HouseholdMembershipSearch(APIView):
         if not result:
             return Response({'message': 'No results found'},status=status.HTTP_200_OK)
         return Response({'message': result}, status=status.HTTP_200_OK)
+
 
 class FamilyMembership(APIView):
     """
@@ -548,6 +548,7 @@ class FamilyMembership(APIView):
             return Response({"error": "Unable to join family at the moment."}, status=status.HTTP_400_BAD_REQUEST)
         
         return Response(status=status.HTTP_200_OK)
+
 
 class ResidentRegisterAPIView(APIView):
     def post(self, request):
@@ -698,7 +699,6 @@ class ResidentRegisterAPIView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-
 class ResidentProfileAPIView(APIView):
     """
     Fetch full resident profile for logged-in user
@@ -739,7 +739,6 @@ class ResidentProfileAPIView(APIView):
             return Response({"error": "Token expired."}, status=401)
         except jwt.InvalidTokenError:
             return Response({"error": "Invalid token."}, status=401)
-
 
 
 class PersonVerificationRequestAPIView(APIView):
