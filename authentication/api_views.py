@@ -1,3 +1,10 @@
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.middleware.csrf import get_token
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import ensure_csrf_cookie
+
+from authentication.cookie_utils import set_auth_cookies, clear_auth_cookies
+
 import jwt, datetime, requests, json
 # import datetime
 # import requests
@@ -28,85 +35,64 @@ EMAIL_HOST_USER = settings.EMAIL_HOST_USER
 JWT_SECRET = settings.SECRET_KEY
 JWT_ALGORITHM = "HS256"
 
+def _is_mobile(request) -> bool:
+    # RN calls login with: X-Platform: mobile
+    return (request.headers.get("X-Platform") or "").lower() == "mobile"
+
 
 class ResidentLoginView(APIView):
-
     permission_classes = [AllowAny]
     authentication_classes = []   # avoid CSRF via SessionAuthentication
-    """
-    Resident login API view
-    """
+
     def post(self, request):
         username = request.data.get('username')
         password = request.data.get('password')
 
-        # Basic validation
         if not username or not password:
-            return Response(
-                {"error": "Username and password are required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Username and password are required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Call Supabase stored procedure user_login()
-            response = supabase.rpc("user_login", {
+            response_rpc = supabase.rpc("user_login", {
                 "p_username": username,
                 "p_password": password
             }).execute()
 
-            # ✅ Check if data was returned
-            user_data = response.data
+            if not response_rpc.data:
+                return Response({"error": "Invalid username or password."}, status=status.HTTP_401_UNAUTHORIZED)
 
-            if not user_data:
-                return Response(
-                    {"error": "Invalid username or password."},
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
+            user = response_rpc.data[0]  # {'user_id': 3, 'user_type': 'PERSON'}
+            uid = user.get("user_id")
+            role = user.get("user_type", "PERSON")
 
-            # Supabase returns: [{'user_id': 3, 'user_type': 'PERSON'}]
-            user = user_data[0]  # Get first row from result
+            # Issue tokens with custom claims
+            refresh = RefreshToken()
+            refresh["uid"] = uid
+            refresh["role"] = role
+            refresh["username"] = username
 
-            # JWT payload
-            payload = {
-                "user_id": user.get("user_id"),
-                "username": username,
-                "role": user.get("user_type", "PERSON"),  # use db user_type
-                "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1)  # Token expiry
-            }
-            token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-                
-            return Response({
+            access = refresh.access_token
+
+            resp = Response({
                 "message": "Login successful.",
-                "token": token,
-                "user": {
-                    "user_id": user.get("user_id"),
-                    "username": username,
-                    "role": user.get("user_type", "PERSON")
-                }
-            }, status=status.HTTP_200_OK)   
+                "user": {"user_id": uid, "username": username, "role": role},
+            }, status=status.HTTP_200_OK)
+
+            # Web: set HttpOnly cookies
+            set_auth_cookies(resp, access, refresh)
+
+            # Mobile: also return tokens in body
+            if _is_mobile(request):
+                resp.data["token"] = str(access)
+                resp.data["refresh"] = str(refresh)
+
+            return resp
 
         except Exception as e:
-            # [DEBUG] print("Login error:", e)
-
-            # If Supabase error dict is passed in e.args[0]
             if hasattr(e, 'args') and isinstance(e.args[0], dict):
-                # Replace Python None with JSON null automatically
-                error_data = e.args[0]
-                # Optional: remove unneeded fields
-                error_response = {
-                    "message": error_data.get("message"),
-                    "code": error_data.get("code")
-                }
-                return Response(
-                    error_response,
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                err = e.args[0]
+                return Response({"message": err.get("message"), "code": err.get("code")}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            # Generic fallback error
-            return Response(
-                {"message": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
 
 
 class EmailConfirmedAPIView(APIView):
@@ -250,6 +236,7 @@ class EmailConfirmedAPIView(APIView):
             )
 
 
+
 class ResendVerificationEmailAPIView(APIView):
     """
     Resend the email verification for a user using shared logic.
@@ -268,6 +255,7 @@ class ResendVerificationEmailAPIView(APIView):
         else:
             return Response({"error": "Failed to send verification email."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
+
 
 class ForgotPasswordAPIView(APIView):
     """
@@ -365,6 +353,7 @@ class ForgotPasswordAPIView(APIView):
                 {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
 
 
 class ResetPasswordAPIView(APIView):
@@ -488,6 +477,7 @@ def _extract_staff_id(data):
     return None
 
 
+
 class BHWFieldVisitLoginAPIView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []   # avoid CSRF via SessionAuthentication
@@ -534,3 +524,56 @@ class BHWFieldVisitLoginAPIView(APIView):
 
             # Generic fallback error
             return Response({"message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+class TokenRefreshAPIView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        raw_refresh = request.data.get("refresh") or request.COOKIES.get("refresh")
+        if not raw_refresh:
+            return Response({"error": "Missing refresh token."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            old = RefreshToken(raw_refresh)
+
+            # Rotate refresh: mint a new refresh with same custom claims
+            new_refresh = RefreshToken()
+            for k in ("uid", "role", "username"):
+                if k in old:
+                    new_refresh[k] = old[k]
+            new_access = new_refresh.access_token
+
+            resp = Response(status=status.HTTP_200_OK)
+            set_auth_cookies(resp, new_access, new_refresh)
+
+            if _is_mobile(request):
+                resp.data = {"token": str(new_access), "refresh": str(new_refresh)}
+
+            return resp
+        except Exception:
+            return Response({"error": "Invalid refresh token."}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+
+class LogoutAPIView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        # If you enable blacklist, you can blacklist the provided refresh here
+        resp = Response({"message": "Logged out."}, status=status.HTTP_200_OK)
+        clear_auth_cookies(resp)
+        return resp
+
+
+@method_decorator(ensure_csrf_cookie, name="dispatch")
+class CSRFTokenAPIView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        # sets csrftoken cookie and returns it
+        return Response({"csrfToken": get_token(request)}, status=status.HTTP_200_OK)

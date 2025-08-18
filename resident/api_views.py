@@ -20,8 +20,11 @@ from src.app.bootstrap.app_containers import AppContainer
 from src.core.contracts.app.family_service import IFamilyMembershipService
 from src.core.exceptions.domain_exceptions import DomainException
 
+from datetime import datetime, date
+from rest_framework.permissions import IsAuthenticated, AllowAny
+
 from supabase_client import supabase  # Your Supabase client
-import jwt
+# import jwt
 from rest_framework.permissions import AllowAny
 import requests
 from barug.constants import RESOURCE_ACCESS_DENIED
@@ -37,27 +40,68 @@ import re
 
 logger = logging.getLogger(__name__)
 
-JWT_SECRET = settings.SECRET_KEY
-JWT_ALGORITHM = "HS256"
+# JWT_SECRET = settings.SECRET_KEY
+# JWT_ALGORITHM = "HS256"
 
 
-def _read_bytes(f):
-    if not f:
+
+# ---------- NEW: helpers for username pattern ----------
+_USERNAME_SUFFIX_DOMAIN = "@user"
+
+def _slug_module(s: str | None) -> str:
+    if s is None:
+        return ""
+    return re.sub(r'[^a-z0-9]+', '', str(s).strip().lower())
+
+def _mmddyy_from_input(dob_raw) -> str | None:
+    """Return MMDDYY from various DOB input formats, or None if invalid."""
+    if not dob_raw:
         return None
-    try:
-        try:
-            f.seek(0)
-        except Exception:
-            pass
-        b = f.read()
-        try:
-            f.seek(0)
-        except Exception:
-            pass
-        return b
-    except Exception as e:
-        logger.exception("Failed reading upload bytes: %s", e)
-        return None
+    dt = None
+    if isinstance(dob_raw, datetime):
+        dt = dob_raw.date()
+    elif isinstance(dob_raw, date):
+        dt = dob_raw
+    else:
+        val = str(dob_raw).strip()
+        # Try common formats
+        fmts = [
+            "%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y", "%Y/%m/%d",
+            "%d-%m-%Y", "%d/%m/%Y",
+            "%m/%d/%y", "%m-%d-%y", "%d-%m-%y", "%d/%m/%y",
+            "%Y%m%d", "%m%d%Y"
+        ]
+        for f in fmts:
+            try:
+                dt = datetime.strptime(val, f).date()
+                break
+            except ValueError:
+                continue
+        if dt is None:
+            # Last ditch: extract digits and try YYYY-MM-DD ordering
+            digits = re.sub(r"\D+", "", val)
+            try:
+                if len(digits) == 8:
+                    # Heuristic: try YYYYMMDD first, else MMDDYYYY
+                    try:
+                        dt = datetime.strptime(digits, "%Y%m%d").date()
+                    except ValueError:
+                        dt = datetime.strptime(digits, "%m%d%Y").date()
+            except Exception:
+                dt = None
+    return dt.strftime("%m%d%y") if dt else None
+
+def generate_username(last_name: str | None, dob_raw) -> str:
+    """
+    Always produce: lastname.MMDDYY@user
+    Fallbacks:
+      - If last_name missing -> "user.MMDDYY@user" or "user.000000@user"
+      - If DOB invalid/missing -> use "000000" for date code
+    """
+    ln = _slug_module(last_name) or "user"
+    mmddyy = _mmddyy_from_input(dob_raw) or "000000"
+    return f"{ln}.{mmddyy}{_USERNAME_SUFFIX_DOMAIN}"[:150]
+# ------------------------------------------------------
 
 
 class ResidentRegisterBHWAPIView(APIView):
@@ -109,13 +153,6 @@ class ResidentRegisterBHWAPIView(APIView):
     @staticmethod
     def _slug(s: str) -> str:
         return re.sub(r'[^a-z0-9]+', '', s.strip().lower())
-
-    @staticmethod
-    def _username_from_names(first_name, last_name) -> str:
-        fn = ResidentRegisterBHWAPIView._slug(ResidentRegisterBHWAPIView._scalar(first_name))
-        ln = ResidentRegisterBHWAPIView._slug(ResidentRegisterBHWAPIView._scalar(last_name))
-        local = '.'.join(p for p in (fn, ln) if p)
-        return (f"{local}@user" if local else "user@user")[:150]
 
     @staticmethod
     def _storage_base(auth_user_id: str | None, email: str | None) -> str:
@@ -303,6 +340,9 @@ class ResidentRegisterBHWAPIView(APIView):
                 else:
                     logger.warning("FILES[%s]: missing", k)
 
+            # ---------- NEW: ALWAYS compute username as lastname.MMDDYY@user ----------
+            username = generate_username(d.get('last_name'), d.get('date_of_birth'))
+
             # (4) Upload after OCR passes (or if no OCR needed)
             base = self._storage_base(auth_user_id, email)
             person_img_url = self._upload(self.PHOTOS_BUCKET, person_img, base)
@@ -310,7 +350,6 @@ class ResidentRegisterBHWAPIView(APIView):
             back_doc_url   = self._upload(self.DOCS_BUCKET,   back_file,   f"{base}/docs")
             selfie_url     = self._upload(self.DOCS_BUCKET,   selfie_file, f"{base}/docs")
 
-            username = self._username_from_names(d.get('first_name'), d.get('last_name'))
             occ = d.get("occupation")
             # (5) RPC payload
             rpc_payload = {
@@ -337,7 +376,7 @@ class ResidentRegisterBHWAPIView(APIView):
 
                 # auth linkage
                 "p_credential_id": auth_user_id,  # None if no email
-                "p_username": username,
+                "p_username": username,           # <-- NEW: use formatted username
                 "p_password": password,           # None if no email
 
                 # meta
@@ -358,7 +397,7 @@ class ResidentRegisterBHWAPIView(APIView):
                 # socioeconomic
                 "p_education_id": self._to_int(d.get("education_level_id")),
                 "p_employment_status_id": self._to_int(d.get("employment_status_id")),
-                "p_occupation": "N\\A" if occ is None else occ,
+                "p_occupation": occ,
                 "p_gov_mem_prog_id": self._to_int(d.get("gov_mem_prog_id") or d.get("gov_prog_id")),
                 "p_mnthly_personal_income_id": self._to_int(d.get("mnthly_personal_income_id") or d.get("monthly_personal_income_id")),
 
@@ -399,7 +438,7 @@ class ResidentRegisterBHWAPIView(APIView):
 
             person_id = person_q.data["person_id"]
 
-            update_body = {"username": username}
+            update_body = {"username": username}  # <-- NEW: always our pattern
             if auth_user_id:
                 update_body["credential_id"] = auth_user_id
 
@@ -421,6 +460,7 @@ class ResidentRegisterBHWAPIView(APIView):
                     "front_doc_url": front_doc_url,
                     "back_doc_url": back_doc_url,
                     "selfie_url": selfie_url,
+                    "username": username,  # <-- NEW: return it for clarity
                 },
                 status=201,
             )
@@ -429,6 +469,8 @@ class ResidentRegisterBHWAPIView(APIView):
             if auth_user_id:
                 delete_supabase_user(auth_user_id)
             return Response({"error": str(e)}, status=500)
+
+
 
 
 class FamilyUnitSelection(APIView):
@@ -703,42 +745,20 @@ class ResidentProfileAPIView(APIView):
     """
     Fetch full resident profile for logged-in user
     """
-
-    authentication_classes = []  # 👈 disable DRF auth
-    permission_classes = []      # 👈 disable DRF auth
+    permission_classes = [IsAuthenticated]  # use DRF auth (header or cookie)
 
     def get(self, request):
-        # ✅ Read token from header
-        auth_header = request.headers.get("Authorization")
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return Response(
-                {"error": "Authorization header missing or invalid."},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+        user_id = request.user.uid  # comes from token claims
 
-        token = auth_header.split(" ")[1]
+        profile_resp = supabase.rpc("get_specific_resident_full_profile", {
+            "p_person_id": user_id
+        }).execute()
 
-        try:
-            # ✅ Decode your custom JWT
-            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-            user_id = payload.get("user_id")
-            if not user_id:
-                return Response({"error": "Invalid token: no user_id."}, status=400)
+        # print(profile_resp.data)
+        if not profile_resp.data:
+            return Response({"error": "Resident profile not found."}, status=404)
 
-            # ✅ Call Supabase to fetch profile
-            profile_resp = supabase.rpc("get_specific_resident_full_profile", {
-                "p_person_id": user_id
-            }).execute()
-
-            if not profile_resp.data:
-                return Response({"error": "Resident profile not found."}, status=404)
-
-            return Response(profile_resp.data[0], status=200)
-
-        except jwt.ExpiredSignatureError:
-            return Response({"error": "Token expired."}, status=401)
-        except jwt.InvalidTokenError:
-            return Response({"error": "Invalid token."}, status=401)
+        return Response(profile_resp.data[0], status=200)
 
 
 class PersonVerificationRequestAPIView(APIView):
@@ -746,9 +766,9 @@ class PersonVerificationRequestAPIView(APIView):
     Accept socioeconomic fields + required ID images when doc_type_id is provided.
     Use OCR to validate doc type + resident name before uploading & calling RPC.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
-    BUCKET = "residents-photos"  # ensure bucket exists & is public
+    BUCKET = "residents-photos"
 
     def _upload_bytes(self, bytes_data: bytes, path: str, content_type: str):
         supabase.storage.from_(self.BUCKET).upload(
@@ -803,22 +823,26 @@ class PersonVerificationRequestAPIView(APIView):
         try:
             d = request.data
 
-            # Resolve requester_id from body, then try JWT as fallback
-            requester_id = d.get("requester_id")
-            if not requester_id:
-                auth_header = request.headers.get("Authorization", "")
-                if auth_header.startswith("Bearer "):
-                    token = auth_header.split(" ", 1)[1]
-                    try:
-                        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
-                        requester_id = payload.get("user_id")
-                    except jwt.ExpiredSignatureError:
-                        return Response({"error": "Token expired."}, status=status.HTTP_401_UNAUTHORIZED)
-                    except jwt.InvalidTokenError:
-                        return Response({"error": "Invalid token."}, status=status.HTTP_401_UNAUTHORIZED)
-
+            # ✅ Default to the authenticated user
+            requester_id = d.get("requester_id") or request.user.uid
+            
             if not requester_id:
                 return Response({"error": "Missing requester_id."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # if not requester_id:
+            #     auth_header = request.headers.get("Authorization", "")
+            #     if auth_header.startswith("Bearer "):
+            #         token = auth_header.split(" ", 1)[1]
+            #         try:
+            #             payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            #             requester_id = payload.get("user_id")
+            #         except jwt.ExpiredSignatureError:
+            #             return Response({"error": "Token expired."}, status=status.HTTP_401_UNAUTHORIZED)
+            #         except jwt.InvalidTokenError:
+            #             return Response({"error": "Invalid token."}, status=status.HTTP_401_UNAUTHORIZED)
+
+            # if not requester_id:
+            #     return Response({"error": "Missing requester_id."}, status=status.HTTP_400_BAD_REQUEST)
 
             # Required non-image fields
             required_keys = [

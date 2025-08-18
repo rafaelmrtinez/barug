@@ -28,7 +28,7 @@ def login(request):
             username = form.cleaned_data["email_username"].strip()
             password = form.cleaned_data["password"]
 
-            api_url = "http://192.168.1.6:8000/api/auth/login/"  # make sure this is correct
+            api_url = "http://192.168.1.4:8000/api/auth/login/"  # make sure this is correct
             print("[WEB] Calling API:", api_url)
             print("[WEB] Payload:", {"username": username, "password": "***"})
 

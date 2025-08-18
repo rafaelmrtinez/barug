@@ -91,7 +91,9 @@ INSTALLED_APPS = [
     "django_bootstrap_icons",
 
     # Third-party apps
-    'rest_framework',           # Django REST Framework
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'corsheaders',
     # 'corsheaders',             # CORS for API access (mobile/web)
 
     # Project Apps
@@ -103,6 +105,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     "django.middleware.security.SecurityMiddleware",
     'whitenoise.middleware.WhiteNoiseMiddleware',
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -113,13 +116,60 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+# REST_FRAMEWORK = {
+#     "DEFAULT_AUTHENTICATION_CLASSES": [],
+#     'DEFAULT_PARSER_CLASSES': [
+#         'rest_framework.parsers.JSONParser',
+#     ],
+#     "EXCEPTION_HANDLER": "src.infra.exceptions.handlers.custom_exception_handler.custom_exception_handler",
+# }
+
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "authentication.auth.CookieOrHeaderJWTAuthentication",  # <-- new (see file below)
+    ),
     'DEFAULT_PARSER_CLASSES': [
         'rest_framework.parsers.JSONParser',
     ],
     "EXCEPTION_HANDLER": "src.infra.exceptions.handlers.custom_exception_handler.custom_exception_handler",
 }
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": False,  # set True if you enable token_blacklist app
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+}
+
+# Cookie flags for JWT cookies
+JWT_COOKIE_SAMESITE = "Lax"
+JWT_COOKIE_SECURE = True
+JWT_COOKIE_DOMAIN = None  # set to ".your-domain.com" if you need subdomains
+
+# CSRF cookies
+CSRF_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SECURE = True
+
+# CORS (adjust to your actual web origin / RN dev IP)
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://192.168.1.4:3000",  # example web dev origin (change/remove as needed)
+    "http://localhost:3000",
+]
+CSRF_TRUSTED_ORIGINS = [
+    "http://192.168.1.4:3000",
+    "http://localhost:3000",
+]
+
+# Developer-friendly overrides when DEBUG is True and using http
+if DEBUG:
+    JWT_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+
 
 # PLEASE READ THIS!!!!
 # 
