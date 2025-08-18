@@ -70,8 +70,7 @@ else:
     print("Development mode enabled")
     DEBUG = True
 
-ALLOWED_HOSTS = ['192.168.1.4']
-ALLOWED_HOSTS = ['192.168.1.2', "*"]
+ALLOWED_HOSTS = ['192.168.1.2', '192.168.1.4', "https://barug-dev.onrender.com/"]
 
 # Application definition
 
