@@ -31,6 +31,13 @@ class MembershipSerializer(serializers.Serializer):
             "required": "Family head relationship is required."
         }
     )
+    years_of_residency = serializers.IntegerField(
+        required=True,
+        error_messages={
+            "invalid": "Invalid years of residency. Please try again.",
+            "required": "Years of residency is required."
+        }
+    )
     resident_id = serializers.IntegerField(
         required=True,
         error_messages={
