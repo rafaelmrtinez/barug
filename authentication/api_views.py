@@ -1,6 +1,6 @@
 # authentication/api_views.py
 from django.http import HttpResponse
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken, AccessToken  # AccessToken added
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -43,71 +43,7 @@ def _is_mobile(request) -> bool:
     return (request.headers.get("X-Platform") or "").lower() == "mobile"
 
 
-class ResidentLoginView(APIView):
-    permission_classes = [AllowAny]
-    authentication_classes = []
-
-    @staticmethod
-    def _only_message_from_exc(e, fallback="Login failed."):
-        if getattr(e, "args", None):
-            first = e.args[0]
-            if isinstance(first, dict):
-                msg = first.get("message")
-                if isinstance(msg, str) and msg.strip():
-                    return msg
-            if isinstance(first, str) and first.strip():
-                return first
-        for attr in ("message", "error", "detail"):
-            val = getattr(e, attr, None)
-            if isinstance(val, str) and val.strip():
-                return val
-        return fallback
-
-    def post(self, request):
-        username = (request.data.get('username') or "").strip()
-        password = request.data.get('password') or ""
-        if not username or not password:
-            # plain text only
-            return HttpResponse("Username and password are required.", status=400, content_type="text/plain; charset=utf-8")
-
-        try:
-            rpc = supabase.rpc("user_login", {"p_username": username, "p_password": password}).execute()
-
-            if not rpc.data:
-                # plain text only
-                return HttpResponse("Invalid username or password.", status=401, content_type="text/plain; charset=utf-8")
-
-            user = rpc.data[0]
-            uid = user.get("user_id")
-            role = user.get("user_type", "PERSON")
-            position = user.get("role_name", "NONE")
-
-            refresh = RefreshToken()
-            refresh["uid"] = uid
-            refresh["role"] = role
-            refresh["username"] = username
-            refresh["position"] = position
-            access = refresh.access_token
-
-            # success stays JSON (keep as-is)
-            resp = Response({
-                "message": "Login successful.",
-                "user": {"user_id": uid, "username": username, "role": role, "position": position},
-            }, status=status.HTTP_200_OK)
-
-            from authentication.cookie_utils import set_auth_cookies
-            set_auth_cookies(resp, access, refresh)
-            if _is_mobile(request):
-                resp.data["token"] = str(access)
-                resp.data["refresh"] = str(refresh)
-            return resp
-
-        except Exception as e:
-            # plain text only from Supabase/PostgREST errors
-            msg = self._only_message_from_exc(e, "Login failed.")
-            print(msg)
-            return HttpResponse(msg, status=400, content_type="text/plain; charset=utf-8")
-
+# ==================== EMAIL RELATED APIs ====================
 
 class EmailConfirmedAPIView(APIView):
     """
@@ -250,7 +186,6 @@ class EmailConfirmedAPIView(APIView):
             )
 
 
-
 class ResendVerificationEmailAPIView(APIView):
     """
     Resend the email verification for a user using shared logic.
@@ -270,6 +205,7 @@ class ResendVerificationEmailAPIView(APIView):
             return Response({"error": "Failed to send verification email."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 
+# ==================== Password-Related APIs ====================
 
 class ForgotPasswordAPIView(APIView):
     """
@@ -369,7 +305,6 @@ class ForgotPasswordAPIView(APIView):
             )
 
 
-
 class ResetPasswordAPIView(APIView):
     """
     Handles password reset:
@@ -467,6 +402,79 @@ class ResetPasswordAPIView(APIView):
             )
 
 
+# ==================== Resident Login and Logout APIs ====================
+
+class ResidentLoginView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @staticmethod
+    def _only_message_from_exc(e, fallback="Login failed."):
+        if getattr(e, "args", None):
+            first = e.args[0]
+            if isinstance(first, dict):
+                msg = first.get("message")
+                if isinstance(msg, str) and msg.strip():
+                    return msg
+            if isinstance(first, str) and first.strip():
+                return first
+        for attr in ("message", "error", "detail"):
+            val = getattr(e, attr, None)
+            if isinstance(val, str) and val.strip():
+                return val
+        return fallback
+
+    def post(self, request):
+        username = (request.data.get('username') or "").strip()
+        password = request.data.get('password') or ""
+        if not username or not password:
+            # plain text only
+            return HttpResponse("Username and password are required.", status=400, content_type="text/plain; charset=utf-8")
+
+        try:
+            rpc = supabase.rpc("user_login", {"p_username": username, "p_password": password}).execute()
+
+            if not rpc.data:
+                # plain text only
+                return HttpResponse("Invalid username or password.", status=401, content_type="text/plain; charset=utf-8")
+
+            user = rpc.data[0]
+            uid = user.get("user_id")
+            role = user.get("user_type", "PERSON")
+            position = user.get("role_name", "NONE")
+
+            refresh = RefreshToken()
+            refresh["uid"] = uid
+            refresh["role"] = role
+            refresh["username"] = username
+            refresh["position"] = position
+            access = refresh.access_token
+
+            print("============= ACCESS ===========")
+            print(access)
+            print("============= ACCESS ===========")
+            # success stays JSON (keep as-is)
+            resp = Response({
+                "message": "Login successful.",
+                "user": {"user_id": uid, "username": username, "role": role, "position": position},
+            }, status=status.HTTP_200_OK)
+
+            from authentication.cookie_utils import set_auth_cookies
+            set_auth_cookies(resp, access, refresh)
+            if _is_mobile(request):
+                resp.data["token"] = str(access)
+                resp.data["refresh"] = str(refresh)
+                print(resp.data["token"])
+            return resp
+
+        except Exception as e:
+            # plain text only from Supabase/PostgREST errors
+            msg = self._only_message_from_exc(e, "Login failed.")
+            print(msg)
+            return HttpResponse(msg, status=400, content_type="text/plain; charset=utf-8")
+
+
+# ==================== Staff Login and Logout APIs  ====================
 
 def _extract_staff_id(data):
     """
@@ -490,6 +498,75 @@ def _extract_staff_id(data):
             return int(v)
     return None
 
+
+class StaffLoginView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @staticmethod
+    def _only_message_from_exc(e, fallback="Login failed."):
+        if getattr(e, "args", None):
+            first = e.args[0]
+            if isinstance(first, dict):
+                msg = first.get("message")
+                if isinstance(msg, str) and msg.strip():
+                    return msg
+            if isinstance(first, str) and first.strip():
+                return first
+        for attr in ("message", "error", "detail"):
+            val = getattr(e, attr, None)
+            if isinstance(val, str) and val.strip():
+                return val
+        return fallback
+
+    def post(self, request):
+        username = (request.data.get('username') or "").strip()
+        password = request.data.get('password') or ""
+        if not username or not password:
+            # plain text only
+            return HttpResponse("Username and password are required.", status=400, content_type="text/plain; charset=utf-8")
+
+        try:
+            rpc = supabase.rpc("staff_login", {"p_username": username, "p_password": password}).execute()
+
+            if not rpc.data:
+                # plain text only
+                return HttpResponse("Invalid username or password.", status=401, content_type="text/plain; charset=utf-8")
+
+            user = rpc.data[0]
+            uid = user.get("user_id")
+            role = user.get("user_type", "PERSON")
+            position = user.get("role_name", "NONE")
+
+            refresh = RefreshToken()
+            refresh["uid"] = uid
+            refresh["role"] = role
+            refresh["username"] = username
+            refresh["position"] = position
+            access = refresh.access_token
+
+            print("============= ACCESS ===========")
+            print(access)
+            print("============= ACCESS ===========")
+            # success stays JSON (keep as-is)
+            resp = Response({
+                "message": "Login successful.",
+                "user": {"user_id": uid, "username": username, "role": role, "position": position},
+            }, status=status.HTTP_200_OK)
+
+            from authentication.cookie_utils import set_auth_cookies
+            set_auth_cookies(resp, access, refresh)
+            if _is_mobile(request):
+                resp.data["token"] = str(access)
+                resp.data["refresh"] = str(refresh)
+                print(resp.data["token"])
+            return resp
+
+        except Exception as e:
+            # plain text only from Supabase/PostgREST errors
+            msg = self._only_message_from_exc(e, "Login failed.")
+            print(msg)
+            return HttpResponse(msg, status=400, content_type="text/plain; charset=utf-8")
 
 
 class BHWFieldVisitLoginAPIView(APIView):
@@ -540,6 +617,7 @@ class BHWFieldVisitLoginAPIView(APIView):
             return Response({"message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# ==================== TOKEN RELATED APIs ====================
 
 class TokenRefreshAPIView(APIView):
     permission_classes = [AllowAny]
@@ -571,7 +649,6 @@ class TokenRefreshAPIView(APIView):
             return Response({"error": "Invalid refresh token."}, status=status.HTTP_401_UNAUTHORIZED)
 
 
-
 class LogoutAPIView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -591,3 +668,4 @@ class CSRFTokenAPIView(APIView):
     def get(self, request):
         # sets csrftoken cookie and returns it
         return Response({"csrfToken": get_token(request)}, status=status.HTTP_200_OK)
+

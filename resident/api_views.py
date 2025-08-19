@@ -32,6 +32,10 @@ from barug.constants import RESOURCE_ACCESS_DENIED
 from authentication.utils.email_helpers import send_signup_confirmation_link
 from authentication.utils.supabase_auth import delete_supabase_user
 
+# add to your imports at the top
+from rest_framework_simplejwt.tokens import RefreshToken, AccessToken  # AccessToken added
+
+
 from resident.verification.ocr_utils import validate_doc_from_images
 from resident.verification.constants import DOC_TYPE_KEY_BY_ID
 from PIL import Image, UnidentifiedImageError
@@ -594,7 +598,6 @@ class FamilyMembership(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
-
 class ResidentRegisterAPIView(APIView):
     def post(self, request):
         try:
@@ -957,3 +960,130 @@ class PersonVerificationRequestAPIView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class RegisterUnverifiedUpdateAPIView(APIView):
+    """
+    Update an UNVERIFIED resident's basic info.
+    Calls: update_unverified_basic_info(
+        p_person_id INT,
+        p_updated_by_id INT,
+        p_first_name TEXT DEFAULT NULL,
+        p_middle_name TEXT DEFAULT NULL,
+        p_last_name TEXT DEFAULT NULL,
+        p_suffix TEXT DEFAULT NULL,
+        p_birthdate DATE DEFAULT NULL,
+        p_mobile_num TEXT DEFAULT NULL,
+        p_sex_id INT DEFAULT NULL,
+        p_civil_status_id INT DEFAULT NULL,
+        p_nationality_id INT DEFAULT NULL,
+        p_religion_id INT DEFAULT NULL,
+        p_city_name TEXT DEFAULT NULL,
+        p_barangay_name TEXT DEFAULT NULL,
+        p_purok_sitio_name TEXT DEFAULT NULL,
+        p_street_name TEXT DEFAULT NULL
+    )
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []  # we'll read the JWT manually
+
+    # ---------- helpers
+    @staticmethod
+    def _null_if_empty(v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            v = v.strip()
+            return v or None
+        return v
+
+    @staticmethod
+    def _to_int_or_none(v):
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        try:
+            return int(v)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _get_bearer_token(request):
+        auth = request.headers.get("Authorization") or request.META.get("HTTP_AUTHORIZATION")
+        if auth and auth.lower().startswith("bearer "):
+            return auth.split(" ", 1)[1].strip()
+        return request.COOKIES.get("access")
+
+    @classmethod
+    def _claims(cls, request):
+        token = cls._get_bearer_token(request)
+        if not token:
+            return {}
+        try:
+            t = AccessToken(token)
+            return dict(t)  # contains uid, role, username, position
+        except Exception:
+            return {}
+
+    # ---------- endpoint
+    def post(self, request):
+        data = request.data or {}
+        claims = self._claims(request)
+
+        # person_id from body OR from JWT (uid)
+        person_id = data.get("person_id") or claims.get("uid")
+        person_id = self._to_int_or_none(person_id)
+
+        if not person_id:
+            return Response(
+                {"error": "person_id is required (or include a valid access token)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        updated_by_id = self._to_int_or_none(data.get("updated_by_id")) or person_id
+
+        # sanitize/convert inputs
+        params = {
+            "p_person_id": person_id,
+            "p_updated_by_id": updated_by_id,
+            "p_first_name": self._null_if_empty(data.get("first_name")),
+            "p_middle_name": self._null_if_empty(data.get("middle_name")),
+            "p_last_name": self._null_if_empty(data.get("last_name")),
+            "p_suffix": self._null_if_empty(data.get("suffix")),
+            # Expecting 'YYYY-MM-DD'; pass through as text and let Postgres cast to DATE
+            "p_birthdate": self._null_if_empty(data.get("birthdate")),
+            "p_mobile_num": self._null_if_empty(data.get("mobile_num")),
+            "p_sex_id": self._to_int_or_none(data.get("sex_id")),
+            "p_civil_status_id": self._to_int_or_none(data.get("civil_status_id")),
+            "p_nationality_id": self._to_int_or_none(data.get("nationality_id")),
+            "p_religion_id": self._to_int_or_none(data.get("religion_id")),
+            "p_city_name": self._null_if_empty(data.get("city_name")),
+            "p_barangay_name": self._null_if_empty(data.get("barangay_name")),
+            "p_purok_sitio_name": self._null_if_empty(data.get("purok_sitio_name")),
+            "p_street_name": self._null_if_empty(data.get("street_name")),
+        }
+
+        try:
+            rpc = supabase.rpc("update_unverified_basic_info", params).execute()
+
+            # Supabase RPC usually returns .data or raises; handle empty gracefully
+            if getattr(rpc, "data", None) is None:
+                return Response(
+                    {"error": "Update failed."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            return Response(
+                {"message": "Unverified profile updated.", "result": rpc.data},
+                status=status.HTTP_200_OK,
+            )
+        except Exception as e:
+            # try to surface Supabase error message
+            err_msg = None
+            if hasattr(e, "args") and e.args:
+                first = e.args[0]
+                if isinstance(first, dict):
+                    err_msg = first.get("message")
+                elif isinstance(first, str):
+                    err_msg = first
+            return Response(
+                {"error": err_msg or "Unexpected error while updating profile."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )

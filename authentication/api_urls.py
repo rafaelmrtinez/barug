@@ -10,6 +10,7 @@ from authentication.api_views import (
     TokenRefreshAPIView,   # NEW
     LogoutAPIView,         # NEW
     CSRFTokenAPIView,      # NEW
+    StaffLoginView,
 )
 
 app_name = "auth_api"
@@ -20,6 +21,9 @@ urlpatterns = [
     path("refresh/", TokenRefreshAPIView.as_view(), name="token-refresh"),   # NEW
     path("logout/", LogoutAPIView.as_view(), name="logout"),                 # NEW
     path("csrf/", CSRFTokenAPIView.as_view(), name="csrf"),                  # NEW (GET only)
+    
+    # Staff login
+    path("staff-login/", StaffLoginView.as_view(), name="staff-login"),
 
     # Email verification
     path("email-confirmed/", EmailConfirmedAPIView.as_view(), name="email-confirmed"),

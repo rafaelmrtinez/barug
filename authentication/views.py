@@ -140,7 +140,7 @@ def login(request):
         # Call your API
         try:
             r = requests.post(
-                API_BASE + "/login/",
+                API_BASE + "/staff-login/",
                 json={"username": username, "password": password},
                 headers={
                     "Accept": "application/json",

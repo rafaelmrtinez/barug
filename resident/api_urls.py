@@ -9,6 +9,8 @@ urlpatterns = [
     path('family-membership/', api_views.FamilyMembership.as_view(), name='api-family-membership'),
     path('households/search/', api_views.HouseholdMembershipSearch.as_view(), name='api-household-membership-search'),
     path('fetch/families/', api_views.FamilyUnitSelection.as_view(), name='api-family-unit-selection'),
+    path("unverified/update/", api_views.RegisterUnverifiedUpdateAPIView.as_view(), name="resident-unverified-update"),
+
     # path('profile/<int:pk>/', api_views.ResidentProfileAPIView.as_view(), name='api-resident-profile'),
 ]
 
