@@ -10,6 +10,7 @@ class FamilyMembershipService(IFamilyMembershipService):
 
     def execute(
         self,
+        years_of_residency: int,
         resident_id: int,
         household_id: int,
         family_id: int,
@@ -30,7 +31,7 @@ class FamilyMembershipService(IFamilyMembershipService):
             'p_family_id': data.get('family_id', None),
             'p_relationship_to_hholdhead_id': household_head_relationship,
             'p_relationship_to_family_head_id': family_head_relationship,
-            'p_residency_period': data.get('residency_period', None)
+            'p_residency_period': years_of_residency
         })
         return True if request_id else False
 
