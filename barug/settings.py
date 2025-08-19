@@ -64,14 +64,14 @@ SECRET_KEY = "django-insecure-_&rs=&x9thq+*#q_(013+n5gv68^@0^c7_h6q^t%m&=1s1vsck
 isProduction = os.getenv("PRODUCTION")
 print("isProduction: ", isProduction)
 if isProduction != None and isProduction == "True":
-    ALLOWED_HOSTS = ['192.168.1.2', '192.168.1.4']
     DEBUG = False
+    ALLOWED_HOSTS = ['192.168.1.2', '192.168.1.4']
 else:
     DEBUG = True
-    ALLOWED_HOSTS = ["https://barug-dev.onrender.com/"]
+    ALLOWED_HOSTS = ["barug-dev.onrender.com"]
+
 
 # Application definition
-
 INSTALLED_APPS = [
     "faq_ingestion.apps.FaqIngestionConfig",
     "ai.apps.AiConfig",
