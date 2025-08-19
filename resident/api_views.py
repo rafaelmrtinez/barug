@@ -20,6 +20,7 @@ from src.app.bootstrap.app_containers import AppContainer
 from src.core.contracts.app.family_service import IFamilyMembershipService
 from src.core.exceptions.domain_exceptions import DomainException
 
+
 from supabase_client import supabase  # Your Supabase client
 import jwt
 from rest_framework.permissions import AllowAny
@@ -486,6 +487,61 @@ class HouseholdMembershipSearch(APIView):
             return Response({'message': 'No results found'},status=status.HTTP_200_OK)
         return Response({'message': result}, status=status.HTTP_200_OK)
 
+
+class FamilyUnitSelection(APIView):
+    
+    parser_classes = [JSONParser]
+    
+    @method_decorator(ratelimit(key='user_or_ip', rate='5/s', block=False))
+    @inject
+    def get(self, request: Request, service: IService = Provide[AppContainer.family_selection]) -> Response:
+        if CustomRateLimiter.is_ratelimited(request=request):
+            return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        user = Claims.verify_jwt_token(request.headers.get("Authorization"))
+        if not user:
+            return Response({"error": RESOURCE_ACCESS_DENIED}, status=status.HTTP_401_UNAUTHORIZED)
+        household_id = request.query_params.get("q", None)
+        serializer = FamilySelectionSerializer(data={
+                'household_id': household_id,
+                "resident_id": user["user_id"],
+                "username": user["username"],
+                "role": user["role"]
+            })
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        result = service.execute(household_id=serializer.validated_data['household_id'])
+        if not result:
+            return Response({'message': 'No results found'},status=status.HTTP_200_OK)
+        return Response({'message': result}, status=status.HTTP_200_OK)
+
+
+class HouseholdMembershipSearch(APIView):
+    """
+    API View for searching household memberships.
+    """
+    parser_classes = [JSONParser]
+    
+    @method_decorator(ratelimit(key='user_or_ip', rate='10/s', block=False))
+    @inject
+    def get(self, request: Request, service: IService = Provide[AppContainer.household_search_service]) -> Response:
+        if CustomRateLimiter.is_ratelimited(request=request):
+            return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        user = Claims.verify_jwt_token(request.headers.get("Authorization"))
+        if not user:
+            return Response({"error": RESOURCE_ACCESS_DENIED}, status=status.HTTP_401_UNAUTHORIZED)
+        key = request.query_params.get("q", None)
+        serializer = MembershipSearch(data={
+                'key': key,
+                "resident_id": user["user_id"],
+                "username": user["username"],
+                "role": user["role"]
+            })
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        result = service.execute(key=key)
+        if not result:
+            return Response({'message': 'No results found'},status=status.HTTP_200_OK)
+        return Response({'message': result}, status=status.HTTP_200_OK)
 
 class FamilyMembership(APIView):
     """
