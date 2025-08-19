@@ -1,4 +1,5 @@
 # resident/api_views.py
+# resident/api_views.py
 from rest_framework.views import APIView
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -592,6 +593,7 @@ class FamilyMembership(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+
 class ResidentRegisterAPIView(APIView):
     def post(self, request):
         try:
@@ -638,8 +640,10 @@ class ResidentRegisterAPIView(APIView):
                 file_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/residents-photos/{file_path}"
                 # [DEBUG] print(f"📸 ID photo uploaded: {file_url}")
     
+    
             # ✅ Step 3: Call stored procedure
             rpc_payload = {
+                "p_added_by_id": None if not data.get('added_by_id') else int(data.get('added_by_id')),
                 "p_added_by_id": None if not data.get('added_by_id') else int(data.get('added_by_id')),
                 "p_barangay": data.get('barangay'),
                 "p_birthdate": data.get('date_of_birth'),

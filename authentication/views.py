@@ -21,6 +21,16 @@ from django.shortcuts import render, redirect
 from django.conf import settings
 import requests
 
+# authentication/views.py
+from django.shortcuts import render, redirect
+from django.urls import reverse
+from django.conf import settings
+import requests
+
+from django.shortcuts import render, redirect
+from django.conf import settings
+import requests
+
 def login(request):
     if request.method == "POST":
         form = LoginForm(request.POST)
@@ -80,6 +90,9 @@ def login(request):
                     return resp
     else:
         form = LoginForm()
+
+    return render(request, "authentication_index.html", {"form": form})
+
 
     return render(request, "authentication_index.html", {"form": form})
 

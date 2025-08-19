@@ -46,6 +46,7 @@ API_VERSION = "v1"  # API version for event logs
 
 # LOCALHOST URL USED
 TESTING_URL_USED = 'http://192.168.1.4:8000'
+TESTING_URL_USED = 'http://192.168.1.4:8000'
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -64,17 +65,16 @@ SECRET_KEY = "django-insecure-_&rs=&x9thq+*#q_(013+n5gv68^@0^c7_h6q^t%m&=1s1vsck
 isProduction = os.getenv("PRODUCTION")
 print("isProduction: ", isProduction)
 if isProduction != None and isProduction == "True":
-    print("Production mode enabled")
     DEBUG = False
+    ALLOWED_HOSTS = ["barug-dev.onrender.com"]
 else:
-    print("Development mode enabled")
     DEBUG = True
+    ALLOWED_HOSTS = ['192.168.1.2', '192.168.1.4']
 
 ALLOWED_HOSTS = ['192.168.1.4']
 ALLOWED_HOSTS = ['192.168.1.2', "*"]
 
 # Application definition
-
 INSTALLED_APPS = [
     "faq_ingestion.apps.FaqIngestionConfig",
     "ai.apps.AiConfig",

@@ -32,3 +32,4 @@ urlpatterns = [
     # BHW login
     path("bhw-field-login/", BHWFieldVisitLoginAPIView.as_view(), name="bhw-field-login"),
 ]
+
