@@ -102,6 +102,7 @@ def generate_username(last_name: str | None, dob_raw) -> str:
     ln = _slug_module(last_name) or "user"
     mmddyy = _mmddyy_from_input(dob_raw) or "000000"
     return f"{ln}.{mmddyy}{_USERNAME_SUFFIX_DOMAIN}"[:150]
+
 # ------------------------------------------------------
 
 
@@ -470,8 +471,6 @@ class ResidentRegisterBHWAPIView(APIView):
             if auth_user_id:
                 delete_supabase_user(auth_user_id)
             return Response({"error": str(e)}, status=500)
-
-
 
 
 class FamilyUnitSelection(APIView):

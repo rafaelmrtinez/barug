@@ -1,12 +1,17 @@
 from django.shortcuts import render
 from django.core.paginator import Paginator
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.http import HttpResponseForbidden
 from .forms import SearchVerificationRequest
+from common.decorators import staff_login_required
 
 user_fullname = 'lname fname mname suffix'
 user_role = 'Clerk'
 user_role_template = user_role.lower().replace(' ', '_')
 
 # Create your views here.
+
+@staff_login_required
 def review_approve(request):
     pending = []
     paginator = Paginator(pending, 10)  # 10 per page

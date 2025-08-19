@@ -1,3 +1,5 @@
+# authentication/api_views.py
+from django.http import HttpResponse
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
@@ -43,57 +45,68 @@ def _is_mobile(request) -> bool:
 
 class ResidentLoginView(APIView):
     permission_classes = [AllowAny]
-    authentication_classes = []   # avoid CSRF via SessionAuthentication
+    authentication_classes = []
+
+    @staticmethod
+    def _only_message_from_exc(e, fallback="Login failed."):
+        if getattr(e, "args", None):
+            first = e.args[0]
+            if isinstance(first, dict):
+                msg = first.get("message")
+                if isinstance(msg, str) and msg.strip():
+                    return msg
+            if isinstance(first, str) and first.strip():
+                return first
+        for attr in ("message", "error", "detail"):
+            val = getattr(e, attr, None)
+            if isinstance(val, str) and val.strip():
+                return val
+        return fallback
 
     def post(self, request):
-        username = request.data.get('username')
-        password = request.data.get('password')
-
+        username = (request.data.get('username') or "").strip()
+        password = request.data.get('password') or ""
         if not username or not password:
-            return Response({"error": "Username and password are required."}, status=status.HTTP_400_BAD_REQUEST)
+            # plain text only
+            return HttpResponse("Username and password are required.", status=400, content_type="text/plain; charset=utf-8")
 
         try:
-            response_rpc = supabase.rpc("user_login", {
-                "p_username": username,
-                "p_password": password
-            }).execute()
+            rpc = supabase.rpc("user_login", {"p_username": username, "p_password": password}).execute()
 
-            if not response_rpc.data:
-                return Response({"error": "Invalid username or password."}, status=status.HTTP_401_UNAUTHORIZED)
+            if not rpc.data:
+                # plain text only
+                return HttpResponse("Invalid username or password.", status=401, content_type="text/plain; charset=utf-8")
 
-            user = response_rpc.data[0]  # {'user_id': 3, 'user_type': 'PERSON'}
+            user = rpc.data[0]
             uid = user.get("user_id")
             role = user.get("user_type", "PERSON")
+            position = user.get("role_name", "NONE")
 
-            # Issue tokens with custom claims
             refresh = RefreshToken()
             refresh["uid"] = uid
             refresh["role"] = role
             refresh["username"] = username
-
+            refresh["position"] = position
             access = refresh.access_token
 
+            # success stays JSON (keep as-is)
             resp = Response({
                 "message": "Login successful.",
-                "user": {"user_id": uid, "username": username, "role": role},
+                "user": {"user_id": uid, "username": username, "role": role, "position": position},
             }, status=status.HTTP_200_OK)
 
-            # Web: set HttpOnly cookies
+            from authentication.cookie_utils import set_auth_cookies
             set_auth_cookies(resp, access, refresh)
-
-            # Mobile: also return tokens in body
             if _is_mobile(request):
                 resp.data["token"] = str(access)
                 resp.data["refresh"] = str(refresh)
-
             return resp
 
         except Exception as e:
-            if hasattr(e, 'args') and isinstance(e.args[0], dict):
-                err = e.args[0]
-                return Response({"message": err.get("message"), "code": err.get("code")}, status=status.HTTP_400_BAD_REQUEST)
-            return Response({"message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+            # plain text only from Supabase/PostgREST errors
+            msg = self._only_message_from_exc(e, "Login failed.")
+            print(msg)
+            return HttpResponse(msg, status=400, content_type="text/plain; charset=utf-8")
 
 
 class EmailConfirmedAPIView(APIView):

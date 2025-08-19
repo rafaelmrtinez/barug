@@ -48,6 +48,10 @@ API_VERSION = "v1"  # API version for event logs
 TESTING_URL_USED = 'http://192.168.1.4:8000'
 TESTING_URL_USED = 'http://192.168.1.4:8000'
 
+# use the named URL, safest
+LOGIN_URL = 'authentication:login'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = 'authentication:login'
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
