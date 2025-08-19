@@ -70,6 +70,7 @@ else:
     DEBUG = True
     ALLOWED_HOSTS = ['192.168.1.2', '192.168.1.4']
 
+
 # Application definition
 INSTALLED_APPS = [
     "faq_ingestion.apps.FaqIngestionConfig",
