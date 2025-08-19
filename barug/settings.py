@@ -70,7 +70,6 @@ else:
     DEBUG = True
     ALLOWED_HOSTS = ["barug-dev.onrender.com"]
 
-
 # Application definition
 INSTALLED_APPS = [
     "faq_ingestion.apps.FaqIngestionConfig",
