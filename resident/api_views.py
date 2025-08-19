@@ -552,7 +552,8 @@ class FamilyMembership(APIView):
                 "household_id": 1,
                 "family_id": 1,
                 "household_head_relationship": 1,
-                "family_head_relationship": 1
+                "family_head_relationship": 1,
+                "years_of_residenct": 1
             }
 
         Returns:
@@ -580,6 +581,7 @@ class FamilyMembership(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         validated_data = serializer.validated_data
         is_success: bool = service.execute(
+                years_of_residency=validated_data["years_of_residency"],
                 resident_id=validated_data["resident_id"],
                 household_id=validated_data["household_id"],
                 family_id=validated_data["family_id"],
