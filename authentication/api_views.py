@@ -454,9 +454,9 @@ class ResidentLoginView(APIView):
             access["username"] = username
             access["position"] = position
 
-            print("============= ACCESS ===========")
-            print(access)
-            print("============= ACCESS ===========")
+            # print("============= ACCESS ===========")
+            # print(access)
+            # print("============= ACCESS ===========")
             # success stays JSON (keep as-is)
             resp = Response({
                 "message": "Login successful.",
