@@ -70,6 +70,9 @@ class FamilyMembership:
             raise DomainException(f"Invalid relationship to family")
 
     def __residency_period_validity(self):
+        if not self.residency_period:
+            raise DomainException("Residency period is not set. Please contact Barangay Health Worker for more details.")
+
         if self.residency_period < 1:
             raise DomainException("Residency period requirement can not be lesser than 1 month")
 
