@@ -853,15 +853,17 @@ class PersonVerificationRequestAPIView(APIView):
             #     return Response({"error": "Missing requester_id."}, status=status.HTTP_400_BAD_REQUEST)
 
             # Required non-image fields
+                
             required_keys = [
                 "education_id",
                 "employment_status_id",
-                "occupation",
                 "gov_mem_prog_id",
                 "mnthly_personal_income_id",
                 "doc_type_id",
             ]
             missing = [k for k in required_keys if not str(d.get(k, "")).strip()]
+ 
+            print(missing)
             if missing:
                 return Response({"error": "Missing required fields.", "missing": missing}, status=400)
 
@@ -900,18 +902,18 @@ class PersonVerificationRequestAPIView(APIView):
             )
 
             # 🔍 DEBUG LOGS FOR OCR
-            print("\n===== 🛠 OCR DEBUG =====")
-            print(f"Doc Type Key: {doc_type_key}")
-            print(f"doc_type_ok: {ocr.get('doc_type_ok')}")
-            print(f"name_ok: {ocr.get('name_ok')}   hits: {ocr.get('name_hits')}")
-            print(f"Final OK: {ocr.get('ok')}")
-            print(f"Reason: {ocr.get('reason')}")
-            print(f"OCR Which Side Matched: {ocr.get('which_matched')}")
-            print("---- FRONT TEXT ----")
-            print(ocr.get("text_front"))
-            print("---- BACK TEXT ----")
-            print(ocr.get("text_back"))
-            print("======================\n")
+            # print("\n===== 🛠 OCR DEBUG =====")
+            # print(f"Doc Type Key: {doc_type_key}")
+            # print(f"doc_type_ok: {ocr.get('doc_type_ok')}")
+            # print(f"name_ok: {ocr.get('name_ok')}   hits: {ocr.get('name_hits')}")
+            # print(f"Final OK: {ocr.get('ok')}")
+            # print(f"Reason: {ocr.get('reason')}")
+            # print(f"OCR Which Side Matched: {ocr.get('which_matched')}")
+            # print("---- FRONT TEXT ----")
+            # print(ocr.get("text_front"))
+            # print("---- BACK TEXT ----")
+            # print(ocr.get("text_back"))
+            # print("======================\n")
 
             if not ocr.get("ok"):
                 return Response(
@@ -936,7 +938,7 @@ class PersonVerificationRequestAPIView(APIView):
                 "p_requester_id":               int(requester_id),
                 "p_education_id":               int(d["education_id"]),
                 "p_employment_status_id":       int(d["employment_status_id"]),
-                "p_occupation":                 d["occupation"],
+                "p_occupation":                 None if not d.get("occupation") else d["occupation"],
                 "p_gov_mem_prog_id":            int(d["gov_mem_prog_id"]),
                 "p_mnthly_personal_income_id":  int(d["mnthly_personal_income_id"]),
                 "p_front_doc_path":             front_url,
@@ -957,133 +959,66 @@ class PersonVerificationRequestAPIView(APIView):
             return Response({"ok": bool(rpc.data), "result": rpc.data}, status=status.HTTP_201_CREATED)
 
         except Exception as e:
+            print(str(e))  # Log the error for debugging
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import AllowAny
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework_simplejwt.tokens import AccessToken
+
+# make sure supabase is imported properly in your project
+# from your_project.supabase_client import supabase  
+
 class RegisterUnverifiedUpdateAPIView(APIView):
-    """
-    Update an UNVERIFIED resident's basic info.
-    Calls: update_unverified_basic_info(
-        p_person_id INT,
-        p_updated_by_id INT,
-        p_first_name TEXT DEFAULT NULL,
-        p_middle_name TEXT DEFAULT NULL,
-        p_last_name TEXT DEFAULT NULL,
-        p_suffix TEXT DEFAULT NULL,
-        p_birthdate DATE DEFAULT NULL,
-        p_mobile_num TEXT DEFAULT NULL,
-        p_sex_id INT DEFAULT NULL,
-        p_civil_status_id INT DEFAULT NULL,
-        p_nationality_id INT DEFAULT NULL,
-        p_religion_id INT DEFAULT NULL,
-        p_city_name TEXT DEFAULT NULL,
-        p_barangay_name TEXT DEFAULT NULL,
-        p_purok_sitio_name TEXT DEFAULT NULL,
-        p_street_name TEXT DEFAULT NULL
-    )
-    """
-    permission_classes = [AllowAny]
-    authentication_classes = []  # we'll read the JWT manually
+    permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
 
-    # ---------- helpers
-    @staticmethod
-    def _null_if_empty(v):
-        if v is None:
-            return None
-        if isinstance(v, str):
-            v = v.strip()
-            return v or None
-        return v
-
-    @staticmethod
-    def _to_int_or_none(v):
-        if v is None or (isinstance(v, str) and not v.strip()):
-            return None
-        try:
-            return int(v)
-        except Exception:
-            return None
-
-    @staticmethod
-    def _get_bearer_token(request):
-        auth = request.headers.get("Authorization") or request.META.get("HTTP_AUTHORIZATION")
-        if auth and auth.lower().startswith("bearer "):
-            return auth.split(" ", 1)[1].strip()
-        return request.COOKIES.get("access")
-
-    @classmethod
-    def _claims(cls, request):
-        token = cls._get_bearer_token(request)
-        if not token:
-            return {}
-        try:
-            t = AccessToken(token)
-            return dict(t)  # contains uid, role, username, position
-        except Exception:
-            return {}
-
-    # ---------- endpoint
     def post(self, request):
-        data = request.data or {}
-        claims = self._claims(request)
-
-        # person_id from body OR from JWT (uid)
-        person_id = data.get("person_id") or claims.get("uid")
-        person_id = self._to_int_or_none(person_id)
+        # person_id directly from authenticated user
+        person_id = getattr(request.user, "id", None)
 
         if not person_id:
             return Response(
-                {"error": "person_id is required (or include a valid access token)."},
+                {"error": "No person_id found in token."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        updated_by_id = self._to_int_or_none(data.get("updated_by_id")) or person_id
+        updated_by_id = request.data.get("updated_by_id") or person_id
 
-        # sanitize/convert inputs
         params = {
             "p_person_id": person_id,
             "p_updated_by_id": updated_by_id,
-            "p_first_name": self._null_if_empty(data.get("first_name")),
-            "p_middle_name": self._null_if_empty(data.get("middle_name")),
-            "p_last_name": self._null_if_empty(data.get("last_name")),
-            "p_suffix": self._null_if_empty(data.get("suffix")),
-            # Expecting 'YYYY-MM-DD'; pass through as text and let Postgres cast to DATE
-            "p_birthdate": self._null_if_empty(data.get("birthdate")),
-            "p_mobile_num": self._null_if_empty(data.get("mobile_num")),
-            "p_sex_id": self._to_int_or_none(data.get("sex_id")),
-            "p_civil_status_id": self._to_int_or_none(data.get("civil_status_id")),
-            "p_nationality_id": self._to_int_or_none(data.get("nationality_id")),
-            "p_religion_id": self._to_int_or_none(data.get("religion_id")),
-            "p_city_name": self._null_if_empty(data.get("city_name")),
-            "p_barangay_name": self._null_if_empty(data.get("barangay_name")),
-            "p_purok_sitio_name": self._null_if_empty(data.get("purok_sitio_name")),
-            "p_street_name": self._null_if_empty(data.get("street_name")),
+            "p_first_name": request.data.get("first_name"),
+            "p_middle_name": request.data.get("middle_name"),
+            "p_last_name": request.data.get("last_name"),
+            "p_suffix": request.data.get("suffix"),
+            "p_birthdate": request.data.get("birthdate"),
+            "p_mobile_num": request.data.get("mobile_num"),
+            "p_sex_id": request.data.get("sex_id"),
+            "p_civil_status_id": request.data.get("civil_status_id"),
+            "p_nationality_id": request.data.get("nationality_id"),
+            "p_religion_id": request.data.get("religion_id"),
+            "p_city_name": request.data.get("city_name"),
+            "p_barangay_name": request.data.get("barangay_name"),
+            "p_purok_sitio_name": request.data.get("purok_sitio_name"),
+            "p_street_name": request.data.get("street_name"),
         }
-
+        print(params)
         try:
             rpc = supabase.rpc("update_unverified_basic_info", params).execute()
-
-            # Supabase RPC usually returns .data or raises; handle empty gracefully
-            if getattr(rpc, "data", None) is None:
-                return Response(
-                    {"error": "Update failed."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            if not getattr(rpc, "data", None):
+                return Response({"error": "Update failed."}, status=400)
 
             return Response(
                 {"message": "Unverified profile updated.", "result": rpc.data},
-                status=status.HTTP_200_OK,
+                status=200,
             )
         except Exception as e:
-            # try to surface Supabase error message
-            err_msg = None
-            if hasattr(e, "args") and e.args:
-                first = e.args[0]
-                if isinstance(first, dict):
-                    err_msg = first.get("message")
-                elif isinstance(first, str):
-                    err_msg = first
             return Response(
-                {"error": err_msg or "Unexpected error while updating profile."},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"error": str(e) or "Unexpected error while updating profile."},
+                status=400,
             )

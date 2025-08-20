@@ -449,6 +449,10 @@ class ResidentLoginView(APIView):
             refresh["username"] = username
             refresh["position"] = position
             access = refresh.access_token
+            access["uid"] = uid
+            access["role"] = role
+            access["username"] = username
+            access["position"] = position
 
             print("============= ACCESS ===========")
             print(access)
