@@ -43,6 +43,13 @@ import os, uuid, tempfile, logging
 from rest_framework.parsers import MultiPartParser, FormParser
 import re
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import AllowAny
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework_simplejwt.tokens import AccessToken
+
 logger = logging.getLogger(__name__)
 
 # JWT_SECRET = settings.SECRET_KEY
@@ -961,14 +968,6 @@ class PersonVerificationRequestAPIView(APIView):
         except Exception as e:
             print(str(e))  # Log the error for debugging
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.permissions import AllowAny
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from rest_framework_simplejwt.tokens import AccessToken
 
 # make sure supabase is imported properly in your project
 # from your_project.supabase_client import supabase  

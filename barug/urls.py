@@ -36,6 +36,10 @@ urlpatterns = [
     path('api/v1/residents/', include('resident.api_urls')),
 
     path('api/auth/', include('authentication.api_urls')),
+
+    # Clerk APIs
+    path('api/clerk/', include('clerk.api_urls')),
+
     path(f'api/{settings.API_VERSION}/', include('metrics.urls', namespace='metrics')),
     path(f'api/{settings.API_VERSION}/ai/', include('ai.urls', namespace='ai')),
     path(f'api/{settings.API_VERSION}/faq-ingest/', include('faq_ingestion.urls', namespace='faq_ingestion')),

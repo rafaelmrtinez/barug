@@ -549,9 +549,9 @@ class StaffLoginView(APIView):
             refresh["position"] = position
             access = refresh.access_token
 
-            print("============= ACCESS ===========")
-            print(access)
-            print("============= ACCESS ===========")
+            # print("============= ACCESS ===========")
+            # print(access)
+            # print("============= ACCESS ===========")
             # success stays JSON (keep as-is)
             resp = Response({
                 "message": "Login successful.",

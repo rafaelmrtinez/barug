@@ -17,16 +17,16 @@
       <div>
 
         <div class="col-md-2 ms-auto">
-            <form method="post">
-              {% csrf_token %}
+          <form method="post">
+            {% csrf_token %}
 
-              <div class="form-floating mb-3">
-                  {{ form.search }}
-                  <label for="{{ form.search.id_for_label }}">{{ form.search.label }}</label>
-              </div>
+            <div class="form-floating mb-3">
+              {{ form.search }}
+              <label for="{{ form.search.id_for_label }}">{{ form.search.label }}</label>
+            </div>
           </form>
         </div>
-        
+
         <table class="table">
           <thead>
             <tr>
@@ -37,30 +37,77 @@
             </tr>
           </thead>
           <tbody>
-              <tr class="table-row-height">
-                <td></td>
-                <td></td>
-                <td></td>
-                <td>
-                  <div class="d-flex gap-1">
-                    <a class="btn btn-icon"
-                       href="{% url 'clerk:person_details' req_id='RBSN00000' %}">
-                      {% bs_icon 'person-lines-fill' size='1em' %}
-                    </a>
-                  </div>
-                </td>
-              </tr>
-              <tr><td colspan="4" class="text-center">No pending for records</td></tr>
+            <tr class="table-row-height">
+              <td></td>
+              <td></td>
+              <td></td>
+              <td>
+                <div class="d-flex gap-1">
+                  <a class="btn btn-icon" href="{% url 'clerk:person_details' req_id='RBSN00000' %}">
+                    {% bs_icon 'person-lines-fill' size='1em' %}
+                  </a>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="4" class="text-center">No pending for records</td>
+            </tr>
           </tbody>
         </table>
       </div>
     </div>
   </div>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      fetch("http://192.168.1.4:8000/api/clerk/id-validation-requests/")
+        .then(res => res.json())
+        .then(data => {
+          const tbody = document.querySelector("table tbody");
+          tbody.innerHTML = ""; // clear placeholder rows
+
+          if (data.data && data.data.length > 0) {
+            data.data.forEach(req => {
+              // Build full name safely (skip nulls)
+              const fullName = [
+                req.requester_first_name,
+                req.requester_middle_name,
+                req.requester_last_name,
+                req.requester_suffix
+              ].filter(Boolean).join(" ");
+
+              tbody.innerHTML += `
+                <tr class="table-row-height">
+                  <td>${fullName}</td>
+                  <td>${new Date(req.date_requested).toLocaleString()}</td>
+                  <td>${req.latest_status} ${req.verify_req_id}</td>
+                  <td>
+                    <div class="d-flex gap-1">
+                      <a class="btn btn-icon" href="/clerk/person-details/${req.requester_person_id}/">
+                        <i class="bi bi-person-lines-fill"></i>
+                      </a>
+                      <a class="btn btn-icon" href="{% url 'clerk:person_details' req_id='RBSN00000' %}">
+                    {% bs_icon 'person-lines-fill' size='1em' %}
+                    </a>  
+
+                                          <a class="btn btn-icon" href="/clerk/person_details/${req.requester_person_id}/">
+                         {% bs_icon 'person-lines-fill' size='1em' %}
+                      </a>
+                    </div>
+                  </td>
+                </tr>`;
+            });
+          } else {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center">No pending records</td></tr>`;
+          }
+        });
+    });
+  </script>
+
 
   {% if page_obj.has_other_pages %}
-    <div class="page-pagination"> 
-      {% include 'paginator.html' %}
-    </div>
+  <div class="page-pagination">
+    {% include 'paginator.html' %}
+  </div>
   {% endif %}
 
 </div>
