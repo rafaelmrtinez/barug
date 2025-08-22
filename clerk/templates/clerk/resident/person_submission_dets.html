@@ -147,15 +147,21 @@
 
   // -------- APPROVE ----------
   async function approve() {
+    // 1) Confirm first
+    const ok = window.confirm('Are you sure you want to APPROVE this request?');
+    if (!ok) return;
+
+    // 2) Then ask for optional remarks
+    let remarks = window.prompt('Remarks (optional):', '');
+    if (remarks === null) remarks = ''; // user cancelled prompt -> treat as empty optional
+    remarks = remarks.trim();
+
     const url = `${API_BASE}/id-validation/requests/${REQUEST_ID}/approve/`;
-
-    const remarks = (window.prompt('Remarks (optional):', '') || '').trim();
-
     const payload = {
       p_clerk_staff_id: CLERK_ID,
       p_person_id:      PERSON_ID,
       p_request_id:     REQUEST_ID,
-      p_status_id:      7,
+      p_status_id:      7,            // Approved
       p_remarks:        remarks || null
     };
 
@@ -198,19 +204,28 @@
 
   // -------- DECLINE ----------
   async function decline() {
-    const url = `${API_BASE}/id-validation/requests/${REQUEST_ID}/decline/`;
+    // 1) Confirm first
+    const ok = window.confirm('Are you sure you want to DECLINE this request?');
+    if (!ok) return;
 
-    const remarks = (window.prompt('Reason for decline (required):', '') || '').trim();
+    // 2) Then ask for required reason
+    let remarks = window.prompt('Reason for decline (required):', '');
+    if (remarks === null) { // user cancelled prompt
+      showAlert('error', 'Decline requires a reason.');
+      return;
+    }
+    remarks = remarks.trim();
     if (!remarks) {
       showAlert('error', 'Decline requires a reason.');
       return;
     }
 
+    const url = `${API_BASE}/id-validation/requests/${REQUEST_ID}/decline/`;
     const payload = {
       p_clerk_staff_id: CLERK_ID,
       p_person_id:      PERSON_ID,
       p_request_id:     REQUEST_ID,
-      p_status_id:      8,
+      p_status_id:      8,           // Declined
       p_remarks:        remarks
     };
 
@@ -256,5 +271,6 @@
   btnDecline?.addEventListener('click', decline);
 })();
 </script>
+
 
 {% endblock %}
