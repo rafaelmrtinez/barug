@@ -59,7 +59,7 @@
   </div>
   <script>
     document.addEventListener("DOMContentLoaded", function () {
-      fetch("http://192.168.1.4:8000/api/clerk/id-validation-requests/")
+      fetch("{{ api_base_url }}/id-validation-requests/")
         .then(res => res.json())
         .then(data => {
           const tbody = document.querySelector("table tbody");
@@ -79,18 +79,11 @@
                 <tr class="table-row-height">
                   <td>${fullName}</td>
                   <td>${new Date(req.date_requested).toLocaleString()}</td>
-                  <td>${req.latest_status} ${req.verify_req_id}</td>
+                  <td>${req.latest_status}</td>
                   <td>
                     <div class="d-flex gap-1">
-                      <a class="btn btn-icon" href="/clerk/person-details/${req.requester_person_id}/">
-                        <i class="bi bi-person-lines-fill"></i>
-                      </a>
-                      <a class="btn btn-icon" href="{% url 'clerk:person_details' req_id='RBSN00000' %}">
-                    {% bs_icon 'person-lines-fill' size='1em' %}
-                    </a>  
-
-                                          <a class="btn btn-icon" href="/clerk/person_details/${req.requester_person_id}/">
-                         {% bs_icon 'person-lines-fill' size='1em' %}
+                      <a class="btn btn-icon" href="/clerk/person_details/${req.requester_person_id}/?verify_req_id=${req.verify_req_id}">
+                        {% bs_icon 'person-lines-fill' size='1em' %}
                       </a>
                     </div>
                   </td>

@@ -9,22 +9,29 @@
 {% endblock %}
 
 {% block content %}
-<div class="container pt-5 px-0" style="margin-top:40px; margin-bottom:20px;">
+<div class="container pt-5 px-0" style="margin-top:40px; margin-bottom:20px;"
+     id="approveDeclineRoot"
+     data-api="{{ api_base_url }}"
+     data-request-id="{{ request_id }}"
+     data-person-id="{{ person_id }}"
+     data-clerk-id="{{ clerk_staff_id }}">
   <div class="row justify-content-center">
     <div class="col-12">
       <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
-        <h4><strong>{{ request_data.first_name }} {{ request_data.middle_name }} {{ request_data.last_name }}</strong></h4>
+        <h4>
+          <strong>{{ request_data.first_name|title }}{% if request_data.middle_name %} {{ request_data.middle_name|slice:":1" }}.{% endif %} {{ request_data.last_name|title }}{% if request_data.suffix %}, {{ request_data.suffix }}{% endif %}</strong>
+        </h4>
         <div class="meta d-flex gap-4">
           <div>
             <div class="section-title mb-1">Date Submitted</div>
             <div>{% bs_icon 'calendar-event-fill' size='1em' %} 
-              <b>{{ request_data.date_submitted|default:"N/A"|date:"F d, Y" }}</b>
+              <b>{{ submitted_at|default:"August 16, 2025" }}</b>
             </div>
           </div>
           <div>
             <div class="section-title mb-1">Status</div>
             <div>{% bs_icon 'reception-2' size='1.2em' %} 
-              <b>{{ request_data.status|default:"Pending" }}</b>
+              <b id="statusText">{{ status|default:"Pending" }}</b>
             </div>
           </div>
         </div>
@@ -37,18 +44,23 @@
         <div class="col-md-6">
           <div class="section-title mb-2">Personal Information</div>
           <div class="kv">
-              <div class="kv-item"><span class="kv-key">Last Name</span><span class="kv-val">{{ request_data.last_name }}</span></div>
-              <div class="kv-item"><span class="kv-key">First Name</span><span class="kv-val">{{ request_data.first_name }}</span></div>
-              <div class="kv-item"><span class="kv-key">Middle Name</span><span class="kv-val">{{ request_data.middle_name }}</span></div>
-              <div class="kv-item"><span class="kv-key">Suffix</span><span class="kv-val">{{ request_data.suffix|default:"-" }}</span></div>
-              <div class="kv-item"><span class="kv-key">Sex</span><span class="kv-val">{{ request_data.sex }}</span></div>
-              <div class="kv-item"><span class="kv-key">Date of Birth</span><span class="kv-val">{{ request_data.birthdate|date:"F d, Y" }}</span></div>
-              <div class="kv-item"><span class="kv-key">Civil Status</span><span class="kv-val">{{ request_data.civil_status }}</span></div>
-              <div class="kv-item"><span class="kv-key">Nationality</span><span class="kv-val">{{ request_data.nationality }}</span></div>
-              <div class="kv-item"><span class="kv-key">Religion</span><span class="kv-val">{{ request_data.religion }}</span></div>
-              <div class="kv-item"><span class="kv-key">Home Address</span><span class="kv-val">{{ request_data.street }}, {{ request_data.sitio_purok }} {{ request_data.barangay }}, {{ request_data.city }}</span></div>
-              <div class="kv-item"><span class="kv-key">Email Address</span><span class="kv-val">{{ request_data.email }}</span></div>
-              <div class="kv-item"><span class="kv-key">Mobile Number</span><span class="kv-val">{{ request_data.mobile_num }}</span></div>
+            <div class="kv-item"><span class="kv-key">Last Name</span><span class="kv-val">{{ request_data.last_name|title }}</span></div>
+            <div class="kv-item"><span class="kv-key">First Name</span><span class="kv-val">{{ request_data.first_name|title }}</span></div>
+            <div class="kv-item"><span class="kv-key">Middle Name</span><span class="kv-val">{{ request_data.middle_name|title }}</span></div>
+            <div class="kv-item"><span class="kv-key">Suffix</span><span class="kv-val">{{ request_data.suffix|default:"—" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Sex</span><span class="kv-val">{{ request_data.sex|title }}</span></div>
+            <div class="kv-item"><span class="kv-key">Date of Birth</span><span class="kv-val">{{ request_data.birthdate }}</span></div>
+            <div class="kv-item"><span class="kv-key">Civil Status</span><span class="kv-val">{{ request_data.civil_status|title }}</span></div>
+            <div class="kv-item"><span class="kv-key">Nationality</span><span class="kv-val">{{ request_data.nationality|title }}</span></div>
+            <div class="kv-item"><span class="kv-key">Religion</span><span class="kv-val">{{ request_data.religion|title }}</span></div>
+            <div class="kv-item"><span class="kv-key">Home Address</span>
+              <span class="kv-val">
+                {{ request_data.street|title }}, Purok {{ request_data.sitio_purok }},
+                Brgy. {{ request_data.barangay|title }}, {{ request_data.city|title }}
+              </span>
+            </div>
+            <div class="kv-item"><span class="kv-key">Email Address</span><span class="kv-val">{{ request_data.email }}</span></div>
+            <div class="kv-item"><span class="kv-key">Mobile Number</span><span class="kv-val">{{ request_data.mobile_num }}</span></div>
           </div>
         </div>
 
@@ -56,55 +68,193 @@
         <div class="col-md-6">
           <div class="section-title mb-2">Socioeconomic Information</div>
           <div class="kv">
-              <div class="kv-item"><span class="kv-key">Educational Attainment</span><span class="kv-val">{{ request_data.education|default:"-" }}</span></div>
-              <div class="kv-item"><span class="kv-key">Employment Status</span><span class="kv-val">{{ request_data.work_status|default:"-" }}</span></div>
-              <div class="kv-item"><span class="kv-key">Occupation</span><span class="kv-val">{{ request_data.occupation|default:"-" }}</span></div>
-              <div class="kv-item"><span class="kv-key">Monthly Personal Income</span><span class="kv-val">{{ request_data.monthly_income|default:"-" }}</span></div>
-              <div class="kv-item"><span class="kv-key">Government Program</span><span class="kv-val">{{ request_data.gov_programs|default:"-" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Educational Attainment</span><span class="kv-val">{{ request_data.educ_level|default:"—" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Employment Status</span><span class="kv-val">{{ request_data.employment_status|default:"—" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Occupation</span><span class="kv-val">{{ request_data.occupation|default:"—" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Monthly Personal Income</span><span class="kv-val">{{ request_data.income_range|default:"—" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Government Program</span><span class="kv-val">{{ request_data.gov_mem_prog|default:"—" }}</span></div>
           </div>
 
           <div class="section-title mb-2 pt-4">Supporting Document</div>
           <div class="kv">
-              <div class="kv-item"><span class="kv-key">ID Type</span><span class="kv-val">{{ request_data.id_type|default:"N/A" }}</span></div>
-              <div class="doc-carousel carousel slide" id="docCarousel" data-bs-ride="false" aria-label="Supporting documents">
-                  <div class="carousel-inner">
-                  {% for doc in request_data.valid_id_files %}
-                  <div class="carousel-item {% if forloop.first %}active{% endif %}">
-                      <div class="img-wrap">
-                        <img src="{{ doc }}" class="doc-img" alt="ID Document">
-                      </div>
-                      <small class="text-muted d-block text-center mt-2">Document {{ forloop.counter }}</small>
-                  </div>
-                  {% endfor %}
-                  {% if request_data.selfie_file %}
-                  <div class="carousel-item">
-                      <div class="img-wrap">
-                        <img src="{{ request_data.selfie_file }}" class="doc-img" alt="Selfie with ID">
-                      </div>
-                      <small class="text-muted d-block text-center mt-2">Selfie w/ ID</small>
-                  </div>
-                  {% endif %}
-                  </div>
+            <div class="kv-item"><span class="kv-key">ID Type</span><span class="kv-val">{{ request_data.id_type }}</span></div>
 
-                  <!-- Controls -->
-                  <button class="carousel-control-prev doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="prev" aria-label="Previous">
-                    <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
-                  </button>
-                  <button class="carousel-control-next doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="next" aria-label="Next">
-                    <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
-                  </button>
+            <div class="doc-carousel carousel slide" id="docCarousel" data-bs-ride="false" aria-label="Supporting documents">
+              <div class="carousel-inner">
+                <div class="carousel-item active">
+                  <div class="img-wrap">
+                    <img src="{{ request_data.valid_id_files.0 }}" class="doc-img" alt="Front of ID">
+                  </div>
+                  <small class="text-muted d-block text-center mt-2">Front of ID</small>
+                </div>
+                <div class="carousel-item">
+                  <div class="img-wrap">
+                    <img src="{{ request_data.valid_id_files.1 }}" class="doc-img" alt="Back of ID">
+                  </div>
+                  <small class="text-muted d-block text-center mt-2">Back of ID</small>
+                </div>
+                <div class="carousel-item">
+                  <div class="img-wrap">
+                    <img src="{{ request_data.selfie_file }}" class="doc-img" alt="Selfie holding the ID">
+                  </div>
+                  <small class="text-muted d-block text-center mt-2">Selfie w/ ID</small>
+                </div>
               </div>
+
+              <!-- Controls -->
+              <button class="carousel-control-prev doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="prev" aria-label="Previous">
+                <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
+              </button>
+              <button class="carousel-control-next doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="next" aria-label="Next">
+                <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       <div class="divider"></div>
 
+      <div id="alertBox" class="alert mt-2" style="display:none;"></div>
+
       <div class="mt-auto button-container justify-content-end mb-2">
-        <button type="reset" class="btn btn-reset">Decline</button>
-        <button type="button" class="btn btn-submit">Approve</button>
+        <button type="reset" class="btn btn-reset" id="btnDecline">Decline</button>
+        <button type="button" class="btn btn-submit" id="btnApprove">Approve</button>
       </div>
     </div>
   </div>
 </div>
+
+
+<script>
+(function () {
+  const root = document.getElementById('approveDeclineRoot');
+  const btnApprove = document.getElementById('btnApprove');
+  const btnDecline = document.getElementById('btnDecline');
+  const alertBox = document.getElementById('alertBox');
+  const statusText = document.getElementById('statusText');
+
+  const API_BASE   = root.dataset.api;                 // e.g. http://192.168.1.4:8000/api
+  const REQUEST_ID = Number(root.dataset.requestId);
+  const PERSON_ID  = Number(root.dataset.personId);
+  const CLERK_ID   = Number(root.dataset.clerkId);
+
+  function showAlert(kind, msg) {
+    alertBox.style.display = 'block';
+    alertBox.className = 'alert ' + (kind === 'success' ? 'alert-success' : 'alert-danger');
+    alertBox.textContent = msg;
+  }
+
+  // -------- APPROVE ----------
+  async function approve() {
+    const url = `${API_BASE}/id-validation/requests/${REQUEST_ID}/approve/`;
+
+    const remarks = (window.prompt('Remarks (optional):', '') || '').trim();
+
+    const payload = {
+      p_clerk_staff_id: CLERK_ID,
+      p_person_id:      PERSON_ID,
+      p_request_id:     REQUEST_ID,
+      p_status_id:      7,
+      p_remarks:        remarks || null
+    };
+
+    console.log("📤 Sending APPROVE payload:", payload);
+    console.log("📤 URL:", url);
+
+    btnApprove.disabled = true;
+    btnApprove.textContent = 'Approving...';
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json().catch(() => ({}));
+      console.log("📥 Response status:", res.status);
+      console.log("📥 Response JSON:", data);
+
+      if (!res.ok) {
+        const msg = data?.message || data?.error || `Approve failed (${res.status}).`;
+        throw new Error(msg);
+      }
+
+      showAlert('success', data?.message || 'Request approved successfully.');
+      if (statusText) statusText.textContent = 'Approved';
+      btnApprove.textContent = 'Approved';
+    } catch (e) {
+      console.error("❌ Error approving:", e);
+      showAlert('error', e.message || 'Something went wrong while approving.');
+      btnApprove.disabled = false;
+      btnApprove.textContent = 'Approve';
+    }
+  }
+
+  // -------- DECLINE ----------
+  async function decline() {
+    const url = `${API_BASE}/id-validation/requests/${REQUEST_ID}/decline/`;
+
+    const remarks = (window.prompt('Reason for decline (required):', '') || '').trim();
+    if (!remarks) {
+      showAlert('error', 'Decline requires a reason.');
+      return;
+    }
+
+    const payload = {
+      p_clerk_staff_id: CLERK_ID,
+      p_person_id:      PERSON_ID,
+      p_request_id:     REQUEST_ID,
+      p_status_id:      8,
+      p_remarks:        remarks
+    };
+
+    console.log("📤 Sending DECLINE payload:", payload);
+    console.log("📤 URL:", url);
+
+    btnDecline.disabled = true;
+    btnDecline.textContent = 'Declining...';
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json().catch(() => ({}));
+      console.log("📥 Response status:", res.status);
+      console.log("📥 Response JSON:", data);
+
+      if (!res.ok) {
+        const msg = data?.message || data?.error || `Decline failed (${res.status}).`;
+        throw new Error(msg);
+      }
+
+      showAlert('success', data?.message || 'Request declined successfully.');
+      if (statusText) statusText.textContent = 'Declined';
+      btnDecline.textContent = 'Declined';
+    } catch (e) {
+      console.error("❌ Error declining:", e);
+      showAlert('error', e.message || 'Something went wrong while declining.');
+      btnDecline.disabled = false;
+      btnDecline.textContent = 'Decline';
+    }
+  }
+
+  // Attach listeners
+  btnApprove?.addEventListener('click', approve);
+  btnDecline?.addEventListener('click', decline);
+})();
+</script>
+
 {% endblock %}

@@ -7,11 +7,10 @@ from django.conf import settings
 from django.middleware.csrf import get_token
 from django.shortcuts import render, redirect
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.contrib.auth import get_user_model
-from django.contrib.auth import login as django_login
 
 from .forms import LoginForm
-from authentication.cookie_utils import set_auth_cookies  # your existing helper
+from .cookie_utils import set_auth_cookies  # your existing helper
+
 
 API_BASE = f"{settings.TESTING_URL_USED}/api/auth"
 
@@ -19,7 +18,7 @@ API_BASE = f"{settings.TESTING_URL_USED}/api/auth"
 # --------------------------- helpers ---------------------------
 
 def _extract_error_message(r: requests.Response) -> str:
-    """Best-effort extraction of a meaningful error."""
+    """Best-effort extraction of a meaningful error from API."""
     try:
         data = r.json()
         msg = (data.get("message") or data.get("error") or data.get("detail") or "").strip()
@@ -30,10 +29,7 @@ def _extract_error_message(r: requests.Response) -> str:
 
     text = (r.text or "").strip()
     m = re.search(r"""['"]message['"]\s*:\s*['"]([^'"]+)['"]""", text)
-    if m:
-        return m.group(1).strip()
-
-    return "Login failed."
+    return m.group(1).strip() if m else "Login failed."
 
 def _norm(s: Optional[str]) -> str:
     """Uppercase + trim + collapse whitespace."""
@@ -41,14 +37,14 @@ def _norm(s: Optional[str]) -> str:
 
 def _is_staff_account(user_payload: dict) -> bool:
     """
-    API returns:
+    Your API returns something like:
       {
         "user_id": 4,
         "username": "brgyclerk",
         "role": "STAFF",
         "position": "BARANGAY CLERK"
       }
-    Only allow STAFF here.
+    Only allow STAFF in the web portal.
     """
     return _norm(user_payload.get("role")) == "STAFF"
 
@@ -63,34 +59,21 @@ def _primary_staff_position(user_payload: dict) -> str:
 
 # Map by **POSITION** (normalized)
 POSITION_TO_DASHBOARD = {
-    # Clerk
     "CLERK": "/clerk/review_request/",
     "BARANGAY CLERK": "/clerk/review_request/",
-
-    # BHW
     "BHW": "/bhw/",
     "BARANGAY HEALTH WORKER": "/bhw/",
-
-    # Lupon
     "LUPON": "/lupon/",
     "LUPON MEMBER": "/lupon/",
     "LUPON_PRESIDENT": "/lupon/president/",
     "LUPON PRESIDENT": "/lupon/president/",
-
-    # Secretary
     "SECRETARY": "/secretary/",
     "BARANGAY SECRETARY": "/secretary/",
-
-    # Captain
     "CAPTAIN": "/captain/",
     "BARANGAY CAPTAIN": "/captain/",
     "PUNONG BARANGAY": "/captain/",
-
-    # Admin
     "ADMIN": "/admin/",
     "SYSTEM ADMIN": "/admin/",
-
-    # Midwife
     "MIDWIFE": "/midwife/",
 }
 
@@ -104,31 +87,14 @@ def _safe_next(request, value: Optional[str]) -> Optional[str]:
         return value
     return None
 
-def _ensure_local_django_user(remote_user: dict):
-    """
-    Create/sync a Django User so @login_required works.
-    Adjust field mapping as needed.
-    """
-    User = get_user_model()
-    # Prefer API username; fallback to user_id-based handle
-    username = remote_user.get("username") or f"staff_{remote_user.get('user_id')}"
-    email = remote_user.get("email") or ""
-    first_name = remote_user.get("first_name") or ""
-    last_name = remote_user.get("last_name") or ""
 
-    obj, _ = User.objects.get_or_create(username=username, defaults={"email": email})
-    obj.email = email
-    obj.first_name = first_name
-    obj.last_name = last_name
-    obj.is_active = True
-    obj.is_staff = True  # staff portal access
-    obj.save()
-    return obj
-
-
-# --------------------------- view ---------------------------
+# --------------------------- views ---------------------------
 
 def login(request):
+    """
+    Session-only login (no Django User model).
+    Stores API payload at request.session["user"] and sets JWT cookies if present.
+    """
     if request.method == "POST":
         form = LoginForm(request.POST)
         if not form.is_valid():
@@ -145,7 +111,7 @@ def login(request):
                 headers={
                     "Accept": "application/json",
                     "Content-Type": "application/json",
-                    "X-Platform": "web",  # identify web if you want
+                    "X-Platform": "web",
                 },
                 timeout=10,
             )
@@ -166,8 +132,10 @@ def login(request):
             return render(request, "authentication_index.html", {"form": form})
 
         user_payload = data.get("user") or {}
-        access = data.get("token")     # optional; set if your API returns them
-        refresh = data.get("refresh")  # optional
+
+        # Accept either "access" or "token" naming
+        access = data.get("access") or data.get("token")
+        refresh = data.get("refresh")
 
         # Staff-only gate
         if not _is_staff_account(user_payload):
@@ -182,16 +150,18 @@ def login(request):
         next_param = request.POST.get("next") or request.GET.get("next")
         target = _safe_next(request, next_param) or default_target
 
-        # Keep your own session payload (if you use it elsewhere)
+        # Store your session payload
+        # (No Django auth login; you control access with a custom decorator.)
+        request.session.flush()  # drop any old session id/contents (anti-fixation)
         request.session["user"] = user_payload
-        request.session.save()
+        request.session["role"] = user_payload.get("role")
+        request.session["position"] = user_payload.get("position")
+        request.session.modified = True
 
-        # Make Django consider the user authenticated (so @login_required passes)
-        local_user = _ensure_local_django_user(user_payload)
-        # Ensure 'django.contrib.auth.backends.ModelBackend' is in AUTHENTICATION_BACKENDS
-        django_login(request, local_user)
+        # Debug ONLY — remove in production
+        print("Session data:", dict(request.session))
 
-        # Set API cookies if tokens exist (skip silently if not present)
+        # Prepare response + set API cookies if tokens exist
         resp = redirect(target)
         if access and refresh:
             set_auth_cookies(resp, access, refresh)
@@ -203,6 +173,29 @@ def login(request):
     # GET
     return render(request, "authentication_index.html", {"form": LoginForm()})
 
+
+def logout(request):
+    """
+    Clear session and auth cookies.
+    """
+    from .cookie_utils import clear_auth_cookies
+
+    resp = redirect("login")  # or your login URL name
+    request.session.flush()
+    clear_auth_cookies(resp)
+    return resp
+
+
+def debug_session(request):
+    """
+    (Optional) Debug helper to inspect session in browser.
+    Protect this behind staff_login_required or remove in production.
+    """
+    from django.http import JsonResponse
+    user = request.session.get("user")
+    if not user:
+        return JsonResponse({"error": "not logged in"}, status=401)
+    return JsonResponse(dict(request.session))
 
 
 # def login(request):
@@ -258,32 +251,32 @@ def login(request):
 
 
 
-def forgot_password(request):
-    form = ForgotPasswordForm()
+# def forgot_password(request):
+#     form = ForgotPasswordForm()
 
-    return render(request, "forgot_password.html", {
-        'form': form,
+#     return render(request, "forgot_password.html", {
+#         'form': form,
 
-    })
+#     })
 
-def new_password(request):
-    form = NewPasswordForm()
+# def new_password(request):
+#     form = NewPasswordForm()
     
-    return render(request, "new_password.html", {
-        'form' : form,
-    })
+#     return render(request, "new_password.html", {
+#         'form' : form,
+#     })
 
-def email_sent(request):
-    return render(request, "email_sent.html")
+# def email_sent(request):
+#     return render(request, "email_sent.html")
 
-def email_confirmed(request):
-    return render(request, "email_confirmed.html")
+# def email_confirmed(request):
+#     return render(request, "email_confirmed.html")
 
-def temporary_password(request):
-    return render(request, 'temporary_password.html', {
-        'user_fullname': user_fullname,
-        'user_role': user_role,
-        'page_path': f'{user_role} / User Registration Log / Temporary Password',
-        'page_title': 'Temporary Password',
-        'user_role_template': user_role_template,
-    })
+# def temporary_password(request):
+#     return render(request, 'temporary_password.html', {
+#         'user_fullname': user_fullname,
+#         'user_role': user_role,
+#         'page_path': f'{user_role} / User Registration Log / Temporary Password',
+#         'page_title': 'Temporary Password',
+#         'user_role_template': user_role_template,
+#     })

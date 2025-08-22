@@ -152,7 +152,7 @@ SIMPLE_JWT = {
 
 # Cookie flags for JWT cookies
 JWT_COOKIE_SAMESITE = "Lax"
-JWT_COOKIE_SECURE = True
+JWT_COOKIE_SECURE = False
 JWT_COOKIE_DOMAIN = None  # set to ".your-domain.com" if you need subdomains
 
 # CSRF cookies
@@ -162,12 +162,12 @@ CSRF_COOKIE_SECURE = True
 # CORS (adjust to your actual web origin / RN dev IP)
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
-    "http://192.168.1.4:3000",  # example web dev origin (change/remove as needed)
-    "http://localhost:3000",
+    "http://192.168.1.4:8000",  # example web dev origin (change/remove as needed)
+    "http://localhost:8000",
 ]
 CSRF_TRUSTED_ORIGINS = [
-    "http://192.168.1.4:3000",
-    "http://localhost:3000",
+    "http://192.168.1.4:8000",
+    "http://localhost:8000",
 ]
 
 # Developer-friendly overrides when DEBUG is True and using http
