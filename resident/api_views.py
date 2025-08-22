@@ -52,10 +52,10 @@ JWT_SECRET = settings.SECRET_KEY
 JWT_ALGORITHM = "HS256"
 
 
-class CreateHouseholdView(APIView):
+class HouseholdCreationView(APIView):
     
     def post(self, request: Request) -> Response:
-        pass
+        return Response(status=status.HTTP_501_NOT_IMPLEMENTED, data={"error": "Not implemented yet."})
 
 def _read_bytes(f):
     if not f:
