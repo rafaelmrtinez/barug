@@ -484,124 +484,154 @@ class ResidentRegisterBHWAPIView(APIView):
             return Response({"error": str(e)}, status=500)
 
 
+from utils.ratelimit_keys import rl_user_or_ip
+
+
 class FamilyUnitSelection(APIView):
-    
-    parser_classes = [JSONParser]
-    
-    @method_decorator(ratelimit(key='user_or_ip', rate='5/s', block=False))
+    """
+    Return family units for a given household id (query param).
+    Auth via DRF (cookie or Authorization header).
+    """
+    permission_classes = [IsAuthenticated]
+
+    @method_decorator(ratelimit(key=rl_user_or_ip, rate='5/s', block=False))
     @inject
-    def get(self, request: Request, service: IService = Provide[AppContainer.family_selection]) -> Response:
-        if CustomRateLimiter.is_ratelimited(request=request):
-            return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
-        user = Claims.verify_jwt_token(request.headers.get("Authorization"))
-        if not user:
-            return Response({"error": RESOURCE_ACCESS_DENIED}, status=status.HTTP_401_UNAUTHORIZED)
-        household_id = request.query_params.get("q", None)
-        serializer = FamilySelectionSerializer(data={
-                'household_id': household_id,
-                "resident_id": user["user_id"],
-                "username": user["username"],
-                "role": user["role"]
-            })
+    def get(self, request, service: IService = Provide[AppContainer.family_selection]) -> Response:
+        # Authenticated user (populated by your JWT auth class)
+        user = request.user
+        user_id = getattr(user, "uid", None) or getattr(user, "id", None)
+        username = getattr(user, "username", None)
+        role = getattr(user, "role", None)
+
+        if not user_id:
+            return Response({"error": "Unauthorized."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Accept both ?household_id= and legacy ?q=
+        raw_hid = request.query_params.get("household_id") or request.query_params.get("q")
+
+        # Basic type validation before serializer (gives clearer 400s)
+        try:
+            household_id = int(raw_hid)
+        except (TypeError, ValueError):
+            return Response({"household_id": ["A valid integer is required."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        data = {
+            "household_id": household_id,
+            "resident_id": user_id,
+            "username": username,
+            "role": role,
+        }
+        serializer = FamilySelectionSerializer(data=data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        result = service.execute(household_id=serializer.validated_data['household_id'])
-        if not result:
-            return Response({'message': 'No results found'},status=status.HTTP_200_OK)
-        return Response({'message': result}, status=status.HTTP_200_OK)
 
+        try:
+            result = service.execute(household_id=serializer.validated_data["household_id"])
+        except Exception:
+            # Log the exception server-side; don’t leak internals
+            return Response({"error": "Lookup failed."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        if not result:
+            return Response({"message": "No results found"}, status=status.HTTP_200_OK)
+
+        return Response({"message": result}, status=status.HTTP_200_OK)
+    
 
 class HouseholdMembershipSearch(APIView):
     """
-    API View for searching household memberships.
+    Search household memberships for the authenticated resident.
     """
-    parser_classes = [JSONParser]
-    
-    @method_decorator(ratelimit(key='user_or_ip', rate='10/s', block=False))
+    permission_classes = [IsAuthenticated]
+    # parser_classes not needed for GET with query params
+
+    # IMPORTANT: don't use key='user_or_ip' unless request.user has .pk.
+    # Using Authorization header as the rate-limit key avoids touching request.user.pk.
+    @method_decorator(ratelimit(key='header:Authorization', rate='10/s', block=False))
     @inject
-    def get(self, request: Request, service: IService = Provide[AppContainer.household_search_service]) -> Response:
-        if CustomRateLimiter.is_ratelimited(request=request):
-            return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
-        user = Claims.verify_jwt_token(request.headers.get("Authorization"))
-        if not user:
-            return Response({"error": RESOURCE_ACCESS_DENIED}, status=status.HTTP_401_UNAUTHORIZED)
-        key = request.query_params.get("q", None)
+    def get(self, request, service: IService = Provide[AppContainer.household_search_service]) -> Response:
+        # pull user info from DRF-authenticated user (set by your JWT auth class)
+        user = getattr(request, "user", None)
+        user_id = getattr(user, "uid", None) or getattr(user, "id", None)
+        username = getattr(user, "username", None)
+        role = getattr(user, "role", None)
+
+        if not user or not user_id:
+            return Response({"error": "Unauthorized."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        key = (request.query_params.get("q") or "").strip()
+
+        # validate inputs (and capture user context for auditing if your serializer uses it)
         serializer = MembershipSearch(data={
-                'key': key,
-                "resident_id": user["user_id"],
-                "username": user["username"],
-                "role": user["role"]
-            })
+            "key": key,
+            "resident_id": user_id,
+            "username": username,
+            "role": role,
+        })
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        result = service.execute(key=key)
-        if not result:
-            return Response({'message': 'No results found'},status=status.HTTP_200_OK)
-        return Response({'message': result}, status=status.HTTP_200_OK)
 
+        try:
+            # if your service needs user context, pass it; otherwise keep as-is
+            result = service.execute(key=key)
+        except Exception as e:
+            # don’t leak internals; log e server-side
+            return Response({"error": "Search failed."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        if not result:
+            return Response({"message": "No results found"}, status=status.HTTP_200_OK)
+
+        return Response({"message": result}, status=status.HTTP_200_OK)
+    
 
 class FamilyMembership(APIView):
     """
-        Description:
-            API View for handling the process of joining a family unit.
-            
-        Request Data Types:
-            - resident_id (int): Unique identifier of the resident.
-            - household_id (int): Unique identifier of the household.
-            - family_id (int): Unique identifier of the family.
-            - household_head_relationship (int): Relationship of the resident to the household head.
-            - family_head_relationship (int): Relationship of the resident to the family head.
-
-        Note:
-            - Only JSON request bodies are accepted. Ensure the request header includes:
-            "Content-Type: application/json".
-            - JWT authentication is required. Include the token in requests made via fetch API,
-            Axios, or other HTTP clients. Requests without authentication will be rejected.
-
-        Example Request:
-            {
-                "household_id": 1,
-                "family_id": 1,
-                "household_head_relationship": 1,
-                "family_head_relationship": 1,
-                "years_of_residenct": 1
-            }
-
-        Returns:
-            - HTTP 200 OK on success.
+    Join a family unit (JSON body only). Auth via DRF (cookies or Bearer token).
     """
+    permission_classes = [IsAuthenticated]
+    # parser_classes = [JSONParser]  # optional; DRF already parses JSON by default
 
-    parser_classes = [JSONParser]
-    
-    @method_decorator(ratelimit(key='user_or_ip', rate='10/s', block=False))
+    @method_decorator(ratelimit(key=rl_user_or_ip, rate='10/s', block=False))
     @inject
-    def post(self, request: Request, service: IFamilyMembershipService = Provide[AppContainer.family_membership]) -> Response:
-        if CustomRateLimiter.is_ratelimited(request=request):
-            return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
-        user = Claims.verify_jwt_token(request.headers.get("Authorization"))
-        if not user:
-            return Response({"error": "Unauthorized Access."}, status=status.HTTP_401_UNAUTHORIZED)
-        serializer = MembershipSerializer(
-            data={
-                **request.data,
-                "resident_id": user["user_id"],
-                "username": user["username"],
-                "role": user["role"]
-            })
+    def post(self, request, service: IFamilyMembershipService = Provide[AppContainer.family_membership]) -> Response:
+        # Auth user is provided by your JWT auth class
+        user = request.user
+        user_id = getattr(user, "uid", None) or getattr(user, "id", None)
+        username = getattr(user, "username", None)
+        role = getattr(user, "role", None)
+
+        if not user_id:
+            return Response({"error": "Unauthorized."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Merge request body with auth context
+        payload = {
+            **request.data,
+            "resident_id": user_id,
+            "username": username,
+            "role": role,
+        }
+
+        serializer = MembershipSerializer(data=payload)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        validated_data = serializer.validated_data
-        is_success: bool = service.execute(
-                years_of_residency=validated_data["years_of_residency"],
-                resident_id=validated_data["resident_id"],
-                household_id=validated_data["household_id"],
-                family_id=validated_data["family_id"],
-                household_head_relationship=validated_data["household_head_relationship"],
-                family_head_relationship=validated_data["family_head_relationship"],
+
+        vd = serializer.validated_data
+        try:
+            is_success: bool = service.execute(
+                years_of_residency=vd["years_of_residency"],
+                resident_id=vd["resident_id"],
+                household_id=vd["household_id"],
+                family_id=vd["family_id"],
+                household_head_relationship=vd["household_head_relationship"],
+                family_head_relationship=vd["family_head_relationship"],
             )
+        except Exception:
+            # Log the exception server-side; don't leak internals
+            return Response({"error": "Membership request failed."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         if not is_success:
+            # If your service distinguishes conflicts (already a member), you could return 409 here.
             return Response({"error": "Unable to join family at the moment."}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         return Response(status=status.HTTP_200_OK)
 
 

@@ -404,6 +404,8 @@ class ResetPasswordAPIView(APIView):
 
 # ==================== Resident Login and Logout APIs ====================
 
+
+
 class ResidentLoginView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -476,6 +478,7 @@ class ResidentLoginView(APIView):
             msg = self._only_message_from_exc(e, "Login failed.")
             print(msg)
             return HttpResponse(msg, status=400, content_type="text/plain; charset=utf-8")
+
 
 
 # ==================== Staff Login and Logout APIs  ====================
