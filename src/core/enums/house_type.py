@@ -6,9 +6,9 @@ class HouseType(Enum):
     I think that the data of this enum can change over time and requires
     a table driven approach."""
     
-    CONCRETE = 'concrete'
-    SEMI_CONCRETE = 'semi_concrete'
-    LIGHT_MATERIAL = 'light_material'
+    CONCRETE = 1
+    SEMI_CONCRETE = 2
+    LIGHT_MATERIAL = 3
 
     @classmethod
     def list_house_types(cls):
