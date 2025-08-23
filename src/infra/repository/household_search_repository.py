@@ -11,42 +11,6 @@ class HouseholdSearchRepository(IHouseholdSearchRepository):
     def __init__(self, client: SupabaseAdapter):
         self.client = client.client
         
-    def get_all_family_count(self):
-        result = (
-            self.client.table('family_unit')
-            .select(count='exact')
-            .execute()
-        )
-        
-        if not result.data:
-            return None
-        
-        return result.count if result.count else 0
-        
-    def get_family_count_by_household_id(self, id):
-        result = (
-            self.client.table('family_unit')
-            .select('family_id', count='exact')
-            .eq('household_id', id)
-            .execute()
-        )
-        
-        if not result.data:
-            return None
-        
-        return result.count if result.count else 0
-        
-    def get_household_info_by_house_num(self, house_num: str) -> dict:
-        result = (
-            self.client
-            .table('household_info')
-            .select('household_id, house_type(house_type_id)')
-            .eq('house_number', house_num)
-            .execute()
-        )
-        return result.data[0] if result.data else {}
-
-
     def get(self, household_id) -> dict:
         try:
             result = (

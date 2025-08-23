@@ -1,64 +1,46 @@
-from src.core.contracts.app.service import IService
-from src.core.contracts.infra.repository.household_search_repository import IHouseholdSearchRepository
+from src.app.transfer_objects.commands.family_creation import FamilyCreationCommand
+from src.app.transfer_objects.persistence.family_creation import FamilyCreationPersistence
+from src.core.contracts.app.family_creation_service import IFamilyCreationService
+from src.core.contracts.infra.repository.family_creation import IFamilyCreationRepository
 from src.core.entities.resident import Resident
 from src.core.service.family_creation_policy import FamilyCreationPolicy
-from src.infra.repository.resident_repository import ResidentRepository
-from src.infra.repository.family_creation_repository import FamilyCreationRepository
 
 
-class FamilyCreationService(IService):
-    def __init__(
-            self,
-            resident_repo: ResidentRepository,
-            household_repo: IHouseholdSearchRepository,
-            family_creation_repo: FamilyCreationRepository):
-        self.resident_repo = resident_repo
-        self.household_repo = household_repo
+class FamilyCreationService(IFamilyCreationService):
+    def __init__(self, family_creation_repo: IFamilyCreationRepository):
         self.family_creation_repo = family_creation_repo
 
-    def execute(self, **kwargs):
-        requester_id = kwargs.get('user_id', None)
-        household_number = kwargs.get('household_number', None)
-        household_head_relationship = kwargs.get(
-            'household_head_relationship', None)
-        indigent_status = kwargs.get('indigent_status', False)
-        source_of_income = kwargs.get('source_of_income', None)
-        family_monthly_income = kwargs.get('family_monthly_income', 0)
-        nhts_status = kwargs.get('nhts_status', None)
-
-        household_info = self.household_repo.get_household_info_by_house_num(
-            household_number)
-
-        resident: Resident = self.resident_repo.get_resident_by_id(
-            requester_id)
+    def execute(self, cmd: FamilyCreationCommand) -> int:
+        household_info = self.family_creation_repo.get_household_info_by_house_num(cmd.household_number)
+        house_type = household_info.house_type_id
+        resident: Resident = self.family_creation_repo.get_resident_by_id(cmd.requester_id)
+        has_existing_household: bool = self.family_creation_repo.find_resident_family_unit_if_exist(cmd.requester_id)
+        pending_requests = self.family_creation_repo.get_pending_request(cmd.requester_id)
         
-        
-        has_existing_household: bool = self.family_creation_repo.find_resident_family_unit_if_exist(requester_id)
-
         FamilyCreationPolicy(resident).ensure_eligibility(
-            household_info['household_id'],
-            household_head_relationship,
-            has_existing_household
+            household_info.household_id,
+            cmd.household_head_relationship,
+            has_existing_household,
+            pending_requests
         )
 
-        family_count_by_household = self.household_repo.get_family_count_by_household_id(
-            id=household_info['household_id'])
-        total_family_count = self.household_repo.get_all_family_count()
-        family_number = f"HH{household_info['household_id']}-FAM00{family_count_by_household + 1}"
-        house_type = household_info['house_type']['house_type_id']
-        ucf_number = f"UFC-{household_info['household_id']}-{total_family_count + 1}"
+        family_count_by_household = self.family_creation_repo.get_family_count_by_household_id(id=household_info.household_id)
+        total_family_count = self.family_creation_repo.get_all_family_count()
 
-        data = {
-            'p_requester_id': requester_id,
-            'p_existing_household_id': household_info['household_id'],
-            'p_family_num': family_number,
-            'p_ucf_num': ucf_number,
-            'p_source_of_income': source_of_income,
-            'p_family_mnthly_income_id': family_monthly_income,
-            'p_nhts_status_id': nhts_status,
-            'p_indigent_status_id': indigent_status,
-            'p_household_type_id': house_type,
-            'p_relationship_to_hholdhead_id': household_head_relationship
-        }
+        family_number = f"HH{household_info.household_id}-FAM00{family_count_by_household + 1}"
+        ucf_number = f"UFC-{household_info.household_id}-{total_family_count + 1}"
 
-        return self.family_creation_repo.create_family_unit(data)
+        return (self.family_creation_repo
+                .create_family_unit(
+                    FamilyCreationPersistence(
+                        requester_id=cmd.requester_id,
+                        household_id=household_info.household_id,
+                        family_number=family_number,
+                        ucf_number=ucf_number,
+                        source_of_income=cmd.source_of_income,
+                        family_monthly_income=cmd.family_monthly_income,
+                        nhts_status=cmd.nhts_status,
+                        indigent_status=cmd.indigent_status,
+                        house_type=house_type,
+                        household_head_relationship=cmd.household_head_relationship
+                    )))

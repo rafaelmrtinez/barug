@@ -7,7 +7,13 @@ class FamilyCreationPolicy:
     def __init__(self, resident: Resident):
         self.resident = resident
 
-    def ensure_eligibility(self, household_number: int, household_head_relationship: str, has_existing_household: bool) -> None:
+    def ensure_eligibility(
+        self, 
+        household_number: int, 
+        household_head_relationship: str, 
+        has_existing_household: bool, 
+        pending_requests: int) -> None:
+        
         if not household_number:
             raise FamilyPolicyException("Household number does not exist.")
         
@@ -26,3 +32,6 @@ class FamilyCreationPolicy:
 
         if household_head_relationship not in Relationships.relationship_list():
             raise FamilyPolicyException("Invalid household head relationship.")
+        
+        # if pending_requests > 0:
+        #     raise FamilyPolicyException("There is already a pending family creation request for this resident.")
