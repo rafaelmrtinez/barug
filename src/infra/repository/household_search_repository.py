@@ -14,8 +14,7 @@ class HouseholdSearchRepository(IHouseholdSearchRepository):
     def get_all_family_count(self):
         result = (
             self.client.table('family_unit')
-            .select('family_id', count='exact')
-            .eq('household_id', id)
+            .select(count='exact')
             .execute()
         )
         
@@ -41,7 +40,7 @@ class HouseholdSearchRepository(IHouseholdSearchRepository):
         result = (
             self.client
             .table('household_info')
-            .select('household_id, house_type(house_type_name)')
+            .select('household_id, house_type(house_type_id)')
             .eq('house_number', house_num)
             .execute()
         )

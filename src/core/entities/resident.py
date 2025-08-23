@@ -12,8 +12,9 @@ class Resident:
     
     id: str
     name: str
-    residential_status: str
-    status: str
+    residential_status: int
+    status: int
+    age: int
 
     def __post_init__(self):
         
@@ -25,9 +26,13 @@ class Resident:
         
     def is_family_creation_eligible(self):
         pass
-        
+    
+    def is_of_legal_age(self):
+        return True if self.age >= 18 else False
+    
     def is_active(self):
         return True if self.status == PersonStatus.ACTIVE.value else False
         
     def is_resident(self):
+        print(f'Residential status: {self.residential_status}')
         return True if self.residential_status == ResidentStatus.RESIDENT.value else False

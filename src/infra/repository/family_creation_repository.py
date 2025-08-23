@@ -11,5 +11,10 @@ class FamilyCreationRepository:
         result = (
             self.client.rpc(fn=func, params=data).execute()
         )
-        
         return result.data
+    
+    def find_resident_family_unit_if_exist(self, id):
+        result = (
+            self.client.table('house_member').select(count='exact').eq('person_id', id).execute()
+        )
+        return True if result.count else False

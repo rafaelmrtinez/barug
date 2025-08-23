@@ -18,4 +18,14 @@ class FamilyCreationServiceTest(TestCase):
         )
         
     def test_service_flow(self):
-        pass
+        result = self.service.execute(
+            user_id=302,
+            household_number=12345,
+            household_head_relationship=3,
+            indigent_status=1,
+            source_of_income="software engineer",
+            family_monthly_income=5,
+            nhts_status=1
+        )
+        
+        print(result)

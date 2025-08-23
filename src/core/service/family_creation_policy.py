@@ -7,10 +7,10 @@ class FamilyCreationPolicy:
     def __init__(self, resident: Resident):
         self.resident = resident
 
-    def ensure_eligibility(self, household_number: int, household_head_relationship: str) -> None:
+    def ensure_eligibility(self, household_number: int, household_head_relationship: str, has_existing_household: bool) -> None:
         if not household_number:
             raise FamilyPolicyException("Household number does not exist.")
-
+        
         if not self.resident.is_resident():
             raise FamilyPolicyException("Resident is not registered in the barangay.")
 
@@ -20,7 +20,8 @@ class FamilyCreationPolicy:
         if not self.resident.is_of_legal_age():
             raise FamilyPolicyException("Resident is not of legal age to request family creation.")
 
-        if self.resident.is_already_family_head():
+        print(f'Has existing household result {has_existing_household}')
+        if has_existing_household:
             raise FamilyPolicyException("Resident is already part of another family unit.")
 
         if household_head_relationship not in Relationships.relationship_list():
