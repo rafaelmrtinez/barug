@@ -8,6 +8,10 @@ class IHouseholdSearchRepository(ABC):
     """
     
     @abstractmethod
+    def get_household_id_by_house_num(self, house_num: str) -> dict:
+        pass
+    
+    @abstractmethod
     def get(self, household_id) -> dict:
         """This method will get the family data and address information
         by household ID.

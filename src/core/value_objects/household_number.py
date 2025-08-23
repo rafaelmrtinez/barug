@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import uuid
 from src.core.exceptions.domain_exceptions import DomainException
 
 @dataclass(frozen=True)
@@ -18,7 +19,7 @@ class HouseholdNumber:
     
     def __validate_household_number(self):
         if not self.household_number:
-            raise DomainException("Household number is required.")
+            self.household_number = str(uuid.uuid4())
 
         if not self.household_number.isdigit():
             raise DomainException("Household number must be a valid numeric string.")
