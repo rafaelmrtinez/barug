@@ -45,7 +45,7 @@ EMAIL_HOST_PASSWORD = "sfpa gadp dpnj licq"
 API_VERSION = "v1"  # API version for event logs
 
 # LOCALHOST URL USED
-TESTING_URL_USED = 'http://10.184.82.83:8000'
+TESTING_URL_USED = 'http://192.168.1.4:8000'
 #TESTING_URL_USED = 'http://192.168.1.4:8000'
 
 # use the named URL, safest
