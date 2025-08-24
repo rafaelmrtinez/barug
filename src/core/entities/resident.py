@@ -25,25 +25,6 @@ class Resident:
         if not self.name:
             raise DomainException("Resident name is required.")
         
-    def service_eligibility_check(self):
-        
-        """This method checks whether resident eligible for accessing barangay services
-
-        Raises:
-            FamilyPolicyException: Resident is not registered in the barangay.
-            FamilyPolicyException: Resident is not active.
-            FamilyPolicyException: Resident is not of legal age to request family creation.
-        """
-        
-        if not self.is_resident():
-            raise PolicyException("Resident is not registered in the barangay.")
-
-        if not self.is_active():
-            raise PolicyException("Resident is not active.")
-
-        if not self.is_of_legal_age():
-            raise PolicyException("Resident is not of legal age to request family creation.")
-    
     def is_of_legal_age(self):
         return True if self.age >= 18 else False
     
