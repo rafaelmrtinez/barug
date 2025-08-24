@@ -1,5 +1,5 @@
 from src.core.entities.resident import Resident
-from src.core.exceptions.family_policy_exception import FamilyPolicyException
+from src.core.exceptions.policy_exception import PolicyException
 
 
 class ResidentEligibilityPolicy:
@@ -9,10 +9,10 @@ class ResidentEligibilityPolicy:
         
     def check_eligibility(self):
         if not self.resident.is_resident():
-            raise FamilyPolicyException("Resident is not registered in the barangay.")
+            raise PolicyException("Resident is not registered in the barangay.")
 
         if not self.resident.is_active():
-            raise FamilyPolicyException("Resident is not active.")
+            raise PolicyException("Resident is not active.")
 
         if not self.resident.is_of_legal_age():
-            raise FamilyPolicyException("Resident is not of legal age to request family creation.")
+            raise PolicyException("Resident is not of legal age to request family creation.")
