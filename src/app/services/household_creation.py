@@ -5,6 +5,7 @@ import pytz
 from resident.transfer_obj.household_creation_request import CreateHouseholdRequest
 from src.app.contracts.household_creation import IHouseholdCreationService
 from src.core.contracts.infra.repository.household_creation import IHouseholdCreationRepository
+from src.core.policies.resident_eligibility_policy import ResidentEligibilityPolicy
 from src.infra.transfer_obj.household_creation_persistence import HouseholdCreationPersistence
 
 
@@ -14,15 +15,15 @@ class HouseholdCreationService(IHouseholdCreationService):
         self.repo = repo
         
     def execute(self, req: CreateHouseholdRequest) -> dict:
-        # Check if house number exist, if not create a  new household
         house_number_count = self.repo.find_household_by_house_number(req.house_number)
 
         if house_number_count > 0:
             raise ValueError("House number already exists")
         
+        ResidentEligibilityPolicy()
+        
         current_time = datetime.datetime.now(pytz.timezone('Asia/Manila'))
         
-        # generate household number
         household_number = f'HH-{req.house_number}-0{current_time.month}{str(current_time.year)[-2:]}'
         
         data = HouseholdCreationPersistence(

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 @dataclass(frozen=True)
-class FamilyCreationCommand:
+class FamilyCreationRequest:
     nhts_status: int
     requester_id: str
     indigent_status: int

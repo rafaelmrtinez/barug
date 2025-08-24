@@ -9,23 +9,25 @@ class FamilyCreationPolicy:
         self.resident = resident
 
     def check_eligibility(
-        self, 
-        household_number: int, 
-        household_head_relationship: str, 
-        has_existing_household: bool, 
-        pending_requests: int) -> None:
-        
+        self,
+        household_number: int,
+        household_head_relationship: str,
+        has_existing_household: bool,
+        pending_requests: int
+    ) -> None:
+
         ResidentEligibilityPolicy(resident=self.resident).check_eligibility()
-        
+
         if not household_number:
             raise PolicyException("Household number does not exist.")
-        
-        print(f'Has existing household result {has_existing_household}')
+
         if has_existing_household:
-            raise PolicyException("Resident is already part of another family unit.")
+            raise PolicyException(
+                "Resident is already part of another family unit.")
 
         if household_head_relationship not in Relationships.relationship_list():
             raise PolicyException("Invalid household head relationship.")
-        
+
         if pending_requests > 0:
-            raise PolicyException("There is already a pending family creation request for this resident.")
+            raise PolicyException(
+                "There is already a pending family creation request for this resident.")
