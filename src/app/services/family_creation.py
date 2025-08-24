@@ -3,7 +3,7 @@ from src.app.transfer_objects.persistence.family_creation import FamilyCreationP
 from src.app.contracts.family_creation_service import IFamilyCreationService
 from src.core.contracts.infra.repository.family_creation import IFamilyCreationRepository
 from src.core.entities.resident import Resident
-from src.core.service.family_creation_policy import FamilyCreationPolicy
+from src.core.policies.family_creation_policy import FamilyCreationPolicy
 
 
 class FamilyCreationService(IFamilyCreationService):
@@ -17,7 +17,7 @@ class FamilyCreationService(IFamilyCreationService):
         has_existing_household: bool = self.family_creation_repo.find_resident_family_unit_if_exist(cmd.requester_id)
         pending_requests = self.family_creation_repo.get_pending_request(cmd.requester_id)
         
-        FamilyCreationPolicy(resident).ensure_eligibility(
+        FamilyCreationPolicy(resident).check_eligibility(
             household_info.household_id,
             cmd.household_head_relationship,
             has_existing_household,
