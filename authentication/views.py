@@ -1,4 +1,5 @@
 # authentication/views.py
+from csv import reader
 import re
 import requests
 from typing import Optional
@@ -280,3 +281,30 @@ def debug_session(request):
 #         'page_title': 'Temporary Password',
 #         'user_role_template': user_role_template,
 #     })
+
+
+
+
+from pypdf import PdfReader
+
+def testPdf(request):
+    reader = PdfReader("barangay-residency.pdf")
+    fields = reader.get_form_text_fields()
+    print(fields)
+
+def list_form_fields(pdf_path: str) -> dict:
+    reader = PdfReader(pdf_path)
+    fields = {}
+    if "/AcroForm" in reader.trailer["/Root"]:
+        form = reader.trailer["/Root"]["/AcroForm"]
+        if "/Fields" in form:
+            for f in form["/Fields"]:
+                obj = f.get_object()
+                name = obj.get("/T")
+                if name:
+                    fields[name] = obj
+    return fields
+
+    reader = PdfReader("barangay-residency.pdf")
+    fields = reader.get_form_text_fields()
+    print(fields)

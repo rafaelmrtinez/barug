@@ -4,6 +4,12 @@ from .forms import ResidentProfileform
 from .forms import HouseholdProfileForm
 from .forms import FamilyProfileForm
 
+from django.conf import settings
+from django.http import FileResponse, Http404
+from django.contrib.auth.decorators import login_required
+from .utils.pdf_forms import fill_pdf_fields
+
+
 #need back-end for proper assignment
 user_fullname = 'lname, fname mname suffix'
 user_role = 'Clerk'
@@ -120,3 +126,41 @@ def family_info(request):
         'user_role_template' : user_role_template,
         'form' : form,
     })
+
+# OPTIONAL: flatten
+# from .utils.pdf_flatten import flatten_filled_pdf
+
+def generate_residency_certificate(request, request_document_id: int):
+    """
+    Generates a Barangay Residency PDF for an APPROVED & PAID request.
+    """
+    # --- Replace this with your real ORM lookups ---
+    # rd = RequestDocument.objects.select_related("person", "status", "payment").get(pk=request_document_id)
+    # if rd.doc_type.code != "BARANGAY_RESIDENCY" or rd.status.code != "APPROVED" or not rd.payment.or_number:
+    #     raise Http404("Request not ready for generation.")
+    # data = {
+    #     "recipient":  rd.person.full_name_upper,
+    #     "requestor":  rd.person.full_name_upper,
+    #     "application": (rd.purpose or "").upper(),
+    #     "date":       rd.approval_date.strftime("%B %d, %Y").upper(),
+    #     "month_year": rd.approval_date.strftime("%B %Y").upper(),
+    # }
+
+    # --- Demo data so you can test now ---
+    data = {
+        "recipient":  "JUAN DELA CRUZ",
+        "requestor":  "JUAN DELA CRUZ",
+        "application":"PASSPORT APPLICATION",
+        "date":       "AUGUST 24, 2025",
+        "month_year": "AUGUST 2025",
+    }
+
+    tpl = settings.BARANGAY_RESIDENCY_TEMPLATE
+    filled = fill_pdf_fields(tpl, data)
+
+    # If you want editable (form remains): return `filled`
+    # If you want non-editable: uncomment the flatten import and this line:
+    # filled = flatten_filled_pdf(filled, data)
+
+    filename = f"Residency_{data['recipient'].replace(' ', '_')}.pdf"
+    return FileResponse(filled, as_attachment=True, filename=filename, content_type="application/pdf")

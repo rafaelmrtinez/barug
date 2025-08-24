@@ -13,4 +13,5 @@ urlpatterns = [
     path("register_household/household_information/", views.household_info, name="household_info"),
     path("register_household/family_information/", views.family_info, name="family_info"),
     path("<str:res_id>/", views.resident_record, name="resident_record"),
+    path("docs/residency/<int:request_document_id>/pdf/", views.generate_residency_certificate, name="residency_pdf"),
 ]

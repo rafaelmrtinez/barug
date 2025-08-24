@@ -19,6 +19,10 @@ load_dotenv()
 AI_API_KEY = os.getenv("AI_API_KEY")
 AI_MODEL = os.getenv("AI_MODEL")
 
+# settings.py
+ABSTRACT_EMAIL_KEY = os.getenv("ABSTRACT_EMAIL_KEY", "")
+EMAIL_VERIFY_ENABLE = True  # feature flag
+
 EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER")
 EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
@@ -35,12 +39,12 @@ SENDGRID_FROM_EMAIL = 'raphaelbellosillo1230@gmail.com' # Your verified sender e
 SENDGRID_FROM_NAME = 'BaRUG'  # Name displayed in inbox
 
 # GMAIL SMTP
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtp.gmail.com"
-EMAIL_PORT = 587
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND")
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_PORT = os.getenv("EMAIL_PORT")
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = "raphaelbellosillo1230@gmail.com"
-EMAIL_HOST_PASSWORD = "sfpa gadp dpnj licq"
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 
 API_VERSION = "v1"  # API version for event logs
 
@@ -56,6 +60,8 @@ LOGOUT_REDIRECT_URL = 'authentication:login'
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+PDF_TEMPLATE_DIR = BASE_DIR / "templates" / "pdf_templates"
+BARANGAY_RESIDENCY_TEMPLATE = PDF_TEMPLATE_DIR / "barangay-residency.pdf"
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/

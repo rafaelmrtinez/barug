@@ -35,7 +35,6 @@ from authentication.utils.supabase_auth import delete_supabase_user
 # add to your imports at the top
 from rest_framework_simplejwt.tokens import RefreshToken, AccessToken  # AccessToken added
 
-
 from resident.verification.ocr_utils import validate_doc_from_images
 from resident.verification.constants import DOC_TYPE_KEY_BY_ID
 from PIL import Image, UnidentifiedImageError
@@ -49,73 +48,15 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.tokens import AccessToken
+from utils.ratelimit_keys import rl_user_or_ip
+
+from resident.utils.username import generate_username
+from authentication.utils.email_helpers import verify_email_deliverable_abstract
 
 logger = logging.getLogger(__name__)
 
 # JWT_SECRET = settings.SECRET_KEY
 # JWT_ALGORITHM = "HS256"
-
-
-
-# ---------- NEW: helpers for username pattern ----------
-_USERNAME_SUFFIX_DOMAIN = "@user"
-
-def _slug_module(s: str | None) -> str:
-    if s is None:
-        return ""
-    return re.sub(r'[^a-z0-9]+', '', str(s).strip().lower())
-
-def _mmddyy_from_input(dob_raw) -> str | None:
-    """Return MMDDYY from various DOB input formats, or None if invalid."""
-    if not dob_raw:
-        return None
-    dt = None
-    if isinstance(dob_raw, datetime):
-        dt = dob_raw.date()
-    elif isinstance(dob_raw, date):
-        dt = dob_raw
-    else:
-        val = str(dob_raw).strip()
-        # Try common formats
-        fmts = [
-            "%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y", "%Y/%m/%d",
-            "%d-%m-%Y", "%d/%m/%Y",
-            "%m/%d/%y", "%m-%d-%y", "%d-%m-%y", "%d/%m/%y",
-            "%Y%m%d", "%m%d%Y"
-        ]
-        for f in fmts:
-            try:
-                dt = datetime.strptime(val, f).date()
-                break
-            except ValueError:
-                continue
-        if dt is None:
-            # Last ditch: extract digits and try YYYY-MM-DD ordering
-            digits = re.sub(r"\D+", "", val)
-            try:
-                if len(digits) == 8:
-                    # Heuristic: try YYYYMMDD first, else MMDDYYYY
-                    try:
-                        dt = datetime.strptime(digits, "%Y%m%d").date()
-                    except ValueError:
-                        dt = datetime.strptime(digits, "%m%d%Y").date()
-            except Exception:
-                dt = None
-    return dt.strftime("%m%d%y") if dt else None
-
-def generate_username(last_name: str | None, dob_raw) -> str:
-    """
-    Always produce: lastname.MMDDYY@user
-    Fallbacks:
-      - If last_name missing -> "user.MMDDYY@user" or "user.000000@user"
-      - If DOB invalid/missing -> use "000000" for date code
-    """
-    ln = _slug_module(last_name) or "user"
-    mmddyy = _mmddyy_from_input(dob_raw) or "000000"
-    return f"{ln}.{mmddyy}{_USERNAME_SUFFIX_DOMAIN}"[:150]
-
-# ------------------------------------------------------
-
 
 class ResidentRegisterBHWAPIView(APIView):
     permission_classes = [AllowAny]
@@ -218,7 +159,6 @@ class ResidentRegisterBHWAPIView(APIView):
             logger.exception("Supabase upload exception for %s: %s", key, e)
             return None
 
-
     # ---------- main ----------
     def post(self, request):
         auth_user_id = None
@@ -227,11 +167,29 @@ class ResidentRegisterBHWAPIView(APIView):
             email = (d.get("email") or "").strip() or None
             password = d.get("password")  # only required if email exists
 
-            # (1) Optional Auth: only when email is provided
+            # (1) Email checks FIRST (format + AbstractAPI deliverability), only if email was provided
             if email:
+
+                # 1b) Deliverability (AbstractAPI) — reject only when clearly UNDELIVERABLE
+                ok, reason = verify_email_deliverable_abstract(email)
+                if not ok:
+                    return Response(
+                        {
+                            "error": "Email address is not deliverable. Please provide a valid email.",
+                            "reason": reason,  # e.g., "UNDELIVERABLE"
+                        },
+                        status=400,
+                    )
+
+                # 1c) Password now required if email path is used
                 if not password:
                     return Response({"error": "Password is required when email is provided."}, status=400)
+            else:
+                # No-email path: NO auth signup, password can be ignored
+                password = d.get("password")
 
+            # (2) Optional Auth signup in Supabase (only when email is provided)
+            if email:
                 user_create_response = requests.post(
                     f"{settings.SUPABASE_URL}/auth/v1/admin/users",
                     headers={
@@ -252,9 +210,6 @@ class ResidentRegisterBHWAPIView(APIView):
                         status=400,
                     )
                 auth_user_id = user_create_response.json()["id"]
-            else:
-                # No-email path: NO auth signup, password can be ignored
-                password = d.get("password")
 
             # Files from request (may be None)
             person_img = request.FILES.get("person_img")
@@ -262,7 +217,7 @@ class ResidentRegisterBHWAPIView(APIView):
             back_file  = request.FILES.get("back_doc")
             selfie_file = request.FILES.get("selfie")
 
-            # (2) OCR if front/back provided
+            # (3) OCR if front/back provided
             if front_file or back_file:
                 raw_doc_type_id = d.get("id_type_id") or d.get("document_type_id")
                 try:
@@ -338,7 +293,7 @@ class ResidentRegisterBHWAPIView(APIView):
             if not person_img and selfie_file:
                 person_img = selfie_file
 
-            # (3) Diagnostics (optional but helpful)
+            # (4) Diagnostics (optional but helpful)
             for k, f in {
                 "person_img": person_img,
                 "front_doc": front_file,
@@ -354,9 +309,9 @@ class ResidentRegisterBHWAPIView(APIView):
                     logger.warning("FILES[%s]: missing", k)
 
             # ---------- NEW: ALWAYS compute username as lastname.MMDDYY@user ----------
-            username = generate_username(d.get('last_name'), d.get('date_of_birth'))
+            username = generate_username(d.get('first_name'), d.get('last_name'), d.get('date_of_birth'))
 
-            # (4) Upload after OCR passes (or if no OCR needed)
+            # (5) Upload after OCR passes (or if no OCR needed)
             base = self._storage_base(auth_user_id, email)
             person_img_url = self._upload(self.PHOTOS_BUCKET, person_img, base)
             front_doc_url  = self._upload(self.DOCS_BUCKET,   front_file,  f"{base}/docs")
@@ -364,7 +319,7 @@ class ResidentRegisterBHWAPIView(APIView):
             selfie_url     = self._upload(self.DOCS_BUCKET,   selfie_file, f"{base}/docs")
 
             occ = d.get("occupation")
-            # (5) RPC payload
+            # (6) RPC payload
             rpc_payload = {
                 # core identity
                 "p_last_name": d.get("last_name"),
@@ -442,7 +397,7 @@ class ResidentRegisterBHWAPIView(APIView):
 
             resident_code = rpc.data
 
-            # (6) Bind credentials row
+            # (7) Bind credentials row
             person_q = supabase.from_("person").select("person_id").eq("person_code", resident_code).single().execute()
             if not person_q.data:
                 if auth_user_id:
@@ -461,7 +416,7 @@ class ResidentRegisterBHWAPIView(APIView):
                     delete_supabase_user(auth_user_id)
                 return Response({"error": "Failed to update credentials."}, status=400)
 
-            # (7) Email confirmation only when email exists
+            # (8) Email confirmation only when email exists
             if email:
                 send_signup_confirmation_link(email)
 
@@ -482,9 +437,6 @@ class ResidentRegisterBHWAPIView(APIView):
             if auth_user_id:
                 delete_supabase_user(auth_user_id)
             return Response({"error": str(e)}, status=500)
-
-
-from utils.ratelimit_keys import rl_user_or_ip
 
 
 class FamilyUnitSelection(APIView):
@@ -586,7 +538,7 @@ class HouseholdMembershipSearch(APIView):
 class FamilyMembership(APIView):
     """
     Join a family unit (JSON body only). Auth via DRF (cookies or Bearer token).
-    """
+    """ 
     permission_classes = [IsAuthenticated]
     # parser_classes = [JSONParser]  # optional; DRF already parses JSON by default
 
@@ -798,7 +750,7 @@ class ResidentProfileAPIView(APIView):
         profile_resp = supabase.rpc("get_specific_resident_full_profile", {
             "p_person_id": user_id
         }).execute()
-
+        print(profile_resp.data)
         # print(profile_resp.data)
         if not profile_resp.data:
             return Response({"error": "Resident profile not found."}, status=404)
