@@ -4,11 +4,11 @@ from dependency_injector import containers, providers
 from src.app.pipelines.rag_pipeline import RAGPipeline
 from src.app.services.family_selection import FamilySelectionService
 from src.app.services.household_membership_search import HouseholdSearchService
-from src.core.contracts.app.family_service import IFamilyMembershipService
-from src.core.contracts.app.pipeline import IPipeline
+from src.app.contracts.family_service import IFamilyMembershipService
+from src.app.contracts.pipeline import IPipeline
 from src.app.services.family_membership import FamilyMembershipService
 from src.app.pipelines.faq_ingestion_pipeline import FAQIngestionPipeline
-from src.core.contracts.app.service import IService
+from src.app.contracts.service import IService
 
 
 class AppContainer(containers.DeclarativeContainer):

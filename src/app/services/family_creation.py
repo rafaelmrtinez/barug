@@ -1,6 +1,6 @@
 from src.app.transfer_objects.commands.family_creation import FamilyCreationCommand
 from src.app.transfer_objects.persistence.family_creation import FamilyCreationPersistence
-from src.core.contracts.app.family_creation_service import IFamilyCreationService
+from src.app.contracts.family_creation_service import IFamilyCreationService
 from src.core.contracts.infra.repository.family_creation import IFamilyCreationRepository
 from src.core.entities.resident import Resident
 from src.core.service.family_creation_policy import FamilyCreationPolicy

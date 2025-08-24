@@ -10,7 +10,7 @@ from django.utils.decorators import method_decorator
 from dependency_injector.wiring import inject, Provide
 
 
-from src.core.contracts.app.pipeline import IPipeline
+from src.app.contracts.pipeline import IPipeline
 from src.app.bootstrap.app_containers import AppContainer
 
 

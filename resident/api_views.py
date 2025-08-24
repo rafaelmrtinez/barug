@@ -41,8 +41,8 @@ from resident.verification.constants import DOC_TYPE_KEY_BY_ID
 from resident.verification.ocr_utils import validate_doc_from_images
 
 from src.app.bootstrap.app_containers import AppContainer
-from src.core.contracts.app.family_service import IFamilyMembershipService
-from src.core.contracts.app.service import IService
+from src.app.contracts.family_service import IFamilyMembershipService
+from src.app.contracts.service import IService
 from src.core.exceptions.domain_exceptions import DomainException
 from src.infra.authentication.claims import Claims
 
