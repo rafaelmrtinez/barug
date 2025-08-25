@@ -7,6 +7,7 @@ from django_ratelimit.exceptions import Ratelimited
 
 from src.app.exceptions.prompt_file_exception import PromptFileException
 from src.core.exceptions.domain_exceptions import DomainException
+from src.core.exceptions.policy_exception import PolicyException
 from src.infra.exceptions.data_access_exception import DataAccessException
 from src.infra.exceptions.general_infra_exception import InfrastructureException
 from src.infra.exceptions.supabase_sdk.family_member_exist import FamilyMemberAlreadyExistException
@@ -34,7 +35,8 @@ def custom_exception_handler(exc, ctx):
         PromptFileException: (status.HTTP_500_INTERNAL_SERVER_ERROR, FRIENDLY_ERROR),
         DataAccessException: (status.HTTP_500_INTERNAL_SERVER_ERROR, FRIENDLY_ERROR),
         InfrastructureException: (status.HTTP_500_INTERNAL_SERVER_ERROR, FRIENDLY_ERROR),
-        Ratelimited: (status.HTTP_429_TOO_MANY_REQUESTS, "Too many requests. Please try again later.")
+        Ratelimited: (status.HTTP_429_TOO_MANY_REQUESTS, "Too many requests. Please try again later."),
+        PolicyException: (status.HTTP_400_BAD_REQUEST, str(exc)),
     }
 
     for exc_type, (code, msg) in exception_mapping.items():
