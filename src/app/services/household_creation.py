@@ -5,7 +5,7 @@ from resident.transfer_obj.household_creation_request import CreateHouseholdRequ
 from src.app.contracts.household_creation import IHouseholdCreationService
 from src.core.contracts.infra.repository.household_creation import IHouseholdCreationRepository
 from src.core.contracts.infra.repository.resident_repository import IResidentRepository
-from src.core.factory.household_number_factory import HouseholdNumber
+from src.core.value_objects.household_number import HouseholdNumber
 from src.core.policies.household_creation_policy import HouseholdCreationPolicy
 from src.core.policies.resident_eligibility_policy import ResidentEligibilityPolicy
 from src.core.utils.household_number_generator import IdentificationGenerator

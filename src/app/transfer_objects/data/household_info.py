@@ -5,3 +5,4 @@ from dataclasses import dataclass
 class HouseholdInformationDTO:
     household_id: str
     house_type_id: int
+    house_number: str

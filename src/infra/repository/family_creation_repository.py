@@ -3,18 +3,27 @@ from postgrest.exceptions import APIError
 from src.app.transfer_objects.data.household_info import HouseholdInformationDTO
 from src.app.transfer_objects.persistence.family_creation import FamilyCreationPersistence
 from src.app.utils.dob_utility import DateOfBirthUtility
+from src.core.contracts.infra.repository.family_creation import IFamilyCreationRepository
 from src.core.entities.resident import Resident
 from src.infra.adapter.supabase_adapter import SupabaseAdapter
 from src.infra.exceptions.supabase_sdk.pending_request import PendingRequestException
 
 
 
-class FamilyCreationRepository:
+class FamilyCreationRepository(IFamilyCreationRepository):
     
     def __init__(self, client: SupabaseAdapter):
         self.client = client.client
         
-    def create_family_unit(self, persistence: 'FamilyCreationPersistence'):
+    def find_existing_family_number_request(self, ufc_number: str):
+        res = (
+            self.client.table('family_creation_req')
+            .select(count='exact')
+            .eq('ufc_num', ufc_number).execute()
+        )
+        return res.count
+        
+    def insert_family_unit(self, persistence: 'FamilyCreationPersistence'):
         func = 'insert_family_creation_request'
         try:
             result = (
@@ -36,12 +45,20 @@ class FamilyCreationRepository:
             if str(e.message) == "This person already has a pending family creation request." and str(e.code) == "P5032":
                 raise PendingRequestException("This person already has a pending family creation request.")
             raise e
+        
+    def get_existing_family_number_request_count(self, family_number: str):
+        res = (
+            self.client
+            .table('family_unit')
+            .select(count='exact')
+            .eq('family_num', family_number).execute()
+        )
+        return res.count
 
-    def get_pending_request(self, requester_id: int) -> int:
+    def find_pending_request(self, requester_id: int) -> int:
         result = (
             self.client.table('family_creation_req').select(count='exact').eq('requested_by', requester_id).execute()
         )
-        
         return result.count if result.count else 0
 
     def get_all_family_count(self):
@@ -88,13 +105,14 @@ class FamilyCreationRepository:
         result = (
             self.client
             .table('household_info')
-            .select('household_id, house_type(house_type_id)')
+            .select('household_id, house_number, house_type(house_type_id)')
             .eq('house_number', house_num)
             .execute()
         )
         data = HouseholdInformationDTO(
             household_id=result.data[0]['household_id'],
-            house_type_id=result.data[0]['house_type']['house_type_id']
+            house_type_id=result.data[0]['house_type']['house_type_id'],
+            house_number=result.data[0]['house_number']
         )
         return data if result.data else None
 
