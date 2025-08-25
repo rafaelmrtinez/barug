@@ -96,9 +96,6 @@ def send_signup_confirmation_link(email: str) -> bool:
     return False
 
 
-import requests
-from django.conf import settings
-
 def verify_email_deliverable_abstract(email: str) -> tuple[bool, str]:
     """
     Check if an email is deliverable using AbstractAPI.

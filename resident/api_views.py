@@ -169,7 +169,6 @@ class ResidentRegisterBHWAPIView(APIView):
 
             # (1) Email checks FIRST (format + AbstractAPI deliverability), only if email was provided
             if email:
-
                 # 1b) Deliverability (AbstractAPI) — reject only when clearly UNDELIVERABLE
                 ok, reason = verify_email_deliverable_abstract(email)
                 if not ok:
@@ -309,7 +308,10 @@ class ResidentRegisterBHWAPIView(APIView):
                     logger.warning("FILES[%s]: missing", k)
 
             # ---------- NEW: ALWAYS compute username as lastname.MMDDYY@user ----------
-            username = generate_username(d.get('first_name'), d.get('last_name'), d.get('date_of_birth'))
+            if email:
+                 username = email
+            else:
+                username = generate_username(d.get('first_name'), d.get('last_name'), d.get('date_of_birth'))
 
             # (5) Upload after OCR passes (or if no OCR needed)
             base = self._storage_base(auth_user_id, email)

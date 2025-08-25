@@ -26,7 +26,7 @@ from django.http import JsonResponse
 from django.core.mail import send_mail, BadHeaderError
 
 from authentication.utils.email_helpers import send_signup_confirmation_link
-from authentication.utils.email_helpers import verify_email_deliverable_abstract
+
 
 # SendGrid API, Verified sender Email, Name displayed in inbox
 SENDGRID_API_KEY = settings.SENDGRID_API_KEY
