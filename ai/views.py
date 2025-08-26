@@ -14,7 +14,7 @@ from dependency_injector.wiring import inject, Provide
 from ai.serializers.chat import ChatSerializer
 
 
-from src.core.contracts.app.pipeline import IPipeline
+from src.app.contracts.pipeline import IPipeline
 from barug.utils.rate_limiter import CustomRateLimiter
 from src.app.bootstrap.app_containers import AppContainer
 

@@ -1,4 +1,4 @@
-from src.core.contracts.app.family_service import IFamilyMembershipService
+from src.app.contracts.family_service import IFamilyMembershipService
 from src.core.contracts.infra.family_membership import IFamilyMembershipRepository
 from src.core.value_objects.family_membership import FamilyMembership
 

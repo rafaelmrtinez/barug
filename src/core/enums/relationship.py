@@ -24,5 +24,5 @@ class Relationships(Enum):
     NON_RELATIVE = 20
 
     @classmethod
-    def get_all_relationships(cls):
-        return list(cls)
+    def relationship_list(cls):
+        return [i.value for i in cls]
