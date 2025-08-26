@@ -2,7 +2,17 @@ from rest_framework import serializers
 
 from resident.serializers.base import BaseSerializer  
 
-class HouseholdCreationSerializer(BaseSerializer):
+class HouseholdCreationSerializer(serializers.Serializer):
+    
+    resident_id = serializers.CharField(
+        max_length=20,
+        required=True,
+        error_messages={
+            'required': 'Resident ID is required.',
+            'blank': 'Resident ID cannot be blank.',
+            'max_length': 'Resident ID cannot exceed 20 characters.'
+        }
+    )
     
     house_number = serializers.CharField(
         max_length=100,

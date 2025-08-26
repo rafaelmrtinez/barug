@@ -27,7 +27,9 @@ from rest_framework.response import Response
 from dependency_injector.wiring import inject, Provide
 
 from resident.serializers.family_creation import FamilyCreationSerializer
+from resident.transfer_obj.household_creation_request import CreateHouseholdRequest
 from src.app.contracts.family_creation_service import IFamilyCreationService
+from src.app.contracts.household_creation import IHouseholdCreationService
 from src.app.transfer_objects.commands.family_creation import FamilyCreationRequest
 from supabase_client import supabase  # Your Supabase client
 
@@ -54,6 +56,23 @@ logger = logging.getLogger(__name__)
 JWT_SECRET = settings.SECRET_KEY
 JWT_ALGORITHM = "HS256"
 
+class HouseholdCreationView(APIView):
+    
+    parser_classes = [JSONParser]
+    
+    @inject
+    def __init__(self, service: IHouseholdCreationService = Provide[AppContainer.household_creation_service], *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.service = service
+    
+    def post(self, request: Request) -> Response:
+        serializer = HouseholdCreationSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        data = self.service.execute(CreateHouseholdRequest(**serializer.validated_data))
+        if not data:
+            return Response({"error": INTERNAL_ERROR}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(data={"message": "Household creation requested successfully"}, status=status.HTTP_201_CREATED)
 
 class FamilyCreationRequestView(APIView):
     
