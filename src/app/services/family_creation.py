@@ -21,6 +21,11 @@ class FamilyCreationService(IFamilyCreationService):
         pending_requests = self.family_creation_repo.find_pending_request(req.requester_id)
         household_info = self.family_creation_repo.get_household_info_by_house_num(req.household_number)
         
+        if not resident:
+            raise ValueError('Resident does not exist.')
+        
+        if not household_info:
+            raise ValueError('Household does not exist.')
         
         ctx = FamilyEligibilityContext(
             household_number=req.household_number,
@@ -58,5 +63,5 @@ class FamilyCreationService(IFamilyCreationService):
                     house_type=household_info.house_type_id,
                     household_head_relationship=req.household_head_relationship
                     )
-        print('Creating a family....')
+        
         return self.family_creation_repo.insert_family_unit(data)

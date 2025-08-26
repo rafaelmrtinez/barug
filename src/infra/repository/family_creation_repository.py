@@ -44,6 +44,8 @@ class FamilyCreationRepository(IFamilyCreationRepository):
         except APIError as e:
             if str(e.message) == "This person already has a pending family creation request." and str(e.code) == "P5032":
                 raise PendingRequestException("This person already has a pending family creation request.")
+            if str(e.message) == "You already have a pending request to join a household." and str(e.code) == "P5035":
+                raise PendingRequestException("You already have a pending request to join a household.")
             raise e
         
     def get_existing_family_number_request_count(self, family_number: str):
@@ -68,9 +70,7 @@ class FamilyCreationRepository(IFamilyCreationRepository):
             .execute()
         )
         
-        if not result.data:
-            return None
-        
+
         return result.count if result.count else 0
     
     def get_family_count_by_household_id(self, id):
@@ -109,6 +109,10 @@ class FamilyCreationRepository(IFamilyCreationRepository):
             .eq('house_number', house_num)
             .execute()
         )
+        
+        if not result.data:
+            return None
+        
         data = HouseholdInformationDTO(
             household_id=result.data[0]['household_id'],
             house_type_id=result.data[0]['house_type']['house_type_id'],

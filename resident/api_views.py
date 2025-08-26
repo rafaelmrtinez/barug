@@ -26,6 +26,9 @@ from rest_framework.response import Response
 
 from dependency_injector.wiring import inject, Provide
 
+from resident.serializers.family_creation import FamilyCreationSerializer
+from src.app.contracts.family_creation_service import IFamilyCreationService
+from src.app.transfer_objects.commands.family_creation import FamilyCreationRequest
 from supabase_client import supabase  # Your Supabase client
 
 from authentication.utils.email_helpers import send_signup_confirmation_link
@@ -34,6 +37,7 @@ from authentication.utils.supabase_auth import delete_supabase_user
 from barug.constants import INTERNAL_ERROR, RESOURCE_ACCESS_DENIED
 from barug.utils.rate_limiter import CustomRateLimiter
 
+from resident.serializers.household_creation import HouseholdCreationSerializer
 from resident.serializers.family_selection import FamilySelectionSerializer
 from resident.serializers.membership import MembershipSerializer
 from resident.serializers.membership_search import MembershipSearch
@@ -43,7 +47,6 @@ from resident.verification.ocr_utils import validate_doc_from_images
 from src.app.bootstrap.app_containers import AppContainer
 from src.app.contracts.family_service import IFamilyMembershipService
 from src.app.contracts.service import IService
-from src.core.exceptions.domain_exceptions import DomainException
 from src.infra.authentication.claims import Claims
 
 logger = logging.getLogger(__name__)
@@ -52,10 +55,34 @@ JWT_SECRET = settings.SECRET_KEY
 JWT_ALGORITHM = "HS256"
 
 
-class HouseholdCreationView(APIView):
+class FamilyCreationRequestView(APIView):
     
+    parser_classes = [JSONParser]
+
+    @inject
+    def __init__(self, service: IFamilyCreationService = Provide[AppContainer.family_creation_service], *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.service = service
+
     def post(self, request: Request) -> Response:
-        return Response(status=status.HTTP_501_NOT_IMPLEMENTED, data={"error": "Not implemented yet."})
+        serializer = FamilyCreationSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        res = self.service.execute(
+            FamilyCreationRequest(
+                requester_id=serializer.validated_data["requester_id"],
+                household_number=serializer.validated_data["household_number"],
+                source_of_income=serializer.validated_data["source_of_income"],
+                family_monthly_income=serializer.validated_data["family_monthly_income"],
+                indigent_status=serializer.validated_data["indigent_status"],
+                nhts_status=serializer.validated_data["nhts_status"],
+                household_head_relationship=serializer.validated_data["household_head_relationship"]
+            )
+        )
+        if not res:
+            return Response({"error": INTERNAL_ERROR}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response(status=status.HTTP_201_CREATED, data={"message": "Family creation requested successfully"})
 
 def _read_bytes(f):
     if not f:

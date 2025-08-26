@@ -1,8 +1,12 @@
 from dependency_injector import containers, providers
 
 
+from src.app.contracts.family_creation_service import IFamilyCreationService
+from src.app.contracts.household_creation import IHouseholdCreationService
 from src.app.pipelines.rag_pipeline import RAGPipeline
+from src.app.services.family_creation import FamilyCreationService
 from src.app.services.family_selection import FamilySelectionService
+from src.app.services.household_creation import HouseholdCreationService
 from src.app.services.household_membership_search import HouseholdSearchService
 from src.app.contracts.family_service import IFamilyMembershipService
 from src.app.contracts.pipeline import IPipeline
@@ -17,6 +21,17 @@ class AppContainer(containers.DeclarativeContainer):
     config = providers.Configuration()
     
     infra  = providers.DependenciesContainer()
+    
+    household_creation_service: providers.Factory[IHouseholdCreationService] = providers.Factory(
+        HouseholdCreationService,
+        repo=infra.household_creation_repository,
+        resident_repo=infra.resident_repository
+    )
+    
+    family_creation_service: providers.Factory[IFamilyCreationService] = providers.Factory(
+        FamilyCreationService,
+        family_creation_repo=infra.family_creation_repository
+    )
     
     family_selection : providers.Factory[IService] = providers.Factory(
         FamilySelectionService,

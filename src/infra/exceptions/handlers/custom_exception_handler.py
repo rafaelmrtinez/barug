@@ -15,6 +15,7 @@ from src.infra.exceptions.supabase_sdk.foreign_key import ForeignKeyException
 from src.infra.exceptions.supabase_sdk.missing_response import MissingResponseException
 from src.infra.exceptions.supabase_sdk.pending_join_family_request import PendingFamilyRequestException
 from src.infra.exceptions.misc.const import FRIENDLY_ERROR
+from src.infra.exceptions.supabase_sdk.pending_request import PendingRequestException
 
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,8 @@ def custom_exception_handler(exc, ctx):
         InfrastructureException: (status.HTTP_500_INTERNAL_SERVER_ERROR, FRIENDLY_ERROR),
         Ratelimited: (status.HTTP_429_TOO_MANY_REQUESTS, "Too many requests. Please try again later."),
         PolicyException: (status.HTTP_400_BAD_REQUEST, str(exc)),
+        ValueError: (status.HTTP_400_BAD_REQUEST, str(exc)),
+        PendingRequestException: (status.HTTP_400_BAD_REQUEST, str(exc)),
     }
 
     for exc_type, (code, msg) in exception_mapping.items():

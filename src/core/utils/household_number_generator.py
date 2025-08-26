@@ -29,9 +29,6 @@ class IdentificationGenerator:
 
     @staticmethod
     def generate_ucf_number(house_number: int, total_family_count: int) -> str:
-        try:
-            padded = f"{int(house_number):04d}"
-        except ValueError:
-            padded = str(house_number).zfill(4)
-
-        return f"UFC-{padded}-{total_family_count + 1}"
+        padded = str(house_number).zfill(4)
+        random_suffix = random.randint(100, 999)
+        return f"UFC-{padded}-{total_family_count + 1}-{random_suffix}"

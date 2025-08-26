@@ -22,6 +22,6 @@ class IFamilyCreationService(ABC):
     """
     
     @abstractmethod
-    def execute(self, cmd: 'FamilyCreationCommand') -> int:
+    def execute(self, req: 'FamilyCreationRequest') -> int:
         pass
 
