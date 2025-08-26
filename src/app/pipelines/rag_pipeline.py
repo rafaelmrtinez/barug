@@ -3,8 +3,8 @@ from typing import List
 
 from src.core.contracts.llm import ILLM
 from src.core.contracts.embedding import IEmbedding
-from src.app.contracts.pipeline import IPipeline
-from src.app.transfer_objects.commands.semantic_search import SemanticSearchDTO
+from src.core.contracts.app.pipeline import IPipeline
+from src.app.dto.semantic_search import SemanticSearchDTO
 from src.core.contracts.rag_repository import IRAGRepository
 from src.app.utils.rag_pipeline_utils import RAGPipelineUtils
 

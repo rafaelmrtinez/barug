@@ -2,7 +2,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 
 
 from src.core.contracts.embedding import IEmbedding
-from src.app.contracts.pipeline import IPipeline
+from src.core.contracts.app.pipeline import IPipeline
 from src.app.utils.batch_utils import BatchDataUtility
 from src.core.entities.faq_document import FAQDocument
 from src.core.contracts.faq_repo import IFAQIngestionRepository
