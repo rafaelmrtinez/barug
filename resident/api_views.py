@@ -1,88 +1,46 @@
 # resident/api_views.py
-import logging
-import os
-import re
-import tempfile
-import uuid
-
-import jwt
-import requests
-from PIL import Image, UnidentifiedImageError
-
-from django.conf import settings
-from django.utils.decorators import method_decorator
-from django_ratelimit.decorators import ratelimit
-
 from rest_framework.views import APIView
-from rest_framework import status
-from rest_framework.parsers import (
-    JSONParser,
-    MultiPartParser,
-    FormParser,
-)
-from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
-
+from rest_framework.parsers import JSONParser
 from dependency_injector.wiring import inject, Provide
+from django_ratelimit.decorators import ratelimit
+from django.utils.decorators import method_decorator
+from rest_framework import status
+from django.conf import settings
+from resident.serializers.family_selection import FamilySelectionSerializer
+from resident.serializers.membership_search import MembershipSearch
+from src.core.contracts.app.service import IService
 
-from resident.serializers.family_creation import FamilyCreationSerializer
-from src.app.contracts.family_creation_service import IFamilyCreationService
-from src.app.transfer_objects.commands.family_creation import FamilyCreationRequest
+from src.infra.authentication.claims import Claims
+from barug.utils.rate_limiter import CustomRateLimiter
+from resident.serializers.membership import MembershipSerializer
+from barug.constants import INTERNAL_ERROR
+from src.app.bootstrap.app_containers import AppContainer
+from src.core.contracts.app.family_service import IFamilyMembershipService
+from src.core.exceptions.domain_exceptions import DomainException
+
+
 from supabase_client import supabase  # Your Supabase client
-
+import jwt
+from rest_framework.permissions import AllowAny
+import requests
+from barug.constants import RESOURCE_ACCESS_DENIED
 from authentication.utils.email_helpers import send_signup_confirmation_link
 from authentication.utils.supabase_auth import delete_supabase_user
 
-from barug.constants import INTERNAL_ERROR, RESOURCE_ACCESS_DENIED
-from barug.utils.rate_limiter import CustomRateLimiter
-
-from resident.serializers.household_creation import HouseholdCreationSerializer
-from resident.serializers.family_selection import FamilySelectionSerializer
-from resident.serializers.membership import MembershipSerializer
-from resident.serializers.membership_search import MembershipSearch
-from resident.verification.constants import DOC_TYPE_KEY_BY_ID
 from resident.verification.ocr_utils import validate_doc_from_images
-
-from src.app.bootstrap.app_containers import AppContainer
-from src.app.contracts.family_service import IFamilyMembershipService
-from src.app.contracts.service import IService
-from src.infra.authentication.claims import Claims
+from resident.verification.constants import DOC_TYPE_KEY_BY_ID
+from PIL import Image, UnidentifiedImageError
+import os, uuid, tempfile, logging
+from rest_framework.parsers import MultiPartParser, FormParser
+import re
 
 logger = logging.getLogger(__name__)
 
 JWT_SECRET = settings.SECRET_KEY
 JWT_ALGORITHM = "HS256"
 
-
-class FamilyCreationRequestView(APIView):
-    
-    parser_classes = [JSONParser]
-
-    @inject
-    def __init__(self, service: IFamilyCreationService = Provide[AppContainer.family_creation_service], *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.service = service
-
-    def post(self, request: Request) -> Response:
-        serializer = FamilyCreationSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
-        res = self.service.execute(
-            FamilyCreationRequest(
-                requester_id=serializer.validated_data["requester_id"],
-                household_number=serializer.validated_data["household_number"],
-                source_of_income=serializer.validated_data["source_of_income"],
-                family_monthly_income=serializer.validated_data["family_monthly_income"],
-                indigent_status=serializer.validated_data["indigent_status"],
-                nhts_status=serializer.validated_data["nhts_status"],
-                household_head_relationship=serializer.validated_data["household_head_relationship"]
-            )
-        )
-        if not res:
-            return Response({"error": INTERNAL_ERROR}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        return Response(status=status.HTTP_201_CREATED, data={"message": "Family creation requested successfully"})
 
 def _read_bytes(f):
     if not f:

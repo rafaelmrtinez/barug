@@ -1,5 +1,5 @@
 from typing import Any
-from src.app.contracts.service import IService
+from src.core.contracts.app.service import IService
 from src.core.contracts.infra.repository.household_search_repository import IHouseholdSearchRepository
 
 
