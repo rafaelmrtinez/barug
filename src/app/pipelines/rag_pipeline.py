@@ -1,11 +1,11 @@
 from typing import List
 
 
-from src.core.contracts.llm import ILLM
-from src.core.contracts.embedding import IEmbedding
+from src.core.contracts.gateways.llm import ILLM
+from src.core.contracts.gateways.embedding import IEmbedding
 from src.app.contracts.pipeline import IPipeline
 from src.app.transfer_objects.semantic_search import SemanticSearchDTO
-from src.core.contracts.rag_repository import IRAGRepository
+from src.core.contracts.repositories.rag_repository import IRAGRepository
 from src.app.utils.rag_pipeline_utils import RAGPipelineUtils
 
 class RAGPipeline(IPipeline):

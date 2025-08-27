@@ -3,13 +3,12 @@ import pandas as pd
 from io import BytesIO
 from typing import List, Tuple
 
-from src.core.contracts.domain.document import IDocument
 from src.core.enums.faq_doc_extensions import FAQDocExtensions
 from src.core.enums.faq_doc_mimes import FAQDocMimeTypes
 from src.core.exceptions.domain_exceptions import DomainException
 
 
-class FAQDocument(IDocument):
+class FAQDocument:
 
     MAX_FILE_SIZE_MB = 5
     FILE_MAX_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024
