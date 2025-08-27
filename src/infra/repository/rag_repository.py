@@ -3,7 +3,6 @@ from postgrest.exceptions import APIError
 
 from src.core.contracts.rag_repository import IRAGRepository
 from src.infra.adapter.supabase_adapter import SupabaseAdapter
-from src.infra.exceptions.data_access_exception import DataAccessException
 
 
 class RAGRepository(IRAGRepository):
@@ -15,20 +14,10 @@ class RAGRepository(IRAGRepository):
         """
         Retrieve a document by its ID.
         """
-        try:
-            response = self.supabase_adapter.table('faq_document').select('id').order(
-                'uploaded_at', desc=True
-                ).execute()
-            
-            if not response.data:
-                raise DataAccessException("No documents found.")
-            
-            if not response.data[0].get('id'):
-                raise DataAccessException("Document ID not found.")
-            
-            return response.data[0]['id']
-        except APIError as e:
-            raise DataAccessException(f"Failed to retrieve document: {str(e)}")
+        response = self.supabase_adapter.table('faq_document').select('id').order(
+            'uploaded_at', desc=True
+            ).execute()
+        return response.data[0]['id']
 
     def exec_semantic_search(
         self, 
@@ -41,19 +30,13 @@ class RAGRepository(IRAGRepository):
         """
         Executes a function call with the given name and parameters.
         """
-        try:
-            params = {
-            'query_embedding': embedding,
-            'match_threshold': threshold,
-            'match_count': top_k,
-            'target_document_id': doc_id
-            }
-            
-            response = self.supabase_adapter.rpc(func_name, params).execute()
-            
-            if not response.data[0]['id']:
-                raise DataAccessException("No results found for the semantic search.")
+        params = {
+        'query_embedding': embedding,
+        'match_threshold': threshold,
+        'match_count': top_k,
+        'target_document_id': doc_id
+        }
+        
+        response = self.supabase_adapter.rpc(func_name, params).execute()
 
-            return response.data
-        except Exception as e:
-            raise DataAccessException(f"Failed to execute semantic search: {str(e)}")
+        return response.data

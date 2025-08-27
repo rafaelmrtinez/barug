@@ -1,7 +1,7 @@
 from typing import List
 
 
-from src.app.transfer_objects.commands.semantic_search import SemanticSearchDTO
+from src.app.transfer_objects.semantic_search import SemanticSearchDTO
 from src.app.exceptions.prompt_file_exception import PromptFileException
 
 

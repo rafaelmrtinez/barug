@@ -26,11 +26,6 @@ from rest_framework.response import Response
 
 from dependency_injector.wiring import inject, Provide
 
-from resident.serializers.family_creation import FamilyCreationSerializer
-from resident.transfer_obj.household_creation_request import CreateHouseholdRequest
-from src.app.contracts.family_creation_service import IFamilyCreationService
-from src.app.contracts.household_creation import IHouseholdCreationService
-from src.app.transfer_objects.commands.family_creation import FamilyCreationRequest
 from supabase_client import supabase  # Your Supabase client
 
 from authentication.utils.email_helpers import send_signup_confirmation_link
@@ -39,69 +34,16 @@ from authentication.utils.supabase_auth import delete_supabase_user
 from barug.constants import INTERNAL_ERROR, RESOURCE_ACCESS_DENIED
 from barug.utils.rate_limiter import CustomRateLimiter
 
-from resident.serializers.household_creation import HouseholdCreationSerializer
-from resident.serializers.family_selection import FamilySelectionSerializer
-from resident.serializers.membership import MembershipSerializer
-from resident.serializers.membership_search import MembershipSearch
 from resident.verification.constants import DOC_TYPE_KEY_BY_ID
 from resident.verification.ocr_utils import validate_doc_from_images
 
 from src.app.bootstrap.app_containers import AppContainer
-from src.app.contracts.family_service import IFamilyMembershipService
-from src.app.contracts.service import IService
 from src.infra.authentication.claims import Claims
 
 logger = logging.getLogger(__name__)
 
 JWT_SECRET = settings.SECRET_KEY
 JWT_ALGORITHM = "HS256"
-
-class HouseholdCreationView(APIView):
-    
-    parser_classes = [JSONParser]
-    
-    @inject
-    def __init__(self, service: IHouseholdCreationService = Provide[AppContainer.household_creation_service], *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.service = service
-    
-    def post(self, request: Request) -> Response:
-        serializer = HouseholdCreationSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
-        data = self.service.execute(CreateHouseholdRequest(**serializer.validated_data))
-        if not data:
-            return Response({"error": INTERNAL_ERROR}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        return Response(data={"message": "Household creation requested successfully"}, status=status.HTTP_201_CREATED)
-
-class FamilyCreationRequestView(APIView):
-    
-    parser_classes = [JSONParser]
-
-    @inject
-    def __init__(self, service: IFamilyCreationService = Provide[AppContainer.family_creation_service], *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.service = service
-
-    def post(self, request: Request) -> Response:
-        serializer = FamilyCreationSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
-        res = self.service.execute(
-            FamilyCreationRequest(
-                requester_id=serializer.validated_data["requester_id"],
-                household_number=serializer.validated_data["household_number"],
-                source_of_income=serializer.validated_data["source_of_income"],
-                family_monthly_income=serializer.validated_data["family_monthly_income"],
-                indigent_status=serializer.validated_data["indigent_status"],
-                nhts_status=serializer.validated_data["nhts_status"],
-                household_head_relationship=serializer.validated_data["household_head_relationship"]
-            )
-        )
-        if not res:
-            return Response({"error": INTERNAL_ERROR}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        return Response(status=status.HTTP_201_CREATED, data={"message": "Family creation requested successfully"})
 
 def _read_bytes(f):
     if not f:
@@ -491,182 +433,6 @@ class ResidentRegisterBHWAPIView(APIView):
             if auth_user_id:
                 delete_supabase_user(auth_user_id)
             return Response({"error": str(e)}, status=500)
-
-
-class FamilyUnitSelection(APIView):
-    
-    parser_classes = [JSONParser]
-    
-    @method_decorator(ratelimit(key='user_or_ip', rate='5/s', block=False))
-    @inject
-    def get(self, request: Request, service: IService = Provide[AppContainer.family_selection]) -> Response:
-        if CustomRateLimiter.is_ratelimited(request=request):
-            return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
-        user = Claims.verify_jwt_token(request.headers.get("Authorization"))
-        if not user:
-            return Response({"error": RESOURCE_ACCESS_DENIED}, status=status.HTTP_401_UNAUTHORIZED)
-        household_id = request.query_params.get("q", None)
-        serializer = FamilySelectionSerializer(data={
-                'household_id': household_id,
-                "resident_id": user["user_id"],
-                "username": user["username"],
-                "role": user["role"]
-            })
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        result = service.execute(household_id=serializer.validated_data['household_id'])
-        if not result:
-            return Response({'message': 'No results found'},status=status.HTTP_200_OK)
-        return Response({'message': result}, status=status.HTTP_200_OK)
-
-
-class HouseholdMembershipSearch(APIView):
-    """
-    API View for searching household memberships.
-    """
-    parser_classes = [JSONParser]
-    
-    @method_decorator(ratelimit(key='user_or_ip', rate='10/s', block=False))
-    @inject
-    def get(self, request: Request, service: IService = Provide[AppContainer.household_search_service]) -> Response:
-        if CustomRateLimiter.is_ratelimited(request=request):
-            return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
-        user = Claims.verify_jwt_token(request.headers.get("Authorization"))
-        if not user:
-            return Response({"error": RESOURCE_ACCESS_DENIED}, status=status.HTTP_401_UNAUTHORIZED)
-        key = request.query_params.get("q", None)
-        serializer = MembershipSearch(data={
-                'key': key,
-                "resident_id": user["user_id"],
-                "username": user["username"],
-                "role": user["role"]
-            })
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        result = service.execute(key=key)
-        if not result:
-            return Response({'message': 'No results found'},status=status.HTTP_200_OK)
-        return Response({'message': result}, status=status.HTTP_200_OK)
-
-
-class FamilyUnitSelection(APIView):
-    
-    parser_classes = [JSONParser]
-    
-    @method_decorator(ratelimit(key='user_or_ip', rate='5/s', block=False))
-    @inject
-    def get(self, request: Request, service: IService = Provide[AppContainer.family_selection]) -> Response:
-        if CustomRateLimiter.is_ratelimited(request=request):
-            return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
-        user = Claims.verify_jwt_token(request.headers.get("Authorization"))
-        if not user:
-            return Response({"error": RESOURCE_ACCESS_DENIED}, status=status.HTTP_401_UNAUTHORIZED)
-        household_id = request.query_params.get("q", None)
-        serializer = FamilySelectionSerializer(data={
-                'household_id': household_id,
-                "resident_id": user["user_id"],
-                "username": user["username"],
-                "role": user["role"]
-            })
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        result = service.execute(household_id=serializer.validated_data['household_id'])
-        if not result:
-            return Response({'message': 'No results found'},status=status.HTTP_200_OK)
-        return Response({'message': result}, status=status.HTTP_200_OK)
-
-
-class HouseholdMembershipSearch(APIView):
-    """
-    API View for searching household memberships.
-    """
-    parser_classes = [JSONParser]
-    
-    @method_decorator(ratelimit(key='user_or_ip', rate='10/s', block=False))
-    @inject
-    def get(self, request: Request, service: IService = Provide[AppContainer.household_search_service]) -> Response:
-        if CustomRateLimiter.is_ratelimited(request=request):
-            return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
-        user = Claims.verify_jwt_token(request.headers.get("Authorization"))
-        if not user:
-            return Response({"error": RESOURCE_ACCESS_DENIED}, status=status.HTTP_401_UNAUTHORIZED)
-        key = request.query_params.get("q", None)
-        serializer = MembershipSearch(data={
-                'key': key,
-                "resident_id": user["user_id"],
-                "username": user["username"],
-                "role": user["role"]
-            })
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        result = service.execute(key=key)
-        if not result:
-            return Response({'message': 'No results found'},status=status.HTTP_200_OK)
-        return Response({'message': result}, status=status.HTTP_200_OK)
-
-class FamilyMembership(APIView):
-    """
-        Description:
-            API View for handling the process of joining a family unit.
-            
-        Request Data Types:
-            - resident_id (int): Unique identifier of the resident.
-            - household_id (int): Unique identifier of the household.
-            - family_id (int): Unique identifier of the family.
-            - household_head_relationship (int): Relationship of the resident to the household head.
-            - family_head_relationship (int): Relationship of the resident to the family head.
-
-        Note:
-            - Only JSON request bodies are accepted. Ensure the request header includes:
-            "Content-Type: application/json".
-            - JWT authentication is required. Include the token in requests made via fetch API,
-            Axios, or other HTTP clients. Requests without authentication will be rejected.
-
-        Example Request:
-            {
-                "household_id": 1,
-                "family_id": 1,
-                "household_head_relationship": 1,
-                "family_head_relationship": 1,
-                "years_of_residenct": 1
-            }
-
-        Returns:
-            - HTTP 200 OK on success.
-    """
-
-    parser_classes = [JSONParser]
-    
-    @method_decorator(ratelimit(key='user_or_ip', rate='10/s', block=False))
-    @inject
-    def post(self, request: Request, service: IFamilyMembershipService = Provide[AppContainer.family_membership]) -> Response:
-        if CustomRateLimiter.is_ratelimited(request=request):
-            return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
-        user = Claims.verify_jwt_token(request.headers.get("Authorization"))
-        if not user:
-            return Response({"error": "Unauthorized Access."}, status=status.HTTP_401_UNAUTHORIZED)
-        serializer = MembershipSerializer(
-            data={
-                **request.data,
-                "resident_id": user["user_id"],
-                "username": user["username"],
-                "role": user["role"]
-            })
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        validated_data = serializer.validated_data
-        is_success: bool = service.execute(
-                years_of_residency=validated_data["years_of_residency"],
-                resident_id=validated_data["resident_id"],
-                household_id=validated_data["household_id"],
-                family_id=validated_data["family_id"],
-                household_head_relationship=validated_data["household_head_relationship"],
-                family_head_relationship=validated_data["family_head_relationship"],
-            )
-        if not is_success:
-            return Response({"error": "Unable to join family at the moment."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        return Response(status=status.HTTP_200_OK)
 
 
 class ResidentRegisterAPIView(APIView):
