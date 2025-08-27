@@ -63,7 +63,6 @@ def _read_bytes(f):
         logger.exception("Failed reading upload bytes: %s", e)
         return None
 
-
 class ResidentRegisterBHWAPIView(APIView):
     permission_classes = [AllowAny]
     parser_classes = (MultiPartParser, FormParser)
