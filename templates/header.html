@@ -1,0 +1,38 @@
+{% load static %}
+
+{% load bootstrap_icons %}
+
+<header class="text-white">
+    <div class="d-flex flex-wrap justify-content-between align-items-center">
+        <div class="mt-2 ">
+            <img src="{% static 'images/brgy-sto-nino.png' %}" alt="Barangay Sto. Niño" class="img-fluid pe-2" style="max-height: 40px;">
+            <span class="navbar-brand">Barangay Sto. Niño</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <div>
+                <button class="btn pe-0">
+                    {% bs_icon 'bell-fill' color='white' size='1.2em' %}
+                </button>
+                    
+                <button class="btn">
+                    {% bs_icon 'person-fill' color='white' size='1.3em' %}
+                </button>
+            </div>
+            <div class="user text-end">
+                <span class="navbar-text">{{ user_fullname }}</span>
+            </div>
+            <span class="navbar-text d-none d-sm-inline"> - </span>
+            <div class="user-type text-end">
+                <span class="navbar-text">{{ user_role }}</span>
+            </div>
+            <div class="d-flex align-items-center">
+                <form action="" method="post" class="m-0 p-0">
+                    {% csrf_token %}
+                    <button type="submit" id="logout" name="logout" class="btn btn-logout">
+                        {% bs_icon 'arrow-bar-right' color='white' size='1.3em' %}
+                    </button>
+                </form>
+            </div>                
+        </div>
+    </div>
+</header>  

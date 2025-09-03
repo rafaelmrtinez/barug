@@ -1,0 +1,82 @@
+{% load static %}
+
+{% load django_bootstrap5 %}
+{% bootstrap_css %}
+{% bootstrap_javascript %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{% static 'css/static_style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/form.css' %}">
+    <link rel="stylesheet" href="{% static 'css/button.css' %}">
+
+    <script src="{% static 'js/password_toggle.js' %}" defer></script>
+
+    <link rel="icon" type="image/x-icon" href="{% static 'images/brgy-sto-nino.png' %}">
+    <title>Login</title>
+</head>
+<body>
+    <div class="container d-flex justify-content-center align-items-center min-vh-100">
+        
+        <div class="row border rounded-5 p-3 bg-white shadow box-area">
+            
+            <div class="col-md-12 right-box">
+                
+                <div class="row align-items-center">
+                    
+                    <div class="header-text mb-4 text-start mt-3 d-flex align-items-center justify-content-between">
+                        <div>
+                            <div>
+                                <img src="{% static 'images/login-logo.png' %}" alt="Logo" class="img-fluid" style="max-height: 80px;">
+                            </div>
+                            <h6>Log in to access barangay services.</h6>
+                        </div>
+                        <div>
+                            <img src="{% static 'images/brgy-sto-nino.png' %}" alt="Logo" class="img-fluid" style="max-height: 100px;">
+                        </div>
+                    </div>
+                    
+                    
+                    <form method="post">                        
+                        {% csrf_token %}
+
+                        <div class="form-floating mb-3">
+                            {{ form.email_username }}
+                            <label for="{{ form.email_username.id_for_label }}">{{ form.email_username.label }}</label>
+                        </div>
+                        
+                        <div class="form-floating mb-3">
+                            {{ form.password }}
+                            <label for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
+                            <button type="button" 
+                                class="btn toggle-password position-absolute top-50 end-0 translate-middle-y me-3 p-0" 
+                                data-target="password" 
+                                style="background: none; border: none; cursor: pointer;">
+                                <small>Show</small>
+                            </button>
+                        </div> 
+
+                        <div class="mb-3 text-end">
+                            <a href="{% url 'authentication:forgot_password' %}" class="forgot-pass" style="color: black; font-weight: 500;">Forgot Password?</a>
+                        </div>       
+
+                        <div class="input-group mb-3">
+                            <button type="submit" id="submit" name="submit" class="btn btn-submit btn-lg w-100 fs-6">Login</button>
+                        </div>
+                        
+                    </form>
+                    
+                </div>
+
+            </div>
+        
+        </div>
+    
+    </div>
+
+</body>
+</html>

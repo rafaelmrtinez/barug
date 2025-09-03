@@ -1,0 +1,36 @@
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+body > .container-fluid {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    min-height: calc(100vh - 50px - 50px - 50px);
+}
+
+/* Form Styling */
+.form-floating .form-control,
+.form-check-input,
+.form-select {
+    border: 2px solid black;
+    border-radius: 24px;
+}
+
+.form-floating label {
+    font-size: 14px;
+    color: gray;
+}
+
+.form-floating .form-control:focus,
+.form-check-input:focus,
+.form-select:focus {
+    border-color: var(--bs-danger-text-emphasis);
+    box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+    outline: none;
+}
+
+.form-check-input:checked {
+    accent-color: var(--bs-danger-text-emphasis);
+}

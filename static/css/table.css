@@ -1,0 +1,20 @@
+/* Table */
+
+.table{
+    font-size: 0.9rem;
+}
+
+.table thead {
+    border: 2px solid;
+}
+
+.table-row-height {
+    vertical-align: middle;
+}
+
+.table td:last-child,
+.table th:last-child {
+  white-space: nowrap;
+  width: 1%;           /* shrink to fit */
+  text-align: center;  /* or right if you prefer */
+}
