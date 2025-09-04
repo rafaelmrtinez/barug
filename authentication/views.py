@@ -1,3 +1,38 @@
 from django.shortcuts import render
+from .forms import LoginForm
+from .forms import ForgotPasswordForm
+from .forms import NewPasswordForm
+
+#need back-end for proper assignment
+user_fullname = 'lname, fname mname suffix'
+user_role = 'Clerk'
+
+user_role_template = user_role.lower().replace(' ', '_')
 
 # Create your views here.
+def login(request):
+    form = LoginForm()
+
+    return render(request, "authentication_index.html", {
+        'form' : form,
+    })
+
+def forgot_password(request):
+    form = ForgotPasswordForm()
+
+    return render(request, "forgot_password.html", {
+        'form' : form,
+    })
+
+def new_password(request):
+    form = NewPasswordForm()
+    
+    return render(request, "new_password.html", {
+        'form' : form,
+    })
+
+def email_sent(request):
+    return render(request, "email_sent.html")
+
+def email_confirmed(request):
+    return render(request, "email_confirmed.html")
