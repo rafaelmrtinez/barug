@@ -38,7 +38,10 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django_bootstrap5",
+    "django_bootstrap_icons",
     "authentication",
+    "clerk",
 ]
 
 MIDDLEWARE = [
@@ -59,6 +62,7 @@ TEMPLATES = [
         "DIRS": [
             BASE_DIR / "templates",
             BASE_DIR / "authentication/templates/authentication",
+            BASE_DIR / "clerk/templates/clerk",
         ],
         "APP_DIRS": True,
         "OPTIONS": {
@@ -122,7 +126,9 @@ USE_TZ = True
 STATIC_URL = "static/"
 
 STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, "static"),
     os.path.join(BASE_DIR, "authentication/static/authentication"),
+    os.path.join(BASE_DIR, "clerk/static/clerk"),
 ]
 
 # Default primary key field type
