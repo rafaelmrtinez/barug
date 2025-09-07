@@ -48,6 +48,12 @@ INSTALLED_APPS = [
     "resident",
     "bhw",
     "clerk",
+    "django_bootstrap5",
+    "django_bootstrap_icons",
+    "authentication",
+    "captain",
+    "clerk",
+    "resident",
 ]
 
 MIDDLEWARE = [
@@ -151,6 +157,14 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "resident/static/resident"),
     os.path.join(BASE_DIR, "bhw/static/bhw"),
     os.path.join(BASE_DIR, "clerk/static/clerk"),
+]
+
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, "static"),
+    os.path.join(BASE_DIR, "authentication/static/authentication"),
+    os.path.join(BASE_DIR, "captain/static/captain"),
+    os.path.join(BASE_DIR, "clerk/static/clerk"),
+    os.path.join(BASE_DIR, "resident/static/resident"),
 ]
 
 # Default primary key field type

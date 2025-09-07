@@ -36,12 +36,3 @@ def email_sent(request):
 
 def email_confirmed(request):
     return render(request, "email_confirmed.html")
-
-def temporary_password(request):
-    return render(request, 'temporary_password.html', {
-        'user_fullname': user_fullname,
-        'user_role': user_role,
-        'page_path': f'{user_role} / User Registration Log / Temporary Password',
-        'page_title': 'Temporary Password',
-        'user_role_template': user_role_template,
-    })

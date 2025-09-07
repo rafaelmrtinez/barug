@@ -270,30 +270,38 @@ class ResidentProfileform(forms.Form):
         required= True,
     )
     # SUPPORTING DOCUMENTS
+    type_of_id = forms.ChoiceField(
+        choices= [], 
+        widget=forms.Select(attrs={
+            'id' : 'type_of_id',
+            'class' : 'form-select',
+    }),
+        label= 'ID Type',
+        required= True,
+    )
+    front_id = forms.ImageField(
+        widget=forms.ClearableFileInput(attrs={
+            'id' : 'front_id',
+            'class' : 'form-control',
+    }),
+        label= 'Front of the ID',
+        required= True, 
+    )
+    back_id = forms.ImageField(
+        widget=forms.ClearableFileInput(attrs={
+            'id' : 'back_id',
+            'class' : 'form-control',
+    }),
+        label= 'Back of the ID',
+        required= True, 
+    )
     res_img = forms.ImageField(
         widget=forms.ClearableFileInput(attrs={
             'id' : 'res_img',
             'class' : 'form-control',
     }),
-        label= 'Resident Image',
-        required= False, #correct if wrong
-    )
-    type_of_doc = forms.ChoiceField(
-        choices= [], 
-        widget=forms.Select(attrs={
-            'id' : 'type_of_doc',
-            'class' : 'form-select',
-    }),
-        label= 'Type of Document',
-        required= False, #correct if wrong
-    )
-    proof_img = forms.ImageField(
-        widget=forms.ClearableFileInput(attrs={
-            'id' : 'proof_img',
-            'class' : 'form-control',
-    }),
-        label= 'Proof of Residency',
-        required= False, #correct if wrong
+        label= 'Selfie Holding the Valid ID',
+        required= True,
     )
 
 class HouseholdProfileForm(forms.Form):

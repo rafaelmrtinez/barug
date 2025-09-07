@@ -20,7 +20,11 @@ from django.urls import path, include
 from authentication import views as auth_view
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    path("", auth_view.login, name="login"),
+    path("authentication/", include("authentication.urls", namespace="authentication")),
+     path("captain/", include("captain.urls", namespace="captain")),
+    path("clerk/", include("clerk.urls", namespace="clerk")),
+    path("person/", include("resident.urls", namespace="resident")),
     path("", auth_view.login, name="login"),
     path("authentication/", include("authentication.urls", namespace="authentication")),
     path("event_logs/", include("event_logs.urls", namespace="event_logs")),
