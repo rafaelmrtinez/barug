@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "django_bootstrap5",
     "django_bootstrap_icons",
     "authentication",
+    "captain",
     "clerk",
     "resident",
 ]
@@ -63,6 +64,7 @@ TEMPLATES = [
         "DIRS": [
             BASE_DIR / "templates",
             BASE_DIR / "authentication/templates/authentication",
+            BASE_DIR / "captain/templates/captain",
             BASE_DIR / "clerk/templates/clerk",
             BASE_DIR / "resident/templates/resident",
         ],
@@ -130,6 +132,7 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
     os.path.join(BASE_DIR, "authentication/static/authentication"),
+    os.path.join(BASE_DIR, "captain/static/captain"),
     os.path.join(BASE_DIR, "clerk/static/clerk"),
     os.path.join(BASE_DIR, "resident/static/resident"),
 ]

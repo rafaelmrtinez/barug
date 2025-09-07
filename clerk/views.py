@@ -26,7 +26,7 @@ def review_approve(request):
     })
 
 def person_submission_dets(request, req_id):
-    return render(request, "resident/person_submission_dets.html", {
+    return render(request, "person/person_submission_dets.html", {
         'user_fullname' : user_fullname,
         'user_role' : user_role,
         'page_path' : f'{user_role} / Account Verification : {req_id}',
