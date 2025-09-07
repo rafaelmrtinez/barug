@@ -23,4 +23,5 @@ urlpatterns = [
     path("", auth_view.login, name="login"),
     path("authentication/", include("authentication.urls", namespace="authentication")),
     path("clerk/", include("clerk.urls", namespace="clerk")),
+    path("resident/", include("resident.urls", namespace="resident")),
 ]
