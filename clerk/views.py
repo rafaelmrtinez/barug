@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.core.paginator import Paginator
 from .forms import SearchVerificationRequest
+from .forms import BusinessDetails
 
 user_fullname = 'lname fname mname suffix'
 user_role = 'Clerk'
@@ -32,4 +33,15 @@ def person_submission_dets(request, req_id):
         'page_path' : f'{user_role} / Account Verification : {req_id}',
         'page_title' : f'Account Verification : {req_id}',
         'user_role_template' : user_role_template,
+    })
+
+def business_details(request):
+    form = BusinessDetails()
+    return render(request, "business/business_details.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Account Verification',
+        'page_title': 'Account Verification',
+        'user_role_template': user_role_template,
+        'form' : form,
     })
