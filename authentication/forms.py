@@ -54,3 +54,11 @@ class NewPasswordForm(forms.Form):
         label= 'Confirm your new password',
         required= True,
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Add Bootstrap invalid class if errors
+        for field in self.fields.values():
+            if self.errors.get(field.name):
+                existing_classes = field.widget.attrs.get("class", "")
+                field.widget.attrs["class"] = existing_classes + " is-invalid"

@@ -47,13 +47,8 @@ INSTALLED_APPS = [
     "event_logs",
     "resident",
     "bhw",
-    "clerk",
-    "django_bootstrap5",
-    "django_bootstrap_icons",
-    "authentication",
     "captain",
     "clerk",
-    "resident",
 ]
 
 MIDDLEWARE = [
@@ -64,6 +59,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "authentication.middleware.NoCacheMiddleware",
+    "authentication.middleware.AttachProfileMiddleware",  # <— add
 ]
 
 ROOT_URLCONF = "barug.urls"
@@ -85,6 +82,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "authentication.context_processors.auth_context",
             ],
         },
     },
@@ -136,13 +134,62 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {"class": "logging.StreamHandler"},
+    },
+    "loggers": {
+        # our views module (adjust if your file path differs)
+        "authentication.views": {
+            "handlers": ["console"],
+            "level": "DEBUG",          # show everything from DEBUG up
+            "propagate": False,
+        },
+        # optional: DB to see SQL errors clearly
+        "django.db.backends": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
+
+
 LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
+# TIME_ZONE = "UTC"
+# USE_I18N = True
+# USE_TZ = True
 
-USE_I18N = True
-
+# --- Timezone (PH) ---
+TIME_ZONE = "Asia/Manila"
 USE_TZ = True
+
+# --- Sessions ---
+SESSION_COOKIE_AGE = 60 * 60 * 8          # 8 hours
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False   # keep until age unless browser quits (your call)
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"           # consider "Strict" if your flows allow
+
+# Only set these True in production:
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
+# (Optional) HSTS in production
+SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD = not DEBUG
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "barug-local",
+        "TIMEOUT": 300,  # 5 minutes default
+    }
+}
 
 
 # Static files (CSS, JavaScript, Images)
