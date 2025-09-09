@@ -28,4 +28,5 @@ urlpatterns = [
     path("clerk/", include("clerk.urls", namespace="clerk")),
     path("person/", include("resident.urls", namespace="resident")),
     path("secretary/", include("secretary.urls", namespace="secretary")),
+    path("treasurer/", include("treasurer.urls", namespace="treasurer")),
 ]
