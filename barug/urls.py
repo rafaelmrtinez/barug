@@ -26,6 +26,7 @@ urlpatterns = [
     path("bhw/", include("bhw.urls", namespace="bhw")),
     path("captain/", include("captain.urls", namespace="captain")),
     path("clerk/", include("clerk.urls", namespace="clerk")),
+    path("lupon_pres/", include("lupon_pres.urls", namespace="lupon_pres")),
     path("person/", include("resident.urls", namespace="resident")),
     path("secretary/", include("secretary.urls", namespace="secretary")),
     path("treasurer/", include("treasurer.urls", namespace="treasurer")),
