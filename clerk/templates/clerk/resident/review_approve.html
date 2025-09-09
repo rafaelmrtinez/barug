@@ -16,17 +16,16 @@
     <div class="row">
       <div>
 
+        <!-- Use GET so the search is shareable and works with pagination -->
         <div class="col-md-4">
-            <form method="post">
-              {% csrf_token %}
-
-              <div class="form-floating mb-3">
-                  {{ form.search }}
-                  <label for="{{ form.search.id_for_label }}">{{ form.search.label }}</label>
-              </div>
+          <form method="get">
+            <div class="form-floating mb-3">
+              {{ form.search }}
+              <label for="{{ form.search.id_for_label }}">{{ form.search.label }}</label>
+            </div>
           </form>
         </div>
-        
+
         <table class="table">
           <thead>
             <tr>
@@ -36,37 +35,91 @@
               <th scope="col">Action</th>
             </tr>
           </thead>
-<tbody>
-  {% if page_obj.object_list %}
-    {% for req in page_obj.object_list %}
-      <tr class="table-row-height">
-        <td>
-          {{ req.requester_first_name }} {{ req.requester_middle_name }} {{ req.requester_last_name }} {{ req.requester_suffix }}
-        </td>
-        <td>{{ req.date_requested|date:"Y-m-d H:i" }}</td>
-        <td>{{ req.latest_status }}</td>
-        <td>
-          <div class="d-flex gap-1">
-            <a class="btn btn-icon"
-               href="{% url 'clerk:person_details' req_id=req.requester_person_id %}">
-              {% bs_icon 'person-lines-fill' size='1em' %}
-            </a>
-          </div>
-        </td>
-      </tr>
-    {% endfor %}
-  {% else %}
-    <tr><td colspan="4" class="text-center">No pending records</td></tr>
-  {% endif %}
-</tbody>
 
+          <tbody>
+            {% if page_obj.object_list %}
+              {% for req in page_obj.object_list %}
+                <tr class="table-row-height">
+                  <td>
+                    {{ req.requester_first_name }}
+                    {% if req.requester_middle_name %} {{ req.requester_middle_name }}{% endif %}
+                    {{ req.requester_last_name }}
+                    {% if req.requester_suffix %} {{ req.requester_suffix }}{% endif %}
+                  </td>
+
+                  <td>
+                    {# Format nicely; handle string or datetime #}
+                    {% with dr=req.date_requested %}
+                      {% if dr %}
+                        {{ dr|date:"M d, Y • h:i A" }}
+                      {% else %}
+                        —
+                      {% endif %}
+                    {% endwith %}
+                    {{ req.date_requested }}
+                  </td>
+
+                  <td>
+                    {% with s=req.latest_status|default:"PENDING"|upper %}
+                      {% if s == "APPROVED" %}
+                        <span class="badge text-bg-success">Approved</span>
+                      {% elif s == "DECLINED" or s == "REJECTED" %}
+                        <span class="badge text-bg-danger">Declined</span>
+                      {% else %}
+                        <span class="badge text-bg-warning text-dark">Pending</span>
+                      {% endif %}
+                    {% endwith %}
+                  </td>
+
+                  <td>
+                    <div class="d-flex gap-1">
+                      <a class="btn btn-icon"
+                         href="{% url 'clerk:person_details' req_id=req.requester_person_id %}"
+                         title="View details">
+                        {% bs_icon 'person-lines-fill' size='1em' %}
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="4" class="text-center">No pending records</td>
+              </tr>
+            {% endif %}
+          </tbody>
         </table>
       </div>
     </div>
   </div>
 
   {% if page_obj.has_other_pages %}
-    <div class="page-pagination"> 
+    <div class="page-pagination">
+      {# If your paginator partial reads querystring, you're set.
+         Otherwise, here's a simple inline example:
+
+      <nav aria-label="Page nav">
+        <ul class="pagination justify-content-center">
+          {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.previous_page_number }}&{{ request.GET.urlencode }}">
+                ‹ Prev
+              </a>
+            </li>
+          {% endif %}
+          <li class="page-item disabled"><span class="page-link">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+          </span></li>
+          {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode }}">
+                Next ›
+              </a>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
+      #}
       {% include 'paginator.html' %}
     </div>
   {% endif %}
