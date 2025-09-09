@@ -71,7 +71,7 @@ TEMPLATES = [
             BASE_DIR / "captain/templates/captain",
             BASE_DIR / "clerk/templates/clerk",
             BASE_DIR / "resident/templates/resident",
-            BASE_DIR / "secreatry/templates/secretary",
+            BASE_DIR / "secretary/templates/secretary",
             BASE_DIR / "staff_admin/templates/staff_admin",
         ],
         "APP_DIRS": True,

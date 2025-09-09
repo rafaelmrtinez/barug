@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+  <link rel="stylesheet" href="{% static 'css/button.css' %}">
+  <link rel="stylesheet" href="{% static 'css/form.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="min-vh-100 w-100 bg-white text-dark" style="margin-top:40px;">
+  <div class="sticky-top border-bottom bg-white">
+    <div class="container px-3 py-3">
+      <h3 class="fw-semibold">Account Management — Business Owners</h3>
+      <p class="mt-1 small text-muted">
+        Link a resident as a business owner by searching their record in the barangay system.
+      </p>
+    </div>
+  </div>
+
+  <div class="container px-3 py-4">
+    <section class="rounded-3 border bg-white p-4 shadow-sm">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <h2 class="fs-5 fw-semibold mb-0">Resident Owner Linking</h2>
+      </div>
+      <p class="small text-muted mb-4">
+        Search for a resident in the barangay records and assign them as the owner of a business.
+      </p>
+
+      <!-- Search (static mockup, not a form) -->
+      <div class="rounded-3 border bg-light p-3">
+        <label class="form-label small">Find Resident Record</label>
+        <div class="form-floating mb-3">
+          <input type="text" id="residentSearch" class="form-control form-control-sm"
+                 placeholder="Enter Resident ID or Full Name">
+          <label for="residentSearch">Enter Resident ID or Full Name</label>
+        </div>
+        <div class="form-text">Enter the Resident ID or name, then review the resident details below.</div>
+      </div>
+
+      <!-- Selected Resident Details (MOCK DATA) -->
+      <div class="mt-4">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <h5 class="card-title mb-1">DELA CRUZ, JUAN S.</h5>
+                <div class="small text-muted">P07-R123</div>
+              </div>
+              <span class="badge" style="background-color: var(--bs-danger-text-emphasis);">RESIDENT</span>
+            </div>
+
+            <hr class="my-3">
+
+            <div class="row g-3">
+               <div class="col-12 col-md-6">
+                <div class="small text-muted">Sex</div>
+                <div>Male</div>
+              </div>
+              <div class="col-12 col-md-6">
+                <div class="small text-muted">Date of Birth</div>
+                <div>1992-05-18</div>
+              </div>
+              <div class="col-12 col-md-6">
+                <div class="small text-muted">Address</div>
+                <div>Blk 12 Lot 4, Sitio Maligaya, Brgy. Sto. Niño, Calapan City, Oriental Mindoro</div>
+              </div>
+              <div class="col-12 col-md-6">
+                <div class="small text-muted">Civil Status</div>
+                <div>+63 917 555 1234</div>
+              </div>
+              <div class="col-12 col-md-6">
+                <div class="small text-muted">Nationality</div>
+                <div>juan.delacruz@example.com</div>
+              </div>
+              <div class="col-12 col-md-6">
+                <div class="small text-muted">Religion</div>
+                <div>juan.delacruz@example.com</div>
+              </div>
+              <div class="col-12 col-md-6">
+                <div class="small text-muted">Mobile</div>
+                <div>+63 917 555 1234</div>
+              </div>
+              <div class="col-12 col-md-6">
+                <div class="small text-muted">Email</div>
+                <div>juan.delacruz@example.com</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Optional: mock selection summary -->
+        <div class="alert alert-light border mt-3 mb-0">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="small">
+              <span class="text-muted">Selected Resident:</span>
+              <strong>DELA CRUZ, JUAN S. (P07-R123)</strong>
+            </div>
+            <a href="#" class="small text-decoration-none" style="color: var(--bs-danger-text-emphasis);">Change</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-3 button-container justify-content-end mb-2 d-flex gap-2">
+        <button type="button" class="btn btn-reset">Back</button>
+        <button type="button" class="btn btn-submit">Continue</button>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

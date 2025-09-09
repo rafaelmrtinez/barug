@@ -12,6 +12,17 @@ class SearchVerificationRequest(forms.Form):
         # required= False,
     )
 
+class SearchBusinessOwner(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control form-control-sm', 
+            'placeholder' : 'Search',
+    }),
+        label= 'Search by Resident ID or Full Name',
+        required= True,
+    )
+
 class BusinessDetails(forms.Form):
     b_name = forms.CharField(
         widget=forms.TextInput(attrs={
