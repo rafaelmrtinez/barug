@@ -9,10 +9,10 @@ from .forms import SearchVerificationRequest
 @role_required("Barangay Clerk")
 @nocache
 def review_approve(request):
-    # Debug: print session auth details in server logs
+    # Debug: print session auth details in server logs  
     auth = request.session.get("auth")
     print("🔐 Session auth payload:", auth)
-
+    profile = request.person_profile  # already attached
     # TODO: Replace this with your actual Supabase query for pending verifications
     pending = []
 
@@ -27,13 +27,14 @@ def review_approve(request):
         "page_title": "Account Verification",
         "page_obj": page_obj,
         "form": form,
+        "profile": profile,    # raw profile if you want to access other fields
         "auth": auth,   # also pass to template if you want
     })
 
 
 
 @session_login_required
-@role_required("Clerk")
+@role_required("Barangay Clerk")
 @nocache
 def person_submission_dets(request, req_id):
     return render(request, "person/person_submission_dets.html", {
