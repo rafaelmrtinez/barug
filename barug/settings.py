@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "bhw",
     "resident",
     "secretary",
+    "staff_admin",
 ]
 
 MIDDLEWARE = [
@@ -71,6 +72,7 @@ TEMPLATES = [
             BASE_DIR / "clerk/templates/clerk",
             BASE_DIR / "resident/templates/resident",
             BASE_DIR / "secreatry/templates/secretary",
+            BASE_DIR / "staff_admin/templates/staff_admin",
         ],
         "APP_DIRS": True,
         "OPTIONS": {
@@ -141,6 +143,7 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "clerk/static/clerk"),
     os.path.join(BASE_DIR, "resident/static/resident"),
     os.path.join(BASE_DIR, "secreatry/static/secretary"),
+    os.path.join(BASE_DIR, "staff_admin/static/staff_admin"),
 ]
 
 # Default primary key field type
