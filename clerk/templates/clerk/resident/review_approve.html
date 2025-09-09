@@ -36,22 +36,30 @@
               <th scope="col">Action</th>
             </tr>
           </thead>
-          <tbody>
-              <tr class="table-row-height">
-                <td>SHIT bag o ni {{ profile.first_name }}</td>
-                <td></td>
-                <td></td>
-                <td>
-                  <div class="d-flex gap-1">
-                    <a class="btn btn-icon"
-                       href="{% url 'clerk:person_details' req_id='RBSN00000' %}">
-                      {% bs_icon 'person-lines-fill' size='1em' %}
-                    </a>
-                  </div>
-                </td>
-              </tr>
-              <tr><td colspan="4" class="text-center">No pending for records</td></tr>
-          </tbody>
+<tbody>
+  {% if page_obj.object_list %}
+    {% for req in page_obj.object_list %}
+      <tr class="table-row-height">
+        <td>
+          {{ req.requester_first_name }} {{ req.requester_middle_name }} {{ req.requester_last_name }} {{ req.requester_suffix }}
+        </td>
+        <td>{{ req.date_requested|date:"Y-m-d H:i" }}</td>
+        <td>{{ req.latest_status }}</td>
+        <td>
+          <div class="d-flex gap-1">
+            <a class="btn btn-icon"
+               href="{% url 'clerk:person_details' req_id=req.requester_person_id %}">
+              {% bs_icon 'person-lines-fill' size='1em' %}
+            </a>
+          </div>
+        </td>
+      </tr>
+    {% endfor %}
+  {% else %}
+    <tr><td colspan="4" class="text-center">No pending records</td></tr>
+  {% endif %}
+</tbody>
+
         </table>
       </div>
     </div>
