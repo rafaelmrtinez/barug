@@ -58,8 +58,8 @@ def login(request):
             cache.set(rl_key, fail_count + 1, RATE_LIMIT_WINDOW)
 
             if "Account does not exist" in msg:
-                messages.error(request, "Account does not exist.")
-            elif "Wrong password" in msg or "Invalid password" in msg:
+                messages.error(request, "Invalid username or password.")
+            elif "Wrong password" in msg or "Incorrect password" in msg:
                 messages.error(request, "Invalid username or password.")
             elif "could not translate host name" in msg or "could not connect" in msg:
                 messages.error(request, "Login service is temporarily unavailable. Please try again.")
@@ -111,7 +111,14 @@ def login(request):
     return render(request, "authentication_index.html", {"form": form})
 
 def logout(request):
-    # Full session clear (also rotates session key)
+    # Clear session
+    auth = request.session.get("auth")
+    username = auth.get("username") if auth else None
+    ip = request.META.get("REMOTE_ADDR", "")
+    if username:
+        rl_key = f"login:rl:{ip}:{username.lower()}"
+        cache.delete(rl_key)  # clear rate-limit counter for this user/ip
+
     request.session.flush()
     messages.success(request, "You have been logged out.")
     return redirect("authentication:login")

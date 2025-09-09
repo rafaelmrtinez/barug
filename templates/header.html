@@ -29,12 +29,12 @@
                 <span class="navbar-text">{{ user_role }}</span>
             </div>
             <div class="d-flex align-items-center">
-                <form action="" method="post" class="m-0 p-0">
-                    {% csrf_token %}
-                    <button type="submit" id="logout" name="logout" class="btn btn-logout">
-                        {% bs_icon 'arrow-bar-right' color='white' size='1.3em' %}
-                    </button>
-                </form>
+              <form action="{% url 'authentication:logout' %}" method="post" class="m-0 p-0">
+                {% csrf_token %}
+                <button type="submit" id="logout" name="logout" class="btn btn-logout" title="Logout">
+                  {% bs_icon 'arrow-bar-right' color='white' size='1.3em' %}
+                </button>
+              </form>
             </div>
         </div>
     </div>
@@ -42,7 +42,7 @@
 <div class="modal fade" id="accountSettingsModal" tabindex="-1" aria-labelledby="accountSettingsLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content border-0 shadow-lg">
-      <div class="modal-header bg-dark text-white">
+      <div class="modal-header bg-gray text-white">
         <h5 class="modal-title d-flex align-items-center gap-2" id="accountSettingsLabel">
           {% bs_icon 'gear-fill' color='white' size='1.1em' %}
           Account Settings
@@ -52,9 +52,9 @@
 
       <div class="modal-body">
         <!-- Tabs -->
-        <ul class="nav nav-tabs mb-3" id="acctTabs" role="tablist">
+        <ul class="nav nav-tabs mb-3" id="acctTabs" role="tablist" style="color: black;">
           <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab" aria-controls="overview" aria-selected="true">
+            <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab" aria-controls="overview" aria-selected="true" style="color: black">
               Overview
             </button>
           </li>
@@ -85,10 +85,14 @@
           <div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview-tab">
             <div class="d-flex flex-wrap align-items-center gap-3 p-3 border rounded">
               <div>
-                <img id="acctAvatarPreview" src="{% static 'images/default-avatar.png' %}" alt="Avatar" class="rounded-circle border" style="width:72px;height:72px;object-fit:cover;">
+<img id="acctAvatarPreview" 
+     src="https://wkactspmojbvuzghmjcj.supabase.co/storage/v1/object/public/id-uploads/person/df2bd136-11c9-4136-9f59-6bb86e60143d/2x2%20pic.png" 
+     alt="Avatar" 
+     class="rounded-circle border" 
+     style="width:72px;height:72px;object-fit:cover;">
               </div>
               <div class="flex-grow-1">
-                <h6 class="mb-1">{{ user_fullname|default:"User" }}</h6>
+                <h6 class="mb-1" style="color: black">{{ user_fullname|default:"User" }}</h6>
                 <div class="small text-muted">
                   Role: <span class="badge bg-secondary">{{ user_role|default:"—" }}</span>
                 </div>
@@ -128,8 +132,8 @@
                       </h6>
                       <p class="small text-muted mb-2">Keep your account protected.</p>
                       <ul class="list-unstyled small mb-0">
-                        <li>2-Step Verification: <span class="badge bg-warning text-dark">Not set</span></li>
-                        <li>Password last changed: <span class="text-muted">—</span></li>
+                        <li>Valid id: <span class="badge text-bg-danger text-dark">{{ profile.is_id_valid }}</span></li>
+                        <li>Email: <span class="badge text-bg-danger text-dark">   {{ profile.is_email_verified }}</span></li>
                       </ul>
                     </div>
                   </div>
@@ -296,12 +300,30 @@
         </div>
       </div>
 
-      <div class="modal-footer">
-        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-primary">Done</button>
-      </div>
+
     </div>
   </div>
 </div>
+<style>
+  /* Force the tab bar background and buttons to be visible */
+  #accountSettingsModal .nav-tabs {
+    background-color: #fff !important;
+    border-radius: 0.5rem;
+    padding: 0.25rem;
+  }
+
+  #accountSettingsModal .nav-tabs .nav-link {
+    color: #000 !important;       /* black text */
+    background-color: #fff !important;
+    border: 1px solid #dee2e6 !important;
+    margin-right: 4px;
+  }
+
+  #accountSettingsModal .nav-tabs .nav-link.active {
+    background-color: #b9696967 !important; /* Bootstrap blue */
+    color: #000000 !important;
+    border-color: #4d0c0c67 !important;
+  }
+</style>
 
 </header>
