@@ -22,6 +22,7 @@ from authentication import views as auth_view
 urlpatterns = [
     path("", auth_view.login, name="login"),
     path("authentication/", include("authentication.urls", namespace="authentication")),
+    path("bhw/", include("bhw.urls", namespace="bhw")),
     path("captain/", include("captain.urls", namespace="captain")),
     path("clerk/", include("clerk.urls", namespace="clerk")),
     path("person/", include("resident.urls", namespace="resident")),
