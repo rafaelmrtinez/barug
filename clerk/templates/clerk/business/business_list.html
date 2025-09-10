@@ -14,15 +14,49 @@
 
   <div class="container-fluid pt-3 page-main" style="margin-top: 40px;">
     <div class="row">
+    <div class="d-flex align-items-center gap-3 mb-2 flex-wrap">
+      <!-- Filters Form -->
+      <form method="get" class="d-flex gap-2 flex-wrap flex-grow-1">
+        <div class="form-floating flex-fill">
+          {{ form.search }}
+          <label for="{{ form.search.id_for_label }}">{{ form.search.label }}</label>
+        </div>
+
+        <div class="form-floating flex-fill">
+          {{ form.b_type }}
+          <label for="{{ form.b_type.id_for_label }}">{{ form.b_type.label }}</label>
+        </div>
+
+        <div class="form-floating flex-fill">
+          {{ form.ownership_type }}
+          <label for="{{ form.ownership_type.id_for_label }}">{{ form.ownership_type.label }}</label>
+        </div>
+
+        <div class="form-floating flex-fill">
+          {{ form.status }}
+          <label for="{{ form.status.id_for_label }}">{{ form.status.label }}</label>
+        </div>
+      </form>
+
+      <!-- Add Business button (outside form) -->
+      <div>
+        <a class="btn btn-submit btn-sm" href="{% url 'clerk:business_owner' %}">
+          Add Business
+        </a>
+      </div>
+    </div>
+
+
       <div class="table-responsive">
         <table class="table align-middle">
           <thead>
             <tr>
               <th scope="col">Business Name</th>
-              <th scope="col">Owner</th>
               <th scope="col">Type</th>
               <th scope="col">Nature</th>
-              <th scope="col">Date Established</th>
+              <th scope="col">Owner</th>
+              <th scope="col">Business Address</th>
+              <th scope="col">Status</th>
               <th scope="col" class="text-end">Action</th>
             </tr>
           </thead>
@@ -33,42 +67,11 @@
               <td>Juan Dela Cruz</td>
               <td>Micro Enterprise</td>
               <td>Retail — General Merchandise</td>
-              <td>2018-03-10</td>
+              <td>Retail — General Merchandise</td>
+              <td>Status</td>
               <td class="text-end">
                 <div class="d-inline-flex gap-1">
-                  <a class="btn btn-icon" href="#">
-                    {% bs_icon 'person-lines-fill' size='1em' %}
-                  </a>
-                </div>
-              </td>
-            </tr>
-
-            <!-- Example Row 2 -->
-            <tr class="table-row-height">
-              <td>Garcia Printing Services</td>
-              <td>Maria Garcia</td>
-              <td>Small Enterprise</td>
-              <td>Printing Services</td>
-              <td>2020-07-15</td>
-              <td class="text-end">
-                <div class="d-inline-flex gap-1">
-                  <a class="btn btn-icon" href="#">
-                    {% bs_icon 'person-lines-fill' size='1em' %}
-                  </a>
-                </div>
-              </td>
-            </tr>
-
-            <!-- Example Row 3 -->
-            <tr class="table-row-height">
-              <td>Santos Auto Repair</td>
-              <td>Carlos Santos</td>
-              <td>Micro Enterprise</td>
-              <td>Automotive Repair</td>
-              <td>2015-11-25</td>
-              <td class="text-end">
-                <div class="d-inline-flex gap-1">
-                  <a class="btn btn-icon" href="#">
+                  <a class="btn btn-icon" href="{% url 'clerk:business_information' %}">
                     {% bs_icon 'person-lines-fill' size='1em' %}
                   </a>
                 </div>

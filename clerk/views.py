@@ -3,12 +3,22 @@ from django.core.paginator import Paginator
 from .forms import SearchVerificationRequest
 from .forms import SearchBusinessOwner
 from .forms import BusinessDetails
+from .forms import BusinessFilters
 
 user_fullname = 'lname fname mname suffix'
-user_role = 'Clerk'
+user_role = 'Barangay Clerk'
 user_role_template = user_role.lower().replace(' ', '_')
 
 # Create your views here.
+def dashboard(request):
+    return render(request, "dashboard.html", {
+        'user_fullname' : user_fullname,
+        'user_role' : user_role,
+        'page_path' : f'{user_role} / Account Verification',
+        'page_title' : f'Account Verification' ,
+        'user_role_template' : user_role_template,
+    })
+
 def review_approve(request):
     pending = []
     paginator = Paginator(pending, 10)  # 10 per page
@@ -17,7 +27,7 @@ def review_approve(request):
 
     form = SearchVerificationRequest()
 
-    return render(request, "resident/review_approve.html", {
+    return render(request, "resident/identity_verification_list.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
         'page_path': f'{user_role} / Account Verification',
@@ -68,12 +78,14 @@ def business_details(request):
     })
 
 def business_list(request):
+    form = BusinessFilters()
     return render(request, "business/business_list.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
         'page_path': f'{user_role} / Account Verification',
         'page_title': 'Account Verification',
         'user_role_template': user_role_template,
+        'form' : form,
     })
 
 def business_information(request):

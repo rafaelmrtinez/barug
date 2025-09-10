@@ -12,11 +12,49 @@ class SearchVerificationRequest(forms.Form):
         # required= False,
     )
 
+class BusinessFilters(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search',
+        }),
+        label= 'Search',
+        required= False,
+    )
+    b_type = forms.ChoiceField(
+        choices= [],
+        widget=forms.Select(attrs={
+            'id' : 'b_type',
+            'class' : 'form-select',
+        }),
+        label= 'Business Type',
+        required= False,
+    )
+    ownership_type = forms.ChoiceField(
+        choices= [],
+        widget=forms.Select(attrs={
+            'id' : 'ownership_type',
+            'class' : 'form-select',
+        }),
+        label= 'Ownership Type',
+        required= False,
+    )
+    status = forms.ChoiceField(
+        choices= [],
+        widget=forms.Select(attrs={
+            'id' : 'status',
+            'class' : 'form-select',
+        }),
+        label= 'Status',
+        required= False,
+    )
+
 class SearchBusinessOwner(forms.Form):
     search = forms.CharField(
         widget=forms.TextInput(attrs={
             'id' : 'search',
-            'class' : 'form-control form-control-sm', 
+            'class' : 'form-control', 
             'placeholder' : 'Search',
     }),
         label= 'Search by Resident ID or Full Name',
