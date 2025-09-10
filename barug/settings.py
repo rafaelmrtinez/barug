@@ -49,6 +49,13 @@ INSTALLED_APPS = [
     "bhw",
     "captain",
     "clerk",
+    "lupon_mem",
+    "lupon_pres",
+    "bhw",
+    "resident",
+    "secretary",
+    "staff_admin",
+    "treasurer",
 ]
 
 MIDDLEWARE = [
@@ -71,10 +78,15 @@ TEMPLATES = [
         "DIRS": [
             BASE_DIR / "templates",
             BASE_DIR / "authentication/templates/authentication",
-            BASE_DIR / "event_logs/templates/event_logs",
-            BASE_DIR / "resident/templates/resident",
             BASE_DIR / "bhw/templates/bhw",
+            BASE_DIR / "captain/templates/captain",
             BASE_DIR / "clerk/templates/clerk",
+            BASE_DIR / "lupon_mem/templates/lupon_mem",
+            BASE_DIR / "lupon_pres/templates/lupon_pres",
+            BASE_DIR / "resident/templates/resident",
+            BASE_DIR / "secretary/templates/secretary",
+            BASE_DIR / "staff_admin/templates/staff_admin",
+            BASE_DIR / "treasurer/templates/treasurer",
         ],
         "APP_DIRS": True,
         "OPTIONS": {
@@ -215,9 +227,15 @@ STATICFILES_DIRS = [
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
     os.path.join(BASE_DIR, "authentication/static/authentication"),
+    os.path.join(BASE_DIR, "bhw/static/bhw"),
     os.path.join(BASE_DIR, "captain/static/captain"),
     os.path.join(BASE_DIR, "clerk/static/clerk"),
+    os.path.join(BASE_DIR, "lupon_mem/static/lupon_mem"),
+    os.path.join(BASE_DIR, "lupon_pres/static/lupon_pres"),
     os.path.join(BASE_DIR, "resident/static/resident"),
+    os.path.join(BASE_DIR, "secreatry/static/secretary"),
+    os.path.join(BASE_DIR, "staff_admin/static/staff_admin"),
+    os.path.join(BASE_DIR, "treasurer/static/treasurer"),
 ]
 
 # Default primary key field type

@@ -37,6 +37,7 @@
           </thead>
 
           <tbody>
+<<<<<<< HEAD:clerk/templates/clerk/resident/review_approve.html
             {% if page_obj.object_list %}
               {% for req in page_obj.object_list %}
                 <tr class="table-row-height">
@@ -85,6 +86,20 @@
             {% else %}
               <tr>
                 <td colspan="4" class="text-center">No pending records</td>
+=======
+              <tr class="table-row-height">
+                <td></td>
+                <td></td>
+                <td></td>
+                <td>
+                  <div class="d-flex gap-1">
+                    <a class="btn btn-icon"
+                       href="{% url 'clerk:person_details' per_id='RBSN00000' %}">
+                      {% bs_icon 'person-lines-fill' size='1em' %}
+                    </a>
+                  </div>
+                </td>
+>>>>>>> 5f46ce9284977f554d2d1bc541bc6a438c3f0b62:clerk/templates/clerk/resident/identity_verification_list.html
               </tr>
             {% endif %}
           </tbody>
