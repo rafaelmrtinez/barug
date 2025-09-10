@@ -16,7 +16,7 @@ def auth_context(request):
     )
 
     return {
-        "user_id": auth.get("user_id", 0),
+        "staff_id": auth.get("staff_id", 0),
         "user_fullname": user_fullname.strip(),
         "user_role": role_name,
         "user_role_template": role_name.lower().replace(" ", "_") if role_name else "",

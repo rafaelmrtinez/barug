@@ -93,8 +93,8 @@
           </div>
           <div>
             <div class="section-title mb-1">Status</div>
-            <div>{% bs_icon 'reception-2' size='1.2em' %}
-              <b>{{ person.civil_status }} TO BE ADDED</b>
+            <div>
+              <b>{{ person.latest_status }}</b>
             </div>
           </div>
         </div>
@@ -128,11 +128,11 @@
         <div class="col-md-6">
           <div class="section-title mb-2">Socioeconomic Information</div>
           <div class="kv">
-            <div class="kv-item"><span class="kv-key">Educational Attainment</span><span class="kv-val">{{ person.educ_attainment }}</span></div>
+            <div class="kv-item"><span class="kv-key">Educational Attainment</span><span class="kv-val">{{ person.educational_attainment }}</span></div>
             <div class="kv-item"><span class="kv-key">Employment Status</span><span class="kv-val">{{ person.employment_status }}</span></div>
             <div class="kv-item"><span class="kv-key">Occupation</span><span class="kv-val">{{ person.occupation }}</span></div>
-            <div class="kv-item"><span class="kv-key">Monthly Personal Income</span><span class="kv-val">{{ person.income }}</span></div>
-            <div class="kv-item"><span class="kv-key">Government Program</span><span class="kv-val">{{ person.gov_program }}</span></div>
+            <div class="kv-item"><span class="kv-key">Monthly Personal Income</span><span class="kv-val">{{ person.monthly_personal_income}}</span></div>
+            <div class="kv-item"><span class="kv-key">Government Program</span><span class="kv-val">{{ person.government_program }}</span></div>
           </div>
 
           <div class="section-title mb-2 pt-4">Supporting Document</div>

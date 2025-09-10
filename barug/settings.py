@@ -51,8 +51,6 @@ INSTALLED_APPS = [
     "clerk",
     "lupon_mem",
     "lupon_pres",
-    "bhw",
-    "resident",
     "secretary",
     "staff_admin",
     "treasurer",

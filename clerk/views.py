@@ -17,6 +17,19 @@ STATUS_APPROVED = 3
 STATUS_REJECTED = 4
 STATUS_DECLINE  = 7
 
+
+@session_login_required
+@role_required("Barangay Clerk")
+@nocache
+def dashboard(request):
+    auth = request.session.get("auth")
+    
+    return render(request, "dashboard.html", {
+        "auth": auth,
+        'page_title' : 'Dashboard' ,
+    })
+
+
 @session_login_required
 @role_required("Barangay Clerk")
 @nocache
@@ -42,7 +55,7 @@ def review_approve(request):
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
-    return render(request, "resident/review_approve.html", {
+    return render(request, "resident/identity_verification_list.html", {
         "page_path": "Barangay Clerk / Account Verification",
         "page_title": "Account Verification",
         "page_obj": page_obj,
@@ -164,6 +177,11 @@ def decision_request(request, req_id: int):
             messages.warning(request, "This request cannot be updated right now.")
 
     return redirect("clerk:person_details", req_id=req_id)
+
+
+
+
+# to be modified
 
 def business_owner(request):
     return render(request, "business/business_owner.html", {

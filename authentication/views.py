@@ -20,7 +20,7 @@ def _get_client_ip(request):
 
 def _role_home(role_name: str) -> str:
     role = (role_name or "").lower()
-    if role == "barangay clerk": return "clerk:review_request"
+    if role == "barangay clerk": return "clerk:dashboard"
     if role == "captain": return "captain:dashboard"
     if role == "bhw": return "bhw:dashboard"
     logger.debug("Role not matched, falling back to resident: %s", role)
@@ -90,7 +90,7 @@ def login(request):
             "first_name": first_name,
             "last_name": last_name,
             "middle_name": middle_name,
-            "role_name": role_name,
+            "role_name": "Barangay Health Worker",
             "username": username,
             "display_name": "",
             "login_at": timezone.now().isoformat(),
