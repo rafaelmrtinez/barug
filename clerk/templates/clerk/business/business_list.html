@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <div class="container-fluid pt-3 page-main" style="margin-top: 40px;">
+    <div class="row">
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th scope="col">Business Name</th>
+              <th scope="col">Owner</th>
+              <th scope="col">Type</th>
+              <th scope="col">Nature</th>
+              <th scope="col">Date Established</th>
+              <th scope="col" class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Example Row 1 -->
+            <tr class="table-row-height">
+              <td>Dela Cruz Sari-Sari Store</td>
+              <td>Juan Dela Cruz</td>
+              <td>Micro Enterprise</td>
+              <td>Retail — General Merchandise</td>
+              <td>2018-03-10</td>
+              <td class="text-end">
+                <div class="d-inline-flex gap-1">
+                  <a class="btn btn-icon" href="#">
+                    {% bs_icon 'person-lines-fill' size='1em' %}
+                  </a>
+                </div>
+              </td>
+            </tr>
+
+            <!-- Example Row 2 -->
+            <tr class="table-row-height">
+              <td>Garcia Printing Services</td>
+              <td>Maria Garcia</td>
+              <td>Small Enterprise</td>
+              <td>Printing Services</td>
+              <td>2020-07-15</td>
+              <td class="text-end">
+                <div class="d-inline-flex gap-1">
+                  <a class="btn btn-icon" href="#">
+                    {% bs_icon 'person-lines-fill' size='1em' %}
+                  </a>
+                </div>
+              </td>
+            </tr>
+
+            <!-- Example Row 3 -->
+            <tr class="table-row-height">
+              <td>Santos Auto Repair</td>
+              <td>Carlos Santos</td>
+              <td>Micro Enterprise</td>
+              <td>Automotive Repair</td>
+              <td>2015-11-25</td>
+              <td class="text-end">
+                <div class="d-inline-flex gap-1">
+                  <a class="btn btn-icon" href="#">
+                    {% bs_icon 'person-lines-fill' size='1em' %}
+                  </a>
+                </div>
+              </td>
+            </tr>
+
+            <!-- If no records -->
+            <tr>
+              <td colspan="7" class="text-center py-4 text-muted">No businesses found</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

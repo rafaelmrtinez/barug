@@ -66,3 +66,21 @@ def business_details(request):
         'user_role_template': user_role_template,
         'form' : form,
     })
+
+def business_list(request):
+    return render(request, "business/business_list.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Account Verification',
+        'page_title': 'Account Verification',
+        'user_role_template': user_role_template,
+    })
+
+def business_information(request):
+    return render(request, "business/business_information.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Account Verification',
+        'page_title': 'Account Verification',
+        'user_role_template': user_role_template,
+    })
