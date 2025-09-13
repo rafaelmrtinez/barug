@@ -20,11 +20,15 @@ from django.urls import path, include
 from authentication import views as auth_view
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
     path("", auth_view.login, name="login"),
+    path("admin/", include("staff_admin.urls", namespace="staff_admin")),
     path("authentication/", include("authentication.urls", namespace="authentication")),
-    path("event_logs/", include("event_logs.urls", namespace="event_logs")),
-    path("resident/", include("resident.urls", namespace="resident")),
     path("bhw/", include("bhw.urls", namespace="bhw")),
+    path("captain/", include("captain.urls", namespace="captain")),
     path("clerk/", include("clerk.urls", namespace="clerk")),
+    path("lupon_mem/", include("lupon_mem.urls", namespace="lupon_mem")),
+    path("lupon_pres/", include("lupon_pres.urls", namespace="lupon_pres")),
+    path("person/", include("resident.urls", namespace="resident")),
+    path("secretary/", include("secretary.urls", namespace="secretary")),
+    path("treasurer/", include("treasurer.urls", namespace="treasurer")),
 ]

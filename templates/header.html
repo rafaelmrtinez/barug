@@ -5,7 +5,8 @@
 <header class="text-white">
     <div class="d-flex flex-wrap justify-content-between align-items-center">
         <div class="mt-2 ">
-            <img src="{% static 'images/brgy-sto-nino.png' %}" alt="Barangay Sto. Niño" class="img-fluid pe-2" style="max-height: 40px;">
+            <img src="{% static 'images/brgy-sto-nino.png' %}" alt="Barangay Sto. Niño" class="img-fluid pe-2"
+                style="max-height: 40px;">
             <span class="navbar-brand">Barangay Sto. Niño</span>
         </div>
         <div class="d-flex align-items-center gap-2">
@@ -13,26 +14,316 @@
                 <button class="btn pe-0">
                     {% bs_icon 'bell-fill' color='white' size='1.2em' %}
                 </button>
-                    
-                <button class="btn">
+
+                <button class="btn" type="button" data-bs-toggle="modal" data-bs-target="#accountSettingsModal"
+                    aria-label="Open account settings">
                     {% bs_icon 'person-fill' color='white' size='1.3em' %}
                 </button>
+
             </div>
             <div class="user text-end">
-                <span class="navbar-text">{{ user_fullname }}</span>
+                <span class="navbar-text">{{ user_fullname }} {{ staff_id }}</span>
             </div>
             <span class="navbar-text d-none d-sm-inline"> - </span>
             <div class="user-type text-end">
                 <span class="navbar-text">{{ user_role }}</span>
             </div>
             <div class="d-flex align-items-center">
-                <form action="" method="post" class="m-0 p-0">
-                    {% csrf_token %}
-                    <button type="submit" id="logout" name="logout" class="btn btn-logout">
-                        {% bs_icon 'arrow-bar-right' color='white' size='1.3em' %}
-                    </button>
-                </form>
-            </div>                
+              <form action="{% url 'authentication:logout' %}" method="post" class="m-0 p-0">
+                {% csrf_token %}
+                <button type="submit" id="logout" name="logout" class="btn btn-logout" title="Logout">
+                  {% bs_icon 'arrow-bar-right' color='white' size='1.3em' %}
+                </button>
+              </form>
+            </div>
         </div>
     </div>
-</header>  
+    <!-- Account Settings Modal -->
+<div class="modal fade" id="accountSettingsModal" tabindex="-1" aria-labelledby="accountSettingsLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title d-flex align-items-center gap-2" id="accountSettingsLabel">
+          {% bs_icon 'gear-fill' color='white' size='1.1em' %}
+          Account Settings
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-3" id="acctTabs" role="tablist" style="color: black;">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab" aria-controls="overview" aria-selected="true" style="color: black">
+              Overview
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile" type="button" role="tab" aria-controls="profile" aria-selected="false">
+              Profile
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="security-tab" data-bs-toggle="tab" data-bs-target="#security" type="button" role="tab" aria-controls="security" aria-selected="false">
+              Security
+            </button>
+          </li>
+          <!-- <li class="nav-item" role="presentation">
+            <button class="nav-link" id="preferences-tab" data-bs-toggle="tab" data-bs-target="#preferences" type="button" role="tab" aria-controls="preferences" aria-selected="false">
+              Preferences
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="sessions-tab" data-bs-toggle="tab" data-bs-target="#sessions" type="button" role="tab" aria-controls="sessions" aria-selected="false">
+              Sessions
+            </button>
+          </li> -->
+        </ul>
+
+        <div class="tab-content" id="acctTabsContent">
+          <!-- Overview -->
+          <div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview-tab">
+            <div class="d-flex flex-wrap align-items-center gap-3 p-3 border rounded">
+              <div>
+<img id="acctAvatarPreview" 
+     src="https://wkactspmojbvuzghmjcj.supabase.co/storage/v1/object/public/id-uploads/person/df2bd136-11c9-4136-9f59-6bb86e60143d/2x2%20pic.png" 
+     alt="Avatar" 
+     class="rounded-circle border" 
+     style="width:72px;height:72px;object-fit:cover;">
+              </div>
+              <div class="flex-grow-1">
+                <h6 class="mb-1" style="color: black">{{ user_fullname|default:"User" }}</h6>
+                <div class="small text-muted">
+                  Role: <span class="badge bg-secondary">{{ user_role|default:"—" }}</span>
+                </div>
+              </div>
+              <div>
+                <label class="btn btn-outline-secondary btn-sm mb-0">
+                  {% bs_icon 'camera-fill' size='1em' %}
+                  Change photo
+                  <input type="file" id="acctAvatarInput" accept="image/*" hidden>
+                </label>
+              </div>
+            </div>
+
+            <div class="mt-3">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <div class="card h-100">
+                    <div class="card-body">
+                      <h6 class="card-title d-flex align-items-center gap-2">
+                        {% bs_icon 'person-badge-fill' size='1em' %}
+                        Basic Info
+                      </h6>
+                      <p class="small text-muted mb-2">Quick glance of your details.</p>
+                      <ul class="list-unstyled small mb-0">
+                        <li><strong>Name:</strong> {{ user_fullname|default:"—" }}</li>
+                        <li><strong>Role:</strong> {{ user_role|default:"—" }}</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="card h-100">
+                    <div class="card-body">
+                      <h6 class="card-title d-flex align-items-center gap-2">
+                        {% bs_icon 'shield-lock-fill' size='1em' %}
+                        Security Status
+                      </h6>
+                      <p class="small text-muted mb-2">Keep your account protected.</p>
+                      <ul class="list-unstyled small mb-0">
+                        <li>Valid id: <span class="badge text-bg-danger text-dark">{{ profile.is_id_valid }}</span></li>
+                        <li>Email: <span class="badge text-bg-danger text-dark">   {{ profile.is_email_verified }}</span></li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Profile -->
+          <div class="tab-pane fade" id="profile" role="tabpanel" aria-labelledby="profile-tab">
+            <form action="#" method="post" class="mt-2">
+              {% csrf_token %}
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">First name</label>
+                  <input type="text" class="form-control" name="first_name" placeholder="e.g., Juan">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Last name</label>
+                  <input type="text" class="form-control" name="last_name" placeholder="e.g., Dela Cruz">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Display name</label>
+                  <input type="text" class="form-control" name="display_name" placeholder="Shown in app">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Contact number</label>
+                  <input type="text" class="form-control" name="phone" placeholder="+63 9xx xxx xxxx">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Email</label>
+                  <input type="email" class="form-control" name="email" placeholder="you@example.com">
+                </div>
+              </div>
+
+              <div class="d-flex justify-content-end gap-2 mt-3">
+                <button type="reset" class="btn btn-light">Reset</button>
+                <button type="submit" class="btn btn-primary">Save changes</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Security -->
+          <div class="tab-pane fade" id="security" role="tabpanel" aria-labelledby="security-tab">
+            <form action="#" method="post" class="mt-2">
+              {% csrf_token %}
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label">Current password</label>
+                  <div class="input-group">
+                    <input type="password" class="form-control" id="currPwd" name="current_password" placeholder="••••••••">
+                    <button class="btn btn-outline-secondary" type="button" data-toggle-pwd="#currPwd" aria-label="Show password">
+                      {% bs_icon 'eye-slash' %}
+                    </button>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">New password</label>
+                  <div class="input-group">
+                    <input type="password" class="form-control" id="newPwd" name="new_password" placeholder="New password">
+                    <button class="btn btn-outline-secondary" type="button" data-toggle-pwd="#newPwd" aria-label="Show password">
+                      {% bs_icon 'eye-slash' %}
+                    </button>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Confirm new password</label>
+                  <div class="input-group">
+                    <input type="password" class="form-control" id="confirmPwd" name="confirm_password" placeholder="Repeat new password">
+                    <button class="btn btn-outline-secondary" type="button" data-toggle-pwd="#confirmPwd" aria-label="Show password">
+                      {% bs_icon 'eye-slash' %}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-check form-switch mt-3">
+                <input class="form-check-input" type="checkbox" role="switch" id="twoFactor">
+                <label class="form-check-label" for="twoFactor">Enable 2-Step Verification (placeholder)</label>
+              </div>
+
+              <div class="d-flex justify-content-end gap-2 mt-3">
+                <button type="reset" class="btn btn-light">Reset</button>
+                <button type="submit" class="btn btn-success">Update security</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Preferences -->
+          <div class="tab-pane fade" id="preferences" role="tabpanel" aria-labelledby="preferences-tab">
+            <form action="#" method="post" class="mt-2">
+              {% csrf_token %}
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Theme</label>
+                  <select class="form-select" name="theme">
+                    <option value="system">System default</option>
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Language</label>
+                  <select class="form-select" name="language">
+                    <option value="en">English</option>
+                    <option value="fil">Filipino</option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="emailNotif">
+                    <label class="form-check-label" for="emailNotif">
+                      Email notifications (placeholder)
+                    </label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="smsNotif">
+                    <label class="form-check-label" for="smsNotif">
+                      SMS notifications (placeholder)
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="d-flex justify-content-end gap-2 mt-3">
+                <button type="reset" class="btn btn-light">Reset</button>
+                <button type="submit" class="btn btn-primary">Save preferences</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Sessions -->
+          <div class="tab-pane fade" id="sessions" role="tabpanel" aria-labelledby="sessions-tab">
+            <div class="table-responsive mt-2">
+              <table class="table align-middle">
+                <thead>
+                  <tr>
+                    <th>Device</th>
+                    <th>Location</th>
+                    <th>Last active</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Chrome • Windows</td>
+                    <td>Cebu City, PH</td>
+                    <td>Just now</td>
+                    <td><button class="btn btn-sm btn-outline-danger" disabled>Sign out</button></td>
+                  </tr>
+                  <tr>
+                    <td>Chrome • Android</td>
+                    <td>—</td>
+                    <td>2 days ago</td>
+                    <td><button class="btn btn-sm btn-outline-danger">Sign out</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="d-flex justify-content-end">
+              <button class="btn btn-outline-danger btn-sm">Sign out of all other sessions</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+    </div>
+  </div>
+</div>
+<style>
+  /* Force the tab bar background and buttons to be visible */
+  #accountSettingsModal .nav-tabs {
+    background-color: #fff !important;
+    border-radius: 0.5rem;
+    padding: 0.25rem;
+  }
+
+  #accountSettingsModal .nav-tabs .nav-link {
+    color: #000 !important;       /* black text */
+    background-color: #fff !important;
+    border: 1px solid #dee2e6 !important;
+    margin-right: 4px;
+  }
+
+  #accountSettingsModal .nav-tabs .nav-link.active {
+    background-color: #b9696967 !important; /* Bootstrap blue */
+    color: #000000 !important;
+    border-color: #4d0c0c67 !important;
+  }
+</style>
+
+</header>

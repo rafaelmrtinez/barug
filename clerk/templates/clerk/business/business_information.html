@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+  <link rel="stylesheet" href="{% static 'css/button.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="margin-top:40px;">
+  <div class="row g-4">
+
+    <!-- Business Owner Details -->
+    <div class="col-12">
+      <div class="card shadow-sm rounded-3">
+        <div class="card-body">
+          <h5 class="card-title d-flex align-items-center gap-2">
+            <i class="bi bi-person-fill text-primary"></i>
+            Business Owner Details
+          </h5>
+
+          <div class="mt-4">
+            <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                <h5 class="card-title mb-1">DELA CRUZ, JUAN S.</h5>
+                <div class="small text-muted">P07-R123</div>
+                </div>
+                <span class="badge" style="background-color: var(--bs-danger-text-emphasis);">RESIDENT</span>
+            </div>
+
+            <hr class="my-3">
+
+            <div class="row g-3">
+                <div class="col-12 col-md-6">
+                <div class="small text-muted">Sex</div>
+                <div>Male</div>
+                </div>
+                <div class="col-12 col-md-6">
+                <div class="small text-muted">Date of Birth</div>
+                <div>1992-05-18</div>
+                </div>
+                <div class="col-12 col-md-6">
+                <div class="small text-muted">Address</div>
+                <div>Blk 12 Lot 4, Sitio Maligaya, Brgy. Sto. Niño, Calapan City, Oriental Mindoro</div>
+                </div>
+                <div class="col-12 col-md-6">
+                <div class="small text-muted">Civil Status</div>
+                <div>Married</div>
+                </div>
+                <div class="col-12 col-md-6">
+                <div class="small text-muted">Nationality</div>
+                <div>Filipino</div>
+                </div>
+                <div class="col-12 col-md-6">
+                <div class="small text-muted">Religion</div>
+                <div>Roman Catholic</div>
+                </div>
+                <div class="col-12 col-md-6">
+                <div class="small text-muted">Mobile</div>
+                <div>+63 917 555 1234</div>
+                </div>
+                <div class="col-12 col-md-6">
+                <div class="small text-muted">Email</div>
+                <div>juan.delacruz@example.com</div>
+                </div>
+            </div>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Business Details -->
+    <div class="col-12">
+      <div class="card shadow-sm rounded-3">
+        <div class="card-body">
+          <h5 class="card-title d-flex align-items-center gap-2">
+            <i class="bi bi-briefcase-fill text-success"></i>
+            Business Details
+          </h5>
+
+          <div class="row mt-3 g-3">
+            <div class="col-md-6">
+              <small class="text-muted">Business Name</small>
+              <p class="fw-semibold mb-0">Dela Cruz Sari-Sari Store</p>
+            </div>
+            <div class="col-md-6">
+              <small class="text-muted">Business Type</small>
+              <p class="fw-semibold mb-0">Micro Enterprise</p>
+            </div>
+            <div class="col-md-6">
+              <small class="text-muted">Nature of Business</small>
+              <p class="fw-semibold mb-0">Retail — General Merchandise</p>
+            </div>
+            <div class="col-md-6">
+              <small class="text-muted">Ownership Type</small><br>
+              <p class="fw-semibold mb-0">Single Proprietorship</p>
+            </div>
+
+            <div class="col-12">
+              <small class="text-muted">Business Address</small>
+              <p class="fw-semibold mb-1">
+                Purok 2, Barangay Sto. Niño, Cityville
+              </p>
+            </div>
+
+            <div class="col-12">
+              <small class="text-muted">Description</small>
+              <p class="fw-semibold mb-0">
+                Convenience retail of daily household items, snacks, and mobile load.
+              </p>
+            </div>
+
+            <div class="col-md-6">
+              <small class="text-muted">Date Established</small>
+              <p class="fw-semibold mb-0">2018-03-10</p>
+            </div>
+            <div class="col-md-6">
+              <small class="text-muted">DTI/SEC Registration No.</small>
+              <p class="fw-semibold mb-0">DTI-1234567890</p>
+            </div>
+
+            <div class="col-md-6">
+              <small class="text-muted">Capital Invested</small>
+              <p class="fw-semibold mb-0">₱ 80,000.00</p>
+            </div>
+            <div class="col-md-6">
+              <small class="text-muted">Previous Year Gross Sales</small>
+              <p class="fw-semibold mb-0">₱ 350,000.00</p>
+            </div>
+
+            <div class="col-md-6">
+              <small class="text-muted d-block">Operating Days</small>
+              <div class="d-flex flex-wrap gap-2 mt-1">
+                <span class="badge bg-light text-dark border">Mon</span>
+                <span class="badge bg-light text-dark border">Tue</span>
+                <span class="badge bg-light text-dark border">Wed</span>
+                <span class="badge bg-light text-dark border">Thu</span>
+                <span class="badge bg-light text-dark border">Fri</span>
+                <span class="badge bg-light text-dark border">Sat</span>
+                <span class="badge bg-light text-dark border">Sun</span>
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <small class="text-muted d-block">Operating Hours</small>
+              <p class="fw-semibold mb-0 mt-1">08:00 — 20:00</p>
+            </div>
+
+            <div class="col-md-6">
+              <small class="text-muted">No. of Employees</small>
+              <p class="fw-semibold mb-0">2</p>
+            </div>
+
+            <div class="col-md-6">
+              <small class="text-muted">Previous Barangay Clearance</small>
+              <p class="fw-semibold mb-0">Yes</p>
+            </div>
+            <div class="col-md-6">
+              <small class="text-muted">Proof of Business</small>
+              <p class="fw-semibold mb-0">
+                receipt_clearance_2024.jpg
+                <a href="#" class="ms-2 small text-decoration-none" style="color: var(--bs-danger-text-emphasis);"
+                   data-bs-toggle="modal" data-bs-target="#proofPreviewModal">View</a>
+              </p>
+            </div>
+          </div>
+
+          <div class="text-end border-top pt-3 mt-2">
+            <button type="button" class="btn btn-submit">Edit Business Information</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- Proof Preview Modal -->
+<div class="modal fade" id="proofPreviewModal" tabindex="-1" aria-labelledby="proofPreviewLabel" aria-hidden="true">
+  <div class="modal-dialog modal-md modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="proofPreviewLabel">Proof of Previous Clearance</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <img src="{% static 'images/receipt_clearance_2024.jpg' %}" alt="Proof Image" class="img-fluid rounded w-100" />
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
