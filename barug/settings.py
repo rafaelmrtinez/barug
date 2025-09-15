@@ -30,7 +30,7 @@ SECRET_KEY = "django-insecure-_&rs=&x9thq+*#q_(013+n5gv68^@0^c7_h6q^t%m&=1s1vsck
 isProduction = os.getenv("PRODUCTION")
 if isProduction != None and isProduction == "True":
     DEBUG = False
-    ALLOWED_HOSTS = ["*"]
+    ALLOWED_HOSTS = ["barug-development.onrender.com"]
 else:
     DEBUG = True
     ALLOWED_HOSTS = ['*']
@@ -39,6 +39,7 @@ else:
 # Application definition
 
 INSTALLED_APPS = [
+    "metrics.apps.MetricsConfig",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
