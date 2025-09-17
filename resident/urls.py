@@ -4,6 +4,9 @@ from . import views
 app_name = 'resident'
 
 urlpatterns = [
+    path("doc-requests/", views.docreq_history, name="docreq_history"),
+    path("doc-requests/<int:doc_request_id>/", views.docreq_detail, name="docreq_detail"),
+
     path("register/", views.register_resident, name="register_resident"),
     path("register/personal_information/", views.personal_info , name="personal_info"),
     path("register/socioeconomic_information/", views.socioeconomic_info, name="socioeconomic_info"),

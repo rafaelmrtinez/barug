@@ -1,0 +1,165 @@
+{# resident/templates/resident/docreq_detail.html #}
+{% extends "base.html" %}
+{% load django_bootstrap5 %}
+
+{% block content %}
+<div class="container py-3">
+
+  <div class="bg-dark text-white rounded-3 p-4 mb-3">
+    <div class="d-flex align-items-center gap-3">
+      <div class="rounded-circle bg-white bg-opacity-10 d-flex align-items-center justify-content-center"
+           style="width:60px;height:60px;">
+        <i class="bi bi-check2 fs-2"></i>
+      </div>
+      <div>
+        <div class="fs-5 fw-bold mb-0">Request Submitted</div>
+        <div class="text-white-50">We’ll notify you of updates.</div>
+      </div>
+      <span class="{{ status_ui.cls }} ms-auto">{{ status_ui.label }}</span>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body">
+      <div class="d-flex align-items-start justify-content-between">
+        <div>
+          <div class="small text-muted">Request #</div>
+          <div class="fs-5 fw-bold">{{ header.request_code }}</div>
+        </div>
+        <div class="text-end small text-muted">
+          {{ header.created_at|date:"M d, Y, P" }}
+        </div>
+      </div>
+
+      <hr class="my-3"/>
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="small text-muted">Requested By</div>
+          <div class="fw-semibold">{{ header.requested_by }}</div>
+        </div>
+        <div class="col-md-6">
+          <div class="small text-muted">On Behalf Of</div>
+          <div class="fw-semibold">
+            {% if header.on_behalf_of %}{{ header.on_behalf_of }}{% else %}—{% endif %}
+          </div>
+        </div>
+        <div class="col-md-12">
+          <div class="small text-muted">Notes</div>
+          <div>{{ header.purpose_notes|default:"—" }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <h5 class="mb-0">Items</h5>
+      </div>
+
+      {% if lines|length == 0 %}
+        <div class="text-muted">No items.</div>
+      {% else %}
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Fee</th>
+                <th>Document</th>
+                <th>Purpose</th>
+                <th class="text-center">Qty</th>
+                <th class="text-end">Base</th>
+                <th class="text-end">Waived</th>
+                <th class="text-end">Surcharge</th>
+                <th class="text-end">Line Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for l in lines %}
+                <tr>
+                  <td class="fw-semibold">{{ l.fee_name }}</td>
+                  <td>{{ l.document_type_name|default:"—" }}</td>
+                  <td>{{ l.purpose_display|default:"—" }}</td>
+                  <td class="text-center">{{ l.quantity }}</td>
+                  <td class="text-end">₱{{ l.base_amount|floatformat:2 }}</td>
+                  <td class="text-end">₱{{ l.waived_amount|floatformat:2 }}</td>
+                  <td class="text-end">₱{{ l.surcharge_amount|floatformat:2 }}</td>
+                  <td class="text-end fw-bold">₱{{ l.line_total|floatformat:2 }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-6">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <h6 class="mb-2">Payments</h6>
+          <div class="row">
+            <div class="col-6">
+              <div class="small text-muted">OR Count</div>
+              <div class="fw-bold">{{ payments.or_count|default:"0" }}</div>
+            </div>
+            <div class="col-6">
+              <div class="small text-muted">Total Paid</div>
+              <div class="fw-bold">₱{{ payments.total_paid|default_if_none:0|floatformat:2 }}</div>
+            </div>
+            <div class="col-6 mt-2">
+              <div class="small text-muted">Latest OR No.</div>
+              <div class="fw-semibold">{{ payments.latest_or_number|default:"—" }}</div>
+            </div>
+            <div class="col-6 mt-2">
+              <div class="small text-muted">Latest OR Time</div>
+              <div class="fw-semibold">
+                {% if payments.latest_or_time %}{{ payments.latest_or_time|date:"M d, Y, P" }}{% else %}—{% endif %}
+              </div>
+            </div>
+          </div>
+          <hr/>
+          <div class="small text-muted">Amount Due</div>
+          <div class="fs-5 fw-bold">₱{{ header.amount_due|floatformat:2 }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <h6 class="mb-2">Timeline</h6>
+          {% if timeline|length == 0 %}
+            <div class="text-muted">No events yet.</div>
+          {% else %}
+            <div class="vstack gap-2">
+              {% for e in timeline %}
+                <div class="d-flex gap-2">
+                  <div class="text-muted small" style="min-width: 150px;">
+                    {{ e.occurred_at|date:"M d, Y, P" }}
+                  </div>
+                  <div>
+                    <div class="fw-semibold">{{ e.action }}</div>
+                    {% if e.staff_name or e.resident_name %}
+                      <div class="small text-muted">
+                        by {{ e.staff_name|default:e.resident_name }}
+                      </div>
+                    {% endif %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-between">
+    <a href="{% url 'resident:docreq_history' %}" class="btn btn-outline-secondary">Back to History</a>
+  </div>
+
+</div>
+{% endblock %}

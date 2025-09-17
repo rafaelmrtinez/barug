@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-3">
+
+  <div class="bg-dark text-white rounded-3 p-4 mb-3 d-flex align-items-center">
+    <div class="me-3 rounded-circle bg-white bg-opacity-10 d-flex align-items-center justify-content-center" style="width:60px;height:60px;">
+      <i class="bi bi-cash-coin fs-2"></i>
+    </div>
+    <div class="me-auto">
+      <div class="fs-5 fw-bold mb-0">Request {{ header.request_code }}</div>
+      <div class="text-white-50">{{ header.created_at|date:"M d, Y, P" }}</div>
+    </div>
+    <span class="{{ status_ui.cls }}">{{ status_ui.label }}</span>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+          <h5 class="mb-3">Items</h5>
+          {% if lines %}
+            <div class="table-responsive">
+              <table class="table align-middle">
+                <thead class="table-light"><tr>
+                  <th>Fee</th><th>Document</th><th>Purpose</th>
+                  <th class="text-center">Qty</th>
+                  <th class="text-end">Total</th>
+                </tr></thead>
+                <tbody>
+                  {% for l in lines %}
+                    <tr>
+                      <td class="fw-semibold">{{ l.fee_name }}</td>
+                      <td>{{ l.document_type_name|default:"—" }}</td>
+                      <td>{{ l.purpose_display|default:"—" }}</td>
+                      <td class="text-center">{{ l.quantity }}</td>
+                      <td class="text-end fw-bold">₱{{ l.line_total|floatformat:2 }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="text-muted">No items.</div>
+          {% endif %}
+          <hr>
+          <div class="d-flex justify-content-between">
+            <div class="small text-muted">Amount Due</div>
+            <div class="fs-5 fw-bold">₱{{ header.amount_due|floatformat:2 }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <h6 class="mb-2">Timeline</h6>
+          {% if timeline %}
+            {% for e in timeline %}
+              <div class="d-flex gap-2">
+                <div class="text-muted small" style="min-width:170px;">{{ e.occurred_at|date:"M d, Y, P" }}</div>
+                <div>
+                  <div class="fw-semibold">{{ e.action }}</div>
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}<div class="text-muted">No events yet.</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <h5 class="mb-3">Take Payment</h5>
+
+          <div class="mb-2 small text-muted">Latest OR</div>
+          {% if payments.latest_or_number %}
+            <div class="mb-3">
+              <div class="fw-semibold">{{ payments.latest_or_number }}</div>
+              <div class="small text-muted">{{ payments.latest_or_time|date:"M d, Y, P" }}</div>
+            </div>
+          {% else %}
+            <div class="mb-3 text-muted">None yet</div>
+          {% endif %}
+
+          <form method="post" action="{% url 'treasurer:take_payment' header.doc_request_id %}">
+            {% csrf_token %}
+            <div class="mb-2">
+              <label class="form-label">Payment Method</label>
+              <select class="form-select" name="payment_method_id" required>
+                <option value="">Select…</option>
+                {% for m in methods %}
+                  <option value="{{ m.payment_method_id }}">{{ m.method_name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Amount Paid (₱)</label>
+              <input class="form-control" name="amount_paid" type="number" step="0.01" min="0" required>
+              <div class="form-text">Amount due: ₱{{ header.amount_due|floatformat:2 }}</div>
+            </div>
+            <button class="btn btn-primary w-100">Post OR</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

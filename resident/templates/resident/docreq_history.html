@@ -1,0 +1,93 @@
+{# resident/templates/resident/docreq_history.html #}
+{% extends "base.html" %}
+{% load django_bootstrap5 %}
+
+{% block content %}
+<div class="container py-3">
+
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">My Document Requests</h3>
+    <form class="d-flex" method="get">
+      <input name="q" value="{{ q }}" class="form-control me-2" placeholder="Search code, type, purpose…" />
+      <button class="btn btn-outline-secondary">Search</button>
+    </form>
+  </div>
+
+  {% if rows|length == 0 %}
+    <div class="alert alert-light border">No requests yet.</div>
+  {% endif %}
+
+  <div class="vstack gap-3">
+    {% for r in rows %}
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <div class="d-flex align-items-start justify-content-between">
+            <div>
+              <div class="small text-muted">Request #</div>
+              <div class="fs-5 fw-bold">{{ r.request_code }}</div>
+              <div class="small text-muted mt-1">
+                {{ r.created_at|date:"M d, Y, P" }}
+              </div>
+            </div>
+            <span class="{{ r.status_ui.cls }} align-self-start">{{ r.status_ui.label }}</span>
+          </div>
+
+          <hr class="my-3"/>
+
+          <div class="row g-2">
+            <div class="col-md-6">
+              <div class="small text-muted mb-1">Document Types</div>
+              <div class="d-flex flex-wrap gap-1">
+                {% for t in r.doc_types %}
+                  <span class="badge rounded-pill text-bg-light border">{{ t }}</span>
+                {% empty %}
+                  <span class="text-muted">—</span>
+                {% endfor %}
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="small text-muted mb-1">Purposes</div>
+              <div class="d-flex flex-wrap gap-1">
+                {% for p in r.purposes_display %}
+                  <span class="badge rounded-pill text-bg-light border">{{ p }}</span>
+                {% empty %}
+                  <span class="text-muted">—</span>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-2 mt-3">
+            <div class="col-sm-4">
+              <div class="small text-muted">Amount Due</div>
+              <div class="fw-bold">₱{{ r.amount_due|floatformat:2 }}</div>
+            </div>
+            <div class="col-sm-4">
+              <div class="small text-muted">Latest OR</div>
+              {% if r.latest_or_number %}
+                <div class="fw-semibold">{{ r.latest_or_number }}</div>
+                <div class="small text-muted">{{ r.latest_or_time|date:"M d, Y, P" }}</div>
+              {% else %}
+                <div class="text-muted">—</div>
+              {% endif %}
+            </div>
+            <div class="col-sm-4 d-flex align-items-end justify-content-sm-end">
+              <a class="btn btn-maroon btn-primary" href="{% url 'resident:docreq_detail' r.doc_request_id %}">
+                View Details
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  {% if has_more %}
+    <div class="text-center my-3">
+      <a class="btn btn-outline-secondary"
+         href="?q={{ q }}&page={{ page|add:1 }}">Load more</a>
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

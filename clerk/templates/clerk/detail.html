@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block css %}
+<style>
+  :root {
+    --brand-maroon: #6a0d0d;
+    --brand-maroon-2: #530b0b;
+    --brand-accent: #f5e9e9;
+  }
+  .brgy-hero {
+    background: linear-gradient(90deg, var(--brand-maroon), var(--brand-maroon-2));
+    color: #fff;
+  }
+  .brgy-hero .badge {
+    background: rgba(255,255,255,.12);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.25);
+  }
+  .brgy-hero .avatar {
+    width: 60px; height:60px; border-radius: 50%;
+    background: rgba(255,255,255,.15);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .card-soft {
+    border: 0; box-shadow: 0 6px 20px rgba(0,0,0,.06);
+  }
+  .btn-maroon { background: var(--brand-maroon); color:#fff; border: none; }
+  .btn-maroon:hover { background: var(--brand-maroon-2); color:#fff; }
+  .btn-outline-maroon { color: var(--brand-maroon); border-color: var(--brand-maroon); background: #fff; }
+  .btn-outline-maroon:hover { background: var(--brand-maroon); color:#fff; }
+  .table thead th { background: var(--brand-accent); border-bottom: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-3">
+
+  <div class="brgy-hero rounded-3 p-4 mb-3 d-flex align-items-center">
+    <div class="me-3 avatar"><i class="bi bi-printer fs-2"></i></div>
+    <div class="me-auto">
+      <div class="fs-5 fw-bold mb-0">Request {{ header.request_code }}</div>
+      <div class="text-white-50">{{ header.created_at|date:"M d, Y, P" }}</div>
+    </div>
+    <span class="{{ status_ui.cls }}">{{ status_ui.label }}</span>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card card-soft mb-3">
+        <div class="card-body">
+          <h5 class="mb-3">Items</h5>
+          {% if lines %}
+            <div class="table-responsive">
+              <table class="table align-middle">
+                <thead><tr>
+                  <th>Fee</th><th>Document</th><th>Purpose</th>
+                  <th class="text-center">Qty</th><th class="text-end">Total</th>
+                </tr></thead>
+                <tbody>
+                  {% for l in lines %}
+                    <tr>
+                      <td class="fw-semibold">{{ l.fee_name }}</td>
+                      <td>{{ l.document_type_name|default:"—" }}</td>
+                      <td>{{ l.purpose_display|default:"—" }}</td>
+                      <td class="text-center">{{ l.quantity }}</td>
+                      <td class="text-end fw-bold">₱{{ l.line_total|floatformat:2 }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}<div class="text-muted">No items.</div>{% endif %}
+          <hr>
+          <div class="d-flex justify-content-between">
+            <div class="small text-muted">Amount Due</div>
+            <div class="fs-5 fw-bold">₱{{ header.amount_due|floatformat:2 }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-soft">
+        <div class="card-body">
+          <h6 class="mb-2">Timeline</h6>
+          {% if timeline %}
+            <div class="vstack gap-2">
+              {% for e in timeline %}
+                <div class="d-flex gap-3">
+                  <div class="text-muted small" style="min-width:170px;">{{ e.occurred_at|date:"M d, Y, P" }}</div>
+                  <div>
+                    <div class="fw-semibold">{{ e.action }}</div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}<div class="text-muted">No events yet.</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card card-soft">
+        <div class="card-body">
+          <h5 class="mb-3">Actions</h5>
+
+          <button class="btn btn-maroon w-100 mb-2" data-bs-toggle="modal" data-bs-target="#confirmPrintModal">
+            <i class="bi bi-download me-1"></i> Mark For Printing & Download
+          </button>
+
+          <form method="post" action="{% url 'clerk:mark_released' header.doc_request_id %}" class="mb-2"
+                onsubmit="return confirm('Mark this request as RELEASED?');">
+            {% csrf_token %}
+            <button class="btn btn-success w-100">Mark Released</button>
+          </form>
+
+          <hr class="my-3">
+
+          <form method="post" action="{% url 'clerk:decline' header.doc_request_id %}"
+                onsubmit="return confirm('Decline this request? This cannot be undone.');">
+            {% csrf_token %}
+            <div class="mb-2">
+              <label class="form-label">Decline Reason</label>
+              <input class="form-control" name="reason" placeholder="Optional reason">
+            </div>
+            <button class="btn btn-outline-danger w-100">Decline</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm & Download Modal -->
+<div class="modal fade" id="confirmPrintModal" tabindex="-1" aria-labelledby="confirmPrintLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header" style="background: var(--brand-accent);">
+        <h5 class="modal-title" id="confirmPrintLabel">Confirm &amp; Download</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="mb-3">
+          <div class="small text-muted">Request Code</div>
+          <div class="fw-bold">{{ header.request_code }}</div>
+        </div>
+
+        <div class="mb-3">
+          <div class="small text-muted">Resident / Requester</div>
+          <div class="fw-semibold">{{ header.requester_full_name|default:"—" }}</div>
+        </div>
+
+        <div class="mb-3">
+          <div class="small text-muted">Items</div>
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead class="table-light">
+                <tr><th>Document</th><th>Purpose</th><th class="text-end">Total</th></tr>
+              </thead>
+              <tbody>
+                {% for l in lines %}
+                  <tr>
+                    <td>{{ l.document_type_name|default:"—" }}</td>
+                    <td>{{ l.purpose_display|default:"—" }}</td>
+                    <td class="text-end">₱{{ l.line_total|floatformat:2 }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="2" class="text-end fw-semibold">Grand Total</td>
+                  <td class="text-end fw-bold">₱{{ header.amount_due|floatformat:2 }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div class="small text-muted">
+            Continuing will (1) mark this request as <strong>For Printing</strong>, and (2) download the filled PDF(s).
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form method="post" action="{% url 'clerk:mark_printing' header.doc_request_id %}">
+          {% csrf_token %}
+          <input type="hidden" name="download" value="1">
+          <button class="btn btn-maroon"><i class="bi bi-download me-1"></i> Proceed &amp; Download</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -12,14 +12,12 @@
 {% block content %}
 <div class="page-wrap">
 
-  <div class="container-fluid pt-3 page-main" style="margin-top: 40px;">
+  <div class="container-fluid pt-3 page-main">
     <div class="row">
       <div>
-
         <div class="col-md-4">
             <form method="post">
               {% csrf_token %}
-
               <div class="form-floating mb-3">
                   {{ form.search }}
                   <label for="{{ form.search.id_for_label }}">{{ form.search.label }}</label>
@@ -38,13 +36,13 @@
           </thead>
           <tbody>
               <tr class="table-row-height">
-                <td></td>
-                <td></td>
-                <td></td>
+                <td>ATAY</td>
+                <td>ATAY</td>
+                <td>ATAY</td>
                 <td>
                   <div class="d-flex gap-1">
                     <a class="btn btn-icon"
-                       href="{% url 'clerk:person_details' per_id='RBSN00000' %}">
+                       >
                       {% bs_icon 'person-lines-fill' size='1em' %}
                     </a>
                   </div>

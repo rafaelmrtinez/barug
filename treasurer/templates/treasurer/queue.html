@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load static django_bootstrap5 %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">Treasurer Queue</h3>
+    <form class="d-flex" method="get" action="">
+      <input
+        type="search"
+        name="q"
+        value="{{ q }}"
+        class="form-control me-2"
+        placeholder="Search code, type, purpose..."
+        aria-label="Search"
+      />
+      {% comment %} keep selected statuses on submit {% endcomment %}
+      {% for s in statuses %}
+        <input type="hidden" name="status" value="{{ s }}">
+      {% endfor %}
+      <button class="btn btn-primary" type="submit">Search</button>
+    </form>
+  </div>
+
+  <form method="get" action="" class="mb-3">
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      {% for opt in status_options %}
+        <div class="form-check form-check-inline">
+          <input class="form-check-input"
+                 type="checkbox"
+                 id="st-{{ opt.code }}"
+                 name="status"
+                 value="{{ opt.code }}"
+                 {% if opt.checked %}checked{% endif %} />
+          <label class="form-check-label" for="st-{{ opt.code }}">
+            <span class="{{ opt.cls }}">{{ opt.label }}</span>
+          </label>
+        </div>
+      {% endfor %}
+      {% if q %}
+        <input type="hidden" name="q" value="{{ q }}">
+      {% endif %}
+      <button class="btn btn-outline-secondary btn-sm" type="submit">Apply</button>
+      <a class="btn btn-link btn-sm" href="?">Reset</a>
+    </div>
+  </form>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 12rem;">Request Code</th>
+            <th>Requester</th>
+            <th>Documents</th>
+            <th>Purposes</th>
+            <th>Status</th>
+            <th style="width: 8rem;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+            <tr>
+              <td><code>{{ r.request_code }}</code></td>
+              <td>
+                {{ r.requester_full_name|default:"—" }}<br>
+                <small class="text-muted">{{ r.request_date|date:"Y-m-d H:i" }}</small>
+              </td>
+              <td>{{ r.doc_types|join:", " }}</td>
+              <td>
+                {% if r.purposes_display %}
+                  {{ r.purposes_display|join:", " }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td><span class="{{ r.status_ui.cls }}">{{ r.status_ui.label }}</span></td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-primary"
+                   href="{% url 'treasurer:detail' r.doc_request_id %}">
+                  View
+                </a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="6" class="text-center text-muted py-5">No requests found.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
