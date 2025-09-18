@@ -16,6 +16,6 @@ class RequestedDocsFilters(forms.Form):
             'id' : 'b_type',
             'class' : 'form-select',
         }),
-        label= 'Business Type',
+        label= 'Document Type',
         required= False,
     )

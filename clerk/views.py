@@ -4,6 +4,7 @@ from .forms import SearchVerificationRequest
 from .forms import SearchBusinessOwner
 from .forms import BusinessDetails
 from .forms import BusinessFilters
+from .forms import RequestedDocsFilters
 
 user_fullname = 'lname fname mname suffix'
 user_role = 'Barangay Clerk'
@@ -15,6 +16,33 @@ def dashboard(request):
         'user_fullname' : user_fullname,
         'user_role' : user_role,
         'page_path' : f'{user_role} / Dashboard',
+        'page_title' : 'Dashboard' ,
+        'user_role_template' : user_role_template,
+    })
+
+def doc_reqs(request):
+    form = RequestedDocsFilters()
+
+    pending = []
+    paginator = Paginator(pending, 10)  # 10 per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, "doc_req/doc_reqs.html", {
+        'user_fullname' : user_fullname,
+        'user_role' : user_role,
+        'page_path' : f'{user_role} / Dashboard',
+        'page_title' : 'Dashboard' ,
+        'user_role_template' : user_role_template,
+        'form' : form,
+        'page_obj': page_obj,
+    })
+
+def doc_details(request, doc_id):
+    return render(request, "doc_req/doc_details.html", {
+        'user_fullname' : user_fullname,
+        'user_role' : user_role,
+        'page_path' : f'{user_role} / Document Request / {doc_id}',
         'page_title' : 'Dashboard' ,
         'user_role_template' : user_role_template,
     })
