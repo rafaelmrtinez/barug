@@ -1,0 +1,24 @@
+  .kpi-card { border: 1px solid #eef1f3; }
+  .kpi-icon {
+    width: 36px; height: 36px; border-radius: .75rem;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #f3f6ff;
+  }
+  .section-card { border: 1px solid #eef1f3; }
+  .item-row {
+    border: 1px solid #eef1f3;
+    border-radius: .75rem;
+    padding: .9rem 1rem;
+  }
+  .item-row + .item-row { margin-top: .75rem; }
+  .btn-chip {
+    font-weight: 600; font-size: .825rem; padding: .45rem .8rem;
+    border-radius: .6rem;
+  }
+
+  /* Equal-height cards that stretch with the row */
+  .equal-card { height: 420px; }                   /* ← set the shared panel height here */
+  .equal-card .card-body { display:flex; flex-direction:column; }
+
+  /* Only the list area scrolls; header stays fixed */
+  .panel-list { height: 300; overflow: auto; }
