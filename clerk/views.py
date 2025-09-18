@@ -176,7 +176,7 @@ def _fill_fields_for_line(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[
     d, m, y = _date_parts(now)
     full_name  = _safe_str(line.get("requester_full_name") or header.get("requester_full_name") or header.get("resident_name") or header.get("full_name"))
     addr       = _safe_str(line.get("requester_addr") or header.get("address") or "")
-    barangay   = _safe_str(header.get("barangay") or "Barangay Sto. Niño")
+    barangay   = "Señor Santo Niño"
     city       = _safe_str(header.get("city") or "Cebu City")
     province   = _safe_str(header.get("province") or "Cebu")
     age        = _safe_str(line.get("requester_age") or header.get("requester_age") or "")
@@ -207,7 +207,7 @@ def _fill_fields_for_line(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[
             return {"requestor_full_name": full_name,"requestor_age": age,"requestor_civil_status": civil,"requestor_addr": addr,
                     "doc_purpose": purpose,"date_issued": d,"month_issued": m,"year_issued": y,
                     "barangay_issued": barangay,"city_mun_issued": city,"province_issued": province,
-                    "brgy_captain": captain,"total_amnt": line_total,"or_number": or_no}
+                    "brgy_captain": captain,"totla_amnt": line_total,"or_number": or_no}
 
     if "indigency" in doc_name or "indegency" in doc_name:
         if _is_minor(header, line):

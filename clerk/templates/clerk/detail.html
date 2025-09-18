@@ -88,6 +88,7 @@
                   <div class="text-muted small" style="min-width:170px;">{{ e.occurred_at|date:"M d, Y, P" }}</div>
                   <div>
                     <div class="fw-semibold">{{ e.action }}</div>
+                    <div class="small text-muted">by {{ e.staff_name|default:"wala atay yawa"}}</div>
                   </div>
                 </div>
               {% endfor %}
