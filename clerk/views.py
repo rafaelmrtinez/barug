@@ -1,9 +1,9 @@
-from __future__ import annotations 
+from __future__ import annotations
 
 from typing import Any, Dict, List
 from decimal import Decimal
 import io, os, zipfile, json
-from datetime import datetime
+from datetime import datetime, date
 
 from django.contrib import messages
 from django.core.paginator import Paginator
@@ -67,27 +67,55 @@ def _guard(request: HttpRequest) -> HttpResponse | None:
     return None
 
 
+# =========================
+# Small utils
+# =========================
+
 def pick(*vals, allow_zero: bool = False):
     """
     Return the first value that is not None and not an empty string.
-    If allow_zero=True, a numeric 0 is considered valid.
+    If allow_zero=True, a numeric 0 (or "0") is considered valid.
     """
     for v in vals:
         if v is None:
             continue
-        if isinstance(v, str) and v.strip() == "":
-            continue
+        if isinstance(v, str):
+            if v.strip() == "":
+                continue
+            if v.strip() == "0" and not allow_zero:
+                continue
+            return v
         if v == 0 and not allow_zero:
-            # skip numeric zero only when not allowed
             continue
         return v
     return None
+
+def _to_date(val) -> date | None:
+    if not val:
+        return None
+    try:
+        if isinstance(val, date):
+            return val
+        s = str(val).strip()
+        if "T" in s:  # ISO with time
+            s = s.split("T", 1)[0]
+        return datetime.fromisoformat(s).date()
+    except Exception:
+        return None
+
+def _calc_age_from_birthdate(bday_val) -> int | None:
+    bday = _to_date(bday_val)
+    if not bday: return None
+    today = timezone.localdate()
+    age = today.year - bday.year - ((today.month, today.day) < (bday.month, bday.day))
+    return max(age, 0)
 
 
 def subject_view(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[str, Any]:
     """
     Decide who the document is about. If on-behalf fields exist, use them;
     otherwise use the requester. Line-level overrides (subject_*) win.
+    Also: if age is missing/0, compute from birthdate (incl. DB fetch fallback).
     """
     has_on_behalf = bool(header.get("on_behalf_of_person_id") or header.get("on_behalf_full_name"))
 
@@ -107,14 +135,35 @@ def subject_view(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[str, Any]
         header.get("address"),
     )
 
+    # Age: prefer explicit; else calculate from birthdate
     age = pick(
         line.get("subject_age"),
         header.get("subject_age"),
         header.get("on_behalf_age") if has_on_behalf else header.get("requester_age"),
         header.get("requester_age"),
         header.get("age"),
-        allow_zero=True,  # <- IMPORTANT: keep 0
+        allow_zero=True,
     )
+
+    need_age_from_bday = (age is None or str(age).strip() == "" or str(age) == "0")
+    if need_age_from_bday:
+        bday = pick(
+            line.get("subject_birthdate"),
+            header.get("subject_birthdate"),
+            header.get("on_behalf_birthdate") if has_on_behalf else header.get("requester_birthdate"),
+            header.get("birthdate"),
+        )
+        if not bday and has_on_behalf and header.get("on_behalf_of_person_id"):
+            try:
+                # lightweight fetch; no schema change required
+                p = supabase.table("person").select("birthdate").eq("person_id", header["on_behalf_of_person_id"]).single().execute()
+                if getattr(p, "data", None):
+                    bday = (p.data or {}).get("birthdate")
+            except Exception:
+                pass
+        age_from_bday = _calc_age_from_birthdate(bday)
+        if age_from_bday is not None:
+            age = age_from_bday
 
     civil = pick(
         line.get("subject_civil_status"),
@@ -182,9 +231,6 @@ def queue(request: HttpRequest):
 # =========================
 # Clerk — Detail
 # =========================
-
-# ... imports unchanged ...
-
 def detail(request: HttpRequest, doc_request_id: int):
     bundle = supabase.rpc("fetch_doc_request_detail_bundle", {"p_doc_request_id": doc_request_id}).execute()
     if getattr(bundle, "error", None):
@@ -197,11 +243,12 @@ def detail(request: HttpRequest, doc_request_id: int):
     payments = data.get("payments", {}) or {}
     timeline = data.get("timeline", []) or []
 
+    # UI bits
     ui = STATUS_UI.get(header.get("status")) or {"label": header.get("status") or "—", "cls": "badge text-bg-secondary"}
     for l in lines:
         l["purpose_display"] = _titleize(l.get("purpose_code"))
 
-    # OR number for UI and PDFs
+    # OR number for UI/PDF
     header["or_number"] = (
         payments.get("latest_or_number")
         or header.get("latest_or_number")
@@ -209,7 +256,7 @@ def detail(request: HttpRequest, doc_request_id: int):
         or ""
     )
 
-    # Subject (who the doc is about) for display
+    # Subject (display)
     subj = subject_view(header, {})
     header["is_on_behalf"] = subj["is_on_behalf"]
     header["subject_full_name"] = subj["full_name"]
@@ -240,38 +287,30 @@ def _humanize_purpose(val: Any) -> str:
     s = _safe_str(val).strip()
     return _titleize(s) if s else ""
 
-def _choose_template_from_rdt(rdt_name: str, is_minor: bool) -> str:
-    key = (rdt_name or "").upper().strip()
-    mapping = {
-        "BARANGAY CLEARANCE":          ("barangay-clearance-minor.pdf", "barangay-clearance.pdf"),
-        "CERTIFICATE OF INDIGENCY":    ("barangay-indegency-minor.pdf", "barangay-indegency.pdf"),
-        "CERTIFICATE OF RESIDENCY":    ("barangay-clearance-minor.pdf", "barangay-clearance.pdf"),  # reuse
-        "BARANGAY BUSINESS CLEARANCE": ("barangay-permit.pdf",          "barangay-permit.pdf"),
-    }
-    minor, adult = mapping.get(key, ("barangay-clearance-minor.pdf", "barangay-clearance.pdf"))
-    return minor if is_minor else adult
-
-
-def _choose_template(doc_name: str, is_minor: bool) -> str:
-    name = "Barangay clearance"
-    if "clearance" in name: return "barangay-clearance-minor.pdf" if is_minor else "barangay-clearance.pdf"
-    if "indigency" in name or "indegency" in name: return "barangay-indegency-minor.pdf" if is_minor else "barangay-indegency.pdf"
-    if "low" in name and "income" in name: return "barangay-cert-of-low-income-minor.pdf" if is_minor else "barangay-cert-of-low-income.pdf"
-    if "death" in name: return "barangay-death-cert.pdf"
-    if "permit" in name: return "barangay-permit.pdf"
+def _choose_template(doc_name: str, _is_minor_ignored: bool) -> str:
+    """
+    Always return the ADULT template, per requirement.
+    """
+    name = (doc_name or "").lower()
+    if "indigency" in name or "indegency" in name:
+        return "barangay-indegency.pdf"
+    if "low" in name and "income" in name:
+        return "barangay-cert-of-low-income.pdf"
+    if "death" in name:
+        return "barangay-death-cert.pdf"
+    if "permit" in name:
+        return "barangay-permit.pdf"
+    # default
     return "barangay-clearance.pdf"
 
-def _is_minor(header: Dict[str, Any], line: Dict[str, Any]) -> bool:
-    age = line.get("requester_age") or header.get("requester_age") or header.get("age")
-    try: return int(age) < 18
-    except Exception: return False
-
 def _fill_fields_for_line(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Build field map for ADULT templates only (no minor variations).
+    """
     now = timezone.localtime()
     d, m, y = _date_parts(now)
 
-    subj = subject_view(header, line)   # <- single source of truth
-
+    subj = subject_view(header, line)   # single source of truth
     subject_full_name  = _safe_str(subj["full_name"])
     subject_addr       = _safe_str(subj["address"])
     subject_age        = _safe_str(subj["age"])           # can be "0"
@@ -301,95 +340,88 @@ def _fill_fields_for_line(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[
     captain  = _safe_str(header.get("captain_name") or "Lourdes R. Ramirez")
     doc_name = _safe_str(line.get("document_type_name")).lower()
 
-    # minor check based on subject age
-    def is_minor() -> bool:
-        try:
-            return int(subj["age"]) < 18
-        except Exception:
-            return False
-
+    # === Always adult mappings ===
     if "clearance" in doc_name:
-        if is_minor():
-            return {
-                "requestor_full_name": subject_full_name,
-                "requestor_age": subject_age,
-                "requestor_addr": subject_addr,
-                "guardiang_name": _safe_str(line.get("guardian_name") or ""),
-                "guardian_relationship": _safe_str(line.get("guardian_relationship") or ""),
-                "request_purpose": purpose, "date_issued": d, "month_issued": m, "Text Box 1": y,
-                "barangay_issued": barangay, "city_mun_issued": city, "province_issued": province,
-                "brgy_captain": captain, "total_amnt": line_total, "or_number": or_no
-            }
-        else:
-            return {
-                "requestor_full_name": subject_full_name,
-                "requestor_age": subject_age,
-                "requestor_civil_status": subject_civil,
-                "requestor_addr": subject_addr,
-                "doc_purpose": purpose, "date_issued": d, "month_issued": m, "year_issued": y,
-                "barangay_issued": barangay, "city_mun_issued": city, "province_issued": province,
-                "brgy_captain": captain, "totla_amnt": line_total, "or_number": or_no
-            }
+        return {
+            "requestor_full_name": subject_full_name,
+            "requestor_age": subject_age,
+            "requestor_civil_status": subject_civil,
+            "requestor_addr": subject_addr,
+            "doc_purpose": purpose,
+            "date_issued": d,
+            "month_issued": m,
+            "year_issued": y,
+            "barangay_issued": barangay,
+            "city_mun_issued": city,
+            "province_issued": province,
+            "brgy_captain": captain,
+            "totla_amnt": line_total,
+            "or_number": or_no,
+        }
 
     if "indigency" in doc_name or "indegency" in doc_name:
-        if is_minor():
-            return {
-                "requestor_name": subject_full_name,
-                "requestor_age": subject_age,
-                "requestor_nationality": subject_nat,
-                "requestor_barangay": barangay, "requestor_cty_mun": city, "requestor_province": province,
-                "guardian_name": _safe_str(line.get("guardian_name") or ""), "guardian_relation": _safe_str(line.get("guardian_relationship") or ""),
-                "doc_purpose": purpose, "issued_date": d, "issued_month": m, "issued_year": y,
-                "barangay_issued": barangay, "city_mun_issued": city, "province_issued": province,
-                "brgy_capt": captain, "total_amnt": line_total, "or_number": or_no
-            }
-        else:
-            return {
-                "requestor_full_name": subject_full_name, "requestor_age": subject_age,
-                "requestor_civil_status": subject_civil, "requestor_nationality": subject_nat,
-                "requestor_barangay": barangay, "requestor_city_mun": city, "requestor_province": province,
-                "requesition_purpose": purpose, "issued_date": d, "issued_month": m, "issued_year": y,
-                "barangay_issued": barangay, "city_mun_issued": city, "province_issued": province,
-                "brgy_captain": captain, "total_amnt": line_total, "or_number": or_no
-            }
+        return {
+            "requestor_full_name": subject_full_name,
+            "requestor_age": subject_age,
+            "requestor_civil_status": subject_civil,
+            "requestor_nationality": subject_nat,
+            "requestor_barangay": barangay,
+            "requestor_city_mun": city,
+            "requestor_province": province,
+            "requesition_purpose": purpose,
+            "issued_date": d,
+            "issued_month": m,
+            "issued_year": y,
+            "barangay_issued": barangay,
+            "city_mun_issued": city,
+            "province_issued": province,
+            "brgy_captain": captain,
+            "total_amnt": line_total,
+            "or_number": or_no,
+        }
 
     if "low" in doc_name and "income" in doc_name:
-        if is_minor():
-            return {
-                "requestor_full_name": subject_full_name, "requestor_age": subject_age,
-                "requestor_nationality": subject_nat, "requestor_barangay": barangay,
-                "requestor_city_municapility": city, "requestor_province": province,
-                "requestor_earning": _safe_str(line.get("monthly_income") or ""),
-                "guardian_name": _safe_str(line.get("guardian_name") or ""),
-                "guardian_relationship": _safe_str(line.get("guardian_relationship") or ""),
-                "request_purpose": purpose, "date_issued": d, "month_issued": m, "year_issued": y,
-                "barangay_issued": barangay, "city_issued": city, "province_issued": province,
-                "brgy_captain": captain, "total_amnt": line_total, "or_number": or_no
-            }
-        else:
-            return {
-                "full_name": subject_full_name, "age": subject_age,
-                "civil_status": subject_civil, "nationality": subject_nat,
-                "barangay_name": barangay, "city_municipality": city, "province": province,
-                "total_earning": _safe_str(line.get("monthly_income") or ""), "purpose": purpose,
-                "day": d, "month": m, "year": y,
-                "issued_at_brgy": barangay, "issued_at_city_municipality": city, "issued_at_province": province,
-                "amnt": line_total, "official_reciept": or_no
-            }
+        return {
+            "full_name": subject_full_name,
+            "age": subject_age,
+            "civil_status": subject_civil,
+            "nationality": subject_nat,
+            "barangay_name": barangay,
+            "city_municipality": city,
+            "province": province,
+            "total_earning": _safe_str(line.get("monthly_income") or ""),
+            "purpose": purpose,
+            "day": d,
+            "month": m,
+            "year": y,
+            "issued_at_brgy": barangay,
+            "issued_at_city_municipality": city,
+            "issued_at_province": province,
+            "amnt": line_total,
+            "official_reciept": or_no,
+        }
 
     if "death" in doc_name:
         return {
             "requestor_full_name": subject_full_name,
             "deceased_civil_status": subject_civil,
             "deceased_nationality": subject_nat,
-            "deceased_barangay": barangay, "deceased_city_mun": city, "deceased_province": province,
+            "deceased_barangay": barangay,
+            "deceased_city_mun": city,
+            "deceased_province": province,
             "date_of_death": _safe_str(line.get("death_day") or d),
             "month_of_death": _safe_str(line.get("death_month") or m),
             "year_of_death": _safe_str(line.get("death_year") or y),
             "place_of_death": _safe_str(line.get("place_of_death") or ""),
-            "curr_date": d, "curr_month": m, "curr_year": y,
-            "barangay_issued": barangay, "city_mun_issued": city, "province_issued": province,
-            "brgy_captain": captain, "total_amnt": line_total, "or_number": or_no
+            "curr_date": d,
+            "curr_month": m,
+            "curr_year": y,
+            "barangay_issued": barangay,
+            "city_mun_issued": city,
+            "province_issued": province,
+            "brgy_captain": captain,
+            "total_amnt": line_total,
+            "or_number": or_no,
         }
 
     if "permit" in doc_name:
@@ -399,15 +431,20 @@ def _fill_fields_for_line(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[
             "requestor_name": subject_full_name,
             "requested_event": _safe_str(line.get("event_name") or ""),
             "event_location": _safe_str(line.get("event_location") or ""),
-            "barangay_name": barangay, "brgy_date_time": event_dt,
-            "issued_date": d, "issued_month": m, "issued_year": y,
-            "barangay_issued": barangay, "cty_mun_issued": city, "province_issued": province,
-            "brgy_capt": captain, "total_amnt": line_total, "or_number": or_no
+            "barangay_name": barangay,
+            "brgy_date_time": event_dt,
+            "issued_date": d,
+            "issued_month": m,
+            "issued_year": y,
+            "barangay_issued": barangay,
+            "cty_mun_issued": city,
+            "province_issued": province,
+            "brgy_capt": captain,
+            "total_amnt": line_total,
+            "or_number": or_no,
         }
 
     return {}
-
-
 
 def _get_all_pdf_field_names(template_path: str) -> List[str]:
     names: List[str] = []
@@ -448,7 +485,7 @@ def _fill_pdf_with_values(template_path: str, merged: Dict[str, str]) -> bytes:
     return buf.getvalue()
 
 # =========================
-# Clerk — Actions (status + printing) with DEBUG
+# Clerk — Actions (status + printing)
 # =========================
 def _set_status(doc_request_id: int, status: str, staff_id: int | None, reason: str | None = None) -> str | None:
     staff_id = 2  # TODO: wire _staff_id(request)
@@ -494,8 +531,8 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
 
     for idx, line in enumerate(lines, start=1):
         doc_name = _safe_str(line.get("document_type_name") or f"doc-{idx}")
-        is_minor = _is_minor(header, line)
-        template_file = _choose_template(doc_name, is_minor)
+        # Always use the ADULT template
+        template_file = _choose_template(doc_name, False)
         template_path = os.path.join(base_dir, template_file)
         exists = os.path.exists(template_path)
         if not exists:
@@ -516,17 +553,16 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
                   for name in field_names}
         missing = [n for n in field_names if n not in base_values or str(base_values.get(n) or "").strip() == ""]
 
-        # PRINT structured debug to server console
+        # Structured debug
         print(json.dumps({
             "doc_index": idx,
             "doc_name": doc_name,
-            "is_minor": is_minor,
             "template_file": template_file,
             "template_path": template_path,
             "field_count": len(field_names),
             "missing_count": len(missing),
             "missing_fields": missing,
-            "sample_values": {k: merged[k] for k in list(merged)[:10]}  # first 10 for brevity
+            "sample_values": {k: merged[k] for k in list(merged)[:10]}
         }, indent=2, default=str))
 
         try:
@@ -539,11 +575,10 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
         out_name = f"{header.get('request_code','REQ')}-{safe_name}.pdf"
         outputs.append((out_name, pdf_bytes))
 
-        # accumulate detailed debug item for optional JSON file
+        # detailed debug item for optional JSON file
         debug_items.append({
             "output_filename": out_name,
             "doc_name": doc_name,
-            "is_minor": is_minor,
             "template_file": template_file,
             "template_path": template_path,
             "field_names": field_names,
@@ -554,11 +589,10 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
         messages.error(request, "No PDF templates found. Check your pdf_templates folder and filenames.")
         return redirect("clerk:detail", doc_request_id=doc_request_id)
 
-    # If only one PDF and no explicit debug requested, return the PDF (plus helpful headers)
+    # Single PDF no-debug => return PDF
     if len(outputs) == 1 and not include_debug:
         fname, bytes_ = outputs[0]
         resp = HttpResponse(bytes_, content_type="application/pdf")
-        # short debug headers (visible in devtools > network)
         if debug_items:
             d0 = debug_items[0]
             resp["X-Debug-Doc-Name"] = d0.get("doc_name","")
@@ -567,7 +601,7 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
         resp["Content-Disposition"] = f'attachment; filename="{fname}"'
         return resp
 
-    # Otherwise build a ZIP (either multi-PDF or explicit debug request)
+    # Otherwise ZIP
     zbuf = io.BytesIO()
     with zipfile.ZipFile(zbuf, "w", zipfile.ZIP_DEFLATED) as zf:
         for fname, b in outputs:

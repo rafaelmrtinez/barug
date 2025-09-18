@@ -2,96 +2,74 @@
 {% block css %}
 <style>
   :root{
-    --brand:#7a1212; --brand-600:#640e0e; --brand-700:#4a0a0a;
-    --accent:#f2c94c; --line:#e5e7eb; --muted:#64748b;
+    --brand:#7a1212; --brand-700:#4a0a0a; --accent:#f2c94c; --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --card:#fff;
   }
   .hero{
     background: radial-gradient(120% 140% at 0% 0%, var(--brand) 0%, var(--brand-700) 70%);
-    color:#fff; border-radius:16px; padding:18px 20px; box-shadow:0 10px 24px rgba(0,0,0,.18);
+    color:#fff; border-radius:16px; padding:18px 20px; box-shadow:0 12px 28px rgba(0,0,0,.15);
   }
-  .hero .avatar{
-    width:56px;height:56px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;
-    background:rgba(255,255,255,.12); color:#fff;
-    box-shadow:0 0 0 3px rgba(122,18,18,.18);
-  }
-  .chip{ border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.10);
-         border-radius:999px; padding:.35rem .65rem; font-weight:700; }
-  .or-pill{
-    background:#fff; color:#111; border-radius:999px; padding:.35rem .65rem;
-    font-weight:800; display:flex; align-items:center; gap:.35rem;
-  }
-  .or-pill i{ color:#198754; } /* green receipt icon */
-  .card-soft{ border:0; border-radius:14px; background:#fff; box-shadow:0 8px 20px rgba(16,24,40,.06); }
-  .section-title{ font-weight:800; display:flex; align-items:center; gap:.5rem; }
-  .section-title .dot{ width:10px;height:10px;border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px rgba(242,201,76,.25); }
-  .small-muted{ color:var(--muted); }
-  .kv{ list-style:none; padding:0; margin:0; }
-  .kv li{ display:flex; justify-content:space-between; gap:12px; padding:.5rem 0; border-bottom:1px dashed var(--line); }
-  .kv li:last-child{ border-bottom:0; }
-  .kv .label{ color:var(--muted); min-width:130px; }
-  .kv .value{ font-weight:700; }
-  .status-chip{ border-radius:999px; padding:.25rem .6rem; font-weight:700; }
+  .hero .chip{border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.08); color:#f3f4f6; border-radius:999px; padding:6px 12px; font-size:.82rem;}
+  .card-soft{border:0;border-radius:14px;box-shadow:0 10px 24px rgba(16,24,40,.06);background:var(--card);}
+  .section-title{font-weight:800;color:var(--ink);display:flex;align-items:center;gap:.5rem;}
+  .section-title .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(242,201,76,.25);}
+  .small-muted{color:var(--muted);}
+  .kv{list-style:none;padding:0;margin:0}.kv li{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px dashed var(--line)}.kv li:last-child{border-bottom:0}
+  .status-chip{border-radius:999px;padding:4px 10px;font-size:.8rem;background:#fff1}
+  .or-badge{background:#fff3cd;color:#7a5a00;border:1px solid #ffe69c;border-radius:10px;padding:6px 10px;font-weight:700}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container py-3">
 
-  <!-- HERO -->
+  <!-- Hero -->
   <div class="hero mb-3 d-flex align-items-center gap-3">
-    <div class="avatar"><i class="bi bi-file-earmark-text fs-3" aria-hidden="true"></i></div>
+    <div class="rounded-circle bg-white bg-opacity-10 d-flex align-items-center justify-content-center" style="width:56px;height:56px;">
+      <i class="bi bi-printer fs-3"></i>
+    </div>
     <div class="me-auto">
       <div class="fw-bold">Request {{ header.request_code }}</div>
       <div class="text-white-50 small">{{ header.created_at|date:"M d, Y, P" }}</div>
     </div>
-    {% if header.or_number %}
-      <span class="or-pill" title="Official Receipt">
-        <i class="bi bi-receipt"></i> OR {{ header.or_number }}
-      </span>
-    {% endif %}
-    <span class="{{ status_ui.cls }} ms-2 status-chip">{{ status_ui.label }}</span>
+    <div class="d-flex flex-column align-items-end gap-2">
+      <span class="chip">{{ status_ui.label }}</span>
+      {% if header.or_number %}
+        <span class="or-badge">OR: {{ header.or_number }}</span>
+      {% endif %}
+    </div>
   </div>
 
   <div class="row g-3">
     <!-- LEFT -->
     <div class="col-lg-8">
-
-      <!-- Subject / Requester -->
+      <!-- Subject (Resident / On-behalf) -->
       <div class="card card-soft mb-3">
         <div class="card-body">
-          <div class="section-title mb-2"><span class="dot"></span> Resident</div>
+          <div class="section-title mb-2"><span class="dot"></span> Subject</div>
           <div class="row g-4">
-
-            <!-- Subject (who the document is for) -->
-            <div class="col-md-6">
-              <div class="small-muted mb-2">
-                {{ header.is_on_behalf|yesno:"Requested For (On Behalf),Requested For" }}
-              </div>
+            <div class="col-12 col-md-6">
+              <div class="small-muted mb-2">Who the document is about{% if header.is_on_behalf %} <span class="text-danger">(On behalf)</span>{% endif %}</div>
               <ul class="kv">
-                <li><span class="label">Name</span><span class="value">{{ header.subject_full_name|default:"—" }}</span></li>
-                <li><span class="label">Age</span><span class="value">{{ header.subject_age|default:"—" }}</span></li>
-                <li><span class="label">Civil Status</span><span class="value">{{ header.subject_civil_status|default:"—" }}</span></li>
-                <li><span class="label">Nationality</span><span class="value">{{ header.subject_nationality|default:"—" }}</span></li>
-                <li><span class="label">Address</span>
-                  <span class="value text-end" style="max-width:60%">{{ header.subject_address|default:"—" }}</span></li>
+                <li><span class="small-muted">Name</span><span class="fw-semibold">{{ header.subject_full_name|default:"—" }}</span></li>
+                <li><span class="small-muted">Age</span><span>{{ header.subject_age|default:"—" }}</span></li>
+                <li><span class="small-muted">Civil Status</span><span>{{ header.subject_civil_status|default:"—" }}</span></li>
+                <li><span class="small-muted">Nationality</span><span>{{ header.subject_nationality|default:"—" }}</span></li>
+                <li><span class="small-muted">Address</span><span class="text-end" style="max-width:60%">{{ header.subject_address|default:"—" }}</span></li>
               </ul>
             </div>
 
-            <!-- Requester (who submitted) -->
-            <div class="col-md-6">
-              <div class="small-muted mb-2">Requested By</div>
+            <div class="col-12 col-md-6">
+              <div class="small-muted mb-2">Request Meta</div>
               <ul class="kv">
-                <li><span class="label">Name</span><span class="value">{{ header.requester_full_name|default:"—" }}</span></li>
-                <li><span class="label">Resident ID</span>
-                    <span class="value">{{ header.requested_by_person_id|default:"—" }}</span></li>
-                {% if header.is_on_behalf %}
-                  <li><span class="label">On Behalf ID</span>
-                      <span class="value">{{ header.on_behalf_of_person_id|default:"—" }}</span></li>
+                <li><span class="small-muted">Requester</span><span class="fw-semibold">{{ header.requester_full_name|default:"—" }}</span></li>
+                <li><span class="small-muted">Barangay Captain</span><span>{{ header.captain_name|default:"—" }}</span></li>
+                <li><span class="small-muted">City</span><span>{{ header.city|default:"—" }}</span></li>
+                <li><span class="small-muted">Province</span><span>{{ header.province|default:"—" }}</span></li>
+                {% if header.or_number %}
+                <li><span class="small-muted">Official Receipt</span><span class="fw-bold">{{ header.or_number }}</span></li>
                 {% endif %}
               </ul>
             </div>
-
           </div>
         </div>
       </div>
@@ -107,15 +85,16 @@
           </div>
 
           {% if lines %}
-          <div class="table-responsive">
-            <table class="table table-sm align-middle">
-              <thead class="table-light">
-                <tr>
-                  <th>Fee</th><th>Document</th><th>Purpose</th>
-                  <th class="text-center">Qty</th><th class="text-end">Total</th>
-                </tr>
-              </thead>
-              <tbody>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th>Fee</th><th>Document</th><th>Purpose</th>
+                    <th class="text-center">Qty</th>
+                    <th class="text-end">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
                 {% for l in lines %}
                   <tr>
                     <td class="fw-semibold">{{ l.fee_name|default:"—" }}</td>
@@ -125,13 +104,14 @@
                     <td class="text-end fw-bold">₱{{ l.line_total|floatformat:2 }}</td>
                   </tr>
                 {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          {% else %}<div class="text-muted">No items.</div>{% endif %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="text-muted">No items.</div>
+          {% endif %}
 
-          <hr class="my-2">
-          <div class="d-flex justify-content-between">
+          <div class="d-flex justify-content-between mt-2 pt-2 border-top">
             <div class="small-muted">Amount Due</div>
             <div class="fs-5 fw-bold text-danger">₱{{ header.amount_due|floatformat:2 }}</div>
           </div>
@@ -155,33 +135,23 @@
                 </div>
               {% endfor %}
             </div>
-          {% else %}<div class="text-muted">No events yet.</div>{% endif %}
+          {% else %}
+            <div class="text-muted">No events yet.</div>
+          {% endif %}
         </div>
       </div>
     </div>
 
     <!-- RIGHT: Actions -->
     <div class="col-lg-4">
-      <div class="card card-soft sticky-top" style="top: 84px;">
+      <div class="card card-soft sticky-top" style="top:84px">
         <div class="card-body">
           <div class="d-flex align-items-center justify-content-between mb-2">
             <div class="section-title mb-0"><span class="dot"></span> Actions</div>
-            {% if header.or_number %}
-              <span class="or-pill"><i class="bi bi-receipt"></i> OR {{ header.or_number }}</span>
-            {% endif %}
+            <span class="status-chip {{ status_ui.cls }}">{{ status_ui.label }}</span>
           </div>
 
-          <div class="small-muted">Latest OR</div>
-          {% if payments.latest_or_number %}
-            <div class="mb-3">
-              <div class="fw-semibold">{{ payments.latest_or_number }}</div>
-              <div class="small text-muted">{{ payments.latest_or_time|date:"M d, Y, P" }}</div>
-            </div>
-          {% else %}
-            <div class="mb-3 text-muted">None yet</div>
-          {% endif %}
-
-          <button class="btn btn-warning w-100 mb-2" data-bs-toggle="modal" data-bs-target="#confirmPrintModal">
+          <button class="btn btn-primary w-100 mb-2" data-bs-toggle="modal" data-bs-target="#confirmPrintModal">
             <i class="bi bi-download me-1"></i> Mark For Printing & Download
           </button>
 
@@ -194,7 +164,7 @@
           <hr class="my-3">
 
           <form method="post" action="{% url 'clerk:decline' header.doc_request_id %}"
-                onsubmit="return confirm('Decline this request?');">
+                onsubmit="return confirm('Decline this request? This cannot be undone.');">
             {% csrf_token %}
             <div class="mb-2">
               <label class="form-label">Decline Reason</label>
@@ -202,26 +172,41 @@
             </div>
             <button class="btn btn-outline-danger w-100">Decline</button>
           </form>
+
+          {% if header.or_number %}
+          <div class="alert alert-warning mt-3 mb-0">
+            <div class="fw-bold">Official Receipt</div>
+            <div>{{ header.or_number }}</div>
+          </div>
+          {% endif %}
         </div>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- Confirm & Download Modal (unchanged behavior) -->
-  <div class="modal fade" id="confirmPrintModal" tabindex="-1" aria-labelledby="confirmPrintLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-      <div class="modal-content">
-        <div class="modal-header" style="background:#fff7e0;">
-          <h5 class="modal-title" id="confirmPrintLabel">Confirm &amp; Download</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
+<!-- Confirm & Download Modal -->
+<div class="modal fade" id="confirmPrintModal" tabindex="-1" aria-labelledby="confirmPrintLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header" style="background: #fff7e6;">
+        <h5 class="modal-title" id="confirmPrintLabel">Confirm &amp; Download</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="mb-3">
           <div class="small-muted">Request Code</div>
-          <div class="fw-bold mb-2">{{ header.request_code }}</div>
+          <div class="fw-bold">{{ header.request_code }}</div>
+        </div>
 
-          <div class="small-muted">Subject (who the document is for)</div>
-          <div class="fw-semibold mb-3">{{ header.subject_full_name|default:"—" }}</div>
+        <div class="mb-3">
+          <div class="small-muted">Subject</div>
+          <div class="fw-semibold">{{ header.subject_full_name|default:"—" }}</div>
+        </div>
 
+        <div class="mb-3">
+          <div class="small-muted">Items</div>
           <div class="table-responsive">
             <table class="table align-middle">
               <thead class="table-light">
@@ -244,24 +229,21 @@
               </tfoot>
             </table>
           </div>
-
           <div class="small text-muted">
-            Continuing will (1) mark as <strong>For Printing</strong> and (2) download the filled PDF(s).
+            Proceeding will (1) mark this request as <strong>For Printing</strong> and (2) download the filled PDF(s).
           </div>
         </div>
-        <div class="modal-footer">
-          <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-          <form method="post" action="{% url 'clerk:mark_printing' header.doc_request_id %}">
-            {% csrf_token %}
-            <input type="hidden" name="download" value="1">
-            <button class="btn btn-warning text-dark fw-bold">
-              <i class="bi bi-download me-1"></i> Proceed &amp; Download
-            </button>
-          </form>
-        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form method="post" action="{% url 'clerk:mark_printing' header.doc_request_id %}">
+          {% csrf_token %}
+          <input type="hidden" name="download" value="1">
+          <button class="btn btn-primary"><i class="bi bi-download me-1"></i> Proceed &amp; Download</button>
+        </form>
       </div>
     </div>
   </div>
-
 </div>
 {% endblock %}
