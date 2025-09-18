@@ -66,6 +66,80 @@ def _guard(request: HttpRequest) -> HttpResponse | None:
         return HttpResponseForbidden("Missing staff id.")
     return None
 
+
+def pick(*vals, allow_zero: bool = False):
+    """
+    Return the first value that is not None and not an empty string.
+    If allow_zero=True, a numeric 0 is considered valid.
+    """
+    for v in vals:
+        if v is None:
+            continue
+        if isinstance(v, str) and v.strip() == "":
+            continue
+        if v == 0 and not allow_zero:
+            # skip numeric zero only when not allowed
+            continue
+        return v
+    return None
+
+
+def subject_view(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Decide who the document is about. If on-behalf fields exist, use them;
+    otherwise use the requester. Line-level overrides (subject_*) win.
+    """
+    has_on_behalf = bool(header.get("on_behalf_of_person_id") or header.get("on_behalf_full_name"))
+
+    full_name = pick(
+        line.get("subject_full_name"),
+        header.get("subject_full_name"),
+        header.get("on_behalf_full_name") if has_on_behalf else header.get("requester_full_name"),
+        header.get("requester_full_name"),
+        header.get("resident_name"),
+        header.get("full_name"),
+    )
+
+    address = pick(
+        line.get("subject_address"),
+        header.get("subject_address"),
+        header.get("on_behalf_address") if has_on_behalf else header.get("address"),
+        header.get("address"),
+    )
+
+    age = pick(
+        line.get("subject_age"),
+        header.get("subject_age"),
+        header.get("on_behalf_age") if has_on_behalf else header.get("requester_age"),
+        header.get("requester_age"),
+        header.get("age"),
+        allow_zero=True,  # <- IMPORTANT: keep 0
+    )
+
+    civil = pick(
+        line.get("subject_civil_status"),
+        header.get("subject_civil_status"),
+        header.get("on_behalf_civil_status") if has_on_behalf else header.get("civil_status"),
+        header.get("civil_status"),
+    )
+
+    nat = pick(
+        line.get("subject_nationality"),
+        header.get("subject_nationality"),
+        header.get("on_behalf_nationality") if has_on_behalf else header.get("nationality"),
+        header.get("nationality"),
+    )
+
+    return {
+        "full_name": full_name or "",
+        "address": address or "",
+        "age": age if age is not None else "",
+        "civil_status": civil or "",
+        "nationality": nat or "",
+        "is_on_behalf": has_on_behalf,
+    }
+
+
 # =========================
 # Clerk — Queue / List
 # =========================
@@ -108,6 +182,9 @@ def queue(request: HttpRequest):
 # =========================
 # Clerk — Detail
 # =========================
+
+# ... imports unchanged ...
+
 def detail(request: HttpRequest, doc_request_id: int):
     bundle = supabase.rpc("fetch_doc_request_detail_bundle", {"p_doc_request_id": doc_request_id}).execute()
     if getattr(bundle, "error", None):
@@ -124,9 +201,27 @@ def detail(request: HttpRequest, doc_request_id: int):
     for l in lines:
         l["purpose_display"] = _titleize(l.get("purpose_code"))
 
+    # OR number for UI and PDFs
+    header["or_number"] = (
+        payments.get("latest_or_number")
+        or header.get("latest_or_number")
+        or header.get("or_number")
+        or ""
+    )
+
+    # Subject (who the doc is about) for display
+    subj = subject_view(header, {})
+    header["is_on_behalf"] = subj["is_on_behalf"]
+    header["subject_full_name"] = subj["full_name"]
+    header["subject_address"] = subj["address"]
+    header["subject_age"] = subj["age"]
+    header["subject_civil_status"] = subj["civil_status"]
+    header["subject_nationality"] = subj["nationality"]
+
     return render(request, "clerk/detail.html", {
         "header": header, "status_ui": ui, "lines": lines, "payments": payments, "timeline": timeline,
     })
+
 
 # =========================
 # PDF helpers
@@ -174,14 +269,19 @@ def _is_minor(header: Dict[str, Any], line: Dict[str, Any]) -> bool:
 def _fill_fields_for_line(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[str, str]:
     now = timezone.localtime()
     d, m, y = _date_parts(now)
-    full_name  = _safe_str(line.get("requester_full_name") or header.get("requester_full_name") or header.get("resident_name") or header.get("full_name"))
-    addr       = _safe_str(line.get("requester_addr") or header.get("address") or "")
-    barangay   = "Señor Santo Niño"
-    city       = _safe_str(header.get("city") or "Cebu City")
-    province   = _safe_str(header.get("province") or "Cebu")
-    age        = _safe_str(line.get("requester_age") or header.get("requester_age") or "")
-    civil      = _safe_str(line.get("civil_status") or header.get("civil_status") or "")
-    nationality= _safe_str(line.get("requester_nationality") or header.get("nationality") or "")
+
+    subj = subject_view(header, line)   # <- single source of truth
+
+    subject_full_name  = _safe_str(subj["full_name"])
+    subject_addr       = _safe_str(subj["address"])
+    subject_age        = _safe_str(subj["age"])           # can be "0"
+    subject_civil      = _safe_str(subj["civil_status"])
+    subject_nat        = _safe_str(subj["nationality"])
+
+    barangay = "Señor Santo Niño"
+    city     = _safe_str(header.get("city") or "Cebu City")
+    province = _safe_str(header.get("province") or "Cebu")
+
     purpose = _humanize_purpose(
         line.get("purpose_display")
         or line.get("purpose_label")
@@ -190,75 +290,124 @@ def _fill_fields_for_line(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[
         or (line.get("details") or {}).get("purpose_code")
     )
 
-    line_total = _safe_str(line.get("line_total") or "")
-    or_no      = _safe_str(header.get("or_number") or (header.get("payments", {}) or {}).get("or_number") or "")
-    captain    = _safe_str(header.get("captain_name") or "Lourdes R. Ramirez")
-    doc_name   = _safe_str(line.get("document_type_name")).lower()
+    line_total = _safe_str(pick(line.get("line_total"), "", allow_zero=True))
+    or_no = _safe_str(
+        pick(
+            line.get("or_number"),
+            header.get("or_number"),
+            (header.get("payments") or {}).get("latest_or_number"),
+        )
+    )
+    captain  = _safe_str(header.get("captain_name") or "Lourdes R. Ramirez")
+    doc_name = _safe_str(line.get("document_type_name")).lower()
+
+    # minor check based on subject age
+    def is_minor() -> bool:
+        try:
+            return int(subj["age"]) < 18
+        except Exception:
+            return False
 
     if "clearance" in doc_name:
-        if _is_minor(header, line):
-            return {"requestor_full_name": full_name,"requestor_age": age,"requestor_addr": addr,
-                    "guardiang_name": _safe_str(line.get("guardian_name") or ""),
-                    "guardian_relationship": _safe_str(line.get("guardian_relationship") or ""),
-                    "request_purpose": purpose,"date_issued": d,"month_issued": m,"Text Box 1": y,
-                    "barangay_issued": barangay,"city_mun_issued": city,"province_issued": province,
-                    "brgy_captain": captain,"total_amnt": line_total,"or_number": or_no}
+        if is_minor():
+            return {
+                "requestor_full_name": subject_full_name,
+                "requestor_age": subject_age,
+                "requestor_addr": subject_addr,
+                "guardiang_name": _safe_str(line.get("guardian_name") or ""),
+                "guardian_relationship": _safe_str(line.get("guardian_relationship") or ""),
+                "request_purpose": purpose, "date_issued": d, "month_issued": m, "Text Box 1": y,
+                "barangay_issued": barangay, "city_mun_issued": city, "province_issued": province,
+                "brgy_captain": captain, "total_amnt": line_total, "or_number": or_no
+            }
         else:
-            return {"requestor_full_name": full_name,"requestor_age": age,"requestor_civil_status": civil,"requestor_addr": addr,
-                    "doc_purpose": purpose,"date_issued": d,"month_issued": m,"year_issued": y,
-                    "barangay_issued": barangay,"city_mun_issued": city,"province_issued": province,
-                    "brgy_captain": captain,"totla_amnt": line_total,"or_number": or_no}
+            return {
+                "requestor_full_name": subject_full_name,
+                "requestor_age": subject_age,
+                "requestor_civil_status": subject_civil,
+                "requestor_addr": subject_addr,
+                "doc_purpose": purpose, "date_issued": d, "month_issued": m, "year_issued": y,
+                "barangay_issued": barangay, "city_mun_issued": city, "province_issued": province,
+                "brgy_captain": captain, "totla_amnt": line_total, "or_number": or_no
+            }
 
     if "indigency" in doc_name or "indegency" in doc_name:
-        if _is_minor(header, line):
-            return {"requestor_name": full_name,"requestor_age": age,"requestor_nationality": nationality,
-                    "requestor_barangay": barangay,"requestor_cty_mun": city,"requestor_province": province,
-                    "guardian_name": _safe_str(line.get("guardian_name") or ""), "guardian_relation": _safe_str(line.get("guardian_relationship") or ""),
-                    "doc_purpose": purpose,"issued_date": d,"issued_month": m,"issued_year": y,
-                    "barangay_issued": barangay,"city_mun_issued": city,"province_issued": province,
-                    "brgy_capt": captain,"total_amnt": line_total,"or_number": or_no}
+        if is_minor():
+            return {
+                "requestor_name": subject_full_name,
+                "requestor_age": subject_age,
+                "requestor_nationality": subject_nat,
+                "requestor_barangay": barangay, "requestor_cty_mun": city, "requestor_province": province,
+                "guardian_name": _safe_str(line.get("guardian_name") or ""), "guardian_relation": _safe_str(line.get("guardian_relationship") or ""),
+                "doc_purpose": purpose, "issued_date": d, "issued_month": m, "issued_year": y,
+                "barangay_issued": barangay, "city_mun_issued": city, "province_issued": province,
+                "brgy_capt": captain, "total_amnt": line_total, "or_number": or_no
+            }
         else:
-            return {"requestor_full_name": full_name,"requestor_age": age,"requestor_civil_status": civil,"requestor_nationality": nationality,
-                    "requestor_barangay": barangay,"requestor_city_mun": city,"requestor_province": province,
-                    "requesition_purpose": purpose,"issued_date": d,"issued_month": m,"issued_year": y,
-                    "barangay_issued": barangay,"city_mun_issued": city,"province_issued": province,
-                    "brgy_captain": captain,"total_amnt": line_total,"or_number": or_no}
+            return {
+                "requestor_full_name": subject_full_name, "requestor_age": subject_age,
+                "requestor_civil_status": subject_civil, "requestor_nationality": subject_nat,
+                "requestor_barangay": barangay, "requestor_city_mun": city, "requestor_province": province,
+                "requesition_purpose": purpose, "issued_date": d, "issued_month": m, "issued_year": y,
+                "barangay_issued": barangay, "city_mun_issued": city, "province_issued": province,
+                "brgy_captain": captain, "total_amnt": line_total, "or_number": or_no
+            }
 
     if "low" in doc_name and "income" in doc_name:
-        if _is_minor(header, line):
-            return {"requestor_full_name": full_name,"requestor_age": age,"requestor_nationality": nationality,
-                    "requestor_barangay": barangay,"requestor_city_municapility": city,"requestor_province": province,
-                    "requestor_earning": _safe_str(line.get("monthly_income") or ""),
-                    "guardian_name": _safe_str(line.get("guardian_name") or ""),"guardian_relationship": _safe_str(line.get("guardian_relationship") or ""),
-                    "request_purpose": purpose,"date_issued": d,"month_issued": m,"year_issued": y,
-                    "barangay_issued": barangay,"city_issued": city,"province_issued": province,
-                    "brgy_captain": captain,"total_amnt": line_total,"or_number": or_no}
+        if is_minor():
+            return {
+                "requestor_full_name": subject_full_name, "requestor_age": subject_age,
+                "requestor_nationality": subject_nat, "requestor_barangay": barangay,
+                "requestor_city_municapility": city, "requestor_province": province,
+                "requestor_earning": _safe_str(line.get("monthly_income") or ""),
+                "guardian_name": _safe_str(line.get("guardian_name") or ""),
+                "guardian_relationship": _safe_str(line.get("guardian_relationship") or ""),
+                "request_purpose": purpose, "date_issued": d, "month_issued": m, "year_issued": y,
+                "barangay_issued": barangay, "city_issued": city, "province_issued": province,
+                "brgy_captain": captain, "total_amnt": line_total, "or_number": or_no
+            }
         else:
-            return {"full_name": full_name,"age": age,"civil_status": civil,"nationality": nationality,
-                    "barangay_name": barangay,"city_municipality": city,"province": province,
-                    "total_earning": _safe_str(line.get("monthly_income") or ""), "purpose": purpose,
-                    "day": d, "month": m, "year": y,
-                    "issued_at_brgy": barangay,"issued_at_city_municipality": city,"issued_at_province": province,
-                    "amnt": line_total,"official_reciept": or_no}
+            return {
+                "full_name": subject_full_name, "age": subject_age,
+                "civil_status": subject_civil, "nationality": subject_nat,
+                "barangay_name": barangay, "city_municipality": city, "province": province,
+                "total_earning": _safe_str(line.get("monthly_income") or ""), "purpose": purpose,
+                "day": d, "month": m, "year": y,
+                "issued_at_brgy": barangay, "issued_at_city_municipality": city, "issued_at_province": province,
+                "amnt": line_total, "official_reciept": or_no
+            }
 
     if "death" in doc_name:
-        return {"requestor_full_name": full_name,"deceased_civil_status": civil,"deceased_nationality": nationality,
-                "deceased_barangay": barangay,"deceased_city_mun": city,"deceased_province": province,
-                "date_of_death": _safe_str(line.get("death_day") or d),"month_of_death": _safe_str(line.get("death_month") or m),"year_of_death": _safe_str(line.get("death_year") or y),
-                "place_of_death": _safe_str(line.get("place_of_death") or ""),
-                "curr_date": d, "curr_month": m, "curr_year": y,
-                "barangay_issued": barangay,"city_mun_issued": city,"province_issued": province,
-                "brgy_captain": captain,"total_amnt": line_total,"or_number": or_no}
+        return {
+            "requestor_full_name": subject_full_name,
+            "deceased_civil_status": subject_civil,
+            "deceased_nationality": subject_nat,
+            "deceased_barangay": barangay, "deceased_city_mun": city, "deceased_province": province,
+            "date_of_death": _safe_str(line.get("death_day") or d),
+            "month_of_death": _safe_str(line.get("death_month") or m),
+            "year_of_death": _safe_str(line.get("death_year") or y),
+            "place_of_death": _safe_str(line.get("place_of_death") or ""),
+            "curr_date": d, "curr_month": m, "curr_year": y,
+            "barangay_issued": barangay, "city_mun_issued": city, "province_issued": province,
+            "brgy_captain": captain, "total_amnt": line_total, "or_number": or_no
+        }
 
     if "permit" in doc_name:
         event_dt = _safe_str(line.get("event_date_time") or "")
-        return {"requestor_org": _safe_str(line.get("org_name") or ""), "requestor_name": full_name,
-                "requested_event": _safe_str(line.get("event_name") or ""), "event_location": _safe_str(line.get("event_location") or ""),
-                "barangay_name": barangay, "brgy_date_time": event_dt,
-                "issued_date": d, "issued_month": m, "issued_year": y,
-                "barangay_issued": barangay, "cty_mun_issued": city, "province_issued": province,
-                "brgy_capt": captain, "total_amnt": line_total, "or_number": or_no}
+        return {
+            "requestor_org": _safe_str(line.get("org_name") or ""),
+            "requestor_name": subject_full_name,
+            "requested_event": _safe_str(line.get("event_name") or ""),
+            "event_location": _safe_str(line.get("event_location") or ""),
+            "barangay_name": barangay, "brgy_date_time": event_dt,
+            "issued_date": d, "issued_month": m, "issued_year": y,
+            "barangay_issued": barangay, "cty_mun_issued": city, "province_issued": province,
+            "brgy_capt": captain, "total_amnt": line_total, "or_number": or_no
+        }
+
     return {}
+
+
 
 def _get_all_pdf_field_names(template_path: str) -> List[str]:
     names: List[str] = []

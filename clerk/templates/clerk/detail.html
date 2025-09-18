@@ -1,95 +1,157 @@
 {% extends "base.html" %}
-
 {% block css %}
 <style>
-  :root {
-    --brand-maroon: #6a0d0d;
-    --brand-maroon-2: #530b0b;
-    --brand-accent: #f5e9e9;
+  :root{
+    --brand:#7a1212; --brand-600:#640e0e; --brand-700:#4a0a0a;
+    --accent:#f2c94c; --line:#e5e7eb; --muted:#64748b;
   }
-  .brgy-hero {
-    background: linear-gradient(90deg, var(--brand-maroon), var(--brand-maroon-2));
-    color: #fff;
+  .hero{
+    background: radial-gradient(120% 140% at 0% 0%, var(--brand) 0%, var(--brand-700) 70%);
+    color:#fff; border-radius:16px; padding:18px 20px; box-shadow:0 10px 24px rgba(0,0,0,.18);
   }
-  .brgy-hero .badge {
-    background: rgba(255,255,255,.12);
-    color: #fff;
-    border: 1px solid rgba(255,255,255,.25);
+  .hero .avatar{
+    width:56px;height:56px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,.12); color:#fff;
+    box-shadow:0 0 0 3px rgba(122,18,18,.18);
   }
-  .brgy-hero .avatar {
-    width: 60px; height:60px; border-radius: 50%;
-    background: rgba(255,255,255,.15);
-    display:flex; align-items:center; justify-content:center;
+  .chip{ border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.10);
+         border-radius:999px; padding:.35rem .65rem; font-weight:700; }
+  .or-pill{
+    background:#fff; color:#111; border-radius:999px; padding:.35rem .65rem;
+    font-weight:800; display:flex; align-items:center; gap:.35rem;
   }
-  .card-soft {
-    border: 0; box-shadow: 0 6px 20px rgba(0,0,0,.06);
-  }
-  .btn-maroon { background: var(--brand-maroon); color:#fff; border: none; }
-  .btn-maroon:hover { background: var(--brand-maroon-2); color:#fff; }
-  .btn-outline-maroon { color: var(--brand-maroon); border-color: var(--brand-maroon); background: #fff; }
-  .btn-outline-maroon:hover { background: var(--brand-maroon); color:#fff; }
-  .table thead th { background: var(--brand-accent); border-bottom: 0; }
+  .or-pill i{ color:#198754; } /* green receipt icon */
+  .card-soft{ border:0; border-radius:14px; background:#fff; box-shadow:0 8px 20px rgba(16,24,40,.06); }
+  .section-title{ font-weight:800; display:flex; align-items:center; gap:.5rem; }
+  .section-title .dot{ width:10px;height:10px;border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px rgba(242,201,76,.25); }
+  .small-muted{ color:var(--muted); }
+  .kv{ list-style:none; padding:0; margin:0; }
+  .kv li{ display:flex; justify-content:space-between; gap:12px; padding:.5rem 0; border-bottom:1px dashed var(--line); }
+  .kv li:last-child{ border-bottom:0; }
+  .kv .label{ color:var(--muted); min-width:130px; }
+  .kv .value{ font-weight:700; }
+  .status-chip{ border-radius:999px; padding:.25rem .6rem; font-weight:700; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container py-3">
 
-  <div class="brgy-hero rounded-3 p-4 mb-3 d-flex align-items-center">
-    <div class="me-3 avatar"><i class="bi bi-printer fs-2"></i></div>
+  <!-- HERO -->
+  <div class="hero mb-3 d-flex align-items-center gap-3">
+    <div class="avatar"><i class="bi bi-file-earmark-text fs-3" aria-hidden="true"></i></div>
     <div class="me-auto">
-      <div class="fs-5 fw-bold mb-0">Request {{ header.request_code }}</div>
-      <div class="text-white-50">{{ header.created_at|date:"M d, Y, P" }}</div>
+      <div class="fw-bold">Request {{ header.request_code }}</div>
+      <div class="text-white-50 small">{{ header.created_at|date:"M d, Y, P" }}</div>
     </div>
-    <span class="{{ status_ui.cls }}">{{ status_ui.label }}</span>
+    {% if header.or_number %}
+      <span class="or-pill" title="Official Receipt">
+        <i class="bi bi-receipt"></i> OR {{ header.or_number }}
+      </span>
+    {% endif %}
+    <span class="{{ status_ui.cls }} ms-2 status-chip">{{ status_ui.label }}</span>
   </div>
 
   <div class="row g-3">
+    <!-- LEFT -->
     <div class="col-lg-8">
+
+      <!-- Subject / Requester -->
       <div class="card card-soft mb-3">
         <div class="card-body">
-          <h5 class="mb-3">Items</h5>
-          {% if lines %}
-            <div class="table-responsive">
-              <table class="table align-middle">
-                <thead><tr>
-                  <th>Fee</th><th>Document</th><th>Purpose</th>
-                  <th class="text-center">Qty</th><th class="text-end">Total</th>
-                </tr></thead>
-                <tbody>
-                  {% for l in lines %}
-                    <tr>
-                      <td class="fw-semibold">{{ l.fee_name }}</td>
-                      <td>{{ l.document_type_name|default:"—" }}</td>
-                      <td>{{ l.purpose_display|default:"—" }}</td>
-                      <td class="text-center">{{ l.quantity }}</td>
-                      <td class="text-end fw-bold">₱{{ l.line_total|floatformat:2 }}</td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
+          <div class="section-title mb-2"><span class="dot"></span> Resident</div>
+          <div class="row g-4">
+
+            <!-- Subject (who the document is for) -->
+            <div class="col-md-6">
+              <div class="small-muted mb-2">
+                {{ header.is_on_behalf|yesno:"Requested For (On Behalf),Requested For" }}
+              </div>
+              <ul class="kv">
+                <li><span class="label">Name</span><span class="value">{{ header.subject_full_name|default:"—" }}</span></li>
+                <li><span class="label">Age</span><span class="value">{{ header.subject_age|default:"—" }}</span></li>
+                <li><span class="label">Civil Status</span><span class="value">{{ header.subject_civil_status|default:"—" }}</span></li>
+                <li><span class="label">Nationality</span><span class="value">{{ header.subject_nationality|default:"—" }}</span></li>
+                <li><span class="label">Address</span>
+                  <span class="value text-end" style="max-width:60%">{{ header.subject_address|default:"—" }}</span></li>
+              </ul>
             </div>
-          {% else %}<div class="text-muted">No items.</div>{% endif %}
-          <hr>
-          <div class="d-flex justify-content-between">
-            <div class="small text-muted">Amount Due</div>
-            <div class="fs-5 fw-bold">₱{{ header.amount_due|floatformat:2 }}</div>
+
+            <!-- Requester (who submitted) -->
+            <div class="col-md-6">
+              <div class="small-muted mb-2">Requested By</div>
+              <ul class="kv">
+                <li><span class="label">Name</span><span class="value">{{ header.requester_full_name|default:"—" }}</span></li>
+                <li><span class="label">Resident ID</span>
+                    <span class="value">{{ header.requested_by_person_id|default:"—" }}</span></li>
+                {% if header.is_on_behalf %}
+                  <li><span class="label">On Behalf ID</span>
+                      <span class="value">{{ header.on_behalf_of_person_id|default:"—" }}</span></li>
+                {% endif %}
+              </ul>
+            </div>
+
           </div>
         </div>
       </div>
 
+      <!-- Items -->
+      <div class="card card-soft mb-3">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="section-title mb-0"><span class="dot"></span> Items</div>
+            <span class="badge rounded-pill text-bg-warning border border-warning-subtle">
+              {{ lines|length }} item{{ lines|length|pluralize }}
+            </span>
+          </div>
+
+          {% if lines %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Fee</th><th>Document</th><th>Purpose</th>
+                  <th class="text-center">Qty</th><th class="text-end">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for l in lines %}
+                  <tr>
+                    <td class="fw-semibold">{{ l.fee_name|default:"—" }}</td>
+                    <td>{{ l.document_type_name|default:"—" }}</td>
+                    <td>{{ l.purpose_display|default:"—" }}</td>
+                    <td class="text-center">{{ l.quantity }}</td>
+                    <td class="text-end fw-bold">₱{{ l.line_total|floatformat:2 }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}<div class="text-muted">No items.</div>{% endif %}
+
+          <hr class="my-2">
+          <div class="d-flex justify-content-between">
+            <div class="small-muted">Amount Due</div>
+            <div class="fs-5 fw-bold text-danger">₱{{ header.amount_due|floatformat:2 }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timeline -->
       <div class="card card-soft">
         <div class="card-body">
-          <h6 class="mb-2">Timeline</h6>
+          <div class="section-title mb-2"><span class="dot"></span> Timeline</div>
           {% if timeline %}
-            <div class="vstack gap-2">
+            <div class="list-group list-group-flush">
               {% for e in timeline %}
-                <div class="d-flex gap-3">
-                  <div class="text-muted small" style="min-width:170px;">{{ e.occurred_at|date:"M d, Y, P" }}</div>
-                  <div>
+                <div class="list-group-item px-0 d-flex gap-3 align-items-start">
+                  <i class="bi bi-clock-history text-warning"></i>
+                  <div class="flex-grow-1">
                     <div class="fw-semibold">{{ e.action }}</div>
-                    <div class="small text-muted">by {{ e.staff_name|default:"wala atay yawa"}}</div>
+                    {% if e.actor %}<div class="text-muted small">{{ e.actor }}</div>{% endif %}
                   </div>
+                  <div class="text-muted small">{{ e.occurred_at|date:"M d, Y, P" }}</div>
                 </div>
               {% endfor %}
             </div>
@@ -98,12 +160,28 @@
       </div>
     </div>
 
+    <!-- RIGHT: Actions -->
     <div class="col-lg-4">
-      <div class="card card-soft">
+      <div class="card card-soft sticky-top" style="top: 84px;">
         <div class="card-body">
-          <h5 class="mb-3">Actions</h5>
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="section-title mb-0"><span class="dot"></span> Actions</div>
+            {% if header.or_number %}
+              <span class="or-pill"><i class="bi bi-receipt"></i> OR {{ header.or_number }}</span>
+            {% endif %}
+          </div>
 
-          <button class="btn btn-maroon w-100 mb-2" data-bs-toggle="modal" data-bs-target="#confirmPrintModal">
+          <div class="small-muted">Latest OR</div>
+          {% if payments.latest_or_number %}
+            <div class="mb-3">
+              <div class="fw-semibold">{{ payments.latest_or_number }}</div>
+              <div class="small text-muted">{{ payments.latest_or_time|date:"M d, Y, P" }}</div>
+            </div>
+          {% else %}
+            <div class="mb-3 text-muted">None yet</div>
+          {% endif %}
+
+          <button class="btn btn-warning w-100 mb-2" data-bs-toggle="modal" data-bs-target="#confirmPrintModal">
             <i class="bi bi-download me-1"></i> Mark For Printing & Download
           </button>
 
@@ -116,7 +194,7 @@
           <hr class="my-3">
 
           <form method="post" action="{% url 'clerk:decline' header.doc_request_id %}"
-                onsubmit="return confirm('Decline this request? This cannot be undone.');">
+                onsubmit="return confirm('Decline this request?');">
             {% csrf_token %}
             <div class="mb-2">
               <label class="form-label">Decline Reason</label>
@@ -128,30 +206,22 @@
       </div>
     </div>
   </div>
-</div>
 
-<!-- Confirm & Download Modal -->
-<div class="modal fade" id="confirmPrintModal" tabindex="-1" aria-labelledby="confirmPrintLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header" style="background: var(--brand-accent);">
-        <h5 class="modal-title" id="confirmPrintLabel">Confirm &amp; Download</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-
-      <div class="modal-body">
-        <div class="mb-3">
-          <div class="small text-muted">Request Code</div>
-          <div class="fw-bold">{{ header.request_code }}</div>
+  <!-- Confirm & Download Modal (unchanged behavior) -->
+  <div class="modal fade" id="confirmPrintModal" tabindex="-1" aria-labelledby="confirmPrintLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header" style="background:#fff7e0;">
+          <h5 class="modal-title" id="confirmPrintLabel">Confirm &amp; Download</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
+        <div class="modal-body">
+          <div class="small-muted">Request Code</div>
+          <div class="fw-bold mb-2">{{ header.request_code }}</div>
 
-        <div class="mb-3">
-          <div class="small text-muted">Resident / Requester</div>
-          <div class="fw-semibold">{{ header.requester_full_name|default:"—" }}</div>
-        </div>
+          <div class="small-muted">Subject (who the document is for)</div>
+          <div class="fw-semibold mb-3">{{ header.subject_full_name|default:"—" }}</div>
 
-        <div class="mb-3">
-          <div class="small text-muted">Items</div>
           <div class="table-responsive">
             <table class="table align-middle">
               <thead class="table-light">
@@ -174,21 +244,24 @@
               </tfoot>
             </table>
           </div>
+
           <div class="small text-muted">
-            Continuing will (1) mark this request as <strong>For Printing</strong>, and (2) download the filled PDF(s).
+            Continuing will (1) mark as <strong>For Printing</strong> and (2) download the filled PDF(s).
           </div>
         </div>
-      </div>
-
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-        <form method="post" action="{% url 'clerk:mark_printing' header.doc_request_id %}">
-          {% csrf_token %}
-          <input type="hidden" name="download" value="1">
-          <button class="btn btn-maroon"><i class="bi bi-download me-1"></i> Proceed &amp; Download</button>
-        </form>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <form method="post" action="{% url 'clerk:mark_printing' header.doc_request_id %}">
+            {% csrf_token %}
+            <input type="hidden" name="download" value="1">
+            <button class="btn btn-warning text-dark fw-bold">
+              <i class="bi bi-download me-1"></i> Proceed &amp; Download
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   </div>
+
 </div>
 {% endblock %}
