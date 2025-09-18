@@ -52,6 +52,7 @@
           <tr>
             <th style="width: 12rem;">Request Code</th>
             <th>Requester</th>
+            <th>On Behalf Of</th>
             <th>Documents</th>
             <th>Purposes</th>
             <th>Status</th>
@@ -63,9 +64,10 @@
             <tr>
               <td><code>{{ r.request_code }}</code></td>
               <td>
-                {{ r.requester_full_name|default:"—" }}<br>
+                {{ r.requested_by|default:"—" }}<br>
                 <small class="text-muted">{{ r.request_date|date:"Y-m-d H:i" }}</small>
               </td>
+              <td>{{ r.on_behalf_of|default:"—" }}</td>
               <td>{{ r.doc_types|join:", " }}</td>
               <td>
                 {% if r.purposes_display %}

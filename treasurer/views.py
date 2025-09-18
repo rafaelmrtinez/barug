@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib import messages
 from django.http import HttpResponseForbidden, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
@@ -82,10 +83,11 @@ def queue(request: HttpRequest):
         {
             "rows": rows,
             "q": q or "",
-            "statuses": statuses,         # currently selected
-            "status_options": status_options,  # for the checkboxes/chips
+            "statuses": statuses,
+            "status_options": status_options,
         },
     )
+
 
 # ========== Detail (with payment panel) ==========
 def detail(request: HttpRequest, doc_request_id: int):
@@ -97,26 +99,56 @@ def detail(request: HttpRequest, doc_request_id: int):
         return redirect("treasurer:queue")
 
     data: Dict[str, Any] = bundle.data or {}
-    header, lines, payments, timeline = data.get("header", {}), data.get("lines", []), data.get("payments", {}), data.get("timeline", [])
+    header = data.get("header", {}) or {}
+    lines: List[Dict[str, Any]] = data.get("lines", []) or []
+    payments = data.get("payments", {}) or {}
+    timeline = data.get("timeline", []) or []
 
     ui = STATUS_UI.get(header.get("status")) or {"label": header.get("status") or "—", "cls": "badge text-bg-secondary"}
-    for l in lines: l["purpose_display"] = _titleize(l.get("purpose_code"))
+    for l in lines:
+        l["purpose_display"] = _titleize(l.get("purpose_code"))
 
-    # payment method lookup
+    # Payment methods
     pm_res = supabase.rpc("get_payment_methods", {}).execute()
     methods = pm_res.data or []
 
+    # --- Build public URLs for authorization letters ---
+    BUCKET = "authorization-letters"
+    supabase_url = getattr(settings, "SUPABASE_URL", "").rstrip("/")
+    public_prefix = f"{supabase_url}/storage/v1/object/public/{BUCKET}/" if supabase_url else ""
+    # Gather paths from header and lines (de-dup)
+    seen = set()
+    paths: List[str] = []
+    for p in (header.get("auth_letter_paths") or []):
+        if p and p not in seen:
+            seen.add(p); paths.append(p)
+    for ln in lines:
+        p = (ln.get("details") or {}).get("auth_letter_path")
+        if p and p not in seen:
+            seen.add(p); paths.append(p)
+
+    auth_links = []
+    for p in paths:
+        name = str(p).split("/")[-1]
+        url = (public_prefix + str(p).lstrip("/")) if public_prefix else ""
+        auth_links.append({
+            "name": name,
+            "url": url,
+            "is_pdf": name.lower().endswith(".pdf"),
+        })
+
     return render(request, "treasurer/detail.html", {
-        "header": header, "status_ui": ui, "lines": lines,
-        "payments": payments, "timeline": timeline, "methods": methods
+        "header": header,
+        "status_ui": ui,
+        "lines": lines,
+        "payments": payments,
+        "timeline": timeline,
+        "methods": methods,
+        "auth_links": auth_links,
     })
 
 
 # ========== Take payment (POST) ==========
-from decimal import Decimal
-from django.utils.html import escape
-from django.contrib import messages
-
 def take_payment(request: HttpRequest, doc_request_id: int):
     staff_id = 2  # TODO: pull from session/auth
     method_id = int(request.POST.get("payment_method_id", "0") or 0)
@@ -127,11 +159,11 @@ def take_payment(request: HttpRequest, doc_request_id: int):
         return redirect("treasurer:detail", doc_request_id=doc_request_id)
 
     res = supabase.rpc("treasurer_accept_payment", {
-        "p_amount_paid": float(amount_paid),          # or str(amount_paid) if you prefer
+        "p_amount_paid": float(amount_paid),
         "p_doc_request_id": doc_request_id,
         "p_payment_method_id": method_id,
         "p_received_by_staff_id": staff_id,
-        # "p_or_number": "OR-..."                     # optional manual OR number
+        # "p_or_number": "OR-..."
     }).execute()
 
     if getattr(res, "error", None):
@@ -141,9 +173,9 @@ def take_payment(request: HttpRequest, doc_request_id: int):
     or_id = res.data  # <-- INT or_id returned by the RPC
 
     # Fetch OR details for the toast
-    or_res = supabase.table("official_receipt") \
-        .select("or_number, amount_paid, amount_due, change_due") \
-        .eq("or_id", or_id).single().execute()
+    or_res = (supabase.table("official_receipt")
+        .select("or_number, amount_paid, amount_due, change_due")
+        .eq("or_id", or_id).single().execute())
 
     if getattr(or_res, "error", None) or not or_res.data:
         messages.success(request, f"Payment posted. OR id {or_id}.")
@@ -156,7 +188,6 @@ def take_payment(request: HttpRequest, doc_request_id: int):
         )
 
     return redirect("treasurer:detail", doc_request_id=doc_request_id)
-
 
 
 # ========== Fees search + update ==========
@@ -183,7 +214,7 @@ def fee_update(request: HttpRequest):
     reason = (request.POST.get("reason") or "").strip() or None
     try:
         new_amount = float(Decimal(request.POST.get("new_amount", "0")))
-    except:
+    except Exception:
         messages.error(request, "Invalid amount.")
         return redirect("treasurer:fees")
 
