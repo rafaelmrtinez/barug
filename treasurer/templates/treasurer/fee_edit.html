@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-3">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">Edit Fee: <code>{{ fee_code }}</code></h1>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{% url 'treasurer:fees' %}">Back to Fees</a>
+    </div>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="row g-3">
+      <div class="col-lg-8">
+        <div class="card">
+          <div class="card-body">
+            <h5 class="mb-3">Basics</h5>
+            <div class="row g-3">
+              <div class="col-md-8">
+                <label class="form-label">Fee Name</label>
+                <input class="form-control" name="fee_name" value="{{ fee.name }}">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Unit</label>
+                <input class="form-control" name="unit" value="{{ fee.unit|default:'per_doc' }}">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Current Amount</label>
+                <input class="form-control" name="current_amount" type="number" step="0.01"
+                       value="{{ fee.current_amount }}">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Max Amount</label>
+                <input class="form-control" name="max_amount" type="number" step="0.01"
+                       value="{{ fee.max_amount }}">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Document Type</label>
+                <select class="form-select" name="doc_type_name">
+                  <option value="">(keep as is)</option>
+                  {% for t in doc_types %}
+                    <option value="{{ t.document_type_name }}"
+                      {% if t.document_type_name == fee.request_document_type_name %}selected{% endif %}>
+                      {{ t.document_type_name }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+
+            <hr class="my-3">
+
+            <h6 class="mb-2">Exemptions & Status</h6>
+            <div class="row g-3">
+              <div class="col-md-2 form-check">
+                <input class="form-check-input" type="checkbox" name="ex_ftj" id="ex_ftj"
+                       {% if fee.exempt_ftj %}checked{% endif %}>
+                <label for="ex_ftj" class="form-check-label">FTJ</label>
+              </div>
+              <div class="col-md-2 form-check">
+                <input class="form-check-input" type="checkbox" name="ex_senior" id="ex_senior"
+                       {% if fee.exempt_senior %}checked{% endif %}>
+                <label for="ex_senior" class="form-check-label">Senior</label>
+              </div>
+              <div class="col-md-2 form-check">
+                <input class="form-check-input" type="checkbox" name="ex_pwd" id="ex_pwd"
+                       {% if fee.exempt_pwd %}checked{% endif %}>
+                <label for="ex_pwd" class="form-check-label">PWD</label>
+              </div>
+              <div class="col-md-3 form-check">
+                <input class="form-check-input" type="checkbox" name="ex_indigent" id="ex_indigent"
+                       {% if fee.exempt_indigent %}checked{% endif %}>
+                <label for="ex_indigent" class="form-check-label">Indigent</label>
+              </div>
+              <div class="col-md-3 form-check">
+                <input class="form-check-input" type="checkbox" name="ex_student" id="ex_student"
+                       {% if fee.exempt_student %}checked{% endif %}>
+                <label for="ex_student" class="form-check-label">Student</label>
+              </div>
+
+              <div class="col-12 form-check mt-2">
+                <input class="form-check-input" type="checkbox" name="is_active" id="is_active"
+                       {% if fee.is_active %}checked{% endif %}>
+                <label for="is_active" class="form-check-label">Active</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+              <h5 class="mb-0">Purposes</h5>
+              <button class="btn btn-sm btn-outline-primary" type="button" id="addRow">
+                <i class="bi bi-plus"></i> Add Purpose
+              </button>
+            </div>
+            <div class="table-responsive mt-2">
+              <table class="table align-middle" id="purpTbl">
+                <thead class="table-light">
+                  <tr>
+                    <th style="min-width:160px;">Purpose Code</th>
+                    <th>Label</th>
+                    <th style="min-width:180px;">Doc Type (override)</th>
+                    <th style="min-width:220px;">Default Details (JSON)</th>
+                    <th style="min-width:120px;">Offense No</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for p in purposes %}
+                    <tr>
+                      <td><input class="form-control" name="purp_{{ forloop.counter }}_code" value="{{ p.purpose_code }}"></td>
+                      <td><input class="form-control" name="purp_{{ forloop.counter }}_label" value="{{ p.purpose_label }}"></td>
+                      <td>
+                        <select class="form-select" name="purp_{{ forloop.counter }}_dtype">
+                          <option value=""></option>
+                          {% for t in doc_types %}
+                            <option value="{{ t.document_type_name }}"
+                              {% if t.document_type_name == p.request_document_type_name %}selected{% endif %}>
+                              {{ t.document_type_name }}
+                            </option>
+                          {% endfor %}
+                        </select>
+                      </td>
+                      <td><input class="form-control" name="purp_{{ forloop.counter }}_details" value='{{ p.default_details|default:"{}" }}'></td>
+                      <td><input class="form-control" name="purp_{{ forloop.counter }}_offense" value="{{ p.default_offense_no }}"></td>
+                      <td><button class="btn btn-sm btn-outline-danger remove-row" type="button">&times;</button></td>
+                    </tr>
+                  {% empty %}
+                    <tr class="empty-row"><td colspan="6" class="text-muted">No purposes yet. Click “Add Purpose”.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-body">
+            <h5 class="mb-3">Surcharge Ladder</h5>
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label">1st Offense %</label>
+                <input class="form-control" name="surcharge_1"
+                       value="{% for s in surcharges %}{% if s.offense_no == 1 %}{{ s.percent }}{% endif %}{% endfor %}">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">2nd Offense %</label>
+                <input class="form-control" name="surcharge_2"
+                       value="{% for s in surcharges %}{% if s.offense_no == 2 %}{{ s.percent }}{% endif %}{% endfor %}">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">3rd Offense %</label>
+                <input class="form-control" name="surcharge_3"
+                       value="{% for s in surcharges %}{% if s.offense_no == 3 %}{{ s.percent }}{% endif %}{% endfor %}">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div class="card-body">
+            <label class="form-label">Reason / Note (audit)</label>
+            <input class="form-control" name="reason" placeholder="Why this change?">
+          </div>
+        </div>
+
+        <div class="mt-3 d-flex gap-2">
+          <button class="btn btn-dark"><i class="bi bi-save me-1"></i> Save</button>
+          <a class="btn btn-outline-secondary" href="{% url 'treasurer:fees' %}">Cancel</a>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card">
+          <div class="card-body">
+            <h6 class="mb-2 text-muted">Current</h6>
+            <div><strong>Name:</strong> {{ fee.name }}</div>
+            <div><strong>Type:</strong> {{ fee.request_document_type_name|default:"—" }}</div>
+            <div><strong>Amount:</strong> ₱{{ fee.current_amount|floatformat:2 }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+  const tbl = document.getElementById('purpTbl').querySelector('tbody');
+  const addRow = document.getElementById('addRow');
+  function rowCount(){ return tbl.querySelectorAll('tr').length; }
+  function makeRow(idx){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input class="form-control" name="purp_${idx}_code" placeholder="e.g., EMPLOYMENT"></td>
+      <td><input class="form-control" name="purp_${idx}_label" placeholder="e.g., Employment"></td>
+      <td>
+        <select class="form-select" name="purp_${idx}_dtype">
+          <option value=""></option>
+          {% for t in doc_types %}
+            <option value="{{ t.document_type_name }}">{{ t.document_type_name }}</option>
+          {% endfor %}
+        </select>
+      </td>
+      <td><input class="form-control" name="purp_${idx}_details" placeholder='{"key":"value"}'></td>
+      <td><input class="form-control" name="purp_${idx}_offense" placeholder="1..3"></td>
+      <td><button class="btn btn-sm btn-outline-danger remove-row" type="button">&times;</button></td>
+    `;
+    return tr;
+  }
+  addRow.addEventListener('click', () => {
+    const empty = tbl.querySelector('.empty-row');
+    if (empty) empty.remove();
+    const idx = rowCount() + 1;
+    tbl.appendChild(makeRow(idx));
+  });
+  tbl.addEventListener('click', e => {
+    const btn = e.target.closest('.remove-row');
+    if (!btn) return;
+    btn.closest('tr').remove();
+  });
+</script>
+{% endblock %}

@@ -247,6 +247,13 @@ def detail(request: HttpRequest, doc_request_id: int):
     ui = STATUS_UI.get(header.get("status")) or {"label": header.get("status") or "—", "cls": "badge text-bg-secondary"}
     for l in lines:
         l["purpose_display"] = _titleize(l.get("purpose_code"))
+        
+        l["doc_purpose"] = (
+            l.get("purpose_display")
+            or l.get("purpose_label")
+            or l.get("purpose")
+            or (l.get("details") or {}).get("purpose_code")
+         )
 
     # OR number for UI/PDF
     header["or_number"] = (
@@ -493,26 +500,41 @@ def _set_status(doc_request_id: int, status: str, staff_id: int | None, reason: 
     res = supabase.rpc("forward_to_clerk_for_printing", {"p_doc_request_id": doc_request_id, "p_staff_id": staff_id, "p_reason": reason}).execute()
     return getattr(res, "error", None) and res.error.message
 
+
+def mark_request_ready_for_pickup(request: HttpRequest, doc_request_id: int):
+    if request.method != "POST":
+        return redirect("clerk:detail", doc_request_id=doc_request_id)
+    staff_id = _staff_id(request)
+    reason = (request.POST.get("reason") or "").strip() or None
+    res = supabase.rpc("mark_request_ready_for_pickup", {
+        "p_doc_request_id": doc_request_id,
+        "p_staff_id": staff_id,
+        "p_reason": reason,
+    }).execute()
+    if getattr(res, "error", None):
+        messages.error(request, f"Failed: {escape(res.error.message)}")
+    else:
+        messages.success(request, "Marked as ready for pickup.")
+    return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+
 def mark_for_printing(request: HttpRequest, doc_request_id: int):
     if request.method != "POST":
         return redirect("clerk:detail", doc_request_id=doc_request_id)
 
+    # 🚨 Removed: err = _set_status(doc_request_id, "FOR_PRINTING", _staff_id(request))
+    # 🚨 Removed: marking logic
+    # Now it ONLY downloads
+
     do_download = (request.POST.get("download") == "1")
     include_debug = (request.POST.get("debug") == "1")
 
-    err = _set_status(doc_request_id, "FOR_PRINTING", _staff_id(request))
-    if err and not do_download:
-        messages.error(request, f"Failed: {escape(err)}")
-        return redirect("clerk:detail", doc_request_id=doc_request_id)
-    if not do_download:
-        messages.success(request, "Marked for printing.")
-        return redirect("clerk:detail", doc_request_id=doc_request_id)
-
+    # Always fetch details for download
     bundle = supabase.rpc("fetch_doc_request_detail_bundle", {"p_doc_request_id": doc_request_id}).execute()
     if getattr(bundle, "error", None):
         messages.error(request, f"Supabase error: {escape(bundle.error.message)}")
         return redirect("clerk:detail", doc_request_id=doc_request_id)
-
+    
     data: Dict[str, Any] = bundle.data or {}
     header = data.get("header", {}) or {}
     lines: List[Dict[str, Any]] = data.get("lines", []) or []
@@ -619,9 +641,28 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
     resp["Content-Disposition"] = f'attachment; filename="{header.get("request_code","REQ")}-documents.zip"'
     return resp
 
+
 def mark_released(request: HttpRequest, doc_request_id: int):
     if request.method != "POST":
         return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+    # Check current status first
+    try:
+        bundle = supabase.rpc("fetch_doc_request_detail_bundle", {"p_doc_request_id": doc_request_id}).execute()
+        if getattr(bundle, "error", None):
+            messages.error(request, f"Supabase error: {escape(bundle.error.message)}")
+            return redirect("clerk:detail", doc_request_id=doc_request_id)
+        header = (bundle.data or {}).get("header", {}) or {}
+        current_status = (header.get("status") or "").upper()
+    except Exception:
+        messages.error(request, "Failed to verify request status.")
+        return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+    if current_status != "READY FOR PICKUP":
+        messages.error(request, "Cannot mark as RELEASED. Request must be READY_FOR_PICKUP first.")
+        return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+    # proceed with release
     staff_id = _staff_id(request)
     reason   = (request.POST.get("reason") or "").strip() or None
     res = supabase.rpc("mark_request_released", {"p_doc_request_id": doc_request_id, "p_staff_id": staff_id, "p_reason": reason}).execute()
@@ -630,6 +671,7 @@ def mark_released(request: HttpRequest, doc_request_id: int):
     else:
         messages.success(request, "Marked as released.")
     return redirect("clerk:detail", doc_request_id=doc_request_id)
+
 
 def decline(request: HttpRequest, doc_request_id: int):
     if request.method != "POST":

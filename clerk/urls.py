@@ -10,6 +10,7 @@ urlpatterns = [
     path("requests/", views.queue, name="queue"),
     path("requests/<int:doc_request_id>/", views.detail, name="detail"),
     path("requests/<int:doc_request_id>/mark-printing/", views.mark_for_printing, name="mark_printing"),
+    path("requests/<int:doc_request_id>/mark-ready-for-pickup/", views.mark_request_ready_for_pickup, name="mark_ready_for_pickup"),
     path("requests/<int:doc_request_id>/mark-released/", views.mark_released, name="mark_released"),
     path("requests/<int:doc_request_id>/decline/", views.decline, name="decline"),
 

@@ -114,6 +114,12 @@
                     </td>
                     <td class="text-end fw-semibold">₱{{ f.current_amount|floatformat:2 }}</td>
                     <td class="text-end">
+
+                        <a class="btn btn-outline-secondary btn-sm" href="{% url 'treasurer:fee_edit' f.fee_code %}">
+  <i class="bi bi-pencil-square"></i> Edit
+</a>
+
+
                       <form class="d-flex justify-content-end gap-2 row-actions align-items-center"
                             method="post" action="{% url 'treasurer:fee_update' %}">
                         {% csrf_token %}
@@ -127,6 +133,10 @@
 
                         <input class="form-control form-control-sm reason-input" name="reason"
                                placeholder="Reason (optional)" aria-label="Reason">
+
+                               <a class="btn btn-outline-secondary btn-sm" href="{% url 'treasurer:fee_edit' f.fee_code %}">
+  <i class="bi bi-pencil-square"></i> Edit
+</a>
 
                         <button class="btn btn-sm text-white" style="background:var(--brand);" disabled>
                           <i class="bi bi-arrow-repeat me-1"></i> Update

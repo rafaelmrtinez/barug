@@ -2,30 +2,12 @@
 {% block content %}
 
 <style>
-  :root {
-    --brand: #7a1212; --brand-700:#4a0a0a; --accent:#f2c94c;
-    --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --card:#fff; --wash:#fafafa;
-  }
-  .hero{
-    background: radial-gradient(120% 140% at 0% 0%, var(--brand) 0%, var(--brand-700) 70%);
-    color:#fff; border-radius:16px; padding:18px 20px; box-shadow:0 12px 28px rgba(0,0,0,.15);
-  }
-  .hero .brand-icon{
-    width:56px; height:56px;
-    border-radius:50%; display:flex; align-items:center; justify-content:center;
-    background: rgba(255,255,255,.08);
-    box-shadow: 0 0 0 3px rgba(122,18,18,.15);
-    position: relative;
-  }
-  .hero .brand-icon::after{
-    content:""; position:absolute; inset:8px; border-radius:50%;
-    background: rgba(242,201,76,.18); /* gold glow behind icon */
-  }
-  .hero .brand-icon i.bi{ color:#fff; position:relative; z-index:1; }  /* ensure visible */
-  .hero .chip{
-    border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.08);
-    color:#f3f4f6; border-radius:999px; padding:6px 12px; font-size:.82rem; width:110px; text-align:center; font-weight:700;
-  }
+  :root { --brand:#7a1212; --brand-700:#4a0a0a; --accent:#f2c94c; --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --card:#fff; --wash:#fafafa; }
+  .hero{ background:radial-gradient(120% 140% at 0% 0%,var(--brand) 0%,var(--brand-700) 70%); color:#fff; border-radius:16px; padding:18px 20px; box-shadow:0 12px 28px rgba(0,0,0,.15); }
+  .hero .brand-icon{ width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.08); box-shadow:0 0 0 3px rgba(122,18,18,.15); position:relative; }
+  .hero .brand-icon::after{ content:""; position:absolute; inset:8px; border-radius:50%; background:rgba(242,201,76,.18); }
+  .hero .brand-icon i.bi{ color:#fff; position:relative; z-index:1; }
+  .hero .chip{ border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.08); color:#f3f4f6; border-radius:999px; padding:6px 12px; font-size:.82rem; width:110px; text-align:center; font-weight:700; }
 
   .card-soft{ border:0; border-radius:14px; box-shadow:0 10px 24px rgba(16,24,40,.06); background:#fff; }
   .section-title{ font-weight:800; color:var(--ink); display:flex; align-items:center; gap:.5rem; }
@@ -51,25 +33,14 @@
   .sticky-aside{ position:sticky; top:84px; }
   .status-chip{ border-radius:999px; padding:4px 10px; font-size:.8rem; background:#fff1; }
 
-  /* OR highlight when paid */
-  .or-highlight{
-    border: 2px solid var(--accent);
-    background: linear-gradient(180deg,#fffdf6,#fff);
-    border-radius: 12px;
-    padding: 10px 12px;
-  }
-  .or-highlight .or-badge{
-    background: var(--accent); color:#000; font-weight:800; border-radius: 6px; padding: 2px 6px;
-  }
+  .or-highlight{ border:2px solid var(--accent); background:linear-gradient(180deg,#fffdf6,#fff); border-radius:12px; padding:10px 12px; }
+  .or-highlight .or-badge{ background:var(--accent); color:#000; font-weight:800; border-radius:6px; padding:2px 6px; }
 </style>
 
 <div class="container py-3">
-
   <!-- Hero -->
   <div class="hero mb-3 d-flex align-items-center gap-3">
-    <div class="brand-icon">
-      <i class="bi bi-cash-coin fs-3" aria-hidden="true"></i>
-    </div>
+    <div class="brand-icon"><i class="bi bi-cash-coin fs-3" aria-hidden="true"></i></div>
     <div class="me-auto">
       <div class="fw-bold">Request {{ header.request_code }}</div>
       <div class="text-white-50 small">{{ header.created_at|date:"M d, Y, P" }}</div>
@@ -81,7 +52,7 @@
     <!-- LEFT -->
     <div class="col-lg-8">
 
-              <!-- Items -->
+      <!-- Items -->
       <div class="card card-soft mb-3">
         <div class="card-body">
           <div class="d-flex align-items-center justify-content-between mb-2">
@@ -92,29 +63,47 @@
           </div>
 
           {% if lines %}
-            <div class="table-responsive">
-              <table class="table table-sm align-middle">
-                <thead class="table-light">
-                  <tr>
-                    <!-- <th>Fee</th> -->
-                    <th>Document</th><th>Purpose</th>
-                    <th class="text-center">Qty</th>
-                    <th class="text-end">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Document</th>
+                  <th>Purpose</th>
+                  <th class="text-center">Qty</th>
+                  <th class="text-end">Total</th>
+                </tr>
+              </thead>
+              <tbody>
                 {% for l in lines %}
-                  <tr>
-                    <!-- <td class="fw-semibold">{{ l.fee_name|default:"—" }}</td> -->
-                    <td>{{ l.document_type_name|default:"—" }}</td>
-                    <td>{{ l.purpose_display|default:"—" }}</td>
-                    <td class="text-center">{{ l.quantity }}</td>
-                    <td class="text-end fw-bold">₱{{ l.line_total|floatformat:2 }}</td>
-                  </tr>
+                <tr>
+                  <td>{{ l.document_type_name|default:"—" }}</td>
+                  <td>{{ l.purpose_display|default:"—" }}</td>
+                  <td class="text-center">{{ l.quantity }}</td>
+                  <td class="text-end fw-bold">
+                    ₱{{ l.line_total|floatformat:2 }}
+                    {% if l.is_exempt %}
+                      <span class="badge text-bg-success ms-2">Exempt</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% if l.reason_chips or l.is_exempt %}
+                <tr class="table-borderless">
+                  <td colspan="4">
+                    <div class="d-flex flex-wrap gap-2">
+                      {% for tag in l.reason_chips %}
+                        <span class="badge rounded-pill bg-success-subtle text-success-emphasis">{{ tag }}</span>
+                      {% endfor %}
+                      {% if l.is_exempt %}
+                        <span class="badge rounded-pill bg-success-subtle text-success-emphasis">Full waiver applied</span>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% endif %}
                 {% endfor %}
-                </tbody>
-              </table>
-            </div>
+              </tbody>
+            </table>
+          </div>
           {% else %}
             <div class="text-muted">No items.</div>
           {% endif %}
@@ -125,14 +114,13 @@
           </div>
         </div>
       </div>
-      
+
       <!-- Resident / On-behalf -->
       <div class="card card-soft mb-3">
         <div class="card-body">
           <div class="section-title mb-2"><span class="dot"></span> Resident</div>
 
           <div class="row g-4">
-            <!-- Requester -->
             <div class="col-12 col-md-6">
               <div class="small-muted mb-2">Requested by</div>
               <ul class="kv">
@@ -141,21 +129,20 @@
                 <li><span class="label">Resident ID</span>
                     <span class="value">{% firstof header.requested_by_person_id header.requested_by_id "—" %}</span></li>
                 {% if header.address or header.barangay or header.city or header.province %}
-                  <li>
-                    <span class="label">Address</span>
-                    <span class="text-end" style="max-width:60%">
-                      {% if header.address %}{{ header.address }}{% else %}
-                        {{ header.barangay|default_if_none:"" }}{% if header.barangay %}, {% endif %}
-                        {{ header.city|default_if_none:"" }}{% if header.city %}, {% endif %}
-                        {{ header.province|default_if_none:"" }}
-                      {% endif %}
-                    </span>
-                  </li>
+                <li>
+                  <span class="label">Address</span>
+                  <span class="text-end" style="max-width:60%">
+                    {% if header.address %}{{ header.address }}{% else %}
+                      {{ header.barangay|default_if_none:"" }}{% if header.barangay %}, {% endif %}
+                      {{ header.city|default_if_none:"" }}{% if header.city %}, {% endif %}
+                      {{ header.province|default_if_none:"" }}
+                    {% endif %}
+                  </span>
+                </li>
                 {% endif %}
               </ul>
             </div>
 
-            <!-- On behalf -->
             <div class="col-12 col-md-6">
               <div class="small-muted mb-2">
                 Requested For{% if not header.on_behalf_full_name and not header.on_behalf_of_person_id and not header.on_behalf_id %}
@@ -196,60 +183,110 @@
         </div>
       </div>
 
+      <!-- Timeline -->
+      <div class="card card-soft mb-3">
+        <div class="card-body">
+          <div class="section-title mb-2"><span class="dot"></span> Timeline</div>
+          {% if timeline %}
+            <ul class="list-unstyled m-0">
+              {% for e in timeline %}
+              <li class="py-2 border-bottom">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <strong>{{ e.action_display }}</strong>
+                    {% if e.to_status_display %}
+                      <span class="badge rounded-pill text-bg-secondary ms-2">{{ e.to_status_display }}</span>
+                    {% endif %}
+                    {% if e.actor %}
+                      <span class="text-muted">— {{ e.actor }}</span>
+                    {% endif %}
+                  </div>
+                  <small class="text-muted">{{ e.occurred_at|date:"M d, Y, P" }}</small>
+                </div>
+              </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="text-muted">No timeline yet.</div>
+          {% endif %}
+        </div>
+      </div>
+
     </div>
 
     <!-- RIGHT: Payment -->
     <div class="col-lg-4">
-      <div class="card card-soft sticky-aside">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between mb-2">
-            <div class="section-title mb-0"><span class="dot"></span> Take Payment</div>
-            <span class="status-chip {{ status_ui.cls }}">{{ status_ui.label }}</span>
-          </div>
+<div class="card card-soft sticky-aside">
+  <div class="card-body">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <div class="section-title mb-0"><span class="dot"></span> Take Payment</div>
+      <span class="status-chip {{ status_ui.cls }}">{{ status_ui.label }}</span>
+    </div>
 
-          <div class="small-muted" style="margin-bottom: 10px;">Official Receipt Number: </div>
-          {% if payments.latest_or_number %}
-            <div class="mb-3 or-highlight">
-              <div class="d-flex align-items-center justify-content-between">
-                <div class="fw-semibold">
-                  <span class="or-badge me-2">OR</span> {{ payments.latest_or_number }}
-                </div>
-                <i class="bi bi-check-circle-fill text-success"></i>
-              </div>
-              <div class="small text-muted">{{ payments.latest_or_time|date:"M d, Y, P" }}</div>
-            </div>
-          {% else %}
-            <div class="mb-3 text-muted">None yet</div>
-          {% endif %}
-
-          {% if header.status == "PAID" %}
-            <div class="alert alert-success mb-0">
-              Payment complete. No further action required.
-            </div>
-          {% else %}
-            <form method="post" action="{% url 'treasurer:take_payment' header.doc_request_id %}">
-              {% csrf_token %}
-              <div class="mb-2">
-                <label class="form-label">Payment Method</label>
-                <select class="form-select" name="payment_method_id" required>
-                  <option value="">Select…</option>
-                  {% for m in methods %}
-                    <option value="{{ m.payment_method_id }}">{{ m.method_name }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Amount Paid (₱)</label>
-                <input class="form-control" name="amount_paid" type="number" step="0.01" min="0" required>
-                <div class="form-text">Amount due: ₱{{ header.amount_due|floatformat:2 }}</div>
-              </div>
-              <button class="btn w-100" style="background: rgba(248, 150, 3, 0.904); color:#fff; border:0;">
-                Accept Payment &amp; Post OR
-              </button>
-            </form>
-          {% endif %}
+    <div class="small-muted" style="margin-bottom: 10px;">Official Receipt Number: </div>
+    {% if payments.latest_or_number %}
+      <div class="mb-3 or-highlight">
+        <div class="d-flex align-items-center justify-content-between">
+          <div class="fw-semibold"><span class="or-badge me-2">OR</span> {{ payments.latest_or_number }}</div>
+          <i class="bi bi-check-circle-fill text-success"></i>
         </div>
+        <div class="small text-muted">{{ payments.latest_or_time|date:"M d, Y, P" }}</div>
       </div>
+    {% else %}
+      <div class="mb-3 text-muted">None yet</div>
+    {% endif %}
+
+    {% if header.amount_due|floatformat:2 == "0.00" %}
+      <div class="alert alert-success">
+        Fully waived / no payment required. Reasons are shown under each item.
+      </div>
+
+      {% if not payments.latest_or_number %}
+        {% if waived_method_id %}
+          <form method="post" action="{% url 'treasurer:take_payment' header.doc_request_id %}" class="mb-2">
+            {% csrf_token %}
+            <input type="hidden" name="payment_method_id" value="{{ waived_method_id }}">
+            <input type="hidden" name="amount_paid" value="0">
+            <button class="btn btn-success w-100">
+              Issue Waived OR (₱0.00) &amp; Move to Printing
+            </button>
+          </form>
+        {% else %}
+          <div class="alert alert-warning">
+            Payment method <strong>WAIVED</strong> was not found. Add it in the database, then reload.
+          </div>
+        {% endif %}
+      {% endif %}
+
+    {% else %}
+      {% if header.status == "PAID" %}
+        <div class="alert alert-success mb-0">Payment complete. No further action required.</div>
+      {% else %}
+        <form method="post" action="{% url 'treasurer:take_payment' header.doc_request_id %}">
+          {% csrf_token %}
+          <div class="mb-2">
+            <label class="form-label">Payment Method</label>
+            <select class="form-select" name="payment_method_id" required>
+              <option value="">Select…</option>
+              {% for m in methods %}
+                <option value="{{ m.payment_method_id }}">{{ m.method_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Amount Paid (₱)</label>
+            <input class="form-control" name="amount_paid" type="number" step="0.01" min="0" required>
+            <div class="form-text">Amount due: ₱{{ header.amount_due|floatformat:2 }}</div>
+          </div>
+          <button class="btn w-100" style="background: rgba(248, 150, 3, 0.904); color:#fff; border:0;">
+            Accept Payment &amp; Post OR
+          </button>
+        </form>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
     </div>
   </div>
 </div>
@@ -269,7 +306,6 @@
 </div>
 
 <script>
-  // Lightbox image swap
   document.addEventListener('click', function(e){
     const t = e.target;
     if (t.matches('.media-thumb')){

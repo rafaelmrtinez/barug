@@ -49,7 +49,7 @@
           <div class="row g-4">
             <div class="col-12 col-md-6">
               <div class="small-muted mb-2">Who the document is about{% if header.is_on_behalf %} <span class="text-danger">(On behalf)</span>{% endif %}</div>
-              <ul class="kv">
+              <ul class="kv">   
                 <li><span class="small-muted">Name</span><span class="fw-semibold">{{ header.subject_full_name|default:"—" }}</span></li>
                 <li><span class="small-muted">Age</span><span>{{ header.subject_age|default:"—" }}</span></li>
                 <li><span class="small-muted">Civil Status</span><span>{{ header.subject_civil_status|default:"—" }}</span></li>
@@ -59,7 +59,7 @@
             </div>
 
             <div class="col-12 col-md-6">
-              <div class="small-muted mb-2">Request Meta</div>
+              <div class="small-muted mb-2">Requester Information</div>
               <ul class="kv">
                 <li><span class="small-muted">Requester</span><span class="fw-semibold">{{ header.requester_full_name|default:"—" }}</span></li>
                 <li><span class="small-muted">Barangay Captain</span><span>{{ header.captain_name|default:"—" }}</span></li>
@@ -99,7 +99,15 @@
                   <tr>
                     <td class="fw-semibold">{{ l.fee_name|default:"—" }}</td>
                     <td>{{ l.document_type_name|default:"—" }}</td>
-                    <td>{{ l.purpose_display|default:"—" }}</td>
+                    <td>
+                    {% if l.purpose_display %}
+                        {{ l.purpose_display }}
+                    {% elif l.purpose_label %}
+                        {{ l.purpose_label }}
+                    {% else %}
+                        &mdash;
+                    {% endif %}
+                    </td>
                     <td class="text-center">{{ l.quantity }}</td>
                     <td class="text-end fw-bold">₱{{ l.line_total|floatformat:2 }}</td>
                   </tr>
@@ -128,8 +136,9 @@
                 <div class="list-group-item px-0 d-flex gap-3 align-items-start">
                   <i class="bi bi-clock-history text-warning"></i>
                   <div class="flex-grow-1">
-                    <div class="fw-semibold">{{ e.action }}</div>
+                    <div class="fw-semibold">{{ e.action }}{% if e.to_status and e.from_status %} — {{ e.from_status }} → {{ e.to_status }}{% elif e.to_status %} — {{ e.to_status }}{% endif %}</div>
                     {% if e.actor %}<div class="text-muted small">{{ e.actor }}</div>{% endif %}
+                    {% if e.reason %}<div class="text-muted small">Reason: {{ e.reason }}</div>{% endif %}
                   </div>
                   <div class="text-muted small">{{ e.occurred_at|date:"M d, Y, P" }}</div>
                 </div>
@@ -151,15 +160,40 @@
             <span class="status-chip {{ status_ui.cls }}">{{ status_ui.label }}</span>
           </div>
 
+          <!-- Print (download-only) -->
           <button class="btn btn-primary w-100 mb-2" data-bs-toggle="modal" data-bs-target="#confirmPrintModal">
-            <i class="bi bi-download me-1"></i> Mark For Printing & Download
+            <i class="bi bi-printer me-1"></i> Print and Download Document
           </button>
 
-          <form method="post" action="{% url 'clerk:mark_released' header.doc_request_id %}" class="mb-2"
-                onsubmit="return confirm('Mark this request as RELEASED?');">
+          {# New: Mark Ready for Pickup #}
+          <form method="post" action="{% url 'clerk:mark_ready_for_pickup' header.doc_request_id %}" class="mb-2">
             {% csrf_token %}
-            <button class="btn btn-success w-100">Mark Released</button>
+            {% if header.status == 'FOR_PRINTING' %}
+              <button class="btn btn-outline-primary w-100 mb-2">
+                <i class="bi bi-check2-square me-1"></i> Mark Ready for Pickup
+              </button>
+            {% else %}
+              <button class="btn btn-outline-primary w-100 mb-2" disabled
+                      data-bs-toggle="tooltip" title="Can only mark Ready for Pickup when status is FOR_PRINTING">
+                <i class="bi bi-check2-square me-1"></i> Mark Ready for Pickup
+              </button>
+            {% endif %}
           </form>
+
+        <form method="post" action="{% url 'clerk:mark_released' header.doc_request_id %}" class="mb-2"
+            onsubmit="return confirm('Mark this request as RELEASED?');">
+        {% csrf_token %}
+        {% if header.status == 'READY FOR PICKUP' %}
+            <button class="btn btn-success w-100">Mark Released</button>
+        {% else %}
+            <button class="btn btn-success w-100" disabled
+                    data-bs-toggle="tooltip" title="Request must be READY_FOR_PICKUP before it can be released">
+            Mark Released
+            </button>
+            <div class="small text-muted mt-1">Status must be <strong>READY_FOR_PICKUP</strong> to release.</div>
+        {% endif %}
+        </form>
+
 
           <hr class="my-3">
 
@@ -216,7 +250,7 @@
                 {% for l in lines %}
                   <tr>
                     <td>{{ l.document_type_name|default:"—" }}</td>
-                    <td>{{ l.purpose_display|default:"—" }}</td>
+                    <td>{{ l.doc_purpose|default:"—" }}</td>
                     <td class="text-end">₱{{ l.line_total|floatformat:2 }}</td>
                   </tr>
                 {% endfor %}
@@ -230,7 +264,7 @@
             </table>
           </div>
           <div class="small text-muted">
-            Proceeding will (1) mark this request as <strong>For Printing</strong> and (2) download the filled PDF(s).
+            Proceeding will download the filled PDF(s). <strong>This action does not change request status.</strong>
           </div>
         </div>
       </div>
@@ -246,4 +280,16 @@
     </div>
   </div>
 </div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    try {
+      var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+      tooltipTriggerList.forEach(function (el) { if (window.bootstrap) new bootstrap.Tooltip(el); });
+    } catch (e) {
+      // ignore if bootstrap not loaded yet
+      console.warn('Tooltip init failed:', e);
+    }
+  });
+</script>
 {% endblock %}

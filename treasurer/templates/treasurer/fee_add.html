@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+  <h1 class="mb-3">Add New Fee</h1>
+
+  <form method="post" class="needs-validation" novalidate>
+    {% csrf_token %}
+
+    <!-- Document Type -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Document Type</h5>
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" role="switch" id="useNewDoc" name="use_new_doc" value="1">
+          <label class="form-check-label" for="useNewDoc">Add as NEW document type</label>
+        </div>
+
+        <div id="existingType">
+          <label class="form-label">Choose existing</label>
+          <select name="doc_type_name" class="form-select">
+            <option value="">— Select —</option>
+            {% for t in doc_types %}
+              <option value="{{ t.document_type_name }}">{{ t.document_type_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div id="newType" class="mt-2 d-none">
+          <label class="form-label">New document type name</label>
+          <input type="text" class="form-control" name="doc_type_name_new" placeholder="e.g., CERTIFICATE OF EMPLOYMENT">
+        </div>
+      </div>
+    </div>
+
+    <!-- Basics -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Fee Basics</h5>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Fee Code</label>
+            <input type="text" class="form-control" name="fee_code" placeholder="e.g., CERT_EMPLOYMENT" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Unit</label>
+            <select name="unit" class="form-select">
+              {% for u in units %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Fee Name</label>
+            <input type="text" class="form-control" name="fee_name" placeholder="e.g., Certificate of Employment – Issuance" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Max Amount (optional)</label>
+            <input type="number" step="0.01" class="form-control" name="max_amount" placeholder="e.g., 1030">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Current Amount</label>
+            <input type="number" step="0.01" class="form-control" name="current_amount" placeholder="e.g., 150" required>
+          </div>
+          <div class="col-12 form-check mt-2">
+            <input class="form-check-input" type="checkbox" id="is_active" name="is_active" checked>
+            <label class="form-check-label" for="is_active">Active</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Exemptions -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Exemptions (full waiver flags)</h5>
+        <div class="row g-3">
+          <div class="col-md-2 form-check"><input class="form-check-input" type="checkbox" name="ex_ftj" id="ex_ftj"><label class="form-check-label" for="ex_ftj">FTJ</label></div>
+          <div class="col-md-2 form-check"><input class="form-check-input" type="checkbox" name="ex_senior" id="ex_senior"><label class="form-check-label" for="ex_senior">Senior</label></div>
+          <div class="col-md-2 form-check"><input class="form-check-input" type="checkbox" name="ex_pwd" id="ex_pwd"><label class="form-check-label" for="ex_pwd">PWD</label></div>
+          <div class="col-md-3 form-check"><input class="form-check-input" type="checkbox" name="ex_indigent" id="ex_indigent"><label class="form-check-label" for="ex_indigent">Indigent</label></div>
+          <div class="col-md-3 form-check"><input class="form-check-input" type="checkbox" name="ex_student" id="ex_student"><label class="form-check-label" for="ex_student">Student</label></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Purpose (optional) -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Purpose Mapping (optional)</h5>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Purpose Code</label>
+            <input type="text" class="form-control" name="purpose_code" placeholder="e.g., EMPLOYMENT">
+          </div>
+          <div class="col-md-8">
+            <label class="form-label">Purpose Label</label>
+            <input type="text" class="form-control" name="purpose_label" placeholder="e.g., Employment">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Default Offense No</label>
+            <input type="number" class="form-control" name="default_offense_no" placeholder="e.g., 1">
+          </div>
+          <div class="col-md-8">
+            <label class="form-label">Default Details (JSON)</label>
+            <textarea class="form-control" name="default_details" rows="3" placeholder='{"key":"value"}'></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Surcharges (optional) -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Surcharge Ladder (optional)</h5>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">1st Offense %</label>
+            <input type="number" step="0.01" class="form-control" name="s1" placeholder="e.g., 10">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">2nd Offense %</label>
+            <input type="number" step="0.01" class="form-control" name="s2" placeholder="e.g., 20">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">3rd Offense %</label>
+            <input type="number" step="0.01" class="form-control" name="s3" placeholder="e.g., 50">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reason -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <label class="form-label">Reason / Note (for audit)</label>
+        <input type="text" class="form-control" name="reason" placeholder="Initial create">
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-dark">Save Fee</button>
+      <a href="{% url 'treasurer:fees' %}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+  const chk = document.getElementById('useNewDoc');
+  const existing = document.getElementById('existingType');
+  const newer = document.getElementById('newType');
+  function sync() {
+    const on = chk.checked;
+    newer.classList.toggle('d-none', !on);
+    existing.classList.toggle('d-none', on);
+    // Clear hidden fields to avoid sending both
+    if (on) { document.querySelector('select[name="doc_type_name"]').value = ""; }
+    else { document.querySelector('input[name="doc_type_name_new"]').value = ""; }
+  }
+  chk.addEventListener('change', sync);
+  sync();
+</script>
+{% endblock %}
