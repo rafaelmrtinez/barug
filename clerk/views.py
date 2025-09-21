@@ -19,7 +19,7 @@ from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
 from authentication.supabase_client import supabase
 
-from .forms import SearchVerificationRequest, SearchBusinessOwner, BusinessDetails, BusinessFilters
+from .forms import SearchVerificationRequest, SearchBusinessOwner, BusinessOwnerInfo, BusinessDetails, BusinessFilters
 
 # pypdf for filling
 try:
@@ -819,6 +819,22 @@ def business_owner_resident(request: HttpRequest):
     return render(
         request,
         "business/business_owner_resident.html",
+        {
+            "user_fullname": user_fullname,
+            "user_role": user_role,
+            "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
+            "page_title": "Business Owner Information",
+            "user_role_template": user_role_template,
+            "form": form,
+        },
+    )
+
+def business_owner_nonresident(request: HttpRequest):
+    user_fullname, user_role, user_role_template = _profile_fallbacks(request)
+    form = BusinessOwnerInfo()
+    return render(
+        request,
+        "business/business_owner_nonres.html",
         {
             "user_fullname": user_fullname,
             "user_role": user_role,
