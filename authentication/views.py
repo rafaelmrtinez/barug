@@ -23,6 +23,7 @@ def _role_home(role_name: str) -> str:
     if role == "barangay clerk": return "clerk:dashboard"
     if role == "captain": return "captain:dashboard"
     if role == "bhw": return "clerk:dashboard"
+    if role == "barangay treasurer": return "treasurer:queue"
     logger.debug("Role not matched, falling back to resident: %s", role)
     return "resident:dashboard"
 
