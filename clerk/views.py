@@ -789,15 +789,9 @@ def decision_request(request: HttpRequest, req_id: int):
 # Business screens (stubs; made safe)
 # =========================
 def _profile_fallbacks(request: HttpRequest):
-    profile = getattr(request, "person_profile", None)
-    user_fullname = (
-        f"{getattr(profile, 'first_name', '')} {getattr(profile, 'last_name', '')}".strip()
-        if profile
-        else (request.session.get("full_name") or "")
-    )
-    user_role = request.session.get("role_name") or "Clerk"
-    user_role_template = "clerk"
-    return user_fullname, user_role, user_role_template
+    user_role = (request.session.get("auth") or {}).get("role_name")
+    user_role_template = user_role.lower().replace(" ", "_")
+    return user_role.title(), user_role_template
 
 def business_owner(request: HttpRequest):
     user_fullname, user_role, user_role_template = _profile_fallbacks(request)
@@ -861,19 +855,29 @@ def business_details(request: HttpRequest):
         },
     )
 
+@session_login_required
+@role_required("Barangay Clerk")
+@nocache
 def business_list(request: HttpRequest):
-    user_fullname, user_role, user_role_template = _profile_fallbacks(request)
+    user_role, user_role_template = _profile_fallbacks(request)
     form = BusinessFilters()
+
+    resp = supabase.rpc("get_business_summary", {}).execute()
+    rows = resp.data or []
+
+    paginator = Paginator(rows, 5)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
     return render(
         request,
         "business/business_list.html",
         {
-            "user_fullname": user_fullname,
-            "user_role": user_role,
             "page_path": f"{user_role} / Business Records",
             "page_title": "Business Records",
             "user_role_template": user_role_template,
             "form": form,
+            "rows": rows,
+            "page_obj": page_obj,
         },
     )
 
