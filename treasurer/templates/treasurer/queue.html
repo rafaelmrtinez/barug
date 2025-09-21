@@ -1,83 +1,191 @@
 {% extends "base.html" %}
 {% load static django_bootstrap5 %}
 
+{% block css %}
+<style>
+  :root {
+    --brand-deep: #6d2932;   /* navbar maroon */
+    --brand-ink:  #561c24;   /* deeper accent */
+    --brand-mid:  #a65a58;   /* rose-brown */
+    --brand-sand: #e8d8c4;   /* sand */
+  }
+
+  .page-head {
+    background: linear-gradient(135deg, var(--brand-sand), #fff);
+    border: 1px solid rgba(0,0,0,.05);
+    border-radius: 1rem;
+    padding: 1rem 1.25rem;
+  }
+  .page-head h3 { color: var(--brand-ink); letter-spacing: .2px; }
+
+  /* Unified toolbar */
+  .queue-toolbar {
+    background: #fff;
+    border: 1px solid rgba(0,0,0,.06);
+    border-radius: 1rem;
+    padding: .75rem;
+  }
+
+  /* Filter chips (checkbox → pill) */
+  .filter-chip { position:relative; display:inline-flex; align-items:center; }
+  .filter-chip input[type="checkbox"] { position:absolute; opacity:0; inset:0; cursor:pointer; }
+  .filter-chip label {
+    display:inline-flex; align-items:center; gap:.5rem; padding:.4rem .7rem;
+    border-radius:999px; border:1px solid rgba(0,0,0,.08);
+    background:#f8f9fa; font-size:.875rem; line-height:1; cursor:pointer; user-select:none; transition:.15s;
+  }
+  .filter-chip input:checked + label { border-color:var(--brand-mid); background:#fff; box-shadow:0 0 0 .20rem rgba(166,90,88,.12); }
+
+  /* Table polish */
+  .card { border-radius:1rem; border:1px solid rgba(0,0,0,.06); overflow:hidden; }
+  .table thead th {
+    background:#faf7f2 !important; color:#3b3b3b; font-weight:600;
+    border-bottom:1px solid rgba(0,0,0,.06) !important;
+    text-align:center;               /* Center headings */
+    vertical-align:middle;
+  }
+  .table tbody tr:hover { background:#fffdf9; }
+
+  /* Center ALL body cells */
+  .table tbody td {
+    text-align:center;               /* Center content */
+    vertical-align:middle;
+  }
+
+  /* Sticky first column (still centered) */
+  .sticky-col { position:sticky; left:0; z-index:1; background:#fff; }
+  .table thead .sticky-col { background:#faf7f2 !important; z-index:2; }
+
+  .code-badge {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size:.875rem; padding:.25rem .4rem; border-radius:.5rem;
+    background:#f5f2ee; border:1px solid rgba(0,0,0,.06); color:var(--brand-ink);
+  }
+  .mini-badge {
+    display:inline-block; padding:.3rem .5rem; margin:0 .25rem .25rem 0;
+    border-radius:.5rem; border:1px solid rgba(0,0,0,.06);
+    background:#fff; font-size:.78rem; line-height:1.1; white-space:normal;
+  }
+
+  /* Brand buttons & focus */
+  .btn-brand { background-color:var(--brand-deep); border-color:var(--brand-deep); color:#fff; }
+  .btn-brand:hover { background-color:var(--brand-ink); border-color:var(--brand-ink); }
+  .btn-outline-brand { border-color:var(--brand-deep); color:var(--brand-deep); }
+  .btn-outline-brand:hover { background:var(--brand-deep); color:#fff; }
+  .form-control:focus, .btn:focus { box-shadow:0 0 0 .2rem rgba(86,28,36,.15); border-color:var(--brand-mid); }
+
+  @media (max-width: 576px) {
+    .table thead { display:none; }
+    .table tr {
+      display:grid; grid-template-columns:1fr auto; gap:.25rem .75rem;
+      border-bottom:1px dashed rgba(0,0,0,.06); padding:.75rem .5rem;
+      justify-items:center;                      /* center on mobile too */
+    }
+    .table td, .table th { border:none !important; text-align:center !important; }
+    .sticky-col { position:static; background:transparent; }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container py-4">
-  <div class="d-flex align-items-center justify-content-between mb-3">
-    <h3 class="mb-0">Treasurer Queue</h3>
-    <form class="d-flex" method="get" action="">
-      <input
-        type="search"
-        name="q"
-        value="{{ q }}"
-        class="form-control me-2"
-        placeholder="Search code, type, purpose..."
-        aria-label="Search"
-      />
-      {% comment %} keep selected statuses on submit {% endcomment %}
-      {% for s in statuses %}
-        <input type="hidden" name="status" value="{{ s }}">
-      {% endfor %}
-      <button class="btn btn-primary" type="submit">Search</button>
-    </form>
+
+  <!-- Page Head -->
+  <div class="page-head mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <h3 class="mb-1">Treasurer Queue</h3>
+      <div class="results-count text-muted">
+        {% with rows|length as n %}
+          Showing <strong>{{ n }}</strong> request{{ n|pluralize }}{% if q %} for “{{ q }}”{% endif %}
+        {% endwith %}
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <a href="?" class="btn btn-outline-brand btn-sm">Reset</a>
+    </div>
   </div>
 
-  <form method="get" action="" class="mb-3">
-    <div class="d-flex flex-wrap gap-2 align-items-center">
+  <!-- Unified Toolbar (Search + Chips in one form) -->
+  <form method="get" action="" class="queue-toolbar mb-3">
+    <div class="row g-2 align-items-center">
+      <div class="col-md-6">
+        <div class="input-group">
+          <span class="input-group-text" id="q-label">🔎</span>
+          <input
+            type="search"
+            name="q"
+            value="{{ q }}"
+            class="form-control"
+            placeholder="Search code, document type, purpose…"
+            aria-label="Search Treasurer Queue"
+            aria-describedby="q-label"
+          />
+        </div>
+      </div>
+      <div class="col-md-6 text-md-end">
+        <button class="btn btn-brand" type="submit">Apply Filters</button>
+      </div>
+    </div>
+
+    <!-- Filter chips -->
+    <div class="mt-2 d-flex flex-wrap gap-2">
       {% for opt in status_options %}
-        <div class="form-check form-check-inline">
-          <input class="form-check-input"
-                 type="checkbox"
-                 id="st-{{ opt.code }}"
-                 name="status"
-                 value="{{ opt.code }}"
-                 {% if opt.checked %}checked{% endif %} />
-          <label class="form-check-label" for="st-{{ opt.code }}">
-            <span class="{{ opt.cls }}">{{ opt.label }}</span>
+        <div class="filter-chip">
+          <input class="form-check-input" type="checkbox" id="st-{{ opt.code }}" name="status" value="{{ opt.code }}" {% if opt.checked %}checked{% endif %} />
+          <label for="st-{{ opt.code }}">
+            <span class="{{ opt.cls }}" style="border-radius:.5rem;">{{ opt.label }}</span>
           </label>
         </div>
       {% endfor %}
-      {% if q %}
-        <input type="hidden" name="q" value="{{ q }}">
-      {% endif %}
-      <button class="btn btn-outline-secondary btn-sm" type="submit">Apply</button>
-      <a class="btn btn-link btn-sm" href="?">Reset</a>
     </div>
   </form>
 
+  <!-- Results Table -->
   <div class="card">
     <div class="table-responsive">
-      <table class="table align-middle mb-0">
+      <table class="table table-hover align-middle mb-0">
         <thead class="table-light">
           <tr>
-            <th style="width: 12rem;">Request Code</th>
+            <th class="sticky-col" style="width: 12rem;">Request Code</th>
             <th>Requester</th>
             <th>On Behalf Of</th>
             <th>Documents</th>
             <th>Purposes</th>
             <th>Status</th>
-            <th style="width: 8rem;"></th>
+            <th style="width: 8rem;">Action</th>
           </tr>
         </thead>
         <tbody>
           {% for r in rows %}
             <tr>
-              <td><code>{{ r.request_code }}</code></td>
-              <td>
-                {{ r.requested_by|default:"—" }}<br>
-                <small class="text-muted">{{ r.request_date|date:"Y-m-d H:i" }}</small>
+              <td class="sticky-col">
+                <span class="code-badge" title="Request Code">{{ r.request_code }}</span>
+                <div class="small text-muted mt-1">{{ r.request_date|date:"Y-m-d H:i" }}</div>
               </td>
+
+              <td>{{ r.requested_by|default:"—" }}</td>
               <td>{{ r.on_behalf_of|default:"—" }}</td>
-              <td>{{ r.doc_types|join:", " }}</td>
+
+              <td>
+                {% if r.doc_types %}
+                  {% for d in r.doc_types %}
+                    <span class="mini-badge" data-bs-toggle="tooltip" data-bs-title="{{ d }}">{{ d }}</span>
+                  {% endfor %}
+                {% else %} — {% endif %}
+              </td>
+
               <td>
                 {% if r.purposes_display %}
-                  {{ r.purposes_display|join:", " }}
-                {% else %}
-                  —
-                {% endif %}
+                  {% for p in r.purposes_display %}
+                    <span class="mini-badge" data-bs-toggle="tooltip" data-bs-title="{{ p }}">{{ p }}</span>
+                  {% endfor %}
+                {% else %} — {% endif %}
               </td>
+
               <td><span class="{{ r.status_ui.cls }}">{{ r.status_ui.label }}</span></td>
-              <td class="text-end">
+
+              <!-- Center the Action button -->
+              <td class="text-center">
                 <a class="btn btn-sm btn-outline-primary"
                    href="{% url 'treasurer:detail' r.doc_request_id %}">
                   View
@@ -86,7 +194,10 @@
             </tr>
           {% empty %}
             <tr>
-              <td colspan="6" class="text-center text-muted py-5">No requests found.</td>
+              <td colspan="7" class="text-center text-muted py-5">
+                <div class="mb-2">No requests found.</div>
+                <a class="btn btn-sm btn-outline-secondary" href="?">Clear filters</a>
+              </td>
             </tr>
           {% endfor %}
         </tbody>
@@ -94,4 +205,13 @@
     </div>
   </div>
 </div>
+
+<!-- Bootstrap tooltips for badges -->
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    if (window.bootstrap) {
+      document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+    }
+  });
+</script>
 {% endblock %}
