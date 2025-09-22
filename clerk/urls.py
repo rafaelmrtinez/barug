@@ -11,11 +11,9 @@ urlpatterns = [
     path("requests/<int:doc_request_id>/mark-ready-for-pickup/", views.mark_request_ready_for_pickup, name="mark_ready_for_pickup"),
     path("requests/<int:doc_request_id>/mark-released/", views.mark_released, name="mark_released"),
     path("requests/<int:doc_request_id>/decline/", views.decline, name="decline"),
-
+    
     # identity verification
     path("dashboard/", views.dashboard, name="dashboard"),
-    path("document_request/document_requests", views.doc_reqs, name="doc_reqs"),
-    path("document_requested/details/<int:doc_id>/", views.doc_details, name="doc_dets"),
     path("identity_verification/", views.review_approve, name="identity_verification"),
     path("person_details/<int:req_id>/", views.person_submission_dets, name="person_details"),
 

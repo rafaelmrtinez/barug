@@ -392,3 +392,23 @@ def fee_edit(request: HttpRequest, fee_code: str):
 
     messages.success(request, f"{fee_code} saved.")
     return redirect("treasurer:fee_edit", fee_code=fee_code)
+
+# HANNAH
+
+from django.shortcuts import render
+from django.core.paginator import Paginator
+from .forms import RequestedDocsFilters
+
+user_fullname = 'lname fname mname suffix'
+user_role = 'Barangay Treasurer'
+user_role_template = user_role.lower().replace(' ', '_')
+
+# Create your views here.
+def dashboard(request):
+    return render(request, "dashboard.html", {
+        'user_fullname' : user_fullname,
+        'user_role' : user_role,
+        'page_path' : f'{user_role} / Dashboard',
+        'page_title' : 'Dashboard' ,
+        'user_role_template' : user_role_template,
+    })

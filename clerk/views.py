@@ -6,20 +6,12 @@ from datetime import datetime
 
 from django.contrib import messages
 from django.core.paginator import Paginator
-<<<<<<< HEAD
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.html import escape
 from django.utils import timezone
 from django.conf import settings
 from django.views.decorators.http import require_POST
-=======
-from .forms import SearchVerificationRequest
-from .forms import SearchBusinessOwner
-from .forms import BusinessDetails
-from .forms import BusinessFilters
-from .forms import RequestedDocsFilters
->>>>>>> db764d437a4885e96c3bce212847921ae8cf3b3f
 
 from postgrest.exceptions import APIError
 
@@ -28,6 +20,14 @@ from authentication.utils import nocache
 from authentication.supabase_client import supabase
 
 from .forms import SearchVerificationRequest, SearchBusinessOwner, BusinessDetails, BusinessFilters
+
+from django.shortcuts import render
+from django.core.paginator import Paginator
+from .forms import RequestedDocsFilters
+
+user_fullname = 'lname fname mname suffix'
+user_role = 'Barangay Treasurer'
+user_role_template = user_role.lower().replace(' ', '_')
 
 # ---- services ----
 from .services.requests_service import _fetch_bundle, _set_status
@@ -111,7 +111,6 @@ def queue(request: HttpRequest):
         "active_count": len(statuses),
     })
 
-<<<<<<< HEAD
 # =========================
 # Clerk — Detail of a document request
 # =========================
@@ -124,40 +123,6 @@ def detail(request: HttpRequest, doc_request_id: int):
     except APIError as e:
         messages.error(request, f"Supabase error: {escape(getattr(e, 'message', str(e)))}")
         return redirect("clerk:queue")
-=======
-def doc_reqs(request):
-    form = RequestedDocsFilters()
-
-    pending = []
-    paginator = Paginator(pending, 10)  # 10 per page
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-
-    return render(request, "doc_req/doc_reqs.html", {
-        'user_fullname' : user_fullname,
-        'user_role' : user_role,
-        'page_path' : f'{user_role} / Dashboard',
-        'page_title' : 'Dashboard' ,
-        'user_role_template' : user_role_template,
-        'form' : form,
-        'page_obj': page_obj,
-    })
-
-def doc_details(request, doc_id):
-    return render(request, "doc_req/doc_details.html", {
-        'user_fullname' : user_fullname,
-        'user_role' : user_role,
-        'page_path' : f'{user_role} / Document Request / {doc_id}',
-        'page_title' : 'Dashboard' ,
-        'user_role_template' : user_role_template,
-    })
-
-def review_approve(request):
-    pending = []
-    paginator = Paginator(pending, 10)  # 10 per page
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
->>>>>>> db764d437a4885e96c3bce212847921ae8cf3b3f
 
     header = data.get("header", {}) or {}
     lines = data.get("lines", []) or []
@@ -371,8 +336,13 @@ STATUS_DECLINE  = 7
 @role_required(CLERK_ROLE)
 @nocache
 def dashboard(request: HttpRequest):
+    auth = request.session.get("auth")
     profile = getattr(request, "person_profile", None)
-    return render(request, "dashboard.html", {"page_title": "Dashboard", "profile": profile})
+    return render(request, "clerk/dashboard.html", {
+        "page_title": "Dashboard",
+        "profile": profile,
+        "auth": auth
+    })
 
 @session_login_required
 @role_required(CLERK_ROLE)
@@ -456,6 +426,7 @@ def person_submission_dets(request: HttpRequest, req_id: int):
         "page_title": f"Account Verification : {req_id}",
         "person": person,
     })
+
 
 def _rpc_approve_person_by_clerk(request: HttpRequest, person_id: int, status_id: int, remarks: str | None):
     auth = request.session.get("auth") or {}
@@ -612,3 +583,4 @@ def business_information(request: HttpRequest, b_id: int):
             "user_role_template": user_role_template,
         },
     )
+
