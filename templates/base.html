@@ -22,7 +22,7 @@
 </head>
 <body>
     {% include 'header.html' %}
-    {% include 'account_management/barangay_clerk.html' %}
+    {% include 'account_management/'|add:user_role_template|add:'.html' %}
     {% include 'page_title.html' %}
 
     {% block content %}{% endblock%}
