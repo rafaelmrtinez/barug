@@ -112,7 +112,41 @@
                 </div>
                 {% endif %}
               </div>
+          <div class="section-title mb-2 pt-4">Supporting Document</div>
+          <div class="kv">
+            <div class="kv-item"><span class="kv-key">Valid IDs</span></div>
+            <div class="doc-carousel carousel slide" id="docCarousel" data-bs-ride="false" aria-label="Supporting documents">
+              <div class="carousel-inner">
+                {% for f in person.valid_id_files %}
+                <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                  <div class="img-wrap">
+                    <img src="{{ f }}" class="doc-img" alt="ID Image">
+                  </div>
+                  <small class="text-muted d-block text-center mt-2">Valid ID {{ forloop.counter }}</small>
+                </div>
+                {% endfor %}
+                {% if person.selfie_file %}
+                <div class="carousel-item">
+                  <div class="img-wrap">
+                    <img src="{{ person.selfie_file }}" class="doc-img" alt="Selfie with ID">
+                  </div>
+                  <small class="text-muted d-block text-center mt-2">Selfie w/ ID</small>
+                </div>
+                {% endif %}
+              </div>
 
+              <!-- Controls -->
+              <button class="carousel-control-prev doc-control" type="button" data-bs-target="#docCarousel"
+                data-bs-slide="prev" aria-label="Previous">
+                <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
+              </button>
+              <button class="carousel-control-next doc-control" type="button" data-bs-target="#docCarousel"
+                data-bs-slide="next" aria-label="Next">
+                <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
+              </button>
+            </div>
+          </div>
+        </div>
               <!-- Controls -->
               <button class="carousel-control-prev doc-control" type="button" data-bs-target="#docCarousel"
                 data-bs-slide="prev" aria-label="Previous">
@@ -129,6 +163,7 @@
 
       <div class="divider"></div>
 
+      
       <div class="mt-auto button-container justify-content-end mb-2">
         <!-- Decline triggers remarks modal -->
         <button type="button" class="btn btn-reset" data-bs-toggle="modal" data-bs-target="#decisionModal">Decline</button>
@@ -199,6 +234,7 @@
           </div>
         </div>
       </div>
+
 
     </div>
   </div>
