@@ -790,8 +790,7 @@ def decision_request(request: HttpRequest, req_id: int):
 # =========================
 def _profile_fallbacks(request: HttpRequest):
     user_role = (request.session.get("auth") or {}).get("role_name")
-    user_role_template = user_role.lower().replace(" ", "_")
-    return user_role.title(), user_role_template
+    return user_role.title()
 
 def business_owner(request: HttpRequest):
     user_fullname, user_role, user_role_template = _profile_fallbacks(request)
@@ -859,7 +858,7 @@ def business_details(request: HttpRequest):
 @role_required("Barangay Clerk")
 @nocache
 def business_list(request: HttpRequest):
-    user_role, user_role_template = _profile_fallbacks(request)
+    user_role= _profile_fallbacks(request)
     form = BusinessFilters()
 
     rows, rpc_error = [], None
@@ -877,7 +876,6 @@ def business_list(request: HttpRequest):
     context = {
         "page_path": f"{user_role} / Business Records",
         "page_title": "Business Records",
-        "user_role_template": user_role_template,
         "form": form,
         "rows": rows,
         "rpc_error": rpc_error,
@@ -891,15 +889,34 @@ def business_list(request: HttpRequest):
     )
 
 def business_information(request: HttpRequest, b_id: int):
-    user_fullname, user_role, user_role_template = _profile_fallbacks(request)
+    user_role = _profile_fallbacks(request)
+
+    b_resp = supabase.rpc("get_business_details", {"p_business_id" : b_id}).execute()
+    b_rows = b_resp.data or []
+    b = b_rows[0] if b_rows else None
+
+    raw_days = str(b.get("operating_days") or "").strip()
+    operating_days_list = [d.strip() for d in raw_days.split(",") if d.strip()] if raw_days else []
+    b["operating_days_list"] = operating_days_list
+
+    owner = None
+    owner_id = b.get("owner_person_id") or None
+
+    if owner_id:
+        p_resp = supabase.rpc("get_details", {"p_person_id" : owner_id}).execute()
+        p_rows = p_resp.data or []
+        owner = p_rows[0] if p_rows else None
+
+    if not b:
+        raise Http404(f"Business {b_id} not found.")
+
     return render(
         request,
         "business/business_information.html",
         {
-            "user_fullname": user_fullname,
-            "user_role": user_role,
             "page_path": f"{user_role} / Business Records / Business Details : {b_id}",
             "page_title": f"Business Details : {b_id}",
-            "user_role_template": user_role_template,
+            "b": b,
+            "owner" : owner,
         },
     )
