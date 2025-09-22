@@ -6,12 +6,20 @@ from datetime import datetime
 
 from django.contrib import messages
 from django.core.paginator import Paginator
+<<<<<<< HEAD
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.html import escape
 from django.utils import timezone
 from django.conf import settings
 from django.views.decorators.http import require_POST
+=======
+from .forms import SearchVerificationRequest
+from .forms import SearchBusinessOwner
+from .forms import BusinessDetails
+from .forms import BusinessFilters
+from .forms import RequestedDocsFilters
+>>>>>>> db764d437a4885e96c3bce212847921ae8cf3b3f
 
 from postgrest.exceptions import APIError
 
@@ -103,6 +111,7 @@ def queue(request: HttpRequest):
         "active_count": len(statuses),
     })
 
+<<<<<<< HEAD
 # =========================
 # Clerk — Detail of a document request
 # =========================
@@ -115,6 +124,40 @@ def detail(request: HttpRequest, doc_request_id: int):
     except APIError as e:
         messages.error(request, f"Supabase error: {escape(getattr(e, 'message', str(e)))}")
         return redirect("clerk:queue")
+=======
+def doc_reqs(request):
+    form = RequestedDocsFilters()
+
+    pending = []
+    paginator = Paginator(pending, 10)  # 10 per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, "doc_req/doc_reqs.html", {
+        'user_fullname' : user_fullname,
+        'user_role' : user_role,
+        'page_path' : f'{user_role} / Dashboard',
+        'page_title' : 'Dashboard' ,
+        'user_role_template' : user_role_template,
+        'form' : form,
+        'page_obj': page_obj,
+    })
+
+def doc_details(request, doc_id):
+    return render(request, "doc_req/doc_details.html", {
+        'user_fullname' : user_fullname,
+        'user_role' : user_role,
+        'page_path' : f'{user_role} / Document Request / {doc_id}',
+        'page_title' : 'Dashboard' ,
+        'user_role_template' : user_role_template,
+    })
+
+def review_approve(request):
+    pending = []
+    paginator = Paginator(pending, 10)  # 10 per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+>>>>>>> db764d437a4885e96c3bce212847921ae8cf3b3f
 
     header = data.get("header", {}) or {}
     lines = data.get("lines", []) or []

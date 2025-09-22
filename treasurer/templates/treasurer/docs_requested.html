@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="container-fluid pt-3 page-main" style="margin-top: 40px;">
+    <div class="row">
+
+      <!-- Filters (keep Django form) -->
+      <div class="mb-2">
+        <form method="get" class="row g-2 align-items-end">
+          <div class="col-12 col-md-4">
+            <div class="form-floating">
+              {{ form.search }}
+              <label for="{{ form.search.id_for_label }}">{{ form.search.label }}</label>
+            </div>
+          </div>
+
+          <div class="col-12 col-md-4">
+            <div class="form-floating">
+              {{ form.doc_type }}
+              <label for="{{ form.doc_type.id_for_label }}">{{ form.doc_type.label }}</label>
+            </div>
+          </div>
+
+        </form>
+      </div>
+
+      <!-- Table with static sample data -->
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th scope="col">Request #</th>
+              <th scope="col">Resident</th>
+              <th scope="col">Document Type</th>
+              <th scope="col">Fee</th>
+              <th scope="col">Date &amp; Time Submitted</th>
+              <th scope="col" class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>REQ-001</td>
+              <td>Juan Dela Cruz</td>
+              <td>Barangay Clearance</td>
+              <td>₱50.00</td>
+              <td>2025-09-18 10:30 AM</td>
+              <td class="text-end">
+                <a class="btn btn-icon" href="#">
+                  {% bs_icon 'file-earmark-check-fill' size='1em' %}
+                </a>
+                <a class="btn btn-icon" href="{% url 'treasurer:doc_dets' doc_id='0130023' %}">
+                  {% bs_icon 'file-earmark-text-fill' size='1em' %}
+                </a>
+              </td>
+            </tr>
+            <tr><td colspan="6" class="text-center">No pending for records</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div class="page-pagination"> 
+      {% include 'paginator.html' %}
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}
