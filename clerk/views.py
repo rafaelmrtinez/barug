@@ -21,12 +21,16 @@ from authentication.supabase_client import supabase
 
 from .forms import SearchVerificationRequest, SearchBusinessOwner, BusinessDetails, BusinessFilters
 
-# ---- services (new) ----
+# ---- services ----
 from .services.requests_service import _fetch_bundle, _set_status
 from .services.subject_service import subject_view
 from .services.pdf_service import (
     _pdf_templates_dir, _get_all_pdf_field_names, _fill_pdf_with_values,
     _choose_template, _safe_str, _fill_fields_for_line
+)
+from .services.id_verification_service import (
+    fetch_id_verification_requests,
+    get_verification_status_for_person,
 )
 
 # =========================
@@ -47,9 +51,7 @@ def _titleize(s: str | None) -> str:
     return "" if not s else s.replace("_", " ").title()
 
 def _staff_id(request: HttpRequest) -> int | None:
-    """
-    Prefer session['auth']['staff_id'] set at login; fallback to profile objects.
-    """
+    """Prefer session['auth']['staff_id'] set at login; fallback to profile objects."""
     auth = request.session.get("auth") or {}
     sid = auth.get("staff_id")
     if sid:
@@ -58,7 +60,7 @@ def _staff_id(request: HttpRequest) -> int | None:
     return getattr(prof, "staff_id", None)
 
 # =========================
-# Clerk — Queue / List
+# Clerk — Queue / List of document requests
 # =========================
 @session_login_required
 @role_required(CLERK_ROLE)
@@ -102,7 +104,7 @@ def queue(request: HttpRequest):
     })
 
 # =========================
-# Clerk — Detail
+# Clerk — Detail of a document request
 # =========================
 @session_login_required
 @role_required(CLERK_ROLE)
@@ -204,7 +206,6 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
             if os.path.exists(alt):
                 template_path = alt
             else:
-                # log debug record and skip
                 print(json.dumps({
                     "doc_index": idx, "doc_name": doc_name, "template_file": template_file,
                     "template_path": template_path, "exists": False, "reason": "Template not found"
@@ -250,7 +251,6 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
         messages.error(request, "No PDF templates found. Check your pdf_templates folder and filenames.")
         return redirect("clerk:detail", doc_request_id=doc_request_id)
 
-    # Single PDF without debug => return PDF
     if len(outputs) == 1 and not include_debug:
         fname, bytes_ = outputs[0]
         resp = HttpResponse(bytes_, content_type="application/pdf")
@@ -262,7 +262,6 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
         resp["Content-Disposition"] = f'attachment; filename="{fname}"'
         return resp
 
-    # Otherwise return ZIP
     zbuf = io.BytesIO()
     with zipfile.ZipFile(zbuf, "w", zipfile.ZIP_DEFLATED) as zf:
         for fname, b in outputs:
@@ -278,14 +277,13 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
 
     req_code = header.get("request_code", "REQ")
     resp = HttpResponse(zbuf.getvalue(), content_type="application/zip")
-    resp["Content-Disposition"] = f'attachment; filename="{req_code}-documents.zip'
+    resp["Content-Disposition"] = f'attachment; filename="{req_code}-documents.zip"'
     return resp
 
 @session_login_required
 @role_required(CLERK_ROLE)
 @require_POST
 def mark_released(request: HttpRequest, doc_request_id: int):
-    # Verify current status first
     try:
         data = _fetch_bundle(doc_request_id)
         header = (data or {}).get("header", {}) or {}
@@ -337,41 +335,79 @@ def dashboard(request: HttpRequest):
 @role_required(CLERK_ROLE)
 @nocache
 def review_approve(request: HttpRequest):
-    auth = request.session.get("auth")
+    """List of ID verification requests."""
     profile = getattr(request, "person_profile", None)
+    auth = request.session.get("auth")
     form = SearchVerificationRequest(request.GET or None)
-    search = (form.cleaned_data.get("search") if form.is_valid() else "") if request.GET else ""
-    resp = supabase.rpc("get_id_validation_requests", {}).execute()
-    rows = resp.data or []
-    if search:
-        q = search.lower().strip()
-        rows = [r for r in rows if q in f"{r.get('requester_first_name','')} {r.get('requester_last_name','')}".lower()
-                or q in (r.get("latest_status","") or "").lower()]
+    search = (form.cleaned_data.get("search") or "").strip() if (request.GET and form.is_valid()) else ""
+
+    rows = fetch_id_verification_requests(supabase, search=search)
+    if not rows and search == "":
+        # Try once to surface a helpful error
+        try:
+            supabase.rpc("get_id_validation_requests", {}).execute()
+        except APIError as e:
+            messages.error(request, f"Supabase error: {escape(getattr(e, 'message', str(e)))}")
+
     paginator = Paginator(rows, 10)
     page_obj = paginator.get_page(request.GET.get("page"))
-    return render(request, "resident/identity_verification_list.html", {
-        "page_path": "Barangay Clerk / Account Verification", "page_title": "Account Verification",
-        "page_obj": page_obj, "form": form, "profile": profile, "auth": auth,
-    })
+
+    return render(
+        request,
+        "clerk/resident/identity_verification_list.html",
+        {
+            "page_path": "Barangay Clerk / Account Verification",
+            "page_title": "Account Verification",
+            "page_obj": page_obj,
+            "rows": page_obj.object_list,
+            "form": form,
+            "profile": profile,
+            "auth": auth,
+        },
+    )
 
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
 def person_submission_dets(request: HttpRequest, req_id: int):
+    """Details of a single person's submitted verification + latest status."""
     resp = supabase.rpc("get_details", {"p_person_id": req_id}).execute()
     data = resp.data or []
-    if not data: raise Http404("Details not found.")
+    if not data:
+        raise Http404("Details not found.")
     person = data[0]
+
+    # ---- Normalize to the keys you pasted (street/sitio_purok/barangay/city etc.) ----
+    raw_dt = person.get("date_requested")
     try:
-        sresp = supabase.rpc("get_id_validation_requests", {}).execute()
-        srows = sresp.data or []
-        status_row = next((r for r in srows if r.get("requester_person_id") == req_id), None)
-    except APIError:
-        status_row = None
+        dt = datetime.fromisoformat(str(raw_dt).replace("Z", "+00:00"))
+        person["submitted_fmt"] = timezone.localtime(dt).strftime("%b %d, %Y %I:%M %p")
+    except Exception:
+        person["submitted_fmt"] = raw_dt or "—"
+
+    gps = person.get("government_programs")
+    if isinstance(gps, str):
+        gps = [s.strip() for s in gps.split(",") if s.strip()]
+    person["government_programs"] = gps or []
+
+    person["valid_id_files"] = person.get("valid_id_files") or []
+    person["selfie_file"] = person.get("selfie_file") or None
+
+    # Build a clean full address to avoid template logic
+    parts = [
+        (person.get("street") or "").strip(),
+        (person.get("sitio_purok") or "").strip(),
+        (person.get("barangay") or "").strip(),
+        (person.get("city") or "").strip(),
+    ]
+    person["full_address"] = ", ".join([p for p in parts if p])
+
+    # Latest status (optional enrichment from the list RPC)
+    status_row = get_verification_status_for_person(supabase, req_id)
     if status_row:
-        person["latest_status"] = status_row.get("latest_status") or "APPROVED"
-        person["latest_remarks"] = status_row.get("latest_remarks")
-        person["approved_date"] = status_row.get("approved_date")
+        person["latest_status"]  = status_row.get("status_text") or person.get("latest_status") or "Pending"
+        person["remarks"]        = status_row.get("latest_remarks") or person.get("remarks")
+
     return render(request, "clerk/resident/person_submission_dets.html", {
         "page_path": f"Clerk / Account Verification : {req_id}",
         "page_title": f"Account Verification : {req_id}",
@@ -381,13 +417,16 @@ def person_submission_dets(request: HttpRequest, req_id: int):
 def _rpc_approve_person_by_clerk(request: HttpRequest, person_id: int, status_id: int, remarks: str | None):
     auth = request.session.get("auth") or {}
     staff_id = auth.get("staff_id") or _staff_id(request)
-    if not staff_id: raise Http404("Staff not found in session.")
+    if not staff_id:
+        raise Http404("Staff not found in session.")
     payload = {"p_clerk_staff_id": staff_id, "p_person_id": person_id, "p_status_id": status_id, "p_remarks": remarks}
     try:
         return supabase.rpc("approve_person_by_clerk", payload).execute()
     except APIError as e:
-        try: msg = e.message.get("message")
-        except Exception: msg = str(e)
+        try:
+            msg = e.message.get("message")
+        except Exception:
+            msg = str(e)
         raise APIError({"message": msg or "Update failed."})
 
 @session_login_required
@@ -398,8 +437,10 @@ def approve_request(request: HttpRequest, req_id: int):
         _rpc_approve_person_by_clerk(request, req_id, STATUS_APPROVED, None)
         messages.success(request, "Request approved.")
     except APIError as e:
-        try: messages.warning(request, e.message.get("message"))
-        except Exception: messages.warning(request, "This request cannot be approved.")
+        try:
+            messages.warning(request, e.message.get("message"))
+        except Exception:
+            messages.warning(request, "This request cannot be approved.")
     return redirect("clerk:person_details", req_id=req_id)
 
 @session_login_required
@@ -414,13 +455,15 @@ def decision_request(request: HttpRequest, req_id: int):
     if not remarks:
         messages.error(request, "Remarks are required.")
         return redirect("clerk:person_details", req_id=req_id)
-    status_id = STATUS_REJECTED if action=="reject" else STATUS_DECLINE
+    status_id = STATUS_REJECTED if action == "reject" else STATUS_DECLINE
     try:
         _rpc_approve_person_by_clerk(request, req_id, status_id, remarks)
         messages.success(request, f"Request marked as {'Rejected' if status_id==STATUS_REJECTED else 'Declined'}.")
     except APIError as e:
-        try: messages.warning(request, e.message.get("message"))
-        except Exception: messages.warning(request, "This request cannot be updated right now.")
+        try:
+            messages.warning(request, e.message.get("message"))
+        except Exception:
+            messages.warning(request, "This request cannot be updated right now.")
     return redirect("clerk:person_details", req_id=req_id)
 
 # =========================
@@ -430,8 +473,7 @@ def _profile_fallbacks(request: HttpRequest):
     profile = getattr(request, "person_profile", None)
     user_fullname = (
         f"{getattr(profile, 'first_name', '')} {getattr(profile, 'last_name', '')}".strip()
-        if profile
-        else (request.session.get("full_name") or "")
+        if profile else (request.session.get("full_name") or "")
     )
     user_role = request.session.get("role_name") or "Clerk"
     user_role_template = "clerk"

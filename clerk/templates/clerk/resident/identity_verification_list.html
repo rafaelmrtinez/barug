@@ -12,54 +12,92 @@
 {% block content %}
 <div class="page-wrap">
 
-  <div class="container-fluid pt-3 page-main">
-    <div class="row">
-      <div>
-        <div class="col-md-4">
-            <form method="post">
-              {% csrf_token %}
-              <div class="form-floating mb-3">
-                  {{ form.search }}
-                  <label for="{{ form.search.id_for_label }}">{{ form.search.label }}</label>
-              </div>
-          </form>
+  <div class="container-fluid pt-3 page-main" style="margin-top:40px;">
+    <div class="row g-3">
+
+      <!-- Search (GET) -->
+      <form method="get" class="d-flex gap-2 flex-wrap">
+        <div class="form-floating" style="min-width:280px;">
+          {{ form.search }}
+          <label for="{{ form.search.id_for_label }}">{{ form.search.label }}</label>
         </div>
-        
-        <table class="table">
-          <thead>
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Date & Time Submitted</th>
-              <th scope="col">Status</th>
-              <th scope="col">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-              <tr class="table-row-height">
-                <td>ATAY</td>
-                <td>ATAY</td>
-                <td>ATAY</td>
-                <td>
-                  <div class="d-flex gap-1">
-                    <a class="btn btn-icon"
-                       >
-                      {% bs_icon 'person-lines-fill' size='1em' %}
-                    </a>
-                  </div>
-                </td>
-              </tr>
-              <tr><td colspan="4" class="text-center">No pending for records</td></tr>
-          </tbody>
-        </table>
+        <button class="btn btn-primary" type="submit">
+          {% bs_icon 'search' size='1em' %} Search
+        </button>
+        {% if request.GET %}
+          <a class="btn btn-outline-secondary" href="{% url 'clerk:identity_verification' %}">Reset</a>
+        {% endif %}
+      </form>
+
+      <!-- Table card -->
+      <div class="col-12">
+        <div class="card shadow-sm rounded-3">
+          <div class="card-body">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+              <h5 class="card-title d-flex align-items-center gap-2 mb-0">
+                {% bs_icon 'person-badge' size='1.1em' %} Identification Requests
+              </h5>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-hover align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Date &amp; Time Submitted</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" style="width:90px;">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% if rows %}
+                    {% for r in rows %}
+                      <tr class="table-row-height">
+                        <td class="fw-semibold">{{ r.requester_display|default:"—" }}</td>
+                        <td>{{ r.submitted_fmt|default:"—" }}</td>
+                        <td>
+                          <span class="{{ r.status_cls|default:'badge text-bg-secondary' }}">
+                            {{ r.status_text|default:"—" }}
+                          </span>
+                        </td>
+                        <td>
+                          <div class="d-flex gap-1">
+                            {% if r.requester_person_id %}
+                              <a class="btn btn-icon" title="View submission"
+                                 href="{% url 'clerk:person_details' r.requester_person_id %}">
+                                {% bs_icon 'person-lines-fill' size='1em' %}
+                              </a>
+                            {% else %}
+                              <button class="btn btn-icon" disabled title="No person id available">
+                                {% bs_icon 'person-lines-fill' size='1em' %}
+                              </button>
+                            {% endif %}
+                          </div>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  {% else %}
+                    <tr>
+                      <td colspan="4" class="text-center text-muted py-4">
+                        No verification requests found.
+                      </td>
+                    </tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+
+            {% if page_obj.has_other_pages %}
+              <div class="page-pagination">
+                {% include 'paginator.html' %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
       </div>
+
     </div>
   </div>
-
-  {% if page_obj.has_other_pages %}
-    <div class="page-pagination"> 
-      {% include 'paginator.html' %}
-    </div>
-  {% endif %}
 
 </div>
 {% endblock %}
