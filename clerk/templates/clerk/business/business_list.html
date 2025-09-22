@@ -61,8 +61,7 @@
             </tr>
           </thead>
           <tbody>
-            {% if rows %}
-            {% for r in rows %}
+            {% for r in page_obj.object_list %}
               <tr class="table-row-height">
                 <td>{{ r.business_name }}</td>
                 <td>{{ r.business_type_name }}</td>
@@ -84,7 +83,6 @@
                 <td colspan="7" class="text-center py-4 text-muted">No businesses found</td>
               </tr>
             {% endfor %}
-            {% endif %}
           </tbody>
         </table>
       </div>

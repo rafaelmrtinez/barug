@@ -862,23 +862,32 @@ def business_list(request: HttpRequest):
     user_role, user_role_template = _profile_fallbacks(request)
     form = BusinessFilters()
 
-    resp = supabase.rpc("get_business_summary", {}).execute()
-    rows = resp.data or []
+    rows, rpc_error = [], None
 
-    paginator = Paginator(rows, 5)
+    try:
+        resp = supabase.rpc("get_business_summary", {}).execute()
+        rows = resp.data or []
+    except Exception as e:
+        rpc_error = str(e)
+        rows = []
+
+    paginator = Paginator(rows, 15)
     page_obj = paginator.get_page(request.GET.get("page"))
+
+    context = {
+        "page_path": f"{user_role} / Business Records",
+        "page_title": "Business Records",
+        "user_role_template": user_role_template,
+        "form": form,
+        "rows": rows,
+        "rpc_error": rpc_error,
+        "page_obj": page_obj,
+    }
 
     return render(
         request,
         "business/business_list.html",
-        {
-            "page_path": f"{user_role} / Business Records",
-            "page_title": "Business Records",
-            "user_role_template": user_role_template,
-            "form": form,
-            "rows": rows,
-            "page_obj": page_obj,
-        },
+        context,
     )
 
 def business_information(request: HttpRequest, b_id: int):
