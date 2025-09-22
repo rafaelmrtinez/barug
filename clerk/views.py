@@ -6,19 +6,12 @@ from datetime import datetime
 
 from django.contrib import messages
 from django.core.paginator import Paginator
-<<<<<<< HEAD
 from django.http import Http404, HttpRequest, HttpResponse
-=======
-from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
->>>>>>> 079089afcf2bb01963fc85912d96d781536cb9e9
 from django.shortcuts import redirect, render
 from django.utils.html import escape
 from django.utils import timezone
 from django.conf import settings
-<<<<<<< HEAD
 from django.views.decorators.http import require_POST
-=======
->>>>>>> 079089afcf2bb01963fc85912d96d781536cb9e9
 
 from postgrest.exceptions import APIError
 
@@ -131,10 +124,6 @@ def detail(request: HttpRequest, doc_request_id: int):
         messages.error(request, f"Supabase error: {escape(getattr(e, 'message', str(e)))}")
         return redirect("clerk:queue")
 
-<<<<<<< HEAD
-=======
-    data: Dict[str, Any] = bundle.data or {}
->>>>>>> 079089afcf2bb01963fc85912d96d781536cb9e9
     header = data.get("header", {}) or {}
     lines = data.get("lines", []) or []
     payments = data.get("payments", {}) or {}
@@ -495,20 +484,10 @@ def decision_request(request: HttpRequest, req_id: int):
 # Business screens (stubs; clerk-only)
 # =========================
 def _profile_fallbacks(request: HttpRequest):
-<<<<<<< HEAD
-    profile = getattr(request, "person_profile", None)
-    user_fullname = (
-        f"{getattr(profile, 'first_name', '')} {getattr(profile, 'last_name', '')}".strip()
-        if profile else (request.session.get("full_name") or "")
-    )
-    user_role = request.session.get("role_name") or "Clerk"
-    user_role_template = "clerk"
-    return user_fullname, user_role, user_role_template
-=======
     user_role = (request.session.get("auth") or {}).get("role_name")
     user_role_template = user_role.lower().replace(" ", "_")
     return user_role.title(), user_role_template
->>>>>>> 079089afcf2bb01963fc85912d96d781536cb9e9
+
 
 @session_login_required
 @role_required(CLERK_ROLE)
@@ -546,28 +525,9 @@ def business_owner_resident(request: HttpRequest):
         },
     )
 
-<<<<<<< HEAD
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
-=======
-def business_owner_nonresident(request: HttpRequest):
-    user_fullname, user_role, user_role_template = _profile_fallbacks(request)
-    form = BusinessOwnerInfo()
-    return render(
-        request,
-        "business/business_owner_nonres.html",
-        {
-            "user_fullname": user_fullname,
-            "user_role": user_role,
-            "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
-            "page_title": "Business Owner Information",
-            "user_role_template": user_role_template,
-            "form": form,
-        },
-    )
-
->>>>>>> 079089afcf2bb01963fc85912d96d781536cb9e9
 def business_details(request: HttpRequest):
     user_fullname, user_role, user_role_template = _profile_fallbacks(request)
     form = BusinessDetails()
@@ -584,17 +544,14 @@ def business_details(request: HttpRequest):
         },
     )
 
+
 @session_login_required
-<<<<<<< HEAD
-@role_required(CLERK_ROLE)
-=======
 @role_required("Barangay Clerk")
->>>>>>> 079089afcf2bb01963fc85912d96d781536cb9e9
 @nocache
 def business_list(request: HttpRequest):
     user_role, user_role_template = _profile_fallbacks(request)
     form = BusinessFilters()
-
+    
     rows, rpc_error = [], None
 
     try:
@@ -623,6 +580,7 @@ def business_list(request: HttpRequest):
         context,
     )
 
+
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
@@ -640,3 +598,20 @@ def business_information(request: HttpRequest, b_id: int):
         },
     )
 
+# Hannah's Code:
+
+def business_owner_nonresident(request: HttpRequest):
+    user_fullname, user_role, user_role_template = _profile_fallbacks(request)
+    form = BusinessOwnerInfo()
+    return render(
+        request,
+        "business/business_owner_nonres.html",
+        {
+            "user_fullname": user_fullname,
+            "user_role": user_role,
+            "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
+            "page_title": "Business Owner Information",
+            "user_role_template": user_role_template,
+            "form": form,
+        },
+    )
