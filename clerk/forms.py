@@ -1,6 +1,42 @@
 from django import forms
 from decimal import Decimal
 
+BUSINESS_TYPE_CHOICES = [
+    ("", "— Select Business Type —"),
+    (1,  "AGRICULTURE / AGRIBUSINESS"),
+    (2,  "EDUCATION & TRAINING"),
+    (3,  "FINANCIAL SERVICES"),
+    (4,  "FOOD & BEVERAGE"),
+    (5,  "HEALTH & WELLNESS"),
+    (6,  "MANUFACTURING / PRODUCTION"),
+    (7,  "REAL ESTATE & LEASING"),
+    (8,  "SERVICES"),
+    (9,  "TOURISM, TRAVEL & ENTERTAINMENT"),
+    (10, "TRADING / RETAIL"),
+    (11, "OTHERS"),
+]
+
+OWNERSHIP_TYPE_CHOICES = [
+    ("", "— Select Ownership Type —"),
+    (1, "SOLE PROPRIETORSHIP"),
+    (2, "PARTNERSHIP"),
+    (3, "CORPORATION"),
+    (4, "COOPERATIVE"),
+    (5, "ONE PERSON CORPORATION"),
+    (6, "OTHERS"),
+]
+
+OPERATING_DAY_CHOICES = [
+    ("", "— Select Day —"),
+    (1, "Monday"),
+    (2, "Tuesday"),
+    (3, "Wednesday"),
+    (4, "Thursday"),
+    (5, "Friday"),
+    (6, "Saturday"),
+    (7, "Sunday"),
+]
+
 class RequestedDocsFilters(forms.Form):
     search = forms.CharField(
         widget=forms.TextInput(attrs={
@@ -259,7 +295,7 @@ class BusinessDetails(forms.Form):
         required= True,
     )
     b_type = forms.ChoiceField(
-        choices= [], 
+        choices= BUSINESS_TYPE_CHOICES, 
         widget=forms.Select(attrs={
             'id' : 'b_type',
             'class' : 'form-select',
@@ -267,17 +303,17 @@ class BusinessDetails(forms.Form):
         label= 'Business Type',
         required= True,
     )
-    b_nature = forms.ChoiceField( 
-        widget=forms.Select(attrs={
+    b_nature = forms.CharField( 
+        widget=forms.TextInput(attrs={
             'id' : 'b_nature',
             'class' : 'form-control',
-            'placeholder' : 'Nature of Business',
+            'placeholder' : 'Nature of Business (e.g., Sari-Sari Store, Eatery, etc.)',
     }),
         label= 'Nature of Business',
         required= True,
     )
     ownership_type = forms.ChoiceField(
-        choices= [], 
+        choices= OWNERSHIP_TYPE_CHOICES, 
         widget=forms.Select(attrs={
             'id' : 'ownership_type',
             'class' : 'form-select',
@@ -335,6 +371,19 @@ class BusinessDetails(forms.Form):
         label= 'City',
         required= True,
     )
+    # Hidden fields filled by the map script
+    latitude = forms.DecimalField(
+        required=False,
+        max_digits=10,
+        decimal_places=7,
+        widget=forms.HiddenInput(attrs={'id': 'latitude'}),
+    )
+    longitude = forms.DecimalField(
+        required=False,
+        max_digits=10,
+        decimal_places=7,
+        widget=forms.HiddenInput(attrs={'id': 'longitude'}),
+    )
     b_desc = forms.CharField(
         widget=forms.Textarea(attrs={
             'id' : 'b_desc',
@@ -391,6 +440,19 @@ class BusinessDetails(forms.Form):
         decimal_places=2,
         max_digits=14,
     )
+    inc_est = forms.DecimalField(
+        widget=forms.NumberInput(attrs={
+            'id' : 'inc_est',
+            'class' : 'form-control',
+            'placeholder' : 'Monthly Gross Income Estimate',
+            'inputmode' : 'decimal',
+        }),
+        label= 'Monthly Gross Income Estimate',
+        required= True,
+        min_value=Decimal('0.00'),
+        decimal_places=2,
+        max_digits=14,
+    )
     emp_num = forms.IntegerField(
         widget=forms.NumberInput(attrs={
             'id' : 'emp_num',
@@ -402,12 +464,20 @@ class BusinessDetails(forms.Form):
         required= True,
         min_value=0,
     )
-    opt_days = forms.MultipleChoiceField(
-        choices= [], 
-        widget=forms.SelectMultiple(attrs={
+    opt_days_start = forms.ChoiceField(
+        choices= OPERATING_DAY_CHOICES, 
+        widget=forms.Select(attrs={
             'id' : 'opt_days',
             'class' : 'form-select',
-            'size' : 1,
+    }),
+        label= 'Operating Days',
+        required= True,
+    )
+    opt_days_end = forms.ChoiceField(
+        choices= OPERATING_DAY_CHOICES, 
+        widget=forms.Select(attrs={
+            'id' : 'opt_days',
+            'class' : 'form-select',
     }),
         label= 'Operating Days',
         required= True,
@@ -445,7 +515,31 @@ class BusinessDetails(forms.Form):
         widget=forms.ClearableFileInput(attrs={
             'id' : 'proof',
             'class' : 'form-control',
+            'accept': 'image/*,application/pdf',
         }),
         label= 'Proof of Business (lease, photos, permit, etc.)',
         required= True, 
     )
+
+
+def clean(self):
+        cleaned = super().clean()
+
+        # Validate day range (1..7 and start <= end)
+        try:
+            d_start = int(cleaned.get('opt_days_start') or 0)
+            d_end = int(cleaned.get('opt_days_end') or 0)
+            if not (1 <= d_start <= 7 and 1 <= d_end <= 7 and d_start <= d_end):
+                self.add_error('opt_days_start', 'Start must be 1–7 and ≤ end.')
+                self.add_error('opt_days_end', '')
+        except (TypeError, ValueError):
+            self.add_error('opt_days_start', 'Invalid day range.')
+
+        # Validate hour range
+        t_start = cleaned.get('opt_start')
+        t_end = cleaned.get('opt_end')
+        if t_start and t_end and not (t_start < t_end):
+            self.add_error('opt_start', 'Start time must be before end time.')
+            self.add_error('opt_end', '')
+
+        return cleaned

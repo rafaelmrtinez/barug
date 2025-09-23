@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import datetime as dt
+
 from uuid import uuid4
 
 from typing import Any, Dict, List, Optional
@@ -812,6 +814,16 @@ def _clear_draft(request: HttpRequest) -> None:
         del request.session[BIZ_DRAFT_KEY]
         request.session.modified = True
 
+def _js(v):
+    """Make values JSON-safe for Supabase RPC."""
+    if v is None:
+        return None
+    if isinstance(v, Decimal):
+        return float(v)                 # or str(v) if you prefer exact text
+    if isinstance(v, (dt.date, dt.datetime, dt.time)):
+        return v.isoformat()            # 'YYYY-MM-DD', 'HH:MM:SS'
+    return v
+
 
 @session_login_required
 @role_required("Barangay Clerk")
@@ -926,10 +938,7 @@ def business_details(request: HttpRequest) -> HttpResponse:
         return redirect("login")
 
     # bucket from settings (required)
-    try:
-        BUCKET = settings.SUPABASE_BUCKET
-    except Exception:
-        BUCKET = None
+    BUCKET = getattr(settings, "SUPABASE_BUCKET", None)
     if not BUCKET:
         messages.error(request, "Storage bucket is not configured. Set SUPABASE_BUCKET in settings.")
         return redirect("business_owner_resident")
@@ -951,7 +960,7 @@ def business_details(request: HttpRequest) -> HttpResponse:
             files = request.FILES.getlist("proof")
             for f in files:
                 ext = f.name.rsplit(".", 1)[-1].lower() if "." in f.name else ""
-                key = f"business-proofs/{staff_id}/{uuid4().hex}.{ext}"
+                key = f"business-proofs/{uuid4().hex}.{ext}"
                 try:
                     supabase.storage.from_(BUCKET).upload(
                         key, f.read(), {"content-type": f.content_type}
@@ -968,42 +977,49 @@ def business_details(request: HttpRequest) -> HttpResponse:
                             "form": form,
                         },
                     )
+                
+            # coerce ints from choices
+            btype_id   = int(cd["b_type"])           if cd.get("b_type") else None
+            own_id     = int(cd["ownership_type"])   if cd.get("ownership_type") else None
+            day_start  = int(cd["opt_days_start"])   if cd.get("opt_days_start") else None
+            day_end    = int(cd["opt_days_end"])     if cd.get("opt_days_end") else None
+            has_clearance = (cd.get("prev_clearance") == "yes")
 
-            payload: Dict[str, Any] = {
+            payload = {
                 "p_performer_staff_id": int(staff_id),
                 "p_owner_person_id": int(owner_person_id),
 
                 # business
                 "p_business_name": cd.get("b_name"),
-                "p_business_location_desc": cd.get("location_description"),
+                "p_business_location_desc": cd.get("b_desc"),
                 "p_business_nature": cd.get("b_nature"),
 
-                "p_prev_yr_total_gross_sales": cd.get("prev_yr_total_gross_sales"),
-                "p_date_est": cd.get("date_est"),
-                "p_dti_sec_reg_num": cd.get("dti_sec_reg_num"),
-                "p_capital_invested": cd.get("capital_invested"),
-                "p_mnthly_gross_incom_est": cd.get("mnthly_gross_incom_est"),
-                "p_num_of_emp": cd.get("num_of_emp"),
-                "p_has_business_clearance": cd.get("has_business_clearance") or False,
+                "p_prev_yr_total_gross_sales": _js(cd.get("prevgross")),        # Decimal -> float
+                "p_date_est": _js(cd.get("date_est")),                           # date -> 'YYYY-MM-DD'
+                "p_dti_sec_reg_num": cd.get("dti"),
+                "p_capital_invested": _js(cd.get("capital_invested")),           # Decimal -> float
+                "p_mnthly_gross_incom_est": _js(cd.get("inc_est")),              # Decimal -> float
+                "p_num_of_emp": cd.get("emp_num"),
+                "p_has_business_clearance": has_clearance,
 
-                "p_business_type_id": cd.get("b_type"),
-                "p_ownership_type_id": cd.get("ownership_type"),
+                "p_business_type_id": btype_id,
+                "p_ownership_type_id": own_id,
 
                 # operating schedule
-                "p_operating_day_start": cd.get("operating_day_start"),
-                "p_operating_day_end": cd.get("operating_day_end"),
-                "p_operating_hour_start": cd.get("operating_hour_start"),
-                "p_operating_hour_end": cd.get("operating_hour_end"),
+                "p_operating_day_start": day_start,
+                "p_operating_day_end": day_end,
+                "p_operating_hour_start": _js(cd.get("opt_start")),              # time -> 'HH:MM:SS'
+                "p_operating_hour_end": _js(cd.get("opt_end")),                  # time -> 'HH:MM:SS'
 
                 # business address
-                "p_business_latitude": cd.get("latitude"),
-                "p_business_longitude": cd.get("longitude"),
+                "p_business_latitude": _js(cd.get("latitude")),                  # Decimal -> float
+                "p_business_longitude": _js(cd.get("longitude")),                # Decimal -> float
                 "p_business_city": cd.get("city"),
                 "p_business_barangay": cd.get("barangay"),
                 "p_business_street": cd.get("street"),
-                "p_business_purok_sitio_name": cd.get("sitio_purok"),
+                "p_business_purok_sitio_name": cd.get("purok_sitio"),
 
-                # proofs (array of storage keys)
+                # proofs
                 "p_business_proof_files": uploaded_paths or None,
             }
 
@@ -1013,11 +1029,14 @@ def business_details(request: HttpRequest) -> HttpResponse:
                 if not rows:
                     messages.warning(request, "The server did not return IDs, but the request may have been processed.")
                 else:
-                    v_business_id, v_owner_id = rows[0][0], rows[0][1]
+                    first = rows[0]
+                    # If the function returns TABLE with named columns, supabase-py returns dicts
+                    v_business_id = first.get("business_id") if isinstance(first, dict) else first[0]
+                    v_owner_id = first.get("owner_person_id") if isinstance(first, dict) else first[1]
 
                 _clear_draft(request)
                 messages.success(request, "Business registered successfully.")
-                return redirect("business_list")
+                return redirect("clerk:business_list")
 
             except APIError as e:
                 code = getattr(e, "code", None) or getattr(e, "error", None) or ""
@@ -1046,7 +1065,6 @@ def business_details(request: HttpRequest) -> HttpResponse:
             "form": form,
         },
     )
-
 
 # ───────────────────── utility: reset the draft ─────────────────────
 
