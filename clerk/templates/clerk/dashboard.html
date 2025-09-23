@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" %} 
 {% load static %}
 {% load bootstrap_icons %}
 
@@ -35,8 +35,9 @@
 .dashboard .shadow-sm{ box-shadow:var(--shadow)!important; }
 .dashboard .btn,.dashboard .form-select,.dashboard .form-control{ border-radius:12px; }
 
-/* Defer rendering offscreen for speed */
-.header-card,.kpi,.section{ content-visibility:auto; contain-intrinsic-size: 300px 400px; }
+/* Keep perf hints, but never defer chart cards themselves */
+.header-card,.kpi{ content-visibility:auto; contain-intrinsic-size: 300px 400px; }
+.section.chart-section{ content-visibility:visible; }
 
 /* Header */
 .header-card{ background:linear-gradient(135deg,var(--brand-100),#fff); }
@@ -49,6 +50,10 @@
 .btn-outline-brand:hover{ background:var(--brand-100); color:var(--brand-800); }
 .btn-brand-subtle{ background:var(--brand-300); color:var(--brand-800); border:1px solid var(--brand-300); }
 .btn-brand-subtle:hover{ background:var(--brand-200); }
+
+/* Links */
+.link-brand{ color:var(--brand-700); text-decoration:none; }
+.link-brand:hover{ color:var(--brand-800); text-decoration:underline; }
 
 /* Filters */
 .filter{ min-width:160px; }
@@ -221,7 +226,7 @@
   <!-- Charts -->
   <div class="row g-3 mt-1">
     <div class="col-12 col-xxl-7">
-      <div class="card section shadow-sm h-100">
+      <div class="card section chart-section shadow-sm h-100">
         <div class="card-header d-flex align-items-center justify-content-between">
           <h5 class="mb-0">Requests — Last 7 Days</h5>
           <span class="small text-muted">All document types</span>
@@ -235,7 +240,7 @@
       </div>
     </div>
     <div class="col-12 col-xxl-5">
-      <div class="card section shadow-sm h-100">
+      <div class="card section chart-section shadow-sm h-100">
         <div class="card-header d-flex align-items-center justify-content-between">
           <h5 class="mb-0">Status Breakdown</h5>
           <span class="small text-muted">Current</span>
@@ -270,7 +275,7 @@
                 <span class="badge rounded-pill status-badge status-{{ v.status|lower }}">{{ v.status }}</span>
               </div>
             {% empty %}
-              <!-- JS will auto-fill sample data -->
+              <!-- JS fills demo -->
             {% endfor %}
           </div>
         </div>
@@ -294,7 +299,7 @@
                 <div class="small text-muted">{{ r.requestor }} — {{ r.code }}</div>
               </div>
             {% empty %}
-              <!-- JS will auto-fill sample data -->
+              <!-- JS fills demo -->
             {% endfor %}
           </div>
         </div>
@@ -335,7 +340,7 @@
                   </td>
                 </tr>
                 {% empty %}
-                <!-- JS will auto-fill sample data -->
+                <!-- JS fills demo -->
                 {% endfor %}
               </tbody>
             </table>
@@ -349,166 +354,151 @@
   {% if dashboard_json %}
     {{ dashboard_json|json_script:"dash-data" }}
   {% endif %}
+
+  <!-- INLINE, ZERO-DEPENDENCY CHARTS (ensures a LINE GRAPH always renders) -->
+  <script>
+  (function(){
+    const css = getComputedStyle(document.documentElement);
+    const pick = k => (css.getPropertyValue(k)||'').trim();
+    const BRAND600 = pick('--brand-600') || '#6d2932';
+    const BRAND500 = pick('--brand-500') || '#561c24';
+    const BRAND300 = pick('--brand-300') || '#e8d8c4';
+    const NEUTRAL300 = pick('--neutral-300') || '#d1d5db';
+    const NEUTRAL500 = pick('--neutral-500') || '#6b7280';
+    const hide = sel => document.querySelector(sel)?.classList.add('hidden');
+
+    // Demo payload if server didn't pass any
+    const dashEl = document.getElementById('dash-data');
+    const dash = dashEl ? JSON.parse(dashEl.textContent) : {
+      requestsTrend: { labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], data:[12,18,21,15,27,23,30] },
+      statusBreakdown: { labels:['Pending','Processing','Approved','Rejected'], data:[18,9,22,3] }
+    };
+
+    // Fill lists/tables if empty (so UI looks complete)
+    const verifHost = document.getElementById('verifList');
+    if (verifHost && !verifHost.querySelector('.item-row')) {
+      verifHost.innerHTML = [
+        {n:'Juan Dela Cruz', s:'ePhilID • 5m ago', st:'Pending'},
+        {n:'Maria Santos', s:'Driver’s License • 12m ago', st:'Pending'},
+        {n:'Pedro Reyes', s:'PhilID • 26m ago', st:'Processing'}
+      ].map(v=>`<div class="item-row d-flex justify-content-between align-items-center">
+        <div><div class="fw-semibold">${v.n}</div><div class="small text-muted">${v.s}</div></div>
+        <span class="badge rounded-pill status-badge status-${v.st.toLowerCase()}">${v.st}</span>
+      </div>`).join('');
+    }
+    const reqHost = document.getElementById('reqList');
+    if (reqHost && !reqHost.querySelector('.item-row')) {
+      reqHost.innerHTML = [
+        {d:'Barangay Clearance', w:'Juan Dela Cruz', c:'RES-00123', st:'Pending'},
+        {d:'Certificate of Residency', w:'Maria Santos', c:'RES-00124', st:'Approved'}
+      ].map(r=>`<div class="item-row">
+        <div class="d-flex justify-content-between align-items-center">
+          <div class="fw-semibold">${r.d}</div>
+          <span class="badge rounded-pill status-badge status-${r.st.toLowerCase()}">${r.st}</span>
+        </div><div class="small text-muted">${r.w} — ${r.c}</div>
+      </div>`).join('');
+    }
+    const bizBody = document.getElementById('bizTableBody');
+    if (bizBody && !bizBody.querySelector('tr')) {
+      bizBody.innerHTML = [
+        {n:'Velasco Sari-sari Store', o:'Rico Velasco', a:'Purok Kanipaan, Sto. Niño', e:'Oct 05'},
+        {n:'Uy Laundry', o:'Claire Uy', a:'Purok Mauco, Sto. Niño', e:'Oct 07'}
+      ].map(b=>`<tr>
+        <td><div class="fw-semibold">${b.n}</div><div class="small text-muted">${b.a}</div></td>
+        <td class="d-none d-sm-table-cell">${b.o}</td>
+        <td><span class="badge rounded-pill status-badge status-processing">${b.e}</span></td>
+        <td class="text-end"><a href="#" class="btn btn-sm btn-outline-brand">View</a></td>
+      </tr>`).join('');
+    }
+
+    // Draw once canvas has layout size
+    function whenSized(canvas, fn){
+      let tries=0;
+      (function tick(){
+        if (canvas && canvas.clientWidth>0 && canvas.clientHeight>0) fn();
+        else if (tries++<40) setTimeout(tick,50);
+        else fn();
+      })();
+    }
+
+    function drawLine(canvas, labels, data, stroke, fill){
+      if (!canvas) return;
+      const dpr = devicePixelRatio||1;
+      const W = canvas.clientWidth||600, H = canvas.clientHeight||300;
+      canvas.width = W*dpr; canvas.height = H*dpr;
+      const ctx = canvas.getContext('2d'); ctx.scale(dpr,dpr);
+      const m={l:36,r:14,t:16,b:26}, x0=m.l, x1=W-m.r, y0=H-m.b, y1=m.t;
+
+      // grid
+      ctx.strokeStyle=NEUTRAL300; ctx.lineWidth=1; ctx.globalAlpha=.6;
+      for(let i=0;i<=4;i++){ const y=y0-(y0-y1)*i/4; ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x1,y); ctx.stroke(); }
+      ctx.globalAlpha=1;
+
+      const max=Math.max(...data,1);
+      const pts=data.map((v,i)=>({ x:x0+(x1-x0)*(i/Math.max(data.length-1,1)), y:y0-(y0-y1)*(v/max) }));
+
+      // area
+      ctx.beginPath(); ctx.moveTo(x0,y0);
+      pts.forEach(p=>ctx.lineTo(p.x,p.y));
+      ctx.lineTo(x1,y0); ctx.closePath();
+      ctx.fillStyle=fill; ctx.fill();
+
+      // smooth line
+      ctx.strokeStyle=stroke; ctx.lineWidth=2; ctx.beginPath();
+      for(let i=0;i<pts.length;i++){
+        const p=pts[i];
+        if(i===0) ctx.moveTo(p.x,p.y);
+        else { const q=pts[i-1]; const cx=(q.x+p.x)/2; ctx.quadraticCurveTo(q.x,q.y,cx,p.y); }
+      }
+      ctx.stroke();
+    }
+
+    function drawDonut(canvas, labels, data, colors){
+      if (!canvas) return;
+      const dpr=devicePixelRatio||1;
+      const W=canvas.clientWidth||400, H=canvas.clientHeight||300;
+      canvas.width=W*dpr; canvas.height=H*dpr;
+      const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+
+      const cx=W/2, cy=H/2, R=Math.min(W,H)/2-10, cut=R*0.62;
+      const total=data.reduce((a,b)=>a+b,0)||1;
+      let a0=-Math.PI/2;
+      data.forEach((v,i)=>{
+        const a1=a0+(v/total)*Math.PI*2;
+        ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,a0,a1); ctx.closePath();
+        ctx.fillStyle=colors[i%colors.length]; ctx.fill(); a0=a1;
+      });
+      ctx.globalCompositeOperation='destination-out';
+      ctx.beginPath(); ctx.arc(cx,cy,cut,0,Math.PI*2); ctx.fill();
+      ctx.globalCompositeOperation='source-over';
+    }
+
+    function legend(el, labels, colors){
+      if (!el) return;
+      el.innerHTML = labels.map((t,i)=>`
+        <span class="legend-dot" style="--dot:${colors[i%colors.length]}"></span>
+        <span class="legend-label">${t}</span>`).join('');
+    }
+
+    // LINE GRAPH (guaranteed)
+    const lineCanvas=document.getElementById('requestsTrend');
+    whenSized(lineCanvas, ()=>{
+      drawLine(lineCanvas, dash.requestsTrend.labels, dash.requestsTrend.data, BRAND600, BRAND300);
+      hide('.chart-skel-req');
+    });
+
+    // DONUT
+    const donutCanvas=document.getElementById('statusBreakdown');
+    const palette=[BRAND600,BRAND500,BRAND300,NEUTRAL300];
+    whenSized(donutCanvas, ()=>{
+      drawDonut(donutCanvas, dash.statusBreakdown.labels, dash.statusBreakdown.data, palette);
+      legend(document.getElementById('statusLegend'), dash.statusBreakdown.labels, palette);
+      hide('.chart-skel-status');
+    });
+  })();
+  </script>
 </div>
 {% endblock %}
 
-{% block extra_js %}
-<script>
-/* Lightweight, lazy Chart.js + demo data.
-   - No blocking <script src> tag.
-   - Loads Chart.js only when canvases are visible. */
-(function(){
-  const css = getComputedStyle(document.documentElement);
-  const pick = (k) => css.getPropertyValue(k).trim();
-  const BRAND600 = pick('--brand-600'), BRAND500 = pick('--brand-500'), BRAND300 = pick('--brand-300');
-  const NEUTRAL300 = pick('--neutral-300'), NEUTRAL500 = pick('--neutral-500');
-  const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  // 1) Fill sample data for lists/tables if backend didn't pass any
-  const SAMPLES = {
-    verifications: [
-      {name:'Juan Dela Cruz', sub:'ePhilID • Uploaded 5m ago', status:'Pending'},
-      {name:'Maria Santos', sub:'Driver’s License • Uploaded 12m ago', status:'Pending'},
-      {name:'Pedro Reyes', sub:'PhilID • Uploaded 26m ago', status:'Processing'},
-      {name:'Ana Manalansan', sub:'UMID • Uploaded 1h ago', status:'Approved'},
-      {name:'Rico Velasco', sub:'PhilHealth • Uploaded 2h ago', status:'Pending'},
-      {name:'Claire Uy', sub:'Passport • Uploaded 3h ago', status:'Rejected'}
-    ],
-    requests: [
-      {doc:'Barangay Clearance', who:'Juan Dela Cruz', code:'RES-00123', status:'Pending'},
-      {doc:'Certificate of Residency', who:'Maria Santos', code:'RES-00124', status:'Approved'},
-      {doc:'Certificate of Indigency', who:'Pedro Reyes', code:'RES-00125', status:'Processing'},
-      {doc:'Barangay Clearance', who:'Ana Manalansan', code:'RES-00126', status:'Rejected'},
-      {doc:'Residency', who:'Rico Velasco', code:'RES-00127', status:'Pending'},
-      {doc:'Indigency', who:'Claire Uy', code:'RES-00128', status:'Processing'}
-    ],
-    businesses: [
-      {name:'Velasco Sari-sari Store', owner:'Rico Velasco', addr:'Purok Kanipaan, Sto. Niño', expiry:'Oct 05'},
-      {name:'Uy Laundry Services', owner:'Claire Uy', addr:'Purok Mauco, Sto. Niño', expiry:'Oct 07'},
-      {name:'Manalansan Eatery', owner:'Ana Manalansan', addr:'Purok Pampango, Sto. Niño', expiry:'Oct 10'},
-      {name:'Reyes Trading', owner:'Pedro Reyes', addr:'Purok Lutaw-Lutaw, Sto. Niño', expiry:'Oct 14'},
-      {name:'Santos Pharmacy', owner:'Maria Santos', addr:'Purok Kanipaan, Sto. Niño', expiry:'Oct 18'}
-    ]
-  };
-
-  const verifHost = document.getElementById('verifList');
-  if (verifHost && !verifHost.querySelector('.item-row')) {
-    verifHost.innerHTML = SAMPLES.verifications.map(v => `
-      <div class="item-row d-flex justify-content-between align-items-center">
-        <div>
-          <div class="fw-semibold">${v.name}</div>
-          <div class="small text-muted">${v.sub}</div>
-        </div>
-        <span class="badge rounded-pill status-badge status-${v.status.toLowerCase()}">${v.status}</span>
-      </div>
-    `).join('');
-  }
-
-  const reqHost = document.getElementById('reqList');
-  if (reqHost && !reqHost.querySelector('.item-row')) {
-    reqHost.innerHTML = SAMPLES.requests.map(r => `
-      <div class="item-row">
-        <div class="d-flex justify-content-between align-items-center">
-          <div class="fw-semibold">${r.doc}</div>
-          <span class="badge rounded-pill status-badge status-${r.status.toLowerCase()}">${r.status}</span>
-        </div>
-        <div class="small text-muted">${r.who} — ${r.code}</div>
-      </div>
-    `).join('');
-  }
-
-  const bizBody = document.getElementById('bizTableBody');
-  if (bizBody && !bizBody.querySelector('tr')) {
-    bizBody.innerHTML = SAMPLES.businesses.map(b => `
-      <tr>
-        <td>
-          <div class="fw-semibold">${b.name}</div>
-          <div class="small text-muted">${b.addr}</div>
-        </td>
-        <td class="d-none d-sm-table-cell">${b.owner}</td>
-        <td><span class="badge rounded-pill status-badge status-processing">${b.expiry}</span></td>
-        <td class="text-end">
-          <a href="#" class="btn btn-sm btn-outline-brand">{% bs_icon 'eye' %} View</a>
-        </td>
-      </tr>
-    `).join('');
-  }
-
-  // 2) Charts: lazy render when visible, dynamically load Chart.js
-  const loadChartJs = () => window.Chart ? Promise.resolve(window.Chart) : new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
-    s.defer = true;
-    s.onload = () => resolve(window.Chart);
-    s.onerror = reject;
-    document.head.appendChild(s);
-  });
-
-  const lazyChart = (canvasId, makeChart, onDrawn) => {
-    const el = document.getElementById(canvasId);
-    if (!el) return;
-    const obs = new IntersectionObserver(async (entries) => {
-      if (!entries[0].isIntersecting) return;
-      obs.disconnect();
-      await loadChartJs();
-      makeChart(el.getContext('2d'));
-      onDrawn && onDrawn();
-    }, { rootMargin: '120px 0px' });
-    obs.observe(el);
-  };
-
-  // Payload (server-provided or defaults)
-  const dashEl = document.getElementById('dash-data');
-  const dash = dashEl ? JSON.parse(dashEl.textContent) : {
-    requestsTrend: { labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], data:[12,18,21,15,27,23,30] },
-    statusBreakdown: { labels:['Pending','Processing','Approved','Rejected'], data:[18,9,22,3] }
-  };
-
-  // Line chart (YES, there is a line graph)
-  lazyChart('requestsTrend', (ctx) => {
-    new window.Chart(ctx, {
-      type:'line',
-      data:{
-        labels: dash.requestsTrend.labels,
-        datasets:[{
-          label:'Requests',
-          data: dash.requestsTrend.data,
-          borderColor: BRAND600,
-          backgroundColor: BRAND300,
-          fill:true,
-          tension:0.35,
-          borderWidth:2,
-          pointRadius:0
-        }]
-      },
-      options:{
-        responsive:true, maintainAspectRatio:false, animation: prefersReduced ? false : undefined,
-        plugins:{ legend:{ display:false } },
-        scales:{
-          x:{ grid:{ display:false }, ticks:{ color:NEUTRAL500 }},
-          y:{ beginAtZero:true, grid:{ color:NEUTRAL300 }, ticks:{ color:NEUTRAL500 } }
-        }
-      }
-    });
-  }, () => document.querySelector('.chart-skel-req')?.classList.add('hidden'));
-
-  // Doughnut chart
-  lazyChart('statusBreakdown', (ctx) => {
-    const palette = [BRAND600, BRAND500, BRAND300, NEUTRAL300];
-    new window.Chart(ctx, {
-      type:'doughnut',
-      data:{ labels:dash.statusBreakdown.labels,
-        datasets:[{ data:dash.statusBreakdown.data, backgroundColor:palette, borderWidth:0 }] },
-      options:{ responsive:true, maintainAspectRatio:false, animation: prefersReduced ? false : undefined,
-        plugins:{ legend:{ display:false } }, cutout:'62%' }
-    });
-    // inline legend
-    const host = document.getElementById('statusLegend');
-    if (host) host.innerHTML = dash.statusBreakdown.labels.map((lbl,i)=>`
-      <span class="legend-dot" style="--dot:${palette[i]}"></span>
-      <span class="legend-label">${lbl}</span>
-    `).join('');
-  }, () => document.querySelector('.chart-skel-status')?.classList.add('hidden'));
-})();
-</script>
-{% endblock %}
+{# keep this block for future use; no dependency on it for charts #}
+{% block extra_js %}{% endblock %}

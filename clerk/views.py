@@ -16,6 +16,7 @@ from django.utils.html import escape
 from django.utils import timezone
 from django.conf import settings
 from django.views.decorators.http import require_POST
+from decimal import Decimal
 
 from postgrest.exceptions import APIError
 
@@ -216,6 +217,35 @@ def _lookup_person_contact(person_id: Optional[int]) -> Tuple[Optional[str], Opt
         print(f"[EMAIL DEBUG] lookup failed for person_id={person_id}: {e}")
         return None, None
 
+# All request document type names (cached for this process)
+_DOC_TYPES_ALL_CACHE: List[str] = []
+
+def _fetch_doc_types_all() -> List[str]:
+    """
+    Get the full list of document type names for the filter panel.
+    Falls back to [] if the query fails.
+    """
+    global _DOC_TYPES_ALL_CACHE
+    if _DOC_TYPES_ALL_CACHE:
+        return _DOC_TYPES_ALL_CACHE
+    try:
+        res = (
+            supabase.table("request_document_type")
+            .select("request_document_type_name")
+            .order("request_document_type_name")
+            .execute()
+        )
+        names = [
+            (r.get("request_document_type_name") or "").strip()
+            for r in (res.data or [])
+            if (r.get("request_document_type_name") or "").strip()
+        ]
+        _DOC_TYPES_ALL_CACHE = names
+        return names
+    except Exception as e:
+        logger.warning("Failed to fetch doc types list: %s", e)
+        return []
+
 
 # =========================
 # Clerk — Queue / List of document requests
@@ -226,39 +256,92 @@ def _lookup_person_contact(person_id: Optional[int]) -> Tuple[Optional[str], Opt
 def queue(request: HttpRequest):
     q = (request.GET.get("q") or "").strip() or None
 
+    # ----- Status filters -----
     statuses = request.GET.getlist("status")
     if not statuses:
         raw = (request.GET.get("status") or "").strip()
         statuses = [s for s in raw.split(",") if s] if raw else CLERK_STATUSES_ALL[:2]
 
-    query = supabase.table("v_doc_request_list_ex").select("*").order("doc_request_id", desc=True)
+    # ----- Document type filters (NEW) -----
+    # Accepts repeated ?doc_type=… or a single comma-separated ?doc_type=A,B
+    doc_types = request.GET.getlist("doc_type")
+    if not doc_types:
+        raw_dt = (request.GET.get("doc_type") or "").strip()
+        doc_types = [s for s in raw_dt.split(",") if s]
+
+    # Base query
+    query = (
+        supabase.table("v_doc_request_list_ex")
+        .select("*")
+        .order("doc_request_id", desc=True)
+    )
+
     if statuses:
         query = query.in_("status", statuses)
-    if q:
-        array_probe = "{" + q + "}"
-        query = query.or_(f"request_code.ilike.%{q}%,doc_types.ov.{array_probe},purposes.ov.{array_probe}")
 
+    if q:
+        # simple overlap probe for array columns doc_types/purposes
+        # Note: if q has commas, PostgREST ov set parsing won't like it; keep as-is for now
+        array_probe = "{" + q + "}"
+        query = query.or_(
+            f"request_code.ilike.%{q}%,doc_types.ov.{array_probe},purposes.ov.{array_probe}"
+        )
+
+    # Execute
     res = query.limit(200).execute()
     rows: List[Dict[str, Any]] = res.data or []
+
+    # In-memory filter by selected document types (overlap), case-insensitive
+    if doc_types:
+        selected = {str(d).strip().lower() for d in doc_types}
+        def _overlaps(row: Dict[str, Any]) -> bool:
+            vals = row.get("doc_types") or []
+            have = {str(v).strip().lower() for v in vals if v}
+            return bool(have & selected)
+        rows = [r for r in rows if _overlaps(r)]
+
+    # UI adornments
     for r in rows:
-        r["status_ui"] = STATUS_UI.get(r.get("status")) or {"label": r.get("status") or "—", "cls": "badge text-bg-secondary"}
+        r["status_ui"] = STATUS_UI.get(r.get("status")) or {
+            "label": r.get("status") or "—",
+            "cls": "badge text-bg-secondary",
+        }
         r["purposes_display"] = [_titleize(p) for p in (r.get("purposes") or [])]
+
         fn = (r.get("requester_first_name") or r.get("first_name") or "").strip()
         ln = (r.get("requester_last_name") or r.get("last_name") or "").strip()
         full = (r.get("requester_full_name") or r.get("resident_name") or "").strip() or " ".join([fn, ln]).strip()
         r["requester_display"] = full or None
+
         created_at = r.get("created_at") or r.get("created_ts") or r.get("date_created")
         try:
             r["created_fmt"] = created_at.strftime("%b %d, %Y %H:%M")  # type: ignore
         except Exception:
             r["created_fmt"] = str(created_at)
 
+    # Get all doc types for the filter panel; fallback to what’s on this page if needed
+    doc_types_all = _fetch_doc_types_all()
+    if not doc_types_all:
+        seen: set[str] = set()
+        for r in rows:
+            for name in (r.get("doc_types") or []):
+                name = (name or "").strip()
+                if name:
+                    seen.add(name)
+        doc_types_all = sorted(seen)
+
     paginator = Paginator(rows, 10)
     page_obj = paginator.get_page(request.GET.get("page"))
+
     return render(request, "clerk/queue.html", {
-        "page_obj": page_obj, "rows": page_obj.object_list,
-        "q": q or "", "statuses": statuses, "statuses_all": CLERK_STATUSES_ALL,
-        "active_count": len(statuses),
+        "page_obj": page_obj,
+        "rows": page_obj.object_list,
+        "q": q or "",
+        "statuses": statuses,
+        "statuses_all": CLERK_STATUSES_ALL,
+        "doc_types": doc_types,                 # NEW
+        "doc_types_all": doc_types_all,         # NEW
+        "active_count": len(statuses) + len(doc_types),  # NEW: show both in the badge
     })
 
 # =========================
