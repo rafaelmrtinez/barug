@@ -32,10 +32,9 @@
       <!-- Search (static mockup, not a form) -->
       <div class="rounded-3 border bg-light p-3">
         <label class="form-label small">Find Resident Record</label>
-        <div class="form-floating mb-3">
-          <input type="text" id="residentSearch" class="form-control form-control-sm"
-                 placeholder="Enter Resident ID or Full Name">
-          <label for="residentSearch">Enter Resident ID or Full Name</label>
+        <div class="form-floating">
+          {{ form.search }}
+          <label for="{{ form.search.id_for_label }}">{{ form.search.label }}</label>
         </div>
         <div class="form-text">Enter the Resident ID or name, then review the resident details below.</div>
       </div>
@@ -136,7 +135,7 @@
           <div class="d-flex align-items-center justify-content-between">
             <div class="small">
               <span class="text-muted">Selected Staff:</span>
-              <strong>DELA CRUZ, JUAN S. (P07-R123)</strong>
+              <strong>DELA CRUZ, JUAN S. — P07-R123</strong>
             </div>
             <a href="#" class="small text-decoration-none" style="color: var(--bs-danger-text-emphasis);">Change</a>
           </div>
