@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+import datetime as dt
+
+from uuid import uuid4
+
+from typing import Any, Dict, List, Optional, Optional, Tuple
 import io, os, zipfile, json, re
 from datetime import datetime
 
@@ -20,7 +24,7 @@ from authentication.utils import nocache
 from authentication.supabase_client import supabase
 
 from .forms import (
-    SearchVerificationRequest, SearchBusinessOwner, BusinessOwnerInfo,
+    SearchVerificationRequest, SearchBusinessOwner, SelectOwnerForm , BusinessOwnerInfo,
     BusinessDetails, BusinessFilters, RequestedDocsFilters
 )
 
@@ -932,71 +936,298 @@ def walkin_create(request: HttpRequest):
 # =========================
 # Business screens (stubs; clerk-only)
 # =========================
-def _profile_fallbacks(request: HttpRequest):
-    user_role = (request.session.get("auth") or {}).get("role_name")
-    user_role_template = user_role.lower().replace(" ", "_")
-    return user_role.title(), user_role_template
+# ─────────────────────────── helpers ───────────────────────────
 
+BIZ_DRAFT_KEY = "biz_reg_draft"
+
+def _auth_staff_id(request: HttpRequest) -> Optional[int]:
+    return ((request.session.get("auth") or {}).get("staff_id")) or None
+
+def _auth_role_name(request: HttpRequest) -> str:
+    return (((request.session.get("auth") or {}).get("role_name")) or "Staff").title()
+
+def _get_draft(request: HttpRequest) -> Dict[str, Any]:
+    return request.session.get(BIZ_DRAFT_KEY) or {}
+
+def _save_draft(request: HttpRequest, draft: Dict[str, Any]) -> None:
+    request.session[BIZ_DRAFT_KEY] = draft
+    request.session.modified = True
+
+def _clear_draft(request: HttpRequest) -> None:
+    if BIZ_DRAFT_KEY in request.session:
+        del request.session[BIZ_DRAFT_KEY]
+        request.session.modified = True
+
+def _js(v):
+    """Make values JSON-safe for Supabase RPC."""
+    if v is None:
+        return None
+    if isinstance(v, Decimal):
+        return float(v)                 # or str(v) if you prefer exact text
+    if isinstance(v, (dt.date, dt.datetime, dt.time)):
+        return v.isoformat()            # 'YYYY-MM-DD', 'HH:MM:SS'
+    return v
+
+
+@session_login_required
+@role_required("Barangay Clerk")
+@nocache
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
 def business_owner(request: HttpRequest):
-    user_fullname, user_role_template = _profile_fallbacks(request)
+    user_role = (request.session.get("auth") or {}).get("role_name").title()
     return render(
         request,
         "business/business_owner.html",
         {
-            "user_fullname": user_fullname,
-            "user_role": user_fullname,
-            "page_path": f"{user_fullname} / Business Records / Add Business / Business Owner",
+            "page_path": f"{user_role} / Business Records / Add Business / Business Owner",
             "page_title": "Business Owner",
-            "user_role_template": user_role_template,
         },
     )
 
+# ───────────────────── step 1: pick existing owner ─────────────────────
+
 @session_login_required
-@role_required(CLERK_ROLE)
+@role_required("Barangay Clerk")
 @nocache
-def business_owner_resident(request: HttpRequest):
-    user_fullname, user_role_template = _profile_fallbacks(request)
-    form = SearchBusinessOwner()
+# @require_http_methods(["GET", "POST"])
+def business_owner_resident(request: HttpRequest) -> HttpResponse:
+    user_role = _auth_role_name(request)
+
+    # allow "Change" to clear selection
+    if request.GET.get("clear") == "1":
+        draft = _get_draft(request)
+        draft.pop("owner_person_id", None)
+        _save_draft(request, draft)
+        messages.info(request, "Selection cleared.")
+        return redirect("clerk:business_owner_resident")
+
+    # POST: selecting an owner (SearchBusinessOwner validates owner_person_id)
+    search_form = SearchBusinessOwner(request.GET or None)
+    select_form = SelectOwnerForm(request.POST or None)
+
+    # POST: selecting an owner
+    if request.method == "POST":
+        if select_form.is_valid():
+            owner_person_id = select_form.cleaned_data["owner_person_id"]
+            draft = _get_draft(request)
+            draft["owner_person_id"] = int(owner_person_id)
+            _save_draft(request, draft)
+            messages.success(request, "Owner selected. Review details below or continue.")
+            return redirect("clerk:business_owner_resident")
+        else:
+            messages.error(request, "Please select a resident owner.")
+
+    # GET: searching residents
+    q = ""
+    results: List[Dict[str, Any]] = []
+    if search_form.is_bound and search_form.is_valid():
+        q = (search_form.cleaned_data.get("search") or "").strip()
+        if q:
+            try:
+                resp = supabase.rpc("search_person_by_code_or_name", {"p_key": q}).execute()
+                # returns rows with keys: person_id, person_code, person_name, street, purok, barangay, city
+                results = resp.data or []
+            except APIError as e:
+                messages.error(request, f"Search error: {getattr(e,'message',str(e))}")
+
+    # Load selected resident (if any)
+    selected = None
+    owner_person_id = (_get_draft(request) or {}).get("owner_person_id")
+    if owner_person_id:
+        try:
+            sel = supabase.rpc("get_details", {"p_person_id": int(owner_person_id)}).execute()
+            data = sel.data
+            selected = (data[0] if isinstance(data, list) and data else data) or None
+        except APIError as e:
+            messages.error(request, f"Failed to load selected resident: {getattr(e,'message',str(e))}")
+
     return render(
         request,
         "business/business_owner_resident.html",
         {
-            "user_fullname": user_fullname,
-            "user_role": user_fullname,
-            "page_path": f"{user_fullname} / Business Records / Add Business / Business Owner Information",
+            "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
             "page_title": "Business Owner Information",
-            "user_role_template": user_role_template,
+            "search_form": search_form,  # GET form
+            "select_form": select_form,  # POST form (not strictly needed in template)
+            "q": q,                # current query
+            "results": results,    # search results for rendering
+            "selected": selected,  # drives the details card
+        },
+    )
+
+def business_owner_nonresident(request: HttpRequest):
+    user_role = (request.session.get("auth") or {}).get("role_name").title()
+
+    form = BusinessOwnerInfo()
+    return render(
+        request,
+        "business/business_owner_nonres.html",
+        {
+            "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
+            "page_title": "Business Owner Information",
             "form": form,
         },
     )
 
+# ───────────────────── step 2: business details ─────────────────────
+
 @session_login_required
-@role_required(CLERK_ROLE)
+@role_required("Barangay Clerk")
 @nocache
-def business_details(request: HttpRequest):
-    user_fullname, user_role_template = _profile_fallbacks(request)
-    form = BusinessDetails()
+# @require_http_methods(["GET", "POST"])
+def business_details(request: HttpRequest) -> HttpResponse:
+    user_role = _auth_role_name(request)
+    staff_id = _auth_staff_id(request)
+    if not staff_id:
+        messages.error(request, "Missing staff context. Please log in again.")
+        return redirect("login")
+
+    # bucket from settings (required)
+    BUCKET = getattr(settings, "SUPABASE_BUCKET", None)
+    if not BUCKET:
+        messages.error(request, "Storage bucket is not configured. Set SUPABASE_BUCKET in settings.")
+        return redirect("business_owner_resident")
+
+    draft = _get_draft(request)
+    owner_person_id = draft.get("owner_person_id")
+    if not owner_person_id:
+        messages.warning(request, "Please choose a resident owner first.")
+        return redirect("business_owner_resident")
+
+    form = BusinessDetails(request.POST or None, request.FILES or None)
+
+    if request.method == "POST":
+        if form.is_valid():
+            cd = form.cleaned_data
+
+            # ── upload proof file(s) to the configured bucket ──
+            uploaded_paths: List[str] = []
+            files = request.FILES.getlist("proof")
+            for f in files:
+                ext = f.name.rsplit(".", 1)[-1].lower() if "." in f.name else ""
+                key = f"business-proofs/{uuid4().hex}.{ext}"
+                try:
+                    supabase.storage.from_(BUCKET).upload(
+                        key, f.read(), {"content-type": f.content_type}
+                    )
+                    uploaded_paths.append(key)
+                except Exception as e:
+                    messages.error(request, f"Failed to upload proof '{f.name}': {e}")
+                    return render(
+                        request,
+                        "business/business_details.html",
+                        {
+                            "page_path": f"{user_role} / Business Records / Add Business / Business Information",
+                            "page_title": "Business Information",
+                            "form": form,
+                        },
+                    )
+                
+            # coerce ints from choices
+            btype_id   = int(cd["b_type"])           if cd.get("b_type") else None
+            own_id     = int(cd["ownership_type"])   if cd.get("ownership_type") else None
+            day_start  = int(cd["opt_days_start"])   if cd.get("opt_days_start") else None
+            day_end    = int(cd["opt_days_end"])     if cd.get("opt_days_end") else None
+            has_clearance = (cd.get("prev_clearance") == "yes")
+
+            payload = {
+                "p_performer_staff_id": int(staff_id),
+                "p_owner_person_id": int(owner_person_id),
+
+                # business
+                "p_business_name": cd.get("b_name"),
+                "p_business_location_desc": cd.get("b_desc"),
+                "p_business_nature": cd.get("b_nature"),
+
+                "p_prev_yr_total_gross_sales": _js(cd.get("prevgross")),        # Decimal -> float
+                "p_date_est": _js(cd.get("date_est")),                           # date -> 'YYYY-MM-DD'
+                "p_dti_sec_reg_num": cd.get("dti"),
+                "p_capital_invested": _js(cd.get("capital_invested")),           # Decimal -> float
+                "p_mnthly_gross_incom_est": _js(cd.get("inc_est")),              # Decimal -> float
+                "p_num_of_emp": cd.get("emp_num"),
+                "p_has_business_clearance": has_clearance,
+
+                "p_business_type_id": btype_id,
+                "p_ownership_type_id": own_id,
+
+                # operating schedule
+                "p_operating_day_start": day_start,
+                "p_operating_day_end": day_end,
+                "p_operating_hour_start": _js(cd.get("opt_start")),              # time -> 'HH:MM:SS'
+                "p_operating_hour_end": _js(cd.get("opt_end")),                  # time -> 'HH:MM:SS'
+
+                # business address
+                "p_business_latitude": _js(cd.get("latitude")),                  # Decimal -> float
+                "p_business_longitude": _js(cd.get("longitude")),                # Decimal -> float
+                "p_business_city": cd.get("city"),
+                "p_business_barangay": cd.get("barangay"),
+                "p_business_street": cd.get("street"),
+                "p_business_purok_sitio_name": cd.get("purok_sitio"),
+
+                # proofs
+                "p_business_proof_files": uploaded_paths or None,
+            }
+
+            try:
+                resp = supabase.rpc("register_business_and_owner", payload).execute()
+                rows = resp.data or []
+                if not rows:
+                    messages.warning(request, "The server did not return IDs, but the request may have been processed.")
+                else:
+                    first = rows[0]
+                    # If the function returns TABLE with named columns, supabase-py returns dicts
+                    v_business_id = first.get("business_id") if isinstance(first, dict) else first[0]
+                    v_owner_id = first.get("owner_person_id") if isinstance(first, dict) else first[1]
+
+                _clear_draft(request)
+                messages.success(request, "Business registered successfully.")
+                return redirect("clerk:business_list")
+
+            except APIError as e:
+                code = getattr(e, "code", None) or getattr(e, "error", None) or ""
+                detail = getattr(e, "message", None) or str(e)
+                if "P6057" in code or "P6057" in detail:
+                    messages.error(request, "Invalid business type. Please pick a valid type.")
+                elif "P6058" in code or "P6058" in detail:
+                    messages.error(request, "Invalid ownership type. Please pick a valid type.")
+                elif "P6061" in code or "P6061" in detail:
+                    messages.error(request, "Invalid operating day range. Start must be ≤ End within 1..7.")
+                elif "P6062" in code or "P6062" in detail:
+                    messages.error(request, "Invalid operating hour range. Start time must be before end time.")
+                elif "P6065" in code or "P6065" in detail:
+                    messages.error(request, "Missing link type 'BUSINESS PROFILING'. Contact admin.")
+                else:
+                    messages.error(request, f"RPC error: {detail}")
+        else:
+            messages.error(request, "Please fix the errors in the Business Information form.")
+
     return render(
         request,
         "business/business_details.html",
         {
-            "user_fullname": user_fullname,
-            "user_role": user_fullname,
-            "page_path": f"{user_fullname} / Business Records / Add Business / Business Information",
+            "page_path": f"{user_role} / Business Records / Add Business / Business Information",
             "page_title": "Business Information",
-            "user_role_template": user_role_template,
             "form": form,
         },
     )
+
+# ───────────────────── utility: reset the draft ─────────────────────
+
+@session_login_required
+@role_required("Barangay Clerk")
+@nocache
+def business_registration_reset(request: HttpRequest) -> HttpResponse:
+    _clear_draft(request)
+    messages.info(request, "Registration draft cleared.")
+    return redirect("business_owner_resident")
 
 @session_login_required
 @role_required("Barangay Clerk")
 @nocache
 def business_list(request: HttpRequest):
-    user_role, user_role_template = _profile_fallbacks(request)
+    user_role = (request.session.get("auth") or {}).get("role_name").title()
     form = BusinessFilters()
     rows, rpc_error = [], None
     try:
@@ -1012,7 +1243,6 @@ def business_list(request: HttpRequest):
     context = {
         "page_path": f"{user_role} / Business Records",
         "page_title": "Business Records",
-        "user_role_template": user_role_template,
         "form": form,
         "rows": rows,
         "rpc_error": rpc_error,
@@ -1022,19 +1252,38 @@ def business_list(request: HttpRequest):
     return render(request, "business/business_list.html", context)
 
 @session_login_required
-@role_required(CLERK_ROLE)
+@role_required("Barangay Clerk")
 @nocache
 def business_information(request: HttpRequest, b_id: int):
-    user_fullname, user_role_template = _profile_fallbacks(request)
+    user_role = (request.session.get("auth") or {}).get("role_name").title()
+
+    b_resp = supabase.rpc("get_business_details", {"p_business_id" : b_id}).execute()
+    b_rows = b_resp.data or []
+    b = b_rows[0] if b_rows else None
+
+    raw_days = str(b.get("operating_days") or "").strip()
+    operating_days_list = [d.strip() for d in raw_days.split(",") if d.strip()] if raw_days else []
+    b["operating_days_list"] = operating_days_list
+
+    owner = None
+    owner_id = b.get("owner_person_id") or None
+
+    if owner_id:
+        p_resp = supabase.rpc("get_details", {"p_person_id" : owner_id}).execute()
+        p_rows = p_resp.data or []
+        owner = p_rows[0] if p_rows else None
+
+    if not b:
+        raise Http404(f"Business {b_id} not found.")
+
     return render(
         request,
         "business/business_information.html",
         {
-            "user_fullname": user_fullname,
-            "user_role": user_fullname,
-            "page_path": f"{user_fullname} / Business Records / Business Details : {b_id}",
+            "page_path": f"{user_role} / Business Records / Business Details : {b_id}",
             "page_title": f"Business Details : {b_id}",
-            "user_role_template": user_role_template,
+            "b": b,
+            "owner" : owner,
         },
     )
 

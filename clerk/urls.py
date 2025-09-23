@@ -31,7 +31,7 @@ urlpatterns = [
     # business
     path("business/business_owner/", views.business_owner, name="business_owner"),
     path("business/business_owner_resident/", views.business_owner_resident, name="business_owner_resident"),
-     path("business/business_owner_non-resident/", views.business_owner_nonresident, name="business_owner_nonres"),
+    path("business/business_owner_non-resident/", views.business_owner_nonresident, name="business_owner_nonres"),
     path("business/business_details/", views.business_details, name="business_details"),
     path("business_list/", views.business_list, name="business_list"),
     path("business_information/<int:b_id>/", views.business_information, name="business_information"),
