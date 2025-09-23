@@ -4,8 +4,9 @@ class SearchPerson(forms.Form):
     search = forms.CharField(
         widget=forms.TextInput(attrs={
             'id' : 'search',
-            'class' : 'form-control form-control-sm', 
+            'class' : 'form-control', 
             'placeholder' : 'Search',
+            'name': 'q'
     }),
         label= 'Search by Resident ID or Full Name',
         required= True,

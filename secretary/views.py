@@ -1,10 +1,12 @@
 # REMOVE this: from email import message
-from django.shortcuts import render
+from django.shortcuts import render, redirect
+from django.http import HttpRequest, HttpResponse
 from django.contrib import messages
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 from django.http import JsonResponse
 
 from secretary.models import Secretary
+from .forms import ResidentProfileform
 
 user_fullname = 'lname, fname mname suffix'
 user_role = 'Barangay Secretary'
@@ -47,9 +49,55 @@ def resident_suggest(request):
         return JsonResponse({"results": out})
     except Exception as e:
         return JsonResponse({"results": [], "error": str(e)}, status=500)
+    
+
+    
 
 def staff_selection_resident(request):
-    # defaults
+    # ── Branch: handle "Continue" (second form posts pid) ───────────────
+    pid = (request.POST.get('pid') or '').strip()
+    auth = request.session.get("auth") or {}
+    staff_id = 6
+    if request.method == "POST" and pid:
+        if not staff_id:
+            messages.error(request, "Your session is missing staff credentials.")
+            return redirect(request.META.get("HTTP_REFERER") or request.path)
+
+        try:
+            req_id = Secretary.insert_staff_account_request(
+                p_requested_by_id=6,
+                p_person_id=int(pid),
+                p_role_id=8,  # <- your chosen role
+                # ignored when p_person_id is provided
+                # p_first_name=None,
+                # p_last_name=None,
+                # p_middle_name=None,
+                # p_suffix=None,
+                # p_birthdate=None,
+                # p_email=None,
+                # p_mobile_num=None,
+                # p_sex_id=None,
+                # p_civil_status_id=None,
+                # p_nationality_id=None,
+                # p_religion_id=None,
+                # p_city=None,
+                # p_barangay=None,
+                # p_sitio_purok=None,
+                # p_street=None,
+                # p_valid_id_front=None,
+                # p_valid_id_back=None,
+                # p_valid_id_type_id=None,
+                # p_selfie_path=None,
+                # p_supporting_docs=None,
+            )
+            messages.success(request, f"Staff account request created. Ref: #{req_id}")
+            # PRG pattern to avoid resubmits
+            return redirect(request.META.get("HTTP_REFERER") or request.path)
+        except Exception as e:
+            messages.error(request, f"Failed to create staff account request: {e}")
+            return redirect(request.META.get("HTTP_REFERER") or request.path)
+
+    # ── Your original search/detail logic (unchanged) ───────────────────
     residents = []
     res_details = None
 
@@ -74,7 +122,10 @@ def staff_selection_resident(request):
         'user_role_template': user_role_template,
         'residents': residents,
         'res_details': res_details,
+        'staff_id': staff_id,
     })
+
+
 
 def staff_selection_nonres(request):
     form = ResidentProfileform()
