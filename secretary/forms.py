@@ -234,52 +234,51 @@ class ResidentProfileform(forms.Form):
         label= 'Mobile Number',
         required= True,
     )
-    # SOCIOECONOMIC INFORMATION
-    educational_attainment = forms.ChoiceField(
-        choices= [], 
-        widget=forms.Select(attrs={
-            'id' : 'educational_attainment',
-            'class' : 'form-select',
-    }),
-        label= 'Educatoinal Attainment',
-        required= True,
-    )
-    employment_status = forms.ChoiceField(
-        choices= [], 
-        widget=forms.Select(attrs={
-            'id' : 'employment_status',
-            'class' : 'form-select',
-    }),
-        label= 'Employment Status',
-        required= True,
-    )
-    occupation = forms.ChoiceField(
-        choices= [], 
-        widget=forms.Select(attrs={
-            'id' : 'occupation',
-            'class' : 'form-select',
-    }),
-        label= 'Occupation',
-        required= True,
-    )
-    monthly_personal_income = forms.CharField(
-        widget=forms.TextInput(attrs={
-            'id' : 'monthtly_personal_income',
-            'class' : 'form-control',
-            'placeholder' : 'Monthly Personal Income',
-    }),
-        label= 'Monthly Personal Income',
-        required= True,
-    )
-    gov_program = forms.ChoiceField(
-        choices= [], 
-        widget=forms.Select(attrs={
-            'id' : 'gov_program',
-            'class' : 'form-select',
-    }),
-        label= 'Goverment Program',
-        required= True,
-    )
+    # # SOCIOECONOMIC INFORMATION
+    # educational_attainment = forms.ChoiceField(
+    #     choices= [], 
+    #     widget=forms.Select(attrs={
+    #         'id' : 'educational_attainment',
+    #         'class' : 'form-select',
+    # }),
+    #     label= 'Educatoinal Attainment',
+    #     required= True,
+    # )
+    # employment_status = forms.ChoiceField(
+    #     choices= [], 
+    #     widget=forms.Select(attrs={
+    #         'id' : 'employment_status',
+    #         'class' : 'form-select',
+    # }),
+    #     label= 'Employment Status',
+    #     required= True,
+    # )
+    # occupation = forms.ChoiceField(
+    #     choices= [], 
+    #     widget=forms.Select(attrs={
+    #         'id' : 'occupation',
+    #         'class' : 'form-control',
+    # }),
+    #     label= 'Occupation',
+    #     required= True,
+    # )
+    # monthly_personal_income = forms.CharField(
+    #     widget=forms.TextInput(attrs={
+    #         'id' : 'monthtly_personal_income',
+    #         'class' : 'form-select',
+    # }),
+    #     label= 'Monthly Personal Income',
+    #     required= True,
+    # )
+    # gov_program = forms.ChoiceField(
+    #     choices= [], 
+    #     widget=forms.Select(attrs={
+    #         'id' : 'gov_program',
+    #         'class' : 'form-select',
+    # }),
+    #     label= 'Goverment Program',
+    #     required= True,
+    # )
     # SUPPORTING DOCUMENTS
     type_of_id = forms.ChoiceField(
         choices= [], 
@@ -312,5 +311,13 @@ class ResidentProfileform(forms.Form):
             'class' : 'form-control',
     }),
         label= 'Selfie Holding the Valid ID',
+        required= True,
+    )
+    proof = forms.ImageField(
+        widget=forms.ClearableFileInput(attrs={
+            'id' : 'proof',
+            'class' : 'form-control',
+    }),
+        label= 'Proof of Employment',
         required= True,
     )
