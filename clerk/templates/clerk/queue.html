@@ -8,21 +8,74 @@
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
 <link rel="stylesheet" href="{% static 'css/paginator.css' %}">
 <style>
-  /* Page-specific polish */
-  .filters-bar { gap: .5rem; }
-  .filter-chip {
-    display:inline-flex; align-items:center; gap:.35rem;
-    padding:.25rem .6rem; border:1px solid var(--bs-border-color,#dee2e6);
-    border-radius:999px; background:#fff; font-size:.825rem; color:inherit;
+  /* ─────────── Brand tokens (BARUG maroon) ─────────── */
+  :root{
+    --brand-900:#3a1217;
+    --brand-800:#561c24;
+    --brand-700:#6d2932;    /* primary */
+    --brand-600:#7a323b;
+    --brand-100:#f3eaeb;    /* soft bg */
+    --brand-050:#fbf6f6;    /* very soft bg */
   }
-  .filter-chip:hover { text-decoration:none; background:#f8f9fa; }
-  .filter-chip .x {
-    display:inline-grid; place-items:center;
-    width:1.05rem; height:1.05rem; border-radius:999px; background:#e9ecef;
-    font-weight:600; line-height:1; color:#495057;
+
+  /* Buttons */
+  .btn-brand{
+    color:#fff; background:var(--brand-700); border-color:var(--brand-700);
   }
-  /* Wider, non-blocking offcanvas */
-  .offcanvas.filter-offcanvas { width: 420px; max-width: 90vw; }
+  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
+  .btn-outline-brand{
+    color:var(--brand-700); border-color:var(--brand-700); background:#fff;
+  }
+  .btn-outline-brand:hover{ background:var(--brand-700); color:#fff; }
+
+  .btn-brand-subtle{
+    background:var(--brand-100); color:var(--brand-700); border-color:var(--brand-100);
+  }
+  .btn-brand-subtle:hover{ background:var(--brand-050); color:var(--brand-700); }
+
+  /* Inputs / focus ring */
+  .form-control:focus, .form-select:focus, .form-check-input:focus{
+    border-color:var(--brand-700);
+    box-shadow:0 0 0 .25rem rgba(109,41,50,.25);
+    outline:none;
+  }
+  .form-check-input:checked{ background-color:var(--brand-700); border-color:var(--brand-700); }
+
+  /* Toolbar */
+  .toolbar{
+    background:#fff; border:1px solid var(--bs-border-color,#dee2e6);
+    border-radius:1rem; padding:.75rem; gap:.5rem;
+  }
+  .searchbox{ position:relative; flex:1; }
+  .searchbox .bi{ position:absolute; left:.8rem; top:50%; transform:translateY(-50%); opacity:.6; color:var(--brand-700); }
+  .searchbox input{ padding-left:2.35rem !important; }
+
+  /* Active filter chips */
+  .filters-bar{ gap:.5rem; }
+  .filter-chip{
+    display:inline-flex; align-items:center; gap:.4rem;
+    padding:.3rem .65rem; border-radius:999px; font-size:.8rem;
+    text-decoration:none; border:1px solid rgba(109,41,50,.18);
+    background:var(--brand-050); color:var(--brand-700);
+  }
+  .filter-chip:hover{ background:var(--brand-100); }
+  .filter-chip .x{
+    display:inline-grid; place-items:center; width:1rem; height:1rem; border-radius:50%;
+    background:#fff; border:1px solid rgba(109,41,50,.22); line-height:1;
+    font-weight:700; color:var(--brand-700);
+  }
+
+  /* Offcanvas */
+  .offcanvas.filter-offcanvas{ width:420px; max-width:90vw; }
+  .offcanvas.filter-offcanvas .offcanvas-header{ border-bottom:1px solid var(--bs-border-color); }
+  .offcanvas-footer{
+    position:sticky; bottom:-1px; background:#fff;
+    border-top:1px solid var(--bs-border-color); padding-top:1rem; margin-top:1rem;
+  }
+
+  /* Table polish */
+  .table thead th{ border-bottom-width:2px; }
+  .table tbody tr:hover{ background:#fcfcfd; }
 </style>
 {% endblock %}
 
@@ -32,58 +85,54 @@
     <div class="row">
       <div>
 
-        <!-- Top controls: Search + Filters button -->
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <form class="d-flex w-100" method="get">
-            <div class="form-floating flex-grow-1 me-2">
-              <input
-                type="text"
-                class="form-control"
-                id="search"
-                name="q"
-                placeholder="Search requests"
-                value="{{ q }}"
-              />
-              <label for="search">Search requests</label>
-            </div>
+        <!-- Toolbar: search + filter -->
+        <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+          <div class="searchbox">
+            {% bs_icon 'search' extra_classes='bi' %}
+            <input
+              type="text"
+              class="form-control"
+              id="search"
+              name="q"
+              placeholder="Search requests"
+              value="{{ q }}"
+            />
+          </div>
 
-            {# preserve current statuses when searching #}
-            {% for s in statuses %}
-              <input type="hidden" name="status" value="{{ s }}">
-            {% endfor %}
+          {# keep current statuses when searching #}
+          {% for s in statuses %}
+            <input type="hidden" name="status" value="{{ s }}">
+          {% endfor %}
 
-            <button class="btn btn-outline-secondary me-2" type="submit">
-              <span class="me-1">{% bs_icon 'search' %}</span> Search
-            </button>
+          <button type="submit" class="btn btn-brand d-flex align-items-center">
+            {% bs_icon 'search' extra_classes='me-2' %} Search
+          </button>
 
-            <button class="btn btn-primary"
-                    type="button"
-                    data-bs-toggle="offcanvas"
-                    data-bs-target="#filterPanel"
-                    data-bs-backdrop="false"
-                    aria-controls="filterPanel">
-              <span class="me-1">{% bs_icon 'sliders' %}</span> Filters
-              {% if active_count %}
-                <span class="badge text-bg-light ms-2">{{ active_count }}</span>
-              {% endif %}
-            </button>
-          </form>
-        </div>
+          <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
+                  type="button"
+                  data-bs-toggle="offcanvas"
+                  data-bs-target="#filterPanel"
+                  aria-controls="filterPanel">
+            {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+            {% if active_count %}
+              <span class="badge rounded-pill text-bg-light ms-2">{{ active_count }}</span>
+            {% endif %}
+          </button>
+        </form>
 
-        <!-- Nicer Active filters row (interactive removable chips) -->
+        <!-- Active filters -->
         <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
           {% if statuses %}
             <span class="text-muted me-1">Active:</span>
             {% for s in statuses %}
-              <a class="filter-chip me-1 mb-1"
+              <a class="filter-chip"
                  title="Remove {{ s|title }}"
                  href="?q={{ q|urlencode }}{% for t in statuses %}{% if t != s %}&status={{ t }}{% endif %}{% endfor %}">
-                {{ s|title }}
-                <span class="x" aria-hidden="true">×</span>
+                {{ s|title }} <span class="x" aria-hidden="true">×</span>
               </a>
             {% endfor %}
-            <a class="btn btn-sm btn-outline-secondary ms-1" href="?q={{ q|urlencode }}">
-              Clear all
+            <a class="btn btn-sm btn-outline-brand ms-1" href="?q={{ q|urlencode }}">
+              {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
             </a>
           {% else %}
             <span class="text-muted small">No active filters.</span>
@@ -100,19 +149,19 @@
               <th scope="col">Action</th>
             </tr>
           </thead>
-
           <tbody>
             {% if page_obj.object_list %}
               {% for r in page_obj.object_list %}
                 <tr class="table-row-height">
                   <td>
-                    
                     <div class="text-muted small">
                       <b>{{ r.request_code }}</b>
                       {% if r.doc_types %}
                         •
                         {% for t in r.doc_types %}
-                          <span class="badge text-bg-light border">{{ t }}</span>
+                          <span class="badge rounded-pill" style="background:var(--brand-100); color:var(--brand-700); border:1px solid rgba(109,41,50,.18);">
+                            {{ t }}
+                          </span>
                         {% endfor %}
                       {% endif %}
                     </div>
@@ -120,11 +169,9 @@
                   <td>{{ r.created_fmt|default:r.created_at|default:"—" }}</td>
                   <td><span class="{{ r.status_ui.cls }}">{{ r.status_ui.label }}</span></td>
                   <td>
-                    <div class="d-flex gap-1">
-                      <a class="btn btn-icon" href="{% url 'clerk:detail' r.doc_request_id %}" title="Open">
-                        {% bs_icon 'person-lines-fill' size='1em' %}
-                      </a>
-                    </div>
+                    <a class="btn btn-outline-brand btn-sm" href="{% url 'clerk:detail' r.doc_request_id %}">
+                      {% bs_icon 'person-lines-fill' extra_classes='me-1' %} Open
+                    </a>
                   </td>
                 </tr>
               {% endfor %}
@@ -145,12 +192,20 @@
   {% endif %}
 </div>
 
-<!-- Offcanvas Filters: wider + backdrop disabled so list stays visible -->
-<div class="offcanvas offcanvas-end filter-offcanvas" tabindex="-1" id="filterPanel" aria-labelledby="filterPanelLabel">
+<!-- Offcanvas Filters -->
+<div
+  class="offcanvas offcanvas-end filter-offcanvas"
+  id="filterPanel"
+  tabindex="-1"
+  aria-labelledby="filterPanelLabel"
+  data-bs-backdrop="false"
+  data-bs-scroll="true"
+>
   <div class="offcanvas-header">
     <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
     <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
   </div>
+
   <div class="offcanvas-body">
     <form method="get" id="filterForm">
       <input type="hidden" name="q" value="{{ q }}">
@@ -163,6 +218,7 @@
             <a href="#" id="clearAllStatuses">None</a>
           </div>
         </div>
+
         <div class="row row-cols-1">
           {% for s in statuses_all %}
             <div class="col mb-2">
@@ -173,27 +229,26 @@
                        value="{{ s }}"
                        id="st-{{ s }}"
                        {% if s in statuses %}checked{% endif %}>
-                <label class="form-check-label" for="st-{{ s }}">
-                  {{ s|title }}
-                </label>
+                <label class="form-check-label" for="st-{{ s }}">{{ s|title }}</label>
               </div>
             </div>
           {% endfor %}
         </div>
       </div>
 
-      <div class="d-flex gap-2">
-        <button class="btn btn-primary" type="submit">
-          <span class="me-1">{% bs_icon 'check2' %}</span> Apply
-        </button>
-        <a class="btn btn-outline-secondary" href="?q={{ q|urlencode }}">
-          <span class="me-1">{% bs_icon 'x-circle' %}</span> Clear
-        </a>
+      <div class="offcanvas-footer">
+        <div class="d-flex gap-2">
+          <button class="btn btn-brand" type="submit">
+            {% bs_icon 'check2' extra_classes='me-1' %} Apply
+          </button>
+          <a class="btn btn-outline-brand" href="?q={{ q|urlencode }}">
+            {% bs_icon 'x-circle' extra_classes='me-1' %} Clear
+          </a>
+        </div>
       </div>
     </form>
   </div>
 </div>
-
 {% endblock %}
 
 {% block js %}
@@ -203,8 +258,8 @@
     const boxes = () => Array.from(document.querySelectorAll('.status-box'));
     const selAll = document.getElementById('selectAllStatuses');
     const clrAll = document.getElementById('clearAllStatuses');
-    if (selAll) selAll.addEventListener('click', function(e){ e.preventDefault(); boxes().forEach(b => b.checked = true); });
-    if (clrAll) clrAll.addEventListener('click', function(e){ e.preventDefault(); boxes().forEach(b => b.checked = false); });
+    if(selAll) selAll.addEventListener('click', e => { e.preventDefault(); boxes().forEach(b => b.checked = true); });
+    if(clrAll) clrAll.addEventListener('click', e => { e.preventDefault(); boxes().forEach(b => b.checked = false); });
   })();
 </script>
 {% endblock %}

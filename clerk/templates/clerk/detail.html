@@ -31,12 +31,16 @@
       <div class="fw-bold">Request {{ header.request_code }}</div>
       <div class="text-white-50 small">{{ header.created_at|date:"M d, Y, P" }}</div>
     </div>
+    
     <div class="d-flex flex-column align-items-end gap-2">
       <span class="chip">{{ status_ui.label }}</span>
-      {% if header.or_number %}
-        <span class="or-badge">OR: {{ header.or_number }}</span>
+      {% if header.status != "RELEASED" %}
+        {% if header.or_number %}
+          <span class="or-badge">OR: {{ header.or_number }}</span>
+        {% endif %}
       {% endif %}
     </div>
+    
   </div>
 
   <div class="row g-3">
@@ -160,6 +164,7 @@
             <span class="status-chip {{ status_ui.cls }}">{{ status_ui.label }}</span>
           </div>
 
+          {% if header.status != 'RELEASED' %}
           <!-- Print (download-only) -->
           <button class="btn btn-primary w-100 mb-2" data-bs-toggle="modal" data-bs-target="#confirmPrintModal">
             <i class="bi bi-printer me-1"></i> Print and Download Document
@@ -190,7 +195,11 @@
                     data-bs-toggle="tooltip" title="Request must be READY_FOR_PICKUP before it can be released">
             Mark Released
             </button>
-            <div class="small text-muted mt-1">Status must be <strong>READY_FOR_PICKUP</strong> to release.</div>
+            {% if header.status == 'RELEASED' %}
+            <div class="small text-muted mt-1">Already Released</div>
+            {% else %}
+            <div class="small text-muted mt-1">Status must be <strong>READY FOR PICKUP</strong> to release.</div>
+            {% endif %}
         {% endif %}
         </form>
 
@@ -206,7 +215,7 @@
             </div>
             <button class="btn btn-outline-danger w-100">Decline</button>
           </form>
-
+        {% endif %}
           {% if header.or_number %}
           <div class="alert alert-warning mt-3 mb-0">
             <div class="fw-bold">Official Receipt</div>

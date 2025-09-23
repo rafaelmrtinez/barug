@@ -12,6 +12,13 @@ urlpatterns = [
     path("requests/<int:doc_request_id>/mark-released/", views.mark_released, name="mark_released"),
     path("requests/<int:doc_request_id>/decline/", views.decline, name="decline"),
     
+    path("walkin/", views.walkin_new, name="walkin_new"),
+    path("walkin/create/", views.walkin_create, name="walkin_create"),
+
+    # Search Helpers
+    path("ajax/resident-search/", views.ajax_resident_search, name="ajax_resident_search"),
+    path("ajax/purpose-options/", views.ajax_purpose_options, name="ajax_purpose_options"),
+
     # identity verification
     path("dashboard/", views.dashboard, name="dashboard"),
     path("identity_verification/", views.review_approve, name="identity_verification"),

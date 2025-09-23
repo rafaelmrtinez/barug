@@ -599,6 +599,336 @@ def person_submission_dets(request: HttpRequest, req_id: int):
         "person": person,
     })
 
+
+# --- AJAX helpers (same file as your walk-in views) ---
+from django.template.loader import render_to_string
+from django.http import JsonResponse
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+def ajax_purpose_options(request: HttpRequest):
+    """Return <option> rows for a given request_document_type_id."""
+    try:
+        req_type_id = int(request.GET.get("request_document_type_id") or 0)
+    except Exception:
+        req_type_id = 0
+    purposes = _fetch_purposes_by_request_type(req_type_id) if req_type_id else []
+    html = render_to_string("clerk/doc_req/_purpose_options.html", {"purposes": purposes})
+    return HttpResponse(html)
+
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+def ajax_resident_search(request: HttpRequest):
+    """Debounced live search via RPC; returns an HTML fragment."""
+    q = (request.GET.get("q") or "").strip()
+    rows: List[Dict[str, Any]] = []
+    if len(q) >= 2:
+        try:
+            res = supabase.rpc("search_person_by_code_or_name", {"p_key": q}).execute()
+            rows = res.data or []
+        except Exception as e:
+            logger.warning("ajax_resident_search RPC failed: %s", e)
+            rows = []
+
+    html = render_to_string("clerk/doc_req/_resident_results.html", {"residents": rows})
+    return HttpResponse(html)
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+def ajax_purposes(request: HttpRequest):
+    """Return the Purpose block for a given request_document_type_id (no page reload)."""
+    try:
+        req_type_id = int(request.GET.get("request_document_type_id") or 0)
+    except Exception:
+        req_type_id = 0
+
+    purposes = _fetch_purposes_by_request_type(req_type_id) if req_type_id else []
+    html = render_to_string("clerk/doc_req/_purpose_block.html", {
+        "chosen_doc_type_id": req_type_id or None,
+        "purposes": purposes,
+    })
+    return HttpResponse(html)
+
+# =========================
+# Walk-in Document Request (Clerk)
+# =========================
+# --- Walk-in Request (Clerk) — request_document_type-first --------------------
+from typing import Any, Dict, List, Optional
+import json
+
+BRGY_BUSINESS_DOC_NAME = "BARANGAY BUSINESS CLEARANCE"  # must match your request_document_type_name
+
+def _fetch_request_doc_types() -> List[Dict[str, Any]]:
+    """
+    Exactly mirrors the mobile `getDocumentTypes()`:
+    request_document_type(request_document_type_id, request_document_type_name)
+    """
+    res = (
+        supabase.table("request_document_type")
+        .select("request_document_type_id, request_document_type_name")
+        .order("request_document_type_name")
+        .execute()
+    )
+    return res.data or []
+
+def _fetch_purposes_by_request_type(req_doc_type_id: int) -> List[Dict[str, Any]]:
+    """
+    Mirrors mobile `getPurposesByDocumentType()`, but your `document_purpose`
+    already carries fee_item_id & default fields (per screenshot).
+    We join fee_item to expose flags and current_amount (used by the UI).
+    """
+    q = (
+        supabase.table("document_purpose")
+        .select(
+            "document_purpose_id, request_document_type_id, purpose_code, purpose_label, "
+            "default_details, default_offense_no, "
+            "fee_item:fee_item_id(fee_item_id, current_amount, "
+            "exempt_ftj, exempt_senior, exempt_pwd, exempt_indigent, exempt_student)"
+        )
+        .eq("request_document_type_id", req_doc_type_id)
+        .order("purpose_label")
+    ).execute()
+
+    rows = q.data or []
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        fi = r.get("fee_item") or {}
+        out.append({
+            "document_purpose_id": r["document_purpose_id"],
+            "purpose_label": r.get("purpose_label"),
+            "purpose_code": r.get("purpose_code"),
+            "default_offense_no": r.get("default_offense_no"),
+            "default_details": r.get("default_details") or {},
+            "fee_item_id": fi.get("fee_item_id"),
+            "current_amount": fi.get("current_amount") or 0,
+            "exempt_ftj": bool(fi.get("exempt_ftj")),
+            "exempt_senior": bool(fi.get("exempt_senior")),
+            "exempt_pwd": bool(fi.get("exempt_pwd")),
+            "exempt_indigent": bool(fi.get("exempt_indigent")),
+            "exempt_student": bool(fi.get("exempt_student")),
+        })
+    return out
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+def walkin_new(request: HttpRequest):
+    """
+    GET:
+      - ?q= search residents
+      - ?request_document_type_id= preselects doc type and loads purposes
+    """
+    q = (request.GET.get("q") or "").strip()
+
+    # load document types for the dropdown
+    doc_types = _fetch_request_doc_types()
+
+    # selected request_document_type_id (if any)
+    try:
+        chosen_req_type_id = int(request.GET.get("request_document_type_id") or 0) or None
+    except Exception:
+        chosen_req_type_id = None
+
+    purposes = _fetch_purposes_by_request_type(chosen_req_type_id) if chosen_req_type_id else []
+
+    # simple resident search
+    residents: List[Dict[str, Any]] = []
+    if q:
+        like = f"%{q}%"
+        res = (
+            supabase.table("person")
+            .select("person_id, person_code, first_name, last_name, email")
+            .or_(f"first_name.ilike.{like},last_name.ilike.{like},person_code.ilike.{like}")
+            .limit(30)
+            .execute()
+        )
+        residents = res.data or []
+
+    return render(request, "clerk/walkin_request.html", {
+        "q": q,
+        "doc_types": doc_types,
+        "chosen_doc_type_id": chosen_req_type_id,  # template uses this name
+        "purposes": purposes,
+        "residents": residents,
+    })
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_POST
+def walkin_create(request: HttpRequest):
+    """
+    POST handler that builds the same payload the mobile sends into
+    `create_document_request`.
+    """
+    # 1) Subject / requester
+    try:
+        requested_by = int(request.POST.get("requested_by_person_id") or 0)
+    except Exception:
+        requested_by = 0
+
+    is_on_behalf_flag = (request.POST.get("is_on_behalf") == "on")
+    try:
+        on_behalf_of = int(request.POST.get("on_behalf_of_person_id") or 0) or None
+    except Exception:
+        on_behalf_of = None
+
+    subject_id = on_behalf_of if (is_on_behalf_flag and on_behalf_of) else requested_by
+    is_on_behalf = bool(subject_id and requested_by and subject_id != requested_by)
+
+    # 2) Optional business
+    try:
+        business_id = int(request.POST.get("business_id") or 0) or None
+    except Exception:
+        business_id = None
+
+    purpose_notes = (request.POST.get("purpose_notes") or "").strip() or None
+
+    # 3) Lines (match mobile names)
+    try:
+        req_doc_type_id = int(request.POST.get("request_document_type_id") or 0) or None
+    except Exception:
+        req_doc_type_id = None
+
+    dp_ids = request.POST.getlist("line_document_purpose_id[]") or []
+    qtys   = request.POST.getlist("line_quantity[]") or []
+    offs   = request.POST.getlist("line_offense_no[]") or []
+
+    if not requested_by:
+        messages.error(request, "Please select a resident first (Requester).")
+        return redirect("clerk:walkin_new")
+
+    if not req_doc_type_id or not dp_ids:
+        messages.error(request, "Please choose a document and a purpose.")
+        return redirect(f"{request.path.replace('/create/','/')}?request_document_type_id={req_doc_type_id or ''}")
+
+    # Map document_purpose_id -> meta (for purpose_code & defaults)
+    purpose_rows = {
+        r["document_purpose_id"]: r
+        for r in _fetch_purposes_by_request_type(req_doc_type_id)
+    }
+
+    lines: List[Dict[str, Any]] = []
+    for i, raw_dp in enumerate(dp_ids):
+        try:
+            dp_id = int(raw_dp)
+        except Exception:
+            continue
+
+        qty = 1
+        try:
+            qty = max(1, int(qtys[i]))
+        except Exception:
+            pass
+
+        offense_no = None
+        try:
+            offense_no = int(offs[i]) if offs[i] else None
+        except Exception:
+            offense_no = None
+
+        meta = purpose_rows.get(dp_id) or {}
+        details: Dict[str, Any] = {}
+
+        # persist purpose_code so the PDF/receipts can show it later
+        if meta.get("purpose_code"):
+            details["purpose_code"] = meta["purpose_code"]
+
+        # allow defaults to flow through (e.g., residency_kind, etc.)
+        if meta.get("default_details"):
+            details.update(meta["default_details"] or {})
+
+        lines.append({
+            "document_purpose_id": dp_id,
+            "quantity": qty,
+            "offense_no": offense_no,
+            "details": details,
+        })
+
+    # Optional soft warning for Business Clearance without business_id
+    try:
+        dt = (
+            supabase.table("request_document_type")
+            .select("request_document_type_name")
+            .eq("request_document_type_id", req_doc_type_id)
+            .limit(1)
+            .execute()
+        )
+        name = ((dt.data or [{}])[0] or {}).get("request_document_type_name") or ""
+        if name == BRGY_BUSINESS_DOC_NAME and not business_id:
+            messages.warning(request, "Business ID is empty for Business Clearance. Treasurer may reject.")
+    except Exception:
+        pass
+
+    payload = {
+        "requested_by": requested_by,
+        "on_behalf_of": (subject_id if (is_on_behalf and subject_id) else None),
+        "is_on_behalf": is_on_behalf,
+        "business_id": business_id,
+        "purpose_notes": purpose_notes,
+        "lines": lines,
+    }
+
+    # --- DEBUG: show exactly what we will send (client-shape) ---
+    print("\n[WALKIN DEBUG] (client-shape) create_document_request payload:\n",
+        json.dumps({
+            "requested_by": requested_by,
+            "on_behalf_of": (subject_id if (is_on_behalf and subject_id) else None),
+            "is_on_behalf": is_on_behalf,
+            "business_id": business_id,
+            "purpose_notes": purpose_notes,
+            "lines": lines,
+        }, indent=2))
+
+    # --- CALL THE RPC WITH THE NAMES YOUR FUNCTION EXPECTS ---
+    rpc_args = {
+        "p_requested_by": requested_by,
+        "p_on_behalf_of": (subject_id if (is_on_behalf and subject_id) else None),
+        "p_is_on_behalf": is_on_behalf,
+        "p_business_id": business_id,
+        "p_purpose_notes": purpose_notes,
+        "p_lines": lines,  # supabase client will JSON-encode this list into jsonb
+    }
+
+    print("[WALKIN DEBUG] (rpc-shape) args sent to create_document_request:\n",
+        json.dumps(rpc_args, indent=2, default=str))
+
+    try:
+        res = supabase.rpc("create_document_request", rpc_args).execute()
+        print("[WALKIN DEBUG] RPC result .data :", getattr(res, "data", None))
+        print("[WALKIN DEBUG] RPC result .error:", getattr(res, "error", None))
+    except Exception as e:
+        print("[WALKIN DEBUG] RPC raised:", e)
+        messages.error(request, f"RPC failed: {e}")
+        return redirect("clerk:walkin_new")
+
+    # Supabase can return a scalar or a 1-row list depending on driver
+    if getattr(res, "error", None):
+        messages.error(request, f"Supabase error: {escape(res.error.message)}")
+        return redirect("clerk:walkin_new")
+
+    data = res.data
+    new_id = None
+    if isinstance(data, list) and data:
+        new_id = data[0]
+    elif isinstance(data, dict) and "doc_request_id" in data:
+        new_id = data["doc_request_id"]
+    else:
+        # plain scalar int
+        new_id = data
+
+    if not new_id:
+        messages.error(request, "Could not obtain new request ID from RPC.")
+        return redirect("clerk:walkin_new")
+
+    messages.success(request, f"Walk-in request created. ID: {new_id}")
+    return redirect("clerk:detail", doc_request_id=new_id)
+
+
+
 # =========================
 # Business screens (stubs; clerk-only)
 # =========================
