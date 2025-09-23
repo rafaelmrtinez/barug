@@ -39,4 +39,29 @@ def staff_selection_nonres(request):
         'page_title': 'Account Verification',
         'user_role_template': user_role_template,
         'form' : form,
+        'redirect' : 'secretary:staff_selection_non-resident_docs',
+    })
+
+
+# def staff_selection_nonres_socio(request):
+#     form = ResidentProfileform()
+#     return render(request, "person/socioeconomic_info.html", {
+#         'user_fullname': user_fullname,
+#         'user_role': user_role,
+#         'page_path': f'{user_role} / Account Verification',
+#         'page_title': 'Account Verification',
+#         'user_role_template': user_role_template,
+#         'form' : form,
+#         'redirect' : 'secretary:staff_selection_non-resident_docs',
+#     })
+
+def staff_selection_nonres_docs(request):
+    form = ResidentProfileform()
+    return render(request, "staff/supporting_docs.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Account Verification',
+        'page_title': 'Account Verification',
+        'user_role_template': user_role_template,
+        'form' : form,
     })
