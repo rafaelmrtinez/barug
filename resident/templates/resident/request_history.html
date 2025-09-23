@@ -1,0 +1,72 @@
+{% load bootstrap5 %}
+{% bootstrap_css %}{% bootstrap_javascript %}
+
+<div class="container py-3">
+  <h3 class="fw-bold mb-3">Document Requests</h3>
+
+  <form class="row g-2 mb-3">
+    <div class="col-md-6">
+      <input class="form-control" type="search" name="q" placeholder="Search request #, document, purpose…" value="{{ q }}">
+    </div>
+    <div class="col-md-3">
+      <select class="form-select" name="status">
+        {% for key,label in
+          "ALL,All|FOR_TREASURER_REVIEW,For Treasurer Review|PAID,Paid|FOR_PRINTING,For Printing|RELEASED,Released|DECLINED,Declined".split("|") %}
+          {% with k=key|cut:",.*"|first s=key|slice:"0:" %}
+          {% endwith %}
+        {% endfor %}
+        <option value="ALL" {% if status == 'ALL' %}selected{% endif %}>All</option>
+        <option value="FOR_TREASURER_REVIEW" {% if status == 'FOR_TREASURER_REVIEW' %}selected{% endif %}>For Treasurer Review</option>
+        <option value="PAID" {% if status == 'PAID' %}selected{% endif %}>Paid</option>
+        <option value="FOR_PRINTING" {% if status == 'FOR_PRINTING' %}selected{% endif %}>For Printing</option>
+        <option value="RELEASED" {% if status == 'RELEASED' %}selected{% endif %}>Released</option>
+        <option value="DECLINED" {% if status == 'DECLINED' %}selected{% endif %}>Declined</option>
+      </select>
+    </div>
+    <div class="col-md-3 d-grid">
+      <button class="btn btn-dark">Apply</button>
+    </div>
+  </form>
+
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Request #</th>
+            <th>Document</th>
+            <th>Requested</th>
+            <th class="text-end">Amount Due</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if rows %}
+            {% for r in rows %}
+              <tr>
+                <td class="fw-semibold"><a href="{% url 'resident:request_detail' r.doc_request_id %}">{{ r.request_code }}</a></td>
+                <td>
+                  <div class="fw-semibold">{{ r.document_type_name }}</div>
+                  <div class="text-muted small">{{ r.purpose_label }}</div>
+
+                  {% if r.status == 'RELEASED' and r.latest_or_number %}
+                    <div class="small mt-1">
+                      <span class="text-muted">OR:</span> {{ r.latest_or_number }}
+                    </div>
+                  {% endif %}
+                </td>
+                <td class="text-muted small">{{ r.created_at }}</td>
+                <td class="text-end fw-bold">{{ r.amount_due_peso }}</td>
+                <td>
+                  <span class="{{ r.status_ui.pill }}">{{ r.status_ui.label }}</span>
+                </td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="5" class="text-center text-muted py-4">No requests found.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

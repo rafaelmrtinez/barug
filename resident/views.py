@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from django.shortcuts import render
 from django.core.paginator import Paginator
 from .forms import ResidentProfileform
@@ -9,6 +11,119 @@ user_fullname = 'lname, fname mname suffix'
 user_role = 'Clerk'
 
 user_role_template = user_role.lower().replace(' ', '_')
+
+# resident/views.py
+
+from typing import Any, Dict, List
+
+from django.contrib import messages
+from django.http import HttpResponseForbidden
+from django.shortcuts import redirect, render
+from django.utils.html import escape
+
+from authentication.supabase_client import supabase  # uses your service key client
+
+
+# ---- small helpers -----------------------------------------------------------
+
+STATUS_UI = {
+    "FOR_TREASURER_REVIEW": {"label": "For Treasurer Review", "cls": "badge bg-warning-subtle text-warning-emphasis"},
+    "PAID":                 {"label": "Paid",                 "cls": "badge bg-primary-subtle text-primary-emphasis"},
+    "FOR_PRINTING":         {"label": "For Printing",         "cls": "badge bg-info-subtle text-info-emphasis"},
+    "RELEASED":             {"label": "Released",             "cls": "badge bg-success-subtle text-success-emphasis"},
+    "DECLINED":             {"label": "Declined",             "cls": "badge bg-danger-subtle text-danger-emphasis"},
+}
+
+def _person_id(request) -> int | None:
+    # Adjust to your middleware/session shape
+    return (
+        getattr(getattr(request, "profile", None), "person_id", None)
+        or request.session.get("person_id")
+    )
+
+def _titleize(code: str | None) -> str:
+    if not code:
+        return ""
+    return code.replace("_", " ").title()
+
+
+# ---- list view ---------------------------------------------------------------
+
+def docreq_history(request):
+    """Resident's own history page (list)."""
+    person_id = 4
+    if not person_id:
+        messages.error(request, "No resident profile bound to this session.")
+        return redirect("/")
+
+    q = (request.GET.get("q") or "").strip() or None
+    page = max(int(request.GET.get("page", "1") or 1), 1)
+    page_size = 20
+    offset = (page - 1) * page_size
+
+    res = supabase.rpc(
+        "search_requests_for_resident",
+        {"p_person_id": 4, "p_q": q, "p_limit": page_size, "p_offset": offset},
+    ).execute()
+
+    rows: List[Dict[str, Any]] = []
+    if getattr(res, "error", None):
+        messages.error(request, f"Supabase error: {escape(res.error.message)}")
+    else:
+        rows = res.data or []
+
+    # annotate rows for UI (status badge + pretty purpose names)
+    for r in rows:
+        ui = STATUS_UI.get(r.get("status")) or {"label": r.get("status") or "—", "cls": "badge text-bg-secondary"}
+        r["status_ui"] = ui
+        r["purposes_display"] = [_titleize(p) for p in (r.get("purposes") or [])]
+
+    ctx = {
+        "rows": rows,
+        "q": q or "",
+        "page": page,
+        "has_more": len(rows) == page_size,
+    }
+    return render(request, "resident/docreq_history.html", ctx)
+
+
+# ---- detail/receipt view -----------------------------------------------------
+
+def docreq_detail(request, doc_request_id: int):
+    """One request detail/receipt page."""
+    person_id = _person_id(request)
+
+    res = supabase.rpc("fetch_doc_request_detail_bundle", {"p_doc_request_id": doc_request_id}).execute()
+    if getattr(res, "error", None):
+        messages.error(request, f"Supabase error: {escape(res.error.message)}")
+        return redirect("resident:docreq_history")
+
+    data: Dict[str, Any] = res.data or {}
+    header = data.get("header") or {}
+    lines  = data.get("lines") or []
+    pay    = data.get("payments") or {}
+    tl     = data.get("timeline") or []
+
+    # simple authorization guard (resident can see only own/for them)
+    if person_id:
+        if header and header.get("requested_by_id") != person_id and header.get("on_behalf_id") != person_id:
+            return HttpResponseForbidden("You are not allowed to view this request.")
+
+    ui = STATUS_UI.get(header.get("status")) or {"label": header.get("status") or "—", "cls": "badge text-bg-secondary"}
+
+    # prettify lines (purpose)
+    for l in lines:
+        l["purpose_display"] = _titleize(l.get("purpose_code"))
+
+    ctx = {
+        "header": header,
+        "status_ui": ui,
+        "lines": lines,
+        "payments": pay,
+        "timeline": tl,
+    }
+    return render(request, "resident/docreq_detail.html", ctx)
+
 
 # Create your views here.
 def register_resident(request):

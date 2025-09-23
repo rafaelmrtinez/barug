@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container py-3">
+  <h4 class="mb-3">Walk-in Document Request</h4>
+
+  <form method="post" action="{% url 'clerk:walkin_create' %}">
+    {% csrf_token %}
+
+    <!-- 1) Resident search/select -->
+    <div class="card mb-3" id="residentSearchPanel">
+      <div class="card-body">
+        <h6 class="mb-2">Find Resident</h6>
+        <div class="row g-2 align-items-center">
+          <div class="col-sm-8 col-md-6">
+            <div class="position-relative">
+              <input id="residentSearch" type="search" class="form-control" placeholder="Search by code or name… (min 2 chars)">
+              <div id="residentSpinner" class="position-absolute top-50 end-0 translate-middle-y me-3" style="display:none;">
+                <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="residentResults" class="mt-3"></div>
+      </div>
+    </div>
+
+    <!-- Selected resident (always visible once chosen) -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <div class="small text-muted">Selected Resident (Requester)</div>
+            <div id="resident_label" class="fw-semibold">—</div>
+          </div>
+          <button class="btn btn-sm btn-outline-secondary d-none" type="button" id="changeResidentBtn">Change</button>
+        </div>
+        <input type="hidden" id="requested_by_person_id" name="requested_by_person_id">
+
+        <div class="form-check mt-3 mb-2">
+          <input class="form-check-input" type="checkbox" id="is_on_behalf" name="is_on_behalf">
+          <label class="form-check-label" for="is_on_behalf">File on behalf of another resident</label>
+        </div>
+        <div class="row g-2">
+          <div class="col-md-5">
+            <input class="form-control" name="on_behalf_of_person_id" placeholder="On-behalf person_id (optional)">
+          </div>
+          <div class="col-md-5">
+            <input class="form-control" name="business_id" placeholder="Business ID (optional)">
+          </div>
+        </div>
+        <div class="form-text">For Business Clearance, provide Business ID if known.</div>
+      </div>
+    </div>
+
+    <!-- 2) Document & Purpose (purpose auto-populates) -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h6 class="mb-3">Document &amp; Purpose</h6>
+
+        <div class="row g-2 align-items-end">
+          <div class="col-md-6">
+            <label class="form-label" for="reqDocType">Document Type</label>
+            <select class="form-select" id="reqDocType" name="request_document_type_id">
+              <option value="">— choose —</option>
+              {% for dt in doc_types %}
+                <option value="{{ dt.request_document_type_id }}">{{ dt.request_document_type_name }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Purposes will load automatically.</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="purposeSelect">Purpose</label>
+            <select class="form-select" id="purposeSelect" name="line_document_purpose_id[]" disabled>
+              <option value="">— select document first —</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row g-2 mt-2">
+          <div class="col-md-2">
+            <label class="form-label">Qty</label>
+            <input class="form-control" type="number" min="1" value="1" name="line_quantity[]">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Offense No</label>
+            <input class="form-control" type="number" min="1" max="3" name="line_offense_no[]" placeholder="auto">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3) Notes -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <label class="form-label">Notes to Treasurer/Clerk (optional)</label>
+        <textarea class="form-control" rows="2" name="purpose_notes" placeholder="Any remarks…"></textarea>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{% url 'clerk:queue' %}">Cancel</a>
+      <button class="btn btn-primary">Create Request</button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function() {
+  // ---------- Live resident search ----------
+  const input   = document.getElementById('residentSearch');
+  const wrap    = document.getElementById('residentResults');
+  const spinner = document.getElementById('residentSpinner');
+  const panel   = document.getElementById('residentSearchPanel');
+  const btnChange = document.getElementById('changeResidentBtn');
+  const URL_SEARCH  = "{% url 'clerk:ajax_resident_search' %}";
+  const URL_PURPOSE = "{% url 'clerk:ajax_purpose_options' %}";
+
+  let t = null;
+  function debounce(fn, ms){ return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+
+  async function doSearch(q) {
+    if (!q || q.trim().length < 2) {
+      wrap.innerHTML = '<div class="text-muted small py-2">Type at least 2 characters…</div>';
+      spinner.style.display = 'none';
+      return;
+    }
+    spinner.style.display = '';
+    try {
+      const resp = await fetch(`${URL_SEARCH}?q=${encodeURIComponent(q)}`, { headers: { "X-Requested-With":"fetch" } });
+      wrap.innerHTML = await resp.text();
+    } catch {
+      wrap.innerHTML = '<div class="alert alert-warning small mb-0">Search failed. Please try again.</div>';
+    } finally {
+      spinner.style.display = 'none';
+    }
+  }
+
+  if (input) input.addEventListener('input', debounce(e => doSearch(e.target.value), 250));
+
+  // pick resident -> fill, close panel
+  wrap.addEventListener('click', function(ev) {
+    const btn = ev.target.closest('.pick-resident');
+    if (!btn) return;
+    const id  = btn.getAttribute('data-person-id');
+    const txt = btn.getAttribute('data-display');
+    document.getElementById('requested_by_person_id').value = id;
+    document.getElementById('resident_label').innerText = txt || `ID ${id}`;
+    // clear & close search
+    input.value = '';
+    wrap.innerHTML = '';
+    panel.classList.add('d-none');
+    btnChange.classList.remove('d-none');
+  });
+
+  // change resident -> reopen search
+  btnChange.addEventListener('click', () => {
+    panel.classList.remove('d-none');
+    input.focus();
+    btnChange.classList.add('d-none');
+  });
+
+  // ---------- Purpose auto-populate ----------
+  const docSel = document.getElementById('reqDocType');
+  const purSel = document.getElementById('purposeSelect');
+
+  async function loadPurposes(docTypeId) {
+    purSel.innerHTML = '<option value="">Loading…</option>';
+    purSel.disabled = true;
+    if (!docTypeId) {
+      purSel.innerHTML = '<option value="">— select document first —</option>';
+      return;
+    }
+    try {
+      const resp = await fetch(`${URL_PURPOSE}?request_document_type_id=${encodeURIComponent(docTypeId)}`, { headers: { "X-Requested-With":"fetch" } });
+      const html = await resp.text();
+      purSel.innerHTML = html;
+      purSel.disabled = false;
+    } catch {
+      purSel.innerHTML = '<option value="">Failed to load purposes</option>';
+    }
+  }
+
+  if (docSel) docSel.addEventListener('change', e => loadPurposes(e.target.value));
+})();
+</script>
+{% endblock %}

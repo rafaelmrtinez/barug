@@ -1,0 +1,32 @@
+{% if chosen_doc_type_id %}
+  <input type="hidden" name="request_document_type_id" value="{{ chosen_doc_type_id }}">
+
+  <div class="border rounded-3 p-3 bg-white shadow-sm">
+    <div class="row g-3">
+      <div class="col-md-7">
+        <label class="form-label fw-semibold">Purpose</label>
+        <select class="form-select" name="line_document_purpose_id[]">
+          {% for p in purposes %}
+            <option value="{{ p.document_purpose_id }}">
+              {{ p.purpose_label }} — ₱{{ p.current_amount|floatformat:2 }}
+            </option>
+          {% endfor %}
+        </select>
+        <div class="form-text">Fees and waivers are confirmed by Treasurer.</div>
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label fw-semibold">Copies</label>
+        <input class="form-control" type="number" min="1" value="1" name="line_quantity[]">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Offense No</label>
+        <input class="form-control" type="number" min="1" max="3" name="line_offense_no[]" placeholder="auto">
+        <div class="form-text">Leave blank to auto-compute (when applicable).</div>
+      </div>
+    </div>
+  </div>
+{% else %}
+  <div class="text-muted">Select a document type to load its purposes.</div>
+{% endif %}

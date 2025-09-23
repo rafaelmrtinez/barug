@@ -1,4 +1,3 @@
-# authentication/views.py
 import logging
 from django.shortcuts import render, redirect
 from django.contrib import messages
@@ -22,7 +21,8 @@ def _role_home(role_name: str) -> str:
     role = (role_name or "").lower()
     if role == "barangay clerk": return "clerk:dashboard"
     if role == "captain": return "captain:dashboard"
-    if role == "bhw": return "bhw:dashboard"
+    if role == "bhw": return "clerk:dashboard"
+    if role == "barangay treasurer": return "treasurer:queue"
     logger.debug("Role not matched, falling back to resident: %s", role)
     return "resident:dashboard"
 
@@ -40,38 +40,46 @@ def login(request):
         logger.debug("[DEBUG] LOGIN start | ip=%s user=%s fail_count=%s", ip, username, fail_count)
         if fail_count >= RATE_LIMIT_ATTEMPTS:
             logger.debug("[DEBUG] RATE_LIMIT_HIT | ip=%s user=%s key=%s", ip, username, rl_key)
-            messages.error(request, "Too many attempts. Please try again in a few minutes.")
+            messages.error(
+                request,
+                "Too many attempts. Please try again in a few minutes.",
+                extra_tags="auth",
+            )
             return render(request, "authentication_index.html", {"form": form})
 
         # 2) RPC
         try:
-            # BEFORE (prints traceback)        
-            # logger.debug("RPC call_staff_login() | user=%s", username)
+            logger.debug("RPC call_staff_login() | user=%s", username)
             row = call_staff_login(username, form.cleaned_data.get("password") or "")
-            # logger.debug("RPC returned | user=%s row=%s", username, bool(row))
+            logger.debug("RPC returned | user=%s row=%s", username, bool(row))
         except DatabaseError as e:
             msg = str(e)
-            # AFTER (no traceback)
             logger.error("[DEBUG] RPC ERROR | user=%s msg=%s", username, msg, exc_info=False)
-            # or just a warning:
-            # logger.warning("RPC WARN | user=%s msg=%s", username, msg, exc_info=False)
             cache.set(rl_key, fail_count + 1, RATE_LIMIT_WINDOW)
 
             if "Account does not exist" in msg:
-                messages.error(request, "Invalid username or password.")
+                messages.error(request, "Invalid username or password.", extra_tags="auth")
             elif "Wrong password" in msg or "Incorrect password" in msg:
-                messages.error(request, "Invalid username or password.")
+                messages.error(request, "Invalid username or password.", extra_tags="auth")
             elif "could not translate host name" in msg or "could not connect" in msg:
-                messages.error(request, "Login service is temporarily unavailable. Please try again.")
+                messages.error(
+                    request,
+                    "Login service is temporarily unavailable. Please try again.",
+                    extra_tags="auth",
+                )
             else:
-                messages.error(request, "Login failed due to a server error. Please try again.")
+                messages.error(
+                    request,
+                    "Login failed due to a server error. Please try again.",
+                    extra_tags="auth",
+                )
             return render(request, "authentication_index.html", {"form": form})
 
         # 3) No row case
         if not row:
             logger.debug("RPC returned no row | user=%s (treat as bad creds)", username)
             cache.set(rl_key, fail_count + 1, RATE_LIMIT_WINDOW)
-            messages.error(request, "Invalid username or password.")
+            messages.error(request, "Invalid username or password.", extra_tags="auth")
             return render(request, "authentication_index.html", {"form": form})
 
         # 4) Success — unpack row
@@ -90,7 +98,7 @@ def login(request):
             "first_name": first_name,
             "last_name": last_name,
             "middle_name": middle_name,
-            "role_name": "Barangay Health Worker",
+            "role_name": role_name,
             "username": username,
             "display_name": "",
             "login_at": timezone.now().isoformat(),
@@ -120,23 +128,17 @@ def logout(request):
         cache.delete(rl_key)  # clear rate-limit counter for this user/ip
 
     request.session.flush()
-    messages.success(request, "You have been logged out.")
+    messages.success(request, "You have been logged out.", extra_tags="auth")
     return redirect("authentication:login")
 
 
 def forgot_password(request):
     form = ForgotPasswordForm()
-
-    return render(request, "forgot_password.html", {
-        'form' : form,
-    })
+    return render(request, "forgot_password.html", {"form": form})
 
 def new_password(request):
     form = NewPasswordForm()
-    
-    return render(request, "new_password.html", {
-        'form' : form,
-    })
+    return render(request, "new_password.html", {"form": form})
 
 def email_sent(request):
     return render(request, "email_sent.html")

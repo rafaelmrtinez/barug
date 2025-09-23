@@ -61,32 +61,39 @@
             </tr>
           </thead>
           <tbody>
-            <!-- Example Row 1 -->
-            <tr class="table-row-height">
-              <td>Dela Cruz Sari-Sari Store</td>
-              <td>Juan Dela Cruz</td>
-              <td>Micro Enterprise</td>
-              <td>Retail — General Merchandise</td>
-              <td>Retail — General Merchandise</td>
-              <td>Status</td>
-              <td class="text-end">
-                <div class="d-inline-flex gap-1">
-                  <a class="btn btn-icon" href="{% url 'clerk:business_information' b_id='RBSN00000' %}">
-                    {% bs_icon 'person-lines-fill' size='1em' %}
-                  </a>
-                </div>
-              </td>
-            </tr>
-
-            <!-- If no records -->
-            <tr>
-              <td colspan="7" class="text-center py-4 text-muted">No businesses found</td>
-            </tr>
+            {% for r in page_obj.object_list %}
+              <tr class="table-row-height">
+                <td>{{ r.business_name }}</td>
+                <td>{{ r.business_type_name }}</td>
+                <td>{{ r.business_nature }}</td>
+                <td>{{ r.business_owner_name }}</td>
+                <td>{{ r.business_address }}</td>
+                <td>{{ r.business_status_name }}</td>
+                <td class="text-end">
+                  <div class="d-inline-flex gap-1">
+                    {# Adjust param name to what your URL expects: b_id or business_id #}
+                    <a class="btn btn-icon" href="{% url 'clerk:business_information' b_id=r.business_id %}">
+                      {% bs_icon 'person-lines-fill' size='1em' %}
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="7" class="text-center py-4 text-muted">No businesses found</td>
+              </tr>
+            {% endfor %}
           </tbody>
         </table>
       </div>
     </div>
   </div>
+
+  {% if page_obj.has_other_pages %}
+    <div class="page-pagination"> 
+      {% include 'paginator.html' %}
+    </div>
+  {% endif %}
 
 </div>
 {% endblock %}

@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block content %}
+
+{# ==== Page-scoped theme & polish (matches maroon/gold system colors) ==== #}
+<style>
+  :root{
+    --brand:#7a1212; --brand-600:#640e0e; --brand-700:#4a0a0a; --accent:#f2c94c;
+    --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --card:#fff; --wash:#fafafa;
+  }
+  .hero{
+    background: radial-gradient(120% 140% at 0% 0%, var(--brand) 0%, var(--brand-700) 70%);
+    color:#fff; border-radius:16px; padding:18px 20px; box-shadow:0 10px 24px rgba(0,0,0,.18);
+  }
+  .hero .brand-icon{
+    width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,.08); box-shadow:0 0 0 3px rgba(122,18,18,.18); position:relative;
+  }
+  .hero .brand-icon::after{ content:""; position:absolute; inset:8px; border-radius:50%; background:rgba(242,201,76,.18); }
+  .hero .brand-icon i{ position:relative; z-index:1; color:#fff; }
+  .chip{ border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.08); color:#f3f4f6;
+         border-radius:999px; padding:6px 12px; font-size:.82rem; }
+  .card-soft{ border:0; border-radius:14px; background:var(--card); box-shadow:0 8px 20px rgba(16,24,40,.06); }
+  .section-title{ font-weight:800; color:var(--ink); display:flex; align-items:center; gap:.5rem; }
+  .section-title .dot{ width:10px;height:10px;border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px rgba(242,201,76,.25); }
+  .small-muted{ color:var(--muted); }
+  .divider{ height:1px; background:var(--line); margin:.5rem 0 1rem; }
+
+  /* table polish */
+  .table thead th{ white-space:nowrap; border-bottom:1px solid var(--line); }
+  .table tbody tr:hover{ background:#fffaf0; }
+  .type-chip{
+    display:inline-flex; align-items:center; gap:.35rem; padding:.15rem .5rem; border-radius:999px;
+    background:#fff3d1; color:#8a6b00; font-size:.75rem; border:1px solid #ffe5a3;
+  }
+
+  /* inline form */
+  .amount-input .input-group-text{ background:#fff; border-right:0; }
+  .amount-input input[type="number"]{ border-left:0; }
+  .row-actions .btn{ white-space:nowrap; }
+  .reason-input{ min-width: 220px; }
+
+  /* timeline */
+  .chg{ border:1px solid var(--line); border-radius:12px; padding:.6rem .75rem; background:#fff; }
+  .chg .code{ font-weight:800; color:var(--ink); }
+  .chg .pill{
+    background:#e6f3ff; color:#0b5ed7; border-radius:999px; padding:.15rem .45rem; font-size:.75rem; font-weight:700;
+  }
+
+  /* empty */
+  .empty{ text-align:center; color:var(--muted); padding:1.25rem; border:1px dashed var(--line); border-radius:12px; background:var(--wash); }
+</style>
+
+<div class="container py-3">
+
+  <!-- Hero / Header -->
+  <div class="hero mb-3 d-flex align-items-center gap-3">
+    <div class="brand-icon"><i class="bi bi-tags fs-3" aria-hidden="true"></i></div>
+    <div class="me-auto">
+      <div class="fw-bold">Fee Catalog</div>
+      <div class="text-white-50 small">Search, review, and update fee amounts</div>
+    </div>
+
+    <form class="d-flex align-items-center gap-2" method="get">
+      <div class="input-group">
+        <span class="input-group-text border-0 bg-white bg-opacity-10 text-white"><i class="bi bi-search"></i></span>
+        <input class="form-control border-0" name="q" value="{{ q }}" placeholder="Search fee code or name">
+      </div>
+      {% if q %}
+        <a class="btn btn-light btn-sm" href="{% url 'treasurer:fees' %}"><i class="bi bi-x-lg"></i></a>
+      {% endif %}
+      <button class="btn btn-warning text-dark fw-bold">Search</button>
+    </form>
+  </div>
+
+  <div class="row g-3">
+    <!-- Results -->
+    <div class="col-lg-8">
+      <div class="card card-soft">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="section-title mb-0"><span class="dot"></span> Results</div>
+            <div class="small-muted">{{ items|length }} result{{ items|length|pluralize }}</div>
+          </div>
+          <div class="divider"></div>
+
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th style="min-width:120px;">Code</th>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th class="text-end">Current</th>
+                  <th class="text-end" style="min-width:420px;">Quick Update</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for f in items %}
+                  <tr>
+                    <td class="fw-bold">
+                      <span class="me-1">{{ f.fee_code }}</span>
+                      <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none copy-code"
+                              data-code="{{ f.fee_code }}" title="Copy code">
+                        <i class="bi bi-clipboard"></i>
+                      </button>
+                    </td>
+                    <td>{{ f.name }}</td>
+                    <td>
+                      {% if f.document_type %}
+                        <span class="type-chip"><i class="bi bi-file-text"></i> {{ f.document_type }}</span>
+                      {% else %}
+                        <span class="text-muted">—</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end fw-semibold">₱{{ f.current_amount|floatformat:2 }}</td>
+                    <td class="text-end">
+
+                        <a class="btn btn-outline-secondary btn-sm" href="{% url 'treasurer:fee_edit' f.fee_code %}">
+  <i class="bi bi-pencil-square"></i> Edit
+</a>
+
+
+                      <form class="d-flex justify-content-end gap-2 row-actions align-items-center"
+                            method="post" action="{% url 'treasurer:fee_update' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="fee_code" value="{{ f.fee_code }}">
+
+                        <div class="input-group input-group-sm amount-input" style="max-width: 160px;">
+                          <span class="input-group-text">₱</span>
+                          <input class="form-control" name="new_amount" type="number" min="0" step="0.01"
+                                 placeholder="New" aria-label="New amount">
+                        </div>
+
+                        <input class="form-control form-control-sm reason-input" name="reason"
+                               placeholder="Reason (optional)" aria-label="Reason">
+
+                               <a class="btn btn-outline-secondary btn-sm" href="{% url 'treasurer:fee_edit' f.fee_code %}">
+  <i class="bi bi-pencil-square"></i> Edit
+</a>
+
+                        <button class="btn btn-sm text-white" style="background:var(--brand);" disabled>
+                          <i class="bi bi-arrow-repeat me-1"></i> Update
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr><td colspan="5">
+                    <div class="empty">
+                      <i class="bi bi-inboxes me-2"></i>No results. Try a different code, name, or clear the search.
+                    </div>
+                  </td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Changes -->
+    <div class="col-lg-4">
+      <div class="card card-soft">
+        <div class="card-body">
+          <div class="section-title mb-0"><span class="dot"></span> Recent Changes</div>
+          <div class="divider"></div>
+
+          <div class="vstack gap-2">
+            {% for h in history %}
+              <div class="chg">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div class="code">{{ h.fee_code }}</div>
+                  <span class="pill">{{ h.changed_at|date:"M d, Y" }}</span>
+                </div>
+                <div class="small-muted">{{ h.changed_at|date:"P" }}</div>
+                <div class="mt-1">
+                  ₱{{ h.old_amount|floatformat:2 }} → <span class="fw-bold">₱{{ h.new_amount|floatformat:2 }}</span>
+                </div>
+                {% if h.changed_by %}
+                  <div class="small-muted">by {{ h.changed_by }}</div>
+                {% endif %}
+                {% if h.reason %}
+                  <div class="small mt-1"><i class="bi bi-chat-quote me-1"></i>{{ h.reason }}</div>
+                {% endif %}
+              </div>
+            {% empty %}
+              <div class="empty"><i class="bi bi-clock-history me-2"></i>No changes yet.</div>
+            {% endfor %}
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# --- Tiny UX helpers --- #}
+<script>
+  // Enable/disable Update button based on amount input; optional confirm
+  document.querySelectorAll('.row-actions').forEach(function(form){
+    const amount = form.querySelector('input[name="new_amount"]');
+    const btn = form.querySelector('button[type="submit"], button.btn');
+    if (amount && btn) {
+      amount.addEventListener('input', () => {
+        btn.disabled = !(amount.value && parseFloat(amount.value) >= 0);
+      });
+      form.addEventListener('submit', (e) => {
+        if (!amount.value) { e.preventDefault(); return; }
+        btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Updating';
+      });
+    }
+  });
+
+  // Copy fee code helper
+  document.addEventListener('click', function(e){
+    const t = e.target.closest('.copy-code');
+    if (!t) return;
+    const code = t.getAttribute('data-code');
+    if (!code) return;
+    navigator.clipboard.writeText(code).then(() => {
+      t.innerHTML = '<i class="bi bi-check2"></i>';
+      setTimeout(() => t.innerHTML = '<i class="bi bi-clipboard"></i>', 1000);
+    });
+  });
+</script>
+
+{% endblock %}
