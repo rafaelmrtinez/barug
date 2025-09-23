@@ -85,10 +85,14 @@ class SearchBusinessOwner(forms.Form):
             'id' : 'search',
             'class' : 'form-control', 
             'placeholder' : 'Search',
+            'name': 'q'
     }),
         label= 'Search by Resident ID or Full Name',
         required= True,
     )
+
+class SelectOwnerForm(forms.Form):
+    owner_person_id = forms.IntegerField(widget=forms.HiddenInput())
 
 class BusinessOwnerInfo(forms.Form):
     # PERSONAL INFORMATION

@@ -4,6 +4,18 @@
 {% block css %}
   <link rel="stylesheet" href="{% static 'css/button.css' %}">
   <link rel="stylesheet" href="{% static 'css/form.css' %}">
+  <style>
+    /* Fixed-height, scrollable results area */
+    .results-viewport{
+      height: 250px;           /* set your fixed height */
+      overflow-y: auto;        /* scroll when overflowing */
+      background: var(--bs-body-bg);
+      border: 1px solid var(--bs-border-color);
+      border-radius: .75rem;
+    }
+    /* Optional: nicer spacing */
+    .results-viewport .result-item + .result-item{ margin-top: .5rem; }
+  </style>
 {% endblock %}
 
 {% block content %}
@@ -26,83 +38,178 @@
         Search for a resident in the barangay records and assign them as the owner of a business.
       </p>
 
-      <!-- Search (static mockup, not a form) -->
-      <div class="rounded-3 border bg-light p-3">
-        <label class="form-label small">Find Resident Record</label>
-        <div class="form-floating mb-3">
-          <input type="text" id="residentSearch" class="form-control form-control-sm"
-                 placeholder="Enter Resident ID or Full Name">
-          <label for="residentSearch">Enter Resident ID or Full Name</label>
-        </div>
-        <div class="form-text">Enter the Resident ID or name, then review the resident details below.</div>
-      </div>
+      <!-- Search form (GET) -->
+      <form method="get" class="rounded-3 border bg-light p-3">
+        <div class="d-flex align-items-end justify-content-between gap-3">
+          <div class="flex-grow-1">
+            <label class="form-label small" for="{{ search_form.q.id_for_label }}">Find Resident Record</label>
+            <div class="form-floating">
+              {{ search_form.search }}
+              <label for="{{ search_form.search.id_for_label }}">{{ search_form.search.label }}</label>
+            </div>
+            <div class="form-text">
+              Type a Resident Code (e.g., P07-R123) or name (e.g., Juan Dela Cruz).
+            </div>
+          </div>
 
-      <!-- Selected Resident Details (MOCK DATA) -->
+          <div class="text-end">
+            <div class="small text-muted mb-2">
+              {% if q %}{{ results|length }} Matches{{ results|length|pluralize }}{% endif %}
+            </div>
+            <button type="submit" class="btn btn-submit btn-sm">Search</button>
+          </div>
+        </div>
+      </form>
+
+
+      <!-- Results: card list style -->
       <div class="mt-4">
-        <div class="card border-0 shadow-sm">
-          <div class="card-body">
-            <div class="d-flex justify-content-between align-items-start">
-              <div>
-                <h5 class="card-title mb-1">DELA CRUZ, JUAN S.</h5>
-                <div class="small text-muted">P07-R123</div>
-              </div>
-              <span class="badge" style="background-color: var(--bs-danger-text-emphasis);">RESIDENT</span>
-            </div>
+        {% if q and results %}
+          <div class="results-viewport p-2">
+            <div class="d-flex flex-column">
+              {% for r in results %}
+                <div class="result-item border rounded-3 p-3 d-flex align-items-start justify-content-between">
+                  <div class="pe-3">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                      <h6 class="mb-0 fw-semibold">{{ r.person_name }}</h6>
+                      <span class="badge bg-white text-dark border rounded-pill fw-semibold small px-2 py-1">
+                        {{ r.person_code }}
+                      </span>
+                    </div>
+                    <div class="text-muted small mt-1">
+                      {{ r.street }}
+                      {% if r.purok %}, {{ r.purok }}{% endif %}
+                      {% if r.barangay %}, {{ r.barangay }}{% endif %}
+                      {% if r.city %}, {{ r.city }}{% endif %}
+                    </div>
+                  </div>
 
-            <hr class="my-3">
+                  <!-- keep your existing POST selection button exactly as before -->
+                  <form method="post" class="ms-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="owner_person_id" value="{{ r.person_id }}">
+                    <button type="submit" class="btn btn-submit btn-sm">Select as Owner</button>
+                  </form>
 
-            <div class="row g-3">
-               <div class="col-12 col-md-6">
-                <div class="small text-muted">Sex</div>
-                <div>Male</div>
-              </div>
-              <div class="col-12 col-md-6">
-                <div class="small text-muted">Date of Birth</div>
-                <div>1992-05-18</div>
-              </div>
-              <div class="col-12 col-md-6">
-                <div class="small text-muted">Address</div>
-                <div>Blk 12 Lot 4, Sitio Maligaya, Brgy. Sto. Niño, Calapan City, Oriental Mindoro</div>
-              </div>
-              <div class="col-12 col-md-6">
-                <div class="small text-muted">Civil Status</div>
-                <div>+63 917 555 1234</div>
-              </div>
-              <div class="col-12 col-md-6">
-                <div class="small text-muted">Nationality</div>
-                <div>juan.delacruz@example.com</div>
-              </div>
-              <div class="col-12 col-md-6">
-                <div class="small text-muted">Religion</div>
-                <div>juan.delacruz@example.com</div>
-              </div>
-              <div class="col-12 col-md-6">
-                <div class="small text-muted">Mobile</div>
-                <div>+63 917 555 1234</div>
-              </div>
-              <div class="col-12 col-md-6">
-                <div class="small text-muted">Email</div>
-                <div>juan.delacruz@example.com</div>
-              </div>
+                </div>
+              {% endfor %}
             </div>
           </div>
-        </div>
 
-        <!-- Optional: mock selection summary -->
-        <div class="alert alert-light border mt-3 mb-0">
-          <div class="d-flex align-items-center justify-content-between">
-            <div class="small">
-              <span class="text-muted">Selected Resident:</span>
-              <strong>DELA CRUZ, JUAN S. (P07-R123)</strong>
-            </div>
-            <a href="#" class="small text-decoration-none" style="color: var(--bs-danger-text-emphasis);">Change</a>
-          </div>
-        </div>
+        {% elif q %}
+          <div class="alert alert-light border">No results for <strong>{{ q }}</strong>.</div>
+        {% endif %}
       </div>
+
+      {# Selected Resident Details (dynamic) #}
+      {% if selected %}
+        <div class="mt-4">
+          <div class="card border-0 shadow-sm">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <h5 class="card-title mb-1">
+                    {% if selected %}
+                      {{ selected.last_name|default:"" |upper }},
+                      {{ selected.first_name|default:"" |upper }}
+                      {% if selected.middle_name %} {{ selected.middle_name|slice:":1"|upper }}.{% endif %}
+                      {% if selected.suffix %} {{ selected.suffix|upper }}{% endif %}
+                    {% endif %}
+                  </h5>
+                  <div class="fw-semibold small text-muted">
+                    {% if selected and selected.person_code %}
+                      {{ selected.person_code }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </div>
+                <span class="badge" style="background-color: var(--bs-danger-text-emphasis);">
+                  {{ selected.residential_status|default:"—" }}
+                </span>
+              </div>
+
+              <hr class="my-3">
+
+              <div class="row g-3">
+                <div class="col-12 col-md-6">
+                  <div class="small text-muted">Sex</div>
+                  <div class="fw-semibold">{{ selected.sex|default:"—" }}</div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="small text-muted">Date of Birth</div>
+                  <div class="fw-semibold">{{ selected.birthdate|default:"—" }}</div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="small text-muted">Address</div>
+                  <div class="fw-semibold">
+                    {% if selected %}
+                      {# Build a readable address with commas only where values exist #}
+                      {% with st=selected.street sp=selected.sitio_purok br=selected.barangay ct=selected.city %}
+                        {% if st %}{{ st }}{% endif %}
+                        {% if sp %}{% if st %}, {% endif %}{{ sp }}{% endif %}
+                        {% if br %}{% if st or sp %}, {% endif %}Brgy. {{ br }}{% endif %}
+                        {% if ct %}{% if st or sp or br %}, {% endif %}{{ ct }}{% endif %}
+                        {% if not st and not sp and not br and not ct %}—{% endif %}
+                      {% endwith %}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="small text-muted">Civil Status</div>
+                  <div class="fw-semibold">{{ selected.civil_status|default:"—" }}</div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="small text-muted">Nationality</div>
+                  <div class="fw-semibold">{{ selected.nationality|default:"—" }}</div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="small text-muted">Religion</div>
+                  <div class="fw-semibold">{{ selected.religion|default:"—" }}</div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="small text-muted">Mobile</div>
+                  <div class="fw-semibold">{{ selected.mobile_num|default:"—" }}</div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="small text-muted">Email</div>
+                  <div class="fw-semibold">{{ selected.email|default:"—" }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Selection summary bar with "Change" -->
+          <div class="alert alert-light border mt-3 mb-0">
+            <div class="d-flex align-items-center justify-content-between">
+              <div class="small">
+                <span class="text-muted">Selected Resident:</span>
+                <strong>
+                  {% if selected %}
+                    {{ selected.last_name|default:"" |upper }},
+                    {{ selected.first_name|default:"" |upper }}
+                    {% if selected.middle_name %} {{ selected.middle_name|slice:":1"|upper }}.{% endif %}
+                    {% if selected.suffix %} {{ selected.suffix|upper }}{% endif %}
+                  {% endif %}
+                  —
+                  {{ selected.person_code }}
+                </strong>
+              </div>
+              <a href="{% url 'clerk:business_owner_resident' %}?clear=1"
+                class="small text-decoration-none"
+                style="color: var(--bs-danger-text-emphasis);">
+                Change
+              </a>
+            </div>
+          </div>
+        </div>
+      {% endif %}
 
       <div class="mt-3 button-container justify-content-end mb-2 d-flex gap-2">
-        <button type="button" class="btn btn-reset">Back</button>
-        <a type="button" class="btn btn-submit" href="{% url 'clerk:business_details' %}">Continue</a>
+        <a class="btn btn-reset" href="{% url 'clerk:business_list' %}">Back</a>
+        <a class="btn btn-submit" href="{% url 'clerk:business_details' %}">Continue</a>
       </div>
     </section>
   </div>
