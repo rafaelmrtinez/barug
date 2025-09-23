@@ -1,0 +1,104 @@
+{% load static %}
+{% comment %} Responsive resident results (cards on mobile, table on desktop) {% endcomment %}
+
+<style>
+  :root{
+    --brand-900:#561c24;
+    --brand-700:#6d2932;
+    --sand-200:#e8d8c4;
+    --sand-300:#c7b7a3;
+  }
+  .chip {
+    display:inline-block; padding:.15rem .5rem; border-radius:9999px;
+    background:var(--sand-200); font-size:.75rem; color:#3b3b3b;
+  }
+  .btn-brand {
+    background:var(--brand-700); color:#fff; border-color:var(--brand-700);
+  }
+  .btn-brand:hover { background:var(--brand-900); border-color:var(--brand-900); color:#fff; }
+  .card-hover { transition:transform .08s ease, box-shadow .08s ease; }
+  .card-hover:hover { transform:translateY(-1px); box-shadow:0 .25rem .75rem rgba(0,0,0,.06); }
+</style>
+
+{% if residents %}
+  <!-- Mobile cards -->
+  <div class="d-md-none">
+    <div class="row g-2">
+      {% for r in residents %}
+      <div class="col-12">
+        <div class="card card-hover">
+          <div class="card-body py-2">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <div class="fw-semibold">
+                  {% if r.person_name %}
+                    {{ r.person_name }}
+                  {% else %}
+                    {{ r.last_name|default_if_none:"" }}, {{ r.first_name|default_if_none:"" }}
+                  {% endif %}
+                </div>
+                <div class="mt-1">
+                  {% if r.person_code %}<span class="chip">{{ r.person_code }}</span>{% endif %}
+                  {% if r.purok %}<span class="chip">{{ r.purok }}</span>{% endif %}
+                </div>
+                <div class="small text-muted mt-1">
+                  {{ r.street|default_if_none:"" }}
+                  {% if r.barangay %}, {{ r.barangay }}{% endif %}
+                  {% if r.city %}, {{ r.city }}{% endif %}
+                </div>
+              </div>
+              <button
+                type="button"
+                class="btn btn-sm btn-brand pick-resident"
+                data-person-id="{{ r.person_id }}"
+                data-display="{% if r.person_name %}{{ r.person_name }}{% else %}{{ r.last_name|default_if_none:"" }}, {{ r.first_name|default_if_none:"" }}{% endif %} ({{ r.person_code }})">
+                Select
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Desktop table -->
+  <div class="table-responsive d-none d-md-block">
+    <table class="table table-sm align-middle">
+      <thead class="table-light">
+        <tr><th style="width:9rem;">Code</th><th>Name</th><th>Address</th><th style="width:7rem;"></th></tr>
+      </thead>
+      <tbody>
+      {% for r in residents %}
+        <tr>
+          <td>{% if r.person_code %}<span class="chip">{{ r.person_code }}</span>{% endif %}</td>
+          <td class="fw-semibold">
+            {% if r.person_name %}
+              {{ r.person_name }}
+            {% else %}
+              {{ r.last_name|default_if_none:"" }}, {{ r.first_name|default_if_none:"" }}
+            {% endif %}
+          </td>
+          <td class="small text-muted">
+            {{ r.street|default_if_none:"" }}
+            {% if r.purok %}, {{ r.purok }}{% endif %}
+            {% if r.barangay %}, {{ r.barangay }}{% endif %}
+            {% if r.city %}, {{ r.city }}{% endif %}
+          </td>
+          <td class="text-end">
+            <button
+              type="button"
+              class="btn btn-sm btn-brand pick-resident"
+              data-person-id="{{ r.person_id }}"
+              data-display="{% if r.person_name %}{{ r.person_name }}{% else %}{{ r.last_name|default_if_none:"" }}, {{ r.first_name|default_if_none:"" }}{% endif %} ({{ r.person_code }})">
+              Select
+            </button>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <div class="text-muted small py-2">No results yet. Start typing at least 2 characters…</div>
+{% endif %}

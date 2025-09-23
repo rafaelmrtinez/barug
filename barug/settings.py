@@ -16,6 +16,21 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Email backend (Gmail SMTP)
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+
+# The Gmail account / app password
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+
+# Nice defaults for From header
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
+DEFAULT_FROM_NAME  = os.getenv("DEFAULT_FROM_NAME", "Barangay Sto. Niño")
+
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -120,7 +135,7 @@ WSGI_APPLICATION = "barug.wsgi.application"
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-
+SUPABASE_ID_UPLOADS_BUCKET = os.getenv("SUPABASE_ID_UPLOADS_BUCKET", "id-uploads")
 
 DATABASES = {
     'default': {
@@ -222,25 +237,25 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
     os.path.join(BASE_DIR, "authentication/static/authentication"),
-    os.path.join(BASE_DIR, "event_logs/static/event_logs"),
+    # os.path.join(BASE_DIR, "event_logs/static/event_logs"),
     os.path.join(BASE_DIR, "resident/static/resident"),
     os.path.join(BASE_DIR, "bhw/static/bhw"),
-    os.path.join(BASE_DIR, "clerk/static/clerk"),
+    # os.path.join(BASE_DIR, "clerk/static/clerk"),
 ]
 
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, "static"),
-    os.path.join(BASE_DIR, "authentication/static/authentication"),
-    os.path.join(BASE_DIR, "bhw/static/bhw"),
-    os.path.join(BASE_DIR, "captain/static/captain"),
-    os.path.join(BASE_DIR, "clerk/static/clerk"),
-    os.path.join(BASE_DIR, "lupon_mem/static/lupon_mem"),
-    os.path.join(BASE_DIR, "lupon_pres/static/lupon_pres"),
-    os.path.join(BASE_DIR, "resident/static/resident"),
-    os.path.join(BASE_DIR, "secreatry/static/secretary"),
-    os.path.join(BASE_DIR, "staff_admin/static/staff_admin"),
-    os.path.join(BASE_DIR, "treasurer/static/treasurer"),
-]
+# STATICFILES_DIRS = [
+#     os.path.join(BASE_DIR, "static"),
+#     os.path.join(BASE_DIR, "authentication/static/authentication"),
+#     os.path.join(BASE_DIR, "bhw/static/bhw"),
+#     os.path.join(BASE_DIR, "captain/static/captain"),
+#     os.path.join(BASE_DIR, "clerk/static/clerk"),
+#     os.path.join(BASE_DIR, "lupon_mem/static/lupon_mem"),
+#     os.path.join(BASE_DIR, "lupon_pres/static/lupon_pres"),
+#     os.path.join(BASE_DIR, "resident/static/resident"),
+#     os.path.join(BASE_DIR, "secreatry/static/secretary"),
+#     os.path.join(BASE_DIR, "staff_admin/static/staff_admin"),
+#     os.path.join(BASE_DIR, "treasurer/static/treasurer"),
+# ]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
