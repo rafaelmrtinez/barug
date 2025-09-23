@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 import io, os, zipfile, json, re
 from datetime import datetime
 
@@ -19,15 +19,15 @@ from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
 from authentication.supabase_client import supabase
 
-from .forms import SearchVerificationRequest, SearchBusinessOwner, BusinessOwnerInfo, BusinessDetails, BusinessFilters
+from .forms import (
+    SearchVerificationRequest, SearchBusinessOwner, BusinessOwnerInfo,
+    BusinessDetails, BusinessFilters, RequestedDocsFilters
+)
 
-from django.shortcuts import render
-from django.core.paginator import Paginator
-from .forms import RequestedDocsFilters
+import logging
 
-user_fullname = 'lname fname mname suffix'
-user_role = 'Barangay Treasurer'
-user_role_template = user_role.lower().replace(' ', '_')
+# ---- email helper (uses your custom Gmail SMTP backend) ----
+from common.send_email import send_email
 
 # ---- services ----
 from .services.requests_service import _fetch_bundle, _set_status
@@ -42,13 +42,45 @@ from .services.id_verification_service import (
 )
 
 # =========================
+# Logger + tiny debug helpers
+# =========================
+logger = logging.getLogger(__name__)
+
+def _format_rcpt(rcpt: Any) -> str:
+    try:
+        if isinstance(rcpt, (list, tuple)) and len(rcpt) == 2:
+            name, email = rcpt
+            return f"{name} <{email}>" if name else str(email)
+    except Exception:
+        pass
+    return str(rcpt)
+
+def _debug_email_preview(subject: str, to_list: List[Any], body_txt: str, body_html: str | None):
+    """Pretty-print what we're about to send (always prints; you can comment out if noisy)."""
+    try:
+        print("\n" + "=" * 72)
+        print("[EMAIL DEBUG] Ready-for-pickup payload")
+        print(f"Subject : {subject}")
+        print(f"To      : {[ _format_rcpt(t) for t in to_list ]}")
+        print("- TEXT ---------------------------------------------------")
+        print(body_txt.rstrip())
+        print("- HTML (first 600 chars) --------------------------------")
+        snippet = (body_html or "")[:600]
+        print(snippet.rstrip())
+        if body_html and len(body_html) > 600:
+            print("... [truncated]")
+        print("=" * 72 + "\n")
+    except Exception as e:
+        logger.warning("Failed to print email preview: %s", e)
+
+# =========================
 # UI helpers / constants
 # =========================
-
 STATUS_UI: Dict[str, Dict[str, str]] = {
     "FOR_TREASURER_REVIEW": {"label": "For Treasurer Review", "cls": "badge bg-warning-subtle text-warning-emphasis"},
     "PAID":                 {"label": "Paid",                 "cls": "badge bg-primary-subtle text-primary-emphasis"},
     "FOR_PRINTING":         {"label": "For Printing",         "cls": "badge bg-info-subtle text-info-emphasis"},
+    "READY_FOR_PICKUP":     {"label": "Ready for Pickup",     "cls": "badge bg-warning-subtle text-warning-emphasis"},
     "RELEASED":             {"label": "Released",             "cls": "badge bg-success-subtle text-success-emphasis"},
     "DECLINED":             {"label": "Declined",             "cls": "badge bg-danger-subtle text-danger-emphasis"},
 }
@@ -66,6 +98,120 @@ def _staff_id(request: HttpRequest) -> int | None:
         return sid
     prof = getattr(request, "profile", None) or getattr(request, "person_profile", None)
     return getattr(prof, "staff_id", None)
+
+# ---------------------------------------------------------------------
+# Email-related helpers
+# ---------------------------------------------------------------------
+# --- add this helper near your email helpers ---
+
+# --- add this helper near your email helpers ---
+def _resolve_person_id_from_header(header: Dict[str, Any]) -> Optional[int]:
+    """
+    Find the most appropriate person_id in the header payload.
+    Order:
+      - requested_by_person_id (the requester)
+      - on_behalf_of_person_id (if someone requested for someone else)
+      - requester_person_id / subject_person_id / resident_person_id / person_id (fallbacks)
+    """
+    candidates = [
+        header.get("requested_by_person_id"),
+        header.get("on_behalf_of_person_id"),
+        header.get("requester_person_id"),
+        header.get("subject_person_id"),
+        header.get("resident_person_id"),
+        header.get("person_id"),
+    ]
+    for pid in candidates:
+        if isinstance(pid, int) and pid > 0:
+            return pid
+    return None
+
+def _send_ready_for_pickup_email(header: Dict[str, Any], lines: List[Dict[str, Any]]) -> Tuple[bool, str]:
+    # resolve person id correctly (this was the bug)
+    person_id = _resolve_person_id_from_header(header)
+    print(f"[EMAIL DEBUG] resolved person_id from header -> {person_id!r}")
+
+    full_name, email = _lookup_person_contact(person_id)
+    if not email:
+        print("[EMAIL DEBUG] no email found on file; skipping send.")
+        return False, "No email on file for this resident. Notification not sent."
+
+    req_code = header.get("request_code") or f"REQ-{header.get('doc_request_id','')}"
+    doc_names = [(l.get("document_type_name") or "").strip() for l in (lines or [])]
+    doc_names = [d for d in doc_names if d]
+    docs_str = ", ".join(doc_names) if doc_names else "your requested document(s)"
+
+    barangay_name = getattr(settings, "BRGY_NAME", "Barangay Sto. Niño")
+    pickup_info  = getattr(settings, "BRGY_PICKUP_INFO", "Please proceed to the Barangay Office during office hours.")
+
+    subject = f"{barangay_name}: Request {req_code} is READY FOR PICKUP"
+    body_html = f"""
+        <p>Hi {full_name or 'Resident'},</p>
+        <p>Your barangay document request <strong>{req_code}</strong> is now
+        <strong>READY FOR PICKUP</strong>.</p>
+        <p><b>Document(s):</b> {docs_str}</p>
+        <p>{pickup_info}</p>
+        <p>Thank you,<br>{barangay_name}</p>
+    """
+    body_txt = (
+        f"Hi {full_name or 'Resident'},\n\n"
+        f"Your barangay document request {req_code} is now READY FOR PICKUP.\n"
+        f"Documents: {docs_str}\n\n"
+        f"{pickup_info}\n\n"
+        f"Thank you,\n{barangay_name}\n"
+    )
+    to_list = [(full_name or "", email)]
+
+    # show payload
+    _debug_email_preview(subject, to_list, body_txt, body_html)
+
+    try:
+        result = send_email(
+            subject=subject,
+            to=to_list,
+            body_text=body_txt,
+            body_html=body_html,
+            from_name=barangay_name,
+            fail_silently=False,  # keep False until verified
+        )
+        print(f"[EMAIL DEBUG] send_email result -> ok={getattr(result,'ok',None)!r}, detail={getattr(result,'detail',None)!r}")
+        return (True, f"Email notification sent to {email}.") if getattr(result, "ok", False) \
+               else (False, "Failed to send email notification at this time.")
+    except Exception as e:
+        print(f"[EMAIL DEBUG] send_email raised: {e}")
+        logger.exception("send_email raised")
+        return False, f"Email not sent: {e}"
+
+
+
+def _lookup_person_contact(person_id: Optional[int]) -> Tuple[Optional[str], Optional[str]]:
+    """Return (full_name, email) for a given person_id from the `person` table."""
+    if not person_id:
+        print("[EMAIL DEBUG] lookup: no person_id provided")
+        return None, None
+    try:
+        res = (
+            supabase
+            .table("person")
+            .select("first_name,last_name,email")
+            .eq("person_id", person_id)
+            .limit(1)
+            .execute()
+        )
+        row = (res.data or [None])[0] or {}
+        first = (row.get("first_name") or "").strip()
+        last  = (row.get("last_name") or "").strip()
+        full  = f"{first} {last}".strip() or None
+        email = (row.get("email") or "").strip() or None
+
+        # --- DEBUG print ---
+        print(f"[EMAIL DEBUG] lookup person_id={person_id} -> full_name={full!r}, email={email!r}")
+        return full, email
+    except Exception as e:
+        logger.exception("Lookup failed for person_id=%s", person_id)
+        print(f"[EMAIL DEBUG] lookup failed for person_id={person_id}: {e}")
+        return None, None
+
 
 # =========================
 # Clerk — Queue / List of document requests
@@ -165,17 +311,47 @@ def detail(request: HttpRequest, doc_request_id: int):
 @role_required(CLERK_ROLE)
 @require_POST
 def mark_request_ready_for_pickup(request: HttpRequest, doc_request_id: int):
+    print(f"[EMAIL DEBUG] mark_request_ready_for_pickup called for doc_request_id={doc_request_id}")
+    # Fetch minimal details first for email context
+    try:
+        bundle = _fetch_bundle(doc_request_id)
+    except APIError as e:
+        print(f"[EMAIL DEBUG] _fetch_bundle failed: {e}")
+        bundle = {"header": {}, "lines": []}
+
+    header = bundle.get("header", {}) or {}
+    lines  = bundle.get("lines", []) or []
+
+    print(f"[EMAIL DEBUG] header keys: {list(header.keys())[:12]} ...")
+    print(f"[EMAIL DEBUG] request_code={header.get('request_code')!r}, "
+          f"requester_person_id={header.get('requester_person_id')!r}, "
+          f"subject_person_id={header.get('subject_person_id')!r}")
+
     staff_id = _staff_id(request)
     reason = (request.POST.get("reason") or "").strip() or None
+    print(f"[EMAIL DEBUG] RPC mark_request_ready_for_pickup -> staff_id={staff_id}, reason={reason!r}")
+
     res = supabase.rpc("mark_request_ready_for_pickup", {
         "p_doc_request_id": doc_request_id,
         "p_staff_id": staff_id,
         "p_reason": reason,
     }).execute()
+
     if getattr(res, "error", None):
+        print(f"[EMAIL DEBUG] RPC returned error: {res.error}")
         messages.error(request, f"Failed: {escape(res.error.message)}")
+        return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+    print("[EMAIL DEBUG] RPC ok. Now sending email …")
+    messages.success(request, "Marked as ready for pickup.")
+
+    ok, info = _send_ready_for_pickup_email(header, lines)
+    print(f"[EMAIL DEBUG] _send_ready_for_pickup_email -> ok={ok}, info={info!r}")
+    if ok:
+        messages.success(request, info)
     else:
-        messages.success(request, "Marked as ready for pickup.")
+        messages.info(request, info)
+
     return redirect("clerk:detail", doc_request_id=doc_request_id)
 
 @session_login_required
@@ -356,7 +532,6 @@ def review_approve(request: HttpRequest):
 
     rows = fetch_id_verification_requests(supabase, search=search)
     if not rows and search == "":
-        # Try once to surface a helpful error
         try:
             supabase.rpc("get_id_validation_requests", {}).execute()
         except APIError as e:
@@ -390,7 +565,6 @@ def person_submission_dets(request: HttpRequest, req_id: int):
         raise Http404("Details not found.")
     person = data[0]
 
-    # ---- Normalize to the keys you pasted (street/sitio_purok/barangay/city etc.) ----
     raw_dt = person.get("date_requested")
     try:
         dt = datetime.fromisoformat(str(raw_dt).replace("Z", "+00:00"))
@@ -406,7 +580,6 @@ def person_submission_dets(request: HttpRequest, req_id: int):
     person["valid_id_files"] = person.get("valid_id_files") or []
     person["selfie_file"] = person.get("selfie_file") or None
 
-    # Build a clean full address to avoid template logic
     parts = [
         (person.get("street") or "").strip(),
         (person.get("sitio_purok") or "").strip(),
@@ -415,7 +588,6 @@ def person_submission_dets(request: HttpRequest, req_id: int):
     ]
     person["full_address"] = ", ".join([p for p in parts if p])
 
-    # Latest status (optional enrichment from the list RPC)
     status_row = get_verification_status_for_person(supabase, req_id)
     if status_row:
         person["latest_status"]  = status_row.get("status_text") or person.get("latest_status") or "Pending"
@@ -427,6 +599,131 @@ def person_submission_dets(request: HttpRequest, req_id: int):
         "person": person,
     })
 
+# =========================
+# Business screens (stubs; clerk-only)
+# =========================
+def _profile_fallbacks(request: HttpRequest):
+    user_role = (request.session.get("auth") or {}).get("role_name")
+    user_role_template = user_role.lower().replace(" ", "_")
+    return user_role.title(), user_role_template
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+def business_owner(request: HttpRequest):
+    user_fullname, user_role_template = _profile_fallbacks(request)
+    return render(
+        request,
+        "business/business_owner.html",
+        {
+            "user_fullname": user_fullname,
+            "user_role": user_fullname,
+            "page_path": f"{user_fullname} / Business Records / Add Business / Business Owner",
+            "page_title": "Business Owner",
+            "user_role_template": user_role_template,
+        },
+    )
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+def business_owner_resident(request: HttpRequest):
+    user_fullname, user_role_template = _profile_fallbacks(request)
+    form = SearchBusinessOwner()
+    return render(
+        request,
+        "business/business_owner_resident.html",
+        {
+            "user_fullname": user_fullname,
+            "user_role": user_fullname,
+            "page_path": f"{user_fullname} / Business Records / Add Business / Business Owner Information",
+            "page_title": "Business Owner Information",
+            "user_role_template": user_role_template,
+            "form": form,
+        },
+    )
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+def business_details(request: HttpRequest):
+    user_fullname, user_role_template = _profile_fallbacks(request)
+    form = BusinessDetails()
+    return render(
+        request,
+        "business/business_details.html",
+        {
+            "user_fullname": user_fullname,
+            "user_role": user_fullname,
+            "page_path": f"{user_fullname} / Business Records / Add Business / Business Information",
+            "page_title": "Business Information",
+            "user_role_template": user_role_template,
+            "form": form,
+        },
+    )
+
+@session_login_required
+@role_required("Barangay Clerk")
+@nocache
+def business_list(request: HttpRequest):
+    user_role, user_role_template = _profile_fallbacks(request)
+    form = BusinessFilters()
+    rows, rpc_error = [], None
+    try:
+        resp = supabase.rpc("get_business_summary", {}).execute()
+        rows = resp.data or []
+    except Exception as e:
+        rpc_error = str(e)
+        rows = []
+
+    paginator = Paginator(rows, 15)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    context = {
+        "page_path": f"{user_role} / Business Records",
+        "page_title": "Business Records",
+        "user_role_template": user_role_template,
+        "form": form,
+        "rows": rows,
+        "rpc_error": rpc_error,
+        "page_obj": page_obj,
+    }
+
+    return render(request, "business/business_list.html", context)
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+def business_information(request: HttpRequest, b_id: int):
+    user_fullname, user_role_template = _profile_fallbacks(request)
+    return render(
+        request,
+        "business/business_information.html",
+        {
+            "user_fullname": user_fullname,
+            "user_role": user_fullname,
+            "page_path": f"{user_fullname} / Business Records / Business Details : {b_id}",
+            "page_title": f"Business Details : {b_id}",
+            "user_role_template": user_role_template,
+        },
+    )
+
+# Hannah's Code:
+def business_owner_nonresident(request: HttpRequest):
+    user_fullname, user_role_template = _profile_fallbacks(request)
+    form = BusinessOwnerInfo()
+    return render(
+        request,
+        "business/business_owner_nonres.html",
+        {
+            "user_fullname": user_fullname,
+            "user_role": user_fullname,
+            "page_path": f"{user_fullname} / Business Records / Add Business / Business Owner Information",
+            "page_title": "Business Owner Information",
+            "user_role_template": user_role_template,
+            "form": form,
+        },
+    )
 
 def _rpc_approve_person_by_clerk(request: HttpRequest, person_id: int, status_id: int, remarks: str | None):
     auth = request.session.get("auth") or {}
@@ -479,139 +776,3 @@ def decision_request(request: HttpRequest, req_id: int):
         except Exception:
             messages.warning(request, "This request cannot be updated right now.")
     return redirect("clerk:person_details", req_id=req_id)
-
-# =========================
-# Business screens (stubs; clerk-only)
-# =========================
-def _profile_fallbacks(request: HttpRequest):
-    user_role = (request.session.get("auth") or {}).get("role_name")
-    user_role_template = user_role.lower().replace(" ", "_")
-    return user_role.title(), user_role_template
-
-
-@session_login_required
-@role_required(CLERK_ROLE)
-@nocache
-def business_owner(request: HttpRequest):
-    user_fullname, user_role, user_role_template = _profile_fallbacks(request)
-    return render(
-        request,
-        "business/business_owner.html",
-        {
-            "user_fullname": user_fullname,
-            "user_role": user_role,
-            "page_path": f"{user_role} / Business Records / Add Business / Business Owner",
-            "page_title": "Business Owner",
-            "user_role_template": user_role_template,
-        },
-    )
-
-@session_login_required
-@role_required(CLERK_ROLE)
-@nocache
-def business_owner_resident(request: HttpRequest):
-    user_fullname, user_role, user_role_template = _profile_fallbacks(request)
-    form = SearchBusinessOwner()
-    return render(
-        request,
-        "business/business_owner_resident.html",
-        {
-            "user_fullname": user_fullname,
-            "user_role": user_role,
-            "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
-            "page_title": "Business Owner Information",
-            "user_role_template": user_role_template,
-            "form": form,
-        },
-    )
-
-@session_login_required
-@role_required(CLERK_ROLE)
-@nocache
-def business_details(request: HttpRequest):
-    user_fullname, user_role, user_role_template = _profile_fallbacks(request)
-    form = BusinessDetails()
-    return render(
-        request,
-        "business/business_details.html",
-        {
-            "user_fullname": user_fullname,
-            "user_role": user_role,
-            "page_path": f"{user_role} / Business Records / Add Business / Business Information",
-            "page_title": "Business Information",
-            "user_role_template": user_role_template,
-            "form": form,
-        },
-    )
-
-
-@session_login_required
-@role_required("Barangay Clerk")
-@nocache
-def business_list(request: HttpRequest):
-    user_role, user_role_template = _profile_fallbacks(request)
-    form = BusinessFilters()
-    
-    rows, rpc_error = [], None
-
-    try:
-        resp = supabase.rpc("get_business_summary", {}).execute()
-        rows = resp.data or []
-    except Exception as e:
-        rpc_error = str(e)
-        rows = []
-
-    paginator = Paginator(rows, 15)
-    page_obj = paginator.get_page(request.GET.get("page"))
-
-    context = {
-        "page_path": f"{user_role} / Business Records",
-        "page_title": "Business Records",
-        "user_role_template": user_role_template,
-        "form": form,
-        "rows": rows,
-        "rpc_error": rpc_error,
-        "page_obj": page_obj,
-    }
-
-    return render(
-        request,
-        "business/business_list.html",
-        context,
-    )
-
-
-@session_login_required
-@role_required(CLERK_ROLE)
-@nocache
-def business_information(request: HttpRequest, b_id: int):
-    user_fullname, user_role, user_role_template = _profile_fallbacks(request)
-    return render(
-        request,
-        "business/business_information.html",
-        {
-            "user_fullname": user_fullname,
-            "user_role": user_role,
-            "page_path": f"{user_role} / Business Records / Business Details : {b_id}",
-            "page_title": f"Business Details : {b_id}",
-            "user_role_template": user_role_template,
-        },
-    )
-
-# Hannah's Code:
-
-def business_owner_nonresident(request: HttpRequest):
-    user_fullname, user_role, user_role_template = _profile_fallbacks(request)
-    form = BusinessOwnerInfo()
-    return render(
-        request,
-        "business/business_owner_nonres.html",
-        {
-            "user_fullname": user_fullname,
-            "user_role": user_role,
-            "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
-            "page_title": "Business Owner Information",
-            "user_role_template": user_role_template,
-            "form": form,
-        },
-    )

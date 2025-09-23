@@ -16,5 +16,5 @@ urlpatterns = [
     path("fees/<str:fee_code>/edit/", views.fee_edit, name="fee_edit"),
 
     # HANNAH TEST:
-    path("dashboard", views.dashboard, name="dashboard"),
+    # path("dashboard", views.dashboard, name="dashboard"),
 ]
