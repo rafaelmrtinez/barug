@@ -12,6 +12,16 @@ class SearchPerson(forms.Form):
         required= True,
     )
 
+class ChooseRole(forms.Form):
+    role = forms.ChoiceField(
+        widget=forms.Select(attrs={
+            'id' : 'role',
+            'class' : 'form-select',
+    }),
+        label= 'Select a Role',
+        required= True,
+    )
+
 class ResidentProfileform(forms.Form):
     res_code = forms.CharField(
         widget=forms.TextInput(attrs={

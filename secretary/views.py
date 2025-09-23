@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.core.paginator import Paginator
 from .forms import SearchPerson
 from .forms import ResidentProfileform
+from .forms import ChooseRole
 
 #need back-end for proper assignment
 user_fullname = 'lname, fname mname suffix'
@@ -21,6 +22,7 @@ def staff_selection(request):
 
 def staff_selection_resident(request):
     form = SearchPerson()
+    role_form = ChooseRole()
     return render(request, "staff/staff_selection_resident.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
@@ -28,6 +30,7 @@ def staff_selection_resident(request):
         'page_title': 'Account Verification',
         'user_role_template': user_role_template,
         'form' : form,
+        'role_form': role_form,
     })
 
 def staff_selection_nonres(request):
