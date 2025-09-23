@@ -263,11 +263,11 @@ class BusinessDetails(forms.Form):
         label= 'Business Type',
         required= True,
     )
-    b_nature = forms.ChoiceField(
-        choices= [], 
+    b_nature = forms.ChoiceField( 
         widget=forms.Select(attrs={
             'id' : 'b_nature',
-            'class' : 'form-select',
+            'class' : 'form-control',
+            'placeholder' : 'Nature of Business',
     }),
         label= 'Nature of Business',
         required= True,
