@@ -8,19 +8,19 @@
 .dashboard.theme-barug{
   --brand-900:#3a1217;
   --brand-800:#561c24;
-  --brand-700:#6d2932;
+  --brand-700:#6d2932;  /* primary */
   --brand-600:#6d2932;
   --brand-500:#561c24;
   --brand-400:#c7b7a3;
-  --brand-300:#e8d8c4;
+  --brand-300:#e8d8c4;  /* area fill */
   --brand-200:#f3ece3;
   --brand-100:#fbf7f4;
 
   --neutral-800:#1f2937;
   --neutral-600:#4b5563;
-  --neutral-500:#6b7280;
+  --neutral-500:#6b7280; /* axis text */
   --neutral-400:#9ca3af;
-  --neutral-300:#d1d5db;
+  --neutral-300:#d1d5db; /* grid */
   --neutral-200:#e5e7eb;
   --neutral-100:#f3f4f6;
 
@@ -34,9 +34,7 @@
 .dashboard .card{ border-radius:16px; border:1px solid var(--border); }
 .dashboard .shadow-sm{ box-shadow:var(--shadow)!important; }
 .dashboard .btn,.dashboard .form-select,.dashboard .form-control{ border-radius:12px; }
-
-/* Keep perf hints, but never defer chart cards themselves */
-.header-card,.kpi{ content-visibility:auto; contain-intrinsic-size: 300px 400px; }
+.header-card,.kpi{ content-visibility:auto; contain-intrinsic-size:300px 400px; }
 .section.chart-section{ content-visibility:visible; }
 
 /* Header */
@@ -55,9 +53,6 @@
 .link-brand{ color:var(--brand-700); text-decoration:none; }
 .link-brand:hover{ color:var(--brand-800); text-decoration:underline; }
 
-/* Filters */
-.filter{ min-width:160px; }
-
 /* KPI */
 .kpi .kpi-icon{
   width:48px;height:48px;border-radius:14px;display:grid;place-items:center;
@@ -71,12 +66,10 @@
 /* Sections */
 .section .card-header{ background:var(--surface-muted); border-bottom:1px solid var(--border); padding:.85rem 1rem; }
 
-/* Lists & Empty */
+/* Lists */
 .panel-list{ max-height:360px; overflow:auto; }
 .item-row + .item-row{ border-top:1px dashed var(--border); }
 .item-row{ padding:.75rem 0; }
-.empty{ color:var(--neutral-500); background:linear-gradient(180deg,var(--brand-100),transparent);
-  border:1px dashed var(--border); border-radius:12px; padding:.9rem 1rem; }
 
 /* Status badges */
 .status-badge{ font-weight:700; }
@@ -86,8 +79,15 @@
 .status-rejected{ background:#fdecea; color:#b22d2d; }
 
 /* Charts */
-.chart-wrap{ position:relative; height:300px; }
-.chart-wrap.donut{ height:300px; }
+.chart-wrap{
+  position:relative;
+  height:clamp(320px, 40vh, 520px); /* Bigger and responsive */
+}
+.chart-wrap canvas{
+  width:100% !important;
+  height:100% !important; /* canvas visually fills the card */
+  display:block;
+}
 .legend-inline{ display:flex; gap:1rem; flex-wrap:wrap; }
 .legend-inline .legend-dot{
   width:.9rem;height:.9rem;border-radius:50%;display:inline-block;margin-right:.35rem;
@@ -95,14 +95,12 @@
 }
 .legend-inline .legend-label{ margin-right:.75rem; font-size:.9rem; color:var(--neutral-600); }
 
-/* Lightweight skeletons */
+/* Skeletons */
 .skeleton{ position:absolute; inset:0; border-radius:12px; overflow:hidden; background:var(--neutral-200); }
-.skeleton::after{
-  content:""; position:absolute; inset:0; transform:translateX(-100%);
+.skeleton::after{ content:""; position:absolute; inset:0; transform:translateX(-100%);
   background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent);
-  animation:shimmer 1.1s infinite;
-}
-@keyframes shimmer{ to{ transform:translateX(100%); } }
+  animation:shimmer 1.1s infinite; }
+@keyframes shimmer{ to{ transform:translateX(100%);} }
 .hidden{ display:none!important; }
 
 /* Tables */
@@ -225,7 +223,7 @@
 
   <!-- Charts -->
   <div class="row g-3 mt-1">
-    <div class="col-12 col-xxl-7">
+    <div class="col-12">
       <div class="card section chart-section shadow-sm h-100">
         <div class="card-header d-flex align-items-center justify-content-between">
           <h5 class="mb-0">Requests — Last 7 Days</h5>
@@ -239,14 +237,14 @@
         </div>
       </div>
     </div>
-    <div class="col-12 col-xxl-5">
-      <div class="card section chart-section shadow-sm h-100">
+    <div class="col-12">
+      <div class="card section chart-section shadow-sm h-100 mt-3">
         <div class="card-header d-flex align-items-center justify-content-between">
           <h5 class="mb-0">Status Breakdown</h5>
           <span class="small text-muted">Current</span>
         </div>
         <div class="card-body">
-          <div class="chart-wrap donut">
+          <div class="chart-wrap">
             <canvas id="statusBreakdown"></canvas>
             <div class="skeleton chart-skel-status"></div>
           </div>
@@ -265,23 +263,18 @@
           <a href="{% url 'clerk:identity_verification' %}" class="link-brand small">Manage</a>
         </div>
         <div class="card-body">
-          <div class="panel-list" id="verifList">
-            {% for v in verifications %}
-              <div class="item-row d-flex justify-content-between align-items-center">
-                <div>
-                  <div class="fw-semibold">{{ v.name }}</div>
-                  <div class="small text-muted">{{ v.subtext }}</div>
-                </div>
-                <span class="badge rounded-pill status-badge status-{{ v.status|lower }}">{{ v.status }}</span>
+          <div class="panel-list" id="verifList">{% for v in verifications %}
+            <div class="item-row d-flex justify-content-between align-items-center">
+              <div>
+                <div class="fw-semibold">{{ v.name }}</div>
+                <div class="small text-muted">{{ v.subtext }}</div>
               </div>
-            {% empty %}
-              <!-- JS fills demo -->
-            {% endfor %}
-          </div>
+              <span class="badge rounded-pill status-badge status-{{ v.status|lower }}">{{ v.status }}</span>
+            </div>
+          {% empty %}{% endfor %}</div>
         </div>
       </div>
     </div>
-
     <div class="col-12 col-xl-6">
       <div class="card section shadow-sm h-100">
         <div class="card-header d-flex align-items-center justify-content-between">
@@ -289,19 +282,15 @@
           <a href="" class="link-brand small">Manage</a>
         </div>
         <div class="card-body">
-          <div class="panel-list" id="reqList">
-            {% for r in recent_requests %}
-              <div class="item-row">
-                <div class="d-flex justify-content-between align-items-center">
-                  <div class="fw-semibold">{{ r.doc_name }}</div>
-                  <span class="badge rounded-pill status-badge status-{{ r.status|lower }}">{{ r.status }}</span>
-                </div>
-                <div class="small text-muted">{{ r.requestor }} — {{ r.code }}</div>
+          <div class="panel-list" id="reqList">{% for r in recent_requests %}
+            <div class="item-row">
+              <div class="d-flex justify-content-between align-items-center">
+                <div class="fw-semibold">{{ r.doc_name }}</div>
+                <span class="badge rounded-pill status-badge status-{{ r.status|lower }}">{{ r.status }}</span>
               </div>
-            {% empty %}
-              <!-- JS fills demo -->
-            {% endfor %}
-          </div>
+              <div class="small text-muted">{{ r.requestor }} — {{ r.code }}</div>
+            </div>
+          {% empty %}{% endfor %}</div>
         </div>
       </div>
     </div>
@@ -320,29 +309,17 @@
             <table class="table align-middle mb-0">
               <thead class="table-light">
                 <tr>
-                  <th scope="col">Business</th>
-                  <th scope="col" class="d-none d-sm-table-cell">Owner</th>
-                  <th scope="col">Expiry</th>
-                  <th scope="col" class="text-end">Action</th>
+                  <th>Business</th><th class="d-none d-sm-table-cell">Owner</th><th>Expiry</th><th class="text-end">Action</th>
                 </tr>
               </thead>
-              <tbody id="bizTableBody">
-                {% for b in expiring_businesses %}
+              <tbody id="bizTableBody">{% for b in expiring_businesses %}
                 <tr>
-                  <td>
-                    <div class="fw-semibold">{{ b.name }}</div>
-                    <div class="small text-muted">{{ b.address }}</div>
-                  </td>
+                  <td><div class="fw-semibold">{{ b.name }}</div><div class="small text-muted">{{ b.address }}</div></td>
                   <td class="d-none d-sm-table-cell">{{ b.owner }}</td>
                   <td><span class="badge rounded-pill status-badge status-processing">{{ b.expiry }}</span></td>
-                  <td class="text-end">
-                    <a href="{% url 'clerk:business_detail' b.id %}" class="btn btn-sm btn-outline-brand">{% bs_icon 'eye' %} View</a>
-                  </td>
+                  <td class="text-end"><a href="{% url 'clerk:business_detail' b.id %}" class="btn btn-sm btn-outline-brand">{% bs_icon 'eye' %} View</a></td>
                 </tr>
-                {% empty %}
-                <!-- JS fills demo -->
-                {% endfor %}
-              </tbody>
+              {% empty %}{% endfor %}</tbody>
             </table>
           </div>
         </div>
@@ -350,32 +327,189 @@
     </div>
   </div>
 
-  {# Optional JSON payload for charts (server data). If not present, JS uses defaults. #}
   {% if dashboard_json %}
     {{ dashboard_json|json_script:"dash-data" }}
   {% endif %}
 
-  <!-- INLINE, ZERO-DEPENDENCY CHARTS (ensures a LINE GRAPH always renders) -->
+  <!-- Inline, zero-dependency charts (professional line chart + donut, responsive) -->
   <script>
   (function(){
     const css = getComputedStyle(document.documentElement);
     const pick = k => (css.getPropertyValue(k)||'').trim();
+    const BRAND700 = pick('--brand-700') || '#6d2932';
     const BRAND600 = pick('--brand-600') || '#6d2932';
     const BRAND500 = pick('--brand-500') || '#561c24';
     const BRAND300 = pick('--brand-300') || '#e8d8c4';
-    const NEUTRAL300 = pick('--neutral-300') || '#d1d5db';
-    const NEUTRAL500 = pick('--neutral-500') || '#6b7280';
+    const NEU300 = pick('--neutral-300') || '#d1d5db';
+    const NEU500 = pick('--neutral-500') || '#6b7280';
     const hide = sel => document.querySelector(sel)?.classList.add('hidden');
 
-    // Demo payload if server didn't pass any
+    // Data (server json or demo)
     const dashEl = document.getElementById('dash-data');
     const dash = dashEl ? JSON.parse(dashEl.textContent) : {
       requestsTrend: { labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], data:[12,18,21,15,27,23,30] },
       statusBreakdown: { labels:['Pending','Processing','Approved','Rejected'], data:[18,9,22,3] }
     };
 
-    // Fill lists/tables if empty (so UI looks complete)
-    const verifHost = document.getElementById('verifList');
+    // Nice axis helpers
+    function niceNum(range, round){
+      const exp = Math.floor(Math.log10(range || 1));
+      const f = range / Math.pow(10, exp);
+      let nf;
+      if (round){
+        if (f < 1.5) nf = 1; else if (f < 3) nf = 2; else if (f < 7) nf = 5; else nf = 10;
+      } else {
+        if (f <= 1) nf = 1; else if (f <= 2) nf = 2; else if (f <= 5) nf = 5; else nf = 10;
+      }
+      return nf * Math.pow(10, exp);
+    }
+    function niceScale(min, max, tickCount=5){
+      let range = niceNum(max-min, false);
+      const step = niceNum(range/(tickCount-1), true);
+      const niceMin = Math.floor(min/step)*step;
+      const niceMax = Math.ceil(max/step)*step;
+      const ticks = [];
+      for (let v = niceMin; v <= niceMax + 1e-9; v += step) ticks.push(v);
+      return {niceMin,niceMax,step,ticks};
+    }
+    function fmt(v){ return Math.round(v*10)/10; }
+
+    // Professional line chart
+    function drawLine(canvas, labels, series){
+      if (!canvas) return;
+      const dpr = devicePixelRatio||1;
+      // make canvas fill container
+      canvas.style.width='100%'; canvas.style.height='100%';
+      const W = canvas.clientWidth||600, H = canvas.clientHeight||320;
+      canvas.width = W*dpr; canvas.height=H*dpr;
+      const ctx = canvas.getContext('2d'); ctx.scale(dpr,dpr);
+
+      // margins (room for y labels)
+      const m = {l:48, r:18, t:18, b:32};
+      const x0=m.l, x1=W-m.r, y0=H-m.b, y1=m.t;
+
+      const data = series.slice();
+      const minV = Math.min(...data), maxV = Math.max(...data);
+      const pad = (maxV-minV) * 0.1 || 1;
+      const scale = niceScale(minV-pad, maxV+pad, 5);
+      const range = scale.niceMax - scale.niceMin;
+
+      // grid + y labels
+      ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif';
+      ctx.textAlign='right'; ctx.textBaseline='middle';
+      ctx.fillStyle = NEU500; ctx.strokeStyle = NEU300; ctx.lineWidth = 1;
+      scale.ticks.forEach(t=>{
+        const y = y0 - ( (t - scale.niceMin)/range )*(y0-y1);
+        ctx.globalAlpha=.6; ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x1,y); ctx.setLineDash([3,3]); ctx.stroke();
+        ctx.setLineDash([]); ctx.globalAlpha=1; ctx.fillText(fmt(t), x0 - 8, y);
+      });
+
+      // x ticks
+      const n = data.length;
+      ctx.textAlign='center'; ctx.textBaseline='top'; ctx.fillStyle=NEU500;
+      labels.forEach((lbl,i)=>{
+        const x = x0 + (x1-x0)*(i/(Math.max(n-1,1)));
+        if (n <= 10 || i%Math.ceil(n/7)===0) ctx.fillText(lbl, x, y0+8);
+      });
+
+      // points coords
+      const pts = data.map((v,i)=>({
+        x: x0 + (x1-x0)*(i/(Math.max(n-1,1))),
+        y: y0 - ((v - scale.niceMin)/range)*(y0-y1),
+        v
+      }));
+
+      // gradient fill
+      const grad = ctx.createLinearGradient(0,y1,0,y0);
+      grad.addColorStop(0, BRAND300);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.moveTo(x0,y0);
+      pts.forEach(p=>ctx.lineTo(p.x,p.y));
+      ctx.lineTo(x1,y0); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
+
+      // smooth line
+      ctx.strokeStyle = BRAND700; ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i=0;i<pts.length;i++){
+        const p = pts[i];
+        if (i===0) ctx.moveTo(p.x,p.y);
+        else {
+          const prev = pts[i-1];
+          const cx = (prev.x+p.x)/2;
+          ctx.quadraticCurveTo(prev.x, prev.y, cx, p.y);
+        }
+      }
+      ctx.stroke();
+
+      // average dashed line
+      const avg = data.reduce((a,b)=>a+b,0)/n;
+      const yAvg = y0 - ((avg - scale.niceMin)/range)*(y0-y1);
+      ctx.save(); ctx.setLineDash([6,6]); ctx.strokeStyle = BRAND500; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(x0,yAvg); ctx.lineTo(x1,yAvg); ctx.stroke(); ctx.restore();
+
+      // data points
+      ctx.fillStyle = BRAND700;
+      pts.forEach(p=>{ ctx.beginPath(); ctx.arc(p.x,p.y,2.5,0,Math.PI*2); ctx.fill(); });
+
+      // simple tooltip
+      const tip = document.createElement('div');
+      tip.style.cssText = 'position:absolute;padding:6px 8px;background:#fff;border:1px solid var(--border);color:#111;font:12px system-ui;border-radius:8px;box-shadow:var(--shadow);pointer-events:none;transform:translate(-50%,-140%);white-space:nowrap;display:none;';
+      canvas.parentElement.appendChild(tip);
+
+      function nearest(x){
+        let best=0, bestDx=1e9;
+        pts.forEach((p,i)=>{ const dx=Math.abs(p.x-x); if(dx<bestDx){best=i;bestDx=dx;} });
+        return best;
+      }
+      function showTip(i){
+        const p = pts[i]; if(!p) return;
+        tip.style.left = p.x+'px'; tip.style.top = p.y+'px';
+        tip.textContent = `${labels[i]} • ${fmt(p.v)}`;
+        tip.style.display='block';
+      }
+      function hideTip(){ tip.style.display='none'; }
+
+      canvas.onmousemove = (e)=>{
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left) * (canvas.width / rect.width) / (devicePixelRatio||1);
+        showTip(nearest(x));
+      };
+      canvas.onmouseleave = hideTip;
+
+      // redraw on resize
+      const ro = new ResizeObserver(()=>drawLine(canvas, labels, series));
+      ro.observe(canvas.parentElement);
+    }
+
+    // Donut
+    function drawDonut(canvas, labels, data, colors){
+      if (!canvas) return;
+      const dpr=devicePixelRatio||1;
+      canvas.style.width='100%'; canvas.style.height='100%';
+      const W=canvas.clientWidth||600, H=canvas.clientHeight||320;
+      canvas.width=W*dpr; canvas.height=H*dpr; const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+
+      const cx=W/2, cy=H/2, R=Math.min(W,H)/2-10, cut=R*0.62;
+      const total = data.reduce((a,b)=>a+b,0) || 1;
+      let a0=-Math.PI/2;
+      data.forEach((v,i)=>{
+        const a1=a0+(v/total)*Math.PI*2;
+        ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,a0,a1); ctx.closePath();
+        ctx.fillStyle=colors[i%colors.length]; ctx.fill(); a0=a1;
+      });
+      ctx.globalCompositeOperation='destination-out';
+      ctx.beginPath(); ctx.arc(cx,cy,cut,0,Math.PI*2); ctx.fill();
+      ctx.globalCompositeOperation='source-over';
+
+      document.getElementById('statusLegend').innerHTML =
+        labels.map((t,i)=>`<span class="legend-dot" style="--dot:${colors[i%colors.length]}"></span><span class="legend-label">${t}</span>`).join('');
+
+      const ro = new ResizeObserver(()=>drawDonut(canvas, labels, data, colors));
+      ro.observe(canvas.parentElement);
+    }
+
+    // Fill lists/tables with demo if empty (so the whole UI is visible)
+    const verifHost=document.getElementById('verifList');
     if (verifHost && !verifHost.querySelector('.item-row')) {
       verifHost.innerHTML = [
         {n:'Juan Dela Cruz', s:'ePhilID • 5m ago', st:'Pending'},
@@ -386,7 +520,7 @@
         <span class="badge rounded-pill status-badge status-${v.st.toLowerCase()}">${v.st}</span>
       </div>`).join('');
     }
-    const reqHost = document.getElementById('reqList');
+    const reqHost=document.getElementById('reqList');
     if (reqHost && !reqHost.querySelector('.item-row')) {
       reqHost.innerHTML = [
         {d:'Barangay Clearance', w:'Juan Dela Cruz', c:'RES-00123', st:'Pending'},
@@ -398,7 +532,7 @@
         </div><div class="small text-muted">${r.w} — ${r.c}</div>
       </div>`).join('');
     }
-    const bizBody = document.getElementById('bizTableBody');
+    const bizBody=document.getElementById('bizTableBody');
     if (bizBody && !bizBody.querySelector('tr')) {
       bizBody.innerHTML = [
         {n:'Velasco Sari-sari Store', o:'Rico Velasco', a:'Purok Kanipaan, Sto. Niño', e:'Oct 05'},
@@ -411,94 +545,18 @@
       </tr>`).join('');
     }
 
-    // Draw once canvas has layout size
-    function whenSized(canvas, fn){
-      let tries=0;
-      (function tick(){
-        if (canvas && canvas.clientWidth>0 && canvas.clientHeight>0) fn();
-        else if (tries++<40) setTimeout(tick,50);
-        else fn();
-      })();
-    }
-
-    function drawLine(canvas, labels, data, stroke, fill){
-      if (!canvas) return;
-      const dpr = devicePixelRatio||1;
-      const W = canvas.clientWidth||600, H = canvas.clientHeight||300;
-      canvas.width = W*dpr; canvas.height = H*dpr;
-      const ctx = canvas.getContext('2d'); ctx.scale(dpr,dpr);
-      const m={l:36,r:14,t:16,b:26}, x0=m.l, x1=W-m.r, y0=H-m.b, y1=m.t;
-
-      // grid
-      ctx.strokeStyle=NEUTRAL300; ctx.lineWidth=1; ctx.globalAlpha=.6;
-      for(let i=0;i<=4;i++){ const y=y0-(y0-y1)*i/4; ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x1,y); ctx.stroke(); }
-      ctx.globalAlpha=1;
-
-      const max=Math.max(...data,1);
-      const pts=data.map((v,i)=>({ x:x0+(x1-x0)*(i/Math.max(data.length-1,1)), y:y0-(y0-y1)*(v/max) }));
-
-      // area
-      ctx.beginPath(); ctx.moveTo(x0,y0);
-      pts.forEach(p=>ctx.lineTo(p.x,p.y));
-      ctx.lineTo(x1,y0); ctx.closePath();
-      ctx.fillStyle=fill; ctx.fill();
-
-      // smooth line
-      ctx.strokeStyle=stroke; ctx.lineWidth=2; ctx.beginPath();
-      for(let i=0;i<pts.length;i++){
-        const p=pts[i];
-        if(i===0) ctx.moveTo(p.x,p.y);
-        else { const q=pts[i-1]; const cx=(q.x+p.x)/2; ctx.quadraticCurveTo(q.x,q.y,cx,p.y); }
-      }
-      ctx.stroke();
-    }
-
-    function drawDonut(canvas, labels, data, colors){
-      if (!canvas) return;
-      const dpr=devicePixelRatio||1;
-      const W=canvas.clientWidth||400, H=canvas.clientHeight||300;
-      canvas.width=W*dpr; canvas.height=H*dpr;
-      const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
-
-      const cx=W/2, cy=H/2, R=Math.min(W,H)/2-10, cut=R*0.62;
-      const total=data.reduce((a,b)=>a+b,0)||1;
-      let a0=-Math.PI/2;
-      data.forEach((v,i)=>{
-        const a1=a0+(v/total)*Math.PI*2;
-        ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,a0,a1); ctx.closePath();
-        ctx.fillStyle=colors[i%colors.length]; ctx.fill(); a0=a1;
-      });
-      ctx.globalCompositeOperation='destination-out';
-      ctx.beginPath(); ctx.arc(cx,cy,cut,0,Math.PI*2); ctx.fill();
-      ctx.globalCompositeOperation='source-over';
-    }
-
-    function legend(el, labels, colors){
-      if (!el) return;
-      el.innerHTML = labels.map((t,i)=>`
-        <span class="legend-dot" style="--dot:${colors[i%colors.length]}"></span>
-        <span class="legend-label">${t}</span>`).join('');
-    }
-
-    // LINE GRAPH (guaranteed)
+    // Draw charts (line maximizes space)
     const lineCanvas=document.getElementById('requestsTrend');
-    whenSized(lineCanvas, ()=>{
-      drawLine(lineCanvas, dash.requestsTrend.labels, dash.requestsTrend.data, BRAND600, BRAND300);
-      hide('.chart-skel-req');
-    });
+    drawLine(lineCanvas, dash.requestsTrend.labels, dash.requestsTrend.data);
+    hide('.chart-skel-req');
 
-    // DONUT
     const donutCanvas=document.getElementById('statusBreakdown');
-    const palette=[BRAND600,BRAND500,BRAND300,NEUTRAL300];
-    whenSized(donutCanvas, ()=>{
-      drawDonut(donutCanvas, dash.statusBreakdown.labels, dash.statusBreakdown.data, palette);
-      legend(document.getElementById('statusLegend'), dash.statusBreakdown.labels, palette);
-      hide('.chart-skel-status');
-    });
+    const palette=[BRAND700, BRAND500, BRAND300, NEU300];
+    drawDonut(donutCanvas, dash.statusBreakdown.labels, dash.statusBreakdown.data, palette);
+    hide('.chart-skel-status');
   })();
   </script>
 </div>
 {% endblock %}
 
-{# keep this block for future use; no dependency on it for charts #}
 {% block extra_js %}{% endblock %}

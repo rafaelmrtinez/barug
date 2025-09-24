@@ -602,6 +602,7 @@ def dashboard(request: HttpRequest):
     auth = request.session.get("auth")
     profile = getattr(request, "person_profile", None)
     return render(request, "clerk/dashboard.html", {
+        "page_path": f"Barangay Clerk/Dashboard",
         "page_title": "Dashboard",
         "profile": profile,
         "auth": auth
@@ -1171,13 +1172,13 @@ def business_details(request: HttpRequest) -> HttpResponse:
     BUCKET = getattr(settings, "SUPABASE_BUCKET", None)
     if not BUCKET:
         messages.error(request, "Storage bucket is not configured. Set SUPABASE_BUCKET in settings.")
-        return redirect("business_owner_resident")
+        return redirect("clerk:business_owner_resident")
 
     draft = _get_draft(request)
     owner_person_id = draft.get("owner_person_id")
     if not owner_person_id:
         messages.warning(request, "Please choose a resident owner first.")
-        return redirect("business_owner_resident")
+        return redirect("clerk:business_owner_resident")
 
     form = BusinessDetails(request.POST or None, request.FILES or None)
 
@@ -1304,7 +1305,7 @@ def business_details(request: HttpRequest) -> HttpResponse:
 def business_registration_reset(request: HttpRequest) -> HttpResponse:
     _clear_draft(request)
     messages.info(request, "Registration draft cleared.")
-    return redirect("business_owner_resident")
+    return redirect("clerk:business_owner_resident")
 
 @session_login_required
 @role_required("Barangay Clerk")
