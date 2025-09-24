@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block css %}
-    <link rel="stylesheet" href="{% static 'css/button.css' %}">
+  <link rel="stylesheet" href="{% static 'css/button.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -27,12 +27,12 @@
         <div class="small fw-medium mb-2">Is the staff member a resident of the barangay?</div>
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
           <p class="small text-muted mb-0">
-            Choose <span class="fw-semibold text-dark">Resident</span> and search by Resident ID or name.  
+            Choose <span class="fw-semibold text-dark">Resident</span> and search by Resident ID or name.
             Choose <span class="fw-semibold text-dark">Non-resident</span> and add details manually.
           </p>
           <div class="d-flex gap-2">
-            <a type="button" class="btn btn-submit btn-sm" href="{% url 'secretary:staff_selection_resident' %}">Resident</a>
-            <a type="reset" class="btn btn-reset btn-sm" href="{% url 'secretary:staff_selection_non-resident' %}">Non-Resident</a>
+            <a class="btn btn-submit btn-sm" href="{% url 'secretary:staff_selection_resident' %}">Resident</a>
+            <a class="btn btn-reset btn-sm" href="{% url 'secretary:staff_selection_non-resident' %}">Non-Resident</a>
           </div>
         </div>
       </div>

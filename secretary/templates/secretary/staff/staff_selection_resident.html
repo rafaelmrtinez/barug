@@ -5,7 +5,6 @@
 {% block css %}
   <link rel="stylesheet" href="{% static 'css/button.css' %}">
   <link rel="stylesheet" href="{% static 'css/form.css' %}">
-  <!-- for .section-title, .kv, .doc-carousel, etc. -->
   <link rel="stylesheet" href="{% static 'css/submission_dets.css' %}">
 {% endblock %}
 
@@ -29,7 +28,8 @@
         Search for a resident in the barangay records and assign them as a staff account.
       </p>
 
-      <form id="controlsForm1" method="post">
+      <!-- Form #1: search/select (POST to same view) -->
+      <form id="controlsForm1" method="post" action="{% url 'secretary:staff_selection_resident' %}">
         {% csrf_token %}
         <div class="rounded-3 border bg-light p-3">
           <label class="form-label small">Find Resident Record</label>
@@ -47,18 +47,15 @@
 
             <!-- dropdown -->
             <div id="residentDropdown"
-                class="list-group position-absolute w-100 shadow-sm d-none"
-                style="top: 100%; left: 0; z-index: 1070; max-height: 250px; overflow:auto;">
+                 class="list-group position-absolute w-100 shadow-sm d-none"
+                 style="top: 100%; left: 0; z-index: 1070; max-height: 250px; overflow:auto;">
             </div>
 
-            <!-- the selected person id goes here -->
+            <!-- the selected person id goes here (used by backend to fetch details) -->
             <input type="hidden" name="person_id" id="person_id">
           </div>
 
           <div class="form-text">Enter the Resident ID or name, then review the resident details below.</div>
-          <!-- <div class="mt-3 d-flex justify-content-end">
-            <button type="submit" class="btn btn-submit btn-sm">Search</button>
-          </div> -->
         </div>
       </form>
 
@@ -76,7 +73,6 @@
 
             <hr class="my-3">
 
-            <!-- Two columns aligned like your screenshot -->
             <div class="row g-4 align-items-start">
               <!-- Personal Information (left) -->
               <div class="col-12 col-md-6">
@@ -91,14 +87,16 @@
                   <div class="kv-item"><span class="kv-key">Civil Status</span><span class="kv-val">{{ res_details.civil_status|default:"—" }}</span></div>
                   <div class="kv-item"><span class="kv-key">Nationality</span><span class="kv-val">{{ res_details.nationality|default:"—" }}</span></div>
                   <div class="kv-item"><span class="kv-key">Religion</span><span class="kv-val">{{ res_details.religion|default:"—" }}</span></div>
-                  <div class="kv-item"><span class="kv-key">Home Address</span>
-                    <span class="kv-val">{{ res_details.street_name|default:"—" }}, {{ res_details.purok_sitio_name|default:"—" }}, {{ res_details.barangay_name|default:"—" }},
+                  <div class="kv-item">
+                    <span class="kv-key">Home Address</span>
+                    <span class="kv-val">
+                      {{ res_details.street_name|default:"—" }},
+                      {{ res_details.purok_sitio_name|default:"—" }},
+                      {{ res_details.barangay_name|default:"—" }},
                       {{ res_details.city_name|default:"—" }}
                     </span>
                   </div>
-                  <div class="kv-item"><span class="kv-key">Email Address</span>
-                    <span class="kv-val">{{ res_details.email|default:"—" }}</span>
-                  </div>
+                  <div class="kv-item"><span class="kv-key">Email Address</span><span class="kv-val">{{ res_details.email|default:"—" }}</span></div>
                   <div class="kv-item"><span class="kv-key">Mobile Number</span><span class="kv-val">{{ res_details.mobile_num|default:"—" }}</span></div>
                 </div>
               </div>
@@ -147,11 +145,9 @@
                       </div>
                     </div>
 
-                    <!-- Controls outside the image bounds -->
                     <button class="carousel-control-prev doc-control" type="button" data-bs-target="#staffDocCarousel" data-bs-slide="prev" aria-label="Previous">
                       <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
                     </button>
-
                     <button class="carousel-control-next doc-control" type="button" data-bs-target="#staffDocCarousel" data-bs-slide="next" aria-label="Next">
                       <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
                     </button>
@@ -177,18 +173,18 @@
                 {{ res_details.last_name|default:"—" }}
               </strong>
             </div>
-            <a href="#" class="small text-decoration-none" style="color: var(--bs-danger-text-emphasis);">Change</a>
+            <a href="{% url 'secretary:staff_selection_resident' %}" class="small text-decoration-none" style="color: var(--bs-danger-text-emphasis);">Change</a>
           </div>
         </div>
       </div>
 
+      <!-- Form #2: create request (Continue) -->
       <form id="controlsForm2" method="post" action="{% url 'secretary:staff_selection_resident' %}">
         {% csrf_token %}
-        <input type="hidden" name="pid" id="pid"
-              value="{{ res_details.person_id|default_if_none:'' }}"> <!-- <<< CHANGED -->
+        <input type="hidden" name="pid" id="pid" value="{{ res_details.person_id|default_if_none:'' }}">
         <div class="mt-3 button-container justify-content-end mb-2 d-flex gap-2">
-          <button type="button" class="btn btn-reset">Back</button>
-          <button type="submit" class="btn btn-submit">Continue</button>
+          <a class="btn btn-reset" href="{% url 'secretary:staff_selection' %}">Back</a>
+          <button type="submit" id="continueBtn" class="btn btn-submit">Continue</button>
         </div>
       </form>
 
@@ -196,14 +192,19 @@
   </div>
 </div>
 
-
 <script>
 (function(){
-  const input  = document.getElementById('residentSearch');
-  const dd     = document.getElementById('residentDropdown');
-  const hid    = document.getElementById('person_id');
-  let timer    = null;
-  let aborter  = null;
+  const input   = document.getElementById('residentSearch');
+  const dd      = document.getElementById('residentDropdown');
+  const pid     = document.getElementById('pid');
+  const contBtn = document.getElementById('continueBtn');
+  let timer     = null;
+  let aborter   = null;
+
+  function setContinueState() {
+    if (!contBtn) return;
+    contBtn.disabled = !(pid && pid.value && pid.value.trim().length > 0);
+  }
 
   function debounce(fn, wait) {
     return (...args) => {
@@ -223,7 +224,7 @@
       empty.className = 'list-group-item disabled text-muted';
       empty.textContent = 'No resident(s) found';
       dd.appendChild(empty);
-      show();     // <- show the dropdown even when empty
+      show();
       return;
     }
 
@@ -240,12 +241,12 @@
       a.addEventListener('click', (e) => {
         e.preventDefault();
         input.value = label;
-        document.getElementById('person_id').value   = it.id || '';
-        document.getElementById('pid').value       = it.id || '';
+        // set both person_id (for details fetch) and pid (for the Continue form)
+        document.getElementById('person_id').value = it.id || '';
+        pid.value = it.id || '';
         hide();
-        input.form.submit();
-        // alert(it.id)
-
+        // Submit Form #1 to refresh details
+        document.getElementById('controlsForm1').submit();
       });
       dd.appendChild(a);
     });
@@ -271,16 +272,18 @@
     }
   }, 250);
 
-  input.addEventListener('input', (e) => search(e.target.value));
+  // Events
+  if (input) {
+    input.addEventListener('input', (e) => search(e.target.value));
+    input.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+  }
+  document.addEventListener('click', (e) => { if (!dd.contains(e.target) && e.target !== input) hide(); });
 
-  document.addEventListener('click', (e) => {
-    if (!dd.contains(e.target) && e.target !== input) hide();
-  });
+  // Initialize Continue button state on load
+  setContinueState();
+  // Also update when pid changes
+  document.addEventListener('input', (e) => { if (e.target && e.target.id === 'pid') setContinueState(); });
 
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') hide();
-  });
 })();
 </script>
 {% endblock %}
-
