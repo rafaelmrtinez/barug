@@ -31,8 +31,6 @@ user_role_template = user_role.lower().replace(' ', '_')
 @require_GET
 def staff_selection(request: HttpRequest) -> HttpResponse:
     return render(request, "staff/staff_selection.html", {
-        'user_fullname': user_fullname,
-        'user_role': user_role,
         'page_path': f'{user_role} / Account Verification',
         'page_title': 'Account Verification',
         'user_role_template': user_role_template,

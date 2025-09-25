@@ -61,7 +61,6 @@
         </div>
       </form>
 
-
       <!-- Results: card list style -->
       <div class="mt-4">
         {% if q and results %}
@@ -84,7 +83,7 @@
                     </div>
                   </div>
 
-                  <!-- keep your existing POST selection button exactly as before -->
+                  <!-- POST: selection -->
                   <form method="post" class="ms-2">
                     {% csrf_token %}
                     <input type="hidden" name="owner_person_id" value="{{ r.person_id }}">
@@ -144,7 +143,6 @@
                   <div class="small text-muted">Address</div>
                   <div class="fw-semibold">
                     {% if selected %}
-                      {# Build a readable address with commas only where values exist #}
                       {% with st=selected.street sp=selected.sitio_purok br=selected.barangay ct=selected.city %}
                         {% if st %}{{ st }}{% endif %}
                         {% if sp %}{% if st %}, {% endif %}{{ sp }}{% endif %}
@@ -193,13 +191,12 @@
                     {% if selected.middle_name %} {{ selected.middle_name|slice:":1"|upper }}.{% endif %}
                     {% if selected.suffix %} {{ selected.suffix|upper }}{% endif %}
                   {% endif %}
-                  —
-                  {{ selected.person_code }}
+                  — {{ selected.person_code }}
                 </strong>
               </div>
               <a href="{% url 'clerk:business_owner_resident' %}?clear=1"
-                class="small text-decoration-none"
-                style="color: var(--bs-danger-text-emphasis);">
+                 class="small text-decoration-none"
+                 style="color: var(--bs-danger-text-emphasis);">
                 Change
               </a>
             </div>
@@ -214,4 +211,34 @@
     </section>
   </div>
 </div>
+
+<!-- ✨ Client-side form debug: logs every submit (GET & POST) to the browser console -->
+<script>
+(() => {
+  function formToJSON(form) {
+    const fd = new FormData(form);
+    const out = {};
+    for (const [k, v] of fd.entries()) {
+      if (Object.prototype.hasOwnProperty.call(out, k)) {
+        if (Array.isArray(out[k])) out[k].push(v);
+        else out[k] = [out[k], v];
+      } else {
+        out[k] = v;
+      }
+    }
+    return out;
+  }
+
+  document.querySelectorAll("form").forEach((f) => {
+    f.addEventListener("submit", function () {
+      try {
+        const data = formToJSON(f);
+        console.log(`[FORM DEBUG] ${f.method.toUpperCase()} ${f.action || location.pathname}`, data);
+      } catch (e) {
+        console.log("[FORM DEBUG] failed to serialize", e);
+      }
+    }, { capture: true });
+  });
+})();
+</script>
 {% endblock %}

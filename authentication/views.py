@@ -105,6 +105,7 @@ def login(request):
             "login_at": timezone.now().isoformat(),
         }
         request.session.set_expiry(60 * 60 * 8)
+        print(request.session.items())
 
         # Clear rate-limit counter
         cache.delete(rl_key)

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import datetime as dt
-
 from uuid import uuid4
 
 from typing import Any, Dict, List, Optional, Optional, Tuple
@@ -78,6 +77,44 @@ def _debug_email_preview(subject: str, to_list: List[Any], body_txt: str, body_h
     except Exception as e:
         logger.warning("Failed to print email preview: %s", e)
 
+# ---------- NEW: generic request debug printers ----------
+def _debug_print_post(request: HttpRequest, label: str = "") -> None:
+    """Pretty-print POST + FILES so you see exactly what arrived."""
+    try:
+        payload = {
+            "label": label or request.path,
+            "method": request.method,
+            "path": request.path,
+            "POST_single": request.POST.dict(),  # last value per key (typical usage)
+            "POST_multi": {k: v for k, v in request.POST.lists()},  # all values per key
+            "FILES": [
+                {
+                    "field": name,
+                    "name": getattr(f, "name", None),
+                    "content_type": getattr(f, "content_type", None),
+                    "size": getattr(f, "size", None),
+                }
+                for name, f in request.FILES.items()
+            ],
+        }
+        print("[DEBUG POST]", json.dumps(payload, indent=2, default=str))
+    except Exception as e:
+        print(f"[DEBUG POST] failed to serialize ({label}): {e}")
+
+def _debug_print_get(request: HttpRequest, label: str = "") -> None:
+    """Pretty-print GET query string (useful for search submits)."""
+    try:
+        payload = {
+            "label": label or request.path,
+            "method": request.method,
+            "path": request.path,
+            "GET": request.GET.dict(),
+            "GET_multi": {k: v for k, v in request.GET.lists()},
+        }
+        print("[DEBUG GET]", json.dumps(payload, indent=2, default=str))
+    except Exception as e:
+        print(f"[DEBUG GET] failed to serialize ({label}): {e}")
+
 # =========================
 # UI helpers / constants
 # =========================
@@ -107,9 +144,6 @@ def _staff_id(request: HttpRequest) -> int | None:
 # ---------------------------------------------------------------------
 # Email-related helpers
 # ---------------------------------------------------------------------
-# --- add this helper near your email helpers ---
-
-# --- add this helper near your email helpers ---
 def _resolve_person_id_from_header(header: Dict[str, Any]) -> Optional[int]:
     """
     Find the most appropriate person_id in the header payload.
@@ -187,8 +221,6 @@ def _send_ready_for_pickup_email(header: Dict[str, Any], lines: List[Dict[str, A
         logger.exception("send_email raised")
         return False, f"Email not sent: {e}"
 
-
-
 def _lookup_person_contact(person_id: Optional[int]) -> Tuple[Optional[str], Optional[str]]:
     """Return (full_name, email) for a given person_id from the `person` table."""
     if not person_id:
@@ -208,8 +240,6 @@ def _lookup_person_contact(person_id: Optional[int]) -> Tuple[Optional[str], Opt
         last  = (row.get("last_name") or "").strip()
         full  = f"{first} {last}".strip() or None
         email = (row.get("email") or "").strip() or None
-
-        # --- DEBUG print ---
         print(f"[EMAIL DEBUG] lookup person_id={person_id} -> full_name={full!r}, email={email!r}")
         return full, email
     except Exception as e:
@@ -221,10 +251,7 @@ def _lookup_person_contact(person_id: Optional[int]) -> Tuple[Optional[str], Opt
 _DOC_TYPES_ALL_CACHE: List[str] = []
 
 def _fetch_doc_types_all() -> List[str]:
-    """
-    Get the full list of document type names for the filter panel.
-    Falls back to [] if the query fails.
-    """
+    """Get the full list of document type names for the filter panel."""
     global _DOC_TYPES_ALL_CACHE
     if _DOC_TYPES_ALL_CACHE:
         return _DOC_TYPES_ALL_CACHE
@@ -246,7 +273,6 @@ def _fetch_doc_types_all() -> List[str]:
         logger.warning("Failed to fetch doc types list: %s", e)
         return []
 
-
 # =========================
 # Clerk — Queue / List of document requests
 # =========================
@@ -262,8 +288,7 @@ def queue(request: HttpRequest):
         raw = (request.GET.get("status") or "").strip()
         statuses = [s for s in raw.split(",") if s] if raw else CLERK_STATUSES_ALL[:2]
 
-    # ----- Document type filters (NEW) -----
-    # Accepts repeated ?doc_type=… or a single comma-separated ?doc_type=A,B
+    # ----- Document type filters -----
     doc_types = request.GET.getlist("doc_type")
     if not doc_types:
         raw_dt = (request.GET.get("doc_type") or "").strip()
@@ -275,23 +300,18 @@ def queue(request: HttpRequest):
         .select("*")
         .order("doc_request_id", desc=True)
     )
-
     if statuses:
         query = query.in_("status", statuses)
 
     if q:
-        # simple overlap probe for array columns doc_types/purposes
-        # Note: if q has commas, PostgREST ov set parsing won't like it; keep as-is for now
         array_probe = "{" + q + "}"
         query = query.or_(
             f"request_code.ilike.%{q}%,doc_types.ov.{array_probe},purposes.ov.{array_probe}"
         )
 
-    # Execute
     res = query.limit(200).execute()
     rows: List[Dict[str, Any]] = res.data or []
 
-    # In-memory filter by selected document types (overlap), case-insensitive
     if doc_types:
         selected = {str(d).strip().lower() for d in doc_types}
         def _overlaps(row: Dict[str, Any]) -> bool:
@@ -300,26 +320,22 @@ def queue(request: HttpRequest):
             return bool(have & selected)
         rows = [r for r in rows if _overlaps(r)]
 
-    # UI adornments
     for r in rows:
         r["status_ui"] = STATUS_UI.get(r.get("status")) or {
             "label": r.get("status") or "—",
             "cls": "badge text-bg-secondary",
         }
         r["purposes_display"] = [_titleize(p) for p in (r.get("purposes") or [])]
-
         fn = (r.get("requester_first_name") or r.get("first_name") or "").strip()
         ln = (r.get("requester_last_name") or r.get("last_name") or "").strip()
         full = (r.get("requester_full_name") or r.get("resident_name") or "").strip() or " ".join([fn, ln]).strip()
         r["requester_display"] = full or None
-
         created_at = r.get("created_at") or r.get("created_ts") or r.get("date_created")
         try:
             r["created_fmt"] = created_at.strftime("%b %d, %Y %H:%M")  # type: ignore
         except Exception:
             r["created_fmt"] = str(created_at)
 
-    # Get all doc types for the filter panel; fallback to what’s on this page if needed
     doc_types_all = _fetch_doc_types_all()
     if not doc_types_all:
         seen: set[str] = set()
@@ -339,9 +355,9 @@ def queue(request: HttpRequest):
         "q": q or "",
         "statuses": statuses,
         "statuses_all": CLERK_STATUSES_ALL,
-        "doc_types": doc_types,                 # NEW
-        "doc_types_all": doc_types_all,         # NEW
-        "active_count": len(statuses) + len(doc_types),  # NEW: show both in the badge
+        "doc_types": doc_types,
+        "doc_types_all": doc_types_all,
+        "active_count": len(statuses) + len(doc_types),
     })
 
 # =========================
@@ -399,7 +415,6 @@ def detail(request: HttpRequest, doc_request_id: int):
 @require_POST
 def mark_request_ready_for_pickup(request: HttpRequest, doc_request_id: int):
     print(f"[EMAIL DEBUG] mark_request_ready_for_pickup called for doc_request_id={doc_request_id}")
-    # Fetch minimal details first for email context
     try:
         bundle = _fetch_bundle(doc_request_id)
     except APIError as e:
@@ -581,22 +596,6 @@ def mark_released(request: HttpRequest, doc_request_id: int):
 
 @session_login_required
 @role_required(CLERK_ROLE)
-@require_POST
-def decline(request: HttpRequest, doc_request_id: int):
-    reason = (request.POST.get("reason") or "").strip() or None
-    err = _set_status(doc_request_id, "DECLINED", _staff_id(request), reason)
-    messages.error(request, f"Failed: {escape(err)}") if err else messages.success(request, "Request declined.")
-    return redirect("clerk:detail", doc_request_id=doc_request_id)
-
-# =========================
-# Identity verification
-# =========================
-STATUS_APPROVED = 3
-STATUS_REJECTED = 4
-STATUS_DECLINE  = 7
-
-@session_login_required
-@role_required(CLERK_ROLE)
 @nocache
 def dashboard(request: HttpRequest):
     auth = request.session.get("auth")
@@ -655,8 +654,8 @@ def person_submission_dets(request: HttpRequest, req_id: int):
 
     raw_dt = person.get("date_requested")
     try:
-        dt = datetime.fromisoformat(str(raw_dt).replace("Z", "+00:00"))
-        person["submitted_fmt"] = timezone.localtime(dt).strftime("%b %d, %Y %I:%M %p")
+        dtv = datetime.fromisoformat(str(raw_dt).replace("Z", "+00:00"))
+        person["submitted_fmt"] = timezone.localtime(dtv).strftime("%b %d, %Y %I:%M %p")
     except Exception:
         person["submitted_fmt"] = raw_dt or "—"
 
@@ -687,8 +686,6 @@ def person_submission_dets(request: HttpRequest, req_id: int):
         "person": person,
     })
 
-
-# --- AJAX helpers (same file as your walk-in views) ---
 from django.template.loader import render_to_string
 from django.http import JsonResponse
 
@@ -705,7 +702,6 @@ def ajax_purpose_options(request: HttpRequest):
     html = render_to_string("clerk/doc_req/_purpose_options.html", {"purposes": purposes})
     return HttpResponse(html)
 
-
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
@@ -720,7 +716,6 @@ def ajax_resident_search(request: HttpRequest):
         except Exception as e:
             logger.warning("ajax_resident_search RPC failed: %s", e)
             rows = []
-
     html = render_to_string("clerk/doc_req/_resident_results.html", {"residents": rows})
     return HttpResponse(html)
 
@@ -744,17 +739,12 @@ def ajax_purposes(request: HttpRequest):
 # =========================
 # Walk-in Document Request (Clerk)
 # =========================
-# --- Walk-in Request (Clerk) — request_document_type-first --------------------
 from typing import Any, Dict, List, Optional
 import json
 
-BRGY_BUSINESS_DOC_NAME = "BARANGAY BUSINESS CLEARANCE"  # must match your request_document_type_name
+BRGY_BUSINESS_DOC_NAME = "BARANGAY BUSINESS CLEARANCE"
 
 def _fetch_request_doc_types() -> List[Dict[str, Any]]:
-    """
-    Exactly mirrors the mobile `getDocumentTypes()`:
-    request_document_type(request_document_type_id, request_document_type_name)
-    """
     res = (
         supabase.table("request_document_type")
         .select("request_document_type_id, request_document_type_name")
@@ -764,11 +754,6 @@ def _fetch_request_doc_types() -> List[Dict[str, Any]]:
     return res.data or []
 
 def _fetch_purposes_by_request_type(req_doc_type_id: int) -> List[Dict[str, Any]]:
-    """
-    Mirrors mobile `getPurposesByDocumentType()`, but your `document_purpose`
-    already carries fee_item_id & default fields (per screenshot).
-    We join fee_item to expose flags and current_amount (used by the UI).
-    """
     q = (
         supabase.table("document_purpose")
         .select(
@@ -805,17 +790,8 @@ def _fetch_purposes_by_request_type(req_doc_type_id: int) -> List[Dict[str, Any]
 @role_required(CLERK_ROLE)
 @nocache
 def walkin_new(request: HttpRequest):
-    """
-    GET:
-      - ?q= search residents
-      - ?request_document_type_id= preselects doc type and loads purposes
-    """
     q = (request.GET.get("q") or "").strip()
-
-    # load document types for the dropdown
     doc_types = _fetch_request_doc_types()
-
-    # selected request_document_type_id (if any)
     try:
         chosen_req_type_id = int(request.GET.get("request_document_type_id") or 0) or None
     except Exception:
@@ -823,7 +799,6 @@ def walkin_new(request: HttpRequest):
 
     purposes = _fetch_purposes_by_request_type(chosen_req_type_id) if chosen_req_type_id else []
 
-    # simple resident search
     residents: List[Dict[str, Any]] = []
     if q:
         like = f"%{q}%"
@@ -839,7 +814,7 @@ def walkin_new(request: HttpRequest):
     return render(request, "clerk/walkin_request.html", {
         "q": q,
         "doc_types": doc_types,
-        "chosen_doc_type_id": chosen_req_type_id,  # template uses this name
+        "chosen_doc_type_id": chosen_req_type_id,
         "purposes": purposes,
         "residents": residents,
     })
@@ -848,11 +823,7 @@ def walkin_new(request: HttpRequest):
 @role_required(CLERK_ROLE)
 @require_POST
 def walkin_create(request: HttpRequest):
-    """
-    POST handler that builds the same payload the mobile sends into
-    `create_document_request`.
-    """
-    # 1) Subject / requester
+    # (kept) Already has comprehensive [WALKIN DEBUG] prints.
     try:
         requested_by = int(request.POST.get("requested_by_person_id") or 0)
     except Exception:
@@ -867,7 +838,6 @@ def walkin_create(request: HttpRequest):
     subject_id = on_behalf_of if (is_on_behalf_flag and on_behalf_of) else requested_by
     is_on_behalf = bool(subject_id and requested_by and subject_id != requested_by)
 
-    # 2) Optional business
     try:
         business_id = int(request.POST.get("business_id") or 0) or None
     except Exception:
@@ -875,7 +845,6 @@ def walkin_create(request: HttpRequest):
 
     purpose_notes = (request.POST.get("purpose_notes") or "").strip() or None
 
-    # 3) Lines (match mobile names)
     try:
         req_doc_type_id = int(request.POST.get("request_document_type_id") or 0) or None
     except Exception:
@@ -893,7 +862,6 @@ def walkin_create(request: HttpRequest):
         messages.error(request, "Please choose a document and a purpose.")
         return redirect(f"{request.path.replace('/create/','/')}?request_document_type_id={req_doc_type_id or ''}")
 
-    # Map document_purpose_id -> meta (for purpose_code & defaults)
     purpose_rows = {
         r["document_purpose_id"]: r
         for r in _fetch_purposes_by_request_type(req_doc_type_id)
@@ -921,11 +889,9 @@ def walkin_create(request: HttpRequest):
         meta = purpose_rows.get(dp_id) or {}
         details: Dict[str, Any] = {}
 
-        # persist purpose_code so the PDF/receipts can show it later
         if meta.get("purpose_code"):
             details["purpose_code"] = meta["purpose_code"]
 
-        # allow defaults to flow through (e.g., residency_kind, etc.)
         if meta.get("default_details"):
             details.update(meta["default_details"] or {})
 
@@ -936,16 +902,15 @@ def walkin_create(request: HttpRequest):
             "details": details,
         })
 
-    # Optional soft warning for Business Clearance without business_id
     try:
-        dt = (
+        dt_row = (
             supabase.table("request_document_type")
             .select("request_document_type_name")
             .eq("request_document_type_id", req_doc_type_id)
             .limit(1)
             .execute()
         )
-        name = ((dt.data or [{}])[0] or {}).get("request_document_type_name") or ""
+        name = ((dt_row.data or [{}])[0] or {}).get("request_document_type_name") or ""
         if name == BRGY_BUSINESS_DOC_NAME and not business_id:
             messages.warning(request, "Business ID is empty for Business Clearance. Treasurer may reject.")
     except Exception:
@@ -960,25 +925,16 @@ def walkin_create(request: HttpRequest):
         "lines": lines,
     }
 
-    # --- DEBUG: show exactly what we will send (client-shape) ---
     print("\n[WALKIN DEBUG] (client-shape) create_document_request payload:\n",
-        json.dumps({
-            "requested_by": requested_by,
-            "on_behalf_of": (subject_id if (is_on_behalf and subject_id) else None),
-            "is_on_behalf": is_on_behalf,
-            "business_id": business_id,
-            "purpose_notes": purpose_notes,
-            "lines": lines,
-        }, indent=2))
+        json.dumps(payload, indent=2))
 
-    # --- CALL THE RPC WITH THE NAMES YOUR FUNCTION EXPECTS ---
     rpc_args = {
         "p_requested_by": requested_by,
         "p_on_behalf_of": (subject_id if (is_on_behalf and subject_id) else None),
         "p_is_on_behalf": is_on_behalf,
         "p_business_id": business_id,
         "p_purpose_notes": purpose_notes,
-        "p_lines": lines,  # supabase client will JSON-encode this list into jsonb
+        "p_lines": lines,
     }
 
     print("[WALKIN DEBUG] (rpc-shape) args sent to create_document_request:\n",
@@ -993,7 +949,6 @@ def walkin_create(request: HttpRequest):
         messages.error(request, f"RPC failed: {e}")
         return redirect("clerk:walkin_new")
 
-    # Supabase can return a scalar or a 1-row list depending on driver
     if getattr(res, "error", None):
         messages.error(request, f"Supabase error: {escape(res.error.message)}")
         return redirect("clerk:walkin_new")
@@ -1005,7 +960,6 @@ def walkin_create(request: HttpRequest):
     elif isinstance(data, dict) and "doc_request_id" in data:
         new_id = data["doc_request_id"]
     else:
-        # plain scalar int
         new_id = data
 
     if not new_id:
@@ -1015,13 +969,9 @@ def walkin_create(request: HttpRequest):
     messages.success(request, f"Walk-in request created. ID: {new_id}")
     return redirect("clerk:detail", doc_request_id=new_id)
 
-
-
 # =========================
 # Business screens (stubs; clerk-only)
 # =========================
-# ─────────────────────────── helpers ───────────────────────────
-
 BIZ_DRAFT_KEY = "biz_reg_draft"
 
 def _auth_staff_id(request: HttpRequest) -> Optional[int]:
@@ -1047,11 +997,10 @@ def _js(v):
     if v is None:
         return None
     if isinstance(v, Decimal):
-        return float(v)                 # or str(v) if you prefer exact text
+        return float(v)
     if isinstance(v, (dt.date, dt.datetime, dt.time)):
-        return v.isoformat()            # 'YYYY-MM-DD', 'HH:MM:SS'
+        return v.isoformat()
     return v
-
 
 @session_login_required
 @role_required("Barangay Clerk")
@@ -1071,11 +1020,9 @@ def business_owner(request: HttpRequest):
     )
 
 # ───────────────────── step 1: pick existing owner ─────────────────────
-
 @session_login_required
 @role_required("Barangay Clerk")
 @nocache
-# @require_http_methods(["GET", "POST"])
 def business_owner_resident(request: HttpRequest) -> HttpResponse:
     user_role = _auth_role_name(request)
 
@@ -1087,23 +1034,31 @@ def business_owner_resident(request: HttpRequest) -> HttpResponse:
         messages.info(request, "Selection cleared.")
         return redirect("clerk:business_owner_resident")
 
-    # POST: selecting an owner (SearchBusinessOwner validates owner_person_id)
+    # POST debug (selection submit)
+    if request.method == "POST":
+        _debug_print_post(request, "business_owner_resident: select owner")
+
+    # GET: searching residents (debug when query present)
+    if request.method == "GET" and request.GET.get("search"):
+        _debug_print_get(request, "business_owner_resident: search GET")
+
     search_form = SearchBusinessOwner(request.GET or None)
     select_form = SelectOwnerForm(request.POST or None)
 
-    # POST: selecting an owner
     if request.method == "POST":
         if select_form.is_valid():
             owner_person_id = select_form.cleaned_data["owner_person_id"]
+            print("[OWNER LINK DEBUG] cleaned owner_person_id:", owner_person_id)
             draft = _get_draft(request)
             draft["owner_person_id"] = int(owner_person_id)
             _save_draft(request, draft)
+            print("[OWNER LINK DEBUG] draft saved:", json.dumps(draft, indent=2))
             messages.success(request, "Owner selected. Review details below or continue.")
             return redirect("clerk:business_owner_resident")
         else:
+            print("[OWNER LINK DEBUG] form.errors:", select_form.errors.as_json())
             messages.error(request, "Please select a resident owner.")
 
-    # GET: searching residents
     q = ""
     results: List[Dict[str, Any]] = []
     if search_form.is_bound and search_form.is_valid():
@@ -1111,12 +1066,10 @@ def business_owner_resident(request: HttpRequest) -> HttpResponse:
         if q:
             try:
                 resp = supabase.rpc("search_person_by_code_or_name", {"p_key": q}).execute()
-                # returns rows with keys: person_id, person_code, person_name, street, purok, barangay, city
                 results = resp.data or []
             except APIError as e:
                 messages.error(request, f"Search error: {getattr(e,'message',str(e))}")
 
-    # Load selected resident (if any)
     selected = None
     owner_person_id = (_get_draft(request) or {}).get("owner_person_id")
     if owner_person_id:
@@ -1133,17 +1086,16 @@ def business_owner_resident(request: HttpRequest) -> HttpResponse:
         {
             "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
             "page_title": "Business Owner Information",
-            "search_form": search_form,  # GET form
-            "select_form": select_form,  # POST form (not strictly needed in template)
-            "q": q,                # current query
-            "results": results,    # search results for rendering
-            "selected": selected,  # drives the details card
+            "search_form": search_form,
+            "select_form": select_form,
+            "q": q,
+            "results": results,
+            "selected": selected,
         },
     )
 
 def business_owner_nonresident(request: HttpRequest):
     user_role = (request.session.get("auth") or {}).get("role_name").title()
-
     form = BusinessOwnerInfo()
     return render(
         request,
@@ -1156,11 +1108,9 @@ def business_owner_nonresident(request: HttpRequest):
     )
 
 # ───────────────────── step 2: business details ─────────────────────
-
 @session_login_required
 @role_required("Barangay Clerk")
 @nocache
-# @require_http_methods(["GET", "POST"])
 def business_details(request: HttpRequest) -> HttpResponse:
     user_role = _auth_role_name(request)
     staff_id = _auth_staff_id(request)
@@ -1168,7 +1118,6 @@ def business_details(request: HttpRequest) -> HttpResponse:
         messages.error(request, "Missing staff context. Please log in again.")
         return redirect("login")
 
-    # bucket from settings (required)
     BUCKET = getattr(settings, "SUPABASE_BUCKET", None)
     if not BUCKET:
         messages.error(request, "Storage bucket is not configured. Set SUPABASE_BUCKET in settings.")
@@ -1183,10 +1132,20 @@ def business_details(request: HttpRequest) -> HttpResponse:
     form = BusinessDetails(request.POST or None, request.FILES or None)
 
     if request.method == "POST":
+        # 🔎 raw POST/FILES before validation
+        _debug_print_post(request, "business_details: raw submit")
+
         if form.is_valid():
             cd = form.cleaned_data
 
-            # ── upload proof file(s) to the configured bucket ──
+            # print cleaned_data with JSON-safe coercion
+            try:
+                cd_json = {k: _js(v) for k, v in cd.items()}
+                print("[BIZ DEBUG] BusinessDetails.cleaned_data:", json.dumps(cd_json, indent=2, default=str))
+            except Exception as e:
+                print("[BIZ DEBUG] failed to serialize cleaned_data:", e)
+
+            # ── upload proof file(s) ──
             uploaded_paths: List[str] = []
             files = request.FILES.getlist("proof")
             for f in files:
@@ -1208,8 +1167,7 @@ def business_details(request: HttpRequest) -> HttpResponse:
                             "form": form,
                         },
                     )
-                
-            # coerce ints from choices
+
             btype_id   = int(cd["b_type"])           if cd.get("b_type") else None
             own_id     = int(cd["ownership_type"])   if cd.get("ownership_type") else None
             day_start  = int(cd["opt_days_start"])   if cd.get("opt_days_start") else None
@@ -1220,50 +1178,52 @@ def business_details(request: HttpRequest) -> HttpResponse:
                 "p_performer_staff_id": int(staff_id),
                 "p_owner_person_id": int(owner_person_id),
 
-                # business
                 "p_business_name": cd.get("b_name"),
                 "p_business_location_desc": cd.get("b_desc"),
                 "p_business_nature": cd.get("b_nature"),
 
-                "p_prev_yr_total_gross_sales": _js(cd.get("prevgross")),        # Decimal -> float
-                "p_date_est": _js(cd.get("date_est")),                           # date -> 'YYYY-MM-DD'
+                "p_prev_yr_total_gross_sales": _js(cd.get("prevgross")),
+                "p_date_est": _js(cd.get("date_est")),
                 "p_dti_sec_reg_num": cd.get("dti"),
-                "p_capital_invested": _js(cd.get("capital_invested")),           # Decimal -> float
-                "p_mnthly_gross_incom_est": _js(cd.get("inc_est")),              # Decimal -> float
+                "p_capital_invested": _js(cd.get("capital_invested")),
+                "p_mnthly_gross_incom_est": _js(cd.get("inc_est")),
                 "p_num_of_emp": cd.get("emp_num"),
                 "p_has_business_clearance": has_clearance,
 
                 "p_business_type_id": btype_id,
                 "p_ownership_type_id": own_id,
 
-                # operating schedule
                 "p_operating_day_start": day_start,
                 "p_operating_day_end": day_end,
-                "p_operating_hour_start": _js(cd.get("opt_start")),              # time -> 'HH:MM:SS'
-                "p_operating_hour_end": _js(cd.get("opt_end")),                  # time -> 'HH:MM:SS'
+                "p_operating_hour_start": _js(cd.get("opt_start")),
+                "p_operating_hour_end": _js(cd.get("opt_end")),
 
-                # business address
-                "p_business_latitude": _js(cd.get("latitude")),                  # Decimal -> float
-                "p_business_longitude": _js(cd.get("longitude")),                # Decimal -> float
+                "p_business_latitude": _js(cd.get("latitude")),
+                "p_business_longitude": _js(cd.get("longitude")),
                 "p_business_city": cd.get("city"),
                 "p_business_barangay": cd.get("barangay"),
                 "p_business_street": cd.get("street"),
                 "p_business_purok_sitio_name": cd.get("purok_sitio"),
 
-                # proofs
                 "p_business_proof_files": uploaded_paths or None,
             }
 
+            # print exact RPC args
+            print("[BIZ DEBUG] register_business_and_owner RPC payload:",
+                  json.dumps(payload, indent=2, default=str))
+
             try:
                 resp = supabase.rpc("register_business_and_owner", payload).execute()
+                print("[BIZ DEBUG] RPC .data:", getattr(resp, "data", None))
+                print("[BIZ DEBUG] RPC .error:", getattr(resp, "error", None))
                 rows = resp.data or []
                 if not rows:
                     messages.warning(request, "The server did not return IDs, but the request may have been processed.")
                 else:
                     first = rows[0]
-                    # If the function returns TABLE with named columns, supabase-py returns dicts
                     v_business_id = first.get("business_id") if isinstance(first, dict) else first[0]
                     v_owner_id = first.get("owner_person_id") if isinstance(first, dict) else first[1]
+                    print("[BIZ DEBUG] returned business_id:", v_business_id, "owner_person_id:", v_owner_id)
 
                 _clear_draft(request)
                 messages.success(request, "Business registered successfully.")
@@ -1272,6 +1232,7 @@ def business_details(request: HttpRequest) -> HttpResponse:
             except APIError as e:
                 code = getattr(e, "code", None) or getattr(e, "error", None) or ""
                 detail = getattr(e, "message", None) or str(e)
+                print("[BIZ DEBUG] APIError.code:", code, "detail:", detail)
                 if "P6057" in code or "P6057" in detail:
                     messages.error(request, "Invalid business type. Please pick a valid type.")
                 elif "P6058" in code or "P6058" in detail:
@@ -1285,7 +1246,11 @@ def business_details(request: HttpRequest) -> HttpResponse:
                 else:
                     messages.error(request, f"RPC error: {detail}")
         else:
-            messages.error(request, "Please fix the errors in the Business Information form.")
+            # invalid form — print errors
+            try:
+                print("[BIZ DEBUG] form.errors:", form.errors.as_json())
+            except Exception:
+                print("[BIZ DEBUG] form.errors (raw):", form.errors)
 
     return render(
         request,
@@ -1296,8 +1261,6 @@ def business_details(request: HttpRequest) -> HttpResponse:
             "form": form,
         },
     )
-
-# ───────────────────── utility: reset the draft ─────────────────────
 
 @session_login_required
 @role_required("Barangay Clerk")
@@ -1371,19 +1334,18 @@ def business_information(request: HttpRequest, b_id: int):
         },
     )
 
-# Hannah's Code:
+# Hannah's Code (kept):
 def business_owner_nonresident(request: HttpRequest):
-    user_fullname, user_role_template = _profile_fallbacks(request)
     form = BusinessOwnerInfo()
     return render(
         request,
         "business/business_owner_nonres.html",
         {
-            "user_fullname": user_fullname,
-            "user_role": user_fullname,
-            "page_path": f"{user_fullname} / Business Records / Add Business / Business Owner Information",
+            "user_fullname": 'lname, fname mname suffix',
+            "user_role": 'lname, fname mname suffix',
+            "page_path": f"lname, fname mname suffix / Business Records / Add Business / Business Owner Information",
             "page_title": "Business Owner Information",
-            "user_role_template": user_role_template,
+            "user_role_template": 'barangay_secretary',
             "form": form,
         },
     )
@@ -1408,7 +1370,7 @@ def _rpc_approve_person_by_clerk(request: HttpRequest, person_id: int, status_id
 @require_POST
 def approve_request(request: HttpRequest, req_id: int):
     try:
-        _rpc_approve_person_by_clerk(request, req_id, STATUS_APPROVED, None)
+        _rpc_approve_person_by_clerk(request, req_id, 3, None)
         messages.success(request, "Request approved.")
     except APIError as e:
         try:
@@ -1429,13 +1391,22 @@ def decision_request(request: HttpRequest, req_id: int):
     if not remarks:
         messages.error(request, "Remarks are required.")
         return redirect("clerk:person_details", req_id=req_id)
-    status_id = STATUS_REJECTED if action == "reject" else STATUS_DECLINE
+    status_id = 4 if action == "reject" else 7
     try:
         _rpc_approve_person_by_clerk(request, req_id, status_id, remarks)
-        messages.success(request, f"Request marked as {'Rejected' if status_id==STATUS_REJECTED else 'Declined'}.")
+        messages.success(request, f"Request marked as {'Rejected' if status_id==4 else 'Declined'}.")
     except APIError as e:
         try:
             messages.warning(request, e.message.get("message"))
         except Exception:
             messages.warning(request, "This request cannot be updated right now.")
     return redirect("clerk:person_details", req_id=req_id)
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_POST
+def decline(request: HttpRequest, doc_request_id: int):
+    reason = (request.POST.get("reason") or "").strip() or None
+    err = _set_status(doc_request_id, "DECLINED", _staff_id(request), reason)
+    messages.error(request, f"Failed: {escape(err)}") if err else messages.success(request, "Request declined.")
+    return redirect("clerk:detail", doc_request_id=doc_request_id)
