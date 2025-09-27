@@ -140,11 +140,10 @@ def active_schedule(request, scheduling_service: ISchedulingService = Provide[Ap
     status_form = StatusActiveScheduleFilter()
     week_range_form = WeekRangeActiveScheduleFilter()
     reschedule_form = Reschedule()
-    
+        
     session = request.session.get("auth")
-    user_fullname = session.get("first_name") + " " + session.get("last_name")
     return render(request, "household/quarterly/active_schedule.html", {
-        'user_fullname' : user_fullname,
+        'user_fullname' : session.get("first_name") + " " + session.get("last_name"),
         'user_role' : session.get("role_name"),
         'page_path' : '',
         'page_title' : '',
