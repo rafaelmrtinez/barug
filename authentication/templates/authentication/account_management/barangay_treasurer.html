@@ -6,14 +6,33 @@
         <div class="collapse navbar-collapse" id="navbarText">
             <ul class="navbar-nav me-auto mb-lg-0">
                 <li class="nav-item me-3">
-                    <a class="nav-link" href="">Dashboard</a>
+                    <a class="nav-link" href="{% url 'clerk:dashboard' %}">Dashboard</a>
+                </li>
+                <li class="nav-item dropdown me-3">
+                    <a class="nav-link dropdown-toggle" href="#" id="resident_dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        Fee Management
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="resident_dropdown">
+                        <li><a class="dropdown-item" href="{% url 'treasurer:fees' %}">Update Fees</a></li>
+                        <li><a class="dropdown-item" href="{% url 'treasurer:fee_add' %}">Add New Fee</a></li>
+                    </ul>
+                </li>
+                <!-- <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'treasurer:fees' %}">XX Management</a>
                 </li>
                 <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'clerk:identity_verification' %}"> XX Identity Verification</a>
+                </li> -->
+                <li class="nav-item dropdown me-3">
+                    <a class="nav-link dropdown-toggle" href="#" id="resident_dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        Document Requests
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="resident_dropdown">
+                        <li><a class="dropdown-item" href="{% url 'treasurer:business_queue' %}">Business</a></li>
+                        <li><a class="dropdown-item" href="{% url 'clerk:walkin_new' %}">Resident</a></li>
+                        <li><a class="dropdown-item" href="{% url 'clerk:queue' %}">History</a></li>
+                    </ul>
                 </li>
-                <li class="nav-item me-3">
-                    <a class="nav-link" href="">Activity Log</a>
-                </li>
-            </ul>
         </div>
     </div>
 </nav>

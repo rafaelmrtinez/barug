@@ -283,6 +283,8 @@
         <form method="post" action="{% url 'clerk:mark_printing' header.doc_request_id %}">
           {% csrf_token %}
           <input type="hidden" name="download" value="1">
+          {# IMPORTANT: ensure business_id is posted for Business Clearance #}
+          <input type="hidden" name="business_id" value="{{ header.business_id }}">
           <button class="btn btn-primary"><i class="bi bi-download me-1"></i> Proceed &amp; Download</button>
         </form>
       </div>
@@ -296,7 +298,6 @@
       var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
       tooltipTriggerList.forEach(function (el) { if (window.bootstrap) new bootstrap.Tooltip(el); });
     } catch (e) {
-      // ignore if bootstrap not loaded yet
       console.warn('Tooltip init failed:', e);
     }
   });

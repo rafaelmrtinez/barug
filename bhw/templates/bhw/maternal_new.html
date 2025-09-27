@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<style>
+  :root{
+    --brand-700:#6d2932;
+    --brand-100:#f3eaeb;
+    --brand-050:#fbf6f6;
+  }
+  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
+  .btn-brand:hover{ background:#561c24; border-color:#561c24; }
+  .card{ border-radius:1rem; }
+  .section-title{ font-weight:700; }
+  .helper{ color:#6c757d; font-size:.875rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3">
+  <div class="row">
+    <div class="col-12 col-xl-10 col-xxl-8">
+
+      <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="{% url 'bhw:dashboard' %}">Dashboard</a></li>
+          <li class="breadcrumb-item active" aria-current="page">New Maternal Record (BHW Intake)</li>
+        </ol>
+      </nav>
+
+      {% if messages %}{% for m in messages %}
+        <div class="alert alert-{{ m.tags|default:'info' }} mb-3">{{ m }}</div>
+      {% endfor %}{% endif %}
+
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        <!-- Mother & family -->
+        <div class="card mb-3">
+          <div class="card-body">
+            <div class="section-title mb-2">Mother</div>
+            <div class="row g-3">
+              <div class="col-sm-4">
+                <label class="form-label" for="{{ form.person_id.id_for_label }}">Mother (person_id)</label>
+                {{ form.person_id }}
+              </div>
+              <div class="col-sm-4">
+                <label class="form-label" for="{{ form.husband_id.id_for_label }}">Husband (person_id)</label>
+                {{ form.husband_id }}
+                <div class="helper">Optional</div>
+              </div>
+              <div class="col-sm-4">
+                <label class="form-label" for="{{ form.family_id.id_for_label }}">Family ID</label>
+                {{ form.family_id }}
+                <div class="helper">Optional link to family</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Anthropometrics -->
+        <div class="card mb-3">
+          <div class="card-body">
+            <div class="section-title mb-2">Anthropometrics</div>
+            <div class="row g-3">
+              <div class="col-sm-3">
+                <label class="form-label" for="{{ form.weight.id_for_label }}">Weight (kg)</label>
+                {{ form.weight }}
+              </div>
+              <div class="col-sm-3">
+                <label class="form-label" for="{{ form.height.id_for_label }}">Height (cm)</label>
+                {{ form.height }}
+              </div>
+              <div class="col-sm-6">
+                <label class="form-label" for="{{ form.bmi_status_id.id_for_label }}">BMI Status</label>
+                {{ form.bmi_status_id }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Plans -->
+        <div class="card mb-3">
+          <div class="card-body">
+            <div class="section-title mb-2">Plans</div>
+            <div class="row g-3">
+              <div class="col-sm-8">
+                <label class="form-label" for="{{ form.place_of_delivery_plan.id_for_label }}">Planned Place of Delivery</label>
+                {{ form.place_of_delivery_plan }}
+              </div>
+              <div class="col-sm-4 d-flex align-items-end">
+                <div class="form-check">
+                  {{ form.newborn_screening_plan }}
+                  <label class="form-check-label" for="{{ form.newborn_screening_plan.id_for_label }}">Newborn screening planned?</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Past medical/obstetric history -->
+        <div class="card mb-3">
+          <div class="card-body">
+            <div class="section-title mb-2">Past Medical & Obstetric History</div>
+
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label" for="{{ form.num_children_born_alive.id_for_label }}"># children born alive</label>
+                {{ form.num_children_born_alive }}
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="{{ form.num_children_living.id_for_label }}"># living children</label>
+                {{ form.num_children_living }}
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="{{ form.num_large_babies.id_for_label }}"># large babies (&gt;8lbs)</label>
+                {{ form.num_large_babies }}
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label" for="{{ form.num_abortion.id_for_label }}"># abortions</label>
+                {{ form.num_abortion }}
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="{{ form.num_stillbirth.id_for_label }}"># stillbirths</label>
+                {{ form.num_stillbirth }}
+              </div>
+              <div class="col-md-4">
+                <div class="form-check mt-4">
+                  {{ form.has_diabetes }}
+                  <label class="form-check-label" for="{{ form.has_diabetes.id_for_label }}">Diabetes?</label>
+                </div>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label" for="{{ form.gravida.id_for_label }}">Gravida</label>
+                {{ form.gravida }}
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="{{ form.para.id_for_label }}">Para</label>
+                {{ form.para }}
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-md-4">
+                <label class="form-label" for="{{ form.checklist_item_ids.id_for_label }}">Checklist item IDs (CSV)</label>
+                {{ form.checklist_item_ids }}
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="{{ form.risk_category_ids.id_for_label }}">Risk category IDs (CSV)</label>
+                {{ form.risk_category_ids }}
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-md-4">
+                <label class="form-label" for="{{ form.prev_illness.id_for_label }}">Previous illness</label>
+                {{ form.prev_illness }}
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="{{ form.prev_hospitalization.id_for_label }}">Previous hospitalization</label>
+                {{ form.prev_hospitalization }}
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="{{ form.prev_preg_complication.id_for_label }}">Prev. pregnancy complications</label>
+                {{ form.prev_preg_complication }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-brand">
+            {% bs_icon 'check2' extra_classes='me-2' %} Save record
+          </button>
+          <a class="btn btn-outline-secondary" href="{% url 'bhw:dashboard' %}">Cancel</a>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

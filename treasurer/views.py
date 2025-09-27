@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 from decimal import Decimal
+from datetime import datetime
 
 from django.conf import settings
 from django.contrib import messages
@@ -13,7 +14,7 @@ from django.views.decorators.http import require_GET, require_POST
 from authentication.guards import session_login_required, role_required
 from authentication.supabase_client import supabase  # still used for the small OR fetch
 
-from .services.requests_service import list_requests, fetch_detail_bundle, build_auth_links
+from .services.requests_service import list_requests, list_business_requests, fetch_detail_bundle, build_auth_links
 from .services.payments_service import list_payment_methods, accept_payment, mark_for_printing
 from .services.fees_service import (
     search_fee_items, recent_fee_changes, update_fee_amount,
@@ -22,7 +23,7 @@ from .services.fees_service import (
 from .utils.ui import STATUS_UI, ACTION_LABELS, titleize
 
 TREASURER_ROLE = "Barangay Treasurer"
-
+#1 
 def _staff_id(request: HttpRequest) -> int | None:
     # Prefer session-based id set at login; fallback to attached profile(s)
     auth = request.session.get("auth") or {}
@@ -392,3 +393,159 @@ def fee_edit(request: HttpRequest, fee_code: str):
 
     messages.success(request, f"{fee_code} saved.")
     return redirect("treasurer:fee_edit", fee_code=fee_code)
+
+# ---------- Business-only queue ----------
+@session_login_required
+@role_required(TREASURER_ROLE)
+def business_queue(request: HttpRequest):
+    q = (request.GET.get("q") or "").strip() or None
+    statuses = request.GET.getlist("status") or [
+        "FOR_TREASURER_REVIEW", "PAID", "FOR_PRINTING", "READY_FOR_PICKUP", "RELEASED", "DECLINED"
+    ]
+    TARGET_DOCS = {"BARANGAY BUSINESS CLEARANCE", "CERTIFIED TRUE COPY"}
+    raw_rows = list_business_requests(q, statuses, limit=100)
+
+    rows: List[Dict[str, Any]] = []
+    for r in raw_rows:
+        docs = [(d or "").strip() for d in (r.get("doc_types") or [])]
+        if any(d in TARGET_DOCS for d in docs):
+            r["status_ui"] = STATUS_UI.get(r.get("status")) or {
+                "label": r.get("status") or "—",
+                "cls": "badge text-bg-secondary",
+            }
+            r["purposes_display"] = [titleize(p) for p in (r.get("purposes") or [])]
+            r["doc_types"] = [d for d in docs if d in TARGET_DOCS]
+            # ensure both ids exist in each row
+            # expects your v_doc_request_list_ex_v2 (or updated view) to expose business_id
+            rows.append(r)
+
+    return render(request, "treasurer/business_queue.html", {
+        "rows": rows,
+        "q": q or "",
+        "statuses": statuses,
+    })
+
+
+# ---------- Business detail (with payment panel) ----------
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_GET
+def business_detail(request: HttpRequest, business_id: int, doc_request_id: int):
+    # 1) Business profile
+    biz_res = supabase.rpc("get_business_details", {"p_business_id": business_id}).execute()
+    biz = (biz_res.data[0] if (biz_res and getattr(biz_res, "data", None)) else {}) or {}
+    # normalize flag key
+    biz["has_business_clearance"] = bool(
+        biz.get("has_business_clearance") or biz.get("has_brgy_clearance")
+    )
+
+    # 2) Doc request bundle (for amount due, payments, etc.)
+    header: Dict[str, Any] = {}
+    payments: Dict[str, Any] = {}
+    lines: List[Dict[str, Any]] = []
+    try:
+        bundle = fetch_detail_bundle(doc_request_id)
+        header   = bundle.get("header")   or {}
+        payments = bundle.get("payments") or {}
+        lines    = bundle.get("lines")    or []
+    except Exception as e:
+        messages.warning(request, f"Could not load request details: {escape(str(getattr(e,'message',e)))}")
+
+    # 3) Payment methods + find WAIVED id
+    methods = list_payment_methods()
+    waived_method_id = next(
+        (m.get("payment_method_id") for m in methods if (m.get("method_name") or "").strip().upper() == "WAIVED"),
+        None
+    )
+
+    # 4) Release history + year status (optional, keeps your previous UI)
+    clr_res = supabase.rpc("list_business_clearances", {"p_business_id": business_id}).execute()
+    clearances = (clr_res.data or []) if clr_res else []
+    year = datetime.utcnow().year
+    yr_res = supabase.rpc("check_business_clearance_for_year",
+                          {"p_business_id": business_id, "p_year": year}).execute()
+    year_status = (yr_res.data[0] if (yr_res and yr_res.data) else None)
+    if year_status and "last_changed_at" not in year_status:
+        year_status["last_changed_at"] = year_status.get("last_created_at")
+    last_cleared_year = clearances[0]["year"] if clearances else None
+
+    return render(request, "treasurer/business_details.html", {
+        "biz": biz,
+        "doc_request_id": doc_request_id,
+        "header": header,
+        "payments": payments,
+        "methods": methods,
+        "waived_method_id": waived_method_id,
+        "clearances": clearances,
+        "year_status": year_status,
+        "last_cleared_year": last_cleared_year,
+        "status_ui": STATUS_UI.get(header.get("status") or "") or {"label": header.get("status") or "—", "cls": "badge text-bg-secondary"},
+    })
+
+# ---------- One-click: Pay -> set flag -> mark for printing ----------
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_POST
+def business_pay_and_print(request: HttpRequest, business_id: int, doc_request_id: int):
+    staff_id = _staff_id(request) or 0
+    if staff_id <= 0:
+        messages.error(request, "Staff session required.")
+        return redirect("treasurer:business_detail", business_id=business_id, doc_request_id=doc_request_id)
+
+    # pull posted form fields
+    try:
+        method_id = int(request.POST.get("payment_method_id", "0") or 0)
+        amount_paid = float(Decimal(request.POST.get("amount_paid", "0") or "0"))
+    except Exception:
+        messages.error(request, "Invalid payment fields.")
+        return redirect("treasurer:business_detail", business_id=business_id, doc_request_id=doc_request_id)
+
+    # STEP 1: Accept payment (fail fast)
+    or_id = None
+    try:
+        or_id = accept_payment(
+            doc_request_id=doc_request_id,
+            method_id=method_id,
+            amount_paid=amount_paid,
+            staff_id=staff_id,
+        )
+    except Exception as e:
+        messages.error(request, f"Payment failed: {escape(str(getattr(e, 'message', e)))}")
+        return redirect("treasurer:business_detail", business_id=business_id, doc_request_id=doc_request_id)
+
+    # show OR info if we can
+    try:
+        or_res = (supabase.table("official_receipt")
+                  .select("or_number, amount_paid, amount_due, change_due")
+                  .eq("or_id", or_id).single().execute())
+        if getattr(or_res, "data", None):
+            o = or_res.data
+            messages.success(
+                request,
+                f"OR {o.get('or_number','—')} posted. Paid ₱{o.get('amount_paid',0):,.2f} "
+                f"(due ₱{o.get('amount_due',0):,.2f}, change ₱{o.get('change_due',0):,.2f})."
+            )
+        else:
+            messages.success(request, f"Payment posted. OR id {or_id}.")
+    except Exception:
+        messages.success(request, f"Payment posted. OR id {or_id}.")
+
+    # STEP 2: Set has_business_clearance = TRUE
+    try:
+        supabase.rpc("set_business_has_clearance_true", {"p_business_id": business_id}).execute()
+        messages.info(request, "Business flag set: has_business_clearance = TRUE.")
+    except Exception as e:
+        messages.warning(request, f"Payment ok, but failed to set business flag: {escape(str(getattr(e,'message',e)))}")
+
+    # STEP 3: Move to FOR_PRINTING
+    try:
+        mark_for_printing(
+            doc_request_id=doc_request_id,
+            staff_id=staff_id,
+            reason="Auto: after payment from Business Details"
+        )
+        messages.info(request, "Request moved to FOR_PRINTING.")
+    except Exception as e:
+        messages.warning(request, f"Payment ok, but failed to move to FOR_PRINTING: {escape(str(getattr(e,'message',e)))}")
+
+    return redirect("treasurer:business_detail", business_id=business_id, doc_request_id=doc_request_id)

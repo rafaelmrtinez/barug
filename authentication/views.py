@@ -21,7 +21,8 @@ def _role_home(role_name: str) -> str:
     role = (role_name or "").lower()
     if role == "barangay clerk": return "clerk:dashboard"
     if role == "captain": return "captain:dashboard"
-    if role == "bhw": return "clerk:dashboard"
+    if role == "bhw": return "bhw:dashboard"
+    if role == "barangay health worker": return "bhw:dashboard"
     if role == "barangay treasurer": return "treasurer:queue"
     if role == "barangay secretary": return "secretary:staff_selection"
     logger.debug("Role not matched, falling back to resident: %s", role)
