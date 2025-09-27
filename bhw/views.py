@@ -1,5 +1,9 @@
 from django.shortcuts import render
 from django.core.paginator import Paginator
+from dependency_injector.wiring import inject, Provide
+
+from src.app.bootstrap.app_containers import AppContainer
+from src.app.contracts.scheduling_service_contract import ISchedulingService
 from .forms import SearchActiveScheduleFilter
 from .forms import StatusActiveScheduleFilter
 from .forms import WeekRangeActiveScheduleFilter
@@ -124,20 +128,24 @@ user_role = 'Barangay Health Worker'
 user_role_template = user_role.lower().replace(' ', '_')
 
 # Create your views here.
-def active_schedule(request):
-    pending = []
+@inject
+def active_schedule(request, scheduling_service: ISchedulingService = Provide[AppContainer.scheduling_service]):
+    pending = scheduling_service.get_active_schedules()
     paginator = Paginator(pending, 10)  # 10 per page
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+    print(scheduling_service.get_active_schedules())
 
     search_form = SearchActiveScheduleFilter()
     status_form = StatusActiveScheduleFilter()
     week_range_form = WeekRangeActiveScheduleFilter()
     reschedule_form = Reschedule()
-
+    
+    session = request.session.get("auth")
+    user_fullname = session.get("first_name") + " " + session.get("last_name")
     return render(request, "household/quarterly/active_schedule.html", {
         'user_fullname' : user_fullname,
-        'user_role' : user_role,
+        'user_role' : session.get("role_name"),
         'page_path' : '',
         'page_title' : '',
         'user_role_template' : user_role_template,
