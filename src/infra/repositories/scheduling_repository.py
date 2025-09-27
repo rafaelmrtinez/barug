@@ -1,3 +1,4 @@
+from src.app.transfer_objects.dto.active_schedule_dto import ActiveScheduleDTO
 from src.infra.contracts.connection_adapter import IConnectionAdapter
 
 
@@ -6,7 +7,7 @@ class SchedulingRepository:
     def __init__(self, ctx: IConnectionAdapter):
         self._ctx = ctx
         
-    def fetch_schedules(self):
+    def fetch_schedules(self) -> list[ActiveScheduleDTO]:
         raw = """
         SELECT 
         bs.schedule_id AS "Schedule ID",
@@ -28,4 +29,4 @@ class SchedulingRepository:
         INNER JOIN calendar_week cw ON cw.week_id = bs.week_id
         INNER JOIN request_status rs ON rs.request_status_id = bs.status;
         """
-        return self._ctx.execute_query(raw)
+        return [ActiveScheduleDTO(*row) for row in self._ctx.execute_query(raw)]
