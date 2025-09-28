@@ -14,6 +14,7 @@ class SearchPerson(forms.Form):
 
 class ChooseRole(forms.Form):
     role = forms.ChoiceField(
+        choices = [],
         widget=forms.Select(attrs={
             'id' : 'role',
             'class' : 'form-select',
@@ -21,6 +22,16 @@ class ChooseRole(forms.Form):
         label= 'Select a Role',
         required= True,
     )
+    purok_sitio = forms.ChoiceField(
+        choices=[],
+        widget=forms.Select(attrs={
+            "id": "purok_sitio",
+            "class": "form-select",
+        }),
+        label="Assign to Purok/Sitio",
+        required=False,
+    )
+
 
 class ResidentProfileform(forms.Form):
     res_code = forms.CharField(
