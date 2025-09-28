@@ -68,3 +68,16 @@ def staff_selection_nonres_docs(request):
         'user_role_template': user_role_template,
         'form' : form,
     })
+
+def staff_selection_nonres_role_review(request):
+    form = ChooseRole()
+    role_form = ChooseRole()
+    return render(request, "staff/role.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Account Verification',
+        'page_title': 'Account Verification',
+        'user_role_template': user_role_template,
+        'form' : form,
+        'role_form': role_form,
+    })
