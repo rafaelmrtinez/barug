@@ -1,6 +1,4 @@
 from django import forms
-# --- BHW Maternal Intake (new) -----------------------------------------------
-from django import forms
 
 BMI_CHOICES = (
     (1, "Low"),
@@ -10,9 +8,8 @@ BMI_CHOICES = (
 
 class MaternalBhwIntakeForm(forms.Form):
     # Required
-    person_id = forms.IntegerField(label="Mother (person_id)")
-    # Optional links
-    husband_id = forms.IntegerField(label="Husband (person_id)", required=False)
+    person_id   = forms.IntegerField(widget=forms.HiddenInput())
+    husband_id  = forms.IntegerField(required=False, widget=forms.HiddenInput())
     family_id = forms.IntegerField(label="Family ID", required=False)
 
     # Anthropometrics

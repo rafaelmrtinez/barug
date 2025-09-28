@@ -24,6 +24,7 @@ urlpatterns = [
     path("admin/", include("staff_admin.urls", namespace="staff_admin")),
     path("authentication/", include("authentication.urls", namespace="authentication")),
     path("bhw/", include("bhw.urls", namespace="bhw")),
+    path("midwife/", include("midwife.urls", namespace="midwife")),
     path("captain/", include("captain.urls", namespace="captain")),
     path("clerk/", include("clerk.urls", namespace="clerk")),
     path("lupon_mem/", include("lupon_mem.urls", namespace="lupon_mem")),

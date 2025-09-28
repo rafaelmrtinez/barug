@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "secretary",
     "staff_admin",
     "treasurer",
+    "midwife",
 ]
 
 MIDDLEWARE = [
@@ -106,6 +107,7 @@ TEMPLATES = [
             BASE_DIR / "secretary/templates/secretary",
             BASE_DIR / "staff_admin/templates/staff_admin",
             BASE_DIR / "treasurer/templates/treasurer",
+            BASE_DIR / "midwife/templates/midwife",
         ],
         "APP_DIRS": True,
         "OPTIONS": {
@@ -241,6 +243,7 @@ STATICFILES_DIRS = [
     # os.path.join(BASE_DIR, "event_logs/static/event_logs"),
     os.path.join(BASE_DIR, "resident/static/resident"),
     os.path.join(BASE_DIR, "bhw/static/bhw"),
+    os.path.join(BASE_DIR, "midwife/static/midwife"),
     # os.path.join(BASE_DIR, "clerk/static/clerk"),
 ]
 

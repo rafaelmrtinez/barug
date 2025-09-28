@@ -1,0 +1,102 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Unauthorized Access</title>
+
+  <!-- Tailwind & Font Awesome (CDN) -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" />
+
+  <style>
+    :root{
+      --brand:#531B24;   /* primary maroon */
+      --accent:#6d2932;  /* deeper accent */
+      --sand:#E8D8C4;    /* soft background */
+      --tan:#C7B7A3;     /* subtle gradient */
+    }
+    .shadow-soft { box-shadow: 0 10px 30px rgba(0,0,0,0.12); }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-b from-[var(--sand)] to-[var(--tan)] flex items-center justify-center p-6">
+
+  <main class="w-full max-w-3xl">
+    <div class="bg-white rounded-2xl border border-[var(--brand)] shadow-soft p-6 md:p-8 w-full">
+      <div class="flex items-start md:items-center gap-4 md:gap-6 mb-6">
+        <div class="flex-none w-14 h-14 rounded-full flex items-center justify-center
+                    bg-[var(--sand)] border-2 border-[var(--brand)]">
+          <i class="fas fa-lock text-xl md:text-2xl text-[var(--brand)]" aria-hidden="true"></i>
+          <span class="sr-only">Locked</span>
+        </div>
+
+        <div class="flex-1 min-w-0">
+          <h1 class="text-2xl md:text-3xl font-semibold text-[var(--brand)] leading-tight">
+            Unauthorized Access
+          </h1>
+          <p class="text-sm md:text-base text-gray-700 mt-1">
+            You do not have permission to view this page.
+          </p>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-[var(--brand)] border-opacity-20 bg-[var(--sand)] bg-opacity-40 p-4 md:p-5 mb-6">
+        <ul class="space-y-2 text-sm md:text-base text-gray-800">
+          {% if role_name %}
+            <li>
+              <span class="font-semibold text-[var(--accent)]">Your role:</span>
+              <span class="uppercase tracking-wide">{{ role_name }}</span>
+            </li>
+          {% endif %}
+          {% if requested_path %}
+            <li class="break-words">
+              <span class="font-semibold text-[var(--accent)]">Requested URL:</span>
+              <code class="px-1.5 py-0.5 rounded bg-white bg-opacity-70 border border-[var(--brand)] border-opacity-20">
+                {{ requested_path }}
+              </code>
+            </li>
+          {% endif %}
+          <li>
+            If you believe this is an error, please contact your Barangay Administrator to request access.
+          </li>
+        </ul>
+      </div>
+
+      <div class="flex flex-col md:flex-row gap-3">
+        <!-- Primary: role-aware dashboard link -->
+        <a href="{{ home_url }}"
+           class="inline-flex items-center justify-center px-5 py-3 rounded-xl
+                  bg-[var(--brand)] text-white font-medium
+                  hover:bg-[var(--accent)] transition">
+          <i class="fas fa-tachometer-alt mr-2"></i>
+          Back to {{ role_name|default:"your"|title }} Dashboard
+        </a>
+
+        <!-- Optional secondary: simple back in history (fallback if needed) -->
+        <button type="button" onclick="history.back()"
+                class="inline-flex items-center justify-center px-5 py-3 rounded-xl
+                       border border-[var(--brand)] text-[var(--brand)] font-medium
+                       bg-white hover:bg-[var(--sand)] transition">
+          <i class="fas fa-arrow-left mr-2"></i> Go Back
+        </button>
+
+        <!-- Tertiary: Log Out -->
+        <a href="{% url 'authentication:logout' %}"
+           class="inline-flex items-center justify-center px-5 py-3 rounded-xl
+                  text-[var(--accent)] font-medium
+                  bg-white bg-opacity-60 hover:bg-opacity-90 border border-transparent transition">
+          <i class="fas fa-sign-out-alt mr-2"></i> Log Out
+        </a>
+      </div>
+    </div>
+
+    <p class="text-xs text-gray-700 mt-4 text-center">
+      Error code: <span class="font-semibold text-[var(--brand)]">403</span> • Barangay System
+    </p>
+  </main>
+
+</body>
+</html>
