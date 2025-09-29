@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<style>
+  :root{
+    --brand-900:#3a1217;
+    --brand-800:#561c24;
+    --brand-700:#6d2932;
+    --brand-600:#7a323b;
+    --brand-100:#f3eaeb;
+    --brand-050:#fbf6f6;
+  }
+  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
+  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
+  .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); background:#fff; }
+  .btn-outline-brand:hover{ background:var(--brand-700); color:#fff; }
+  .btn-brand-subtle{ background:var(--brand-100); color:var(--brand-700); border-color:var(--brand-100); }
+  .btn-brand-subtle:hover{ background:var(--brand-050); color:var(--brand-700); }
+
+  .form-control:focus, .form-select:focus{
+    border-color:var(--brand-700);
+    box-shadow:0 0 0 .25rem rgba(109,41,50,.25);
+    outline:none;
+  }
+
+  /* Toolbar */
+  .toolbar{
+    background:#fff; border:1px solid var(--bs-border-color,#dee2e6);
+    border-radius:1rem; padding:.75rem; gap:.5rem;
+  }
+  .searchbox{ position:relative; flex:1; min-width:280px; }
+  .searchbox .bi{
+    position:absolute; left:.8rem; top:50%; transform:translateY(-50%);
+    opacity:.6; color:var(--brand-700); pointer-events:none;
+  }
+  .searchbox :where(input,.form-control){ padding-left:2.35rem !important; }
+
+  /* Chips */
+  .filters-bar{ gap:.5rem; }
+  .filter-chip{
+    display:inline-flex; align-items:center; gap:.4rem;
+    padding:.3rem .65rem; border-radius:999px; font-size:.8rem;
+    text-decoration:none; border:1px solid rgba(109,41,50,.18);
+    background:var(--brand-050); color:var(--brand-700);
+  }
+  .filter-chip:hover{ background:var(--brand-100); }
+  .filter-chip .x{
+    display:inline-grid; place-items:center; width:1rem; height:1rem; border-radius:50%;
+    background:#fff; border:1px solid rgba(109,41,50,.22); line-height:1; font-weight:700; color:var(--brand-700);
+  }
+
+  .table thead th{ border-bottom-width:2px; }
+  .table tbody tr:hover{ background:#fcfcfd; }
+
+  /* Offcanvas */
+  .offcanvas.filter-offcanvas{
+    width:420px; max-width:90vw; --bs-offcanvas-bg:#fff;
+    background-color:var(--bs-offcanvas-bg)!important;
+    z-index:1200; box-shadow:-2px 0 24px rgba(0,0,0,.12);
+  }
+  .offcanvas.filter-offcanvas .offcanvas-header{ border-bottom:1px solid var(--bs-border-color); }
+  .offcanvas-footer{ position:sticky; bottom:-1px; background:#fff; border-top:1px solid var(--bs-border-color); padding-top:1rem; margin-top:1rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <div class="container-fluid pt-3 page-main" style="margin-top: 40px;">
+    <div class="row">
+      <div>
+
+        {# ─── Toolbar: search + filters + add ─── #}
+        <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+          {% csrf_token %}
+          <div class="searchbox">
+            {% bs_icon 'search' extra_classes='bi' %}
+            {{form.search}}
+          </div>
+
+          {# preserve selected filters when searching #}
+          <input type="hidden" name="role" value="{{ request.GET.role|default:'' }}">
+
+           <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
+              type="button" data-bs-toggle="offcanvas" data-bs-target="#filterPanel" aria-controls="filterPanel">
+              {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+              {% if request.GET.role %}
+                <span class="badge rounded-pill text-bg-light ms-2">•</span>
+              {% endif %}
+            </button>
+
+          <a class="btn btn-outline-brand ms-2" href="{% url 'staff_admin:staff_selection' %}">
+            {% bs_icon 'plus-lg' extra_classes='me-2' %} Add Staff
+          </a>
+        </form>
+
+        {# ─── Active filter chips (show selected labels) ─── #}
+        <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
+          {% if request.GET.b_type or request.GET.ownership_type or request.GET.status %}
+            <span class="text-muted me-1">Active:</span>
+
+            {% if request.GET.b_type %}
+              <a class="filter-chip"
+                 href="?q={{ request.GET.q|urlencode }}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}">
+                {{ request.GET.b_type }}
+                <span class="x" aria-hidden="true">×</span>
+              </a>
+            {% endif %}
+
+            {% if request.GET.ownership_type %}
+              <a class="filter-chip"
+                 href="?q={{ request.GET.q|urlencode }}{% if request.GET.b_type %}&b_type={{ request.GET.b_type|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}">
+                {{ request.GET.ownership_type }}
+                <span class="x" aria-hidden="true">×</span>
+              </a>
+            {% endif %}
+
+            {% if request.GET.status %}
+              <a class="filter-chip"
+                 href="?q={{ request.GET.q|urlencode }}{% if request.GET.b_type %}&b_type={{ request.GET.b_type|urlencode }}{% endif %}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}">
+                {{ request.GET.status }}
+                <span class="x" aria-hidden="true">×</span>
+              </a>
+            {% endif %}
+
+            <a class="btn btn-sm btn-outline-brand ms-1" href="?q={{ request.GET.q|urlencode }}">
+              {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
+            </a>
+          {% else %}
+            <span class="text-muted small">No active filters.</span>
+          {% endif %}
+        </div>
+        
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Date & Time Submitted</th>
+              <th scope="col">Status</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+              <tr class="table-row-height">
+                <td></td>
+                <td></td>
+                <td></td>
+                <td>
+                  <div class="d-flex gap-1">
+                    <a class="btn btn-icon"
+                       href="">
+                      {% bs_icon 'person-lines-fill' size='1em' %}
+                    </a>
+                  </div>
+                </td>
+              </tr>
+              <tr><td colspan="4" class="text-center">No pending for records</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div class="page-pagination"> 
+      {% include 'paginator.html' %}
+    </div>
+  {% endif %}
+
+  {# ─── Offcanvas: Role filter ─── #}
+  <div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
+      aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150;">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+
+    <div class="offcanvas-body">
+    <form method="get" id="filterForm">
+      <div>
+        <label class="form-label">Role</label>
+        {{ form.role }}
+      </div>
+
+      {# keep search term when applying role #}
+      <input type="hidden" name="q" value="{{ request.GET.q|default:'' }}"/>
+
+      <div class="offcanvas-footer">
+        <div class="d-flex justify-content-between">
+          <a class="btn btn-outline-brand" href="?q={{ request.GET.q|urlencode }}">Clear</a>
+          <button type="submit" class="btn btn-brand">Apply Filters</button>
+        </div>
+      </div>
+    </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
