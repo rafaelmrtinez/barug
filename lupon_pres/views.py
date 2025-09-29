@@ -98,3 +98,12 @@ def members_list(request):
         'form' : form,
         'page_obj': page_obj,
     })
+
+def member_dets(request, mem_id):
+    return render(request, "person/staff_dets.html", {
+        'user_fullname' : user_fullname,
+        'user_role' : user_role,
+        'page_path' : f'{user_role} / Staff Details : {mem_id}',
+        'page_title' : f'Staff Details : {mem_id}',
+        'user_role_template' : user_role_template,
+    })

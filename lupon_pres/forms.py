@@ -20,6 +20,16 @@ class StaffFilters(forms.Form):
         label='Day',
         required=False,
     )
+    residential_stat = forms.ChoiceField(
+        choices=[],
+        widget=forms.Select(attrs={
+            'id': 'residential_stat',
+            'class': 'form-select',
+            'name': 'role',
+        }),
+        label='Residential Status',
+        required=False,
+    )
 
 class SearchPerson(forms.Form):
     search = forms.CharField(

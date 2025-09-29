@@ -82,8 +82,8 @@
           <thead>
             <tr>
               <th scope="col">Name</th>
-              <th scope="col">Date & Time Submitted</th>
-              <th scope="col">Status</th>
+              <th scope="col">Role</th>
+              <th scope="col">Residential Status</th>
               <th scope="col">Action</th>
             </tr>
           </thead>
@@ -95,7 +95,7 @@
                 <td>
                   <div class="d-flex gap-1">
                     <a class="btn btn-icon"
-                       href="{% url 'captain:staff_details' req_id='RBSN00000' %}">
+                       href="{% url 'secretary:staff_details' staff_id='RBSN00000' %}">
                       {% bs_icon 'person-lines-fill' size='1em' %}
                     </a>
                   </div>
@@ -128,6 +128,11 @@
     <div>
       <label class="form-label">Role</label>
       {{ form.role }}
+    </div>
+
+    <div>
+      <label class="form-label">Residential Status</label>
+      {{ form.residential_stat }}
     </div>
 
     {# keep search term when applying role #}

@@ -103,3 +103,12 @@ def staff_list(request):
         'form' : form,
         'page_obj': page_obj,
     })
+
+def staff_dets(request, staff_id):
+    return render(request, "person/staff_dets.html", {
+        'user_fullname' : user_fullname,
+        'user_role' : user_role,
+        'page_path' : f'{user_role} / Staff Details : {staff_id}',
+        'page_title' : f'Staff Details : {staff_id}',
+        'user_role_template' : user_role_template,
+    })

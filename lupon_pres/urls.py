@@ -11,4 +11,5 @@ urlpatterns = [
     path("members_selection/staff_selection_non-resident_supporting_docs/", views.staff_selection_nonres_docs , name="staff_selection_non-resident_docs"),
     path("members_selection/staff_selection_non-resident_role_review/", views.staff_selection_nonres_role_review , name="staff_selection_non-resident_role_review"),
     path("members_list/", views.members_list , name="members_list"),
+    path("member_list/member_details/<str:mem_id>/", views.member_dets , name="mem_details"),
 ]
