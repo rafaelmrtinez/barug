@@ -23,6 +23,9 @@ def _role_home(role_name: str) -> str:
     if role == "captain": return "captain:dashboard"
     if role == "bhw": return "clerk:dashboard"
     if role == "barangay treasurer": return "treasurer:queue"
+    # Temporary placement just to allow super admin login and avoid crashing the application.
+    # Please dont hesitate to change this to the appropriate page.
+    if role == "super admin": return "metrics:health_check"
     logger.debug("Role not matched, falling back to resident: %s", role)
     return "resident:dashboard"
 
