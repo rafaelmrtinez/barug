@@ -22,6 +22,12 @@ class ConnectionAdapter(IConnectionAdapter):
             cursor.execute(sql, params)
             return cursor.fetchall()
 
+    def execute_query_to_dict(self, sql: str, params: Sequence[Any] | None = None) -> list[dict]:
+        with self.conn.cursor() as cursor:
+            cursor.execute(sql, params)
+            columns = [col[0] for col in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
     def execute_scalar(self, sql: str, params: Sequence[Any] | None = None) -> Any:
         with self.conn.cursor() as cursor:
             cursor.execute(sql, params)

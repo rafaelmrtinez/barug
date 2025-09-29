@@ -1,9 +1,16 @@
-from django.shortcuts import render
+from urllib import request
+from django.db import connection
+from django.shortcuts import redirect, render
 from django.core.paginator import Paginator
 from dependency_injector.wiring import inject, Provide
+from django.views.decorators.csrf import csrf_protect
 
+from authentication.guards import role_required, session_login_required
 from src.app.bootstrap.app_containers import AppContainer
 from src.app.contracts.scheduling_service_contract import ISchedulingService
+from src.app.services.household_info_service import HouseholdInformationService
+from src.infra.database.connection_adapter import ConnectionAdapter
+from src.infra.repositories.household_info_repository import HouseholdInfoRepository
 from .forms import SearchActiveScheduleFilter
 from .forms import StatusActiveScheduleFilter
 from .forms import WeekRangeActiveScheduleFilter
@@ -11,7 +18,7 @@ from .forms import Reschedule
 
 # ============================ BHW =================================
 # bhw/views_ocr.py (or wherever you keep views)
-from django.http import JsonResponse, HttpRequest
+from django.http import HttpResponse, HttpResponsePermanentRedirect, HttpResponseRedirect, JsonResponse, HttpRequest
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
 
@@ -25,6 +32,7 @@ IDTYPE_TO_ID = {
     "drivers_license": 6,
     # ...
 }
+
 
 @require_http_methods(["POST"])
 def verify_valid_id_view(request: HttpRequest):
@@ -122,44 +130,89 @@ def verify_valid_id_view(request: HttpRequest):
 
 # ============================ BHW =================================
 
+
 user_fullname = 'laname fname mname suffix'
 user_role = 'Barangay Health Worker'
 
 user_role_template = user_role.lower().replace(' ', '_')
 
 # Create your views here.
+
+@session_login_required
+@role_required("Super Admin")
+@csrf_protect
 @inject
-def active_schedule(request, scheduling_service: ISchedulingService = Provide[AppContainer.scheduling_service]):
-    pending = scheduling_service.get_active_schedules()
+def active_schedule(request: HttpRequest, scheduling_service: ISchedulingService = Provide[AppContainer.scheduling_service]):
+    
+    if request.method == "POST":
+        week_range = request.POST.get('select-week_range')
+        reason = request.POST.get('reschedule')
+        id = request.POST.get('reschedule-id')
+        print(week_range, reason, id)
+        return redirect('bhw:active_schedule')
+    
+    pending = scheduling_service.execute(
+        request.GET.get('search'),
+        request.GET.get('status'),
+        request.GET.get('week_range'))
     paginator = Paginator(pending, 10)  # 10 per page
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    print(scheduling_service.get_active_schedules())
 
-    search_form = SearchActiveScheduleFilter()
-    status_form = StatusActiveScheduleFilter()
-    week_range_form = WeekRangeActiveScheduleFilter()
+    search_form = SearchActiveScheduleFilter(request.GET or None)
+    status_form = StatusActiveScheduleFilter(request.GET or None)
+    week_range_form = WeekRangeActiveScheduleFilter(request.GET or None)
     reschedule_form = Reschedule()
-        
+
     session = request.session.get("auth")
+
+    if request.GET.get('search'):
+        search_form = SearchActiveScheduleFilter(request.GET)
+        if not search_form.is_valid():
+            search_form = SearchActiveScheduleFilter()
+
+    if request.GET.get('status'):
+        status_form = StatusActiveScheduleFilter(request.GET)
+        if not status_form.is_valid():
+            status_form = StatusActiveScheduleFilter()
+
+    if request.GET.get('week_range'):
+        week_range_form = WeekRangeActiveScheduleFilter(request.GET)
+        if not week_range_form.is_valid():
+            week_range_form = WeekRangeActiveScheduleFilter()
+
     return render(request, "household/quarterly/active_schedule.html", {
-        'user_fullname' : session.get("first_name") + " " + session.get("last_name"),
-        'user_role' : session.get("role_name"),
-        'page_path' : '',
-        'page_title' : '',
-        'user_role_template' : user_role_template,
-        'search_form' : search_form,
-        'status_form' : status_form,
-        'week_range_form' : week_range_form,
-        'reschedule_form' : reschedule_form,
+        'user_fullname': session.get("first_name") + " " + session.get("middle_name", "") + " " + session.get("last_name"),
+        'user_role': session.get("role_name"),
+        'page_path': '',
+        'page_title': '',
+        'user_role_template': user_role_template,
+        'search_form': search_form,
+        'status_form': status_form,
+        'week_range_form': week_range_form,
+        'reschedule_form': reschedule_form,
         'page_obj': page_obj,
     })
 
-def household_info(request):
+@session_login_required
+@role_required("Super Admin")
+@csrf_protect
+def household_info(request, household_id) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+    if not household_id:
+        return redirect('bhw:active_schedule')
+    session = request.session.get("auth")
+    service = HouseholdInformationService(
+        HouseholdInfoRepository(
+            ConnectionAdapter()
+            )
+        )
+    household_details = service.execute(household_id)
     return render(request, "household/household_info.html", {
-        'user_fullname' : user_fullname,
-        'user_role' : user_role,
+        'user_fullname' : session.get("first_name") + " " + session.get("middle_name", "") + " " + session.get("last_name"),
+        'user_role' : session.get("role_name"),
         'page_path' : f'{user_role} / Request Details',
         'page_title' : 'Request Details',
-        'user_role_template' : user_role_template
+        'user_role_template' : user_role_template,
+        'household_details' : household_details.get('household_info'),
+        'families' : household_details.get('family_units'),
     })

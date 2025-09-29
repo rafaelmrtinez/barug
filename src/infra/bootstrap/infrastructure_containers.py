@@ -1,7 +1,7 @@
 from dependency_injector import containers, providers
 
 from src.domain.contracts.scheduling_repository_contract import ISchedulingRepository
-from src.infra.repositories.scheduling_repository import SchedulingRepository
+from src.infra.repositories.scheduling_repository import ActiveScheduleRepository
 
 
 class InfraContainer(containers.DeclarativeContainer):
@@ -10,6 +10,6 @@ class InfraContainer(containers.DeclarativeContainer):
     context = providers.Object(None)
     
     active_schedules: providers.Factory[ISchedulingRepository] = providers.Factory(
-        SchedulingRepository,
+        ActiveScheduleRepository,
         ctx=context
     )

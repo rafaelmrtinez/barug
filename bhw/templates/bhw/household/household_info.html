@@ -24,11 +24,11 @@
         <div class="col-md-6">
           <div class="section-title mb-2">Household</div>
           <div class="kv">
-            <div class="kv-item"><span class="kv-key">Household Head</span><span class="kv-val">{{ household_head }}</span></div>
-            <div class="kv-item"><span class="kv-key">Household No.</span><span class="kv-val">{{ household_num }}</span></div>
-            <div class="kv-item"><span class="kv-key">House Type</span><span class="kv-val">{{ house_type }}</span></div>
-            <div class="kv-item"><span class="kv-key">House Ownership</span><span class="kv-val">{{ house_ownership }}</span></div>
-            <div class="kv-item"><span class="kv-key">Home Address</span><span class="kv-val">{{ address }}</span></div>
+            <div class="kv-item"><span class="kv-key">Household Head</span><span class="kv-val">{{ household_details.household_head }}</span></div>
+            <div class="kv-item"><span class="kv-key">Household No.</span><span class="kv-val">{{ household_details.household_num }}</span></div>
+            <div class="kv-item"><span class="kv-key">House Type</span><span class="kv-val">{{ household_details.house_type }}</span></div>
+            <div class="kv-item"><span class="kv-key">House Ownership</span><span class="kv-val">{{ household_details.house_ownership }}</span></div>
+            <div class="kv-item"><span class="kv-key">Home Address</span><span class="kv-val">{{ household_details.address }}</span></div>
           </div>
         </div>
 
@@ -79,8 +79,19 @@
                     <strong class="d-block mb-2">Members</strong>
                     {% if family.members and family.members|length > 0 %}
                     <div class="member-grid" data-bs-toggle="modal" data-bs-target="#memberModal">
-                      {% for member in family.members %}
-                        <button type="button" class="btn member-pill">{{ member }}</button>
+                      {% for member in family.member_details %}
+                      <button type="button"
+                              class="btn member-pill"
+                              data-bs-toggle="modal"
+                              data-bs-target="#memberModal"
+                              data-name="{{ member.name }}"
+                              data-relation="{{ member.relation }}"
+                              data-age="{{ member.age }}"
+                              data-sex="{{ member.sex }}"
+                              data-family="{{ family.family_num }}"
+                              data-head="{{ family.head_name }}">
+                        {{ member.name }}
+                      </button>
                       {% endfor %}
                     </div>
                     {% else %}
@@ -147,4 +158,36 @@
     </div>
   </div>
 </div>
+<script>
+(() => {
+  document.addEventListener('DOMContentLoaded', function () {
+  const memberModal = document.getElementById('memberModal');
+
+  memberModal.addEventListener('show.bs.modal', function (event) {
+    const button = event.relatedTarget; // button that triggered the modal
+
+    // Grab data from button
+    const name = button.getAttribute('data-name') || '—';
+    const relation = button.getAttribute('data-relation') || '—';
+    const age = button.getAttribute('data-age') || '—';
+    const sex = button.getAttribute('data-sex') || '—';
+    const family = button.getAttribute('data-family') || '—';
+    const head = button.getAttribute('data-head') || '—';
+
+    // Populate modal
+    memberModal.querySelector('[data-field="name"]').textContent = name;
+    memberModal.querySelector('[data-field="relation"]').textContent = relation;
+    memberModal.querySelector('[data-field="age"]').textContent = age;
+    memberModal.querySelector('[data-field="sex"]').textContent = sex;
+    memberModal.querySelector('[data-field="family"]').textContent = family;
+    memberModal.querySelector('[data-field="head"]').textContent = head;
+
+    // Initials avatar (first letters of first/last word)
+    const initials = name.trim().split(/\s+/).map(w => w[0]).join('').substring(0,2).toUpperCase();
+    memberModal.querySelector('#memberInitials').textContent = initials || '?';
+  });
+});
+})();
+</script>
+
 {% endblock %}
