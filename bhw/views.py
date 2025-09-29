@@ -149,6 +149,7 @@ def active_schedule(
 ) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
     
     if request.method == "POST":
+        # TODO: To be implemented: Reschedule
         week_range = request.POST.get("select-week_range")
         reason = request.POST.get("reschedule")
         reschedule_id = request.POST.get("reschedule-id")
@@ -201,10 +202,13 @@ def active_schedule(
 
 
 @session_login_required
-@role_required("Super Admin")
+@role_required("Super Admin", "Barangay Health Worker")
 @csrf_protect
 @inject
-def household_info(request, household_id, service: IHouseholdInfoService = Provide[AppContainer.household_info_service]) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+def household_info(
+    request, household_id, 
+    service: IHouseholdInfoService = Provide[
+        AppContainer.household_info_service]) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
     if not household_id:
         return redirect('bhw:active_schedule')
     session = request.session.get("auth")
