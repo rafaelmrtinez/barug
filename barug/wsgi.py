@@ -10,8 +10,9 @@ https://docs.djangoproject.com/en/5.2/howto/deployment/wsgi/
 import os
 
 from django.core.wsgi import get_wsgi_application
-from barug.containers import app
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "barug.settings")
 
 application = get_wsgi_application()
+
+from barug.containers import app
