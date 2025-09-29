@@ -1,5 +1,38 @@
 from django import forms
 
+class Schedule(forms.Form):
+    day = forms.ChoiceField(
+        choices = [],
+        widget=forms.Select(attrs={
+            'id' : 'day',
+            'class' : 'form-select',
+    }),
+        label= 'Select a Day',
+        required= True,
+    )
+    time_start = forms.TimeField(
+        widget=forms.TimeInput(attrs={
+            "id": "time_start",
+            "class": "form-control",
+            "type": "time",
+            "step": "300",
+        }),
+        input_formats=["%H:%M", "%H:%M:%S"],
+        label="Time-in",
+        required=True,
+    )
+    time_end = forms.TimeField(
+        widget=forms.TimeInput(attrs={
+            "id": "time_end",
+            "class": "form-control",
+            "type": "time",
+            "step": "300",
+        }),
+        input_formats=["%H:%M", "%H:%M:%S"],
+        label="Time-out",
+        required=True,
+    )
+
 class StaffFilters(forms.Form):
     search = forms.CharField(
         widget=forms.TextInput(attrs={

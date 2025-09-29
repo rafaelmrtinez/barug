@@ -4,6 +4,7 @@ from .forms import SearchPerson
 from .forms import ResidentProfileform
 from .forms import ChooseRole
 from .forms import StaffFilters
+from .forms import Schedule
 
 #need back-end for proper assignment
 user_fullname = 'lname, fname mname suffix'
@@ -24,6 +25,7 @@ def staff_selection(request):
 def staff_selection_resident(request):
     form = SearchPerson()
     role_form = ChooseRole()
+    sched_form = Schedule()
     return render(request, "staff_admin/staff/staff_selection_resident.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
@@ -32,6 +34,7 @@ def staff_selection_resident(request):
         'user_role_template': user_role_template,
         'form' : form,
         'role_form': role_form,
+        'sched_form': sched_form
     })
 
 def staff_selection_nonres(request):
@@ -71,16 +74,16 @@ def staff_selection_nonres_docs(request):
     })
 
 def staff_selection_nonres_role_review(request):
-    form = ChooseRole()
     role_form = ChooseRole()
+    sched_form = Schedule()
     return render(request, "staff_admin/staff/role.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
         'page_path': f'{user_role} / Account Verification',
         'page_title': 'Account Verification',
         'user_role_template': user_role_template,
-        'form' : form,
         'role_form': role_form,
+        'sched_form': sched_form,
     })
 
 def staff_list(request):

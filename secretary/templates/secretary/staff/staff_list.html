@@ -7,66 +7,7 @@
 <link rel="stylesheet" href="{% static 'css/table.css' %}">
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
 <link rel="stylesheet" href="{% static 'css/paginator.css' %}">
-<style>
-  :root{
-    --brand-900:#3a1217;
-    --brand-800:#561c24;
-    --brand-700:#6d2932;
-    --brand-600:#7a323b;
-    --brand-100:#f3eaeb;
-    --brand-050:#fbf6f6;
-  }
-  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
-  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
-  .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); background:#fff; }
-  .btn-outline-brand:hover{ background:var(--brand-700); color:#fff; }
-  .btn-brand-subtle{ background:var(--brand-100); color:var(--brand-700); border-color:var(--brand-100); }
-  .btn-brand-subtle:hover{ background:var(--brand-050); color:var(--brand-700); }
-
-  .form-control:focus, .form-select:focus{
-    border-color:var(--brand-700);
-    box-shadow:0 0 0 .25rem rgba(109,41,50,.25);
-    outline:none;
-  }
-
-  /* Toolbar */
-  .toolbar{
-    background:#fff; border:1px solid var(--bs-border-color,#dee2e6);
-    border-radius:1rem; padding:.75rem; gap:.5rem;
-  }
-  .searchbox{ position:relative; flex:1; min-width:280px; }
-  .searchbox .bi{
-    position:absolute; left:.8rem; top:50%; transform:translateY(-50%);
-    opacity:.6; color:var(--brand-700); pointer-events:none;
-  }
-  .searchbox :where(input,.form-control){ padding-left:2.35rem !important; }
-
-  /* Chips */
-  .filters-bar{ gap:.5rem; }
-  .filter-chip{
-    display:inline-flex; align-items:center; gap:.4rem;
-    padding:.3rem .65rem; border-radius:999px; font-size:.8rem;
-    text-decoration:none; border:1px solid rgba(109,41,50,.18);
-    background:var(--brand-050); color:var(--brand-700);
-  }
-  .filter-chip:hover{ background:var(--brand-100); }
-  .filter-chip .x{
-    display:inline-grid; place-items:center; width:1rem; height:1rem; border-radius:50%;
-    background:#fff; border:1px solid rgba(109,41,50,.22); line-height:1; font-weight:700; color:var(--brand-700);
-  }
-
-  .table thead th{ border-bottom-width:2px; }
-  .table tbody tr:hover{ background:#fcfcfd; }
-
-  /* Offcanvas */
-  .offcanvas.filter-offcanvas{
-    width:420px; max-width:90vw; --bs-offcanvas-bg:#fff;
-    background-color:var(--bs-offcanvas-bg)!important;
-    z-index:1200; box-shadow:-2px 0 24px rgba(0,0,0,.12);
-  }
-  .offcanvas.filter-offcanvas .offcanvas-header{ border-bottom:1px solid var(--bs-border-color); }
-  .offcanvas-footer{ position:sticky; bottom:-1px; background:#fff; border-top:1px solid var(--bs-border-color); padding-top:1rem; margin-top:1rem; }
-</style>
+<link rel="stylesheet" href="{% static 'css/filters.css' %}">
 {% endblock %}
 
 {% block content %}
