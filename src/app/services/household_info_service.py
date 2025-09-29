@@ -1,3 +1,4 @@
+from typing import Any
 from src.infra.repositories.household_info_repository import HouseholdInfoRepository
 
 
@@ -5,8 +6,8 @@ class HouseholdInformationService:
     
     def __init__(self, household_info_repository: HouseholdInfoRepository):
         self._household_info_repository = household_info_repository
-        
-    def execute(self, household_id: int):
+
+    def execute(self, household_id: int) -> dict[str, dict[str, Any] | list]:
         basic_household_info = self._household_info_repository.get_basic_info_by_id(household_id)
         raw_families = self._household_info_repository.get_basic_family_unit_details_by_household_id(household_id)
         normalized_families = []
