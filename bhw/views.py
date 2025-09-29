@@ -150,10 +150,8 @@ def active_schedule(
     
     if request.method == "POST":
         # TODO: To be implemented: Reschedule
-        week_range = request.POST.get("select-week_range")
-        reason = request.POST.get("reschedule")
-        reschedule_id = request.POST.get("reschedule-id")
-        print(week_range, reason, reschedule_id)
+        week_range = request.POST.get("week_start")
+        reason = request.POST.get("reason")
         return redirect("bhw:active_schedule")
 
     pending = scheduling_service.execute(
