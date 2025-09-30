@@ -7,7 +7,7 @@ class SchedulingRepositoryTest(TestCase):
     
     def setUp(self):
         self.repo: ActiveScheduleRepository = ActiveScheduleRepository(ConnectionAdapter())
-        
+
     def test_insert_new_schedule(self):
         from src.app.transfer_objects.commands.reschedule_cmd import RescheduleCommand
         cmd = RescheduleCommand(

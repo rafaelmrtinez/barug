@@ -12,6 +12,7 @@ from src.app.services.household_info_service import HouseholdInformationService
 from src.app.transfer_objects.commands.reschedule_cmd import RescheduleCommand
 from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.exceptions.rescheduling_exception import ReschedulingException
+
 from src.infra.repositories.household_info_repository import HouseholdInfoRepository
 from .forms import SearchActiveScheduleFilter
 from .forms import StatusActiveScheduleFilter
@@ -139,8 +140,6 @@ user_role = 'Barangay Health Worker'
 user_role_template = user_role.lower().replace(' ', '_')
 
 # Create your views here.
-
-
 @session_login_required
 @role_required("Super Admin", "Barangay Health Worker")
 @csrf_protect
@@ -201,7 +200,7 @@ def active_schedule(
         status_form = StatusActiveScheduleFilter()
     if request.GET.get("week_range") and not week_range_form.is_valid():
         week_range_form = WeekRangeActiveScheduleFilter()
-
+        
     return render(
         request,
         template,
