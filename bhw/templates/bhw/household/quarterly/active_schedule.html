@@ -12,11 +12,19 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-wrap">
 
+<div class="page-wrap">
+    
     <div class="container-fluid pt-3 page-main" style="margin-top: 40px;">
         <div class="row">
             <div>
+                {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}">
+                    {{ message }}
+                    </div>
+                {% endfor %}
+                {% endif %}
 
                 <div class="col-12 mb-3">
                     <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-2">
@@ -135,6 +143,9 @@
                                 </button>
                             </div>
 
+                            <input type="hidden" name="schedule_id" id="scheduleIdField" value="">
+
+
                             <!-- seed from Django; JS updates this before submit -->
                             <input type="hidden" name="week_start" id="weekStartField"
                                 value="{{ week_start|date:'Y-m-d' }}">
@@ -183,6 +194,18 @@
                 });
             }
         });
+    })();
+</script>
+<script>
+    (() => {
+        const rescheduleModal = document.getElementById('rescheduleModal')
+        rescheduleModal.addEventListener('show.bs.modal', event => {
+        const button = event.relatedTarget // Button that triggered the modal
+        const scheduleId = button.getAttribute('data-schedule-id')
+        // Update hidden field
+        const hiddenInput = rescheduleModal.querySelector('#scheduleIdField')
+        hiddenInput.value = scheduleId
+    })
     })();
 </script>
 {% endblock %}
