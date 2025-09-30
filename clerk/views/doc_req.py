@@ -19,9 +19,8 @@ from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
 from authentication.supabase_client import supabase
 
-from .forms import (
-    SearchVerificationRequest, SearchBusinessOwner, BusinessOwnerInfo,
-    BusinessDetails, BusinessFilters, RequestedDocsFilters
+from ..forms import (
+    SearchVerificationRequest
 )
 
 import logging
@@ -30,13 +29,13 @@ import logging
 from common.send_email import send_email
 
 # ---- services ----
-from .services.requests_service import _fetch_bundle, _set_status
-from .services.subject_service import subject_view
-from .services.pdf_service import (
+from ..services.requests_service import _fetch_bundle, _set_status
+from ..services.subject_service import subject_view
+from ..services.pdf_service import (
     _pdf_templates_dir, _get_all_pdf_field_names, _fill_pdf_with_values,
     _choose_template, _safe_str, _fill_fields_for_line
 )
-from .services.id_verification_service import (
+from ..services.id_verification_service import (
     fetch_id_verification_requests,
     get_verification_status_for_person,
 )
@@ -932,128 +931,128 @@ def walkin_create(request: HttpRequest):
 # =========================
 # Business screens (stubs; clerk-only)
 # =========================
-def _profile_fallbacks(request: HttpRequest):
-    user_role = (request.session.get("auth") or {}).get("role_name")
-    user_role_template = user_role.lower().replace(" ", "_")
-    return user_role.title(), user_role_template
+# def _profile_fallbacks(request: HttpRequest):
+#     user_role = (request.session.get("auth") or {}).get("role_name")
+#     user_role_template = user_role.lower().replace(" ", "_")
+#     return user_role.title(), user_role_template
 
-@session_login_required
-@role_required(CLERK_ROLE)
-@nocache
-def business_owner(request: HttpRequest):
-    user_fullname, user_role_template = _profile_fallbacks(request)
-    return render(
-        request,
-        "business/business_owner.html",
-        {
-            "user_fullname": user_fullname,
-            "user_role": user_fullname,
-            "page_path": f"{user_fullname} / Business Records / Add Business / Business Owner",
-            "page_title": "Business Owner",
-            "user_role_template": user_role_template,
-        },
-    )
+# @session_login_required
+# @role_required(CLERK_ROLE)
+# @nocache
+# def business_owner(request: HttpRequest):
+#     user_fullname, user_role_template = _profile_fallbacks(request)
+#     return render(
+#         request,
+#         "business/business_owner.html",
+#         {
+#             "user_fullname": user_fullname,
+#             "user_role": user_fullname,
+#             "page_path": f"{user_fullname} / Business Records / Add Business / Business Owner",
+#             "page_title": "Business Owner",
+#             "user_role_template": user_role_template,
+#         },
+#     )
 
-@session_login_required
-@role_required(CLERK_ROLE)
-@nocache
-def business_owner_resident(request: HttpRequest):
-    user_fullname, user_role_template = _profile_fallbacks(request)
-    form = SearchBusinessOwner()
-    return render(
-        request,
-        "business/business_owner_resident.html",
-        {
-            "user_fullname": user_fullname,
-            "user_role": user_fullname,
-            "page_path": f"{user_fullname} / Business Records / Add Business / Business Owner Information",
-            "page_title": "Business Owner Information",
-            "user_role_template": user_role_template,
-            "form": form,
-        },
-    )
+# @session_login_required
+# @role_required(CLERK_ROLE)
+# @nocache
+# def business_owner_resident(request: HttpRequest):
+#     user_fullname, user_role_template = _profile_fallbacks(request)
+#     form = SearchBusinessOwner()
+#     return render(
+#         request,
+#         "business/business_owner_resident.html",
+#         {
+#             "user_fullname": user_fullname,
+#             "user_role": user_fullname,
+#             "page_path": f"{user_fullname} / Business Records / Add Business / Business Owner Information",
+#             "page_title": "Business Owner Information",
+#             "user_role_template": user_role_template,
+#             "form": form,
+#         },
+#     )
 
-@session_login_required
-@role_required(CLERK_ROLE)
-@nocache
-def business_details(request: HttpRequest):
-    user_fullname, user_role_template = _profile_fallbacks(request)
-    form = BusinessDetails()
-    return render(
-        request,
-        "business/business_details.html",
-        {
-            "user_fullname": user_fullname,
-            "user_role": user_fullname,
-            "page_path": f"{user_fullname} / Business Records / Add Business / Business Information",
-            "page_title": "Business Information",
-            "user_role_template": user_role_template,
-            "form": form,
-        },
-    )
+# @session_login_required
+# @role_required(CLERK_ROLE)
+# @nocache
+# def business_details(request: HttpRequest):
+#     user_fullname, user_role_template = _profile_fallbacks(request)
+#     form = BusinessDetails()
+#     return render(
+#         request,
+#         "business/business_details.html",
+#         {
+#             "user_fullname": user_fullname,
+#             "user_role": user_fullname,
+#             "page_path": f"{user_fullname} / Business Records / Add Business / Business Information",
+#             "page_title": "Business Information",
+#             "user_role_template": user_role_template,
+#             "form": form,
+#         },
+#     )
 
-@session_login_required
-@role_required("Barangay Clerk")
-@nocache
-def business_list(request: HttpRequest):
-    user_role, user_role_template = _profile_fallbacks(request)
-    form = BusinessFilters()
-    rows, rpc_error = [], None
-    try:
-        resp = supabase.rpc("get_business_summary", {}).execute()
-        rows = resp.data or []
-    except Exception as e:
-        rpc_error = str(e)
-        rows = []
+# @session_login_required
+# @role_required("Barangay Clerk")
+# @nocache
+# def business_list(request: HttpRequest):
+#     user_role, user_role_template = _profile_fallbacks(request)
+#     form = BusinessFilters()
+#     rows, rpc_error = [], None
+#     try:
+#         resp = supabase.rpc("get_business_summary", {}).execute()
+#         rows = resp.data or []
+#     except Exception as e:
+#         rpc_error = str(e)
+#         rows = []
 
-    paginator = Paginator(rows, 15)
-    page_obj = paginator.get_page(request.GET.get("page"))
+#     paginator = Paginator(rows, 15)
+#     page_obj = paginator.get_page(request.GET.get("page"))
 
-    context = {
-        "page_path": f"{user_role} / Business Records",
-        "page_title": "Business Records",
-        "user_role_template": user_role_template,
-        "form": form,
-        "rows": rows,
-        "rpc_error": rpc_error,
-        "page_obj": page_obj,
-    }
+#     context = {
+#         "page_path": f"{user_role} / Business Records",
+#         "page_title": "Business Records",
+#         "user_role_template": user_role_template,
+#         "form": form,
+#         "rows": rows,
+#         "rpc_error": rpc_error,
+#         "page_obj": page_obj,
+#     }
 
-    return render(request, "business/business_list.html", context)
+#     return render(request, "business/business_list.html", context)
 
-@session_login_required
-@role_required(CLERK_ROLE)
-@nocache
-def business_information(request: HttpRequest, b_id: int):
-    user_fullname, user_role_template = _profile_fallbacks(request)
-    return render(
-        request,
-        "business/business_information.html",
-        {
-            "user_fullname": user_fullname,
-            "user_role": user_fullname,
-            "page_path": f"{user_fullname} / Business Records / Business Details : {b_id}",
-            "page_title": f"Business Details : {b_id}",
-            "user_role_template": user_role_template,
-        },
-    )
+# @session_login_required
+# @role_required(CLERK_ROLE)
+# @nocache
+# def business_information(request: HttpRequest, b_id: int):
+#     user_fullname, user_role_template = _profile_fallbacks(request)
+#     return render(
+#         request,
+#         "business/business_information.html",
+#         {
+#             "user_fullname": user_fullname,
+#             "user_role": user_fullname,
+#             "page_path": f"{user_fullname} / Business Records / Business Details : {b_id}",
+#             "page_title": f"Business Details : {b_id}",
+#             "user_role_template": user_role_template,
+#         },
+#     )
 
 # Hannah's Code:
-def business_owner_nonresident(request: HttpRequest):
-    user_fullname, user_role_template = _profile_fallbacks(request)
-    form = BusinessOwnerInfo()
-    return render(
-        request,
-        "business/business_owner_nonres.html",
-        {
-            "user_fullname": user_fullname,
-            "user_role": user_fullname,
-            "page_path": f"{user_fullname} / Business Records / Add Business / Business Owner Information",
-            "page_title": "Business Owner Information",
-            "user_role_template": user_role_template,
-            "form": form,
-        },
-    )
+# def business_owner_nonresident(request: HttpRequest):
+#     user_fullname, user_role_template = _profile_fallbacks(request)
+#     form = BusinessOwnerInfo()
+#     return render(
+#         request,
+#         "business/business_owner_nonres.html",
+#         {
+#             "user_fullname": user_fullname,
+#             "user_role": user_fullname,
+#             "page_path": f"{user_fullname} / Business Records / Add Business / Business Owner Information",
+#             "page_title": "Business Owner Information",
+#             "user_role_template": user_role_template,
+#             "form": form,
+#         },
+#     )
 
 def _rpc_approve_person_by_clerk(request: HttpRequest, person_id: int, status_id: int, remarks: str | None):
     auth = request.session.get("auth") or {}
