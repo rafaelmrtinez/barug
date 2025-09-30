@@ -1,180 +1,446 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load static %}
-{% load bootstrap_icons %}
+{% block title %}Record Details{% endblock %}
 
-{% block css %}
-<link rel="stylesheet" href="{% static 'css/form.css' %}">
-<link rel="stylesheet" href="{% static 'css/table.css' %}">
-<link rel="stylesheet" href="{% static 'css/button.css' %}">
-<style>.badge-soft{background:#f8f9fa;border:1px solid #e9ecef;border-radius:999px;padding:.2rem .5rem;}</style>
+{% block extra_css %}
+<style>
+  :root{
+    --brand-900:#321017; --brand-800:#4a1620; --brand-700:#6d2932;
+    --brand-100:#f7eef0; --ink:#222; --muted:#6b7280;
+  }
+  .card{border:1px solid var(--brand-800);border-radius:16px;background:#fff;}
+  .pill{padding:.125rem .6rem;border-radius:9999px;font-weight:600;font-size:.75rem;}
+  .pill-green{background:#e7f6ea;color:#187b2b;}
+  .pill-gray{background:#eee;color:#444;}
+  .section-title{color:var(--brand-700);font-weight:700;}
+  details summary{cursor:pointer;user-select:none;}
+  details{border:1px dashed #e5e7eb;border-radius:12px;padding:.5rem 1rem;background:#fff;}
+
+  /* chips */
+  .chip{display:inline-flex;align-items:center;gap:.35rem;padding:.25rem .6rem;border-radius:999px;
+        border:1px solid #e5e7eb;font-size:.78rem;background:#fafafa;margin:.2rem .25rem;}
+  .chip .x{cursor:pointer;font-weight:700;opacity:.7}
+
+  /* toggle pills (danger signs) */
+  .toggle-pills .btn{border-radius:999px;border:1px solid rgba(109,41,50,.25);color:var(--brand-700);}
+  .toggle-pills .btn.active{background:var(--brand-700);color:#fff;border-color:var(--brand-700);}
+
+  /* modal polish */
+  .modal.mhr .modal-dialog{max-width:980px;}
+  .modal.mhr .modal-content{border-radius:16px;border:1px solid var(--brand-800);box-shadow:0 20px 50px rgba(0,0,0,.25);}
+  .modal.mhr .modal-header{background:linear-gradient(90deg,var(--brand-800),var(--brand-700));color:#fff;border-top-left-radius:16px;border-top-right-radius:16px;}
+  .modal.mhr .modal-title{font-weight:700}
+  .modal.mhr.fade .modal-dialog{transform:translateY(10px) scale(.98);transition:transform .18s ease,opacity .18s ease;}
+  .modal.mhr.show .modal-dialog{transform:translateY(0) scale(1);}
+  .modal.mhr .badge-tri{background:var(--brand-100);color:var(--brand-800);font-weight:600;border:1px solid rgba(109,41,50,.25);}
+  .modal.mhr .sticky-footer{position:sticky;bottom:-1px;background:#fff;border-top:1px solid #eee;
+    display:flex;justify-content:space-between;align-items:center;gap:.5rem;padding:.75rem 1rem;
+    border-bottom-left-radius:16px;border-bottom-right-radius:16px;}
+
+  .muted{color:#6b7280}
+  .label-sm{font-size:.85rem;color:#374151}
+  .kbd{font-variant:all-small-caps; letter-spacing:.5px; font-weight:600; color:#555;}
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid pt-3" style="margin-top: 40;">
+<div class="container my-4">
+
+  <!-- Header -->
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-      <div class="text-muted small">{{ page_path }}</div>
-      <h3 class="mb-0">{{ page_title }}</h3>
-    </div>
-    <div>
-      {% if rec.kind == 'maternal' %}
-      <button class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#ancModal">{% bs_icon 'plus' extra_classes='me-2' %} Add ANC Visit</button>
-      {% else %}
-      <button class="btn btn-brand me-2" data-bs-toggle="modal" data-bs-target="#vaxModal">{% bs_icon 'plus' extra_classes='me-2' %} Add Vaccine</button>
-      <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#childVisitModal">{% bs_icon 'plus' extra_classes='me-2' %} Add Visit</button>
-      {% endif %}
-    </div>
+    <h2 class="mb-0">Record Details</h2>
+    <span class="pill {% if rec.status and rec.status|lower == 'active' %}pill-green{% else %}pill-gray{% endif %}">
+      {{ rec.status|default:"ACTIVE" }}
+    </span>
   </div>
 
-  <div class="card mb-3">
-    <div class="card-body">
-      <div class="d-flex flex-wrap gap-3 align-items-center">
-        <div><strong>{{ rec.name }}</strong> <span class="badge-soft text-uppercase ms-2">{{ rec.kind }}</span></div>
-        <div>Family #: <strong>{{ rec.family_no }}</strong></div>
-        {% if rec.ufc_no %}<div>UFC #: <strong>{{ rec.ufc_no }}</strong></div>{% endif %}
-        <div>Address: <strong>{{ rec.address|default:'—' }}</strong></div>
+  <!-- Summary cards -->
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="card p-3 h-100">
+        <div class="section-title mb-2">Mother & Episode</div>
+        <div class="small">
+          <div class="d-flex justify-content-between"><span>Name</span><span class="fw-semibold">{{ rec.person_name|default:"—" }}</span></div>
+          <div class="d-flex justify-content-between"><span>MHR ID</span><span>#{{ rec.mhr_id|default:"—" }}</span></div>
+          <div class="d-flex justify-content-between"><span>Family No.</span><span>{{ rec.family_num|default:"—" }}</span></div>
+          <div class="d-flex justify-content-between"><span>LMP</span><span>{{ rec.lmp_date|default:"—" }}</span></div>
+          <div class="d-flex justify-content-between"><span>EDD</span><span>{{ rec.edd_date|default:"—" }}</span></div>
+          <div class="d-flex justify-content-between"><span>Assessed by (ID)</span><span>{{ rec.assessed_by_id|default:"—" }}</span></div>
+        </div>
       </div>
     </div>
-  </div>
 
-  {% if rec.kind == 'maternal' %}
-  <div class="row g-3">
-    <div class="col-lg-8">
-      <div class="card mb-3">
-        <div class="card-header fw-semibold">Present Pregnancy</div>
-        <div class="card-body">
-          <div class="row">
-            <div class="col">Gravida: <strong>{{ rec.present.gravida }}</strong></div>
-            <div class="col">Para: <strong>{{ rec.present.para }}</strong></div>
-            <div class="col">LMP: <strong>{{ rec.present.lmp }}</strong></div>
-            <div class="col">EDC: <strong>{{ rec.present.edc }}</strong></div>
+    <div class="col-md-4">
+      <div class="card p-3 h-100">
+        <div class="section-title mb-2">Plans</div>
+        <div class="small">
+          <div class="d-flex justify-content-between"><span>Delivery Plan</span><span class="fw-semibold">{{ rec.place_of_delivery_plan|default:"—" }}</span></div>
+          <div class="d-flex justify-content-between"><span>Newborn Screening</span>
+            <span>{% if rec.new_born_screening_plan %}Planned{% else %}Not planned{% endif %}</span>
           </div>
         </div>
       </div>
-
-      <div class="card mb-3">
-        <div class="card-header fw-semibold">ANC Visits</div>
-        <div class="card-body p-0">
-          <table class="table mb-0">
-            <thead><tr><th>Date</th><th>GA</th><th>BP</th><th>Weight</th><th>FHT</th><th>Remarks</th></tr></thead>
-            <tbody>
-              {% for v in rec.anc %}<tr><td>{{ v.date }}</td><td>{{ v.ga }}</td><td>{{ v.bp }}</td><td>{{ v.wt }}</td><td>{{ v.fht }}</td><td>{{ v.remarks }}</td></tr>{% empty %}
-              <tr><td colspan="6" class="text-center">No ANC visits yet.</td></tr>{% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
 
-    <div class="col-lg-4">
-      <div class="card mb-3">
-        <div class="card-header fw-semibold">Tetanus Toxoid</div>
-        <div class="card-body">
-          <ul class="mb-0">{% for t in rec.tt %}<li>{{ t.dose }} — {{ t.date }}</li>{% empty %}<li>No doses.</li>{% endfor %}</ul>
-        </div>
-      </div>
-      <div class="card mb-3"><div class="card-header fw-semibold">Laboratory</div>
-        <div class="card-body">
-          {% for k,v in rec.labs.items %}<div class="d-flex justify-content-between"><span>{{ k }}</span><strong>{{ v }}</strong></div>{% empty %}
-          <div class="text-muted">No results.</div>{% endfor %}
-          <div class="mt-2 small text-muted">OGCT 50g: {{ rec.ogct_50 }} &nbsp;•&nbsp; OGCT 100g: {{ rec.ogct_100 }}</div>
-        </div>
-      </div>
-      <div class="card"><div class="card-header fw-semibold">Plans</div>
-        <div class="card-body">
-          <div>Place of Delivery: <strong>{{ rec.plan_delivery }}</strong></div>
-          <div>Newborn Screening: <strong>{{ rec.plan_nbs|yesno:"Yes,No" }}</strong></div>
+    <div class="col-md-4">
+      <div class="card p-3 h-100">
+        <div class="section-title mb-2">Anthropometrics</div>
+        <div class="small">
+          <div class="d-flex justify-content-between"><span>Height</span><span id="h-val">{{ rec.height|default:"—" }}</span></div>
+          <div class="d-flex justify-content-between"><span>Weight</span><span id="w-val">{{ rec.weight|default:"—" }}</span></div>
+          <div class="d-flex justify-content-between"><span>BMI</span><span id="bmi-val">—</span></div>
+          <div class="d-flex justify-content-between"><span>BMI Status</span><span>{{ rec.bmi_status_id|default:"—" }}</span></div>
+          <div class="d-flex justify-content-between"><span>Created</span><span>{{ rec.created_at|default:"—" }}</span></div>
         </div>
       </div>
     </div>
   </div>
 
-  {% else %}{# child #}
-  <div class="row g-3">
-    <div class="col-lg-5">
-      <div class="card">
-        <div class="card-header fw-semibold">Child Information</div>
-        <div class="card-body">
-          <div>Sex: <strong>{{ rec.sex }}</strong></div>
-          <div>Birth Date: <strong>{{ rec.dob }}</strong></div>
-          <div>Birth Order: <strong>{{ rec.birth_order }}</strong></div>
-          <div>Place of Delivery: <strong>{{ rec.place_of_delivery }}</strong></div>
-          <div>Birth Weight: <strong>{{ rec.birth_weight }}</strong></div>
-          <div>Feeding: <strong>{{ rec.feeding }}</strong></div>
-          <div>Mother: <strong>{{ rec.mother }}</strong></div>
-          <div>Father: <strong>{{ rec.father }}</strong></div>
-        </div>
+  <!-- ANC Visits -->
+  <details class="mb-3" id="anc-section" open>
+    <summary class="fw-semibold">ANC Visits</summary>
+    <div class="mt-3">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead class="text-muted">
+            <tr>
+              <th>Date</th><th>GA (wks)</th><th>Trimester</th><th>BP</th><th>Weight</th><th>FHR</th><th>Danger</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for v in rec.visits %}
+              <tr>
+                <td>{{ v.visit_date|default:"—" }}</td>
+                <td>{{ v.ga_weeks|default:"—" }}</td>
+                <td>{{ v.trimester_name|default:"—" }}</td>
+                <td>{% if v.bp_sys and v.bp_dia %}{{ v.bp_sys }}/{{ v.bp_dia }}{% else %}—{% endif %}</td>
+                <td>{% if v.weight_kg %}{{ v.weight_kg }} kg{% else %}—{% endif %}</td>
+                <td>{{ v.fhr_bpm|default:"—" }}</td>
+                <td>{% if v.has_danger %}<span class="pill pill-gray">YES</span>{% else %}<span class="pill pill-green">NO</span>{% endif %}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="7" class="text-center text-muted">No visits yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
+
+      <button id="openAddVisitBtn" class="btn btn-sm" style="background:var(--brand-700);color:#fff"
+              data-bs-toggle="modal" data-bs-target="#visitModal">
+        Add New Visit
+      </button>
     </div>
-    <div class="col-lg-7">
-      <div class="card mb-3">
-        <div class="card-header fw-semibold">Immunizations</div>
-        <div class="card-body p-0">
-          <table class="table mb-0"><thead><tr><th>Vaccine</th><th colspan="4">Doses</th></tr></thead>
-            <tbody>{% for im in rec.immunizations %}<tr><td>{{ im.name }}</td>
-              {% for d in im.doses %}<td>{{ d|default:"—" }}</td>{% endfor %}</tr>{% empty %}
-              <tr><td colspan="5" class="text-center">No records.</td></tr>{% endfor %}</tbody>
-          </table>
+  </details>
+
+  <!-- Delivery (placeholder) -->
+  <details id="delivery-section">
+    <summary class="fw-semibold">Delivery</summary>
+    <div class="mt-3">
+      {% if rec.delivery %}
+        <div class="card p-3">
+          <div class="small">
+            <div class="d-flex justify-content-between"><span>Date</span><span>{{ rec.delivery.delivery_date|default:"—" }}</span></div>
+            <div class="d-flex justify-content-between"><span>Type</span><span>{{ rec.delivery.delivery_type_name|default:"—" }}</span></div>
+            <div class="d-flex justify-content-between"><span>Place</span><span>{{ rec.delivery.place|default:"—" }}</span></div>
+            <div class="d-flex justify-content-between"><span>Notes</span><span>{{ rec.delivery.notes|default:"—" }}</span></div>
+          </div>
         </div>
-      </div>
-      <div class="card">
-        <div class="card-header fw-semibold">Visits</div>
-        <div class="card-body p-0">
-          <table class="table mb-0"><thead><tr><th>Date</th><th>Age</th><th>Wt</th><th>Temp</th><th>Ht</th><th>Findings</th><th>Notes</th></tr></thead>
-            <tbody>{% for v in rec.visits %}<tr><td>{{ v.date }}</td><td>{{ v.age }}</td><td>{{ v.wt }}</td><td>{{ v.temp }}</td><td>{{ v.ht }}</td><td>{{ v.findings }}</td><td>{{ v.notes }}</td></tr>
-              {% empty %}<tr><td colspan="7" class="text-center">No visits.</td></tr>{% endfor %}</tbody></table>
+      {% else %}
+        <div class="text-muted">No delivery recorded.</div>
+      {% endif %}
+    </div>
+  </details>
+
+</div>
+
+<!-- ============ ADD VISIT MODAL (non-dismissable) ============ -->
+<div class="modal fade mhr" id="visitModal" tabindex="-1" aria-labelledby="visitTitle"
+     data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="visitTitle">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title h5" id="visitTitle">Add ANC Visit</div>
+          <div class="small">Fill out details below. <span class="badge badge-tri ms-1" id="triBadge">—</span></div>
         </div>
+        <button type="button" class="btn btn-sm btn-outline-light" id="xClose">Close</button>
       </div>
+
+      <form id="ancVisitForm" method="post" action="{% url 'midwife:add_anc_visit' rec.mhr_id %}">
+        {% csrf_token %}
+
+        <!-- hidden fields that the view/RPC will read -->
+        <!-- map to your RPC:
+             p_lab_results <- labs_json
+             p_tt_vaccines <- tt_json
+             p_supplements <- supplements_json
+             p_danger_signs <- danger_signs_json
+             p_trimester_stage_id <- trimester_stage_id
+        -->
+        <input type="hidden" name="labs_json" id="labs_json">
+        <input type="hidden" name="tt_json" id="tt_json">
+        <input type="hidden" name="supplements_json" id="supplements_json">
+        <input type="hidden" name="danger_signs_json" id="danger_signs_json">
+        <input type="hidden" name="trimester_stage_id" id="trimester_stage_id">
+
+        <div class="modal-body">
+          <!-- grid -->
+          <div class="row g-3">
+            <div class="col-6 col-md-3">
+              <label class="form-label label-sm">Visit Date<span class="text-danger">*</span></label>
+              <input name="visit_date" type="date" class="form-control" required>
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label label-sm">GA (weeks)</label>
+              <input name="ga_weeks" id="ga_weeks" type="number" class="form-control" min="0" step="1" placeholder="e.g. 24">
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label label-sm">BP Systolic</label>
+              <input name="bp_sys" type="number" class="form-control" min="50" max="260" step="1" placeholder="110">
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label label-sm">BP Diastolic</label>
+              <input name="bp_dia" type="number" class="form-control" min="30" max="160" step="1" placeholder="70">
+            </div>
+
+            <div class="col-6 col-md-3">
+              <label class="form-label label-sm">Weight (kg)</label>
+              <input name="weight_kg" type="number" class="form-control" step="0.1" placeholder="54.0">
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label label-sm">Fundic Height (cm)</label>
+              <input name="fundic_height_cm" type="number" class="form-control" step="1" placeholder="24">
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label label-sm">FHR (bpm)</label>
+              <input name="fhr_bpm" type="number" class="form-control" step="1" placeholder="148">
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label label-sm">Assessed by (Staff ID)</label>
+              <input name="assessed_by_id" type="number" class="form-control" placeholder="e.g. 12">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label label-sm">Encounter notes</label>
+              <textarea name="notes" class="form-control" rows="2" placeholder="Encounter notes"></textarea>
+            </div>
+          </div>
+
+          <hr class="my-3">
+
+          <!-- Danger Signs -->
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="fw-semibold">Danger Signs</div>
+            <div class="text-muted small">Toggle all that apply</div>
+          </div>
+          <div class="toggle-pills" id="dangerPills"><!-- built by JS --></div>
+
+          <hr class="my-3">
+
+          <!-- Labs / TT / Supplements -->
+          <div class="row g-3">
+            <div class="col-md-4">
+              <div class="fw-semibold mb-2">Labs</div>
+              <div class="d-flex gap-2 mb-2">
+                <select class="form-select" id="lab_type">
+                  <option value="URINE">Urinalysis</option>
+                  <option value="HGB">Hemoglobin</option>
+                  <option value="BS">Blood Sugar</option>
+                </select>
+                <input id="lab_result" class="form-control" placeholder="Result">
+                <button class="btn btn-outline-secondary" type="button" id="addLabBtn">Add</button>
+              </div>
+              <div id="labsList" class="small text-wrap"></div>
+            </div>
+
+            <div class="col-md-4">
+              <div class="fw-semibold mb-2">TT Dose</div>
+              <div class="d-flex gap-2 mb-2">
+                <select class="form-select" id="tt_dose">
+                  <option>TT1</option><option>TT2</option><option>TT3</option>
+                  <option>TT4</option><option>TT5</option><option>FIM</option>
+                </select>
+                <input id="tt_date" type="date" class="form-control">
+                <button class="btn btn-outline-secondary" type="button" id="addTtBtn">Add</button>
+              </div>
+              <div id="ttList" class="small text-wrap"></div>
+            </div>
+
+            <div class="col-md-4">
+              <div class="fw-semibold mb-2">Supplements</div>
+              <div class="d-flex gap-2 mb-2">
+                <select class="form-select" id="supp_name">
+                  <option value="IRON_FOLATE">Iron/Folate</option>
+                  <option value="CALCIUM">Calcium</option>
+                  <option value="VITAMIN_A">Vitamin A</option>
+                </select>
+                <input id="supp_qty" type="number" class="form-control" style="max-width:100px" value="30" min="1">
+                <button class="btn btn-outline-secondary" type="button" id="addSuppBtn">Add</button>
+              </div>
+              <div id="suppList" class="small text-wrap"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sticky-footer">
+          <div class="text-muted small d-none d-md-block">
+            <span class="kbd">ESC</span> disabled · backdrop is static · unsaved-change guard on close
+          </div>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary" id="cancelBtn">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="saveBtn">Save Visit</button>
+          </div>
+        </div>
+      </form>
     </div>
   </div>
-  {% endif %}
 </div>
+{% endblock %}
 
-{# Modals #}
-<div class="modal fade" id="ancModal" tabindex="-1" style="margin-top: 150;">
-  <div class="modal-dialog"><form class="modal-content" method="post" action="{% url 'bhw:add_anc_visit' rec.id %}">{% csrf_token %}
-    <div class="modal-header"><h5 class="modal-title">Add ANC Visit</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-    <div class="modal-body">
-      <div class="row g-2">
-        <div class="col-6"><label class="form-label">Date</label><input class="form-control" type="date" name="date"></div>
-        <div class="col-6"><label class="form-label">GA</label><input class="form-control" type="text" name="ga"></div>
-        <div class="col-6"><label class="form-label">BP</label><input class="form-control" type="text" name="bp"></div>
-        <div class="col-6"><label class="form-label">Weight</label><input class="form-control" type="text" name="wt"></div>
-        <div class="col-12"><label class="form-label">Remarks</label><input class="form-control" type="text" name="remarks"></div>
-      </div>
-    </div>
-    <div class="modal-footer"><button class="btn btn-brand" type="submit">Save</button></div>
-  </form></div>
-</div>
+{% block extra_js %}
+<script>
+(function(){
+  // ----- BMI in header cards -----
+  function num(x){ if(!x) return null; const n=parseFloat(String(x).replace(/[^\d.]/g,'')); return isNaN(n)?null:n; }
+  let h=num(document.getElementById('h-val')?.textContent||''); if(h && h>3) h=h/100.0;
+  let w=num(document.getElementById('w-val')?.textContent||'');
+  const bmiOut=document.getElementById('bmi-val'); if(h && w && bmiOut){ const bmi=Math.round((w/(h*h))*10)/10; bmiOut.textContent=String(bmi); }
 
-<div class="modal fade" id="vaxModal" tabindex="-1" style="margin-top:200">
-  <div class="modal-dialog"><form class="modal-content" method="post" action="{% url 'bhw:add_vaccine' rec.id %}">{% csrf_token %}
-    <div class="modal-header"><h5 class="modal-title">Add Vaccine Dose</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-    <div class="modal-body">
-      <div class="row g-2">
-        <div class="col-6"><label class="form-label">Vaccine</label><input class="form-control" name="vaccine"></div>
-        <div class="col-6"><label class="form-label">Dose Date</label><input class="form-control" type="date" name="dose_date"></div>
-      </div>
-    </div>
-    <div class="modal-footer"><button class="btn btn-brand" type="submit">Save</button></div>
-  </form></div>
-</div>
+  // ----- Bootstrap modal (static) + dirty guard -----
+  const modalEl = document.getElementById('visitModal');
+  const modal = new bootstrap.Modal(modalEl, {backdrop:'static', keyboard:false});
+  let dirty = false;
 
-<div class="modal fade" id="childVisitModal" tabindex="-1" style="margin-top: 200;"> 
-  <div class="modal-dialog"><form class="modal-content" method="post" action="{% url 'bhw:add_child_visit' rec.id %}">{% csrf_token %}
-    <div class="modal-header"><h5 class="modal-title">Add Visit</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-    <div class="modal-body">
-      <div class="row g-2">
-        <div class="col-6"><label class="form-label">Date</label><input class="form-control" type="date" name="date"></div>
-        <div class="col-6"><label class="form-label">Age</label><input class="form-control" type="text" name="age"></div>
-        <div class="col-4"><label class="form-label">Weight</label><input class="form-control" type="text" name="wt"></div>
-        <div class="col-4"><label class="form-label">Temp</label><input class="form-control" type="text" name="temp"></div>
-        <div class="col-4"><label class="form-label">Height</label><input class="form-control" type="text" name="ht"></div>
-        <div class="col-12"><label class="form-label">Findings</label><input class="form-control" name="findings"></div>
-        <div class="col-12"><label class="form-label">Notes</label><input class="form-control" name="notes"></div>
-      </div>
-    </div>
-    <div class="modal-footer"><button class="btn btn-brand" type="submit">Save</button></div>
-  </form></div>
-</div>
+  function markDirty(){ dirty = true; }
+  function tryClose(){
+    if(!dirty) { modal.hide(); return; }
+    if(confirm('Discard changes?')) modal.hide();
+  }
+  document.getElementById('xClose').addEventListener('click', tryClose);
+  document.getElementById('cancelBtn').addEventListener('click', tryClose);
+  modalEl.addEventListener('shown.bs.modal', ()=>{ dirty=false; initDefaults(); });
+
+  // ----- GA → trimester -----
+  const gaEl = document.getElementById('ga_weeks');
+  const triBadge = document.getElementById('triBadge');
+  function triId(v){ if(!v||isNaN(v)) return null; if(v<=13) return 1; if(v<=27) return 2; return 3; }
+  function updateTri(){
+    const v=parseInt(gaEl.value||'');
+    const id=triId(v);
+    document.getElementById('trimester_stage_id').value = id||'';
+    triBadge.textContent = id ? (id===1?'1st Trimester':id===2?'2nd Trimester':'3rd Trimester') : '—';
+  }
+  gaEl?.addEventListener('input', ()=>{ updateTri(); markDirty(); });
+
+  // ----- Danger Signs (toggle pills) -----
+  const DANGER_SIGNS = [
+    { code:"BLEEDING", label:"Bleeding" },
+    { code:"HEADACHE", label:"Severe headache" },
+    { code:"BLURRED_VISION", label:"Blurred vision" },
+    { code:"EDEMA", label:"Generalized edema" },
+    { code:"FEVER", label:"Fever" },
+    { code:"NO_FM", label:"No fetal movement" },
+    { code:"NONE", label:"No danger signs" }
+  ];
+  const dangerPills = document.getElementById('dangerPills');
+  function renderDanger(){
+    dangerPills.innerHTML='';
+    DANGER_SIGNS.forEach(d=>{
+      const id='ds_'+d.code;
+      const input=document.createElement('input');
+      input.type='checkbox'; input.className='btn-check'; input.id=id; input.autocomplete='off'; input.value=d.code;
+      const lab=document.createElement('label');
+      lab.className='btn btn-sm me-2 mb-2'; lab.htmlFor=id; lab.textContent=d.label;
+      dangerPills.appendChild(input); dangerPills.appendChild(lab);
+    });
+    document.getElementById('ds_NONE').checked = true;
+    applyPillStyles();
+    dangerPills.addEventListener('change', (e)=>{
+      if(!e.target.classList.contains('btn-check')) return;
+      markDirty();
+      const none = document.getElementById('ds_NONE');
+      if(e.target.id!=='ds_NONE' && e.target.checked){ none.checked=false; }
+      const anyOther=[...dangerPills.querySelectorAll('.btn-check')].some(cb=>cb.id!=='ds_NONE' && cb.checked);
+      if(!anyOther){ none.checked=true; }
+      applyPillStyles();
+    });
+  }
+  function applyPillStyles(){
+    [...dangerPills.querySelectorAll('.btn-check')].forEach(cb=>{
+      const lab = dangerPills.querySelector(`label[for="${cb.id}"]`);
+      lab.classList.toggle('active', cb.checked);
+      lab.classList.toggle('btn-outline-secondary', !cb.checked);
+      lab.classList.toggle('btn-secondary', cb.checked);
+    });
+  }
+
+  // ----- Collections: labs, TT, supplements (chips) -----
+  const labs=[]; const tts=[]; const supps=[];
+  const labsList=document.getElementById('labsList');
+  const ttList=document.getElementById('ttList');
+  const suppList=document.getElementById('suppList');
+
+  function chips(listEl, arr, render){
+    listEl.innerHTML = arr.length ? arr.map(render).join(' ') : '<span class="text-muted">None</span>';
+  }
+  function renderLabs(){ chips(labsList, labs, (l,i)=>`<span class="chip">${l.type}: <b>${l.result}</b> <span class="x" data-i="${i}" data-k="lab">×</span></span>`); }
+  function renderTT(){ chips(ttList, tts, (t,i)=>`<span class="chip">${t.dose} — ${t.date} <span class="x" data-i="${i}" data-k="tt">×</span></span>`); }
+  function renderSupp(){ chips(suppList, supps, (s,i)=>`<span class="chip">${s.name.replaceAll('_',' ')} (${s.qty}) <span class="x" data-i="${i}" data-k="supp">×</span></span>`); }
+
+  document.getElementById('addLabBtn').addEventListener('click', ()=>{
+    const type=document.getElementById('lab_type').value;
+    const result=document.getElementById('lab_result').value.trim();
+    if(!result){ document.getElementById('lab_result').focus(); return; }
+    labs.push({type,result}); document.getElementById('lab_result').value=''; markDirty(); renderLabs();
+  });
+  labsList.addEventListener('click', (e)=>{
+    if(e.target.dataset.k==='lab'){ labs.splice(parseInt(e.target.dataset.i),1); markDirty(); renderLabs(); }
+  });
+
+  document.getElementById('addTtBtn').addEventListener('click', ()=>{
+    const dose=document.getElementById('tt_dose').value;
+    const date=document.getElementById('tt_date').value;
+    if(!date){ document.getElementById('tt_date').focus(); return; }
+    tts.push({dose,date}); markDirty(); renderTT();
+  });
+  ttList.addEventListener('click', (e)=>{
+    if(e.target.dataset.k==='tt'){ tts.splice(parseInt(e.target.dataset.i),1); markDirty(); renderTT(); }
+  });
+
+  document.getElementById('addSuppBtn').addEventListener('click', ()=>{
+    const name=document.getElementById('supp_name').value;
+    const qty=parseInt(document.getElementById('supp_qty').value||'0',10);
+    if(!qty){ document.getElementById('supp_qty').focus(); return; }
+    supps.push({name,qty}); markDirty(); renderSupp();
+  });
+  suppList.addEventListener('click', (e)=>{
+    if(e.target.dataset.k==='supp'){ supps.splice(parseInt(e.target.dataset.i),1); markDirty(); renderSupp(); }
+  });
+
+  // ----- defaults each time modal opens -----
+  function initDefaults(){
+    const f=document.getElementById('ancVisitForm');
+    f.reset();
+    f.querySelector('[name="visit_date"]').value = new Date().toISOString().slice(0,10);
+    labs.length=0; tts.length=0; supps.length=0;
+    renderLabs(); renderTT(); renderSupp(); renderDanger();
+    updateTri();
+  }
+
+  // ----- serialize before submit -----
+  document.getElementById('ancVisitForm').addEventListener('input', markDirty);
+  document.getElementById('ancVisitForm').addEventListener('submit', function(e){
+    // turn toggles into a compact array (default NONE)
+    const chosen=[...dangerPills.querySelectorAll('.btn-check')].filter(cb=>cb.checked).map(cb=>cb.value);
+    document.getElementById('danger_signs_json').value = JSON.stringify(chosen.length?chosen:['NONE']);
+    document.getElementById('labs_json').value = JSON.stringify(labs);
+    document.getElementById('tt_json').value = JSON.stringify(tts);
+    document.getElementById('supplements_json').value = JSON.stringify(supps);
+    dirty = false; // allow close after submit
+  });
+
+  // allow the “Add New Visit” button to open (in case markup changes)
+  document.getElementById('openAddVisitBtn')?.addEventListener('click', ()=> modal.show());
+})();
+</script>
 {% endblock %}

@@ -73,19 +73,19 @@
 
 /* Status badges */
 .status-badge{ font-weight:700; }
-.status-pending{ background:var(--brand-200); color:var(--brand-800); }
-.status-processing{ background:#fff7e6; color:#b96b00; }
-.status-approved{ background:#e9f7ef; color:#0a7f3f; }
-.status-rejected{ background:#fdecea; color:#b22d2d; }
+.status-upcoming{ background:var(--brand-200); color:var(--brand-800); }
+.status-high{ background:#fdecea; color:#b22d2d; }
+.status-normal{ background:#e9f7ef; color:#0a7f3f; }
+.status-due{ background:#fff7e6; color:#b96b00; }
 
 /* Charts */
 .chart-wrap{
   position:relative;
-  height:clamp(320px, 40vh, 520px); /* Bigger and responsive */
+  height:clamp(320px, 40vh, 520px);
 }
 .chart-wrap canvas{
   width:100% !important;
-  height:100% !important; /* canvas visually fills the card */
+  height:100% !important;
   display:block;
 }
 .legend-inline{ display:flex; gap:1rem; flex-wrap:wrap; }
@@ -122,19 +122,19 @@
       <div class="card header-card shadow-sm">
         <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
           <div>
-            <div class="eyebrow text-uppercase">Barangay Control Center</div>
-            <h1 class="h4 mb-0 fw-bold">Overview</h1>
+            <div class="eyebrow text-uppercase">Midwife Control Center</div>
+            <h1 class="h4 mb-0 fw-bold">Maternal & Child Health Dashboard</h1>
             <div class="text-muted small mt-1">{{ today|default:"" }}</div>
           </div>
           <div class="d-flex flex-wrap gap-2">
-            <a href="{% url 'clerk:identity_verification' %}" class="btn btn-outline-brand">
-              {% bs_icon 'shield-check' %}<span class="ms-1">Verify IDs</span>
+            <a href="{% url 'bhw:maternal_new' %}" class="btn btn-brand">
+              {% bs_icon 'person-heart' %}<span class="ms-1">New Maternal Record</span>
             </a>
-            <a href="" class="btn btn-brand">
-              {% bs_icon 'file-earmark-text' %}<span class="ms-1">Doc Requests</span>
+            <a href="{% url 'bhw:records' %}" class="btn btn-outline-brand">
+              {% bs_icon 'journal-text' %}<span class="ms-1">Open Registries</span>
             </a>
-            <a href="{% url 'clerk:business_owner_resident' %}" class="btn btn-brand-subtle">
-              {% bs_icon 'buildings' %}<span class="ms-1">New Business</span>
+            <a href="#" class="btn btn-brand-subtle">
+              {% bs_icon 'calendar-event' %}<span class="ms-1">View Schedules</span>
             </a>
           </div>
         </div>
@@ -155,12 +155,12 @@
             </select>
           </div>
           <div class="filter">
-            <label class="form-label small mb-1">Type</label>
+            <label class="form-label small mb-1">Cohort</label>
             <select class="form-select form-select-sm">
-              <option>All documents</option>
-              <option>Barangay Clearance</option>
-              <option>Residency</option>
-              <option>Indigency</option>
+              <option>All clients</option>
+              <option>Pregnant</option>
+              <option>Postpartum</option>
+              <option>Children &lt; 1 yr</option>
             </select>
           </div>
           <button class="btn btn-sm btn-outline-brand ms-auto" title="Refresh">{% bs_icon 'arrow-clockwise' %}</button>
@@ -174,47 +174,47 @@
     <div class="col">
       <div class="card kpi shadow-sm h-100 lift-on-hover">
         <div class="card-body d-flex align-items-center gap-3">
-          <div class="kpi-icon">{% bs_icon 'file-earmark-text' size='1.2em' %}</div>
-          <div class="flex-grow-1">
-            <div class="kpi-label">Document Requests (Today)</div>
-            <div class="kpi-value">{{ kpis.doc_requests_today|default:"27" }}</div>
-            <div class="kpi-sub text-success">{% bs_icon 'arrow-up-right' %} {{ kpis.doc_requests_delta|default:"+8%" }}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col">
-      <div class="card kpi shadow-sm h-100 lift-on-hover">
-        <div class="card-body d-flex align-items-center gap-3">
-          <div class="kpi-icon">{% bs_icon 'person-check' size='1.2em' %}</div>
-          <div class="flex-grow-1">
-            <div class="kpi-label">Pending Verifications</div>
-            <div class="kpi-value">{{ kpis.pending_verifications|default:"12" }}</div>
-            <div class="kpi-sub text-danger">{% bs_icon 'arrow-down-right' %} {{ kpis.verif_delta|default:"-5%" }}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col">
-      <div class="card kpi shadow-sm h-100 lift-on-hover">
-        <div class="card-body d-flex align-items-center gap-3">
-          <div class="kpi-icon">{% bs_icon 'buildings' size='1.2em' %}</div>
-          <div class="flex-grow-1">
-            <div class="kpi-label">Active Businesses</div>
-            <div class="kpi-value">{{ kpis.active_businesses|default:"48" }}</div>
-            <span class="badge rounded-pill kpi-pill">+{{ kpis.new_businesses_week|default:"3" }} this week</span>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col">
-      <div class="card kpi shadow-sm h-100 lift-on-hover">
-        <div class="card-body d-flex align-items-center gap-3">
           <div class="kpi-icon">{% bs_icon 'people' size='1.2em' %}</div>
           <div class="flex-grow-1">
-            <div class="kpi-label">Registered Residents</div>
-            <div class="kpi-value">{{ kpis.residents_total|default:"2,354" }}</div>
-            <span class="badge rounded-pill kpi-pill">{{ kpis.new_residents_month|default:"42" }} new</span>
+            <div class="kpi-label">Active Maternal Clients</div>
+            <div class="kpi-value">{{ kpis.active_maternal|default:"128" }}</div>
+            <span class="badge rounded-pill kpi-pill">{{ kpis.new_maternal_month|default:"12" }} new</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card kpi shadow-sm h-100 lift-on-hover">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="kpi-icon">{% bs_icon 'activity' size='1.2em' %}</div>
+          <div class="flex-grow-1">
+            <div class="kpi-label">ANC Visits (This Week)</div>
+            <div class="kpi-value">{{ kpis.anc_week|default:"37" }}</div>
+            <div class="kpi-sub text-success">{% bs_icon 'arrow-up-right' %} {{ kpis.anc_delta|default:"+9%" }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card kpi shadow-sm h-100 lift-on-hover">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="kpi-icon">{% bs_icon 'exclamation-triangle' size='1.2em' %}</div>
+          <div class="flex-grow-1">
+            <div class="kpi-label">High-Risk Cases</div>
+            <div class="kpi-value">{{ kpis.high_risk|default:"9" }}</div>
+            <span class="badge rounded-pill kpi-pill">needs follow-up</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card kpi shadow-sm h-100 lift-on-hover">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="kpi-icon">{% bs_icon 'calendar3-event' size='1.2em' %}</div>
+          <div class="flex-grow-1">
+            <div class="kpi-label">Upcoming EDD (30 days)</div>
+            <div class="kpi-value">{{ kpis.edd_30d|default:"18" }}</div>
+            <span class="badge rounded-pill kpi-pill">{{ kpis.booked_deliveries|default:"11" }} booked</span>
           </div>
         </div>
       </div>
@@ -226,13 +226,13 @@
     <div class="col-12">
       <div class="card section chart-section shadow-sm h-100">
         <div class="card-header d-flex align-items-center justify-content-between">
-          <h5 class="mb-0">Requests — Last 7 Days</h5>
-          <span class="small text-muted">All document types</span>
+          <h5 class="mb-0">ANC Visits — Last 8 Weeks</h5>
+          <span class="small text-muted">All clients</span>
         </div>
         <div class="card-body">
           <div class="chart-wrap">
-            <canvas id="requestsTrend"></canvas>
-            <div class="skeleton chart-skel-req"></div>
+            <canvas id="ancTrend"></canvas>
+            <div class="skeleton chart-skel-anc"></div>
           </div>
         </div>
       </div>
@@ -240,36 +240,36 @@
     <div class="col-12">
       <div class="card section chart-section shadow-sm h-100 mt-3">
         <div class="card-header d-flex align-items-center justify-content-between">
-          <h5 class="mb-0">Status Breakdown</h5>
-          <span class="small text-muted">Current</span>
+          <h5 class="mb-0">Risk Category Breakdown</h5>
+          <span class="small text-muted">Current cohort</span>
         </div>
         <div class="card-body">
           <div class="chart-wrap">
-            <canvas id="statusBreakdown"></canvas>
-            <div class="skeleton chart-skel-status"></div>
+            <canvas id="riskBreakdown"></canvas>
+            <div class="skeleton chart-skel-risk"></div>
           </div>
-          <div class="legend-inline mt-3" id="statusLegend"></div>
+          <div class="legend-inline mt-3" id="riskLegend"></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Queues -->
+  <!-- Panels -->
   <div class="row g-3 mt-1 align-items-stretch">
     <div class="col-12 col-xl-6">
       <div class="card section shadow-sm h-100">
         <div class="card-header d-flex align-items-center justify-content-between">
-          <h5 class="mb-0">Identity Verification Queue</h5>
-          <a href="{% url 'clerk:identity_verification' %}" class="link-brand small">Manage</a>
+          <h5 class="mb-0">Upcoming ANC Schedule</h5>
+          <a href="#" class="link-brand small">Manage</a>
         </div>
         <div class="card-body">
-          <div class="panel-list" id="verifList">{% for v in verifications %}
+          <div class="panel-list" id="ancList">{% for v in upcoming_anc %}
             <div class="item-row d-flex justify-content-between align-items-center">
               <div>
                 <div class="fw-semibold">{{ v.name }}</div>
-                <div class="small text-muted">{{ v.subtext }}</div>
+                <div class="small text-muted">{{ v.when }}</div>
               </div>
-              <span class="badge rounded-pill status-badge status-{{ v.status|lower }}">{{ v.status }}</span>
+              <span class="badge rounded-pill status-badge status-{{ v.tag|default:'upcoming' }}">{{ v.tag|default:"Upcoming" }}</span>
             </div>
           {% empty %}{% endfor %}</div>
         </div>
@@ -278,17 +278,17 @@
     <div class="col-12 col-xl-6">
       <div class="card section shadow-sm h-100">
         <div class="card-header d-flex align-items-center justify-content-between">
-          <h5 class="mb-0">Latest Document Requests</h5>
-          <a href="" class="link-brand small">Manage</a>
+          <h5 class="mb-0">Recent Maternal Records</h5>
+          <a href="{% url 'bhw:records' %}" class="link-brand small">Open</a>
         </div>
         <div class="card-body">
-          <div class="panel-list" id="reqList">{% for r in recent_requests %}
+          <div class="panel-list" id="recentMat">{% for r in recent_maternal %}
             <div class="item-row">
               <div class="d-flex justify-content-between align-items-center">
-                <div class="fw-semibold">{{ r.doc_name }}</div>
-                <span class="badge rounded-pill status-badge status-{{ r.status|lower }}">{{ r.status }}</span>
+                <div class="fw-semibold">{{ r.name }}</div>
+                <span class="badge rounded-pill status-badge status-{{ r.status|default:'normal' }}">{{ r.status|default:"Normal" }}</span>
               </div>
-              <div class="small text-muted">{{ r.requestor }} — {{ r.code }}</div>
+              <div class="small text-muted">G{{ r.gravida }}/P{{ r.para }} — {{ r.last_visit }}</div>
             </div>
           {% empty %}{% endfor %}</div>
         </div>
@@ -296,28 +296,28 @@
     </div>
   </div>
 
-  <!-- Businesses -->
+  <!-- TT doses / immunization follow-ups -->
   <div class="row g-3 mt-1">
     <div class="col-12">
       <div class="card section shadow-sm">
         <div class="card-header d-flex align-items-center justify-content-between">
-          <h5 class="mb-0">Expiring Business Permits</h5>
-          <a href="{% url 'clerk:business_list' %}" class="link-brand small">View all</a>
+          <h5 class="mb-0">TT Doses Due Soon</h5>
+          <a href="#" class="link-brand small">View all</a>
         </div>
         <div class="card-body p-0">
           <div class="table-responsive">
             <table class="table align-middle mb-0">
               <thead class="table-light">
                 <tr>
-                  <th>Business</th><th class="d-none d-sm-table-cell">Owner</th><th>Expiry</th><th class="text-end">Action</th>
+                  <th>Mother</th><th>Last TT</th><th>Next Due</th><th class="text-end">Action</th>
                 </tr>
               </thead>
-              <tbody id="bizTableBody">{% for b in expiring_businesses %}
+              <tbody id="ttTableBody">{% for b in tt_due %}
                 <tr>
                   <td><div class="fw-semibold">{{ b.name }}</div><div class="small text-muted">{{ b.address }}</div></td>
-                  <td class="d-none d-sm-table-cell">{{ b.owner }}</td>
-                  <td><span class="badge rounded-pill status-badge status-processing">{{ b.expiry }}</span></td>
-                  <td class="text-end"><a href="{% url 'clerk:business_detail' b.id %}" class="btn btn-sm btn-outline-brand">{% bs_icon 'eye' %} View</a></td>
+                  <td>{{ b.last_tt }}</td>
+                  <td><span class="badge rounded-pill status-badge status-due">{{ b.next_due }}</span></td>
+                  <td class="text-end"><a href="#" class="btn btn-sm btn-outline-brand">{% bs_icon 'check2-circle' %} Update</a></td>
                 </tr>
               {% empty %}{% endfor %}</tbody>
             </table>
@@ -328,16 +328,15 @@
   </div>
 
   {% if dashboard_json %}
-    {{ dashboard_json|json_script:"dash-data" }}
+    {{ dashboard_json|json_script:"mid-dash" }}
   {% endif %}
 
-  <!-- Inline, zero-dependency charts (professional line chart + donut, responsive) -->
+  <!-- Inline, zero-dependency charts (line + donut) -->
   <script>
   (function(){
     const css = getComputedStyle(document.documentElement);
     const pick = k => (css.getPropertyValue(k)||'').trim();
     const BRAND700 = pick('--brand-700') || '#6d2932';
-    const BRAND600 = pick('--brand-600') || '#6d2932';
     const BRAND500 = pick('--brand-500') || '#561c24';
     const BRAND300 = pick('--brand-300') || '#e8d8c4';
     const NEU300 = pick('--neutral-300') || '#d1d5db';
@@ -345,13 +344,13 @@
     const hide = sel => document.querySelector(sel)?.classList.add('hidden');
 
     // Data (server json or demo)
-    const dashEl = document.getElementById('dash-data');
+    const dashEl = document.getElementById('mid-dash');
     const dash = dashEl ? JSON.parse(dashEl.textContent) : {
-      requestsTrend: { labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], data:[12,18,21,15,27,23,30] },
-      statusBreakdown: { labels:['Pending','Processing','Approved','Rejected'], data:[18,9,22,3] }
+      ancTrend: { labels:['W1','W2','W3','W4','W5','W6','W7','W8'], data:[18,24,21,26,30,28,33,37] },
+      riskBreakdown: { labels:['Normal','At Risk','High-Risk'], data:[72,18,10] }
     };
 
-    // Nice axis helpers
+    // Helpers for nice axes
     function niceNum(range, round){
       const exp = Math.floor(Math.log10(range || 1));
       const f = range / Math.pow(10, exp);
@@ -364,7 +363,8 @@
       return nf * Math.pow(10, exp);
     }
     function niceScale(min, max, tickCount=5){
-      let range = niceNum(max-min, false);
+      let range = max - min; if (range <= 0) range = 1;
+      range = niceNum(range, false);
       const step = niceNum(range/(tickCount-1), true);
       const niceMin = Math.floor(min/step)*step;
       const niceMax = Math.ceil(max/step)*step;
@@ -374,17 +374,15 @@
     }
     function fmt(v){ return Math.round(v*10)/10; }
 
-    // Professional line chart
+    // Line chart (ANC visits)
     function drawLine(canvas, labels, series){
       if (!canvas) return;
       const dpr = devicePixelRatio||1;
-      // make canvas fill container
       canvas.style.width='100%'; canvas.style.height='100%';
       const W = canvas.clientWidth||600, H = canvas.clientHeight||320;
       canvas.width = W*dpr; canvas.height=H*dpr;
       const ctx = canvas.getContext('2d'); ctx.scale(dpr,dpr);
 
-      // margins (room for y labels)
       const m = {l:48, r:18, t:18, b:32};
       const x0=m.l, x1=W-m.r, y0=H-m.b, y1=m.t;
 
@@ -394,7 +392,6 @@
       const scale = niceScale(minV-pad, maxV+pad, 5);
       const range = scale.niceMax - scale.niceMin;
 
-      // grid + y labels
       ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif';
       ctx.textAlign='right'; ctx.textBaseline='middle';
       ctx.fillStyle = NEU500; ctx.strokeStyle = NEU300; ctx.lineWidth = 1;
@@ -404,22 +401,18 @@
         ctx.setLineDash([]); ctx.globalAlpha=1; ctx.fillText(fmt(t), x0 - 8, y);
       });
 
-      // x ticks
-      const n = data.length;
       ctx.textAlign='center'; ctx.textBaseline='top'; ctx.fillStyle=NEU500;
       labels.forEach((lbl,i)=>{
-        const x = x0 + (x1-x0)*(i/(Math.max(n-1,1)));
-        if (n <= 10 || i%Math.ceil(n/7)===0) ctx.fillText(lbl, x, y0+8);
+        const x = x0 + (x1-x0)*(i/(Math.max(labels.length-1,1)));
+        if (labels.length <= 10 || i%Math.ceil(labels.length/7)===0) ctx.fillText(lbl, x, y0+8);
       });
 
-      // points coords
       const pts = data.map((v,i)=>({
-        x: x0 + (x1-x0)*(i/(Math.max(n-1,1))),
+        x: x0 + (x1-x0)*(i/(Math.max(data.length-1,1))),
         y: y0 - ((v - scale.niceMin)/range)*(y0-y1),
         v
       }));
 
-      // gradient fill
       const grad = ctx.createLinearGradient(0,y1,0,y0);
       grad.addColorStop(0, BRAND300);
       grad.addColorStop(1, 'rgba(0,0,0,0)');
@@ -427,7 +420,6 @@
       pts.forEach(p=>ctx.lineTo(p.x,p.y));
       ctx.lineTo(x1,y0); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
 
-      // smooth line
       ctx.strokeStyle = BRAND700; ctx.lineWidth = 2;
       ctx.beginPath();
       for (let i=0;i<pts.length;i++){
@@ -441,17 +433,14 @@
       }
       ctx.stroke();
 
-      // average dashed line
-      const avg = data.reduce((a,b)=>a+b,0)/n;
+      const avg = data.reduce((a,b)=>a+b,0)/data.length;
       const yAvg = y0 - ((avg - scale.niceMin)/range)*(y0-y1);
       ctx.save(); ctx.setLineDash([6,6]); ctx.strokeStyle = BRAND500; ctx.lineWidth = 1.2;
       ctx.beginPath(); ctx.moveTo(x0,yAvg); ctx.lineTo(x1,yAvg); ctx.stroke(); ctx.restore();
 
-      // data points
       ctx.fillStyle = BRAND700;
       pts.forEach(p=>{ ctx.beginPath(); ctx.arc(p.x,p.y,2.5,0,Math.PI*2); ctx.fill(); });
 
-      // simple tooltip
       const tip = document.createElement('div');
       tip.style.cssText = 'position:absolute;padding:6px 8px;background:#fff;border:1px solid var(--border);color:#111;font:12px system-ui;border-radius:8px;box-shadow:var(--shadow);pointer-events:none;transform:translate(-50%,-140%);white-space:nowrap;display:none;';
       canvas.parentElement.appendChild(tip);
@@ -476,12 +465,11 @@
       };
       canvas.onmouseleave = hideTip;
 
-      // redraw on resize
       const ro = new ResizeObserver(()=>drawLine(canvas, labels, series));
       ro.observe(canvas.parentElement);
     }
 
-    // Donut
+    // Donut (Risk breakdown)
     function drawDonut(canvas, labels, data, colors){
       if (!canvas) return;
       const dpr=devicePixelRatio||1;
@@ -501,59 +489,60 @@
       ctx.beginPath(); ctx.arc(cx,cy,cut,0,Math.PI*2); ctx.fill();
       ctx.globalCompositeOperation='source-over';
 
-      document.getElementById('statusLegend').innerHTML =
+      document.getElementById('riskLegend').innerHTML =
         labels.map((t,i)=>`<span class="legend-dot" style="--dot:${colors[i%colors.length]}"></span><span class="legend-label">${t}</span>`).join('');
 
       const ro = new ResizeObserver(()=>drawDonut(canvas, labels, data, colors));
       ro.observe(canvas.parentElement);
     }
 
-    // Fill lists/tables with demo if empty (so the whole UI is visible)
-    const verifHost=document.getElementById('verifList');
-    if (verifHost && !verifHost.querySelector('.item-row')) {
-      verifHost.innerHTML = [
-        {n:'Juan Dela Cruz', s:'ePhilID • 5m ago', st:'Pending'},
-        {n:'Maria Santos', s:'Driver’s License • 12m ago', st:'Pending'},
-        {n:'Pedro Reyes', s:'PhilID • 26m ago', st:'Processing'}
+    // Demo fillers if no server data
+    const ancHost=document.getElementById('ancList');
+    if (ancHost && !ancHost.querySelector('.item-row')) {
+      ancHost.innerHTML = [
+        {n:'Maria Santos', w:'Tomorrow • 9:00 AM', tag:'Upcoming'},
+        {n:'Ana Rivera', w:'Tomorrow • 10:30 AM', tag:'Upcoming'},
+        {n:'Jocelyn Cruz (High-risk)', w:'Fri • 1:00 PM', tag:'High'}
       ].map(v=>`<div class="item-row d-flex justify-content-between align-items-center">
-        <div><div class="fw-semibold">${v.n}</div><div class="small text-muted">${v.s}</div></div>
-        <span class="badge rounded-pill status-badge status-${v.st.toLowerCase()}">${v.st}</span>
+        <div><div class="fw-semibold">${v.n}</div><div class="small text-muted">${v.w}</div></div>
+        <span class="badge rounded-pill status-badge ${v.tag==='High'?'status-high':'status-upcoming'}">${v.tag}</span>
       </div>`).join('');
     }
-    const reqHost=document.getElementById('reqList');
-    if (reqHost && !reqHost.querySelector('.item-row')) {
-      reqHost.innerHTML = [
-        {d:'Barangay Clearance', w:'Juan Dela Cruz', c:'RES-00123', st:'Pending'},
-        {d:'Certificate of Residency', w:'Maria Santos', c:'RES-00124', st:'Approved'}
+    const recentHost=document.getElementById('recentMat');
+    if (recentHost && !recentHost.querySelector('.item-row')) {
+      recentHost.innerHTML = [
+        {name:'Charlz Arranchado', status:'Normal', g:2, p:1, last:'ANC • Mon'},
+        {name:'Raphael H. Bellosillo', status:'Normal', g:3, p:2, last:'ANC • Tue'}
       ].map(r=>`<div class="item-row">
         <div class="d-flex justify-content-between align-items-center">
-          <div class="fw-semibold">${r.d}</div>
-          <span class="badge rounded-pill status-badge status-${r.st.toLowerCase()}">${r.st}</span>
-        </div><div class="small text-muted">${r.w} — ${r.c}</div>
+          <div class="fw-semibold">${r.name}</div>
+          <span class="badge rounded-pill status-badge status-normal">${r.status}</span>
+        </div>
+        <div class="small text-muted">G${r.g}/P${r.p} — ${r.last}</div>
       </div>`).join('');
     }
-    const bizBody=document.getElementById('bizTableBody');
-    if (bizBody && !bizBody.querySelector('tr')) {
-      bizBody.innerHTML = [
-        {n:'Velasco Sari-sari Store', o:'Rico Velasco', a:'Purok Kanipaan, Sto. Niño', e:'Oct 05'},
-        {n:'Uy Laundry', o:'Claire Uy', a:'Purok Mauco, Sto. Niño', e:'Oct 07'}
+    const ttBody=document.getElementById('ttTableBody');
+    if (ttBody && !ttBody.querySelector('tr')) {
+      ttBody.innerHTML = [
+        {name:'Maria Santos', addr:'Purok Kanipaan', last:'TT2 • May 10', next:'Jul 10'},
+        {name:'Ana Rivera', addr:'Purok Pampango', last:'TT1 • Jun 02', next:'Jul 02'}
       ].map(b=>`<tr>
-        <td><div class="fw-semibold">${b.n}</div><div class="small text-muted">${b.a}</div></td>
-        <td class="d-none d-sm-table-cell">${b.o}</td>
-        <td><span class="badge rounded-pill status-badge status-processing">${b.e}</span></td>
-        <td class="text-end"><a href="#" class="btn btn-sm btn-outline-brand">View</a></td>
+        <td><div class="fw-semibold">${b.name}</div><div class="small text-muted">${b.addr}</div></td>
+        <td>${b.last}</td>
+        <td><span class="badge rounded-pill status-badge status-due">${b.next}</span></td>
+        <td class="text-end"><a href="#" class="btn btn-sm btn-outline-brand">Update</a></td>
       </tr>`).join('');
     }
 
-    // Draw charts (line maximizes space)
-    const lineCanvas=document.getElementById('requestsTrend');
-    drawLine(lineCanvas, dash.requestsTrend.labels, dash.requestsTrend.data);
-    hide('.chart-skel-req');
+    // Draw charts
+    const lineCanvas=document.getElementById('ancTrend');
+    drawLine(lineCanvas, dash.ancTrend.labels, dash.ancTrend.data);
+    hide('.chart-skel-anc');
 
-    const donutCanvas=document.getElementById('statusBreakdown');
-    const palette=[BRAND700, BRAND500, BRAND300, NEU300];
-    drawDonut(donutCanvas, dash.statusBreakdown.labels, dash.statusBreakdown.data, palette);
-    hide('.chart-skel-status');
+    const donutCanvas=document.getElementById('riskBreakdown');
+    const palette=[BRAND700, BRAND500, BRAND300];
+    drawDonut(donutCanvas, dash.riskBreakdown.labels, dash.riskBreakdown.data, palette);
+    hide('.chart-skel-risk');
   })();
   </script>
 </div>

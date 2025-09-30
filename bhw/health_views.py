@@ -118,96 +118,57 @@ def verify_valid_id(*, supabase_uid: str, legit_person_id: int, id_type_raw: str
 
     return {"ok": True, "status": getattr(edge, "status", 200), "edge": getattr(edge, "data", None)}
 
+
 def build_maternal_payload(cd: Dict[str, Any], staff_id: Optional[int]) -> Dict[str, Any]:
     """
-    Build the argument object for Supabase RPC create_maternal_health_record.
-    NOTE: We only add a small BMI fallback; everything else is unchanged.
+    Minimal argument object for create_maternal_health_record_bhw.
+    Mirrors the function signature exactly.
     """
-    weight = cd.get("weight")
-    height = cd.get("height")
-    bmi_status_id = int(cd["bmi_status_id"]) if cd.get("bmi_status_id") else None
-    if bmi_status_id is None:
-        # Safe server-side fallback if UI didn't include it
-        try:
-            w = float(weight) if weight not in (None, "") else None
-            h = float(height) if height not in (None, "") else None
-        except Exception:
-            w = h = None
-        bmi_status_id = _derive_bmi_status_id(w, h)
-
     payload = {
-        "p_staff_id": int(staff_id) if staff_id else None,
+        "p_added_by_id": int(staff_id) if staff_id else None,
         "p_person_id": int(cd["person_id"]),
         "p_husband_id": int(cd["husband_id"]) if cd.get("husband_id") else None,
-        "p_family_id": int(cd["family_id"]) if cd.get("family_id") else None,
-
-        "p_weight": weight,
-        "p_height": height,
-        "p_bmi_status_id": bmi_status_id,
-
-        "p_place_of_delivery_plan": cd.get("place_of_delivery_plan") or None,
-        "p_newborn_screening_plan": bool(cd.get("newborn_screening_plan")),
-
-        "p_prev_illness": cd.get("prev_illness") or None,
-        "p_prev_hospitalization": cd.get("prev_hospitalization") or None,
-        "p_prev_preg_complication": cd.get("prev_preg_complication") or None,
-
-        "p_num_children_born_alive": cd.get("num_children_born_alive"),
-        "p_num_children_living": cd.get("num_children_living"),
-        "p_num_abortion": cd.get("num_abortion"),
-        "p_num_stillbirth": cd.get("num_stillbirth"),
-        "p_num_large_babies": cd.get("num_large_babies"),
-        "p_has_diabetes": bool(cd.get("has_diabetes")),
-        "p_gravida": cd.get("gravida"),
-        "p_para": cd.get("para"),
-
-        "p_checklist_item_ids": parse_csv_ints(cd.get("checklist_item_ids")),
-        "p_risk_category_ids": parse_csv_ints(cd.get("risk_category_ids")),
-
-        # Midwife-owned fields — left None by BHW intake
-        "p_is_fullterm": None,
-        "p_is_preterm": None,
-        "p_lmp": None,
-        "p_edc": None,
-        "p_iron_start_date": None,
-        "p_iron_end_date": None,
-        "p_deworming_given_date": None,
-        "p_tt_vaccines": None,
-        "p_anc_visits": None,
-        "p_lab_results": None,
-        "p_prev_pregs": None,
     }
 
-    # Log exactly what we'll send upstream
     try:
         print("\n[BHW] build_maternal_payload → payload:")
-        print(json.dumps(payload, indent=2, default=str))
+        import json as _json
+        print(_json.dumps(payload, indent=2, default=str))
     except Exception:
-        print("[BHW] build_maternal_payload → (could not pretty-print payload)")
+        pass
 
     return payload
 
 def create_maternal_record(payload: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
     """
-    Calls Supabase RPC and PRINTS both the payload and the response.
+    Call the correct RPC and strictly pass only its 3 parameters.
+    Includes a small shim for legacy 'p_staff_id'.
     """
-    # Always log what we're about to send
-    try:
-        print("\n[BHW] create_maternal_record → RPC payload:")
-        print(json.dumps(payload, indent=2, default=str))
-    except Exception:
-        print("[BHW] create_maternal_record → (could not pretty-print payload)")
+    # Legacy shim
+    if "p_staff_id" in payload and "p_added_by_id" not in payload:
+        payload["p_added_by_id"] = payload.pop("p_staff_id")
+        print("[BHW] NOTE: mapped legacy key p_staff_id → p_added_by_id")
+
+    # Keep only the args your SQL function accepts
+    allowed = {"p_added_by_id", "p_person_id", "p_husband_id"}
+    payload = {k: payload.get(k) for k in allowed}
 
     try:
-        res = supabase.rpc("create_maternal_health_record", payload).execute()
-        # Log RPC results verbosely
-        print("[BHW] RPC create_maternal_health_record → data :", getattr(res, "data", None))
-        print("[BHW] RPC create_maternal_health_record → error:", getattr(res, "error", None))
+        print("\n[BHW] create_maternal_record → RPC payload (sanitized):")
+        import json as _json
+        print(_json.dumps(payload, indent=2, default=str))
+    except Exception:
+        pass
+
+    try:
+        res = supabase.rpc("create_maternal_health_record_bhw", payload).execute()
+        print("[BHW] RPC create_maternal_health_record_bhw → data :", getattr(res, "data", None))
+        print("[BHW] RPC create_maternal_health_record_bhw → error:", getattr(res, "error", None))
         if getattr(res, "error", None):
             return False, getattr(res.error, "message", str(res.error))
         return True, None
     except Exception as e:
-        print("[BHW] RPC create_maternal_health_record → exception:", e)
+        print("[BHW] RPC create_maternal_health_record_bhw → exception:", e)
         return False, str(e)
 
 # ---------- Demo data used by UI (replace later with DB) ----------

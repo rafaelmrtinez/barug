@@ -186,7 +186,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     })
 
 @session_login_required
-@role_required(*hv.ROLE_BHW)
+@role_required(*hv.ROLE_BHW, "midwife")
 @nocache
 def records(request: HttpRequest) -> HttpResponse:
     rows = hv.sample_registry()
@@ -277,7 +277,7 @@ def add_vaccine(request: HttpRequest, record_id: int) -> HttpResponse:
     return redirect("bhw:record_detail", kind="child", record_id=record_id)
 
 @session_login_required
-@role_required(*hv.ROLE_BHW)
+@role_required(*hv.ROLE_BHW, "midwife")
 @nocache
 def maternal_new(request: HttpRequest) -> HttpResponse:
     auth = request.session.get("auth") or {}

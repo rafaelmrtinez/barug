@@ -58,6 +58,7 @@ def queue(request: HttpRequest):
         "status_options": status_options,
     })
 
+from django.utils.dateparse import parse_datetime
 # ========= Detail (with payment panel) =========
 @session_login_required
 @role_required(TREASURER_ROLE)
@@ -89,7 +90,9 @@ def detail(request: HttpRequest, doc_request_id: int):
         to_status = e.get("to_status") or (e.get("details") or {}).get("to_status")
         if to_status:
             e["to_status_display"] = (STATUS_UI.get(to_status) or {"label": titleize(to_status)}).get("label")
-
+        # ✅ Parse datetime
+        if e.get("occurred_at"):
+            e["occurred_at"] = parse_datetime(e["occurred_at"])
     # Payment methods + find WAIVED id
     methods = list_payment_methods()
     waived_method_id = next(
@@ -434,12 +437,11 @@ def business_detail(request: HttpRequest, business_id: int, doc_request_id: int)
     # 1) Business profile
     biz_res = supabase.rpc("get_business_details", {"p_business_id": business_id}).execute()
     biz = (biz_res.data[0] if (biz_res and getattr(biz_res, "data", None)) else {}) or {}
-    # normalize flag key
     biz["has_business_clearance"] = bool(
         biz.get("has_business_clearance") or biz.get("has_brgy_clearance")
     )
 
-    # 2) Doc request bundle (for amount due, payments, etc.)
+    # 2) Doc request bundle (current request)
     header: Dict[str, Any] = {}
     payments: Dict[str, Any] = {}
     lines: List[Dict[str, Any]] = []
@@ -451,14 +453,46 @@ def business_detail(request: HttpRequest, business_id: int, doc_request_id: int)
     except Exception as e:
         messages.warning(request, f"Could not load request details: {escape(str(getattr(e,'message',e)))}")
 
-    # 3) Payment methods + find WAIVED id
+    # Identify document type for conditional UI
+    document_type_name = None
+    if lines:
+        document_type_name = (lines[0].get("document_type_name") or "").strip()
+
+    # 2b) If this is a CTC, fetch the ORIGINAL (reference) clearance bundle
+    ctc_mode = (document_type_name or "").upper() == "CERTIFIED TRUE COPY"
+    ctc_ref_header: Dict[str, Any] = {}
+    ctc_ref_lines: List[Dict[str, Any]] = []
+    ctc_ref_request_id: int | None = None
+
+    if ctc_mode:
+        try:
+            # pull from the first line details; fallback: scan all lines
+            det = (lines[0].get("details") or {}) if lines else {}
+            ctc_ref_request_id = int(det.get("reference_request_id") or 0) or None
+            if not ctc_ref_request_id:
+                for l in lines:
+                    d = l.get("details") or {}
+                    if d.get("reference_request_id"):
+                        ctc_ref_request_id = int(d["reference_request_id"])
+                        break
+
+            if ctc_ref_request_id:
+                ref_bundle = fetch_detail_bundle(ctc_ref_request_id)
+                ctc_ref_header = ref_bundle.get("header") or {}
+                ctc_ref_lines  = ref_bundle.get("lines")  or []
+            else:
+                messages.warning(request, "CTC: no reference_request_id found on line details.")
+        except Exception as e:
+            messages.warning(request, f"CTC: failed to load reference clearance details: {escape(str(getattr(e,'message',e)))}")
+
+    # 3) Payment methods + WAIVED id
     methods = list_payment_methods()
     waived_method_id = next(
         (m.get("payment_method_id") for m in methods if (m.get("method_name") or "").strip().upper() == "WAIVED"),
         None
     )
 
-    # 4) Release history + year status (optional, keeps your previous UI)
+    # 4) Release history + year status
     clr_res = supabase.rpc("list_business_clearances", {"p_business_id": business_id}).execute()
     clearances = (clr_res.data or []) if clr_res else []
     year = datetime.utcnow().year
@@ -479,8 +513,18 @@ def business_detail(request: HttpRequest, business_id: int, doc_request_id: int)
         "clearances": clearances,
         "year_status": year_status,
         "last_cleared_year": last_cleared_year,
-        "status_ui": STATUS_UI.get(header.get("status") or "") or {"label": header.get("status") or "—", "cls": "badge text-bg-secondary"},
+        "document_type_name": document_type_name,
+        "status_ui": STATUS_UI.get(header.get("status") or "") or {
+            "label": header.get("status") or "—",
+            "cls": "badge text-bg-secondary"
+        },
+        # 👇 extra context for CTC
+        "ctc_mode": ctc_mode,
+        "ctc_ref_request_id": ctc_ref_request_id,
+        "ctc_ref_header": ctc_ref_header,
+        "ctc_ref_lines": ctc_ref_lines,
     })
+
 
 # ---------- One-click: Pay -> set flag -> mark for printing ----------
 @session_login_required

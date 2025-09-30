@@ -82,7 +82,7 @@
                 <td>{{ r.purok|default:"—" }}</td>
                 <td class="text-capitalize">{{ r.kind }}</td>
                 <td>
-                  <a class="btn btn-outline-brand btn-sm" href="{% url 'bhw:record_detail' r.kind r.id %}">
+                  <a class="btn btn-outline-brand btn-sm" href="{% url 'midwife:record_detail' r.kind r.id %}">
                     {% bs_icon 'folder2-open' extra_classes='me-1' %} Open
                   </a>
                 </td>

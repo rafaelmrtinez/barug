@@ -1,11 +1,19 @@
 # midwife/views.py
 from __future__ import annotations
-from typing import Any
-from django.shortcuts import render, redirect
-from django.core.paginator import Paginator
-from django.http import JsonResponse, HttpRequest, HttpResponse, HttpResponseNotAllowed
-from django.template.loader import render_to_string
+
+from datetime import date
+from typing import Any, Dict, List, Optional, Tuple
+
 from django.contrib import messages
+from django.core.paginator import Paginator
+from django.http import (
+    HttpRequest,
+    HttpResponse,
+    JsonResponse,
+    HttpResponseNotAllowed,
+)
+from django.shortcuts import render, redirect
+from django.template.loader import render_to_string
 
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
@@ -18,36 +26,29 @@ from .forms import (
     MaternalBhwIntakeForm,
 )
 
-# All logic lives here:
+# Service helpers (unchanged)
+from .services import (
+    fetch_maternal_registry,
+    search_residents,
+    verify_valid_id,
+    build_maternal_payload,
+    create_maternal_record,
+    get_record_detail,
+    build_anc_visit_payload,
+    insert_anc_visit_with_details,
+)
 
-from midwife.services import * 
+# Two AJAX helpers use RPC directly
+from common.supabase_client import supabase
 
-# -------------------- Simple UI-only globals --------------------
+# -------------------- Role / UI globals (unchanged) --------------------
+ROLE_MIDWIFE = ("MIDWIFE", "Midwife", "midwife")
 user_fullname = "laname fname mname suffix"
 user_role = "MIDWIFE"
 user_role_template = user_role.lower().replace(" ", "_")
 
-# -------------------- UI / render handlers ----------------------
 
-# midwife/views.py
-from typing import List, Dict, Any
-from django.http import JsonResponse, HttpRequest
-from django.template.loader import render_to_string
-from authentication.guards import session_login_required, role_required
-from authentication.utils import nocache
-
-from common.supabase_client import supabase  # same client Clerk uses
-
-# midwife/views.py
-from datetime import date
-from typing import Any, Dict
-from django.http import JsonResponse, HttpRequest
-from authentication.guards import session_login_required, role_required
-from authentication.utils import nocache
-from common.supabase_client import supabase
-
-ROLE_MIDWIFE = ("MIDWIFE", "Midwife", "midwife")
-
+# -------------------- Small utilities (unchanged) --------------------
 def _age_from_birthdate_py(bd: Any):
     try:
         if not bd:
@@ -59,11 +60,173 @@ def _age_from_birthdate_py(bd: Any):
     except Exception:
         return None
 
+
+# -------------------- Parsing helpers for normalization --------------------
+def _to_float(s: Any) -> Optional[float]:
+    if s is None:
+        return None
+    if isinstance(s, (int, float)):
+        return float(s)
+    try:
+        # strip units like "54 kg"
+        txt = str(s)
+        num = "".join(ch for ch in txt if (ch.isdigit() or ch == "." or ch == "-"))
+        return float(num) if num else None
+    except Exception:
+        return None
+
+
+def _parse_bp(bp: Any) -> Tuple[Optional[int], Optional[int]]:
+    try:
+        if not bp:
+            return (None, None)
+        txt = str(bp)
+        if "/" in txt:
+            a, b = txt.split("/", 1)
+            return (int("".join(ch for ch in a if ch.isdigit())),
+                    int("".join(ch for ch in b if ch.isdigit())))
+        return (None, None)
+    except Exception:
+        return (None, None)
+
+
+def _parse_ga_weeks(ga: Any) -> Optional[int]:
+    if ga is None:
+        return None
+    if isinstance(ga, (int, float)):
+        return int(ga)
+    txt = str(ga).lower().strip()
+    # accept formats like "8w", "8", "8 weeks"
+    digits = "".join(ch for ch in txt if ch.isdigit())
+    return int(digits) if digits else None
+
+
+def _trimester_name(ga_weeks: Optional[int]) -> Optional[str]:
+    if ga_weeks is None:
+        return None
+    if ga_weeks <= 13:
+        return "1st"
+    if ga_weeks <= 27:
+        return "2nd"
+    return "3rd"
+
+
+def _normalize_maternal_detail(raw: Dict[str, Any] | None, record_id: int) -> Dict[str, Any]:
+    """
+    Accepts either your service's 'maternal_health_record' style or the sample payload style
+    (id/kind/name/plan_delivery/anc/etc.) and returns a unified dict the template can use safely.
+    """
+    raw = raw or {}
+
+    def first(*keys, default=None):
+        for k in keys:
+            if k in raw and raw[k] not in (None, "", [], {}):
+                return raw[k]
+        return default
+
+    # IDs / names
+    mhr_id = first("maternal_record_id", "id", default=record_id)
+    person_name = first("person_name", "name")
+    family_num = first("family_num", "family_no")
+    status = first("status", default="ACTIVE")
+
+    # baseline / anthropometrics
+    height = first("height", "height_m")
+    weight = first("weight", "baseline_weight_kg")
+    bmi_status_id = first("bmi_status_id")
+    created_at = first("created_at")
+    assessed_by_id = first("assessed_by_id")
+    husband_id = first("husband_id")
+    person_id = first("person_id")
+    family_id = first("family_id")
+
+    # plans
+    place_plan = first("place_of_delivery_plan", "plan_delivery")
+    nbs_plan = first("new_born_screening_plan", "plan_nbs")
+
+    # dates (optional)
+    lmp_date = first("lmp_date", ("present" in raw and raw["present"].get("lmp")))
+    edd_date = first("edd_date", ("present" in raw and raw["present"].get("edc")))
+
+    # Normalize visits
+    visits: List[Dict[str, Any]] = []
+    if isinstance(raw.get("visits"), list):
+        # already normalized by service
+        visits = list(raw["visits"])
+    elif isinstance(raw.get("anc"), list):
+        for v in raw["anc"]:
+            ga_w = _parse_ga_weeks(v.get("ga"))
+            bp_s, bp_d = _parse_bp(v.get("bp"))
+            visits.append({
+                "visit_date": v.get("date"),
+                "ga_weeks": ga_w,
+                "trimester_name": _trimester_name(ga_w),
+                "bp_sys": bp_s,
+                "bp_dia": bp_d,
+                "weight_kg": _to_float(v.get("wt")),
+                "fhr_bpm": _to_float(v.get("fhr")) if v.get("fhr") not in (None, "—") else None,
+                "fundic_height_cm": None,
+                "has_danger": False,
+                "notes": v.get("remarks"),
+                "labs": [],
+                "tt": [],
+                "supplements": [],
+                "assessed_by": None,
+            })
+
+    # Delivery block (optional)
+    delivery = raw.get("delivery")
+
+    # Shape for template
+    return {
+        "mhr_id": mhr_id,
+        "person_name": person_name,
+        "family_num": family_num,
+        "status": status,
+        "height": height,
+        "weight": weight,
+        "bmi_status_id": bmi_status_id,
+        "created_at": created_at,
+        "assessed_by_id": assessed_by_id,
+        "husband_id": husband_id,
+        "person_id": person_id,
+        "family_id": family_id,
+        "place_of_delivery_plan": place_plan,
+        "new_born_screening_plan": nbs_plan,
+        "lmp_date": lmp_date,
+        "edd_date": edd_date,
+        "visits": visits,
+        "delivery": delivery,
+    }
+
+
+def _demo_maternal_payload(record_id: int) -> Dict[str, Any]:
+    """Temporary sample data when the DB returns nothing (for debugging the UI)."""
+    return {
+        "id": record_id,
+        "kind": "maternal",
+        "name": "Maria Santos",
+        "age": 28,
+        "family_no": "F-001",
+        "address": "Purok Kanipaan",
+        "present": {"gravida": 2, "para": 1, "lmp": "2025-05-01", "edc": "2026-02-05"},
+        "tt": [{"dose": "TT1", "date": "2024-11-10"}, {"dose": "TT2", "date": "2025-01-12"}],
+        "anc": [
+            {"date": "2025-06-10", "ga": "8w", "bp": "110/70", "wt": "54 kg", "fht": "—", "remarks": "Initial"}
+        ],
+        "labs": {"Urinalysis": "Normal", "Syphilis": "NR"},
+        "ogct_50": "85 mg/dL",
+        "ogct_100": "—",
+        "plan_delivery": "NSVD – District Hospital",
+        "plan_nbs": True,
+    }
+
+
+# -------------------- AJAX endpoints --------------------
 @session_login_required
 @role_required(*ROLE_MIDWIFE)
 @nocache
 def ajax_person_details(request: HttpRequest):
-    """Return minimal structured details for a person_id (DOB, age, address, etc.)."""
     try:
         pid = int(request.GET.get("person_id") or 0)
     except Exception:
@@ -72,14 +235,12 @@ def ajax_person_details(request: HttpRequest):
         return JsonResponse({"ok": False, "error": "missing person_id"}, status=400)
 
     try:
-        # Use your existing DB RPC that already joins address pieces
         resp = supabase.rpc("get_specific_resident_full_profile", {"p_person_id": pid}).execute()
         data = resp.data or []
         row: Dict[str, Any] = (data[0] if isinstance(data, list) and data else data) or {}
     except Exception as e:
         return JsonResponse({"ok": False, "error": f"{e}"}, status=500)
 
-    # Compose address
     parts = [
         (row.get("street_name") or "").strip(),
         (row.get("sitio_purok_name") or row.get("purok_sitio_name") or "").strip(),
@@ -90,7 +251,6 @@ def ajax_person_details(request: HttpRequest):
     birthdate = (row.get("birthdate") or row.get("date_of_birth") or None)
     birthdate_iso = str(birthdate)[:10] if birthdate else None
     age = _age_from_birthdate_py(birthdate_iso)
-    family_num = row.get("family_num")
 
     payload = {
         "first_name": row.get("first_name"),
@@ -102,7 +262,7 @@ def ajax_person_details(request: HttpRequest):
         "civil_status": row.get("civil_status"),
         "occupation": row.get("occupation"),
         "sex": row.get("sex"),
-        "family_num": family_num
+        "family_num": row.get("family_num"),
     }
     return JsonResponse({"ok": True, "person": payload})
 
@@ -112,22 +272,15 @@ def ajax_person_details(request: HttpRequest):
 @nocache
 def ajax_resident_search(request: HttpRequest) -> JsonResponse:
     q = (request.GET.get("q") or "").strip()
-    rows: List[Dict[str, Any]] = []
-    if len(q) >= 2:
-        try:
-            resp = supabase.rpc("search_person_by_code_or_name", {"raphael": q}).execute()
-            rows = resp.data or []
-        except Exception:
-            rows = []
-
+    rows = search_residents(q)
     html = render_to_string("midwife/_resident_results.html", {"residents": rows})
     return JsonResponse({"ok": True, "html": html})
+
 
 @session_login_required
 @role_required(*ROLE_MIDWIFE)
 @nocache
 def ajax_person_card(request: HttpRequest) -> JsonResponse:
-    """Load a lightweight person card (mirrors Clerk’s ‘view details’ style)."""
     try:
         pid = int(request.GET.get("person_id") or 0)
     except Exception:
@@ -146,87 +299,115 @@ def ajax_person_card(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"ok": bool(row), "html": html})
 
 
+# -------------------- Pages --------------------
 def active_schedule(request: HttpRequest) -> HttpResponse:
-    pending = []
+    pending: List[Dict[str, Any]] = []
     page_obj = Paginator(pending, 10).get_page(request.GET.get("page"))
-    return render(request, "household/quarterly/active_schedule.html", {
-        "user_fullname": user_fullname,
-        "user_role": user_role,
-        "page_path": "",
-        "page_title": "",
-        "user_role_template": user_role_template,
-        "search_form": SearchActiveScheduleFilter(),
-        "status_form": StatusActiveScheduleFilter(),
-        "week_range_form": WeekRangeActiveScheduleFilter(),
-        "reschedule_form": Reschedule(),
-        "page_obj": page_obj,
-    })
+    return render(
+        request,
+        "household/quarterly/active_schedule.html",
+        {
+            "user_fullname": user_fullname,
+            "user_role": user_role,
+            "page_path": "",
+            "page_title": "",
+            "user_role_template": user_role_template,
+            "search_form": SearchActiveScheduleFilter(),
+            "status_form": StatusActiveScheduleFilter(),
+            "week_range_form": WeekRangeActiveScheduleFilter(),
+            "reschedule_form": Reschedule(),
+            "page_obj": page_obj,
+        },
+    )
 
 
 def household_info(request: HttpRequest) -> HttpResponse:
-    return render(request, "household/household_info.html", {
-        "user_fullname": user_fullname,
-        "user_role": user_role,
-        "page_path": f"{user_role} / Request Details",
-        "page_title": "Request Details",
-        "user_role_template": user_role_template,
-    })
+    return render(
+        request,
+        "household/household_info.html",
+        {
+            "user_fullname": user_fullname,
+            "user_role": user_role,
+            "page_path": f"{user_role} / Request Details",
+            "page_title": "Request Details",
+            "user_role_template": user_role_template,
+        },
+    )
 
 
 @session_login_required
-@role_required("MIDWIFE")
+@role_required(*ROLE_MIDWIFE)
 @nocache
 def dashboard(request: HttpRequest) -> HttpResponse:
     auth = request.session.get("auth")
-    
-    return render(request, "midwife/dashboard.html", {
-        "page_path": "Midwife/Dashboard",
-        "page_title": "Dashboard",
-        "auth": auth,
-    })
+    return render(
+        request,
+        "midwife/dashboard.html",
+        {
+            "page_path": "Midwife/Dashboard",
+            "page_title": "Dashboard",
+            "auth": auth,
+        },
+    )
+
 
 @session_login_required
-@role_required(ROLE_MIDWIFE)
+@role_required(*ROLE_MIDWIFE)
 @nocache
 def records(request: HttpRequest) -> HttpResponse:
-    rows = sample_registry()
+    q = (request.GET.get("q") or "").strip()
+    rows = fetch_maternal_registry(q=q, limit=300)
     page_obj = Paginator(rows, 10).get_page(request.GET.get("page"))
-    return render(request, "midwife/records.html", {
-        "page_path": "Midwife / Records",
-        "page_title": "Records",
-        "q": request.GET.get("q", ""),
-        "types": request.GET.getlist("type"),
-        "puroks": request.GET.getlist("purok"),
-        "statuses": request.GET.getlist("status"),
-        "types_all": ["maternal", "child"],
-        "puroks_all": ["Kanipaan", "Pampango", "Lutaw-lutaw", "Mauco"],
-        "statuses_all": ["active", "completed", "archived"],
-        "active_count": len(request.GET.getlist("type")) + len(request.GET.getlist("purok")) + len(request.GET.getlist("status")),
-        "page_obj": page_obj,
-    })
+    return render(
+        request,
+        "midwife/records.html",
+        {
+            "page_path": "Midwife / Records",
+            "page_title": "Records",
+            "q": q,
+            "types": request.GET.getlist("type"),
+            "puroks": request.GET.getlist("purok"),
+            "statuses": request.GET.getlist("status"),
+            "types_all": ["maternal", "child"],
+            "puroks_all": ["Kanipaan", "Pampango", "Lutaw-lutaw", "Mauco"],
+            "statuses_all": ["active", "completed", "archived"],
+            "active_count": len(request.GET.getlist("type"))
+            + len(request.GET.getlist("purok"))
+            + len(request.GET.getlist("status")),
+            "page_obj": page_obj,
+        },
+    )
+
 
 @session_login_required
-@role_required(ROLE_MIDWIFE)
+@role_required(*ROLE_MIDWIFE)
 @nocache
 def record_detail(request: HttpRequest, kind: str, record_id: int) -> HttpResponse:
-    rec = get_record_detail(kind, record_id)
-    return render(request, "midwife/record_detail.html", {
-        "page_path": "Midwife / Record Details",
-        "page_title": "Record Details",
-        "rec": rec,
-    })
+    """
+    When opened from Records, display maternal details prefilled *up to Anthropometrics*.
+    Falls back to demo data if none returned, and normalizes keys for the template.
+    """
+    raw = get_record_detail(kind, record_id)
+    if not raw:
+        raw = _demo_maternal_payload(record_id)  # <-- temp data for debugging
+
+    rec = _normalize_maternal_detail(raw, record_id)
+
+    return render(
+        request,
+        "midwife/record_detail.html",
+        {
+            "page_path": "Midwife / Record Details",
+            "page_title": "Record Details",
+            "rec": rec,          # normalized record
+            "kind": kind,
+            "record_id": record_id,  # provided for completeness
+        },
+    )
+
 
 @session_login_required
-@role_required(ROLE_MIDWIFE)
-@nocache
-def ajax_resident_search(request: HttpRequest) -> JsonResponse:
-    q = (request.GET.get("q") or "").strip()
-    rows = search_residents(q)
-    html = render_to_string("midwife/_resident_results.html", {"residents": rows})
-    return JsonResponse({"ok": True, "html": html})
-
-@session_login_required
-@role_required(ROLE_MIDWIFE)
+@role_required(*ROLE_MIDWIFE)
 @nocache
 def verify_valid_id_view(request: HttpRequest) -> JsonResponse:
     if request.method != "POST":
@@ -249,17 +430,35 @@ def verify_valid_id_view(request: HttpRequest) -> JsonResponse:
     status = result.pop("status", 200) if not result.get("ok") else 200
     return JsonResponse(result, status=status)
 
+
 @session_login_required
-@role_required(ROLE_MIDWIFE)
+@role_required(*ROLE_MIDWIFE)
 @nocache
 def add_anc_visit(request: HttpRequest, record_id: int) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
-    messages.success(request, "ANC visit saved (demo).")
+
+    auth = request.session.get("auth") or {}
+    staff_id = auth.get("staff_id")
+
+    # Build RPC payload from the modal form
+    payload = build_anc_visit_payload(
+        record_id=record_id,
+        form=request.POST,
+        staff_id=staff_id,
+    )
+
+    ok, err = insert_anc_visit_with_details(payload)
+    if ok:
+        messages.success(request, "ANC visit saved.")
+    else:
+        messages.error(request, f"RPC error: {err}")
+
     return redirect("midwife:record_detail", kind="maternal", record_id=record_id)
 
+
 @session_login_required
-@role_required(ROLE_MIDWIFE)
+@role_required(*ROLE_MIDWIFE)
 @nocache
 def add_child_visit(request: HttpRequest, record_id: int) -> HttpResponse:
     if request.method != "POST":
@@ -267,8 +466,9 @@ def add_child_visit(request: HttpRequest, record_id: int) -> HttpResponse:
     messages.success(request, "Child visit saved (demo).")
     return redirect("midwife:record_detail", kind="child", record_id=record_id)
 
+
 @session_login_required
-@role_required(ROLE_MIDWIFE)
+@role_required(*ROLE_MIDWIFE)
 @nocache
 def add_vaccine(request: HttpRequest, record_id: int) -> HttpResponse:
     if request.method != "POST":
@@ -276,8 +476,9 @@ def add_vaccine(request: HttpRequest, record_id: int) -> HttpResponse:
     messages.success(request, "Vaccine dose saved (demo).")
     return redirect("midwife:record_detail", kind="child", record_id=record_id)
 
+
 @session_login_required
-@role_required(ROLE_MIDWIFE)
+@role_required(*ROLE_MIDWIFE)
 @nocache
 def maternal_new(request: HttpRequest) -> HttpResponse:
     auth = request.session.get("auth") or {}
@@ -297,8 +498,35 @@ def maternal_new(request: HttpRequest) -> HttpResponse:
     else:
         form = MaternalBhwIntakeForm()
 
-    return render(request, "midwife/maternal_new.html", {
-        "page_path": "Midwife / Maternal Records / New",
-        "page_title": "New Maternal Record (BHW Intake)",
-        "form": form,
-    })
+    return render(
+        request,
+        "midwife/maternal_new.html",
+        {
+            "page_path": "Midwife / Maternal Records / New",
+            "page_title": "New Maternal Record (BHW Intake)",
+            "form": form,
+        },
+    )
+
+# -------------------- NEW: Child Health Record (UI only / ready for RPC wiring) --------------------
+@session_login_required
+@role_required(*ROLE_MIDWIFE)
+@nocache
+def child_new(request: HttpRequest) -> HttpResponse:
+    """
+    UI for the Child Health Record intake that mirrors the DOH paper form.
+    This version focuses on frontend capture; wire to your RPC when ready.
+    """
+    if request.method == "POST":
+        # Placeholder: accept POST, show success. Replace with your service call later.
+        messages.success(request, "Child health record saved (demo UI).")
+        return redirect("midwife:child_new")
+
+    return render(
+        request,
+        "midwife/child_new.html",
+        {
+            "page_path": "Midwife / Child Records / New",
+            "page_title": "New Child Health Record",
+        },
+    )

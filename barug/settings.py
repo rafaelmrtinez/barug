@@ -48,7 +48,7 @@ if isProduction != None and isProduction == "True":
     ALLOWED_HOSTS = ["barug-development.onrender.com"]
 else:
     DEBUG = True
-    ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -243,7 +243,6 @@ STATICFILES_DIRS = [
     # os.path.join(BASE_DIR, "event_logs/static/event_logs"),
     os.path.join(BASE_DIR, "resident/static/resident"),
     os.path.join(BASE_DIR, "bhw/static/bhw"),
-    os.path.join(BASE_DIR, "midwife/static/midwife"),
     # os.path.join(BASE_DIR, "clerk/static/clerk"),
 ]
 

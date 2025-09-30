@@ -440,8 +440,30 @@ def detail(request: HttpRequest, doc_request_id: int):
     header["subject_civil_status"] = subj["civil_status"]
     header["subject_nationality"] = subj["nationality"]
 
+    # --- NEW: CTC context for UI banner & modal ---
+    ctc_mode = False
+    ctc_of = None
+    ctc_ref_request_id = None
+    ctc_ref_code = None
+    try:
+        for l in lines:
+            if (l.get("document_type_name") or "").strip().upper() == "CERTIFIED TRUE COPY":
+                ctc_mode = True
+                det = l.get("details") or {}
+                ctc_of = (det.get("ctc_of") or "").strip() or None
+                ctc_ref_request_id = det.get("reference_request_id")
+                break
+        if ctc_mode and ctc_ref_request_id:
+            ref_bundle = _fetch_bundle(int(ctc_ref_request_id))
+            ref_header = ref_bundle.get("header") or {}
+            ctc_ref_code = ref_header.get("request_code")
+    except Exception:
+        pass
+
     return render(request, "clerk/detail.html", {
         "header": header, "status_ui": ui, "lines": lines, "payments": payments, "timeline": timeline,
+        "ctc_mode": ctc_mode, "ctc_of": ctc_of,
+        "ctc_ref_request_id": ctc_ref_request_id, "ctc_ref_code": ctc_ref_code,
     })
 
 # ────────────────────────────────────────────────────────────
@@ -553,164 +575,183 @@ def _apply_pdf_field_mapping(
 def mark_for_printing(request: HttpRequest, doc_request_id: int):
     include_debug = (request.POST.get("debug") == "1")
 
+    def _override_if_blank(d: Dict[str, Any], key: str, fallback: Any):
+        cur = d.get(key)
+        cur_blank = (cur is None) or (str(cur).strip() == "")
+        if cur_blank and fallback is not None and str(fallback).strip() != "":
+            d[key] = fallback
+
+    # ---- Load the primary (this CTC) bundle
     try:
-        data: Dict[str, Any] = _fetch_bundle(doc_request_id)
+        data_raw = _fetch_bundle(doc_request_id)
+        data = (data_raw[0] if isinstance(data_raw, list) and data_raw else data_raw) or {}
     except APIError as e:
         messages.error(request, f"Supabase error: {escape(getattr(e, 'message', str(e)))}")
         return redirect("clerk:detail", doc_request_id=doc_request_id)
 
-    header = data.get("header", {}) or {}
-    lines: List[Dict[str, Any]] = data.get("lines", []) or []
-    payments = data.get("payments", {}) or {}
+    header: Dict[str, Any]   = data.get("header", {}) or {}
+    lines: List[Dict[str,Any]] = data.get("lines", []) or []
+    payments: Dict[str, Any] = data.get("payments", {}) or {}
 
-    # expose receipt info to PDFs
-    header["or_number"] = (
-        payments.get("latest_or_number")
-        or payments.get("or_number")
-        or _safe_str(header.get("or_number"))
-    )
-    
-    line_total = sum(float(line.get("line_total", 0) or 0) for line in lines)
-
+    # Expose receipt info to PDFs (from THIS request – the CTC usually has the OR)
+    line_total = sum(float(l.get("line_total", 0) or 0) for l in lines)
+    header["or_number"]   = payments.get("latest_or_number") or payments.get("or_number") or _safe_str(header.get("or_number"))
     header["paid_amount"] = line_total or payments.get("amount")
-
     header["paid_date"]   = payments.get("latest_paid_at") or payments.get("paid_at") or payments.get("latest_or_time")
-    print("[PRINT DEBUG] payments keys (sample):", list(payments.keys())[:20])
-    print("[PRINT DEBUG] header snapshot:", json.dumps({k: header.get(k) for k in ["request_code","or_number","paid_amount","paid_date"]}, indent=2, default=str))
+
+    print("[PRINT DEBUG] header snapshot:", json.dumps({
+        "request_code": header.get("request_code"),
+        "or_number": header.get("or_number"),
+        "paid_amount": header.get("paid_amount"),
+        "paid_date": str(header.get("paid_date")),
+    }, indent=2, default=str))
 
     outputs: List[tuple[str, bytes]] = []
     debug_items: List[Dict[str, Any]] = []
     base_dir = _pdf_templates_dir()
 
     for idx, line in enumerate(lines, start=1):
-        doc_name = _safe_str(line.get("document_type_name") or f"doc-{idx}")
+        original_doc_name = _safe_str(line.get("document_type_name") or f"doc-{idx}")
+        is_ctc = (original_doc_name.strip().upper() == "CERTIFIED TRUE COPY")
 
-        # Choose template; override for Business Clearance
-        template_file = _choose_template(doc_name, False)
-        det = (line.get("details") or {})
-        if (doc_name.strip().upper() == BRGY_BUSINESS_DOC_NAME) or (det.get("template_override") == BRGY_BUSINESS_PDF_FILE):
+        # ---------- If CTC, load the ORIGINAL request it's certifying ----------
+        ref_header: Dict[str, Any] = {}
+        ref_line: Dict[str, Any]   = {}
+        ref_payments: Dict[str, Any] = {}
+        if is_ctc:
+            det = (line.get("details") or {})
+            ctc_of = (det.get("ctc_of") or "").strip().upper() or None
+            ref_id = det.get("reference_request_id") or det.get("reference_doc_request_id")
+            try:
+                if ref_id:
+                    rb_raw = _fetch_bundle(int(ref_id))
+                    rb = (rb_raw[0] if isinstance(rb_raw, list) and rb_raw else rb_raw) or {}
+                    ref_header   = rb.get("header", {}) or {}
+                    ref_lines    = rb.get("lines", []) or []
+                    ref_payments = rb.get("payments", {}) or {}
+                    # choose the referenced line (same doc) or first
+                    for rl in ref_lines:
+                        if ctc_of and (str(rl.get("document_type_name") or "").strip().upper() == ctc_of):
+                            ref_line = rl
+                            break
+                    if not ref_line and ref_lines:
+                        ref_line = ref_lines[0]
+            except Exception as e:
+                print(f"[CTC DEBUG] Could not load reference bundle for CTC: {e}")
+
+        # The document to PRINT (for CTC we print the original's document)
+        doc_name_print = _safe_str(ref_line.get("document_type_name")) if (is_ctc and ref_line) else original_doc_name
+        doc_name_upper = doc_name_print.strip().upper()
+
+        # Is this a (CTC of) Barangay Business Clearance?
+        is_bc = (
+            doc_name_upper == BRGY_BUSINESS_DOC_NAME
+            or (is_ctc and ((line.get("details") or {}).get("ctc_of","").strip().upper() == BRGY_BUSINESS_DOC_NAME))
+        )
+
+        # Template selection
+        template_file = _choose_template(doc_name_print, False)
+        if is_bc or (line.get("details") or {}).get("template_override") == BRGY_BUSINESS_PDF_FILE:
             template_file = BRGY_BUSINESS_PDF_FILE
         template_path = os.path.join(base_dir, template_file)
-        print(f"[PRINT DEBUG] doc='{doc_name}' -> using template_file='{template_file}'")
+        print(f"[PRINT DEBUG] doc='{doc_name_print}' (from='{original_doc_name}') -> template='{template_file}' (CTC={is_ctc})")
 
-        # Resolve template path
         if not os.path.exists(template_path):
             alt = os.path.join(settings.BASE_DIR, "clerk", "pdf_templates", template_file)
             if os.path.exists(alt):
                 template_path = alt
             else:
                 print(json.dumps({
-                    "doc_index": idx, "doc_name": doc_name, "template_file": template_file,
+                    "doc_index": idx, "doc_name": doc_name_print, "template_file": template_file,
                     "template_path": template_path, "exists": False, "reason": "Template not found"
                 }, indent=2))
                 continue
 
-        # Build values:
-        #   - start with system-computed values
-        #   - overlay any values from line.details (Business Clearance fields live here)
-        base_values = _fill_fields_for_line(header, line)
-        detail_values = (line.get("details") or {})
-        combined_values = {**detail_values, **base_values}
+        # ---------- Build values ----------
+        if is_ctc and ref_header and ref_line:
+            base_values   = _fill_fields_for_line(ref_header, ref_line)
+            detail_values = (ref_line.get("details") or {})
+            combined_values = {**detail_values, **base_values}
+            # Helpful CTC stamps (if any template uses them)
+            combined_values["is_ctc"] = True
+            combined_values["ctc_reference_code"] = ref_header.get("request_code")
+            ref_created = ref_header.get("created_at") or ref_header.get("created_ts") or ref_header.get("date_created")
+            combined_values["ctc_reference_date"] = _friendly_date_text(ref_created) or _safe_str(ref_created)
 
-        # ── Fill subject-based applicant_* fallbacks (so BC always has these)
+            # If original has blanks, override from **this CTC's** header/payments
+            _override_if_blank(combined_values, "or_number", header.get("or_number") or payments.get("latest_or_number"))
+            _override_if_blank(combined_values, "paid_amount", header.get("paid_amount") or payments.get("latest_amount"))
+            _override_if_blank(combined_values, "paid_date", _friendly_date_text(header.get("paid_date") or payments.get("latest_or_time")))
+        else:
+            base_values   = _fill_fields_for_line(header, line)
+            detail_values = (line.get("details") or {})
+            combined_values = {**detail_values, **base_values}
+            _override_if_blank(combined_values, "or_number", header.get("or_number") or payments.get("latest_or_number"))
+            _override_if_blank(combined_values, "paid_amount", header.get("paid_amount") or payments.get("latest_amount"))
+            _override_if_blank(combined_values, "paid_date", _friendly_date_text(header.get("paid_date") or payments.get("latest_or_time")))
+
+        # Subject fallbacks
         try:
-            _subj = subject_view(header, line)
+            _subj = subject_view(ref_header if (is_ctc and ref_header) else header,
+                                 ref_line   if (is_ctc and ref_line)   else line)
             combined_values.setdefault("applicant_full_name", _safe_str(_subj.get("full_name")))
             combined_values.setdefault("applicant_age", _safe_str(_subj.get("age")))
             combined_values.setdefault("applicant_nationality", _safe_str(_subj.get("nationality")))
         except Exception as e:
             print(f"[PRINT DEBUG] subject fallbacks failed: {e}")
 
-        # ── Meta boxes on your BC template
-        combined_values["numberfour"] = header.get("request_code")                # Application No.
-
-        created_any = header.get("created_at") or header.get("created_ts") or header.get("date_created")
-        # FORMAT to 'September 27, 2025' (NEW)
-        friendly_applied = _friendly_date_text(created_any)
-        combined_values["numberfive"] = friendly_applied or _safe_str(created_any)  # Date applied
-
-        combined_values.setdefault("numbersixteen", header.get("captain_name") or "Lourdes R. Ramirez")
+        # BC meta boxes (request code/date from the bundle we’re printing)
+        use_header = ref_header if (is_ctc and ref_header) else header
+        created_any = use_header.get("created_at") or use_header.get("created_ts") or use_header.get("date_created")
+        combined_values["numberfour"]  = use_header.get("request_code")
+        combined_values["numberfive"]  = _friendly_date_text(created_any) or _safe_str(created_any)
+        combined_values.setdefault("numbersixteen", use_header.get("captain_name") or "Lourdes R. Ramirez")
         combined_values.setdefault("year_issued", timezone.localtime().strftime("%Y"))
-        
-        # ensure header payment fields are present for mapping
-        combined_values.setdefault("paid_amount", header.get("paid_amount"))
-        # FORMAT paid_date to 'September 27, 2025' (NEW)
-        if header.get("paid_date"):
-            combined_values["paid_date"] = _friendly_date_text(header.get("paid_date"))
-        else:
-            combined_values.setdefault("paid_date", None)
-        combined_values.setdefault("or_number", header.get("or_number"))
 
-        # ── PRINT-TIME BUSINESS FALLBACK (if BC keys are missing)
-        if doc_name.strip().upper() == BRGY_BUSINESS_DOC_NAME:
+        # Enrich Business Clearance fields if needed
+        if is_bc:
             bc_keys = ["business_name_style","business_address","capital_invested","gross_sales_prev_year"]
-            needs_enrich = any(not _safe_str(combined_values.get(k)).strip() for k in bc_keys)
-            if needs_enrich:
-                bid = header.get("business_id")
+            if any(not _safe_str(combined_values.get(k)).strip() for k in bc_keys):
+                bid = use_header.get("business_id")
                 if not bid:
                     try:
-                        r = (
-                            supabase.table("document_request")
-                            .select("business_id")
-                            .eq("doc_request_id", doc_request_id)
-                            .limit(1)
-                            .execute()
-                        )
+                        r = (supabase.table("document_request")
+                             .select("business_id").eq("doc_request_id", doc_request_id)
+                             .limit(1).execute())
                         bid = ((r.data or [{}])[0] or {}).get("business_id")
                     except Exception as e:
                         print(f"[PRINT DEBUG] could not fetch business_id for request {doc_request_id}: {e}")
-                subj_pid = header.get("subject_person_id") or header.get("requested_by_person_id")
+                subj_pid = use_header.get("subject_person_id") or use_header.get("requested_by_person_id")
                 if bid:
                     try:
                         bc_enrich = _fetch_business_clearance_fields(int(bid), int(subj_pid) if subj_pid else None)
-                        # fetched values + existing details/base (existing wins)
                         combined_values = {**bc_enrich, **combined_values}
-                        print("[PRINT DEBUG] Applied business fallback from DB:",
-                              json.dumps({k: combined_values.get(k) for k in bc_keys}, default=str))
                     except Exception as e:
                         print(f"[PRINT DEBUG] business fallback failed: {e}")
 
+        # ---------- Map & fill PDF ----------
         field_names = _get_all_pdf_field_names(template_path)
+        # IMPORTANT: if this is (CTC of) Business Clearance, use the BC mapping name
+        mapping_doc_name = BRGY_BUSINESS_DOC_NAME if is_bc else doc_name_print
+        values_mapped = _apply_pdf_field_mapping(mapping_doc_name, field_names, combined_values, include_debug)
 
-        # Apply Business Clearance mapping (and optional discovery labels)
-        values_mapped = _apply_pdf_field_mapping(doc_name, field_names, combined_values, include_debug)
+        merged = {name: (values_mapped.get(name) if str(values_mapped.get(name) or "").strip() else "No data")
+                  for name in field_names}
 
-        # Final merged values for the PDF (fallback "No data" for blanks)
-        merged = {
-            name: (values_mapped.get(name) if str(values_mapped.get(name) or "").strip() else "No data")
-            for name in field_names
-        }
-        missing = [n for n in field_names if n not in values_mapped or str(values_mapped.get(n) or "").strip() == ""]
-
-        # ── EXTENSIVE DEBUG OUTPUT (prints all data passed)
-        print(json.dumps({
-            "doc_index": idx,
-            "doc_name": doc_name,
-            "template_file": template_file,
-            "template_path": template_path,
-            "field_count": len(field_names),
-            "missing_count": len(missing),
-            "missing_fields": missing,
-            "line_details_keys": list((line.get("details") or {}).keys()),
-            "combined_values_sample": {k: combined_values.get(k) for k in list(combined_values)[:15]},
-            "values_mapped_sample": {k: values_mapped.get(k) for k in list(values_mapped)[:15]},
-            "sample_values_written": {k: merged[k] for k in field_names[:10]},
-        }, indent=2, default=str))
-
-        # Fill PDF
         try:
             pdf_bytes = _fill_pdf_with_values(template_path, merged)
         except Exception:
             with open(template_path, "rb") as f:
                 pdf_bytes = f.read()
 
-        # Collect outputs
-        safe_name = doc_name.lower().replace(" ", "-")
-        out_name = f"{header.get('request_code','REQ')}-{safe_name}.pdf"
+        # Output filename (add ctc-of-… when applicable)
+        safe_name = doc_name_print.lower().replace(" ", "-")
+        out_name = (f"{header.get('request_code','REQ')}-ctc-of-{safe_name}.pdf"
+                    if is_ctc else f"{header.get('request_code','REQ')}-{safe_name}.pdf")
         outputs.append((out_name, pdf_bytes))
         debug_items.append({
             "output_filename": out_name,
-            "doc_name": doc_name,
+            "doc_name": doc_name_print,
             "template_file": template_file,
             "template_path": template_path,
             "field_names": field_names,
@@ -721,7 +762,6 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
         messages.error(request, "No PDF templates found. Check your pdf_templates folder and filenames.")
         return redirect("clerk:detail", doc_request_id=doc_request_id)
 
-    # Single PDF return (no debug)
     if len(outputs) == 1 and not include_debug:
         fname, bytes_ = outputs[0]
         resp = HttpResponse(bytes_, content_type="application/pdf")
@@ -733,11 +773,9 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
         resp["Content-Disposition"] = f'attachment; filename="{fname}"'
         return resp
 
-    # Otherwise ZIP them (and include debug payload when requested)
     zbuf = io.BytesIO()
     with zipfile.ZipFile(zbuf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for fname, b in outputs:
-            zf.writestr(fname, b)
+        for fname, b in outputs: zf.writestr(fname, b)
         if include_debug and debug_items:
             debug_payload = {
                 "request_code": header.get("request_code"),
@@ -1238,7 +1276,8 @@ def walkin_create(request: HttpRequest):
     except Exception:
         doc_type_name = ""
 
-    if doc_type_name.strip().upper() == BRGY_BUSINESS_DOC_NAME:
+    if doc_type_name.strip().upper() in {BRGY_BUSINESS_DOC_NAME, "CERTIFIED TRUE COPY"}:
+    # do something
         if not business_id:
             messages.error(request, "Business is required for Barangay Business Clearance.")
             return redirect(f"{request.path.replace('/create/','/')}?request_document_type_id={req_doc_type_id or ''}")
@@ -1335,6 +1374,7 @@ def _js(v):
         return v.isoformat()            # 'YYYY-MM-DD' / 'HH:MM:SS'
     return v
 
+#DO NOT TOUCH THIS FUNCTION
 @session_login_required
 @role_required("Barangay Clerk")
 @nocache
@@ -1352,6 +1392,7 @@ def business_owner(request: HttpRequest):
         },
     )
 
+#DO NOT TOUCH THIS FUNCTION
 @session_login_required
 @role_required("Barangay Clerk")
 @nocache
@@ -1418,6 +1459,7 @@ def business_owner_resident(request: HttpRequest) -> HttpResponse:
         },
     )
 
+#DO NOT TOUCH THIS FUNCTION
 def business_owner_nonresident(request: HttpRequest):
     user_role = (request.session.get("auth") or {}).get("role_name").title()
     form = BusinessOwnerInfo()
@@ -1431,6 +1473,7 @@ def business_owner_nonresident(request: HttpRequest):
         },
     )
 
+#DO NOT TOUCH THIS FUNCTION
 @session_login_required
 @role_required("Barangay Clerk")
 @nocache
@@ -1569,6 +1612,7 @@ def business_details(request: HttpRequest) -> HttpResponse:
         },
     )
 
+#DO NOT TOUCH THIS FUNCTION
 @session_login_required
 @role_required("Barangay Clerk")
 @nocache
@@ -1577,6 +1621,7 @@ def business_registration_reset(request: HttpRequest) -> HttpResponse:
     messages.info(request, "Registration draft cleared.")
     return redirect("clerk:business_owner_resident")
 
+#DO NOT TOUCH THIS FUNCTION
 @session_login_required
 @role_required("Barangay Clerk")
 @nocache
@@ -1605,6 +1650,7 @@ def business_list(request: HttpRequest):
 
     return render(request, "business/business_list.html", context)
 
+#DO NOT TOUCH THIS FUNCTION
 @session_login_required
 @role_required("Barangay Clerk")
 @nocache
@@ -1641,6 +1687,7 @@ def business_information(request: HttpRequest, b_id: int):
         },
     )
 
+#DO NOT TOUCH THIS FUNCTION
 # Hannah's Code (kept as-is; unrelated to printing)
 def business_owner_nonresident(request: HttpRequest):
     user_fullname, user_role_template = _profile_fallbacks(request)
