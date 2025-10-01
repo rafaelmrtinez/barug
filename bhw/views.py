@@ -12,7 +12,10 @@ from src.app.bootstrap.app_containers import AppContainer
 from src.app.contracts.household_info_service_contract import IHouseholdInfoService
 from src.app.contracts.scheduling_service_contract import ISchedulingService
 from src.app.services.household_info_service import HouseholdInformationService
+from src.app.transfer_objects.commands.reschedule_cmd import RescheduleCommand
 from src.infra.database.connection_adapter import ConnectionAdapter
+from src.infra.exceptions.rescheduling_exception import ReschedulingException
+
 from src.infra.repositories.household_info_repository import HouseholdInfoRepository
 from .forms import SearchActiveScheduleFilter
 from .forms import StatusActiveScheduleFilter
@@ -169,7 +172,6 @@ def ajax_person_card(request: HttpRequest) -> JsonResponse:
 
 
 # Create your views here.
-
 @session_login_required
 @role_required("Super Admin", "Barangay Health Worker")
 @csrf_protect
@@ -178,27 +180,51 @@ def active_schedule(
     request: HttpRequest,
     scheduling_service: ISchedulingService = Provide[AppContainer.scheduling_service],
 ) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
-    
-    if request.method == "POST":
-        # TODO: To be implemented: Reschedule
-        week_range = request.POST.get("week_start")
-        reason = request.POST.get("reason")
-        return redirect("bhw:active_schedule")
 
+    search_form = SearchActiveScheduleFilter(request.GET or None)
+    status_form = StatusActiveScheduleFilter(request.GET or None)
+    week_range_form = WeekRangeActiveScheduleFilter()
+    reschedule_form = Reschedule()
+    template = "household/quarterly/active_schedule.html"
+    
+    session = request.session.get("auth")
+    user_fullname = " ".join(
+        filter(None, [session.get("first_name"), session.get(
+            "middle_name", ""), session.get("last_name")])
+    )
+    
     pending = scheduling_service.execute(
         request.GET.get("search"),
         request.GET.get("status"),
         request.GET.get("week_range"),
     )
-
     paginator = Paginator(pending, 10)  # 10 per page
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
-    search_form = SearchActiveScheduleFilter(request.GET or None)
-    status_form = StatusActiveScheduleFilter(request.GET or None)
-    week_range_form = WeekRangeActiveScheduleFilter(request.GET or None)
-    reschedule_form = Reschedule()
+    if request.method == "POST":
+        week_range = request.POST.get("week_start")
+        reason = request.POST.get("reason")
+        schedule_id = request.POST.get("schedule_id")
+
+        try:
+            service = scheduling_service.execute_reschedule(
+                week_start=week_range,
+                reasoning=reason,
+                schedule_id=schedule_id,
+                added_by=session.get("person_id"),
+            )
+            
+            if not service:
+                messages.error(request, "Rescheduling failed, please try again.")
+                return redirect("bhw:active_schedule")
+            
+            messages.success(request, "Rescheduling successful.")
+            return redirect("bhw:active_schedule")
+        except ReschedulingException as se:
+            # add to messages framework
+            messages.error(request, f"Rescheduling failed: {se.message}")
+            return redirect("bhw:active_schedule")
 
     if request.GET.get("search") and not search_form.is_valid():
         search_form = SearchActiveScheduleFilter()
@@ -206,15 +232,10 @@ def active_schedule(
         status_form = StatusActiveScheduleFilter()
     if request.GET.get("week_range") and not week_range_form.is_valid():
         week_range_form = WeekRangeActiveScheduleFilter()
-
-    session = request.session.get("auth")
-    user_fullname = " ".join(
-        filter(None, [session.get("first_name"), session.get("middle_name", ""), session.get("last_name")])
-    )
-
+        
     return render(
         request,
-        "household/quarterly/active_schedule.html",
+        template,
         {
             "user_fullname": user_fullname,
             "user_role": session.get("role_name"),
@@ -235,7 +256,7 @@ def active_schedule(
 @csrf_protect
 @inject
 def household_info(
-    request, household_id, 
+    request, household_id,
     service: IHouseholdInfoService = Provide[
         AppContainer.household_info_service]) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
     if not household_id:
@@ -243,13 +264,144 @@ def household_info(
     session = request.session.get("auth")
     household_details = service.execute(household_id)
     return render(request, "household/household_info.html", {
-        'user_fullname' : session.get("first_name") + " " + session.get("middle_name", "") + " " + session.get("last_name"),
-        'user_role' : session.get("role_name"),
-        'page_path' : f'{user_role} / Request Details',
-        'page_title' : 'Request Details',
-        'user_role_template' : user_role_template,
-        'household_details' : household_details.get('household_info'),
-        'families' : household_details.get('family_units'),
+        'user_fullname': session.get("first_name") + " " + session.get("middle_name", "") + " " + session.get("last_name"),
+        'user_role': session.get("role_name"),
+        'page_path': f'{user_role} / Request Details',
+        'page_title': 'Request Details',
+        'user_role_template': user_role_template,
+        'household_details': household_details.get('household_info'),
+        'families': household_details.get('family_units'),
+    })
+
+@session_login_required
+@role_required(*hv.ROLE_BHW)
+@nocache
+def dashboard(request: HttpRequest) -> HttpResponse:
+    auth = request.session.get("auth")
+    profile = getattr(request, "person_profile", None)
+    return render(request, "bhw/dashboard.html", {
+        "page_path": "Barangay Health Worker/Dashboard",
+        "page_title": "Dashboard",
+        "profile": profile,
+        "auth": auth,
+    })
+
+@session_login_required
+@role_required(*hv.ROLE_BHW, "midwife")
+@nocache
+def records(request: HttpRequest) -> HttpResponse:
+    rows = hv.sample_registry()
+    page_obj = Paginator(rows, 10).get_page(request.GET.get("page"))
+    return render(request, "bhw/records.html", {
+        "page_path": "Barangay Health Worker / Records",
+        "page_title": "Records",
+        "q": request.GET.get("q", ""),
+        "types": request.GET.getlist("type"),
+        "puroks": request.GET.getlist("purok"),
+        "statuses": request.GET.getlist("status"),
+        "types_all": ["maternal", "child"],
+        "puroks_all": ["Kanipaan", "Pampango", "Lutaw-lutaw", "Mauco"],
+        "statuses_all": ["active", "completed", "archived"],
+        "active_count": len(request.GET.getlist("type")) + len(request.GET.getlist("purok")) + len(request.GET.getlist("status")),
+        "page_obj": page_obj,
+    })
+
+@session_login_required
+@role_required(*hv.ROLE_BHW)
+@nocache
+def record_detail(request: HttpRequest, kind: str, record_id: int) -> HttpResponse:
+    rec = hv.get_record_detail(kind, record_id)
+    return render(request, "bhw/record_detail.html", {
+        "page_path": "Barangay Health Worker / Record Details",
+        "page_title": "Record Details",
+        "rec": rec,
+    })
+
+@session_login_required
+@role_required(*hv.ROLE_BHW)
+@nocache
+def ajax_resident_search(request: HttpRequest) -> JsonResponse:
+    q = (request.GET.get("q") or "").strip()
+    rows = hv.search_residents(q)
+    html = render_to_string("bhw/_resident_results.html", {"residents": rows})
+    return JsonResponse({"ok": True, "html": html})
+
+@session_login_required
+@role_required(*hv.ROLE_BHW)
+@nocache
+def verify_valid_id_view(request: HttpRequest) -> JsonResponse:
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Method not allowed"}, status=405)
+
+    supabase_uid = request.POST.get("supabase_uid") or ""
+    legit_person_id = int(request.POST.get("legit_person_id") or 0)
+    id_type_raw = request.POST.get("id_type") or ""
+    profile_name = request.POST.get("profile_name") or ""
+
+    result = hv.verify_valid_id(
+        supabase_uid=supabase_uid,
+        legit_person_id=legit_person_id,
+        id_type_raw=id_type_raw,
+        profile_name=profile_name,
+        front=request.FILES.get("front"),
+        back=request.FILES.get("back"),
+        selfie=request.FILES.get("selfie"),
+    )
+    status = result.pop("status", 200) if not result.get("ok") else 200
+    return JsonResponse(result, status=status)
+
+@session_login_required
+@role_required(*hv.ROLE_BHW)
+@nocache
+def add_anc_visit(request: HttpRequest, record_id: int) -> HttpResponse:
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    messages.success(request, "ANC visit saved (demo).")
+    return redirect("bhw:record_detail", kind="maternal", record_id=record_id)
+
+@session_login_required
+@role_required(*hv.ROLE_BHW)
+@nocache
+def add_child_visit(request: HttpRequest, record_id: int) -> HttpResponse:
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    messages.success(request, "Child visit saved (demo).")
+    return redirect("bhw:record_detail", kind="child", record_id=record_id)
+
+@session_login_required
+@role_required(*hv.ROLE_BHW)
+@nocache
+def add_vaccine(request: HttpRequest, record_id: int) -> HttpResponse:
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    messages.success(request, "Vaccine dose saved (demo).")
+    return redirect("bhw:record_detail", kind="child", record_id=record_id)
+
+@session_login_required
+@role_required(*hv.ROLE_BHW, "midwife")
+@nocache
+def maternal_new(request: HttpRequest) -> HttpResponse:
+    auth = request.session.get("auth") or {}
+    staff_id = auth.get("staff_id")
+
+    if request.method == "POST":
+        form = MaternalBhwIntakeForm(request.POST)
+        if form.is_valid():
+            payload = hv.build_maternal_payload(form.cleaned_data, staff_id)
+            ok, err = hv.create_maternal_record(payload)
+            if ok:
+                messages.success(request, "Maternal health record created.")
+                return redirect("bhw:maternal_new")
+            messages.error(request, f"RPC error: {err}")
+        else:
+            messages.error(request, "Please fix the form errors below.")
+    else:
+        form = MaternalBhwIntakeForm()
+
+    return render(request, "bhw/maternal_new.html", {
+        "page_path": "Barangay Health Worker / Maternal Records / New",
+        "page_title": "New Maternal Record (BHW Intake)",
+        "form": form,
     })
 
 @session_login_required

@@ -12,11 +12,21 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-wrap">
 
+<div class="page-wrap">
+    
     <div class="container-fluid pt-3 page-main" style="margin-top: 40px;">
         <div class="row">
-        <div>
+            <div>
+              
+                {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}">
+                    {{ message }}
+                    </div>
+                {% endfor %}
+                {% endif %}
+
 
             <div class="col-12 mb-3">
                 <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-2">
@@ -117,10 +127,12 @@
                     {{ week_start|date:"M d, Y" }} – {{ week_end|date:"M d, Y" }}
                 </span>
 
-                <button type="button" id="nextWeek" class="btn btn-light btn-sm">
-                    {% bs_icon 'chevron-right' size='1em' %}
-                </button>
-                </div>
+                                <button type="button" id="nextWeek" class="btn btn-light btn-sm">
+                                    {% bs_icon 'chevron-right' size='1em' %}
+                                </button>
+                            </div>
+
+                            <input type="hidden" name="schedule_id" id="scheduleIdField" value="">
 
                 <!-- seed from Django; JS updates this before submit -->
                 <input type="hidden" name="week_start" id="weekStartField" value="{{ week_start|date:'Y-m-d' }}">
@@ -150,4 +162,39 @@
     {% endif %}
 
 </div>
+
+<script>
+    (() => {
+        document.addEventListener("DOMContentLoaded", function () {
+            const statusSelect = document.getElementById("{{ status_form.status.id_for_label }}");
+            const weekRangeSelect = document.getElementById("{{ week_range_form.week_range.id_for_label }}");
+
+            if (statusSelect) {
+                statusSelect.addEventListener("change", function () {
+                    this.form.submit();
+                });
+            }
+
+            if (weekRangeSelect) {
+                weekRangeSelect.addEventListener("change", function () {
+                    this.form.submit();
+                });
+            }
+        });
+    })();
+</script>
+
+<script>
+    (() => {
+        const rescheduleModal = document.getElementById('rescheduleModal')
+        rescheduleModal.addEventListener('show.bs.modal', event => {
+        const button = event.relatedTarget // Button that triggered the modal
+        const scheduleId = button.getAttribute('data-schedule-id')
+        // Update hidden field
+        const hiddenInput = rescheduleModal.querySelector('#scheduleIdField')
+        hiddenInput.value = scheduleId
+    })
+    })();
+</script>
+
 {% endblock %}
