@@ -11,6 +11,15 @@ def list_requests(q: str | None, statuses: List[str], limit: int = 50) -> List[D
     res = query.limit(limit).execute()
     return res.data or []
 
+def list_business_requests(q: str | None, statuses: List[str], limit: int = 50) -> List[Dict[str, Any]]:
+    query = supabase.table("v_doc_request_list_ex_v2").select("*").order("doc_request_id", desc=True)
+    if statuses:
+        query = query.in_("status", statuses)
+    if q:
+        query = query.or_(f"request_code.ilike.%{q}%,doc_types.cs.{{{q}}},purposes.cs.{{{q}}}")
+    res = query.limit(limit).execute()
+    return res.data or []
+
 def fetch_detail_bundle(doc_request_id: int) -> Dict[str, Any]:
     res = supabase.rpc("fetch_doc_request_detail_bundle", {"p_doc_request_id": doc_request_id}).execute()
     if getattr(res, "error", None):

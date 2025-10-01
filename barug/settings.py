@@ -48,7 +48,7 @@ if isProduction != None and isProduction == "True":
     ALLOWED_HOSTS = ["barug-development.onrender.com"]
 else:
     DEBUG = True
-    ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "secretary",
     "staff_admin",
     "treasurer",
+    "midwife",
 ]
 
 MIDDLEWARE = [
@@ -106,6 +107,7 @@ TEMPLATES = [
             BASE_DIR / "secretary/templates/secretary",
             BASE_DIR / "staff_admin/templates/staff_admin",
             BASE_DIR / "treasurer/templates/treasurer",
+            BASE_DIR / "midwife/templates/midwife",
         ],
         "APP_DIRS": True,
         "OPTIONS": {
@@ -135,6 +137,7 @@ WSGI_APPLICATION = "barug.wsgi.application"
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET")
 SUPABASE_ID_UPLOADS_BUCKET = os.getenv("SUPABASE_ID_UPLOADS_BUCKET", "id-uploads")
 
 DATABASES = {

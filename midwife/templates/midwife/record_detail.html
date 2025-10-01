@@ -1,0 +1,714 @@
+{# templates/midwife/record_detail.html #}
+{% extends "base.html" %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<style>
+  :root{
+    --brand-900:#2c0e16; --brand-800:#44141e; --brand-700:#6d2932; --brand-600:#8b3a45;
+    --brand-050:#fbf6f6; --brand-100:#f7eef0; --ink:#1f2937; --muted:#6b7280;
+    --ring: rgba(109,41,50,.35);
+  }
+  body{ background:#faf9fb; color:var(--ink); }
+
+  /* Account Settings tabs from the global header */
+  #accountSettingsModal .nav-tabs { background-color:#fff!important; border-radius:.5rem; padding:.25rem; }
+  #accountSettingsModal .nav-tabs .nav-link {
+    color:#000!important; background-color:#fff!important; border:1px solid #dee2e6!important; margin-right:4px;
+  }
+  #accountSettingsModal .nav-tabs .nav-link.active {
+    background-color:#b9696967!important; color:#000!important; border-color:#4d0c0c67!important;
+  }
+
+  /* Page styles */
+  .container-xxl{ max-width:1320px; }
+  .hero{
+    background:linear-gradient(90deg,var(--brand-900),var(--brand-700));
+    color:#fff; border-radius:20px; padding:1rem 1.25rem;
+  }
+  .hero .name{ font-weight:700; font-size:1.35rem; }
+  .hero .meta{ opacity:.85; }
+  .hero .pill{ background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.22); padding:.25rem .6rem; border-radius:999px; font-weight:600; font-size:.8rem;}
+  .hero .btn-hero{ background:#fff; color:var(--brand-800); border:none; }
+  .card{ border:1px solid rgba(68,20,30,.25); border-radius:18px; background:#fff; }
+  .card-title{ color:var(--brand-700); font-weight:700; }
+  .muted{ color:var(--muted); }
+  .kpi{ display:flex; justify-content:space-between; font-size:.92rem;}
+  .kpi span:last-child{ font-weight:600; }
+
+  .visit-table thead th{ color:#6b7280; font-weight:600; }
+  .visit-table td, .visit-table th{ vertical-align:middle; }
+
+  .chip{display:inline-flex;align-items:center;gap:.35rem;padding:.25rem .6rem;border-radius:999px;
+        border:1px solid #e5e7eb;font-size:.78rem;background:#fff;margin:.2rem .25rem;}
+  .chip .x{cursor:pointer;font-weight:700;opacity:.7}
+
+  /* Modal sizing & polish */
+  .modal { z-index: 1200; }
+  .modal-backdrop { z-index: 1190; }
+  .modal.mhr .modal-header{ background:linear-gradient(90deg,var(--brand-800),var(--brand-700)); color:#fff; border-top-left-radius:18px; border-top-right-radius:18px; }
+  .modal.mhr .modal-content{ border-radius:18px; border:1px solid var(--brand-800); box-shadow:0 20px 60px rgba(0,0,0,.25); }
+  .modal.mhr .modal-title{ font-weight:700; }
+  .modal.mhr .badge-tri{ background:var(--brand-100); color:var(--brand-800); font-weight:600; border:1px solid rgba(109,41,50,.25);}
+  .modal.mhr .sticky-footer{
+    position:sticky; bottom:-1px; background:#fff; border-top:1px solid #eee;
+    display:flex; justify-content:space-between; align-items:center; gap:.5rem; padding:.75rem 1rem;
+    border-bottom-left-radius:18px; border-bottom-right-radius:18px;
+  }
+
+  .side-summary{ background:var(--brand-050); border-left:1px dashed rgba(68,20,30,.25); padding-left:1rem; }
+  .summary-row{ display:flex; align-items:start; gap:.6rem; margin-bottom:.5rem; }
+  .summary-row .icon{ width:28px; height:28px; border-radius:8px; display:grid; place-items:center;
+    background:#fff; border:1px solid #eee; color:var(--brand-700); }
+
+  .kbd{font-variant:all-small-caps; letter-spacing:.5px; font-weight:600; color:#555;}
+  .form-control:focus, .form-select:focus{
+    border-color:var(--brand-600); box-shadow:0 0 0 .25rem var(--ring);
+  }
+
+  /* Expanded modal for better data entry */
+  .modal.mhr .modal-dialog.modal-xxl{ max-width:1320px; }
+  @media (max-width: 992px){
+    .modal.mhr .modal-dialog { margin:0; } /* fullscreen on small screens */
+  }
+
+  /* Collections UI helpers */
+  .collection-card .input-group>.form-control,
+  .collection-card .input-group>.form-select { min-width: 0; }
+  .collection-table td { vertical-align: middle; }
+  .collection-table .col-val { white-space: nowrap; }
+
+  /* Space under global header */
+  .page-wrap { margin-top: 40px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="container-xxl py-4">
+    <!-- Hero header -->
+    <div class="hero mb-4">
+      <div class="d-flex flex-wrap align-items-center gap-3">
+        <div class="flex-grow-1">
+          <div class="name">{{ person_name|default:"Maria Santos" }}</div>
+          <div class="meta small">
+            MHR #<strong>{{ mhr_number|default:"1032" }}</strong> ·
+            Family #<strong>{{ family_no|default:"F-001" }}</strong> ·
+            LMP <strong>{{ lmp|default:"2025-05-01" }}</strong> ·
+            EDD <strong>{{ edd|default:"2026-02-05" }}</strong>
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 ms-auto">
+          <span class="pill">{{ status_label|default:"ACTIVE" }}</span>
+          <button
+            class="btn btn-hero"
+            id="openVisit"
+            type="button"
+            data-bs-toggle="modal"
+            data-bs-target="#visitModal">
+            <i class="bi bi-file-plus me-1"></i> Add ANC Visit
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <!-- MAIN: Visits & timeline -->
+      <div class="col-lg-8">
+        <div class="card p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">ANC Visits</h5>
+            <small class="text-muted">Last updated: {{ last_updated|default:"2025-06-10" }}</small>
+          </div>
+          <div class="table-responsive mt-2">
+            <table class="table table-sm visit-table align-middle">
+              <thead>
+                <tr><th>Date</th><th>GA</th><th>Trimester</th><th>BP</th><th>Weight</th><th>FHR</th><th>Danger</th><th></th></tr>
+              </thead>
+              <tbody id="visitsTbody">
+                {% for v in visits %}
+                  <tr>
+                    <td>{{ v.date }}</td>
+                    <td>{{ v.ga_weeks|default:"—" }}{% if v.ga_weeks %} wks{% endif %}</td>
+                    <td>{{ v.trimester|default:"—" }}</td>
+                    <td>{{ v.bp|default:"—" }}</td>
+                    <td>{{ v.weight|default:"—" }}</td>
+                    <td>{{ v.fhr|default:"—" }}</td>
+                    <td>
+                      {% if v.has_danger %}
+                        <span class="badge text-bg-danger">Flag</span>
+                      {% else %}
+                        <span class="badge text-bg-success">None</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end">
+                      <button class="btn btn-outline-secondary btn-sm" disabled>
+                        <i class="bi bi-eye"></i>
+                      </button>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr><td colspan="8" class="text-center text-muted">No visits yet.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Secondary area -->
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="card p-3 h-100">
+              <h6 class="card-title mb-2">Recent Labs</h6>
+              <div class="small">
+                <div class="kpi"><span>Urinalysis</span><span>{{ lab_urinalysis|default:"Normal" }}</span></div>
+                <div class="kpi"><span>Syphilis</span><span>{{ lab_syphilis|default:"Non-reactive" }}</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card p-3 h-100">
+              <h6 class="card-title mb-2">TT Doses</h6>
+              <div class="small">
+                <div class="kpi"><span>TT1</span><span>{{ tt1|default:"2024-11-10" }}</span></div>
+                <div class="kpi"><span>TT2</span><span>{{ tt2|default:"2025-01-12" }}</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SIDE -->
+      <div class="col-lg-4">
+        <div class="card p-3 mb-3">
+          <h6 class="card-title mb-2">Episode Plan</h6>
+          <div class="small">
+            <div class="kpi"><span>Delivery Plan</span><span>{{ delivery_plan|default:"NSVD — District Hospital" }}</span></div>
+            <div class="kpi"><span>Newborn Screening</span><span>{{ nbs_plan|default:"Planned" }}</span></div>
+          </div>
+        </div>
+
+        <div class="card p-3 mb-3">
+          <h6 class="card-title mb-2">Anthropometrics</h6>
+          <div class="small">
+            <div class="kpi"><span>Height</span><span id="h-val">{{ height_cm|default:"154" }} cm</span></div>
+            <div class="kpi"><span>Weight</span><span id="w-val">{{ weight_kg|default:"54" }} kg</span></div>
+            <div class="kpi"><span>BMI</span><span id="bmi-val">—</span></div>
+            <div class="kpi"><span>BMI Status</span><span>{{ bmi_status|default:"Normal" }}</span></div>
+          </div>
+        </div>
+
+        <div class="card p-3">
+          <h6 class="card-title mb-2">Last Visit Snapshot</h6>
+          <div class="small">
+            <div class="kpi"><span>Date</span><span>{{ last_visit_date|default:"2025-06-10" }}</span></div>
+            <div class="kpi"><span>GA</span><span>{{ last_ga|default:"8 wks (1st)" }}</span></div>
+            <div class="kpi"><span>BP</span><span>{{ last_bp|default:"110/70" }}</span></div>
+            <div class="kpi"><span>FHR</span><span>{{ last_fhr|default:"—" }}</span></div>
+            <div class="kpi"><span>Danger</span><span>{{ last_danger|default:"None" }}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===================== ADD VISIT MODAL ===================== -->
+  <div class="modal fade mhr" id="visitModal" tabindex="-1" aria-labelledby="visitTitle"
+       data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered modal-xxl modal-fullscreen-lg-down">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <div class="modal-title h5" id="visitTitle">Add ANC Visit</div>
+            <div class="small">Live summary on the right <span class="badge badge-tri ms-1" id="triBadge">—</span></div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-light" id="xClose">
+            <i class="bi bi-x-lg me-1"></i>Close
+          </button>
+        </div>
+
+        <form id="visitForm">
+          <!-- Hidden fields aligned to backend payload -->
+          <input type="hidden" name="labs_json" id="labs_json">
+          <input type="hidden" name="tt_json" id="tt_json">
+          <input type="hidden" name="supplements_json" id="supplements_json">
+          <input type="hidden" name="danger_signs_json" id="danger_signs_json">
+          <input type="hidden" name="trimester_stage_id" id="trimester_stage_id">
+
+          <div class="modal-body">
+            <div class="row g-4">
+              <!-- LEFT: form -->
+              <div class="col-lg-7">
+                <div class="row g-3">
+                  <div class="col-6 col-md-6">
+                    <label class="form-label">Visit Date <span class="text-danger">*</span></label>
+                    <input name="visit_date" type="date" class="form-control" required>
+                  </div>
+                  <div class="col-6 col-md-6">
+                    <label class="form-label">GA (weeks)</label>
+                    <input name="ga_weeks" id="ga_weeks" type="number" class="form-control" min="0" step="1" placeholder="e.g. 24">
+                  </div>
+                  <div class="col-6 col-md-6">
+                    <label class="form-label">BP Systolic</label>
+                    <input name="bp_sys" type="number" class="form-control" min="50" max="260" step="1" placeholder="110">
+                  </div>
+                  <div class="col-6 col-md-6">
+                    <label class="form-label">BP Diastolic</label>
+                    <input name="bp_dia" type="number" class="form-control" min="30" max="160" step="1" placeholder="70">
+                  </div>
+                  <div class="col-6 col-md-6">
+                    <label class="form-label">Weight (kg)</label>
+                    <input name="weight_kg" type="number" class="form-control" step="0.1" placeholder="54.0">
+                  </div>
+                  <div class="col-6 col-md-6">
+                    <label class="form-label">Fundic Height (cm)</label>
+                    <input name="fundic_height_cm" type="number" class="form-control" step="1" placeholder="24">
+                  </div>
+                  <div class="col-6 col-md-6">
+                    <label class="form-label">FHR (bpm)</label>
+                    <input name="fhr_bpm" type="number" class="form-control" step="1" placeholder="148">
+                  </div>
+                  <div class="col-6 col-md-6">
+                    <label class="form-label">Assessed by (Staff ID)</label>
+                    <input name="assessed_by_id" type="number" class="form-control" placeholder="12">
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">Encounter notes</label>
+                    <textarea name="notes" class="form-control" rows="2" placeholder="Free text notes…"></textarea>
+                  </div>
+                </div>
+
+                <hr class="my-4">
+
+                <!-- Danger Signs -->
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="fw-semibold">Danger Signs</div>
+                  <small class="text-muted">Toggle all that apply</small>
+                </div>
+                <div id="dangerPills" class="d-flex flex-wrap gap-2"></div>
+
+                <hr class="my-4">
+
+                <!-- Collections (improved) -->
+                <div class="row g-3">
+                  <!-- LABS -->
+                  <div class="col-12 col-xl-4">
+                    <div class="fw-semibold mb-2">Labs</div>
+                    <div class="collection-card">
+                      <div class="input-group mb-2">
+                        <label class="input-group-text" for="lab_type">Type</label>
+                        <select class="form-select" id="lab_type">
+                          <option value="URINE">Urinalysis</option>
+                          <option value="HGB">Hemoglobin</option>
+                          <option value="BS">Blood Sugar</option>
+                        </select>
+                      </div>
+                      <div class="input-group mb-2">
+                        <label class="input-group-text" for="lab_result">Result</label>
+                        <input id="lab_result" class="form-control" placeholder="e.g., Normal / 12.5 g/dL / 95 mg/dL">
+                        <button class="btn btn-outline-secondary" type="button" id="addLabBtn" disabled>Add</button>
+                      </div>
+                      <div class="table-responsive">
+                        <table class="table table-sm align-middle collection-table mb-0">
+                          <tbody id="labsList">
+                            <tr class="text-muted"><td>None</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- TT DOSE -->
+                  <div class="col-12 col-xl-4">
+                    <div class="fw-semibold mb-2">TT Dose</div>
+                    <div class="collection-card">
+                      <div class="input-group mb-2">
+                        <label class="input-group-text" for="tt_dose">Dose</label>
+                        <select class="form-select" id="tt_dose">
+                          <option>TT1</option><option>TT2</option><option>TT3</option>
+                          <option>TT4</option><option>TT5</option><option>FIM</option>
+                        </select>
+                      </div>
+                      <div class="input-group mb-2">
+                        <label class="input-group-text" for="tt_date">Date</label>
+                        <input id="tt_date" type="date" class="form-control">
+                        <button class="btn btn-outline-secondary" type="button" id="addTtBtn" disabled>Add</button>
+                      </div>
+                      <div class="table-responsive">
+                        <table class="table table-sm align-middle collection-table mb-0">
+                          <tbody id="ttList">
+                            <tr class="text-muted"><td>None</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- SUPPLEMENTS -->
+                  <div class="col-12 col-xl-4">
+                    <div class="fw-semibold mb-2">Supplements</div>
+                    <div class="collection-card">
+                      <div class="input-group mb-2">
+                        <label class="input-group-text" for="supp_name">Name</label>
+                        <select class="form-select" id="supp_name">
+                          <option value="IRON_FOLATE">Iron/Folate</option>
+                          <option value="CALCIUM">Calcium</option>
+                          <option value="VITAMIN_A">Vitamin A</option>
+                        </select>
+                      </div>
+                      <div class="input-group mb-2">
+                        <label class="input-group-text" for="supp_qty">Qty</label>
+                        <input id="supp_qty" type="number" class="form-control" value="30" min="1" step="1">
+                        <button class="btn btn-outline-secondary" type="button" id="addSuppBtn" disabled>Add</button>
+                      </div>
+                      <div class="table-responsive">
+                        <table class="table table-sm align-middle collection-table mb-0">
+                          <tbody id="suppList">
+                            <tr class="text-muted"><td>None</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- RIGHT: live summary -->
+              <div class="col-lg-5">
+                <div class="side-summary h-100">
+                  <div class="d-flex align-items-center justify-content-between">
+                    <h6 class="mb-1 fw-bold">Visit Summary (Live)</h6>
+                    <small class="text-muted">changes vs last visit</small>
+                  </div>
+                  <hr class="mt-2 mb-3">
+                  <div id="sumList" class="small"></div>
+                </div>
+              </div>
+            </div> <!-- /row -->
+          </div>
+
+          <div class="sticky-footer">
+            <div class="text-muted small d-none d-md-block">
+              <span class="kbd">ESC</span> disabled · static backdrop · “discard changes” guard
+            </div>
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-outline-secondary" id="cancelBtn">Cancel</button>
+              <button type="submit" class="btn btn-primary" id="saveBtn">
+                <i class="bi bi-check2-circle me-1"></i>Save Visit
+              </button>
+            </div>
+          </div>
+        </form>
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+(function(){
+  // --- baseline “last visit” values for comparison (mock data) ---
+  const last = {
+    date:'{{ last_visit_date|default:"2025-06-10" }}',
+    ga: {{ last_ga_num|default:"8" }},
+    tri: 1, bp_sys:110, bp_dia:70, weight:54.0, fhr:null, danger:['NONE']
+  };
+
+  // --- helpers ---
+  const $ = (sel,root=document)=>root.querySelector(sel);
+  const $$ = (sel,root=document)=>Array.from(root.querySelectorAll(sel));
+  const num = v => v==null || v==='' ? null : Number(v);
+  const fmt = {
+    weight: v => v==null?'—':`${Number(v).toFixed(1)} kg`,
+    bp: (s,d)=> (s&&d) ? `${s}/${d}` : '—',
+    fhr: v => v==null?'—':`${v} bpm`,
+    ga: v => v==null?'—':`${v} wks`
+  };
+  const triId = w => !w && w!==0 ? null : (w<=13?1:(w<=27?2:3));
+  const triName = id => id===1?'1st Trimester':id===2?'2nd Trimester':id===3?'3rd Trimester':'—';
+
+  // --- compute BMI in sidebar
+  const hNode = $('#h-val'), wNode = $('#w-val'), bmiNode = $('#bmi-val');
+  (function(){
+    let h = Number(String(hNode.textContent).replace(/[^\d.]/g,'')); if(h>3) h=h/100;
+    let w = Number(String(wNode.textContent).replace(/[^\d.]/g,'')); if(h&&w){ bmiNode.textContent=(w/(h*h)).toFixed(1); }
+  })();
+
+  // --- Modal setup ---
+  const modalEl = $('#visitModal');
+  const modal = new bootstrap.Modal(modalEl, {backdrop:'static', keyboard:false});
+  $('#openVisit').addEventListener('click', ()=>modal.show());
+  let dirty=false;
+  function markDirty(){ dirty=true; }
+  $('#xClose').addEventListener('click', tryClose);
+  $('#cancelBtn').addEventListener('click', tryClose);
+  function tryClose(){ if(!dirty || confirm('Discard changes?')){ modal.hide(); } }
+  modalEl.addEventListener('shown.bs.modal',()=>{ dirty=false; initForm(); });
+
+  // --- Danger sign pills ---
+  const P = [
+    {code:'BLEEDING',label:'Bleeding'},
+    {code:'HEADACHE',label:'Severe headache'},
+    {code:'BLURRED_VISION',label:'Blurred vision'},
+    {code:'EDEMA',label:'Generalized edema'},
+    {code:'FEVER',label:'Fever'},
+    {code:'NO_FM',label:'No fetal movement'},
+    {code:'NONE',label:'No danger signs'}
+  ];
+  function buildPills(){
+    const wrap = $('#dangerPills'); wrap.innerHTML='';
+    P.forEach(p=>{
+      const id='ds_'+p.code;
+      const cb=document.createElement('input'); cb.type='checkbox'; cb.className='btn-check'; cb.id=id; cb.value=p.code; cb.autocomplete='off';
+      const lb=document.createElement('label'); lb.className='btn btn-sm btn-outline-secondary'; lb.htmlFor=id; lb.textContent=p.label;
+      wrap.append(cb,lb);
+    });
+    $('#ds_NONE').checked=true;
+    wrap.addEventListener('change',e=>{
+      if(!e.target.classList.contains('btn-check')) return;
+      markDirty();
+      const none = $('#ds_NONE');
+      if(e.target.id!=='ds_NONE' && e.target.checked) none.checked=false;
+      const anyOther = $$('.btn-check', wrap).some(cb=>cb.id!=='ds_NONE' && cb.checked);
+      if(!anyOther) none.checked=true;
+      // style active
+      $$('.btn-check', wrap).forEach(cb=>{
+        const lab = wrap.querySelector(`label[for="${cb.id}"]`);
+        lab.classList.toggle('btn-secondary', cb.checked);
+        lab.classList.toggle('btn-outline-secondary', !cb.checked);
+      });
+      renderSummary();
+    });
+    // initial style
+    $$('.btn-check', wrap).forEach(cb=>{
+      const lab = wrap.querySelector(`label[for="${cb.id}"]`);
+      lab.classList.add('btn-outline-secondary');
+    });
+  }
+
+  // ================== Collections (improved) ==================
+  const labs=[], tts=[], supps=[];
+  function todayISO(){ return new Date().toISOString().slice(0,10); }
+  function renderEmptyRow(tbody){ tbody.innerHTML = '<tr class="text-muted"><td>None</td></tr>'; }
+  function chipRowsTable(tbody, arr, renderRow){
+    if(!arr.length){ renderEmptyRow(tbody); return; }
+    tbody.innerHTML = arr.map(renderRow).join('');
+  }
+
+  function buildCollections(){
+    // Prefill TT date
+    const ttDate = $('#tt_date');
+    if(!ttDate.value) ttDate.value = todayISO();
+
+    // Buttons
+    const addLabBtn = $('#addLabBtn');
+    const addTtBtn  = $('#addTtBtn');
+    const addSuppBtn= $('#addSuppBtn');
+
+    // Validators toggle
+    function toggleLabBtn(){ addLabBtn.disabled = $('#lab_result').value.trim()===''; }
+    function toggleTtBtn(){ addTtBtn.disabled = !$('#tt_date').value; }
+    function toggleSuppBtn(){ addSuppBtn.disabled = (parseInt($('#supp_qty').value||'0',10) <= 0); }
+
+    $('#lab_result').addEventListener('input', toggleLabBtn); toggleLabBtn();
+    ttDate.addEventListener('input', toggleTtBtn);           toggleTtBtn();
+    $('#supp_qty').addEventListener('input', toggleSuppBtn); toggleSuppBtn();
+
+    // ADD — LAB
+    $('#addLabBtn').onclick = ()=>{
+      const type = $('#lab_type').value;
+      const result = $('#lab_result').value.trim();
+      if(!result){ $('#lab_result').focus(); return; }
+      labs.push({type,result});
+      $('#lab_result').value=''; toggleLabBtn(); markDirty(); renderSummary();
+
+      chipRowsTable($('#labsList'), labs, (l,i)=>`
+        <tr>
+          <td class="col-val"><span class="badge text-bg-light border">${l.type}</span></td>
+          <td><strong>${l.result}</strong></td>
+          <td class="text-end"><button class="btn btn-sm btn-outline-danger" data-k="lab" data-i="${i}">{% bs_icon 'x-lg' %}</button></td>
+        </tr>`);
+    };
+
+    // REMOVE — LAB
+    $('#labsList').onclick = (e)=>{
+      const btn = e.target.closest('button[data-k="lab"]'); if(!btn) return;
+      labs.splice(parseInt(btn.dataset.i,10),1); markDirty(); renderSummary();
+      chipRowsTable($('#labsList'), labs, (l,i)=>`
+        <tr>
+          <td class="col-val"><span class="badge text-bg-light border">${l.type}</span></td>
+          <td><strong>${l.result}</strong></td>
+          <td class="text-end"><button class="btn btn-sm btn-outline-danger" data-k="lab" data-i="${i}">{% bs_icon 'x-lg' %}</button></td>
+        </tr>`);
+    };
+
+    // ADD — TT
+    $('#addTtBtn').onclick = ()=>{
+      const dose=$('#tt_dose').value;
+      const date=$('#tt_date').value || todayISO();
+      tts.push({dose,date}); markDirty(); renderSummary();
+      chipRowsTable($('#ttList'), tts, (t,i)=>`
+        <tr>
+          <td class="col-val"><span class="badge text-bg-light border">${t.dose}</span></td>
+          <td>${t.date}</td>
+          <td class="text-end"><button class="btn btn-sm btn-outline-danger" data-k="tt" data-i="${i}">{% bs_icon 'x-lg' %}</button></td>
+        </tr>`);
+      toggleTtBtn();
+    };
+
+    // REMOVE — TT
+    $('#ttList').onclick = (e)=>{
+      const btn = e.target.closest('button[data-k="tt"]'); if(!btn) return;
+      tts.splice(parseInt(btn.dataset.i,10),1); markDirty(); renderSummary();
+      chipRowsTable($('#ttList'), tts, (t,i)=>`
+        <tr>
+          <td class="col-val"><span class="badge text-bg-light border">${t.dose}</span></td>
+          <td>${t.date}</td>
+          <td class="text-end"><button class="btn btn-sm btn-outline-danger" data-k="tt" data-i="${i}">{% bs_icon 'x-lg' %}</button></td>
+        </tr>`);
+    };
+
+    // ADD — SUPPLEMENTS
+    $('#addSuppBtn').onclick = ()=>{
+      const name=$('#supp_name').value;
+      const qty = parseInt($('#supp_qty').value||'0',10);
+      if(qty<=0){ $('#supp_qty').focus(); return; }
+      supps.push({name,qty}); markDirty(); renderSummary();
+      chipRowsTable($('#suppList'), supps, (s,i)=>`
+        <tr>
+          <td class="col-val"><span class="badge text-bg-light border">${s.name.replaceAll('_',' ')}</span></td>
+          <td>${s.qty}</td>
+          <td class="text-end"><button class="btn btn-sm btn-outline-danger" data-k="supp" data-i="${i}">{% bs_icon 'x-lg' %}</button></td>
+        </tr>`);
+      toggleSuppBtn();
+    };
+
+    // REMOVE — SUPPLEMENTS
+    $('#suppList').onclick = (e)=>{
+      const btn = e.target.closest('button[data-k="supp"]'); if(!btn) return;
+      supps.splice(parseInt(btn.dataset.i,10),1); markDirty(); renderSummary();
+      chipRowsTable($('#suppList'), supps, (s,i)=>`
+        <tr>
+          <td class="col-val"><span class="badge text-bg-light border">${s.name.replaceAll('_',' ')}</span></td>
+          <td>${s.qty}</td>
+          <td class="text-end"><button class="btn btn-sm btn-outline-danger" data-k="supp" data-i="${i}">{% bs_icon 'x-lg' %}</button></td>
+        </tr>`);
+    };
+
+    // ENTER submits group
+    $('#lab_result').addEventListener('keydown', e=>{ if(e.key==='Enter' && !addLabBtn.disabled){ e.preventDefault(); $('#addLabBtn').click(); }});
+    ttDate.addEventListener('keydown', e=>{ if(e.key==='Enter' && !addTtBtn.disabled){ e.preventDefault(); $('#addTtBtn').click(); }});
+    $('#supp_qty').addEventListener('keydown', e=>{ if(e.key==='Enter' && !addSuppBtn.disabled){ e.preventDefault(); $('#addSuppBtn').click(); }});
+  }
+
+  // --- init form each open ---
+  function initForm(){
+    const f = $('#visitForm'); f.reset();
+    f.visit_date.value = todayISO();
+    labs.length=0; tts.length=0; supps.length=0;
+    $('#labsList').innerHTML='<tr class="text-muted"><td>None</td></tr>';
+    $('#ttList').innerHTML  ='<tr class="text-muted"><td>None</td></tr>';
+    $('#suppList').innerHTML='<tr class="text-muted"><td>None</td></tr>';
+    buildPills(); buildCollections();
+    $$('#visitForm input, #visitForm textarea, #visitForm select').forEach(el=> el.addEventListener('input', ()=>{ markDirty(); renderSummary(); }));
+    renderSummary();
+  }
+
+  // --- live summary render ---
+  function renderSummary(){
+    const f = $('#visitForm');
+    const ga = num(f.ga_weeks.value);
+    const tri = triId(ga);
+    $('#trimester_stage_id').value = tri || '';
+    $('#triBadge').textContent = tri ? triName(tri) : '—';
+
+    const bpS = num(f.bp_sys.value), bpD = num(f.bp_dia.value);
+    const wt = num(f.weight_kg.value);
+    const fhr = num(f.fhr_bpm.value);
+    const notes = f.notes.value.trim();
+    const chosen = $$('#dangerPills .btn-check:checked').map(cb=>cb.value);
+
+    const sum = $('#sumList'); sum.innerHTML = '';
+
+    const line = (icon, title, body, tag='')=>{
+      const wrap = document.createElement('div'); wrap.className='summary-row';
+      wrap.innerHTML = `<div class="icon"><i class="bi ${icon}"></i></div>
+                        <div class="flex-grow-1"><div class="fw-semibold">${title} ${tag}</div>
+                        <div class="text-muted">${body}</div></div>`;
+      sum.appendChild(wrap);
+    };
+
+    if(ga || tri){
+      const delta = (ga && last.ga!=null) ? ` (${ga>=last.ga?'+':''}${(ga-last.ga)||0} wks vs last)` : '';
+      line('bi-calendar2-week','Gestational Age', `${fmt.ga(ga)} · ${tri?triName(tri):'—'}${delta}`);
+    }
+
+    if(bpS||bpD||wt||fhr){
+      const bpTxt = (bpS||bpD) ? fmt.bp(bpS,bpD) : '—';
+      const wtTxt = wt!=null ? fmt.weight(wt) : '—';
+      const fhrTxt = fhr!=null ? fmt.fhr(fhr) : '—';
+      line('bi-activity','Vitals', `BP ${bpTxt} · Weight ${wtTxt} · FHR ${fhrTxt}`);
+    }
+
+    if(chosen.length){
+      const label = chosen.includes('NONE') && chosen.length===1 ? 'None' : chosen.join(', ');
+      const tag = chosen.includes('NONE') && chosen.length===1 ? `<span class="badge text-bg-success ms-1">OK</span>` : `<span class="badge text-bg-danger ms-1">FLAG</span>`;
+      line('bi-exclamation-triangle','Danger Signs', label, tag);
+    }
+
+    if(notes){ line('bi-journal-text','Notes', notes); }
+
+    if(labs.length){ line('bi-beaker','Labs Added', labs.map(l=>`${l.type}: <b>${l.result}</b>`).join(' · ')); }
+    if(tts.length){ line('bi-droplet','TT Doses', tts.map(t=>`${t.dose} — ${t.date}`).join(' · ')); }
+    if(supps.length){ line('bi-capsule','Supplements', supps.map(s=>`${s.name.replaceAll('_',' ')} (${s.qty})`).join(' · ')); }
+
+    if(!sum.children.length){ sum.innerHTML = '<div class="text-muted">No changes yet.</div>'; }
+
+    // Hidden JSONs for backend
+    $('#danger_signs_json').value = JSON.stringify(chosen.length?chosen:['NONE']);
+    $('#labs_json').value = JSON.stringify(labs);
+    $('#tt_json').value = JSON.stringify(tts);
+    $('#supplements_json').value = JSON.stringify(supps);
+  }
+
+  // --- submit (demo: add row to table) ---
+  $('#visitForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    const f = e.currentTarget;
+    const row = document.createElement('tr');
+    const ga = f.ga_weeks.value ? `${f.ga_weeks.value} wks` : '—';
+    const tri = triName(triId(num(f.ga_weeks.value)));
+    const bp = (f.bp_sys.value && f.bp_dia.value) ? `${f.bp_sys.value}/${f.bp_dia.value}` : '—';
+    const wt = f.weight_kg.value ? `${Number(f.weight_kg.value).toFixed(1)} kg` : '—';
+    const fhr = f.fhr_bpm.value ? f.fhr_bpm.value : '—';
+    const danger = JSON.parse($('#danger_signs_json').value);
+    row.innerHTML = `
+      <td>${f.visit_date.value}</td>
+      <td>${ga}</td>
+      <td>${tri}</td>
+      <td>${bp}</td>
+      <td>${wt}</td>
+      <td>${fhr}</td>
+      <td>${danger.includes('NONE')&&danger.length===1?'<span class="badge text-bg-success">None</span>':'<span class="badge text-bg-danger">Flag</span>'}</td>
+      <td class="text-end"><button class="btn btn-outline-secondary btn-sm" disabled><i class="bi bi-eye"></i></button></td>`;
+    $('#visitsTbody').prepend(row);
+
+    dirty=false; // allow close
+    const modal = bootstrap.Modal.getInstance($('#visitModal'));
+    modal.hide();
+  });
+
+  // Also allow programmatic open (in case data attributes are removed)
+  const openBtn = document.getElementById('openVisit');
+  if(openBtn){ openBtn.addEventListener('click', ()=> bootstrap.Modal.getOrCreateInstance('#visitModal').show()); }
+
+  // Helper available to both initForm and elsewhere
+  function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+})();
+</script>
+{% endblock %}

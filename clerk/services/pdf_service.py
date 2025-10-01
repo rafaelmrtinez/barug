@@ -1,3 +1,7 @@
+# ============================================================
+# pdf_service.py — PDF helpers + Business Clearance field map
+# ============================================================
+
 from __future__ import annotations
 from typing import Any, Dict, List
 import io, os
@@ -13,6 +17,46 @@ except Exception:
 
 from .subject_service import subject_view, pick  # reuse subject logic
 
+# ────────────────────────────────────────────────────────────
+# SECTION: Business Clearance → PDF field name map
+# (Fill/adjust these after inspecting the PDF field names)
+# ────────────────────────────────────────────────────────────
+BUSINESS_CLEARANCE_FIELD_MAP: Dict[str, str] = {
+    # Applicant block
+    "applicant_nationality":   "Text Box 1",     # CORRECT
+    "applicant_full_name":     "Text Box 1_2",   # CORRECT
+    "applicant_age":           "Text Box 1_3",   # CORRECT
+
+    # Application no / date applied (your notes said WALA; we’ll still map them)
+    "numberfour":              "Text Box 1_4",   # Application No.
+    "numberfour=":             "Text Box 1_4",   # (typo-safe alias → same box)
+    "numberfive":              "Text Box 1_5",   # Date Applied
+
+    # Business block
+    "business_name_style":     "Text Box 1_6",   # CORRECT
+    "business_address":        "Text Box 1_7",   # CORRECT
+    "capital_invested":        "Text Box 1_8",   # CORRECT
+
+    # Lines of business (1..5)
+    "lines_of_business_1":     "Text Box 1_9",   # CORRECT
+    "lines_of_business_2":     "Text Box 1_10",  # CORRECT
+    "lines_of_business_3":     "Text Box 1_11",  # CORRECT
+    "lines_of_business_4":     "Text Box 1_12",  # CORRECT
+    "lines_of_business_5":     "Text Box 1_13",  # CORRECT
+
+    "gross_sales_prev_year":   "Text Box 1_14",  # CORRECT
+
+    # Footer / receipt block
+    "requestor_full_name":     "Text Box 1_15",  # CORRECT
+    "numbersixteen":           "Text Box 1_16",  # Punong Brgy.
+    "or_number":               "Text Box 1_17",  # CORRECT
+    "paid_date":               "Text Box 1_18",  # CORRECT
+    "paid_amount":             "Text Box 1_19",  # CORRECT
+}
+
+# ────────────────────────────────────────────────────────────
+# SECTION: Basic helpers
+# ────────────────────────────────────────────────────────────
 def _pdf_templates_dir() -> str:
     base = getattr(settings, "PDF_TEMPLATES_DIR", None)
     return str(base) if base else str(getattr(settings, "BASE_DIR") / "pdf_templates")
@@ -41,31 +85,37 @@ def _choose_template(doc_name: str, _is_minor_ignored: bool) -> str:
 
 def _get_all_pdf_field_names(template_path: str) -> List[str]:
     names: List[str] = []
-    if PdfReader is None: return names
+    if PdfReader is None:
+        return names
     r = PdfReader(template_path)
     try:
         fdict = r.get_form_text_fields()
-        if fdict: names.extend(list(fdict.keys()))
+        if fdict:
+            names.extend(list(fdict.keys()))
     except Exception:
         try:
             fdict = r.get_fields()
-            if fdict: names.extend(list(fdict.keys()))
+            if fdict:
+                names.extend(list(fdict.keys()))
         except Exception:
             pass
     for page in r.pages:
         annots = page.get("/Annots")
-        if not annots: continue
+        if not annots:
+            continue
         for a in annots:
             obj = a.get_object()
             if obj.get("/Subtype") == "/Widget":
                 nm = obj.get("/T")
                 if nm:
                     nm = str(nm).strip("()")
-                    if nm not in names: names.append(nm)
+                    if nm not in names:
+                        names.append(nm)
     return names
 
 def _fill_pdf_with_values(template_path: str, merged: Dict[str, str]) -> bytes:
-    if PdfReader is None: raise RuntimeError("pypdf is not installed. Run: pip install pypdf")
+    if PdfReader is None:
+        raise RuntimeError("pypdf is not installed. Run: pip install pypdf")
     reader = PdfReader(template_path)
     writer = PdfWriter()
     writer.clone_document_from_reader(reader)
@@ -77,6 +127,9 @@ def _fill_pdf_with_values(template_path: str, merged: Dict[str, str]) -> bytes:
     writer.write(buf)
     return buf.getvalue()
 
+# ────────────────────────────────────────────────────────────
+# SECTION: Semantic → default field builder (per doc type)
+# ────────────────────────────────────────────────────────────
 def _fill_fields_for_line(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[str, str]:
     now = timezone.localtime()
     d, m, y = _date_parts(now)
@@ -143,7 +196,7 @@ def _fill_fields_for_line(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[
             "total_earning": _safe_str(line.get("monthly_income") or ""), "purpose": purpose,
             "day": d, "month": m, "year": y,
             "issued_at_brgy": barangay, "issued_at_city_municipality": city, "issued_at_province": province,
-            "amnt": line_total, "official_reciept": or_no,
+            "amnt": _safe_str(line.get("monthly_income") or ""), "official_reciept": or_no,
         }
 
     if "death" in doc_name:
@@ -157,7 +210,7 @@ def _fill_fields_for_line(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[
             "place_of_death": _safe_str(line.get("place_of_death") or ""),
             "curr_date": d, "curr_month": m, "curr_year": y,
             "barangay_issued": barangay, "city_mun_issued": city, "province_issued": province,
-            "brgy_captain": captain, "total_amnt": line_total, "or_number": or_no,
+            "brgy_captain": captain, "total_amnt": _safe_str(pick(line.get("line_total"), "", allow_zero=True)), "or_number": or_no,
         }
 
     if "permit" in doc_name:
@@ -168,7 +221,7 @@ def _fill_fields_for_line(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[
             "barangay_name": barangay, "brgy_date_time": event_dt,
             "issued_date": d, "issued_month": m, "issued_year": y,
             "barangay_issued": barangay, "cty_mun_issued": city, "province_issued": province,
-            "brgy_capt": captain, "total_amnt": line_total, "or_number": or_no,
+            "brgy_capt": captain, "total_amnt": _safe_str(pick(line.get("line_total"), "", allow_zero=True)), "or_number": or_no,
         }
 
     return {}

@@ -19,18 +19,11 @@
   }
 
   /* Buttons */
-  .btn-brand{
-    color:#fff; background:var(--brand-700); border-color:var(--brand-700);
-  }
+  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
   .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
-  .btn-outline-brand{
-    color:var(--brand-700); border-color:var(--brand-700); background:#fff;
-  }
+  .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); background:#fff; }
   .btn-outline-brand:hover{ background:var(--brand-700); color:#fff; }
-
-  .btn-brand-subtle{
-    background:var(--brand-100); color:var(--brand-700); border-color:var(--brand-100);
-  }
+  .btn-brand-subtle{ background:var(--brand-100); color:var(--brand-700); border-color:var(--brand-100); }
   .btn-brand-subtle:hover{ background:var(--brand-050); color:var(--brand-700); }
 
   /* Inputs / focus ring */
@@ -42,10 +35,8 @@
   .form-check-input:checked{ background-color:var(--brand-700); border-color:var(--brand-700); }
 
   /* Toolbar */
-  .toolbar{
-    background:#fff; border:1px solid var(--bs-border-color,#dee2e6);
-    border-radius:1rem; padding:.75rem; gap:.5rem;
-  }
+  .toolbar{ background:#fff; border:1px solid var(--bs-border-color,#dee2e6);
+            border-radius:1rem; padding:.75rem; gap:.5rem; }
   .searchbox{ position:relative; flex:1; }
   .searchbox .bi{ position:absolute; left:.8rem; top:50%; transform:translateY(-50%); opacity:.6; color:var(--brand-700); }
   .searchbox input{ padding-left:2.35rem !important; }
@@ -59,23 +50,24 @@
     background:var(--brand-050); color:var(--brand-700);
   }
   .filter-chip:hover{ background:var(--brand-100); }
-  .filter-chip .x{
-    display:inline-grid; place-items:center; width:1rem; height:1rem; border-radius:50%;
-    background:#fff; border:1px solid rgba(109,41,50,.22); line-height:1;
-    font-weight:700; color:var(--brand-700);
-  }
-
-  /* Offcanvas */
-  .offcanvas.filter-offcanvas{ width:420px; max-width:90vw; }
-  .offcanvas.filter-offcanvas .offcanvas-header{ border-bottom:1px solid var(--bs-border-color); }
-  .offcanvas-footer{
-    position:sticky; bottom:-1px; background:#fff;
-    border-top:1px solid var(--bs-border-color); padding-top:1rem; margin-top:1rem;
-  }
+  .filter-chip .x{ display:inline-grid; place-items:center; width:1rem; height:1rem; border-radius:50%;
+                   background:#fff; border:1px solid rgba(109,41,50,.22); line-height:1; font-weight:700; color:var(--brand-700); }
 
   /* Table polish */
   .table thead th{ border-bottom-width:2px; }
   .table tbody tr:hover{ background:#fcfcfd; }
+
+  /* Offcanvas (opaque + on top) */
+  .offcanvas.filter-offcanvas{
+    width:420px; max-width:90vw;
+    --bs-offcanvas-bg:#fff;
+    background-color:var(--bs-offcanvas-bg)!important;
+    z-index:1200;
+    box-shadow:-2px 0 24px rgba(0,0,0,.12);
+    isolation:isolate;
+  }
+  .offcanvas.filter-offcanvas .offcanvas-header{ border-bottom:1px solid var(--bs-border-color); }
+  .offcanvas-footer{ position:sticky; bottom:-1px; background:#fff; border-top:1px solid var(--bs-border-color); padding-top:1rem; margin-top:1rem; }
 </style>
 {% endblock %}
 
@@ -99,10 +91,9 @@
             />
           </div>
 
-          {# keep current statuses when searching #}
-          {% for s in statuses %}
-            <input type="hidden" name="status" value="{{ s }}">
-          {% endfor %}
+          {# preserve current filters when searching #}
+          {% for s in statuses %}<input type="hidden" name="status" value="{{ s }}">{% endfor %}
+          {% for dt in doc_types %}<input type="hidden" name="doc_type" value="{{ dt }}">{% endfor %}
 
           <button type="submit" class="btn btn-brand d-flex align-items-center">
             {% bs_icon 'search' extra_classes='me-2' %} Search
@@ -122,15 +113,27 @@
 
         <!-- Active filters -->
         <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
-          {% if statuses %}
+          {% if statuses or doc_types %}
             <span class="text-muted me-1">Active:</span>
+
+            {# Status chips #}
             {% for s in statuses %}
               <a class="filter-chip"
                  title="Remove {{ s|title }}"
-                 href="?q={{ q|urlencode }}{% for t in statuses %}{% if t != s %}&status={{ t }}{% endif %}{% endfor %}">
+                 href="?q={{ q|urlencode }}{% for t in statuses %}{% if t != s %}&status={{ t }}{% endif %}{% endfor %}{% for d in doc_types %}&doc_type={{ d }}{% endfor %}">
                 {{ s|title }} <span class="x" aria-hidden="true">×</span>
               </a>
             {% endfor %}
+
+            {# Document type chips #}
+            {% for d in doc_types %}
+              <a class="filter-chip"
+                 title="Remove {{ d|title }}"
+                 href="?q={{ q|urlencode }}{% for s in statuses %}&status={{ s }}{% endfor %}{% for t in doc_types %}{% if t != d %}&doc_type={{ t }}{% endif %}{% endfor %}">
+                {{ d|title }} <span class="x" aria-hidden="true">×</span>
+              </a>
+            {% endfor %}
+
             <a class="btn btn-sm btn-outline-brand ms-1" href="?q={{ q|urlencode }}">
               {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
             </a>
@@ -192,7 +195,7 @@
   {% endif %}
 </div>
 
-<!-- Offcanvas Filters -->
+<!-- Offcanvas Filters (non-blocking, opaque) -->
 <div
   class="offcanvas offcanvas-end filter-offcanvas"
   id="filterPanel"
@@ -200,8 +203,9 @@
   aria-labelledby="filterPanelLabel"
   data-bs-backdrop="false"
   data-bs-scroll="true"
+  style="margin-top: 100;"
 >
-  <div class="offcanvas-header">
+  <div class="offcanvas-header" style="margin-top: 50;">
     <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
     <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
   </div>
@@ -210,7 +214,8 @@
     <form method="get" id="filterForm">
       <input type="hidden" name="q" value="{{ q }}">
 
-      <div class="mb-3">
+      <!-- Status filter -->
+      <div class="mb-4">
         <div class="form-label fw-semibold d-flex justify-content-between align-items-center">
           <span>Statuses</span>
           <div class="small">
@@ -218,18 +223,37 @@
             <a href="#" id="clearAllStatuses">None</a>
           </div>
         </div>
-
         <div class="row row-cols-1">
           {% for s in statuses_all %}
             <div class="col mb-2">
               <div class="form-check">
-                <input class="form-check-input status-box"
-                       type="checkbox"
-                       name="status"
-                       value="{{ s }}"
-                       id="st-{{ s }}"
+                <input class="form-check-input status-box" type="checkbox"
+                       name="status" value="{{ s }}" id="st-{{ s }}"
                        {% if s in statuses %}checked{% endif %}>
                 <label class="form-check-label" for="st-{{ s }}">{{ s|title }}</label>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Document type filter -->
+      <div class="mb-3">
+        <div class="form-label fw-semibold d-flex justify-content-between align-items-center">
+          <span>Document Types</span>
+          <div class="small">
+            <a href="#" id="selectAllDocTypes" class="me-2">Select all</a>
+            <a href="#" id="clearAllDocTypes">None</a>
+          </div>
+        </div>
+        <div class="row row-cols-1">
+          {% for d in doc_types_all %}
+            <div class="col mb-2">
+              <div class="form-check">
+                <input class="form-check-input doc-type-box" type="checkbox"
+                       name="doc_type" value="{{ d }}" id="dt-{{ d|slugify }}"
+                       {% if d in doc_types %}checked{% endif %}>
+                <label class="form-check-label" for="dt-{{ d|slugify }}">{{ d|title }}</label>
               </div>
             </div>
           {% endfor %}
@@ -253,13 +277,35 @@
 
 {% block js %}
 <script>
-  // Select all / none for statuses
   (function(){
-    const boxes = () => Array.from(document.querySelectorAll('.status-box'));
-    const selAll = document.getElementById('selectAllStatuses');
-    const clrAll = document.getElementById('clearAllStatuses');
-    if(selAll) selAll.addEventListener('click', e => { e.preventDefault(); boxes().forEach(b => b.checked = true); });
-    if(clrAll) clrAll.addEventListener('click', e => { e.preventDefault(); boxes().forEach(b => b.checked = false); });
+    // Statuses
+    const statusBoxes = () => Array.from(document.querySelectorAll('.status-box'));
+    const selAllS = document.getElementById('selectAllStatuses');
+    const clrAllS = document.getElementById('clearAllStatuses');
+    if (selAllS) selAllS.addEventListener('click', e => { e.preventDefault(); statusBoxes().forEach(b => b.checked = true); });
+    if (clrAllS) clrAllS.addEventListener('click', e => { e.preventDefault(); statusBoxes().forEach(b => b.checked = false); });
+
+    // Document types
+    const docBoxes = () => Array.from(document.querySelectorAll('.doc-type-box'));
+    const selAllD = document.getElementById('selectAllDocTypes');
+    const clrAllD = document.getElementById('clearAllDocTypes');
+    if (selAllD) selAllD.addEventListener('click', e => { e.preventDefault(); docBoxes().forEach(b => b.checked = true); });
+    if (clrAllD) clrAllD.addEventListener('click', e => { e.preventDefault(); docBoxes().forEach(b => b.checked = false); });
+  })();
+</script>
+
+<script>
+  // Safety guard: remove any stray backdrops from old double-inits
+  (function () {
+    const oc = document.getElementById('filterPanel');
+    if (!oc) return;
+    oc.addEventListener('show.bs.offcanvas', () => {
+      document.querySelectorAll('.offcanvas-backdrop').forEach(b => b.remove());
+    });
+    oc.addEventListener('hidden.bs.offcanvas', () => {
+      document.body.classList.remove('offcanvas-open');
+      document.querySelectorAll('.offcanvas-backdrop').forEach(b => b.remove());
+    });
   })();
 </script>
 {% endblock %}

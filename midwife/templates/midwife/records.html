@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<style>
+  :root{ --brand-700:#6d2932; --brand-800:#561c24; --brand-100:#f3eaeb; --brand-050:#fbf6f6; }
+  .btn-brand{ color:#fff;background:var(--brand-700);border-color:var(--brand-700); }
+  .btn-brand:hover{ background:var(--brand-800);border-color:var(--brand-800); }
+  .btn-outline-brand{ color:var(--brand-700);border-color:var(--brand-700); }
+  .btn-outline-brand:hover{ background:var(--brand-700);color:#fff; }
+  .toolbar{ background:#fff;border:1px solid var(--bs-border-color);border-radius:1rem;padding:.75rem;gap:.5rem; }
+  .searchbox{ position:relative;flex:1; }
+  .searchbox .bi{ position:absolute;left:.8rem;top:50%;transform:translateY(-50%);opacity:.6;color:var(--brand-700); }
+  .searchbox input{ padding-left:2.35rem!important; }
+  .filters-bar{ gap:.5rem; }
+  .filter-chip{ display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .65rem;border-radius:999px;font-size:.8rem;
+    text-decoration:none;border:1px solid rgba(109,41,50,.18);background:var(--brand-050);color:var(--brand-700);}
+  .filter-chip .x{ width:1rem;height:1rem;display:grid;place-items:center;border-radius:50%;background:#fff;border:1px solid rgba(109,41,50,.22);font-weight:700; }
+  .offcanvas.filter-offcanvas{ width:420px;max-width:90vw;--bs-offcanvas-bg:#fff;z-index:1200; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap" style="margin-top: 40;">
+  <div class="container-fluid pt-3 page-main">
+    <div class="row"><div>
+
+      <!-- Toolbar -->
+      <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+        <div class="searchbox">
+          {% bs_icon 'search' extra_classes='bi' %}
+          <input type="text" class="form-control" name="q" placeholder="Search residents / family #" value="{{ q }}">
+        </div>
+        {% for t in types %}<input type="hidden" name="type" value="{{ t }}">{% endfor %}
+        {% for p in puroks %}<input type="hidden" name="purok" value="{{ p }}">{% endfor %}
+        {% for s in statuses %}<input type="hidden" name="status" value="{{ s }}">{% endfor %}
+        <button class="btn btn-brand d-flex align-items-center" type="submit">{% bs_icon 'search' extra_classes='me-2' %}Search</button>
+        <button class="btn btn-outline-brand ms-auto" type="button" data-bs-toggle="offcanvas" data-bs-target="#filterPanel">
+          {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+          {% if active_count %}<span class="badge rounded-pill text-bg-light ms-2">{{ active_count }}</span>{% endif %}
+        </button>
+      </form>
+
+      <!-- Active filters -->
+      <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
+        {% if types or puroks or statuses %}
+          <span class="text-muted me-1">Active:</span>
+          {% for t in types %}
+            <a class="filter-chip" href="?q={{ q|urlencode }}{% for x in types %}{% if x != t %}&type={{ x }}{% endif %}{% endfor %}{% for y in puroks %}&purok={{ y }}{% endfor %}{% for z in statuses %}&status={{ z }}{% endfor %}">
+              {{ t|title }} <span class="x">×</span>
+            </a>
+          {% endfor %}
+          {% for p in puroks %}
+            <a class="filter-chip" href="?q={{ q|urlencode }}{% for t in types %}&type={{ t }}{% endfor %}{% for y in puroks %}{% if y != p %}&purok={{ y }}{% endif %}{% endfor %}{% for z in statuses %}&status={{ z }}{% endfor %}">
+              {{ p|title }} <span class="x">×</span>
+            </a>
+          {% endfor %}
+          <a class="btn btn-sm btn-outline-brand ms-1" href="?q={{ q|urlencode }}">{% bs_icon 'x-circle' extra_classes='me-1' %} Clear</a>
+        {% else %}
+          <span class="text-muted small">No active filters.</span>
+        {% endif %}
+      </div>
+
+      <!-- Table -->
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Name</th><th>Family #</th><th>Purok</th><th>Type</th><th>Open</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if page_obj.object_list %}
+            {% for r in page_obj.object_list %}
+              <tr>
+                <td>{{ r.name }}</td>
+                <td>{{ r.family_no|default:"—" }}</td>
+                <td>{{ r.purok|default:"—" }}</td>
+                <td class="text-capitalize">{{ r.kind }}</td>
+                <td>
+                  <a class="btn btn-outline-brand btn-sm" href="{% url 'midwife:record_detail' r.kind r.id %}">
+                    {% bs_icon 'folder2-open' extra_classes='me-1' %} Open
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="5" class="text-center">No records.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+
+      {% if page_obj.has_other_pages %}
+        <div class="page-pagination">{% include 'paginator.html' with page_obj=page_obj %}</div>
+      {% endif %}
+
+    </div></div>
+  </div>
+</div>
+
+<!-- Offcanvas: Filters -->
+<div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" data-bs-backdrop="false" data-bs-scroll="true" tabindex="-1">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title">Filters</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+  </div>
+  <div class="offcanvas-body">
+    <form method="get" id="filterForm">
+      <input type="hidden" name="q" value="{{ q }}">
+      <div class="mb-4">
+        <div class="form-label fw-semibold d-flex justify-content-between">
+          <span>Type</span>
+          <div class="small"><a href="#" id="selAllType" class="me-2">Select all</a><a href="#" id="clrAllType">None</a></div>
+        </div>
+        {% for t in types_all %}
+          <div class="form-check mb-2">
+            <input class="form-check-input type-box" type="checkbox" name="type" value="{{ t }}" id="t-{{ t }}" {% if t in types %}checked{% endif %}>
+            <label class="form-check-label" for="t-{{ t }}">{{ t|title }}</label>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="mb-4">
+        <div class="form-label fw-semibold d-flex justify-content-between">
+          <span>Purok</span>
+          <div class="small"><a href="#" id="selAllPurok" class="me-2">Select all</a><a href="#" id="clrAllPurok">None</a></div>
+        </div>
+        {% for p in puroks_all %}
+          <div class="form-check mb-2">
+            <input class="form-check-input purok-box" type="checkbox" name="purok" value="{{ p }}" id="p-{{ p|slugify }}" {% if p in puroks %}checked{% endif %}>
+            <label class="form-check-label" for="p-{{ p|slugify }}">{{ p|title }}</label>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-brand" type="submit">{% bs_icon 'check2' extra_classes='me-1' %} Apply</button>
+        <a class="btn btn-outline-brand" href="?q={{ q|urlencode }}">{% bs_icon 'x-circle' extra_classes='me-1' %} Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+(function(){
+  const boxSel = (cls)=>Array.from(document.querySelectorAll(cls));
+  const bind = (id, fn)=>{ const el=document.getElementById(id); if(el) el.addEventListener('click', e=>{e.preventDefault();fn();});};
+  bind('selAllType', ()=>boxSel('.type-box').forEach(b=>b.checked=true));
+  bind('clrAllType', ()=>boxSel('.type-box').forEach(b=>b.checked=false));
+  bind('selAllPurok', ()=>boxSel('.purok-box').forEach(b=>b.checked=true));
+  bind('clrAllPurok', ()=>boxSel('.purok-box').forEach(b=>b.checked=false));
+})();
+</script>
+{% endblock %}

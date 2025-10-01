@@ -28,117 +28,104 @@
                 {% endif %}
 
 
-                <div class="col-12 mb-3">
-                    <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-2">
+            <div class="col-12 mb-3">
+                <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-2">
 
-                        <!-- LEFT: current week -->
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="fw-semibold text-muted">Current week</span>
-                            <span class="fw-bold" id="currentWeekLabel"></span>
-                        </div>
+                    <!-- LEFT: current week -->
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="fw-semibold text-muted">Current week</span>
+                        <span class="fw-bold" id="currentWeekLabel"></span>
+                    </div>
 
-                        <!-- RIGHT: separate forms in one line -->
-                        <div class="d-flex flex-wrap gap-2 justify-content-end">
+                    <!-- RIGHT: separate forms in one line -->
+                    <div class="d-flex flex-wrap gap-2 justify-content-end">
 
-                            <!-- Search form -->
-                            <form method="get" class="d-flex m-0 align-items-end">
-                                <div class="form-floating" style="min-width: 280px;">
-                                    {{ search_form.search }}
-                                    <label for="{{ search_form.search.id_for_label }}">{{ search_form.search.label }}</label>
-                                </div>
-                            </form>
+                        <!-- Search form -->
+                        <form method="get" class="d-flex m-0 align-items-end">
+                            <div class="form-floating" style="min-width: 280px;">
+                            {{ search_form.search }}
+                            <label for="{{ search_form.search.id_for_label }}">{{ search_form.search.label }}</label>
+                            </div>
+                        </form>
 
+                        <!-- Status form -->
+                        <form method="get" class="d-flex m-0 align-items-end">
+                            <div class="form-floating" style="min-width: 220px;">
+                            {{ status_form.status }}
+                            <label for="{{ status_form.status.id_for_label }}">{{ status_form.status.label }}</label>
+                            </div>
+                        </form>
 
-                            <!-- Status form -->
-                            <form method="get" class="d-flex m-0 align-items-end">
-                                <div class="form-floating" style="min-width: 220px;">
-                                    {{ status_form.status }}
-                                    <label for="{{ status_form.status.id_for_label }}">{{ status_form.status.label }}</label>
-                                </div>
-                            </form>
+                        <!-- Week range form -->
+                        <form method="get" class="d-flex m-0 align-items-end">
+                            <div class="form-floating" style="min-width: 240px;">
+                            {{ week_range_form.week_range }}
+                            <label for="{{ week_range_form.week_range.id_for_label }}">{{ week_range_form.week_range.label }}</label>
+                            </div>
+                        </form>
 
-                            <!-- Week range form -->
-                            <form method="get" class="d-flex m-0 align-items-end">
-                                <div class="form-floating" style="min-width: 240px;">
-                                    {{ week_range_form.week_range }}
-                                    <label for="{{ week_range_form.week_range.id_for_label }}">{{ week_range_form.week_range.label }}</label>
-                                </div>
-                            </form>
-
-
-                        </div>
                     </div>
                 </div>
-
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th scope="col">Household Name?</th>
-                            <th scope="col">Week Range</th>
-                            <th scope="col">Status</th>
-                            <th scope="col" style="width: 1%;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if page_obj.object_list %}
-                        {% for sched in page_obj.object_list %}
-                        <tr class="table-row-height">
-                            <td>{{ sched.household_name }}</td>
-                            <td>{{ sched.week_range }}</td>
-                            <td>{{ sched.status }}</td>
-                            <td>
-                                <div class="text-center">
-                                    <a class="btn btn-icon d-inline-flex align-items-center gap-1" href="{% url 'bhw:active_sched_household_info' sched.household_id %}">
-                                        {% bs_icon 'house-door' size='1em' %} Visit
-                                    </a>
-                                    <button class="btn btn-icon d-inline-flex align-items-center gap-1"
-                                        data-bs-toggle="modal" data-bs-target="#rescheduleModal"
-                                        data-schedule-id="{{ sched.schedule_id }}">
-                                        {% bs_icon 'calendar-week' size='1em' %} Reschedule
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                        {% else %}
-                        <tr>
-                            <td colspan="4" class="text-center">No active task.</td>
-                        </tr>
-                        {% endif %}
-                    </tbody>
-
-                </table>
             </div>
+        
+            <table class="table">
+            <thead>
+                <tr>
+                <th scope="col">Household Number</th>
+                <th scope="col">Week Range</th>
+                <th scope="col">Status</th>
+                <th scope="col" style="width: 1%;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="table-row-height">
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td>
+                    <div class="text-center">
+                        <a class="btn btn-icon d-inline-flex align-items-center gap-1" href="{% url 'bhw:active_sched_householf_info' %}">
+                        {% bs_icon 'house-door' size='1em' %} Visit
+                        </a>
+                        <button class="btn btn-icon d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#rescheduleModal">
+                        {% bs_icon 'calendar-week' size='1em' %} Reschedule
+                        </button>
+                    </div>
+                    </td>
+                </tr>
+                <tr><td colspan="4" class="text-center">No active task.</td></tr>
+            </tbody>
+            </table>
+        </div>
         </div>
     </div>
 
     <!-- Reschedule Modal -->
-    <div class="modal fade" id="rescheduleModal" tabindex="-1" aria-labelledby="rescheduleModalLabel"
-        aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
+    <div class="modal fade" id="rescheduleModal" tabindex="-1" aria-labelledby="rescheduleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+        
+        <div class="modal-header">
+            <h5 class="modal-title" id="rescheduleModalLabel">Reschedule Visit</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
 
-                <div class="modal-header">
-                    <h5 class="modal-title" id="rescheduleModalLabel">Reschedule Visit</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
+        <div class="modal-body">
 
-                <div class="modal-body">
+        <form method="post" id="rescheduleForm" class="m-0">
+            {% csrf_token %}
 
-                    <form method="post" id="rescheduleForm" class="m-0">
-                        {% csrf_token %}
+            <div class="align-items-center gap-2 mb-3">
+                <span class="fw-semibold">Select week range</span>
 
-                        <div class="align-items-center gap-2 mb-3">
-                            <span class="fw-semibold">Select week range</span>
+                <div class="d-flex align-items-center gap-2">
+                <button type="button" id="prevWeek" class="btn btn-light btn-sm">
+                    {% bs_icon 'chevron-left' size='1em' %}
+                </button>
 
-                            <div class="d-flex align-items-center gap-2">
-                                <button type="button" id="prevWeek" class="btn btn-light btn-sm">
-                                    {% bs_icon 'chevron-left' size='1em' %}
-                                </button>
-
-                                <span id="weekLabel" class="fw-bold">
-                                    {{ week_start|date:"M d, Y" }} – {{ week_end|date:"M d, Y" }}
-                                </span>
+                <span id="weekLabel" class="fw-bold">
+                    {{ week_start|date:"M d, Y" }} – {{ week_end|date:"M d, Y" }}
+                </span>
 
                                 <button type="button" id="nextWeek" class="btn btn-light btn-sm">
                                     {% bs_icon 'chevron-right' size='1em' %}
@@ -147,32 +134,31 @@
 
                             <input type="hidden" name="schedule_id" id="scheduleIdField" value="">
 
-                            <!-- seed from Django; JS updates this before submit -->
-                            <input type="hidden" name="week_start" id="weekStartField"
-                                value="{{ week_start|date:'Y-m-d' }}">
-                        </div>
-
-                        <div class="form-floating mb-3">
-                            {{ reschedule_form.reason }}
-                            <label for="{{ reschedule_form.reason.id_for_label }}">{{ reschedule_form.reason.label }}</label>
-                        </div>
-
-                        <div class="modal-footer pb-0">
-                            <button type="reset" class="btn btn-reset" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-submit">Confirm</button>
-                        </div>
-                    </form>
-
-                </div>
-
+                <!-- seed from Django; JS updates this before submit -->
+                <input type="hidden" name="week_start" id="weekStartField" value="{{ week_start|date:'Y-m-d' }}">
             </div>
+
+            <div class="form-floating mb-3">
+                {{ reschedule_form.reason }}
+                <label for="{{ reschedule_form.reason.id_for_label }}">{{ reschedule_form.reason.label }}</label>
+            </div>
+
+            <div class="modal-footer pb-0">
+                <button type="reset" class="btn btn-reset" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-submit">Confirm</button>
+            </div>
+        </form>
+
         </div>
+
+        </div>
+    </div>
     </div>
 
     {% if page_obj.has_other_pages %}
-    <div class="page-pagination">
+        <div class="page-pagination"> 
         {% include 'paginator.html' %}
-    </div>
+        </div>
     {% endif %}
 
 </div>

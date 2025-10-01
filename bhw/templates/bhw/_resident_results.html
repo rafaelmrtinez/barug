@@ -1,0 +1,41 @@
+{% comment %}Residents table like Clerk -> each row has a .pick-resident button{% endcomment %}
+{% if residents %}
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th style="width: 140px;">Code</th>
+          <th>Name</th>
+          <th style="width: 110px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in residents %}
+        <tr>
+          <td>
+            {% if r.person_code %}
+              <span class="code-badge">{{ r.person_code }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if r.person_name %}
+              {{ r.person_name }}
+            {% else %}
+              {{ r.last_name|default_if_none:"" }}, {{ r.first_name|default_if_none:"" }}
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <button type="button"
+                    class="btn btn-sm btn-brand pick-resident"
+                    data-person-id="{{ r.person_id }}">
+              Select
+            </button>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <div class="text-muted">No matches.</div>
+{% endif %}

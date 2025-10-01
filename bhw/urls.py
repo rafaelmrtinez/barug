@@ -1,10 +1,21 @@
+# bhw/urls.py
 from django.urls import path
 from . import views
 
-app_name = 'bhw'
+app_name = "bhw"
 
-urlpatterns=[
-    path("active_schedule/", views.active_schedule, name="active_schedule"),
-    path("active_schedule/household_info/<int:household_id>/", views.household_info, name="active_sched_household_info"),
-    path("ocr/verify/", views.verify_valid_id_view, name="ocr_verify"),
+urlpatterns = [
+    path("dashboard/", views.dashboard, name="dashboard"),
+    path("records/", views.records, name="records"),
+    path("records/<str:kind>/<int:record_id>/", views.record_detail, name="record_detail"),
+    path("records/<int:record_id>/add-anc/", views.add_anc_visit, name="add_anc_visit"),
+    path("records/<int:record_id>/add-child-visit/", views.add_child_visit, name="add_child_visit"),
+    path("records/<int:record_id>/add-vaccine/", views.add_vaccine, name="add_vaccine"),
+
+    path("ajax/resident-search/", views.ajax_resident_search, name="ajax_resident_search"),
+    path("ajax/person-card/", views.ajax_person_card, name="ajax_person_card"),
+    path("ajax/person-details/", views.ajax_person_details, name="ajax_person_details"),  # NEW
+    
+    path("verify-id/", views.verify_valid_id_view, name="verify_valid_id"),
+    path("maternal/new/", views.maternal_new, name="maternal_new"),
 ]
