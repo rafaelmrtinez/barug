@@ -12,7 +12,7 @@ certifi==2025.6.15
 charset-normalizer==3.4.2
 colorama==0.4.6
 defusedxml==0.7.1
-dependency-injector==4.48.1
+dependency-injector==4.48.2
 deprecation==2.1.0
 distro==1.9.0
 Django==5.2.3
@@ -28,6 +28,7 @@ frozenlist==1.7.0
 fsspec==2025.7.0
 gotrue==2.12.0
 groq==0.30.0
+greenlet==3.2.4
 gunicorn==23.0.0
 h11==0.16.0
 h2==4.2.0
@@ -68,6 +69,7 @@ realtime==2.4.3
 requests==2.32.4
 six==1.17.0
 sniffio==1.3.1
+SQLAlchemy==2.0.43
 sqlparse==0.5.3
 storage3==0.11.3
 StrEnum==0.4.15

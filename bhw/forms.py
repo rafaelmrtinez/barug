@@ -57,7 +57,7 @@ class SearchActiveScheduleFilter(forms.Form):
             'placeholder' : 'Search',
     }),
         label= 'Search',
-        # required= False,
+        required= False,
     )
 
 class StatusActiveScheduleFilter(forms.Form):
@@ -70,6 +70,13 @@ class StatusActiveScheduleFilter(forms.Form):
         label= 'Status',
         # required= False,
     )
+    
+    def __init__(self, *args, **kwargs):
+        from src.infra.database.connection_adapter import ConnectionAdapter
+        from src.infra.repositories.account_status_repository import AccountStatusRepository
+        super().__init__(*args, **kwargs)
+        status = AccountStatusRepository(ConnectionAdapter())
+        self.fields['status'].choices = [('', 'All')] + [(str(row[0]), row[1]) for row in status.get_all()]
 
 class WeekRangeActiveScheduleFilter(forms.Form):
     week_range = forms.ChoiceField(
@@ -81,6 +88,13 @@ class WeekRangeActiveScheduleFilter(forms.Form):
         label= "Week Range",
         # required= False,
     )
+    
+    def __init__(self, *args, **kwargs):
+        from src.infra.database.connection_adapter import ConnectionAdapter
+        from src.infra.repositories.week_range_repository import WeekRangeRepository
+        super().__init__(*args, **kwargs)
+        week_range = WeekRangeRepository(ConnectionAdapter())
+        self.fields['week_range'].choices = [('', 'All')] + [(str(row[0]), row[1]) for row in week_range.get_all()]
 
 class Reschedule(forms.Form):
     week_range = forms.ChoiceField(
@@ -92,8 +106,20 @@ class Reschedule(forms.Form):
         label= 'Week Range',
         required= True,
     )
+
     reason = forms.ChoiceField(
-        choices=[],
+        choices=[
+            ('No one at home', 'No one at home'),
+            ('Household requested new date', 'Household requested new date'),
+            ('Emergency in household', 'Emergency in household'),
+            ('Bad weather conditions', 'Bad weather conditions'),
+            ('Health worker unavailable', 'Health worker unavailable'),
+            ('Barangay activity conflict', 'Barangay activity conflict'),
+            ('Incorrect address given', 'Incorrect address given'),
+            ('Ongoing household event (e.g., wake, celebration)', 'Ongoing household event (e.g., wake, celebration)'),
+            ('Security/safety concern', 'Security/safety concern'),
+            ('Access to area restricted', 'Access to area restricted'),
+            ],
         widget=forms.Select(attrs={
             'id' : 'reschedule',
             'class' : 'form-select',

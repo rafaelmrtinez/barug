@@ -1,6 +1,8 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python,django,node,database
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,django,node,database
 
+.vscode/
+
 ### Add your virtual environments here ###
 .venv
 venv
@@ -414,6 +416,8 @@ poetry.toml
 # LSP config files
 pyrightconfig.json
 
-# End of https://www.toptal.com/developers/gitignore/api/python,django,node,database. v s c o d e /  
- . v s c o d e /  
+# End of https://www.toptal.com/developers/gitignore/api/python,django,node,database. v s c o d e / 
+ 
+ . v s c o d e / 
+ 
  

@@ -839,7 +839,9 @@ STATUS_DECLINE  = 7
 
 @session_login_required
 @role_required(CLERK_ROLE)
+@role_required(CLERK_ROLE)
 @nocache
+def dashboard(request: HttpRequest):
 def dashboard(request: HttpRequest):
     auth = request.session.get("auth")
     profile = getattr(request, "person_profile", None)
@@ -852,7 +854,11 @@ def dashboard(request: HttpRequest):
 
 @session_login_required
 @role_required(CLERK_ROLE)
+@role_required(CLERK_ROLE)
 @nocache
+def review_approve(request: HttpRequest):
+    """List of ID verification requests."""
+    profile = getattr(request, "person_profile", None)
 def review_approve(request: HttpRequest):
     """List of ID verification requests."""
     profile = getattr(request, "person_profile", None)
@@ -866,10 +872,33 @@ def review_approve(request: HttpRequest):
             supabase.rpc("get_id_validation_requests", {}).execute()
         except APIError as e:
             messages.error(request, f"Supabase error: {escape(getattr(e, 'message', str(e)))}")
+    form = SearchVerificationRequest(request.GET or None)
+    search = (form.cleaned_data.get("search") or "").strip() if (request.GET and form.is_valid()) else ""
+
+    rows = fetch_id_verification_requests(supabase, search=search)
+    if not rows and search == "":
+        try:
+            supabase.rpc("get_id_validation_requests", {}).execute()
+        except APIError as e:
+            messages.error(request, f"Supabase error: {escape(getattr(e, 'message', str(e)))}")
 
     paginator = Paginator(rows, 10)
     page_obj = paginator.get_page(request.GET.get("page"))
+    page_obj = paginator.get_page(request.GET.get("page"))
 
+    return render(
+        request,
+        "clerk/resident/identity_verification_list.html",
+        {
+            "page_path": "Barangay Clerk / Account Verification",
+            "page_title": "Account Verification",
+            "page_obj": page_obj,
+            "rows": page_obj.object_list,
+            "form": form,
+            "profile": profile,
+            "auth": auth,
+        },
+    )
     return render(
         request,
         "clerk/resident/identity_verification_list.html",
@@ -886,7 +915,10 @@ def review_approve(request: HttpRequest):
 
 @session_login_required
 @role_required(CLERK_ROLE)
+@role_required(CLERK_ROLE)
 @nocache
+def person_submission_dets(request: HttpRequest, req_id: int):
+    """Details of a single person's submitted verification + latest status."""
 def person_submission_dets(request: HttpRequest, req_id: int):
     """Details of a single person's submitted verification + latest status."""
     resp = supabase.rpc("get_details", {"p_person_id": req_id}).execute()
@@ -920,6 +952,8 @@ def person_submission_dets(request: HttpRequest, req_id: int):
 
     status_row = get_verification_status_for_person(supabase, req_id)
     if status_row:
+        person["latest_status"]  = status_row.get("status_text") or person.get("latest_status") or "Pending"
+        person["remarks"]        = status_row.get("latest_remarks") or person.get("remarks")
         person["latest_status"]  = status_row.get("status_text") or person.get("latest_status") or "Pending"
         person["remarks"]        = status_row.get("latest_remarks") or person.get("remarks")
 

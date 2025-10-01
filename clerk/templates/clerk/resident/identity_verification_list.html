@@ -150,6 +150,18 @@
 
     </div>
   </div>
+            {% if page_obj.has_other_pages %}
+              <div class="page-pagination">
+                {% include 'paginator.html' %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
 
 </div>
 {% endblock %}
+
