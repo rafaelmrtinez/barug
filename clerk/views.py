@@ -839,9 +839,7 @@ STATUS_DECLINE  = 7
 
 @session_login_required
 @role_required(CLERK_ROLE)
-@role_required(CLERK_ROLE)
 @nocache
-def dashboard(request: HttpRequest):
 def dashboard(request: HttpRequest):
     auth = request.session.get("auth")
     profile = getattr(request, "person_profile", None)

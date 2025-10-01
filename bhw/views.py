@@ -1,4 +1,5 @@
 # bhw/views.py
+from __future__ import annotations
 # Raf
 from urllib import request
 from django.db import connection
@@ -20,7 +21,6 @@ from .forms import Reschedule
 
 
 # Raph
-from __future__ import annotations
 from typing import Any
 from django.shortcuts import render, redirect
 from django.core.paginator import Paginator
