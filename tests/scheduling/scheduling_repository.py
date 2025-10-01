@@ -7,15 +7,13 @@ class SchedulingRepositoryTest(TestCase):
     
     def setUp(self):
         self.repo: ActiveScheduleRepository = ActiveScheduleRepository(ConnectionAdapter())
-        
-    def test_sort_by_week_range(self):
-        key = "Week of Jul 07 – Jul 11"
-        year = "2025"
-        print(self.repo.sort_by_week_range(week_range=key, year=year))
 
-    def test_search_schedule(self):
-        key = "hannah"
-        
-    def test_fetch_schedules(self):
-        result = self.repo.fetch_schedules()
-            
+    def test_insert_new_schedule(self):
+        from src.app.transfer_objects.commands.reschedule_cmd import RescheduleCommand
+        cmd = RescheduleCommand(
+            p_schedule_id=12,
+            p_new_week_id=2,
+            p_reason="Testing",
+            p_resched_by_id=1
+        )
+        print(self.repo.insert_new_schedule(cmd))
