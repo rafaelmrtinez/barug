@@ -435,24 +435,111 @@ def verify_valid_id_view(request: HttpRequest) -> JsonResponse:
 @role_required(*ROLE_MIDWIFE)
 @nocache
 def add_anc_visit(request: HttpRequest, record_id: int) -> HttpResponse:
+    """
+    Insert a new ANC visit via Supabase RPC `insert_anc_visit_with_details`.
+    The form posts JSON strings for labs/tt/supplements/danger_signs.
+    We also compute trimester_stage_id from GA weeks.
+    """
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
+
+    # helpers
+    def _to_i(x):
+        try:
+            return int(x) if x not in (None, "",) else None
+        except Exception:
+            return None
+
+    def _to_f(x):
+        try:
+            return float(x) if x not in (None, "",) else None
+        except Exception:
+            return None
+
+    def _to_b(x):
+        if x in (True, "true", "True", "1", 1): return True
+        if x in (False, "false", "False", "0", 0): return False
+        return None
+
+    def _parse_json(s):
+        import json
+        try:
+            return json.loads(s) if s else None
+        except Exception:
+            return None
+
+    def _tri_id(ga_weeks: Optional[int]) -> Optional[int]:
+        if ga_weeks is None:
+            return None
+        return 1 if ga_weeks <= 13 else 2 if ga_weeks <= 27 else 3
 
     auth = request.session.get("auth") or {}
     staff_id = auth.get("staff_id")
 
-    # Build RPC payload from the modal form
-    payload = build_anc_visit_payload(
-        record_id=record_id,
-        form=request.POST,
-        staff_id=staff_id,
-    )
+    # POST fields
+    visit_date = request.POST.get("visit_date") or None
+    ga_weeks = _to_i(request.POST.get("ga_weeks"))
+    bp_sys = _to_i(request.POST.get("bp_sys"))
+    bp_dia = _to_i(request.POST.get("bp_dia"))
+    weight_kg = _to_f(request.POST.get("weight_kg"))
+    fundic_cm = _to_i(request.POST.get("fundic_height_cm"))
+    fhr_bpm = _to_i(request.POST.get("fhr_bpm"))
+    assessed_by_id = _to_i(request.POST.get("assessed_by_id")) or _to_i(staff_id)
+    notes = (request.POST.get("notes") or "").strip()
+    trimester_stage_id = _to_i(request.POST.get("trimester_stage_id")) or _tri_id(ga_weeks)
 
-    ok, err = insert_anc_visit_with_details(payload)
-    if ok:
-        messages.success(request, "ANC visit saved.")
-    else:
-        messages.error(request, f"RPC error: {err}")
+    labs = _parse_json(request.POST.get("labs_json"))
+    tt = _parse_json(request.POST.get("tt_json"))
+    supps = _parse_json(request.POST.get("supplements_json"))
+    danger = _parse_json(request.POST.get("danger_signs_json")) or ["NONE"]
+
+    # Build RPC payload. Only include keys your function expects.
+    # (Extras are typically ignored by PostgREST; still, we keep a clean set.)
+    payload: Dict[str, Any] = {
+        # required
+        "p_maternal_record_id": int(record_id),
+        "p_assessed_by_id": assessed_by_id,
+        "p_visit_date": visit_date,
+        "p_trimester_stage_id": trimester_stage_id,
+
+        # visit vitals (if your RPC supports these named args)
+        "p_bp_sys": bp_sys,
+        "p_bp_dia": bp_dia,
+        "p_weight_kg": weight_kg,
+        "p_fundic_height_cm": fundic_cm,
+        "p_fhr_bpm": fhr_bpm,
+        "p_notes": notes if notes else None,
+
+        # collections (jsonb)
+        "p_lab_results": labs,
+        "p_tt_vaccines": tt,
+        "p_supplements": supps,
+        "p_danger_signs": danger,
+    }
+
+    # Optional maternal fields (leave None unless you capture them here)
+    # Keeping them out avoids accidental overwrites.
+
+    # DEBUG LOG
+    try:
+        import json as _json
+        print("\n[MIDWIFE] insert_anc_visit_with_details payload:")
+        print(_json.dumps(payload, indent=2, default=str))
+    except Exception:
+        pass
+
+    # Call Supabase
+    try:
+        res = supabase.rpc("insert_anc_visit_with_details", payload).execute()
+        print("[MIDWIFE] RPC insert_anc_visit_with_details → data:", getattr(res, "data", None))
+        print("[MIDWIFE] RPC insert_anc_visit_with_details → error:", getattr(res, "error", None))
+        if getattr(res, "error", None):
+            messages.error(request, f"Insert failed: {getattr(res.error, 'message', res.error)}")
+        else:
+            messages.success(request, "ANC visit saved.")
+    except Exception as e:
+        print("[MIDWIFE] RPC insert_anc_visit_with_details → exception:", e)
+        messages.error(request, f"Error: {e}")
 
     return redirect("midwife:record_detail", kind="maternal", record_id=record_id)
 

@@ -26,5 +26,7 @@
     {% include 'page_title.html' %}
 
     {% block content %}{% endblock%}
+        {# ⬇️ add this just before </body> ⬇️ #}
+    {% block js %}{% endblock %}
 </body>
 </html>
