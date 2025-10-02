@@ -565,7 +565,7 @@ def add_vaccine(request: HttpRequest, record_id: int) -> HttpResponse:
 
 
 @session_login_required
-@role_required(*ROLE_MIDWIFE)
+@role_required(*ROLE_MIDWIFE, "Super Admin")
 @nocache
 def maternal_new(request: HttpRequest) -> HttpResponse:
     auth = request.session.get("auth") or {}
