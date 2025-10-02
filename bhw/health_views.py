@@ -118,7 +118,6 @@ def verify_valid_id(*, supabase_uid: str, legit_person_id: int, id_type_raw: str
 
     return {"ok": True, "status": getattr(edge, "status", 200), "edge": getattr(edge, "data", None)}
 
-
 def build_maternal_payload(cd: Dict[str, Any], staff_id: Optional[int]) -> Dict[str, Any]:
     """
     Minimal argument object for create_maternal_health_record_bhw.
