@@ -13,15 +13,10 @@ from authentication.guards import role_required, session_login_required
 from src.app.bootstrap.app_containers import AppContainer
 from src.app.contracts.household_info_service_contract import IHouseholdInfoService
 from src.app.contracts.scheduling_service_contract import ISchedulingService
-from src.app.services.household_info_service import HouseholdInformationService
-from src.app.services.maternal_service import MaternalService
 from src.app.transfer_objects.request.create_child_record_request import CreateChildRecordRequest
-from src.app.transfer_objects.request.reschedule_cmd import RescheduleRequest
-from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.exceptions.maternal_exceptions import MaternalException
 from src.infra.exceptions.rescheduling_exception import ReschedulingException
 
-from src.infra.repositories.household_info_repository import HouseholdInfoRepository
 from .forms import SearchActiveScheduleFilter
 from .forms import StatusActiveScheduleFilter
 from .forms import WeekRangeActiveScheduleFilter
