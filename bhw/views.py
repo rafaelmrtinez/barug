@@ -403,8 +403,17 @@ def add_child(request: HttpRequest, service = Provide[AppContainer.maternal_serv
                 return JsonResponse({"response": "Invalid JSON body."}, status=400)
         else:
             data = request.POST
-            
-        print( data )  # Debugging line to see incoming data
+        
+        if not data.get("family_no"):
+            return JsonResponse({"response": "Family Number is required."}, status=400)
+        if not data.get("child_id"):
+            return JsonResponse({"response": "Child full name is required."}, status=400)
+        if not data.get("mother_id"):
+            return JsonResponse({"response": "Mother full name is required."}, status=400)
+        if not data.get("birth_order"):
+            return JsonResponse({"response": "Birth order is required."}, status=400)
+        if not data.get("place_delivery"):
+            return JsonResponse({"response": "Place of delivery is required."}, status=400)
             
         child_data = CreateChildRecordRequest(
             request.session.get("auth", {}).get("staff_id"),
