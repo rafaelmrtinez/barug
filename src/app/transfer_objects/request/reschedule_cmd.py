@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class RescheduleCommand:
+class RescheduleRequest:
     p_schedule_id: int
     p_new_week_id: int
     p_reason: str

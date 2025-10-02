@@ -43,6 +43,8 @@ from common.supabase_client import supabase
 
 # -------------------- Role / UI globals (unchanged) --------------------
 ROLE_MIDWIFE = ("MIDWIFE", "Midwife", "midwife")
+# This was added to allow extended roles to access/re-use features such as resident search
+FEATURE_ACCESS = ("MIDWIFE", "Midwife", "midwife", "Barangay Health Worker", "Super Admin")
 user_fullname = "laname fname mname suffix"
 user_role = "MIDWIFE"
 user_role_template = user_role.lower().replace(" ", "_")
@@ -224,7 +226,7 @@ def _demo_maternal_payload(record_id: int) -> Dict[str, Any]:
 
 # -------------------- AJAX endpoints --------------------
 @session_login_required
-@role_required(*ROLE_MIDWIFE)
+@role_required(*FEATURE_ACCESS)
 @nocache
 def ajax_person_details(request: HttpRequest):
     try:
@@ -268,7 +270,7 @@ def ajax_person_details(request: HttpRequest):
 
 
 @session_login_required
-@role_required(*ROLE_MIDWIFE)
+@role_required(*FEATURE_ACCESS)
 @nocache
 def ajax_resident_search(request: HttpRequest) -> JsonResponse:
     q = (request.GET.get("q") or "").strip()
@@ -278,7 +280,7 @@ def ajax_resident_search(request: HttpRequest) -> JsonResponse:
 
 
 @session_login_required
-@role_required(*ROLE_MIDWIFE)
+@role_required(*FEATURE_ACCESS)
 @nocache
 def ajax_person_card(request: HttpRequest) -> JsonResponse:
     try:

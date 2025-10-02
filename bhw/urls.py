@@ -19,5 +19,6 @@ urlpatterns = [
     path("verify-id/", views.verify_valid_id_view, name="verify_valid_id"),
     path("maternal/new/", views.maternal_new, name="maternal_new"),
 
-    path("child/new/", views.child_new, name="child_new"), 
+    path("child/new/", views.child_new, name="child_new"),
+    path("add-child/", views.add_child, name="add_child"),
 ]

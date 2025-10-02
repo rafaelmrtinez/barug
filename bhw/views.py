@@ -1,19 +1,24 @@
 # bhw/views.py
 from __future__ import annotations
 # Raf
+import json
 from urllib import request
 from django.db import connection
 from django.shortcuts import redirect, render
 from django.core.paginator import Paginator
 from dependency_injector.wiring import inject, Provide
-from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.csrf import csrf_protect, csrf_exempt
+from django.views.decorators.http import require_http_methods
 from authentication.guards import role_required, session_login_required
 from src.app.bootstrap.app_containers import AppContainer
 from src.app.contracts.household_info_service_contract import IHouseholdInfoService
 from src.app.contracts.scheduling_service_contract import ISchedulingService
 from src.app.services.household_info_service import HouseholdInformationService
-from src.app.transfer_objects.commands.reschedule_cmd import RescheduleCommand
+from src.app.services.maternal_service import MaternalService
+from src.app.transfer_objects.request.create_child_record_request import CreateChildRecordRequest
+from src.app.transfer_objects.request.reschedule_cmd import RescheduleRequest
 from src.infra.database.connection_adapter import ConnectionAdapter
+from src.infra.exceptions.maternal_exceptions import MaternalException
 from src.infra.exceptions.rescheduling_exception import ReschedulingException
 
 from src.infra.repositories.household_info_repository import HouseholdInfoRepository
@@ -368,6 +373,7 @@ def add_child_visit(request: HttpRequest, record_id: int) -> HttpResponse:
     messages.success(request, "Child visit saved (demo).")
     return redirect("bhw:record_detail", kind="child", record_id=record_id)
 
+@csrf_protect
 @session_login_required
 @role_required(*ROLE_BHW)
 @nocache
@@ -376,11 +382,6 @@ def child_new(request: HttpRequest) -> HttpResponse:
     UI for the Child Health Record intake that mirrors the DOH paper form.
     This version focuses on frontend capture; wire to your RPC when ready.
     """
-    if request.method == "POST":
-        # Placeholder: accept POST, show success. Replace with your service call later.
-        messages.success(request, "Child health record saved (demo UI).")
-        return redirect("midwife:child_new")
-
     return render(
         request,
         "bhw/child_new.html",
@@ -389,6 +390,40 @@ def child_new(request: HttpRequest) -> HttpResponse:
             "page_title": "New Child Health Record",
         },
     )
+    
+@csrf_exempt
+@require_http_methods(["POST"])
+@inject
+def add_child(request: HttpRequest, service = Provide[AppContainer.maternal_service]) -> HttpResponse:
+    try:
+        if request.content_type == "application/json":
+            try:
+                data = json.loads(request.body.decode("utf-8") or "{}")
+            except json.JSONDecodeError:
+                return JsonResponse({"response": "Invalid JSON body."}, status=400)
+        else:
+            data = request.POST
+            
+        print( data )  # Debugging line to see incoming data
+            
+        child_data = CreateChildRecordRequest(
+            request.session.get("auth", {}).get("staff_id"),
+            data.get("child_id"),
+            data.get("mother_id"),
+            data.get("father_id"),
+            data.get("birth_order"),
+            data.get("place_delivery"),
+            data.get("family_no")
+        )
+        id = service.insert_child_record(child_data)
+        
+        if not id:
+            return JsonResponse({"response": "Something went wrong."}, status=500)
+        
+        return JsonResponse({"response": True}, status=200)
+
+    except MaternalException as e:
+        return JsonResponse({"response": str(e.message)}, status=500)
 
 @session_login_required
 @role_required(*hv.ROLE_BHW)
