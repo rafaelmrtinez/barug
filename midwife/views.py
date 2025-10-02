@@ -336,6 +336,7 @@ def household_info(request: HttpRequest) -> HttpResponse:
 
 
 @session_login_required
+
 @role_required(*ROLE_MIDWIFE, "Super Admin")
 @nocache
 def dashboard(request: HttpRequest) -> HttpResponse:

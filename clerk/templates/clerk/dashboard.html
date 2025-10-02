@@ -169,72 +169,11 @@
     </div>
   </div>
 
-<div class="dashboard theme-barug container-fluid py-4" style="margin-top:0px;">
-
-  <!-- Page Header -->
-  <div class="row g-3 align-items-center mb-3">
-    <div class="col-12 col-xl-8">
-      <div class="card header-card shadow-sm">
-        <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
-          <div>
-            <div class="eyebrow text-uppercase">Barangay Control Center</div>
-            <h1 class="h4 mb-0 fw-bold">Overview</h1>
-            <div class="text-muted small mt-1">{{ today|default:"" }}</div>
-          </div>
-          <div class="d-flex flex-wrap gap-2">
-            <a href="{% url 'clerk:identity_verification' %}" class="btn btn-outline-brand">
-              {% bs_icon 'shield-check' %}<span class="ms-1">Verify IDs</span>
-            </a>
-            <a href="" class="btn btn-brand">
-              {% bs_icon 'file-earmark-text' %}<span class="ms-1">Doc Requests</span>
-            </a>
-            <a href="{% url 'clerk:business_owner_resident' %}" class="btn btn-brand-subtle">
-              {% bs_icon 'buildings' %}<span class="ms-1">New Business</span>
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Filters -->
-    <div class="col-12 col-xl-4">
-      <div class="card shadow-sm">
-        <div class="card-body d-flex flex-wrap align-items-center gap-2">
-          <div class="filter">
-            <label class="form-label small mb-1">Range</label>
-            <select class="form-select form-select-sm">
-              <option>Last 7 days</option>
-              <option>Last 30 days</option>
-              <option>Quarter to date</option>
-              <option>Year to date</option>
-            </select>
-          </div>
-          <div class="filter">
-            <label class="form-label small mb-1">Type</label>
-            <select class="form-select form-select-sm">
-              <option>All documents</option>
-              <option>Barangay Clearance</option>
-              <option>Residency</option>
-              <option>Indigency</option>
-            </select>
-          </div>
-          <button class="btn btn-sm btn-outline-brand ms-auto" title="Refresh">{% bs_icon 'arrow-clockwise' %}</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- KPIs -->
   <div class="row g-3 row-cols-1 row-cols-md-2 row-cols-xl-4">
     <div class="col">
       <div class="card kpi shadow-sm h-100 lift-on-hover">
-      <div class="card kpi shadow-sm h-100 lift-on-hover">
         <div class="card-body d-flex align-items-center gap-3">
-          <div class="kpi-icon">{% bs_icon 'file-earmark-text' size='1.2em' %}</div>
-          <div class="flex-grow-1">
-            <div class="kpi-label">Document Requests (Today)</div>
-            <div class="kpi-value">{{ kpis.doc_requests_today|default:"27" }}</div>
-            <div class="kpi-sub text-success">{% bs_icon 'arrow-up-right' %} {{ kpis.doc_requests_delta|default:"+8%" }}</div>
           <div class="kpi-icon">{% bs_icon 'file-earmark-text' size='1.2em' %}</div>
           <div class="flex-grow-1">
             <div class="kpi-label">Document Requests (Today)</div>
@@ -248,17 +187,7 @@
       <div class="card kpi shadow-sm h-100 lift-on-hover">
         <div class="card-body d-flex align-items-center gap-3">
           <div class="kpi-icon">{% bs_icon 'person-check' size='1.2em' %}</div>
-        </div>
-      </div>
-    </div>
-    <div class="col">
-      <div class="card kpi shadow-sm h-100 lift-on-hover">
-        <div class="card-body d-flex align-items-center gap-3">
-          <div class="kpi-icon">{% bs_icon 'person-check' size='1.2em' %}</div>
           <div class="flex-grow-1">
-            <div class="kpi-label">Pending Verifications</div>
-            <div class="kpi-value">{{ kpis.pending_verifications|default:"12" }}</div>
-            <div class="kpi-sub text-danger">{% bs_icon 'arrow-down-right' %} {{ kpis.verif_delta|default:"-5%" }}</div>
             <div class="kpi-label">Pending Verifications</div>
             <div class="kpi-value">{{ kpis.pending_verifications|default:"12" }}</div>
             <div class="kpi-sub text-danger">{% bs_icon 'arrow-down-right' %} {{ kpis.verif_delta|default:"-5%" }}</div>
@@ -268,14 +197,9 @@
     </div>
     <div class="col">
       <div class="card kpi shadow-sm h-100 lift-on-hover">
-      <div class="card kpi shadow-sm h-100 lift-on-hover">
         <div class="card-body d-flex align-items-center gap-3">
           <div class="kpi-icon">{% bs_icon 'buildings' size='1.2em' %}</div>
-          <div class="kpi-icon">{% bs_icon 'buildings' size='1.2em' %}</div>
           <div class="flex-grow-1">
-            <div class="kpi-label">Active Businesses</div>
-            <div class="kpi-value">{{ kpis.active_businesses|default:"48" }}</div>
-            <span class="badge rounded-pill kpi-pill">+{{ kpis.new_businesses_week|default:"3" }} this week</span>
             <div class="kpi-label">Active Businesses</div>
             <div class="kpi-value">{{ kpis.active_businesses|default:"48" }}</div>
             <span class="badge rounded-pill kpi-pill">+{{ kpis.new_businesses_week|default:"3" }} this week</span>
@@ -285,14 +209,9 @@
     </div>
     <div class="col">
       <div class="card kpi shadow-sm h-100 lift-on-hover">
-      <div class="card kpi shadow-sm h-100 lift-on-hover">
         <div class="card-body d-flex align-items-center gap-3">
           <div class="kpi-icon">{% bs_icon 'people' size='1.2em' %}</div>
-          <div class="kpi-icon">{% bs_icon 'people' size='1.2em' %}</div>
           <div class="flex-grow-1">
-            <div class="kpi-label">Registered Residents</div>
-            <div class="kpi-value">{{ kpis.residents_total|default:"2,354" }}</div>
-            <span class="badge rounded-pill kpi-pill">{{ kpis.new_residents_month|default:"42" }} new</span>
             <div class="kpi-label">Registered Residents</div>
             <div class="kpi-value">{{ kpis.residents_total|default:"2,354" }}</div>
             <span class="badge rounded-pill kpi-pill">{{ kpis.new_residents_month|default:"42" }} new</span>
@@ -355,7 +274,6 @@
           {% empty %}{% endfor %}</div>
         </div>
       </div>
-      </div>
     </div>
     <div class="col-12 col-xl-6">
       <div class="card section shadow-sm h-100">
@@ -406,9 +324,7 @@
           </div>
         </div>
       </div>
-      </div>
     </div>
-  </div>
   </div>
 
   {% if dashboard_json %}
