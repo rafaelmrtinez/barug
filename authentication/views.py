@@ -37,6 +37,7 @@ def _role_home(role_name: str) -> str:
     is_treas    = role in {"barangay treasurer", "treasurer"}
     is_secy     = role in {"barangay secretary", "secretary"}
     is_nurse    = role in {"nurse", "barangay nurse"}
+    is_super_admin = role in {"super admin", "Super Admin"}
 
     if is_clerk:   return "clerk:dashboard"
     if is_captain: return "captain:dashboard"
@@ -45,6 +46,7 @@ def _role_home(role_name: str) -> str:
     if is_treas:   return "treasurer:queue"
     if is_secy:    return "secretary:staff_selection"
     if is_nurse:   return "nurse:dashboard"
+    if is_super_admin: return "metrics:health_check"
 
     logger.debug("Role not matched in _role_home; role=%s -> resident fallback", role)
     return "resident:dashboard"
