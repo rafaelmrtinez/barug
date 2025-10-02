@@ -336,7 +336,8 @@ def household_info(request: HttpRequest) -> HttpResponse:
 
 
 @session_login_required
-@role_required(*ROLE_MIDWIFE)
+
+@role_required(*ROLE_MIDWIFE, "Super Admin")
 @nocache
 def dashboard(request: HttpRequest) -> HttpResponse:
     auth = request.session.get("auth")
@@ -352,7 +353,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
 
 @session_login_required
-@role_required(*ROLE_MIDWIFE)
+@role_required(*ROLE_MIDWIFE, "Super Admin")
 @nocache
 def records(request: HttpRequest) -> HttpResponse:
     q = (request.GET.get("q") or "").strip()
@@ -565,7 +566,7 @@ def add_vaccine(request: HttpRequest, record_id: int) -> HttpResponse:
 
 
 @session_login_required
-@role_required(*ROLE_MIDWIFE)
+@role_required(*ROLE_MIDWIFE, "Super Admin")
 @nocache
 def maternal_new(request: HttpRequest) -> HttpResponse:
     auth = request.session.get("auth") or {}
