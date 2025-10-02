@@ -397,7 +397,7 @@ def add_child(request: HttpRequest, service = Provide[AppContainer.maternal_serv
             except json.JSONDecodeError:
                 return JsonResponse({"response": "Invalid JSON body."}, status=400)
         else:
-            data = request.POST
+            return JsonResponse({"response": "Unsupported content type."}, status=415)
         
         if not data.get("family_no"):
             return JsonResponse({"response": "Family Number is required."}, status=400)
