@@ -12,6 +12,7 @@ from django.utils.html import escape
 from django.views.decorators.http import require_GET, require_POST
 
 from authentication.guards import session_login_required, role_required
+from authentication.utils import nocache
 from authentication.supabase_client import supabase  # still used for the small OR fetch
 
 from .services.requests_service import list_requests, list_business_requests, fetch_detail_bundle, build_auth_links
@@ -32,6 +33,19 @@ def _staff_id(request: HttpRequest) -> int | None:
         return sid
     prof = getattr(request, "profile", None) or getattr(request, "person_profile", None)
     return getattr(prof, "staff_id", None)
+
+# ========= DASHBOARD =========
+@session_login_required
+@role_required(TREASURER_ROLE)
+@nocache
+def dashboard(request: HttpRequest):
+    auth = request.session.get("auth")
+    return render(request, "treasurer/dashboard.html", {
+        "page_path": f"Barangay Treasurer/Dashboard",
+        "page_title": "Dashboard",
+        "auth": auth
+    })
+
 
 # ========= Queue =========
 @session_login_required
@@ -164,14 +178,147 @@ def take_payment(request: HttpRequest, doc_request_id: int):
     return redirect("treasurer:detail", doc_request_id=doc_request_id)
 
 # ========= Fees search + update =========
+# treasurer/views.py
+from django.core.paginator import Paginator
+import re
+
+def _compact_page_range(page_number: int, total_pages: int, delta: int = 2):
+    """
+    Build a compact page list for the paginator UI: [1, None, 4,5,6, None, N]
+    None represents an ellipsis.
+    """
+    window = set([1, total_pages])
+    for n in range(max(1, page_number - delta), min(total_pages, page_number + delta) + 1):
+        window.add(n)
+    ordered = sorted(window)
+    out, prev = [], None
+    for n in ordered:
+        if prev is not None and n - prev > 1:
+            out.append(None)
+        out.append(n)
+        prev = n
+    return out
+
+# treasurer/views.py
+from django.core.paginator import Paginator, EmptyPage  # <-- add this import near the top
+
+# ========= Fees search + update =========
 @session_login_required
 @role_required(TREASURER_ROLE)
 @require_GET
 def fees(request: HttpRequest):
+    # --- Query params ---
     q = (request.GET.get("q") or "").strip() or None
-    items = search_fee_items(q)
-    history = recent_fee_changes(limit=50)
-    return render(request, "treasurer/fees.html", {"q": q or "", "items": items, "history": history})
+    # per_page: default 5; clamp to allowed set
+    try:
+        per_page = int(request.GET.get("per_page", "5") or "5")
+    except Exception:
+        per_page = 5
+    if per_page not in (5, 10, 25, 50):
+        per_page = 5
+
+    # multi-select filters
+    doc_types = [d.strip() for d in request.GET.getlist("doc_type") if d.strip()]
+    fee_types = [k.strip() for k in request.GET.getlist("fee_type") if k.strip()]
+    active_count = len(doc_types) + len(fee_types)
+
+    # --- Fetch all (optionally searched) ---
+    # Expected item shape includes: fee_code, name, current_amount, document_type, fee_type, description (optional)
+    items_all = search_fee_items(q)
+
+    # --- Build filter option lists from the unfiltered set (sorted, unique) ---
+    doc_types_all = sorted({(i.get("document_type") or "").strip()
+                            for i in items_all if (i.get("document_type") or "").strip()})
+    fee_types_all = sorted({(i.get("fee_type") or "").strip()
+                            for i in items_all if (i.get("fee_type") or "").strip()})
+
+    # --- Apply filters (if any) ---
+    def passes_filters(row: Dict[str, Any]) -> bool:
+        dt = (row.get("document_type") or "").strip()
+        ft = (row.get("fee_type") or "").strip()
+        if doc_types and dt not in doc_types:
+            return False
+        if fee_types and ft not in fee_types:
+            return False
+        return True
+
+    filtered = [r for r in items_all if passes_filters(r)]
+
+    # --- Split name into two nicer lines (e.g., "Barangay Business Clearance — Sari-Sari Store") ---
+    for r in filtered:
+        name = (r.get("name") or "").strip()
+        main, sub = name, None
+        # Try EN dash / em dash / simple hyphen
+        for sep in [" – ", " — ", " - "]:
+            if sep in name:
+                parts = [p.strip() for p in name.split(sep, 1)]
+                if len(parts) == 2:
+                    main, sub = parts[0], parts[1]
+                break
+        r["name_main"] = main
+        r["name_sub"] = sub
+
+    # --- Paginate (safe) ---
+    paginator = Paginator(filtered, per_page)
+    # read page and clamp to valid bounds
+    try:
+        page = int(request.GET.get("page", "1") or "1")
+    except Exception:
+        page = 1
+    if page < 1:
+        page = 1
+    if paginator.num_pages >= 1 and page > paginator.num_pages:
+        page = paginator.num_pages
+
+    try:
+        page_obj = paginator.page(page)
+    except EmptyPage:
+        # Fallback (should be rare thanks to clamp)
+        page_obj = paginator.page(1)
+
+    # --- Build compact page number list with ellipses (None) ---
+    def build_page_numbers(curr: int, total: int, radius: int = 2):
+        if total <= 1:
+            return [1]
+        nums = []
+        left = max(1, curr - radius)
+        right = min(total, curr + radius)
+
+        if left > 1:
+            nums.append(1)
+            if left > 2:
+                nums.append(None)  # ellipsis
+
+        nums.extend(range(left, right + 1))
+
+        if right < total:
+            if right < total - 1:
+                nums.append(None)  # ellipsis
+            nums.append(total)
+        return nums
+
+    page_numbers = build_page_numbers(page_obj.number, paginator.num_pages)
+
+    # --- Recent changes (compact list) ---
+    history = recent_fee_changes(limit=11)
+
+    ctx = {
+        "q": q or "",
+        "per_page": per_page,
+        "doc_types": doc_types,
+        "fee_types": fee_types,
+        "doc_types_all": doc_types_all,
+        "fee_types_all": fee_types_all,
+        "active_count": active_count,
+
+        "is_paginated": paginator.num_pages > 1,
+        "paginator": paginator,
+        "page_obj": page_obj,
+        "page_numbers": page_numbers,
+
+        "history": history,
+    }
+    return render(request, "treasurer/fees.html", ctx)
 
 @session_login_required
 @role_required(TREASURER_ROLE)
@@ -305,6 +452,8 @@ def fee_add(request: HttpRequest):
     return redirect(f"{settings.FORCE_SCRIPT_NAME or ''}/treasurer/fees/?q={fee_code}")
 
 # ========= Edit/Upsert Fee =========
+# ... keep your existing imports and code ...
+
 @session_login_required
 @role_required(TREASURER_ROLE)
 def fee_edit(request: HttpRequest, fee_code: str):
@@ -319,6 +468,10 @@ def fee_edit(request: HttpRequest, fee_code: str):
     surcharges = data.get("surcharges") or []
     doc_types = list_document_types()
 
+    # ✅ add this list (same as in fee_add)
+    units = ["per_doc", "per_copy", "per_event", "per_month", "per_year",
+             "per_hour", "per_unit_per_day", "per_use"]
+
     if request.method != "POST":
         return render(request, "treasurer/fee_edit.html", {
             "fee_code": fee_code,
@@ -326,8 +479,10 @@ def fee_edit(request: HttpRequest, fee_code: str):
             "purposes": purposes,
             "surcharges": surcharges,
             "doc_types": doc_types,
+            "units": units,  # ✅ pass to template
         })
 
+    # ... keep the rest of your POST branch unchanged ...
     staff_id = _staff_id(request) or 0
     if staff_id <= 0:
         messages.error(request, "Staff session is required.")
@@ -593,3 +748,299 @@ def business_pay_and_print(request: HttpRequest, business_id: int, doc_request_i
         messages.warning(request, f"Payment ok, but failed to move to FOR_PRINTING: {escape(str(getattr(e,'message',e)))}")
 
     return redirect("treasurer:business_detail", business_id=business_id, doc_request_id=doc_request_id)
+
+# treasurer/views.py
+from django.core.paginator import Paginator, EmptyPage
+from django.views.decorators.http import require_GET
+
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_GET
+def business_renewal(request: HttpRequest):
+    """
+    Treasurer > Business > Renewal
+    Lists renewal_request rows with search + filters + pagination.
+    """
+    q = (request.GET.get("q") or "").strip() or None
+
+    # Filters
+    period_types = [p.strip().upper() for p in request.GET.getlist("period_type") if p.strip()]
+    year = request.GET.get("year", "").strip()
+    paid_filters = [p.strip().lower() for p in request.GET.getlist("paid") if p.strip()]  # 'paid', 'unpaid'
+    # pagination (default 10 per your business pages; change to 5 if you prefer)
+    try:
+        per_page = int(request.GET.get("per_page", "10") or "10")
+    except Exception:
+        per_page = 10
+    if per_page not in (5, 10, 25, 50):
+        per_page = 10
+
+    # ---- fetch from DB ----
+    # base query
+    query = supabase.table("renewal_request").select("*").order("created_at", desc=True)
+
+    # Loose search on request_code/or_number; if q is digits, we'll also filter by period_year/business_id
+    if q:
+        or_parts = [f"request_code.ilike.%{q}%", f"or_number.ilike.%{q}%"]
+        if q.isdigit():
+            or_parts += [f"period_year.eq.{q}", f"business_id.eq.{q}"]
+        query = query.or_(",".join(or_parts))
+
+    # Apply server-side filters when easy, else filter after fetch
+    if year.isdigit():
+        query = query.eq("period_year", int(year))
+    if period_types:
+        query = query.in_("period_type", period_types)
+
+    # Fetch a reasonable cap to paginate locally (adjust if you expect >500)
+    res = query.limit(500).execute()
+    rows = res.data or []
+
+    # Post-filter paid/unpaid (depends on paid_on)
+    if paid_filters:
+        want_paid = "paid" in paid_filters and "unpaid" not in paid_filters
+        want_unpaid = "unpaid" in paid_filters and "paid" not in paid_filters
+        if want_paid:
+            rows = [r for r in rows if r.get("paid_on")]
+        elif want_unpaid:
+            rows = [r for r in rows if not r.get("paid_on")]
+        # if both are present we keep all
+
+    # decorate rows for UI
+    STATUS_ID_MAP = {8: "FOR_TREASURER_REVIEW", 9: "PAID"}  # extend as needed
+    for r in rows:
+        # status ui
+        name = "PAID" if r.get("paid_on") else STATUS_ID_MAP.get(r.get("request_status_id"), "—")
+        ui = STATUS_UI.get(name) or {"label": name, "cls": "badge text-bg-secondary"}
+        r["status_name"] = name
+        r["status_ui"] = ui
+
+        # period label
+        ptype = (r.get("period_type") or "").upper()
+        yr = r.get("period_year")
+        qtr = r.get("period_quarter")
+        if ptype == "QUARTERLY":
+            r["period_label"] = f"Q{qtr} {yr}" if (yr and qtr) else (ptype or "—")
+        else:
+            r["period_label"] = str(yr or "—")
+
+        # amounts as float for display
+        def _to_float(v):
+            try:
+                return float(v)
+            except Exception:
+                return None
+        r["base_fee_quote_f"] = _to_float(r.get("base_fee_quote"))
+        r["surcharge_quote_f"] = _to_float(r.get("surcharge_quote"))
+        r["total_quote_f"] = _to_float(r.get("total_quote"))
+
+    # pagination
+    paginator = Paginator(rows, per_page)
+    try:
+        page_num = int(request.GET.get("page", "1") or "1")
+    except Exception:
+        page_num = 1
+    if page_num < 1:
+        page_num = 1
+    if paginator.num_pages >= 1 and page_num > paginator.num_pages:
+        page_num = paginator.num_pages
+    try:
+        page_obj = paginator.page(page_num)
+    except EmptyPage:
+        page_obj = paginator.page(1)
+
+    # compact page numbers with ellipses
+    def build_page_numbers(curr: int, total: int, radius: int = 2):
+        if total <= 1:
+            return [1]
+        nums = []
+        left = max(1, curr - radius)
+        right = min(total, curr + radius)
+
+        if left > 1:
+            nums.append(1)
+            if left > 2:
+                nums.append(None)
+
+        nums.extend(range(left, right + 1))
+
+        if right < total:
+            if right < total - 1:
+                nums.append(None)
+            nums.append(total)
+        return nums
+
+    page_numbers = build_page_numbers(page_obj.number, paginator.num_pages)
+
+    # filter option sources (from what we actually have)
+    period_type_all = sorted({(r.get("period_type") or "").upper() for r in rows if r.get("period_type")})
+    year_all = sorted({int(r.get("period_year")) for r in rows if r.get("period_year")}, reverse=True)
+
+    ctx = {
+        "q": q or "",
+        "per_page": per_page,
+
+        "period_types": period_types,
+        "paid_filters": paid_filters,
+        "year": year,
+
+        "period_type_all": period_type_all,
+        "year_all": year_all,
+
+        "rows": page_obj.object_list,
+        "page_obj": page_obj,
+        "paginator": paginator,
+        "page_numbers": page_numbers,
+        "is_paginated": paginator.num_pages > 1,
+    }
+    return render(request, "treasurer/business_renewal.html", ctx)
+
+# treasurer/views.py (add below business_renewal)
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_GET
+def business_renewal_detail(request: HttpRequest, renewal_request_id: int):
+    # Fetch single renewal
+    res = (supabase.table("renewal_request")
+           .select("*")
+           .eq("renewal_request_id", renewal_request_id)
+           .single()
+           .execute())
+    if getattr(res, "error", None) or not res.data:
+        messages.error(request, "Renewal request not found.")
+        return redirect("treasurer:business_renewal")
+
+    r = res.data
+
+    # Determine status
+    STATUS_ID_MAP = {8: "FOR_TREASURER_REVIEW", 9: "PAID"}
+    status_name = "PAID" if r.get("paid_on") else STATUS_ID_MAP.get(r.get("request_status_id"), "—")
+    status_ui = STATUS_UI.get(status_name) or {"label": status_name, "cls": "badge text-bg-secondary"}
+
+    # Period label
+    ptype = (r.get("period_type") or "").upper()
+    yr = r.get("period_year")
+    qtr = r.get("period_quarter")
+    if ptype == "QUARTERLY":
+        period_label = f"Q{qtr} {yr}" if (yr and qtr) else (ptype or "—")
+    else:
+        period_label = str(yr or "—")
+
+    # Parse floats
+    def _f(x):
+        try:
+            return float(x)
+        except Exception:
+            return None
+
+    r["base_fee_quote_f"] = _f(r.get("base_fee_quote"))
+    r["surcharge_quote_f"] = _f(r.get("surcharge_quote"))
+    r["total_quote_f"] = _f(r.get("total_quote"))
+    r["period_label"] = period_label
+
+    # Pull business snapshot
+    biz = {}
+    try:
+        biz_res = supabase.rpc("get_business_details", {"p_business_id": r["business_id"]}).execute()
+        if getattr(biz_res, "data", None):
+            biz = (biz_res.data[0] if isinstance(biz_res.data, list) else biz_res.data) or {}
+    except Exception:
+        biz = {}
+
+    return render(request, "treasurer/business_renewal_details.html", {
+        "renewal": r,
+        "status_ui": status_ui,
+        "biz": biz,
+    })
+# treasurer/views.py (add below business_renewal)
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_GET
+def business_renewal_detail(request: HttpRequest, renewal_request_id: int):
+    # Fetch single renewal
+    res = (supabase.table("renewal_request")
+           .select("*")
+           .eq("renewal_request_id", renewal_request_id)
+           .single()
+           .execute())
+    if getattr(res, "error", None) or not res.data:
+        messages.error(request, "Renewal request not found.")
+        return redirect("treasurer:business_renewal")
+
+    r = res.data
+
+    # Determine status
+    STATUS_ID_MAP = {8: "FOR_TREASURER_REVIEW", 9: "PAID"}
+    status_name = "PAID" if r.get("paid_on") else STATUS_ID_MAP.get(r.get("request_status_id"), "—")
+    status_ui = STATUS_UI.get(status_name) or {"label": status_name, "cls": "badge text-bg-secondary"}
+
+    # Period label
+    ptype = (r.get("period_type") or "").upper()
+    yr = r.get("period_year")
+    qtr = r.get("period_quarter")
+    if ptype == "QUARTERLY":
+        period_label = f"Q{qtr} {yr}" if (yr and qtr) else (ptype or "—")
+    else:
+        period_label = str(yr or "—")
+
+    # Parse floats
+    def _f(x):
+        try:
+            return float(x)
+        except Exception:
+            return None
+
+    r["base_fee_quote_f"] = _f(r.get("base_fee_quote"))
+    r["surcharge_quote_f"] = _f(r.get("surcharge_quote"))
+    r["total_quote_f"] = _f(r.get("total_quote"))
+    r["period_label"] = period_label
+
+    # Pull business snapshot
+    biz = {}
+    try:
+        biz_res = supabase.rpc("get_business_details", {"p_business_id": r["business_id"]}).execute()
+        if getattr(biz_res, "data", None):
+            biz = (biz_res.data[0] if isinstance(biz_res.data, list) else biz_res.data) or {}
+    except Exception:
+        biz = {}
+
+    return render(request, "treasurer/business_renewal_details.html", {
+        "renewal": r,
+        "status_ui": status_ui,
+        "biz": biz,
+    })
+
+from django.views.decorators.http import require_POST
+from datetime import date
+from django.utils.dateparse import parse_date
+
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_POST
+def business_renewal_recalc(request: HttpRequest, renewal_request_id: int):
+    """Recalculate surcharge/total preview for a renewal and persist it."""
+    asof_str = (request.POST.get("asof_date") or "").strip()
+    asof_date = parse_date(asof_str) or date.today()
+
+    try:
+        res = supabase.rpc("renewal_preview_recalculate", {
+            "p_renewal_request_id": int(renewal_request_id),
+            "p_asof_date": asof_date.isoformat(),
+        }).execute()
+        if getattr(res, "error", None):
+            raise RuntimeError(getattr(res.error, "message", "RPC error"))
+    except Exception as e:
+        messages.error(request, f"Recalculate failed: {escape(str(getattr(e, 'message', e)))}")
+        return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)
+
+    # Optionally surface new values in a toast
+    row = (res.data or {}) if isinstance(res.data, dict) else (res.data[0] if res.data else {})
+    try:
+        base = float(row.get("base_fee_quote", 0) or 0)
+        sur  = float(row.get("surcharge_quote", 0) or 0)
+        tot  = float(row.get("total_quote", 0) or 0)
+        messages.success(request, f"Preview updated — Base ₱{base:,.2f}, Surcharge ₱{sur:,.2f}, Total ₱{tot:,.2f}.")
+    except Exception:
+        messages.success(request, "Preview updated.")
+
+    return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)

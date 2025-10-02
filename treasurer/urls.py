@@ -3,9 +3,10 @@ from django.urls import path
 from . import views
 
 app_name = "treasurer"
-app_name = "treasurer"
 
 urlpatterns = [
+    path("dashboard/", views.dashboard, name="dashboard"),
+
     path("requests/", views.queue, name="queue"),
     path("requests/<int:doc_request_id>/", views.detail, name="detail"),
     path("requests/<int:doc_request_id>/pay/", views.take_payment, name="take_payment"),
@@ -16,6 +17,8 @@ urlpatterns = [
 
     # Business-only queue
     path("business/requests/", views.business_queue, name="business_queue"),
+    path("business/renewal/", views.business_renewal, name="business_renewal"),
+    path("business/renewal/<int:renewal_request_id>/", views.business_renewal_detail, name="business_renewal_detail"),
 
     # Business detail WITH request id
     path(
@@ -30,4 +33,11 @@ urlpatterns = [
         views.business_pay_and_print,
         name="business_pay_and_print",
     ),
+
+    path(
+        "business/renewal/<int:renewal_request_id>/recalc/",
+        views.business_renewal_recalc,
+        name="business_renewal_recalc"
+    ),
+
 ]
