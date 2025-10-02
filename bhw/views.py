@@ -71,7 +71,7 @@ from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
 from common.supabase_client import supabase
 
-ROLE_BHW = ("BARANGAY HEALTH WORKER", "Barangay Health Worker", "bhw")
+ROLE_BHW = ("BARANGAY HEALTH WORKER", "Barangay Health Worker", "bhw", "Super Admin")
 
 def _age_from_birthdate_py(bd: Any):
     try:
@@ -367,6 +367,28 @@ def add_child_visit(request: HttpRequest, record_id: int) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     messages.success(request, "Child visit saved (demo).")
     return redirect("bhw:record_detail", kind="child", record_id=record_id)
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@nocache
+def child_new(request: HttpRequest) -> HttpResponse:
+    """
+    UI for the Child Health Record intake that mirrors the DOH paper form.
+    This version focuses on frontend capture; wire to your RPC when ready.
+    """
+    if request.method == "POST":
+        # Placeholder: accept POST, show success. Replace with your service call later.
+        messages.success(request, "Child health record saved (demo UI).")
+        return redirect("midwife:child_new")
+
+    return render(
+        request,
+        "bhw/child_new.html",
+        {
+            "page_path": "Midwife / Child Records / New",
+            "page_title": "New Child Health Record",
+        },
+    )
 
 @session_login_required
 @role_required(*hv.ROLE_BHW)

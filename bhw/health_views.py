@@ -7,7 +7,7 @@ import re
 import json  # <<< added for pretty printing
 
 # Expose role tuple so views.py can reuse in decorators
-ROLE_BHW = ("BARANGAY HEALTH WORKER", "Barangay Health Worker", "bhw")
+ROLE_BHW = ("BARANGAY HEALTH WORKER", "Barangay Health Worker", "bhw", "Super Admin")
 
 # Map normalized id_type -> valid_id_type_id (extend as needed)
 IDTYPE_TO_ID = {
