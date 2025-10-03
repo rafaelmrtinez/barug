@@ -240,7 +240,7 @@ STATICFILES_DIRS = [
     # os.path.join(BASE_DIR, "event_logs/static/event_logs"),
     os.path.join(BASE_DIR, "resident/static/resident"),
     os.path.join(BASE_DIR, "bhw/static/bhw"),
-    # os.path.join(BASE_DIR, "clerk/static/clerk"),
+    os.path.join(BASE_DIR, "clerk/static/clerk"),
 ]
 
 # STATICFILES_DIRS = [

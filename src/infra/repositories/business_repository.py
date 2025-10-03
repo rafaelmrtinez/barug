@@ -80,7 +80,7 @@ class ResidentOwnerRepository(IResidentOwnerRepository):
     def __init__(self, ctx: IConnectionAdapter):
         self._ctx = ctx
 
-    def search_owner(self, search: str):
+    def search_owner(self, search: str) -> list[ResidentOwnerDTO]:
         try: 
             sql = "SELECT * FROM search_person_by_code_or_name(%s)"
             rows = self._ctx.execute_query_to_dict(sql, [search])
@@ -94,20 +94,76 @@ class ResidentOwnerRepository(IResidentOwnerRepository):
                 ResidentOwnerDTO(
                     person_id=r["person_id"],
                     person_code=r.get("person_code"),
-                    full_name=r.get("person_name"),     # note: your SQL names this 'person_name'
-                    sex_name=None,                      # not provided by the SQL; extend SQL if needed
-                    date_of_birth=None,                 # "
+                    full_name=r.get("person_name"),
                     address_line=_addr(r),
-                    residential_status_name=None,       # "
-                    mobile=None,                        # "
-                    email=None,                         # "
                     street=r.get("street"),
                     purok=r.get("purok"),
                     barangay=r.get("barangay"),
                     city=r.get("city"),
+                    # fields your SQL doesn't return yet — leave None
+                    sex_name=None,
+                    date_of_birth=None,
+                    residential_status_name=None,
+                    civil_status=None,
+                    nationality=None,
+                    religion=None,
+                    mobile=None,
+                    email=None,
                 )
-                for r in rows
+                for r in rows or []
             ]
 
         except Exception as e:
             raise QueryExecutionException(f"search_owner failed: {e}") from e
+        
+    def get_owner_details(self, person_id: int) -> list[ResidentOwnerDTO]:
+        try:
+            sql = "SELECT * FROM get_details(%s)"
+            rows = self._ctx.execute_query_to_dict(sql, [person_id]) or []
+
+            if not rows:
+                return None
+            r = rows[0]
+
+            def _addr(r: dict) -> str | None:
+                parts = [r.get("street"), r.get("purok"), r.get("barangay"), r.get("city")]
+                parts = [p for p in parts if p and str(p).strip()]
+                return ", ".join(parts) if parts else None
+            
+            def _compose_full_name(r: dict) -> str:
+                last   = (r.get("last_name") or "").strip()
+                first  = (r.get("first_name") or "").strip()
+                middle = (r.get("middle_name") or "").strip()
+                suffix = (r.get("suffix") or "").strip()
+
+                # build "LAST, FIRST"
+                main = ", ".join([x for x in (last, first) if x])
+
+                # middle initial "M." only if middle exists
+                mi = f"{middle[0]}." if middle else ""
+
+                parts = [p for p in (main, mi, suffix) if p]
+                return " ".join(parts) if parts else ""
+            
+            full_name = r.get("full_name") or _compose_full_name(r)
+
+            return ResidentOwnerDTO(
+                person_id=r["person_id"],
+                person_code=r.get("person_code"),
+                full_name=full_name,
+                sex_name=r.get("sex"),
+                date_of_birth=r.get("birthdate"),
+                residential_status_name= r.get("residential_status"),
+                civil_status=r.get("civil_status"),
+                nationality=r.get("nationality"),
+                religion=r.get("religion"),
+                mobile=r.get("mobile_num"),
+                email=r.get("email"),
+                street=r.get("street"),
+                purok=r.get("purok"),
+                barangay=r.get("barangay"),
+                city=r.get("city"),
+                address_line=_addr(r),
+            )
+        except Exception as e:
+            raise QueryExecutionException(f"get_owner_details failed: {e}") from e

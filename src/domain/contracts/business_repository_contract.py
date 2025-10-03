@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+from typing import Optional
 from src.app.transfer_objects.dto.business_dto import BusinessListDTO
 from src.app.transfer_objects.dto.business_dto import ResidentOwnerDTO
 
@@ -32,4 +33,11 @@ class IResidentOwnerRepository(ABC):
        self,
        search: str,
     ) -> list[ResidentOwnerDTO]:
+        pass
+    
+    @abstractmethod
+    def get_owner_details(
+        self,
+        person_id: int,
+    ) -> Optional[ResidentOwnerDTO]:
         pass

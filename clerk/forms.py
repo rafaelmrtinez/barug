@@ -126,6 +126,10 @@ class SearchBusinessOwner(forms.Form):
         required= True,
     )
 
+class SelectOwnerForm(forms.Form):
+    owner_person_id = forms.IntegerField(widget=forms.HiddenInput())
+    search = forms.CharField(required=False, widget=forms.HiddenInput)
+    
 class BusinessOwnerInfo(forms.Form):
     # PERSONAL INFORMATION
     last_name = forms.CharField(

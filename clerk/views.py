@@ -22,7 +22,7 @@ from authentication.supabase_client import supabase
 
 from .forms import (
     SearchVerificationRequest, SearchBusinessOwner, BusinessOwnerInfo,
-    BusinessDetails, BusinessFilters, RequestedDocsFilters
+    BusinessDetails, BusinessFilters, RequestedDocsFilters, SelectOwnerForm
 )
 
 import logging
@@ -42,6 +42,9 @@ from .services.id_verification_service import (
     get_verification_status_for_person,
 )
 
+import logging
+log = logging.getLogger(__name__)
+from dataclasses import is_dataclass, asdict as dc_asdict
 from django.views.decorators.csrf import csrf_protect
 from dependency_injector.wiring import inject, Provide
 from src.app.bootstrap.app_containers import AppContainer
@@ -969,6 +972,40 @@ def _to_int_or_none(val: str | None) -> int | None:
         return int(s)
     except ValueError:
         return None
+    
+def _normalize_owner_rows(rows):
+    """
+    Normalize DTOs/objects into dicts the template & AJAX both expect.
+    """
+    payload = []
+    for r in rows or []:
+        if isinstance(r, dict):
+            d = r
+        elif is_dataclass(r):
+            d = dc_asdict(r)
+        elif hasattr(r, "_asdict"):
+            try:
+                d = r._asdict()
+            except Exception:
+                d = getattr(r, "__dict__", {}) or {}
+        else:
+            d = getattr(r, "__dict__", {}) or {}
+
+        payload.append({
+            "person_id": d.get("person_id"),
+            "person_code": d.get("person_code") or "",
+            "person_name": d.get("full_name") or d.get("person_name") or "",
+            "street": d.get("street") or "",
+            "purok": d.get("purok") or "",
+            "barangay": d.get("barangay") or "",
+            "city": d.get("city") or "",
+            # optional extras if your SQL provides them
+            "sex_name": d.get("sex_name") or "",
+            "date_of_birth": d.get("date_of_birth") or "",
+            "residential_status_name": d.get("residential_status_name") or "",
+            "address_line": d.get("address_line") or "",
+        })
+    return payload
 
 @session_login_required
 @role_required(CLERK_ROLE)
@@ -979,20 +1016,38 @@ def business_owner_resident(
     request: HttpRequest,
     resident_owner_service: IResidentOwnerService = Provide[AppContainer.resident_owner_service],
 ) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+    """
+    Page render:
+      - preserves server-side render if `?search=` is present
+      - front-end enhances with AJAX type-ahead
+    """
     user_role = _auth_role_name(request)
     form = SearchBusinessOwner(request.GET or None)
+    select_form = SelectOwnerForm(request.POST or None)
 
-    search = (request.GET.get("search") or "").strip()
+    search = (request.GET.get("search") or request.POST.get("search") or "").strip()
 
-    rows = []
+    rows: List[Dict[str, Any]] = []
     if search:
         try:
-            rows = resident_owner_service.execute(search=search) or []  
+            rows = resident_owner_service.execute(search=search) or []
         except Exception:
+            log.exception("Owner search failed for %r", search)  # <-- keep a trace
             rows = []
 
+    results_payload = _normalize_owner_rows(rows)
 
-    if (search) and not form.is_valid():
+    selected: dict | None = None
+    if request.method == "POST" and select_form.is_valid():
+        try:
+            owner_id = int(select_form.cleaned_data["owner_person_id"])
+            selected = resident_owner_service.get_owner_details(owner_id)
+        except Exception:
+            log.exception("Fetching owner details failed for id=%s", request.POST.get("owner_person_id"))
+            selected = None
+
+    # keep form pristine if invalid
+    if search and not form.is_valid():
         form = SearchBusinessOwner()
 
     return render(
@@ -1002,68 +1057,34 @@ def business_owner_resident(
             "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
             "page_title": "Business Owner Information",
             "form": form,
-            "search": search,
-            "q": search, 
-            "results": rows,
+            "select_form": select_form,
+            "search": search,           # single source of truth (no 'q')
+            "results": results_payload, # server-rendered initial list (optional)
+            "selected": selected,
         },
     )
 
 @require_GET
 @inject
 def ajax_owner_search(
-    request,
+    request: HttpRequest,
     resident_owner_service: IResidentOwnerService = Provide[AppContainer.resident_owner_service],
 ):
-    q = (request.GET.get("q") or request.GET.get("search") or "").strip()
-    if not q:
+    """
+    AJAX endpoint for live search.
+    Expects: ?search=<term>
+    Returns: {"results": [ ...normalized rows... ]}
+    """
+    search = (request.GET.get("search") or "").strip()
+    if not search:
         return JsonResponse({"results": []})
 
-    # Call service and coerce None → []
     try:
-        rows = resident_owner_service.execute(search=q) or []
+        rows = resident_owner_service.execute(search=search) or []
     except Exception:
         rows = []
 
-    # Helper to normalize DTOs/namedtuples/objects/dicts into a dict
-    def _row_to_dict(r):
-        # dict already
-        if isinstance(r, dict):
-            return r
-        # dataclass
-        try:
-            from dataclasses import is_dataclass, asdict
-            if is_dataclass(r):
-                return asdict(r)
-        except Exception:
-            pass
-        # namedtuple
-        if hasattr(r, "_asdict"):
-            try:
-                return r._asdict()
-            except Exception:
-                pass
-        # generic object
-        return getattr(r, "__dict__", {}) or {}
-
-    # Normalize to the fields your template expects in the card list
-    payload = []
-    for r in rows:
-        # r may be ResidentOwnerDTO or dict, so use getattr/keys safely
-        asdict = r if isinstance(r, dict) else r.__dict__
-        payload.append({
-            "person_id": asdict.get("person_id"),
-            "person_code": asdict.get("person_code") or "",
-            "person_name": asdict.get("full_name") or asdict.get("person_name") or "",
-            "street": (asdict.get("street") or "") if "street" in asdict else "",
-            "purok": asdict.get("purok") or "",
-            "barangay": asdict.get("barangay") or "",
-            "city": asdict.get("city") or "",
-            # Optional richer fields if your SQL added them:
-            "sex_name": asdict.get("sex_name") or "",
-            "date_of_birth": asdict.get("date_of_birth") or "",
-            "residential_status_name": asdict.get("residential_status_name") or "",
-            "address_line": asdict.get("address_line") or "",
-        })
+    payload = _normalize_owner_rows(rows)
     return JsonResponse({"results": payload})
 
 @session_login_required

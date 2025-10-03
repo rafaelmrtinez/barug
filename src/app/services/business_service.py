@@ -48,4 +48,9 @@ class ResidentOwnerService(IResidentOwnerService):
         if not search or not str(search).strip():
             return []
         return self._residentowner_repo.search_owner(search=search.strip())
+    
+    def get_owner_details(self, person_id: int)-> Optional[ResidentOwnerDTO]:
+        if not person_id:
+            return None
+        return self._residentowner_repo.get_owner_details(int(person_id))
 

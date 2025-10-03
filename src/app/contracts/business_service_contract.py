@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 from typing import Any, Dict, List, Optional, Tuple
+from src.app.transfer_objects.dto.business_dto import ResidentOwnerDTO  
 
 # from supabase_auth import Optional
 
@@ -23,13 +24,20 @@ class IBusinessService(ABC):
 class IResidentOwnerService(ABC):
     @abstractmethod
     def execute(
-        self,
-        search: Optional[str],
-    ) -> Tuple[List[Dict[str, Any]], Dict[str, List[tuple[str, str]]], Optional[str]]:
+      self,
+      search: Optional[str] = None,
+    ) -> list[ResidentOwnerDTO]:
         """
         Returns:
           rows:    filtered resident rows (to pick as business owners)
-          choices: {'sex': [...], 'status': [...]}
           error:   error string if something failed, else None
         """
         pass
+    
+    @abstractmethod
+    def get_owner_details(
+      self,
+      person_id: Optional[int],
+    ) -> Optional[ResidentOwnerDTO]:
+      """Fetch full details of a single owner."""
+      pass
