@@ -5,8 +5,22 @@ from src.app.contracts.scheduling_service_contract import ISchedulingService
 from src.app.services.household_info_service import HouseholdInformationService
 from src.app.services.scheduling_service import SchedulingService
 
+from src.app.contracts.business_service_contract import (
+    IBusinessService,
+    IResidentOwnerService
+)
+from src.app.services.business_service import (
+    BusinessService,
+    ResidentOwnerService
+)
+
+
 class AppContainer(containers.DeclarativeContainer):
     """Application container for dependency injection."""
+
+    # wiring_config = containers.WiringConfiguration(
+    #     modules=["clerk.views.business"]   # 👈 THIS matches your file path
+    # )
     
     config = providers.Configuration()
     
@@ -20,4 +34,14 @@ class AppContainer(containers.DeclarativeContainer):
     scheduling_service: providers.Factory[ISchedulingService] = providers.Factory(
         SchedulingService,
         scheduling_repository=infra.active_schedules
+    )
+
+    business_service: providers.Factory[IBusinessService] = providers.Factory(
+        BusinessService,
+        business_repository=infra.business
+    )
+
+    resident_owner_service: providers.Factory[IResidentOwnerService] = providers.Factory(
+        ResidentOwnerService,
+        resident_owner_repository=infra.resident_owner
     )

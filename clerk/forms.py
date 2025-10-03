@@ -1,6 +1,41 @@
 from django import forms
 from decimal import Decimal
 
+BUSINESS_TYPE_CHOICES = [
+    ("", "— All types —"),
+    (1, "AGRICULTURE / AGRIBUSINESS"),
+    (2, "EDUCATION & TRAINING"),
+    (3, "FINANCIAL SERVICES"),
+    (4, "FOOD & BEVERAGE"),
+    (5, "HEALTH & WELLNESS"),
+    (6, "MANUFACTURING / PRODUCTION"),
+    (7, "REAL ESTATE & LEASING"),
+    (8, "SERVICES"),
+    (9, "TOURISM, TRAVEL & ENTERTAINMENT"),
+    (10, "TRADING / RETAIL"),
+    (11, "OTHERS"),
+]
+
+OWNERSHIP_TYPE_CHOICES = [
+    ("", "— All ownerships —"),
+    (1, "SOLE PROPRIETORSHIP"),
+    (2, "PARTNERSHIP"),
+    (3, "CORPORATION"),
+    (4, "COOPERATIVE"),
+    (5, "ONE PERSON CORPORATION"),
+    (6, "OTHERS"),
+]
+
+BUSINESS_STATUS_CHOICES = [
+    ("", "— All statuses —"),
+    (1, "ACTIVE"),
+    (2, "INACTIVE"),
+    (3, "SUSPENDED"),
+    (4, "REVOKED"),
+    (5, "CLOSED"),
+    (6, "EXPIRED"),
+]
+
 class RequestedDocsFilters(forms.Form):
     search = forms.CharField(
         widget=forms.TextInput(attrs={
@@ -52,7 +87,7 @@ class BusinessFilters(forms.Form):
         required= False,
     )
     b_type = forms.ChoiceField(
-        choices= [],
+        choices= BUSINESS_TYPE_CHOICES,
         widget=forms.Select(attrs={
             'id' : 'b_type',
             'class' : 'form-select',
@@ -61,7 +96,7 @@ class BusinessFilters(forms.Form):
         required= False,
     )
     ownership_type = forms.ChoiceField(
-        choices= [],
+        choices= OWNERSHIP_TYPE_CHOICES,
         widget=forms.Select(attrs={
             'id' : 'ownership_type',
             'class' : 'form-select',
@@ -70,7 +105,7 @@ class BusinessFilters(forms.Form):
         required= False,
     )
     status = forms.ChoiceField(
-        choices= [],
+        choices= BUSINESS_STATUS_CHOICES,
         widget=forms.Select(attrs={
             'id' : 'status',
             'class' : 'form-select',
@@ -85,6 +120,7 @@ class SearchBusinessOwner(forms.Form):
             'id' : 'search',
             'class' : 'form-control', 
             'placeholder' : 'Search',
+            "autocomplete": "off",
     }),
         label= 'Search by Resident ID or Full Name',
         required= True,

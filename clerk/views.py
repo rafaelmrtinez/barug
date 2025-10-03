@@ -6,7 +6,7 @@ from datetime import datetime
 
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.http import Http404, HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect, HttpResponsePermanentRedirect, HttpResponseBadRequest
 from django.shortcuts import redirect, render
 from django.utils.html import escape
 from django.utils import timezone
@@ -14,13 +14,15 @@ from django.conf import settings
 from django.views.decorators.http import require_POST
 
 from postgrest.exceptions import APIError
+from django.views.decorators.http import require_GET
 
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
 from authentication.supabase_client import supabase
 
-from ..forms import (
-    SearchVerificationRequest
+from .forms import (
+    SearchVerificationRequest, SearchBusinessOwner, BusinessOwnerInfo,
+    BusinessDetails, BusinessFilters, RequestedDocsFilters
 )
 
 import logging
@@ -29,16 +31,27 @@ import logging
 from common.send_email import send_email
 
 # ---- services ----
-from ..services.requests_service import _fetch_bundle, _set_status
-from ..services.subject_service import subject_view
-from ..services.pdf_service import (
+from .services.requests_service import _fetch_bundle, _set_status
+from .services.subject_service import subject_view
+from .services.pdf_service import (
     _pdf_templates_dir, _get_all_pdf_field_names, _fill_pdf_with_values,
     _choose_template, _safe_str, _fill_fields_for_line
 )
-from ..services.id_verification_service import (
+from .services.id_verification_service import (
     fetch_id_verification_requests,
     get_verification_status_for_person,
 )
+
+from django.views.decorators.csrf import csrf_protect
+from dependency_injector.wiring import inject, Provide
+from src.app.bootstrap.app_containers import AppContainer
+from src.app.contracts.business_service_contract import (
+    IBusinessService,
+    IResidentOwnerService
+)
+
+def _auth_role_name(request: HttpRequest) -> str:
+    return (((request.session.get("auth") or {}).get("role_name")) or "Staff").title()
 
 # =========================
 # Logger + tiny debug helpers
@@ -931,128 +944,252 @@ def walkin_create(request: HttpRequest):
 # =========================
 # Business screens (stubs; clerk-only)
 # =========================
-# def _profile_fallbacks(request: HttpRequest):
-#     user_role = (request.session.get("auth") or {}).get("role_name")
-#     user_role_template = user_role.lower().replace(" ", "_")
-#     return user_role.title(), user_role_template
 
-# @session_login_required
-# @role_required(CLERK_ROLE)
-# @nocache
-# def business_owner(request: HttpRequest):
-#     user_fullname, user_role_template = _profile_fallbacks(request)
-#     return render(
-#         request,
-#         "business/business_owner.html",
-#         {
-#             "user_fullname": user_fullname,
-#             "user_role": user_fullname,
-#             "page_path": f"{user_fullname} / Business Records / Add Business / Business Owner",
-#             "page_title": "Business Owner",
-#             "user_role_template": user_role_template,
-#         },
-#     )
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+def business_owner(request: HttpRequest):
+    user_role = _auth_role_name(request)
+    return render(
+        request,
+        "business/business_owner.html",
+        {
+            "page_path": f"{user_role} / Business Records / Add Business / Business Owner",
+            "page_title": "Business Owner",
+        },
+    )
 
-# @session_login_required
-# @role_required(CLERK_ROLE)
-# @nocache
-# def business_owner_resident(request: HttpRequest):
-#     user_fullname, user_role_template = _profile_fallbacks(request)
-#     form = SearchBusinessOwner()
-#     return render(
-#         request,
-#         "business/business_owner_resident.html",
-#         {
-#             "user_fullname": user_fullname,
-#             "user_role": user_fullname,
-#             "page_path": f"{user_fullname} / Business Records / Add Business / Business Owner Information",
-#             "page_title": "Business Owner Information",
-#             "user_role_template": user_role_template,
-#             "form": form,
-#         },
-#     )
+def _to_int_or_none(val: str | None) -> int | None:
+    if val is None:
+        return None
+    s = str(val).strip()
+    if not s:
+        return None
+    try:
+        return int(s)
+    except ValueError:
+        return None
 
-# @session_login_required
-# @role_required(CLERK_ROLE)
-# @nocache
-# def business_details(request: HttpRequest):
-#     user_fullname, user_role_template = _profile_fallbacks(request)
-#     form = BusinessDetails()
-#     return render(
-#         request,
-#         "business/business_details.html",
-#         {
-#             "user_fullname": user_fullname,
-#             "user_role": user_fullname,
-#             "page_path": f"{user_fullname} / Business Records / Add Business / Business Information",
-#             "page_title": "Business Information",
-#             "user_role_template": user_role_template,
-#             "form": form,
-#         },
-#     )
+@session_login_required
+@role_required(CLERK_ROLE)
+@csrf_protect
+@nocache
+@inject
+def business_owner_resident(
+    request: HttpRequest,
+    resident_owner_service: IResidentOwnerService = Provide[AppContainer.resident_owner_service],
+) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+    user_role = _auth_role_name(request)
+    form = SearchBusinessOwner(request.GET or None)
 
-# @session_login_required
-# @role_required("Barangay Clerk")
-# @nocache
-# def business_list(request: HttpRequest):
-#     user_role, user_role_template = _profile_fallbacks(request)
-#     form = BusinessFilters()
-#     rows, rpc_error = [], None
-#     try:
-#         resp = supabase.rpc("get_business_summary", {}).execute()
-#         rows = resp.data or []
-#     except Exception as e:
-#         rpc_error = str(e)
-#         rows = []
+    search = (request.GET.get("search") or "").strip()
 
-#     paginator = Paginator(rows, 15)
-#     page_obj = paginator.get_page(request.GET.get("page"))
+    rows = []
+    if search:
+        try:
+            rows = resident_owner_service.execute(search=search) or []  
+        except Exception:
+            rows = []
 
-#     context = {
-#         "page_path": f"{user_role} / Business Records",
-#         "page_title": "Business Records",
-#         "user_role_template": user_role_template,
-#         "form": form,
-#         "rows": rows,
-#         "rpc_error": rpc_error,
-#         "page_obj": page_obj,
-#     }
 
-#     return render(request, "business/business_list.html", context)
+    if (search) and not form.is_valid():
+        form = SearchBusinessOwner()
 
-# @session_login_required
-# @role_required(CLERK_ROLE)
-# @nocache
-# def business_information(request: HttpRequest, b_id: int):
-#     user_fullname, user_role_template = _profile_fallbacks(request)
-#     return render(
-#         request,
-#         "business/business_information.html",
-#         {
-#             "user_fullname": user_fullname,
-#             "user_role": user_fullname,
-#             "page_path": f"{user_fullname} / Business Records / Business Details : {b_id}",
-#             "page_title": f"Business Details : {b_id}",
-#             "user_role_template": user_role_template,
-#         },
-#     )
+    return render(
+        request,
+        "business/business_owner_resident.html",
+        {
+            "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
+            "page_title": "Business Owner Information",
+            "form": form,
+            "search": search,
+            "q": search, 
+            "results": rows,
+        },
+    )
+
+@require_GET
+@inject
+def ajax_owner_search(
+    request,
+    resident_owner_service: IResidentOwnerService = Provide[AppContainer.resident_owner_service],
+):
+    q = (request.GET.get("q") or request.GET.get("search") or "").strip()
+    if not q:
+        return JsonResponse({"results": []})
+
+    # Call service and coerce None → []
+    try:
+        rows = resident_owner_service.execute(search=q) or []
+    except Exception:
+        rows = []
+
+    # Helper to normalize DTOs/namedtuples/objects/dicts into a dict
+    def _row_to_dict(r):
+        # dict already
+        if isinstance(r, dict):
+            return r
+        # dataclass
+        try:
+            from dataclasses import is_dataclass, asdict
+            if is_dataclass(r):
+                return asdict(r)
+        except Exception:
+            pass
+        # namedtuple
+        if hasattr(r, "_asdict"):
+            try:
+                return r._asdict()
+            except Exception:
+                pass
+        # generic object
+        return getattr(r, "__dict__", {}) or {}
+
+    # Normalize to the fields your template expects in the card list
+    payload = []
+    for r in rows:
+        # r may be ResidentOwnerDTO or dict, so use getattr/keys safely
+        asdict = r if isinstance(r, dict) else r.__dict__
+        payload.append({
+            "person_id": asdict.get("person_id"),
+            "person_code": asdict.get("person_code") or "",
+            "person_name": asdict.get("full_name") or asdict.get("person_name") or "",
+            "street": (asdict.get("street") or "") if "street" in asdict else "",
+            "purok": asdict.get("purok") or "",
+            "barangay": asdict.get("barangay") or "",
+            "city": asdict.get("city") or "",
+            # Optional richer fields if your SQL added them:
+            "sex_name": asdict.get("sex_name") or "",
+            "date_of_birth": asdict.get("date_of_birth") or "",
+            "residential_status_name": asdict.get("residential_status_name") or "",
+            "address_line": asdict.get("address_line") or "",
+        })
+    return JsonResponse({"results": payload})
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+def business_details(request: HttpRequest):
+    user_role = _auth_role_name(request)
+    form = BusinessDetails()
+    return render(
+        request,
+        "business/business_details.html",
+        {
+            "page_path": f"{user_role} / Business Records / Add Business / Business Information",
+            "page_title": "Business Information",
+            "form": form,
+        },
+    )
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@csrf_protect
+@nocache
+@inject
+def business_list(
+    request: HttpRequest,
+    business_service: IBusinessService = Provide[AppContainer.business_service],
+) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+    
+    user_role = _auth_role_name(request)
+    form = BusinessFilters(request.GET or None)
+
+    search = request.GET.get("search")
+    b_type = _to_int_or_none(request.GET.get("b_type"))
+    ownership_type = _to_int_or_none(request.GET.get("ownership_type"))
+    status = _to_int_or_none(request.GET.get("status"))
+
+    rows = business_service.execute(
+        search= search,
+        b_type= b_type,
+        ownership_type= ownership_type,
+        status= status,
+    )
+
+    paginator = Paginator(rows, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    if (search or b_type is not None or ownership_type is not None or status is not None) and not form.is_valid():
+        form = BusinessFilters()
+
+    return render(request, "business/business_list.html", {
+        'page_path': f'{user_role} / Business Records',
+        'page_title': 'Business Records',
+        'form' : form,
+        'page_obj' : page_obj,
+        'filters' : {
+            'search' : search,
+            'b_type' : b_type,
+            'ownership_type' :ownership_type,
+            'status' : status,
+        }
+    })
+
+@inject
+def ajax_business_search(
+    request: HttpRequest,
+    business_service: IBusinessService = Provide[AppContainer.business_service],
+) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseBadRequest("GET only")
+
+    # only allow XHR (optional, but nice)
+    if request.headers.get("x-requested-with") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR required")
+
+    q = request.GET.get("q", "") or None
+    b_type = request.GET.get("b_type")
+    ownership_type = request.GET.get("ownership_type")
+    status = request.GET.get("status")
+
+    def to_int_or_none(v):
+        try:
+            return int(v) if v not in (None, "",) else None
+        except ValueError:
+            return None
+
+    rows = business_service.execute(
+        search=q,
+        b_type=to_int_or_none(b_type),
+        ownership_type=to_int_or_none(ownership_type),
+        status=to_int_or_none(status),
+    )
+
+    # If you want to cap results for live list:
+    rows = rows[:50]
+
+    html = render_to_string("business/_business_list.html", {"rows": rows}, request=request)
+    return HttpResponse(html)
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+def business_information(request: HttpRequest, b_id: int):
+    user_role = _auth_role_name(request)
+    return render(
+        request,
+        "business/business_information.html",
+        {
+            "page_path": f"{user_role} / Business Records / Business Details : {b_id}",
+            "page_title": f"Business Details : {b_id}",
+        },
+    )
 
 # Hannah's Code:
-# def business_owner_nonresident(request: HttpRequest):
-#     user_fullname, user_role_template = _profile_fallbacks(request)
-#     form = BusinessOwnerInfo()
-#     return render(
-#         request,
-#         "business/business_owner_nonres.html",
-#         {
-#             "user_fullname": user_fullname,
-#             "user_role": user_fullname,
-#             "page_path": f"{user_fullname} / Business Records / Add Business / Business Owner Information",
-#             "page_title": "Business Owner Information",
-#             "user_role_template": user_role_template,
-#             "form": form,
-#         },
-#     )
+def business_owner_nonresident(request: HttpRequest):
+    user_role = _auth_role_name(request)
+    form = BusinessOwnerInfo()
+    return render(
+        request,
+        "business/business_owner_nonres.html",
+        {
+            "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
+            "page_title": "Business Owner Information",
+            "form": form,
+        },
+    )
 
 def _rpc_approve_person_by_clerk(request: HttpRequest, person_id: int, status_id: int, remarks: str | None):
     auth = request.session.get("auth") or {}

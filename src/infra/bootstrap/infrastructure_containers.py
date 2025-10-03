@@ -4,6 +4,15 @@ from src.domain.contracts.scheduling_repository_contract import ISchedulingRepos
 from src.infra.repositories.household_info_repository import HouseholdInfoRepository
 from src.infra.repositories.scheduling_repository import ActiveScheduleRepository
 
+from src.domain.contracts.business_repository_contract import (
+    IBusinessRepository,
+    IResidentOwnerRepository
+)
+from src.infra.repositories.business_repository import (
+    BusinessRepository,
+    ResidentOwnerRepository
+)
+
 
 class InfraContainer(containers.DeclarativeContainer):
 
@@ -19,4 +28,13 @@ class InfraContainer(containers.DeclarativeContainer):
         ActiveScheduleRepository,
         ctx=context
     )
-    
+
+    business: providers.Factory[IBusinessRepository] = providers.Factory(
+        BusinessRepository,
+        ctx=context
+    )
+
+    resident_owner: providers.Factory[IResidentOwnerRepository] = providers.Factory(
+        ResidentOwnerRepository,
+        ctx=context
+    )
