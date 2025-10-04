@@ -1,10 +1,11 @@
 from src.app.transfer_objects.request.create_child_record_request import CreateChildRecordRequest
+from src.domain.contracts.maternal_repository import IMaternalRepository
 from src.infra.contracts.connection_adapter import IConnectionAdapter
 from src.infra.exceptions.maternal_exceptions import MaternalException
 from src.infra.exceptions.query_exec_exception import QueryExecutionException
 
 
-class MaternalRepository:
+class MaternalRepository(IMaternalRepository):
 
     def __init__(self, ctx: IConnectionAdapter) -> None:
         self._ctx = ctx

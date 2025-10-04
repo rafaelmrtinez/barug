@@ -1,7 +1,8 @@
+from src.domain.contracts.family_repository import IFamilyRepository
 from src.infra.contracts.connection_adapter import IConnectionAdapter
 
 
-class FamilyRepository:
+class FamilyRepository(IFamilyRepository):
     
     def __init__(self, ctx: IConnectionAdapter):
         self.ctx = ctx
