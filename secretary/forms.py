@@ -1,5 +1,70 @@
 from django import forms
 
+class Schedule(forms.Form):
+    day = forms.ChoiceField(
+        choices = [],
+        widget=forms.Select(attrs={
+            'id' : 'day',
+            'class' : 'form-select',
+    }),
+        label= 'Select a Day',
+        required= True,
+    )
+    time_start = forms.TimeField(
+        widget=forms.TimeInput(attrs={
+            "id": "time_start",
+            "class": "form-control",
+            "type": "time",
+            "step": "300",
+        }),
+        input_formats=["%H:%M", "%H:%M:%S"],
+        label="Time-in",
+        required=True,
+    )
+    time_end = forms.TimeField(
+        widget=forms.TimeInput(attrs={
+            "id": "time_end",
+            "class": "form-control",
+            "type": "time",
+            "step": "300",
+        }),
+        input_formats=["%H:%M", "%H:%M:%S"],
+        label="Time-out",
+        required=True,
+    )
+
+class StaffFilters(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search Staff',
+            'name': 'q'
+        }),
+        label='Search Staff',
+        required= False,
+    )
+    role = forms.ChoiceField(
+        choices=[],
+        widget=forms.Select(attrs={
+            'id': 'role_filter',
+            'class': 'form-select',
+            'name': 'role',
+        }),
+        label='Filter by Role',
+        required=False,
+    )
+    residential_stat = forms.ChoiceField(
+        choices=[],
+        widget=forms.Select(attrs={
+            'id': 'residential_stat',
+            'class': 'form-select',
+            'name': 'role',
+        }),
+        label='Residential Status',
+        required=False,
+    )
+
 class SearchPerson(forms.Form):
     search = forms.CharField(
         widget=forms.TextInput(attrs={
@@ -11,6 +76,27 @@ class SearchPerson(forms.Form):
         label= 'Search by Resident ID or Full Name',
         required= True,
     )
+
+class ChooseRole(forms.Form):
+    role = forms.ChoiceField(
+        choices = [],
+        widget=forms.Select(attrs={
+            'id' : 'role',
+            'class' : 'form-select',
+    }),
+        label= 'Select a Role',
+        required= True,
+    )
+    purok_sitio = forms.ChoiceField(
+        choices=[],
+        widget=forms.Select(attrs={
+            "id": "purok_sitio",
+            "class": "form-select",
+        }),
+        label="Assign to Purok/Sitio",
+        required=False,
+    )
+
 
 class ResidentProfileform(forms.Form):
     res_code = forms.CharField(

@@ -9,6 +9,9 @@ from django.views.decorators.http import require_GET, require_http_methods
 
 from secretary.models import Secretary
 from .forms import ResidentProfileform
+from .forms import ChooseRole
+from .forms import StaffFilters
+from .forms import Schedule
 
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
@@ -117,6 +120,8 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
     except Exception as e:
         messages.error(request, f"Error loading resident: {e}")
 
+    role_form = ChooseRole()
+    sched_form = Schedule()
     return render(request, "staff/staff_selection_resident.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
@@ -126,6 +131,8 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
         'residents': residents,
         'res_details': res_details,
         'staff_id': staff_id,
+        'role_form': role_form,
+        'sched_form': sched_form,
     })
 
 
@@ -159,4 +166,44 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
         'page_title': 'Account Verification',
         'user_role_template': user_role_template,
         'form': form,
+    })
+
+def staff_selection_nonres_role_review(request):
+    role_form = ChooseRole()
+    sched_form = Schedule()
+    return render(request, "staff/role.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Account Verification',
+        'page_title': 'Account Verification',
+        'user_role_template': user_role_template,
+        'role_form': role_form,
+        'sched_form': sched_form,
+    })
+
+def staff_list(request):
+    form = StaffFilters()
+
+    list = []
+    paginator = Paginator(list, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, "staff/staff_list.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Account Verification',
+        'page_title': 'Account Verification',
+        'user_role_template': user_role_template,
+        'form' : form,
+        'page_obj': page_obj,
+    })
+
+def staff_dets(request, staff_id):
+    return render(request, "person/staff_dets.html", {
+        'user_fullname' : user_fullname,
+        'user_role' : user_role,
+        'page_path' : f'{user_role} / Staff Details : {staff_id}',
+        'page_title' : f'Staff Details : {staff_id}',
+        'user_role_template' : user_role_template,
     })
