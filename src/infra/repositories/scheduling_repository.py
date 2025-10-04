@@ -1,5 +1,5 @@
 from django.db import InternalError
-from src.app.transfer_objects.commands.reschedule_cmd import RescheduleCommand
+from src.app.transfer_objects.request.reschedule_cmd import RescheduleRequest
 from src.app.transfer_objects.dto.active_schedule_dto import ActiveScheduleDTO
 from src.domain.contracts.scheduling_repository_contract import ISchedulingRepository
 from src.infra.contracts.connection_adapter import IConnectionAdapter
@@ -20,7 +20,7 @@ class ActiveScheduleRepository(ISchedulingRepository):
             raise ReschedulingException("Selected week range does not exist.")
         return result[0]["week_id"]
         
-    def insert_new_schedule(self, cmd: RescheduleCommand) -> list[dict] | None:
+    def insert_new_schedule(self, cmd: RescheduleRequest) -> list[dict] | None:
         try:
             raw = """SELECT * FROM reschedule_bhw_schedule(%s, %s, %s, %s);"""
             params = [

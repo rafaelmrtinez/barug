@@ -6,6 +6,15 @@ BMI_CHOICES = (
     (3, "High"),
 )
 
+class ChildHealtheRecordForm(forms.Form):
+    """VALIDATION TO BE IMPLEMENTED IN BHW add_child VIEW"""
+    child_id = forms.CharField(label="Child ID", max_length=20)
+    mother_id = forms.IntegerField(label="Mother ID")
+    father_id = forms.IntegerField(label="Father ID", required=False)
+    birth_order = forms.CharField(label="Birth Order", max_length=50)
+    delivery_place_type_id = forms.IntegerField(label="Delivery Place Type ID")
+    family_id = forms.CharField(label="Family ID", max_length=20)
+
 class MaternalBhwIntakeForm(forms.Form):
     # Required
     person_id   = forms.IntegerField(widget=forms.HiddenInput())

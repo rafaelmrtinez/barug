@@ -1,22 +1,22 @@
 # bhw/views.py
 from __future__ import annotations
 # Raf
+import json
 from urllib import request
 from django.db import connection
 from django.shortcuts import redirect, render
 from django.core.paginator import Paginator
 from dependency_injector.wiring import inject, Provide
-from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.csrf import csrf_protect, csrf_exempt
+from django.views.decorators.http import require_http_methods
 from authentication.guards import role_required, session_login_required
 from src.app.bootstrap.app_containers import AppContainer
 from src.app.contracts.household_info_service_contract import IHouseholdInfoService
 from src.app.contracts.scheduling_service_contract import ISchedulingService
-from src.app.services.household_info_service import HouseholdInformationService
-from src.app.transfer_objects.commands.reschedule_cmd import RescheduleCommand
-from src.infra.database.connection_adapter import ConnectionAdapter
+from src.app.transfer_objects.request.create_child_record_request import CreateChildRecordRequest
+from src.infra.exceptions.maternal_exceptions import MaternalException
 from src.infra.exceptions.rescheduling_exception import ReschedulingException
 
-from src.infra.repositories.household_info_repository import HouseholdInfoRepository
 from .forms import SearchActiveScheduleFilter
 from .forms import StatusActiveScheduleFilter
 from .forms import WeekRangeActiveScheduleFilter
@@ -71,7 +71,7 @@ from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
 from common.supabase_client import supabase
 
-ROLE_BHW = ("BARANGAY HEALTH WORKER", "Barangay Health Worker", "bhw")
+ROLE_BHW = ("BARANGAY HEALTH WORKER", "Barangay Health Worker", "bhw", "Super Admin")
 
 def _age_from_birthdate_py(bd: Any):
     try:
@@ -367,6 +367,67 @@ def add_child_visit(request: HttpRequest, record_id: int) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     messages.success(request, "Child visit saved (demo).")
     return redirect("bhw:record_detail", kind="child", record_id=record_id)
+
+@csrf_protect
+@session_login_required
+@role_required(*ROLE_BHW)
+@nocache
+def child_new(request: HttpRequest) -> HttpResponse:
+    """
+    UI for the Child Health Record intake that mirrors the DOH paper form.
+    This version focuses on frontend capture; wire to your RPC when ready.
+    """
+    return render(
+        request,
+        "bhw/child_new.html",
+        {
+            "page_path": "Midwife / Child Records / New",
+            "page_title": "New Child Health Record",
+        },
+    )
+    
+@csrf_exempt
+@require_http_methods(["POST"])
+@inject
+def add_child(request: HttpRequest, service = Provide[AppContainer.maternal_service]) -> HttpResponse:
+    try:
+        if request.content_type == "application/json":
+            try:
+                data = json.loads(request.body.decode("utf-8") or "{}")
+            except json.JSONDecodeError:
+                return JsonResponse({"response": "Invalid JSON body."}, status=400)
+        else:
+            return JsonResponse({"response": "Unsupported content type."}, status=415)
+        
+        if not data.get("family_no"):
+            return JsonResponse({"response": "Family Number is required."}, status=400)
+        if not data.get("child_id"):
+            return JsonResponse({"response": "Child full name is required."}, status=400)
+        if not data.get("mother_id"):
+            return JsonResponse({"response": "Mother full name is required."}, status=400)
+        if not data.get("birth_order"):
+            return JsonResponse({"response": "Birth order is required."}, status=400)
+        if not data.get("place_delivery"):
+            return JsonResponse({"response": "Place of delivery is required."}, status=400)
+            
+        child_data = CreateChildRecordRequest(
+            request.session.get("auth", {}).get("staff_id"),
+            data.get("child_id"),
+            data.get("mother_id"),
+            data.get("father_id"),
+            data.get("birth_order"),
+            data.get("place_delivery"),
+            data.get("family_no")
+        )
+        id = service.insert_child_record(child_data)
+        
+        if not id:
+            return JsonResponse({"response": "Something went wrong."}, status=500)
+        
+        return JsonResponse({"response": True}, status=200)
+
+    except MaternalException as e:
+        return JsonResponse({"response": str(e.message)}, status=500)
 
 @session_login_required
 @role_required(*hv.ROLE_BHW)

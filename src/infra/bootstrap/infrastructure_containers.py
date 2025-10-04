@@ -1,7 +1,9 @@
 from dependency_injector import containers, providers
 
 from src.domain.contracts.scheduling_repository_contract import ISchedulingRepository
+from src.infra.repositories.family_repository import FamilyRepository
 from src.infra.repositories.household_info_repository import HouseholdInfoRepository
+from src.infra.repositories.maternal_repository import MaternalRepository
 from src.infra.repositories.scheduling_repository import ActiveScheduleRepository
 
 
@@ -9,6 +11,16 @@ class InfraContainer(containers.DeclarativeContainer):
 
     config = providers.Configuration()
     context = providers.Object(None)
+    
+    family_repository = providers.Factory(
+        FamilyRepository,
+        ctx=context
+    )
+    
+    maternal_repository = providers.Factory(
+        MaternalRepository,
+        ctx=context
+    )
     
     household_info = providers.Factory(
         HouseholdInfoRepository,
