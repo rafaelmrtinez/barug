@@ -35,6 +35,10 @@
                 <span class="badge rounded-pill text-bg-light ms-2">•</span>
               {% endif %}
             </button>
+
+            <a class="btn btn-outline-brand ms-2" href="{% url 'captain:staff_selection' %}">
+              {% bs_icon 'plus-lg' extra_classes='me-2' %} Add Staff
+            </a>
         </form>
 
         {# ─── Active filter chips (show selected labels) ─── #}
