@@ -9,9 +9,9 @@ urlpatterns = [
     path("api/renewals/<int:renewal_id>/confirm", pay_views.confirm_after_redirect,  name="confirm_after_redirect"),
     path("api/renewals/<int:renewal_id>/decline", pay_views.decline_and_refund,     name="decline_and_refund"),
     path("webhook/paymongo",                      pay_views.paymongo_webhook,       name="paymongo_webhook"),
-    path("success",                               pay_views.success_page,           name="success_page"),
     # ✅ NEW: DOC REQUESTS
     path("api/docs/<int:doc_id>/start",           pay_views.start_doc_checkout,      name="start_doc_checkout"),
     path("api/docs/<int:doc_id>/status",          pay_views.doc_status,              name="doc_status"),
-path("api/docs/<int:doc_id>/confirm",             pay_views.confirm_doc_after_redirect,name="confirm_doc_after_redirect"),
+    path("api/docs/<int:doc_id>/confirm",             pay_views.confirm_doc_after_redirect,name="confirm_doc_after_redirect"),
+    path("success", pay_views.success, name="payments_success"),
 ]

@@ -1788,3 +1788,6 @@ def decision_request(request: HttpRequest, req_id: int):
         except Exception:
             messages.warning(request, "This request cannot be updated right now.")
     return redirect("clerk:person_details", req_id=req_id)
+
+
+

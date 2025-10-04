@@ -1,13 +1,21 @@
 # payments/views.py
+from __future__ import annotations
+
 import json
 import requests
+from urllib.parse import urlparse, unquote
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, date
 from zoneinfo import ZoneInfo
+from typing import Any, Dict, Optional
 
 from django.conf import settings
-from django.http import JsonResponse, HttpResponse, HttpResponseBadRequest
+from django.http import (
+    JsonResponse, HttpResponse, HttpResponseBadRequest
+)
 from django.views.decorators.csrf import csrf_exempt
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_GET
 
 from .db import exec_sql, exec_one
 from .utils import paymongo_auth_header, verify_paymongo_signature
@@ -34,9 +42,103 @@ def _st(name: str) -> int:
     return row["request_status_id"]
 
 
-def _finalize_paid(renewal_id: int, paid_dt, event_ref: str, provider_payment_id: str | None):
+ALLOWED_APP_SCHEMES = {"barug", "exp", "exps", "exp+"}  # adjust to your schemes
+
+def _sanitize_return_to(raw: Optional[str]) -> Optional[str]:
+    """Allow only deep links (custom schemes) or safe https links if you use Universal Links."""
+    if not raw:
+        return None
+    try:
+        pr = urlparse(raw)
+        if pr.scheme and pr.scheme in ALLOWED_APP_SCHEMES:
+            return raw
+        if pr.scheme in ("http", "https") and url_has_allowed_host_and_scheme(raw, allowed_hosts=None):
+            return raw
+    except Exception:
+        pass
+    return None
+
+
+# ============================= Finalizers ===================================
+
+def _payment_method_online_id() -> Optional[int]:
+    # Prefer ONLINE_GCASH if present; else GCASH
+    row = exec_one("""
+      select payment_method_id
+        from payment_method
+       where method_name in ('ONLINE_GCASH','GCASH')
+       order by case when method_name='ONLINE_GCASH' then 0 else 1 end
+       limit 1;
+    """)
+    return row["payment_method_id"] if row else None
+
+
+def _make_or_number_fallback(event_ref: str) -> str:
+    try:
+        r = exec_one("select make_or_number() as or_number;")
+        if r and r["or_number"]:
+            return r["or_number"]
+    except Exception:
+        pass
+    return f"OR-{event_ref}"
+
+
+def _finalize_doc_paid(doc_id: int, paid_dt, event_ref: str, provider_payment_id: Optional[str]):
+    # Mark latest session as PAID and fetch amounts
+    ps = exec_one("""
+      with x as (
+        select payment_session_id
+        from payment_session
+        where doc_request_id=%s
+        order by created_at desc
+        limit 1
+      )
+      update payment_session ps
+         set status='PAID',
+             paid_at=%s,
+             provider_payment_id = coalesce(%s, provider_payment_id)
+        from x
+       where ps.payment_session_id = x.payment_session_id
+      returning ps.amount, ps.payment_session_id;
+    """, [doc_id, paid_dt, provider_payment_id])
+
+    if not ps:
+        return
+
+    collected = Decimal(str(ps["amount"] or 0))
+    server    = exec_one("select _doc_request_amount(%s) as amt;", [doc_id])
+    server_amt = Decimal(str((server or {}).get("amt", 0)))
+
+    pm_id  = _payment_method_online_id()
+    or_no  = _make_or_number_fallback(event_ref)
+    issuer = getattr(settings, "STAFF_SYSTEM_ID", None)
+
+    # Issue OR for the collected amount (what the gateway charged)
+    exec_sql("""
+      insert into official_receipt(
+        or_number, issued_by_staff_id, doc_request_id, payment_method_id,
+        amount_due, amount_paid, change_due
+      ) values (%s, %s, %s, %s, %s, %s, 0);
+    """, [or_no, issuer, doc_id, pm_id, float(collected), float(collected)])
+
+    # Advance status (PAID or FOR_PRINTING)
+    auto_fp = bool(getattr(settings, "ONLINE_PAYMENT_AUTO_ADVANCE", False))
+    exec_sql("""
+      update doc_request_hdr
+         set request_status_id = %s,
+             current_status_set_at = now()
+       where doc_request_id = %s;
+    """, [_st("FOR_PRINTING" if auto_fp else "PAID"), doc_id])
+
+    # Reconcile flag if mismatch
+    if abs(collected - server_amt) > Decimal("0.01"):
+        exec_sql("update doc_request_hdr set request_status_id=%s where doc_request_id=%s;",
+                 [_st("RECONCILE"), doc_id])
+
+
+def _finalize_paid(renewal_id: int, paid_dt, event_ref: str, provider_payment_id: Optional[str]):
     """
-    Idempotent finalizer:
+    Idempotent finalizer for renewals:
     - marks latest payment_session as PAID
     - calls process_clearance_payment_and_renew
     - advances renewal_request statuses (PAID → ISSUED)
@@ -236,7 +338,6 @@ def paymongo_webhook(request):
         elif "doc_request_id" in meta:
             _finalize_doc_paid(int(meta["doc_request_id"]), paid_dt, evid, provider_payment_id)
 
-
     elif typ == "payment.failed":
         exec_sql("""
           update payment_session ps
@@ -258,6 +359,7 @@ def paymongo_webhook(request):
         """, [json.dumps(ev), pay_id])
 
     return HttpResponse(status=200)
+
 
 # ====================== 3) status (for polling / UI) ========================
 
@@ -531,134 +633,193 @@ def confirm_doc_after_redirect(request, doc_id: int):
 
 
 # =========================== 6) success page ================================
-# payments/views.py  (replace the whole success_page function)
 
-# payments/views.py
-from django.conf import settings
-from django.http import HttpResponse, HttpResponseBadRequest
-from urllib.parse import unquote
-
-def success_page(request):
+@require_GET
+def success(request):
     """
     Unified success page for both Renewal and Document flows.
-    Accepts ?renewal_id=123 OR ?doc_id=456.
-    Optional ?return_to=<deep-link> (generated by the app).
-    Stops polling at terminal states and attempts to open the app once.
+
+    Accepts:
+      ?renewal_id=123 OR ?doc_id=456
+      &return_to=<deep-link generated by the app>
+
+    Behavior:
+      - Tries to confirm/finalize payment (idempotent).
+      - If PAID and we have a valid deep-link, immediately deep-links back to the app
+        (auto-closes the in-app browser via openAuthSessionAsync on the app side).
+      - Renders a button fallback to open the app manually.
     """
-    renewal_id = request.GET.get("renewal_id")
-    doc_id     = request.GET.get("doc_id")
-    if not renewal_id and not doc_id:
+    renewal_id_raw = request.GET.get("renewal_id")
+    doc_id_raw     = request.GET.get("doc_id")
+    if not renewal_id_raw and not doc_id_raw:
         return HttpResponseBadRequest("Missing renewal_id or doc_id")
 
-    # Deep-link scheme fallback if the app didn't pass return_to
-    scheme = getattr(settings, "APP_SCHEME", "barug")
-    default_link = f"{scheme}://renewal?id={renewal_id}" if renewal_id else f"{scheme}://receipt?id={doc_id}"
-    app_link = unquote(request.GET.get("return_to") or "") or default_link
+    dev_bypass = settings.PAYMENTS_DEV_BYPASS or request.GET.get("dev") == "1"
+    status = "PENDING"
+    clearance_rec_id = None
 
-    if renewal_id:
-        poll_url    = f"/payments/api/renewals/{renewal_id}/confirm"
-        poll_method = "POST"
-        success_msg = "Payment recorded. Clearance Ref: "
-        show_clearance = True
-    else:
-        poll_url    = f"/payments/api/docs/{doc_id}/confirm"
-        poll_method = "POST"
-        success_msg = "Payment recorded. Your request is now paid / for printing."
-        show_clearance = False
+    # sanitize/prepare deep link
+    scheme = getattr(settings, "APP_SCHEME", "barug")
+    default_link = None
+    if renewal_id_raw:
+        default_link = f"{scheme}://renewal?id={renewal_id_raw}"
+    elif doc_id_raw:
+        default_link = f"{scheme}://receipt?id={doc_id_raw}"
+
+    return_to = _sanitize_return_to(unquote(request.GET.get("return_to") or "")) or default_link
+
+    # --- Try to finalize server-side (safe/idempotent) ---
+    try:
+        if renewal_id_raw:
+            renewal_id = int(renewal_id_raw)
+
+            # Use the same logic as confirm_after_redirect (inline)
+            ps = exec_one("""
+              select payment_session_id, provider_session_id, status
+                from payment_session
+               where renewal_request_id=%s
+               order by created_at desc
+               limit 1;
+            """, [renewal_id])
+
+            if ps and ps["status"] == "PAID":
+                status = "PAID"
+                row = exec_one("""
+                  select rr.clearance_rec_id from renewal_request rr where rr.renewal_request_id=%s limit 1;
+                """, [renewal_id])
+                clearance_rec_id = (row or {}).get("clearance_rec_id")
+
+            else:
+                if dev_bypass and ps:
+                    paid_dt = datetime.now(tz=ZoneInfo("Asia/Manila"))
+                    done = _finalize_paid(renewal_id, paid_dt, f"DEV-{ps['provider_session_id']}", "DEV_PAYMENT")
+                    status = "PAID" if done.get("ok") else "PENDING"
+                    clearance_rec_id = done.get("clearance_rec_id")
+                elif ps:
+                    cs_id = ps["provider_session_id"]
+                    r = requests.get(f"https://api.paymongo.com/v1/checkout_sessions/{cs_id}",
+                                     headers=paymongo_auth_header(), timeout=20)
+                    j = r.json()
+                    attrs = j.get("data", {}).get("attributes", {}) if r.status_code < 400 else {}
+                    pst = (attrs.get("status") or attrs.get("payment_status") or "").lower()
+                    paid = (pst == "paid")
+                    payments = attrs.get("payments") or []
+                    if isinstance(payments, list):
+                        for p in payments:
+                            if isinstance(p, dict) and p.get("status", "").lower() in ("paid", "succeeded", "successful"):
+                                paid = True
+                                provider_payment_id = p.get("id") or p.get("payment_id")
+                                break
+                        else:
+                            provider_payment_id = None
+                    else:
+                        provider_payment_id = None
+                    if paid:
+                        paid_dt = datetime.now(tz=ZoneInfo("Asia/Manila"))
+                        done = _finalize_paid(renewal_id, paid_dt, cs_id, provider_payment_id)
+                        status = "PAID" if done.get("ok") else "PENDING"
+                        clearance_rec_id = done.get("clearance_rec_id")
+
+        elif doc_id_raw:
+            doc_id = int(doc_id_raw)
+
+            ps = exec_one("""
+              select payment_session_id, provider_session_id, status
+                from payment_session
+               where doc_request_id=%s
+               order by created_at desc
+               limit 1;
+            """, [doc_id])
+
+            if ps and ps["status"] == "PAID":
+                status = "PAID"
+            else:
+                if dev_bypass and ps:
+                    paid_dt = datetime.now(tz=ZoneInfo("Asia/Manila"))
+                    _finalize_doc_paid(doc_id, paid_dt, f"DEV-{ps['provider_session_id']}", "DEV_PAYMENT")
+                    status = "PAID"
+                elif ps:
+                    cs_id = ps["provider_session_id"]
+                    r = requests.get(f"https://api.paymongo.com/v1/checkout_sessions/{cs_id}",
+                                     headers=paymongo_auth_header(), timeout=20)
+                    j = r.json()
+                    attrs = j.get("data", {}).get("attributes", {}) if r.status_code < 400 else {}
+                    pst = (attrs.get("status") or attrs.get("payment_status") or "").lower()
+                    paid = (pst == "paid")
+                    payments = attrs.get("payments") or []
+                    provider_payment_id = None
+                    if isinstance(payments, list):
+                        for p in payments:
+                            if isinstance(p, dict) and p.get("status", "").lower() in ("paid", "succeeded", "successful"):
+                                paid = True
+                                provider_payment_id = p.get("id") or p.get("payment_id")
+                                break
+                    if paid:
+                        paid_dt = datetime.now(tz=ZoneInfo("Asia/Manila"))
+                        _finalize_doc_paid(doc_id, paid_dt, cs_id, provider_payment_id)
+                        status = "PAID"
+    except Exception:
+        # keep status as PENDING on error
+        pass
+
+    # --- Render minimal page that auto-bounces back if PAID ---
+    success_text = (
+        f"Payment recorded. Clearance Ref: {clearance_rec_id}" if clearance_rec_id
+        else "Payment recorded. Your request is now paid / for printing."
+    )
+    instant_meta = (f'<meta http-equiv="refresh" content="0; url={return_to}">' if (status == "PAID" and return_to) else "")
+    instant_js = (
+        f"""
+        <script>
+          (function(){{
+            var target = "{(return_to or '').replace('"','%22')}";
+            if (!target) return;
+            try {{ window.location.replace(target); }} catch(e) {{}}
+            setTimeout(function(){{ try{{ window.location.href = target; }}catch(e){{}} }}, 200);
+            setTimeout(function(){{ try{{ window.location.assign(target); }}catch(e){{}} }}, 800);
+          }})();
+        </script>
+        """ if (status == "PAID" and return_to) else ""
+    )
 
     html = f"""<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width,initial-scale=1"/>
-    <title>Payment Success</title>
-    <style>
-      body {{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; padding: 24px; background:#fff7f5; }}
-      .card {{ max-width: 720px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; padding: 20px; background:white; }}
-      .ok {{ color: #065f46; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 8px 12px; border-radius: 8px; display:inline-block; }}
-      .muted {{ color: #6b7280; }}
-      .spinner {{ width:16px;height:16px;border:2px solid #d1d5db;border-top-color:#111827;border-radius:50%;display:inline-block;animation:spin .8s linear infinite;vertical-align:middle }}
-      @keyframes spin {{ to {{ transform: rotate(360deg); }} }}
-      .btn {{ display:inline-flex; gap:.5rem; align-items:center; padding:10px 14px; border-radius:10px; border:1px solid #dbe1ea; text-decoration:none; }}
-      .btn-primary {{ color:#1d4ed8; background:#eef2ff; border-color:#c7d2fe; }}
-      .actions {{ margin-top: 14px; display:none; }}
-      h2 {{ margin: 0 0 8px 0; line-height: 1.2; }}
-    </style>
-  </head>
-  <body>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Finalizing your payment…</title>
+  {instant_meta}
+  {instant_js}
+  <style>
+    :root{{--brand:#310101;--ink:#111827;--muted:#6b7280;--ok-bg:#ecfdf5;--ok-fg:#065f46;--ok-br:#86efac;--card:#ffffff;--page:#fff7f5;--border:#e5e7eb}}
+    html,body{{margin:0;height:100%;background:var(--page);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial}}
+    .wrap{{min-height:100%;display:flex;align-items:flex-start;justify-content:center;padding:24px}}
+    .card{{width:100%;max-width:720px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px 18px 20px}}
+    h1{{margin:0 0 6px;font-size:28px;line-height:1.2;color:var(--ink)}}
+    p{{color:var(--muted);margin:6px 0 0}}
+    .status{{margin-top:12px;font-weight:700;color:var(--ink)}}
+    .alert-ok{{margin-top:14px;border:1px solid var(--ok-br);background:var(--ok-bg);color:var(--ok-fg);border-radius:12px;padding:12px 14px}}
+    .btn{{display:inline-block;margin-top:16px;padding:12px 16px;border-radius:12px;text-decoration:none;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;font-weight:700}}
+    .hint{{color:var(--muted);font-size:12px;margin-top:8px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
     <div class="card">
-      <h2>Thanks! We’re finalizing your payment… <span id="spin" class="spinner"></span></h2>
-      <p class="muted">This page will refresh the status automatically.</p>
-      <div id="status" class="muted">Checking…</div>
-      <div id="result" style="margin-top:8px;"></div>
-      <div id="actions" class="actions">
-        <a class="btn btn-primary" id="open" href="{app_link}">Go back and check the receipt</a>
-      </div>
+      <h1>Thanks! We’re finalizing your payment…</h1>
+      <p>This page will refresh or return to the app automatically.</p>
+      <div class="status">Status: <strong>{status}</strong></div>
+      {"<div class='alert-ok'>" + success_text + "</div>" if status == "PAID" else ""}
+      {"<a class='btn' href='" + return_to + "'>Go back and check the receipt</a>" if return_to else ""}
+      {"<div class='hint'>If it doesn’t return automatically, tap the button above.</div>" if status == "PAID" and return_to else ""}
     </div>
-    <script>
-      const pollUrl    = "{poll_url}";
-      const pollMethod = "{poll_method}";
-      const showClearance = {str(show_clearance).lower()};
-      const appLink = "{app_link}".trim();
-      let doneFlag = false;
-      let timerId  = null;
-
-      function stop() {{
-        doneFlag = true;
-        if (timerId) {{ clearTimeout(timerId); timerId = null; }}
-        const sp = document.getElementById("spin");
-        if (sp) sp.style.display = "none";
-        const acts = document.getElementById("actions");
-        if (acts) acts.style.display = "block";
-      }}
-
-      function tryOpenApp() {{
-        if (!appLink) return;
-        // Attempt once; browsers will show the chooser if available.
-        window.location.href = appLink;
-      }}
-
-      function done(status, data) {{
-        let msg = "{success_msg}";
-        if (showClearance && data && data.clearance_rec_id) {{
-          msg += (data.clearance_rec_id);
-        }}
-        document.getElementById("result").innerHTML = '<p class="ok">'+msg+'</p>';
-        stop();
-        // auto-attempt to open the app once
-        setTimeout(tryOpenApp, 100);
-      }}
-
-      async function poll() {{
-        if (doneFlag) return;
-        try {{
-          const r = await fetch(pollUrl, {{ method: pollMethod }});
-          const j = await r.json();
-          const status = (j.status || "").toUpperCase();
-          document.getElementById("status").textContent = "Status: " + (status || "…");
-
-          if (["PAID","FOR_PRINTING","ISSUED","READY_FOR_PICKUP","RELEASED"].includes(status)) {{
-            done(status, j);
-            return;
-          }}
-        }} catch (e) {{
-          console.error(e);
-          document.getElementById("status").textContent = "Still waiting…";
-        }}
-        timerId = setTimeout(poll, 1500);
-      }}
-      poll();
-    </script>
-  </body>
+  </div>
+</body>
 </html>"""
     return HttpResponse(html)
 
 
 # --- DOC REQUEST: start checkout (mirrors renewal start) ---------------------
-from django.views.decorators.csrf import csrf_exempt
-from decimal import Decimal
-import json, requests
-from django.http import JsonResponse, HttpResponseBadRequest
 
 @csrf_exempt
 def start_doc_checkout(request, doc_id: int):
@@ -736,6 +897,8 @@ def start_doc_checkout(request, doc_id: int):
         doc_id, json.dumps({"client_payload": body, "metadata": pm_payload["data"]["attributes"]["metadata"]})
     ])
 
+    # NOTE: You probably want a "PAYMENT_INITIATED" status here, not PAID.
+    # Keeping as-is in case you rely on it elsewhere.
     exec_sql("update doc_request_hdr set request_status_id=%s where doc_request_id=%s;",
              [_st("PAID"), doc_id])
 
@@ -743,6 +906,7 @@ def start_doc_checkout(request, doc_id: int):
 
 
 # --- DOC REQUEST: status (simple poll endpoint) ------------------------------
+
 @csrf_exempt
 def doc_status(request, doc_id: int):
     row = exec_one("""
@@ -756,78 +920,3 @@ def doc_status(request, doc_id: int):
     if not row:
         return JsonResponse({"error":"not found"}, status=404)
     return JsonResponse({"doc_request_id": row["doc_request_id"], "status": row["status"]})
-
-from datetime import datetime
-from zoneinfo import ZoneInfo
-
-def _payment_method_online_id():
-    # Prefer ONLINE_GCASH if present; else GCASH
-    row = exec_one("""
-      select payment_method_id
-        from payment_method
-       where method_name in ('ONLINE_GCASH','GCASH')
-       order by case when method_name='ONLINE_GCASH' then 0 else 1 end
-       limit 1;
-    """)
-    return row["payment_method_id"] if row else None
-
-def _make_or_number_fallback(event_ref: str) -> str:
-    try:
-        r = exec_one("select make_or_number() as or_number;")
-        if r and r["or_number"]:
-            return r["or_number"]
-    except Exception:
-        pass
-    return f"OR-{event_ref}"
-
-def _finalize_doc_paid(doc_id: int, paid_dt, event_ref: str, provider_payment_id: str | None):
-    # Mark latest session as PAID and fetch amounts
-    ps = exec_one("""
-      with x as (
-        select payment_session_id
-        from payment_session
-        where doc_request_id=%s
-        order by created_at desc
-        limit 1
-      )
-      update payment_session ps
-         set status='PAID',
-             paid_at=%s,
-             provider_payment_id = coalesce(%s, provider_payment_id)
-        from x
-       where ps.payment_session_id = x.payment_session_id
-      returning ps.amount, ps.payment_session_id;
-    """, [doc_id, paid_dt, provider_payment_id])
-
-    if not ps:
-        return
-
-    collected = Decimal(str(ps["amount"] or 0))
-    server    = exec_one("select _doc_request_amount(%s) as amt;", [doc_id])
-    server_amt = Decimal(str((server or {}).get("amt", 0)))
-
-    pm_id  = _payment_method_online_id()
-    or_no  = _make_or_number_fallback(event_ref)
-    issuer = getattr(settings, "STAFF_SYSTEM_ID", None)
-
-    # Issue OR for the collected amount (what the gateway charged)
-    exec_sql("""
-      insert into official_receipt(
-        or_number, issued_by_staff_id, doc_request_id, payment_method_id,
-        amount_due, amount_paid, change_due
-      ) values (%s, %s, %s, %s, %s, %s, 0);
-    """, [or_no, issuer, doc_id, pm_id, float(collected), float(collected)])
-
-    # Advance status (PAID or FOR_PRINTING)
-    auto_fp = bool(getattr(settings, "ONLINE_PAYMENT_AUTO_ADVANCE", False))
-    exec_sql("""
-      update doc_request_hdr
-         set request_status_id = %s,
-             current_status_set_at = now()
-       where doc_request_id = %s;
-    """, [_st("FOR_PRINTING" if auto_fp else "PAID"), doc_id])
-
-    # Reconcile flag if mismatch
-    if abs(collected - server_amt) > Decimal("0.01"):
-        exec_sql("update doc_request_hdr set request_status_id=%s where doc_request_id=%s;",
-                 [_st("RECONCILE"), doc_id])

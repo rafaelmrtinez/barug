@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import web_views
 
 app_name = 'clerk'
 
@@ -53,5 +54,9 @@ urlpatterns = [
     path("business_list/", views.business_list, name="business_list"),
     path("business_information/<int:b_id>/", views.business_information, name="business_information"),
     path("business_information/<int:b_id>/", views.business_information, name="business_information"),
+
+    # OCR 
+    path("valid-id/upload/", web_views.upload_valid_id_files, name="valid_id_upload"),
+    path("valid-id/test/", web_views.upload_valid_id_test_page, name="valid_id_test"),
 ]
 
