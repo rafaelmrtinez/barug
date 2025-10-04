@@ -7,7 +7,9 @@ app_name = 'clerk'
 urlpatterns = [
     # document requests
     path("requests/", views.queue, name="queue"),
+
     path("requests/<int:doc_request_id>/", views.detail, name="detail"),
+    path("<int:doc_request_id>/confirm", views.detail, name="confirm_request"),
     path("requests/<int:doc_request_id>/mark-printing/", views.mark_for_printing, name="mark_printing"),
     path("requests/<int:doc_request_id>/mark-ready-for-pickup/", views.mark_request_ready_for_pickup, name="mark_ready_for_pickup"),
     path("requests/<int:doc_request_id>/mark-released/", views.mark_released, name="mark_released"),
@@ -56,6 +58,7 @@ urlpatterns = [
     path("business_information/<int:b_id>/", views.business_information, name="business_information"),
 
     # OCR 
+    path('upload-id/', web_views.upload_valid_id_files, name='upload_id_files'),
     path("valid-id/upload/", web_views.upload_valid_id_files, name="valid_id_upload"),
     path("valid-id/test/", web_views.upload_valid_id_test_page, name="valid_id_test"),
 ]

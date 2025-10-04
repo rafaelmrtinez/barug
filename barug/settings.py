@@ -19,7 +19,7 @@ INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY")
 PAYMENTS_DEV_BYPASS = os.getenv("PAYMENTS_DEV_BYPASS", "false").lower() in ("1","true","yes")
 PAYMONGO_SECRET_KEY    = os.getenv("PAYMONGO_SECRET_KEY")
 PAYMONGO_WEBHOOK_SECRET= os.getenv("PAYMONGO_WEBHOOK_SECRET")
-STAFF_SYSTEM_ID        = int(os.getenv("STAFF_SYSTEM_ID", "1"))
+STAFF_SYSTEM_ID        =13
 
 DEBUG = True
 ALLOWED_HOSTS = ["*", "localhost", "127.0.0.1", ".ngrok-free.app"]

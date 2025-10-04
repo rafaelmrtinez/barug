@@ -88,13 +88,15 @@ def _debug_email_preview(subject: str, to_list: List[Any], body_txt: str, body_h
 # ────────────────────────────────────────────────────────────
 STATUS_UI: Dict[str, Dict[str, str]] = {
     "FOR_TREASURER_REVIEW": {"label": "For Treasurer Review", "cls": "badge bg-warning-subtle text-warning-emphasis"},
+    "FOR CLERK REVIEW":     {"label": "For Clerk Review",     "cls": "badge bg-secondary-subtle text-secondary-emphasis"},
     "PAID":                 {"label": "Paid",                 "cls": "badge bg-primary-subtle text-primary-emphasis"},
     "FOR_PRINTING":         {"label": "For Printing",         "cls": "badge bg-info-subtle text-info-emphasis"},
     "READY_FOR_PICKUP":     {"label": "Ready for Pickup",     "cls": "badge bg-warning-subtle text-warning-emphasis"},
     "RELEASED":             {"label": "Released",             "cls": "badge bg-success-subtle text-success-emphasis"},
     "DECLINED":             {"label": "Declined",             "cls": "badge bg-danger-subtle text-danger-emphasis"},
 }
-CLERK_STATUSES_ALL = ["PAID", "FOR_PRINTING", "RELEASED", "DECLINED"]
+# include clerk-review in default list shown on queue if you want
+CLERK_STATUSES_ALL = ["FOR CLERK REVIEW", "PAID", "FOR_PRINTING", "RELEASED", "DECLINED"]
 CLERK_ROLE = "Barangay Clerk"
 
 def _titleize(s: str | None) -> str:
@@ -1791,3 +1793,37 @@ def decision_request(request: HttpRequest, req_id: int):
 
 
 
+# ────────────────────────────────────────────────────────────
+# SECTION: Confirm (PAID → FOR_PRINTING)
+# ────────────────────────────────────────────────────────────
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_POST
+def confirm_request(request: HttpRequest, doc_request_id: int):
+    """
+    Clerk-only confirm step:
+    - Allowed only when current status is PAID
+    - Sets status to FOR_PRINTING (no PDF generation/download)
+    """
+    try:
+        bundle = _fetch_bundle(doc_request_id)
+        header = (bundle or {}).get("header", {}) or {}
+        current_status = (header.get("status") or "").strip().upper().replace(" ", "_")
+    except Exception:
+        messages.error(request, "Unable to load request to confirm.")
+        return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+    if current_status != "PAID":
+        messages.error(request, "You can only confirm requests that are currently PAID.")
+        return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+    staff_id = _staff_id(request)
+    reason = (request.POST.get("reason") or "").strip() or None
+
+    err = _set_status(doc_request_id, "FOR_PRINTING", staff_id, reason)
+    if err:
+        messages.error(request, f"Failed to confirm: {escape(err)}")
+    else:
+        messages.success(request, "Confirmed. Status is now FOR PRINTING.")
+
+    return redirect("clerk:detail", doc_request_id=doc_request_id)
