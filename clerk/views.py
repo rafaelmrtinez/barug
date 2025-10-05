@@ -29,7 +29,7 @@ from postgrest.exceptions import APIError
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
 from authentication.supabase_client import supabase
-
+from django.views.decorators.http import require_POST
 from .forms import (
     SearchVerificationRequest, SearchBusinessOwner, SelectOwnerForm , BusinessOwnerInfo,
     BusinessDetails, BusinessFilters, RequestedDocsFilters
@@ -39,7 +39,15 @@ from .forms import (
 from common.send_email import send_email
 
 # ---- services (PDF, request bundles, subject resolver, ID verification) ----
-from .services.requests_service import _fetch_bundle, _set_status
+# existing imports above…
+
+from .services.requests_service import (
+    _fetch_bundle,
+    _set_status,
+    confirm_and_send_to_printing,
+    confirm_forward_treasurer as svc_confirm_forward_treasurer,
+)
+
 from .services.subject_service import subject_view
 from .services.pdf_service import (
     _pdf_templates_dir, _get_all_pdf_field_names, _fill_pdf_with_values,
@@ -51,6 +59,13 @@ from .services.id_verification_service import (
     get_verification_status_for_person,
 )
 
+from treasurer.services.requests_service import build_auth_links
+
+
+def titleize(s):
+    txt = str(s or "")
+    return " ".join(txt.replace("_", " ").replace("-", " ").split()).title()
+    
 # ────────────────────────────────────────────────────────────
 # SECTION: Logger + tiny email preview helpers
 # ────────────────────────────────────────────────────────────
@@ -399,6 +414,55 @@ def queue(request: HttpRequest):
         "active_count": len(statuses) + len(doc_types),
     })
 
+
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+
+PH_TZ = ZoneInfo("Asia/Manila")
+
+def _fmt_occured_at(val) -> str:
+    """Accepts a datetime or ISO string, returns a Manila-local formatted string."""
+    if not val:
+        return "—"
+    dt = None
+    if isinstance(val, datetime):
+        dt = val
+    elif isinstance(val, str):
+        dt = parse_datetime(val)  # handles '...+00:00' etc.
+    if not dt:
+        return val  # show raw if parsing fails
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.utc)
+    # convert to Asia/Manila
+    dt_local = timezone.localtime(dt, PH_TZ)
+    return dt_local.strftime("%b %d, %Y • %I:%M %p")
+
+
+def _resolve_actor_name(ev: dict, header: dict) -> str:
+    """Return a friendly actor name for a timeline event."""
+    # Prefer explicit names on the event
+    for k in ("staff_name", "resident_name"):
+        v = (ev.get(k) or "").strip()
+        if v:
+            return v
+
+    actor = (ev.get("actor") or "").strip()
+    if actor:
+        # If it's an ID like "4", show the requester's name instead
+        if actor.isdigit() and header.get("requester_full_name"):
+            return header["requester_full_name"]
+        return actor
+
+    # Fallbacks by user type
+    ut = (ev.get("user_type_name") or "").strip().upper()
+    if ut == "PERSON" and header.get("requester_full_name"):
+        return header["requester_full_name"]
+
+    return "SYSTEM"
+
+
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
@@ -413,15 +477,23 @@ def detail(request: HttpRequest, doc_request_id: int):
     lines = data.get("lines", []) or []
     payments = data.get("payments", {}) or {}
     timeline = data.get("timeline", []) or []
-
+    # collect links for the Authorization Letter
+    auth_links = build_auth_links(settings, header, lines)  
     ui = STATUS_UI.get(header.get("status")) or {"label": header.get("status") or "—", "cls": "badge text-bg-secondary"}
+    # After you fetch lines = data.get("lines", []) or []
     for l in lines:
-        l["purpose_display"] = _titleize(l.get("purpose_code"))
-        l["doc_purpose"] = (
-            l.get("purpose_display")
-            or l.get("purpose_label")
-            or l.get("purpose")
-            or (l.get("details") or {}).get("purpose_code")
+        details = l.get("details") or {}
+        # humanized purpose (fallback to details.purpose_code)
+        l["purpose_display"] = titleize(l.get("purpose_code") or details.get("purpose_code"))
+        # show applied waiver reasons as chips
+        l["reason_chips"] = list(l.get("reasons_applied") or details.get("reason_tags") or [])
+        # flag for full exemption (or explicit boolean if your backend sets it)
+        l["is_exempt"] = bool(
+            l.get("is_exempt")
+            or (
+                (l.get("waived_amount") or 0) > 0
+                and (l.get("base_amount") or 0) <= (l.get("waived_amount") or 0)
+            )
         )
 
     # OR number and payment/receipt info (exposed for PDFs)
@@ -462,10 +534,20 @@ def detail(request: HttpRequest, doc_request_id: int):
     except Exception:
         pass
 
+    # Preformat timestamps (Asia/Manila) for template
+    header["created_fmt"] = _fmt_occured_at(header.get("created_at"))
+
+    for ev in timeline:
+        ev["occur_fmt"] = _fmt_occured_at(
+            ev.get("occurred_at") or ev.get("occurredAt") or ev.get("occur_time")
+        )
+        ev["display_actor"] = _resolve_actor_name(ev, header)
+
     return render(request, "clerk/detail.html", {
         "header": header, "status_ui": ui, "lines": lines, "payments": payments, "timeline": timeline,
         "ctc_mode": ctc_mode, "ctc_of": ctc_of,
         "ctc_ref_request_id": ctc_ref_request_id, "ctc_ref_code": ctc_ref_code,
+        "auth_links": auth_links,
     })
 
 # ────────────────────────────────────────────────────────────
@@ -1194,11 +1276,14 @@ def _fetch_business_clearance_fields(business_id: int, subject_person_id: Option
 # ────────────────────────────────────────────────────────────
 # SECTION: Walk-in create (payload builder + BC enrichment)
 # ────────────────────────────────────────────────────────────
+
 @session_login_required
 @role_required(CLERK_ROLE)
 @require_POST
 def walkin_create(request: HttpRequest):
-    """POST handler that builds the same payload the mobile sends into `create_document_request`."""
+    """POST handler that builds the same payload the mobile sends, but routes through
+    create_document_request_walkin so we tag channel=WALKIN and filed_by clerk staff.
+    """
     # DEBUG: dump important POST data (sanitized)
     try:
         safe_post = {
@@ -1311,7 +1396,6 @@ def walkin_create(request: HttpRequest):
         doc_type_name = ""
 
     if doc_type_name.strip().upper() in {BRGY_BUSINESS_DOC_NAME, "CERTIFIED TRUE COPY"}:
-    # do something
         if not business_id:
             messages.error(request, "Business is required for Barangay Business Clearance.")
             return redirect(f"{request.path.replace('/create/','/')}?request_document_type_id={req_doc_type_id or ''}")
@@ -1321,6 +1405,7 @@ def walkin_create(request: HttpRequest):
             ln["details"] = {**(ln.get("details") or {}), **bc_details}
         print("[WALKIN DEBUG] lines after Business Clearance enrichment:\n", json.dumps(lines, indent=2, default=str))
 
+    # Debug preview in client-shape for parity with mobile logs
     payload_client_shape = {
         "requested_by": requested_by,
         "on_behalf_of": (subject_id if (is_on_behalf and subject_id) else None),
@@ -1329,24 +1414,29 @@ def walkin_create(request: HttpRequest):
         "purpose_notes": purpose_notes,
         "lines": lines,
     }
-    print("\n[WALKIN DEBUG] (client-shape) create_document_request payload:\n",
-        json.dumps(payload_client_shape, indent=2, default=str))
+    print("\n[WALKIN DEBUG] (client-shape) create_document_request_walkin payload:\n",
+          json.dumps(payload_client_shape, indent=2, default=str))
 
-    # CALL THE RPC with the names your function expects
-    rpc_args = {
-        "p_requested_by": requested_by,
-        "p_on_behalf_of": (subject_id if (is_on_behalf and subject_id) else None),
-        "p_is_on_behalf": is_on_behalf,
-        "p_business_id": business_id,
-        "p_purpose_notes": purpose_notes,
-        "p_lines": lines,  # supabase client will JSON-encode this list into jsonb
+    # ==== CALL THE WALK-IN RPC (NEW) ====
+    staff_id = (request.session.get("auth") or {}).get("staff_id") or _staff_id(request)
+    if not staff_id:
+        messages.error(request, "Missing staff context. Please login again.")
+        return redirect("clerk:walkin_new")
+
+    walkin_args = {
+        "p_requester_person_id": int(requested_by),
+        "p_subject_person_id":   int(subject_id or requested_by),
+        "p_business_id":         business_id,        # may be None
+        "p_purpose_notes":       purpose_notes,      # may be None
+        "p_lines":               lines,              # list; Supabase will JSON-encode to jsonb
+        "p_clerk_user_id":       int(staff_id),
     }
 
-    print("[WALKIN DEBUG] (rpc-shape) args sent to create_document_request:\n",
-        json.dumps(rpc_args, indent=2, default=str))
+    print("[WALKIN DEBUG] (rpc-shape) args sent to create_document_request_walkin:\n",
+          json.dumps(walkin_args, indent=2, default=str))
 
     try:
-        res = supabase.rpc("create_document_request", rpc_args).execute()
+        res = supabase.rpc("create_document_request_walkin", walkin_args).execute()
         print("[WALKIN DEBUG] RPC result .data :", getattr(res, "data", None))
         print("[WALKIN DEBUG] RPC result .error:", getattr(res, "error", None))
     except Exception as e:
@@ -1354,19 +1444,20 @@ def walkin_create(request: HttpRequest):
         messages.error(request, f"RPC failed: {e}")
         return redirect("clerk:walkin_new")
 
-    # Handle supabase response forms (scalar / obj / list)
     if getattr(res, "error", None):
         messages.error(request, f"Supabase error: {escape(res.error.message)}")
         return redirect("clerk:walkin_new")
 
+    # Function RETURNS int, but be defensive about shapes
     data = res.data
     new_id = None
-    if isinstance(data, list) and data:
-        new_id = data[0]
-    elif isinstance(data, dict) and "doc_request_id" in data:
-        new_id = data["doc_request_id"]
-    else:
+    if isinstance(data, int):
         new_id = data
+    elif isinstance(data, list) and data:
+        first = data[0]
+        new_id = first if isinstance(first, int) else (first.get("doc_request_id") if isinstance(first, dict) else None)
+    elif isinstance(data, dict):
+        new_id = data.get("doc_request_id") or data.get("id")
 
     if not new_id:
         messages.error(request, "Could not obtain new request ID from RPC.")
@@ -1374,6 +1465,7 @@ def walkin_create(request: HttpRequest):
 
     messages.success(request, f"Walk-in request created. ID: {new_id}")
     return redirect("clerk:detail", doc_request_id=new_id)
+
 
 # ────────────────────────────────────────────────────────────
 # SECTION: Business screens (stubs; clerk-only)
@@ -1796,34 +1888,60 @@ def decision_request(request: HttpRequest, req_id: int):
 # ────────────────────────────────────────────────────────────
 # SECTION: Confirm (PAID → FOR_PRINTING)
 # ────────────────────────────────────────────────────────────
+
 @session_login_required
 @role_required(CLERK_ROLE)
 @require_POST
 def confirm_request(request: HttpRequest, doc_request_id: int):
     """
-    Clerk-only confirm step:
-    - Allowed only when current status is PAID
-    - Sets status to FOR_PRINTING (no PDF generation/download)
+    Confirm (PAID → FOR_PRINTING). If not fully paid, do nothing and advise to use
+    the 'Confirm & Forward to Treasurer' action.
     """
     try:
         bundle = _fetch_bundle(doc_request_id)
-        header = (bundle or {}).get("header", {}) or {}
-        current_status = (header.get("status") or "").strip().upper().replace(" ", "_")
-    except Exception:
-        messages.error(request, "Unable to load request to confirm.")
+    except APIError as e:
+        messages.error(request, f"Unable to load request: {e}")
         return redirect("clerk:detail", doc_request_id=doc_request_id)
 
-    if current_status != "PAID":
-        messages.error(request, "You can only confirm requests that are currently PAID.")
+    header = (bundle or {}).get("header", {}) or {}
+    payments = (bundle or {}).get("payments", {}) or {}
+
+    amount_due  = float(header.get("amount_due") or 0)
+    total_paid  = float(payments.get("total_paid") or 0)
+
+    if total_paid + 1e-6 < amount_due:
+        messages.warning(
+            request,
+            "This request is not fully paid yet. Use “Confirm & Forward to Treasurer”."
+        )
         return redirect("clerk:detail", doc_request_id=doc_request_id)
 
-    staff_id = _staff_id(request)
-    reason = (request.POST.get("reason") or "").strip() or None
-
-    err = _set_status(doc_request_id, "FOR_PRINTING", staff_id, reason)
+    # fully paid → move to FOR_PRINTING
+    staff_id = 2
+    err = confirm_and_send_to_printing(doc_request_id, int(staff_id), notes="Clerk confirmed (paid)")
     if err:
-        messages.error(request, f"Failed to confirm: {escape(err)}")
+        messages.error(request, f"Failed to move to FOR PRINTING: {err}")
     else:
         messages.success(request, "Confirmed. Status is now FOR PRINTING.")
+    return redirect("clerk:detail", doc_request_id=doc_request_id)
 
+# ────────────────────────────────────────────────────────────
+# NEW: Confirm & Forward to Treasurer (FOR_CLERK_REVIEW/PAID → FOR_TREASURER_REVIEW)
+# ────────────────────────────────────────────────────────────
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_POST
+def confirm_forward_treasurer(request: HttpRequest, doc_request_id: int):
+    """
+    Clerk confirm (FOR CLERK REVIEW/PAID → FOR_TREASURER_REVIEW).
+    Always routes through the RPC that logs CONFIRMED_BY_CLERK and sets status.
+    """
+    staff_id = (request.session.get("auth") or {}).get("staff_id") or _staff_id(request)
+    notes = (request.POST.get("reason") or "").strip() or None
+
+    err = svc_confirm_forward_treasurer(doc_request_id, int(staff_id), notes)
+    if err:
+        messages.error(request, f"Failed to forward to Treasurer: {err}")
+    else:
+        messages.success(request, "Confirmed. Sent to Treasurer for payment review.")
     return redirect("clerk:detail", doc_request_id=doc_request_id)

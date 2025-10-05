@@ -111,7 +111,7 @@
 {% block content %}
 <div class="container py-3" margin>
 
-  <form id="walkinForm" method="post" action="{% url 'clerk:walkin_create' %}">
+  <form id="walkinForm" method="post" action="{% url 'clerk:walkin_create' %}" autocomplete="off">
     {% csrf_token %}
 
     <div id="formAlert" class="alert alert-danger d-hidden" role="alert"></div>
@@ -127,7 +127,7 @@
               <div class="col-sm-9 col-md-7">
                 <div class="position-relative">
                   <label for="residentSearch" class="form-label label-req mb-1">Search</label>
-                  <input id="residentSearch" type="search" class="form-control" placeholder="Search by code or name (min 2 chars)">
+                  <input id="residentSearch" type="search" class="form-control" placeholder="Search by code or name (min 2 chars)" autocomplete="off">
                   <div id="residentSpinner" class="position-absolute top-50 end-0 translate-middle-y me-3 d-hidden">
                     <div class="spinner-border spinner-border-sm text-secondary" role="status" aria-label="Searching"></div>
                   </div>
@@ -330,8 +330,6 @@
       const resp = await fetch(`${URL_SEARCH}?q=${encodeURIComponent(q)}`, { headers: { "X-Requested-With":"fetch" } });
       const html = await resp.text();
       wrap.innerHTML = html || '<div class="help">No results.</div>';
-      // Optional: style server-rendered items that use .pick-resident
-      // (If your partial renders clickable rows with .pick-resident, we keep compatibility.)
     }catch{
       wrap.innerHTML = '<div class="text-danger small">Search failed. Please try again.</div>';
     }finally{

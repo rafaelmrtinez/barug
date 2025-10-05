@@ -74,6 +74,55 @@ def queue(request: HttpRequest):
 
 from django.utils.dateparse import parse_datetime
 # ========= Detail (with payment panel) =========
+
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+
+PH_TZ = ZoneInfo("Asia/Manila")
+
+def _fmt_occured_at(val) -> str:
+    """Accepts a datetime or ISO string, returns a Manila-local formatted string."""
+    if not val:
+        return "—"
+    dt = None
+    if isinstance(val, datetime):
+        dt = val
+    elif isinstance(val, str):
+        dt = parse_datetime(val)  # handles '...+00:00' etc.
+    if not dt:
+        return val  # show raw if parsing fails
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.utc)
+    # convert to Asia/Manila
+    dt_local = timezone.localtime(dt, PH_TZ)
+    return dt_local.strftime("%b %d, %Y • %I:%M %p")
+
+def _resolve_actor_name(ev: dict, header: dict) -> str:
+    """Return a friendly actor name for a timeline event."""
+    # Prefer explicit names on the event
+    for k in ("staff_name", "resident_name"):
+        v = (ev.get(k) or "").strip()
+        if v:
+            return v
+
+    actor = (ev.get("actor") or "").strip()
+    if actor:
+        # If it's an ID like "4", show the requester's name instead
+        if actor.isdigit() and header.get("requester_full_name"):
+            return header["requester_full_name"]
+        return actor
+
+    # Fallbacks by user type
+    ut = (ev.get("user_type_name") or "").strip().upper()
+    if ut == "PERSON" and header.get("requester_full_name"):
+        return header["requester_full_name"]
+
+    # Last fallback
+    return "SYSTEM"
+
+
 @session_login_required
 @role_required(TREASURER_ROLE)
 @require_GET
@@ -88,6 +137,8 @@ def detail(request: HttpRequest, doc_request_id: int):
     lines: List[Dict[str, Any]] = data.get("lines", []) or []
     payments = data.get("payments", {}) or {}
     timeline: List[Dict[str, Any]] = data.get("timeline", []) or []
+    # Preformat hero timestamp
+    header["created_fmt"] = _fmt_occured_at(header.get("created_at"))
 
     ui = STATUS_UI.get(header.get("status")) or {"label": header.get("status") or "—", "cls": "badge text-bg-secondary"}
 
@@ -99,14 +150,24 @@ def detail(request: HttpRequest, doc_request_id: int):
         l["is_exempt"] = bool(l.get("is_exempt") or False)
 
     # Timeline presentation
+    # Timeline presentation
+    # Timeline presentation
     for e in timeline:
         e["action_display"] = ACTION_LABELS.get(e.get("action")) or titleize(e.get("action"))
         to_status = e.get("to_status") or (e.get("details") or {}).get("to_status")
         if to_status:
             e["to_status_display"] = (STATUS_UI.get(to_status) or {"label": titleize(to_status)}).get("label")
-        # ✅ Parse datetime
-        if e.get("occurred_at"):
-            e["occurred_at"] = parse_datetime(e["occurred_at"])
+
+        # Parse + format datetime
+        raw = e.get("occurred_at") or e.get("occurredAt") or e.get("occur_time")
+        dt = raw if isinstance(raw, datetime) else (parse_datetime(raw) if raw else None)
+        e["occurred_at"] = dt
+        e["occur_fmt"] = _fmt_occured_at(dt or raw)
+
+        # NEW: friendly actor
+        e["display_actor"] = _resolve_actor_name(e, header)
+
+
     # Payment methods + find WAIVED id
     methods = list_payment_methods()
     waived_method_id = next(
@@ -127,6 +188,8 @@ def detail(request: HttpRequest, doc_request_id: int):
         "waived_method_id": waived_method_id,
         "auth_links": auth_links,
     })
+
+
 
 # ========= Take payment (POST) =========
 @session_login_required
