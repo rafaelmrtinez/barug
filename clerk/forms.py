@@ -1,6 +1,58 @@
 from django import forms
 from decimal import Decimal
 
+CIVIL_STATUS_CHOICES = [
+    ("", "— Select Civil Status —"),
+    (1, "SINGLE"),
+    (2, "MARRIED"),
+    (3, "WIDOWED"),
+    (4, "SEPARATED"),
+    (5, "DIVORCED"),
+]
+
+NATIONALITY_CHOICES = [
+    ("", "— Select Nationality —"),
+    (1, "AMERICAN"),
+    (2, "AUSTRALIAN"),
+    (3, "BRAZILIAN"),
+    (4, "BRITISH"),
+    (5, "CANADIAN"),
+    (6, "CHINESE"),
+    (7, "FILIPINO"),
+    (8, "FRENCH"),
+    (9, "GERMAN"),
+    (10, "INDIAN"),
+    (11, "INDONESIAN"),
+    (12, "ITALIAN"),
+    (13, "JAPANESE"),
+    (14, "KOREAN"),
+    (15, "MALAYSIAN"),
+    (16, "RUSSIAN"),
+    (17, "SAUDI"),
+    (18, "SPANISH"),
+    (19, "THAI"),
+    (20, "VIETNAMESE"),
+    (21, "OTHERS"),
+]
+
+RELIGION_CHOICES = [
+    ("", "— Select Religion —"),
+    (1, "AGNOSTIC"),
+    (2, "BORN AGAIN"),
+    (3, "BUDDHIST"),
+    (4, "CHRISTIAN"),
+    (5, "EVANGELICAL"),
+    (6, "HINDU"),
+    (7, "IGLESIA NI CRISTO"),
+    (8, "ISLAM"),
+    (9, "JEHOVAH'S WITNESS"),
+    (10, "ORTHODOX"),
+    (11, "PROTESTANT"),
+    (12, "ROMAN CATHOLIC"),
+    (13, "SEVENTH-DAY ADVENTIST"),
+    (14, "OTHERS"),
+]
+
 BUSINESS_TYPE_CHOICES = [
     ("", "— All types —"),
     (1, "AGRICULTURE / AGRIBUSINESS"),
@@ -34,6 +86,17 @@ BUSINESS_STATUS_CHOICES = [
     (4, "REVOKED"),
     (5, "CLOSED"),
     (6, "EXPIRED"),
+]
+
+OPERATING_DAY_CHOICES = [
+    ("", "— Select Day —"),
+    (1, "Monday"),
+    (2, "Tuesday"),
+    (3, "Wednesday"),
+    (4, "Thursday"),
+    (5, "Friday"),
+    (6, "Saturday"),
+    (7, "Sunday"),
 ]
 
 class RequestedDocsFilters(forms.Form):
@@ -170,7 +233,7 @@ class BusinessOwnerInfo(forms.Form):
         required= True,
     )
     sex = forms.ChoiceField(
-        choices= [('male', 'Male'), ('female', 'Female')],
+        choices= [(1, 'Male'), (2, 'Female')],
         widget=forms.RadioSelect(attrs={
             'id' : 'sex',
             'class' : 'form-check-input',
@@ -189,7 +252,7 @@ class BusinessOwnerInfo(forms.Form):
         required= True,
     )
     civil_status = forms.ChoiceField(
-        choices= [], 
+        choices= CIVIL_STATUS_CHOICES, 
         widget=forms.Select(attrs={
             'id' : 'civil_status',
             'class' : 'form-select',
@@ -198,7 +261,7 @@ class BusinessOwnerInfo(forms.Form):
         required= True,
     )
     nationality = forms.ChoiceField(
-        choices= [], 
+        choices= NATIONALITY_CHOICES, 
         widget=forms.Select(attrs={
             'id' : 'nationality',
             'class' : 'form-select',
@@ -207,7 +270,7 @@ class BusinessOwnerInfo(forms.Form):
         required= True,
     )
     religion = forms.ChoiceField(
-        choices= [], 
+        choices= RELIGION_CHOICES, 
         widget=forms.Select(attrs={
             'id' : 'religion',
             'class' : 'form-select',
@@ -215,18 +278,18 @@ class BusinessOwnerInfo(forms.Form):
         label= 'Religion',
         required= True,
     )
-    home_address = forms.CharField(
-        widget=forms.TextInput(attrs={
-            'id' : 'home_address',
-            'class' : 'form-control',
-            'placeholder' : 'Home Address',
-            'readonly' : 'readonly',
-            'data-bs-toggle' : 'modal',
-            'data-bs-target' : '#address_modal',
-    }),
-        label= 'Home Address',
-        required= True
-    )
+    # home_address = forms.CharField(
+    #     widget=forms.TextInput(attrs={
+    #         'id' : 'home_address',
+    #         'class' : 'form-control',
+    #         'placeholder' : 'Home Address',
+    #         'readonly' : 'readonly',
+    #         'data-bs-toggle' : 'modal',
+    #         'data-bs-target' : '#address_modal',
+    # }),
+    #     label= 'Home Address',
+    #     required= True
+    # )
     street = forms.CharField(
         widget=forms.TextInput(attrs={
             'id' : 'street',
@@ -250,7 +313,6 @@ class BusinessOwnerInfo(forms.Form):
             'id' : 'barangay',
             'class' : 'form-control',
             'placeholder' : 'Barangay',
-            'readonly' : 'readonly',
     }),
         label= 'Barangay',
         required= True,
@@ -260,7 +322,6 @@ class BusinessOwnerInfo(forms.Form):
             'id' : 'city',
             'class' : 'form-control',
             'placeholder' : 'City',
-            'readonly' : 'readonly',
     }),
         label= 'City',
         required= True,
@@ -295,7 +356,7 @@ class BusinessDetails(forms.Form):
         required= True,
     )
     b_type = forms.ChoiceField(
-        choices= [], 
+        choices= BUSINESS_TYPE_CHOICES, 
         widget=forms.Select(attrs={
             'id' : 'b_type',
             'class' : 'form-select',
@@ -303,17 +364,17 @@ class BusinessDetails(forms.Form):
         label= 'Business Type',
         required= True,
     )
-    b_nature = forms.ChoiceField(
-        choices= [], 
-        widget=forms.Select(attrs={
+    b_nature = forms.CharField( 
+        widget=forms.TextInput(attrs={
             'id' : 'b_nature',
-            'class' : 'form-select',
+            'class' : 'form-control',
+            'placeholder' : 'Nature of Business (e.g., Sari-Sari Store, Eatery, etc.)',
     }),
         label= 'Nature of Business',
         required= True,
     )
     ownership_type = forms.ChoiceField(
-        choices= [], 
+        choices= OWNERSHIP_TYPE_CHOICES, 
         widget=forms.Select(attrs={
             'id' : 'ownership_type',
             'class' : 'form-select',
@@ -371,6 +432,19 @@ class BusinessDetails(forms.Form):
         label= 'City',
         required= True,
     )
+    # Hidden fields filled by the map script
+    latitude = forms.DecimalField(
+        required=False,
+        max_digits=10,
+        decimal_places=7,
+        widget=forms.HiddenInput(attrs={'id': 'latitude'}),
+    )
+    longitude = forms.DecimalField(
+        required=False,
+        max_digits=10,
+        decimal_places=7,
+        widget=forms.HiddenInput(attrs={'id': 'longitude'}),
+    )
     b_desc = forms.CharField(
         widget=forms.Textarea(attrs={
             'id' : 'b_desc',
@@ -427,6 +501,19 @@ class BusinessDetails(forms.Form):
         decimal_places=2,
         max_digits=14,
     )
+    inc_est = forms.DecimalField(
+        widget=forms.NumberInput(attrs={
+            'id' : 'inc_est',
+            'class' : 'form-control',
+            'placeholder' : 'Monthly Gross Income Estimate',
+            'inputmode' : 'decimal',
+        }),
+        label= 'Monthly Gross Income Estimate',
+        required= True,
+        min_value=Decimal('0.00'),
+        decimal_places=2,
+        max_digits=14,
+    )
     emp_num = forms.IntegerField(
         widget=forms.NumberInput(attrs={
             'id' : 'emp_num',
@@ -438,12 +525,20 @@ class BusinessDetails(forms.Form):
         required= True,
         min_value=0,
     )
-    opt_days = forms.MultipleChoiceField(
-        choices= [], 
-        widget=forms.SelectMultiple(attrs={
-            'id' : 'opt_days',
+    opt_days_start = forms.ChoiceField(
+        choices= OPERATING_DAY_CHOICES, 
+        widget=forms.Select(attrs={
+            'id' : 'opt_days_start',
             'class' : 'form-select',
-            'size' : 1,
+    }),
+        label= 'Operating Days',
+        required= True,
+    )
+    opt_days_end = forms.ChoiceField(
+        choices= OPERATING_DAY_CHOICES, 
+        widget=forms.Select(attrs={
+            'id' : 'opt_days_end',
+            'class' : 'form-select',
     }),
         label= 'Operating Days',
         required= True,
@@ -468,19 +563,20 @@ class BusinessDetails(forms.Form):
         label= 'Operating Hours - End',
         required= True,
     )
-    prev_clearance = forms.ChoiceField(
-        choices= [('yes', 'Yes'), ('no', 'No')],
-        widget=forms.RadioSelect(attrs={
-            'id' : 'prev_clearance',
-            'class' : 'form-check-input',
-    }),
-        label= 'Has previous Barangay Clearance?',
-        required= True,
-    )
+    # prev_clearance = forms.ChoiceField(
+    #     choices= [('yes', 'Yes'), ('no', 'No')],
+    #     widget=forms.RadioSelect(attrs={
+    #         'id' : 'prev_clearance',
+    #         'class' : 'form-check-input',
+    # }),
+    #     label= 'Has previous Barangay Clearance?',
+    #     required= True,
+    # )
     proof = forms.FileField(
         widget=forms.ClearableFileInput(attrs={
             'id' : 'proof',
             'class' : 'form-control',
+            'accept': 'image/*,application/pdf',
         }),
         label= 'Proof of Business (lease, photos, permit, etc.)',
         required= True, 

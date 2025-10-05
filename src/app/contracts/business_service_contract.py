@@ -1,7 +1,10 @@
 from abc import ABC, abstractmethod
 
 from typing import Any, Dict, List, Optional, Tuple
-from src.app.transfer_objects.dto.business_dto import ResidentOwnerDTO  
+from src.app.transfer_objects.dto.business_dto import (
+  ResidentOwnerDTO,
+  NonResidentOwnerDTO
+)  
 
 # from supabase_auth import Optional
 
@@ -41,3 +44,12 @@ class IResidentOwnerService(ABC):
     ) -> Optional[ResidentOwnerDTO]:
       """Fetch full details of a single owner."""
       pass
+
+class INonResidentOwnerService(ABC):
+    @abstractmethod
+    def execute_insert_owner_details(self, cleaned_data: Dict[str, Any], added_by_id: int) -> NonResidentOwnerDTO:
+        """
+        Map form.cleaned_data -> command -> repo.insert_owner_details.
+        Raise a ValueError (or domain error) on duplicates/validation problems.
+        """
+        pass

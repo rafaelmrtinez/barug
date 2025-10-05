@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Iterable
 import io, os, zipfile, json, re
-from datetime import datetime
+from datetime import datetime, date, time
+from decimal import Decimal
+from django.forms import Form
 
 from django.contrib import messages
 from django.core.paginator import Paginator
@@ -948,6 +950,271 @@ def walkin_create(request: HttpRequest):
 # Business screens (stubs; clerk-only)
 # =========================
 
+def _sstrip(v: Any) -> Optional[str]:
+    """Strip only if string; return None for empty strings; pass through other types."""
+    if v is None:
+        return None
+    if isinstance(v, str):
+        t = v.strip()
+        return t or None
+    return v  # keep non-strings as-is
+
+def _to_str_num(v: Any, default: str = "0") -> str:
+    """Convert Decimal/int/float to string for session JSON safety."""
+    if v is None or v == "":
+        return default
+    try:
+        return str(v)
+    except Exception:
+        return default
+
+def _to_float_or_none(val) -> Optional[float]:
+    try:
+        if val in (None, "", "None"):
+            return None
+        return float(val)
+    except Exception:
+        return None
+
+def _to_int_or_none(val) -> Optional[int]:
+    try:
+        if val in (None, "", "None"):
+            return None
+        return int(val)
+    except Exception:
+        return None
+
+def _parse_date_iso(s: Any) -> Any:
+    if isinstance(s, date):
+        return s
+    if isinstance(s, str) and s:
+        try:
+            return date.fromisoformat(s)
+        except ValueError:
+            return s
+    return s
+
+def _parse_time_hms(s: Any) -> Any:
+    if isinstance(s, time):
+        return s
+    if isinstance(s, str) and s:
+        try:
+            parts = s.split(":")
+            if len(parts) == 2:
+                h, m = parts
+                return time(int(h), int(m), 0)
+            elif len(parts) == 3:
+                h, m, sec = parts
+                return time(int(h), int(m), int(sec))
+        except Exception:
+            return s
+    return s
+
+def _fmt_peso(v: Any) -> str:
+    # We stored money-like values as strings earlier; accept Decimal/float/string
+    if v in (None, "", "None"):
+        return "₱ 0.00"
+    try:
+        num = float(v) if not isinstance(v, (int, float)) else v
+        return f"₱ {num:,.2f}"
+    except Exception:
+        return f"₱ {v}"
+
+def _json_safe(val):
+    """Recursively convert Decimals, dates, times, etc. to JSON-serializable types."""
+    if isinstance(val, Decimal):
+        # choose float for numbers (you already stringified money fields separately)
+        return float(val)
+    if isinstance(val, (list, tuple)):
+        return [ _json_safe(v) for v in val ]
+    if isinstance(val, dict):
+        return { k: _json_safe(v) for k, v in val.items() }
+    # dates/times in your code are already converted to isoformat or HH:MM:SS
+    return val
+
+def _owner_full_name(o: dict) -> str:
+    last = (o.get("last_name") or "").strip()
+    first = (o.get("first_name") or "").strip()
+    mid = (o.get("middle_name") or "").strip()
+    suffix = (o.get("suffix") or "").strip()
+    parts: List[str] = []
+    if last: parts.append(last.upper())
+    if first: parts.append(", " + first.title())
+    if mid: parts.append(" " + (mid[0].upper() + "."))
+    if suffix: parts.append(" " + suffix.upper())
+    if parts:
+        return "".join(parts)
+    # 🔽 DTO fallback
+    fn = (o.get("full_name") or "").strip()
+    return fn or "—"
+
+def _join_addr(parts: List[str]) -> str:
+    return ", ".join([p.strip() for p in parts if p and p.strip()])
+
+def _choices_to_map(choices: Iterable) -> Dict[Any, str]:
+    """
+    Convert Django choices (which may include optgroups) to {value: label}.
+    Safely handles:
+      - [("", "— Select —"), (1, "ONE"), (2, "TWO")]
+      - [("WEEKDAYS", [(1,"Mon"), (2,"Tue")]), ("WEEKEND", [(6,"Sat"), (7,"Sun")])]
+    """
+    out: Dict[Any, str] = {}
+    for item in choices or []:
+        # Optgroup: (group_label, list_of_choices)
+        if isinstance(item, (list, tuple)) and len(item) == 2 and isinstance(item[1], (list, tuple)):
+            _group_label, _group_choices = item
+            for v, lbl in _group_choices:
+                out[_coerce_key(v)] = str(lbl)
+        else:
+            # Regular choice: (value, label)
+            try:
+                v, lbl = item
+                out[_coerce_key(v)] = str(lbl)
+            except Exception:
+                continue
+    return out
+
+def _coerce_key(v: Any) -> Any:
+    """Try to turn numeric-looking keys into int for easy matching; else leave as-is."""
+    if v is None:
+        return None
+    # If already an int, or your TypedChoiceField coerces to int, this keeps it as int.
+    if isinstance(v, int):
+        return v
+    # Try to int-ify strings like "1"
+    try:
+        return int(v)
+    except Exception:
+        return v  # keep original (e.g., "" for blank choice)
+
+def _field_map(form: Form, field_name: str) -> Dict[Any, str]:
+    field = form.fields.get(field_name)
+    if not field:
+        return {}
+    return _choices_to_map(field.choices)
+
+def fetch_display_maps_from_forms() -> Dict[str, Dict[Any, str]]:
+    """
+    Build all needed {id: label} maps directly from your static Django forms.
+    Adjust field names if yours differ.
+    """
+    from .forms import BusinessOwnerInfo, BusinessDetails  # import here to avoid circulars
+    owner_form = BusinessOwnerInfo()
+    biz_form = BusinessDetails()
+
+    return {
+        # Owner-side lookups
+        "sex": _field_map(owner_form, "sex"),
+        "civil_status": _field_map(owner_form, "civil_status"),
+        "nationality": _field_map(owner_form, "nationality"),
+        "religion": _field_map(owner_form, "religion"),
+
+        # Business-side lookups
+        "business_type": _field_map(biz_form, "b_type"),
+        "ownership_type": _field_map(biz_form, "ownership_type"),
+
+        # Operating day labels if your BusinessDetails uses these choice fields
+        # (IDs likely 1..7 → "Mon", "Tue", ...). If you don't have them as ChoiceFields,
+        # this will just return {} and our fallback will kick in.
+        "operating_day": _field_map(biz_form, "opt_days_start") or _field_map(biz_form, "opt_days_end"),
+    }
+
+def build_owner_display(owner: dict, maps: Dict[str, Dict[Any, str]]) -> Dict[str, Any]:
+    sex_name = (
+        owner.get("sex_name")
+        or maps.get("sex", {}).get(owner.get("sex_id"))
+        or owner.get("sex")
+    )
+    civil_name = (
+        owner.get("civil_status_name")
+        or owner.get("civil_status")
+        or maps.get("civil_status", {}).get(owner.get("civil_status_id"))
+        or owner.get("civil_status_id")
+    )
+    nat_name = (
+        owner.get("nationality_name")
+        or owner.get("nationality")
+        or maps.get("nationality", {}).get(owner.get("nationality_id"))
+        or owner.get("nationality_id")
+    )
+    rel_name = (
+        owner.get("religion_name")
+        or owner.get("religion")
+        or maps.get("religion", {}).get(owner.get("religion_id"))
+        or owner.get("religion_id")
+    )
+
+    full_name = _owner_full_name(owner)
+    addr = _join_addr([
+        owner.get("street") or "",
+        owner.get("purok_sitio") or "",
+        owner.get("barangay") or "",
+        owner.get("city") or "",
+    ])
+
+    # 👇 normalize for display even if session is old and lacks the field
+    res_name = _normalize_residency_name(
+        owner.get("residency_name") or owner.get("residential_status_name")
+    )
+
+    return {
+        "full_name": full_name,
+        "person_code": owner.get("person_code"),
+        "sex_name": sex_name or "—",
+        "dob": owner.get("dob") or owner.get("date_of_birth") or "—",
+        "civil_status_name": civil_name or "—",
+        "nationality_name": nat_name or "—",
+        "religion_name": rel_name or "—",
+        "mobile": owner.get("mobile") or "—",
+        "email": owner.get("email") or "—",
+        "address_display": addr or (owner.get("address_line") or "—"),
+        "residency_name": res_name,  # 👈 always a value
+    }
+
+def build_business_display(biz: dict, maps: Dict[str, Dict[int, str]]) -> Dict[str, Any]:
+    """
+    Return a label-rich dict strictly for display.
+    """
+    btype_name = maps.get("business_type", {}).get(biz.get("b_type")) or biz.get("b_type_name")
+    owner_type_name = maps.get("ownership_type", {}).get(biz.get("ownership_type")) or biz.get("ownership_type_name")
+
+    # Operating day labels from form choices (fallback to raw if missing)
+    day_map = maps.get("operating_day", {}) or {}
+    opt_days_start_lbl = day_map.get(biz.get("opt_days_start")) or biz.get("opt_days_start")
+    opt_days_end_lbl   = day_map.get(biz.get("opt_days_end"))   or biz.get("opt_days_end")
+
+    addr = _join_addr([
+        biz.get("street") or "",
+        biz.get("purok_sitio") or "",
+        biz.get("barangay") or "",
+        biz.get("city") or "",
+    ])
+
+    return {
+        "b_name": biz.get("b_name") or "—",
+        "b_type_name": btype_name or biz.get("b_type") or "—",
+        "b_nature": biz.get("b_nature") or "—",
+        "ownership_type_name": owner_type_name or biz.get("ownership_type") or "—",
+        "address_display": addr or "—",
+        "latitude": biz.get("latitude"),
+        "longitude": biz.get("longitude"),
+        "b_desc": biz.get("b_desc") or "—",
+        "date_est": biz.get("date_est") or "—",
+        "dti": biz.get("dti") or "—",
+        "capital_display": _fmt_peso(biz.get("capital_invested")),
+        "prevgross_display": _fmt_peso(biz.get("prevgross")),
+        "inc_est": _fmt_peso(biz.get("inc_est")),
+        "employees_display": biz.get("emp_num") or "—",
+        # expose both label and raw for completeness
+        "opt_days_start_name": opt_days_start_lbl,
+        "opt_days_end_name": opt_days_end_lbl,
+        "opt_days_start": biz.get("opt_days_start"),
+        "opt_days_end": biz.get("opt_days_end"),
+        "opt_start": biz.get("opt_start"),
+        "opt_end": biz.get("opt_end"),
+        "proof_name": biz.get("proof_name") or "—",  # keep original case in template
+    }
+
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
@@ -962,16 +1229,16 @@ def business_owner(request: HttpRequest):
         },
     )
 
-def _to_int_or_none(val: str | None) -> int | None:
-    if val is None:
-        return None
-    s = str(val).strip()
-    if not s:
-        return None
-    try:
-        return int(s)
-    except ValueError:
-        return None
+# def _to_int_or_none(val: str | None) -> int | None:
+#     if val is None:
+#         return None
+#     s = str(val).strip()
+#     if not s:
+#         return None
+#     try:
+#         return int(s)
+#     except ValueError:
+#         return None
     
 def _normalize_owner_rows(rows):
     """
@@ -1005,6 +1272,90 @@ def _normalize_owner_rows(rows):
             "residential_status_name": d.get("residential_status_name") or "",
             "address_line": d.get("address_line") or "",
         })
+    return payload
+
+def _asdict_loose(obj: Any) -> Dict[str, Any]:
+    """Return a plain dict from dataclass / namedtuple / dict / generic object."""
+    if obj is None:
+        return {}
+    if isinstance(obj, dict):
+        return obj
+    if is_dataclass(obj):
+        return dc_asdict(obj)
+    if hasattr(obj, "_asdict"):
+        try:
+            return obj._asdict()
+        except Exception:
+            pass
+    out: Dict[str, Any] = {}
+    for k in dir(obj):
+        if k.startswith("_"):
+            continue
+        try:
+            v = getattr(obj, k)
+        except Exception:
+            continue
+        if callable(v):
+            continue
+        out[k] = v
+    return out
+
+def _normalize_residency_name(s: Optional[str]) -> str:
+    if not s:
+        return "NON-RESIDENT"
+    x = (str(s) or "").strip().upper()
+    if x in {"RESIDENT", "R"}: return "RESIDENT"
+    if x in {"NON RESIDENT", "NON-RESIDENT", "NONRESIDENT", "NR"}: return "NON-RESIDENT"
+    if x in {"TRANSIENT", "T"}: return "TRANSIENT"
+    return x or "NON-RESIDENT"
+
+
+def _owner_payload_common_from_dict(src: Any) -> Dict[str, Any]:
+    d = _asdict_loose(src)
+
+    dob_val = d.get("dob") or d.get("date_of_birth")
+    if isinstance(dob_val, date):
+        dob_str = dob_val.isoformat()
+    elif isinstance(dob_val, str):
+        dob_str = dob_val
+    else:
+        dob_str = None
+
+    payload = {
+        "owner_person_id": _to_int_or_none(d.get("owner_person_id") or d.get("person_id")),
+        # keep split names if available + full_name for display fallback
+        "last_name": _sstrip(d.get("last_name")) or "",
+        "first_name": _sstrip(d.get("first_name")) or "",
+        "middle_name": _sstrip(d.get("middle_name")),
+        "suffix": _sstrip(d.get("suffix")),
+        "full_name": _sstrip(d.get("full_name")),
+
+        "dob": dob_str,
+        "email": _sstrip(d.get("email")),
+        "mobile": _sstrip(d.get("mobile") or d.get("mob_num")),
+
+        # IDs if you ever have them (DTO strings will not coerce to int)
+        "sex_id": _to_int_or_none(d.get("sex_id") or d.get("sex")),
+        "civil_status_id": _to_int_or_none(d.get("civil_status_id")),
+        "nationality_id": _to_int_or_none(d.get("nationality_id")),
+        "religion_id": _to_int_or_none(d.get("religion_id")),
+
+        # 🔽 carry human-readable labels from DTO
+        "sex_name": _sstrip(d.get("sex_name")),
+        "civil_status_name": _sstrip(d.get("civil_status")),
+        "nationality_name": _sstrip(d.get("nationality")),
+        "religion_name": _sstrip(d.get("religion")),
+
+        # address
+        "street": _sstrip(d.get("street")) or "",
+        "purok_sitio": _sstrip(d.get("purok_sitio") or d.get("purok")) or "",
+        "barangay": _sstrip(d.get("barangay")) or "",
+        "city": _sstrip(d.get("city")) or "",
+        "address_line": _sstrip(d.get("address_line")),  # optional fallback for display
+
+        "person_code": _sstrip(d.get("person_code")),
+        "residency_name": _normalize_residency_name(d.get("residency_name") or d.get("residential_status_name") or "NON-RESIDENT"),
+    }
     return payload
 
 @session_login_required
@@ -1045,6 +1396,14 @@ def business_owner_resident(
         except Exception:
             log.exception("Fetching owner details failed for id=%s", request.POST.get("owner_person_id"))
             selected = None
+
+    if selected:
+        owner_payload = _owner_payload_common_from_dict(selected)
+
+        request.session["bizreg_owner"] = owner_payload
+        request.session.set_expiry(1800)
+
+        messages.success(request, "Owner selected. Continue with business details.")
 
     # keep form pristine if invalid
     if search and not form.is_valid():
@@ -1089,10 +1448,154 @@ def ajax_owner_search(
 
 @session_login_required
 @role_required(CLERK_ROLE)
+@csrf_protect
+@nocache
+def business_owner_nonresident(request: HttpRequest) -> HttpResponse:
+    user_role = _auth_role_name(request)
+
+    if request.method == "POST":
+        form = BusinessOwnerInfo(request.POST)
+        if form.is_valid():
+
+            dob_val = form.cleaned_data["dob"]
+            dob_str = dob_val.isoformat() if isinstance(dob_val, date) else str(dob_val)
+
+            owner_payload: Dict[str, Any] = {
+                "owner_person_id": form.cleaned_data.get("owner_person_id") or None,
+                "last_name": form.cleaned_data["last_name"].strip(),
+                "first_name": form.cleaned_data["first_name"].strip(),
+                "middle_name": (form.cleaned_data.get("middle_name") or "").strip() or None,
+                "suffix": (form.cleaned_data.get("suffix") or "").strip() or None,
+                # ensure your form field is named 'dob' and is a DateField or "YYYY-MM-DD" string
+                "dob": dob_str,
+                "email": (form.cleaned_data.get("email") or "").strip() or None,
+                "mobile": (form.cleaned_data.get("mob_num") or "").strip() or None,
+                "sex_id": int(form.cleaned_data["sex"]),
+                "civil_status_id": int(form.cleaned_data["civil_status"]),
+                "nationality_id": int(form.cleaned_data["nationality"]),
+                "religion_id": int(form.cleaned_data["religion"]),
+                "street": form.cleaned_data["street"].strip(),
+                "purok_sitio": (form.cleaned_data.get("purok_sitio") or "").strip(),
+                "barangay": form.cleaned_data["barangay"].strip(),
+                "city": form.cleaned_data["city"].strip(),
+            }
+
+            # Store and expire in 30 minutes
+            request.session["bizreg_owner"] = owner_payload
+            request.session.set_expiry(1800)
+            owner_payload["residency_name"] = "NON-ESIDENT"
+            # Optional success flash
+            messages.success(request, "Owner info saved. Continue with business details.")
+
+            # Redirect to the next step (ensure this URL name exists)
+            return redirect("clerk:business_details")
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        # GET — prefill from session if present; convert dob string back to a date for the DateField
+        saved = request.session.get("bizreg_owner") or {}
+        if "dob" in saved and isinstance(saved["dob"], str):
+            try:
+                saved["dob"] = date.fromisoformat(saved["dob"])
+            except ValueError:
+                # leave as-is if parsing fails; the form will show the raw string
+                pass
+        form = BusinessOwnerInfo(initial=saved or None)
+
+    return render(
+        request,
+        "business/business_owner_nonres.html",
+        {
+            "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
+            "page_title": "Business Owner Information",
+            "form": form,
+        },
+    )
+
+@session_login_required
+@role_required(CLERK_ROLE)
 @nocache
 def business_details(request: HttpRequest):
     user_role = _auth_role_name(request)
-    form = BusinessDetails()
+
+    owner = request.session.get("bizreg_owner")
+    if not owner:
+        messages.warning(request, "No owner info found. Please fill the form first.")
+        return redirect("clerk:business_owner_nonresident")
+    
+    if request.method == "POST":
+        form = BusinessDetails(request.POST, request.FILES or None)
+
+        if form.is_valid():
+            cd = form.cleaned_data
+
+            # Build a JSON-serializable payload for session
+            payload: Dict[str, Any] = {
+                # strings → strip safely
+                "b_name": _sstrip(cd.get("b_name")) or "",
+                "b_nature": _sstrip(cd.get("b_nature")),
+                "b_address": _sstrip(cd.get("b_address")) or "",
+                "b_desc": _sstrip(cd.get("b_desc")),
+                "dti": _sstrip(cd.get("dti")),
+                "inc_est": _sstrip(cd.get("inc_est")),
+
+                # choice/ids
+                "b_type": _to_int_or_none(cd.get("b_type")),
+                "ownership_type": _to_int_or_none(cd.get("ownership_type")),
+
+                # numbers (keep JSON-safe as strings)
+                "capital_invested": _to_str_num(cd.get("capital_invested"), "0"),
+                "prevgross": _to_str_num(cd.get("prevgross"), "0"),
+                "emp_num": _to_int_or_none(cd.get("emp_num") or 0),
+
+                # days/time
+                "opt_days_start": _to_int_or_none(cd.get("opt_days_start")),
+                "opt_days_end": _to_int_or_none(cd.get("opt_days_end")),
+                "opt_start": cd["opt_start"].strftime("%H:%M:%S") if cd.get("opt_start") else None,
+                "opt_end": cd["opt_end"].strftime("%H:%M:%S") if cd.get("opt_end") else None,
+
+                # date
+                "date_est": (cd["date_est"].isoformat() if cd.get("date_est") else None),
+
+                # geo
+                "latitude": _to_float_or_none(cd.get("latitude")),
+                "longitude": _to_float_or_none(cd.get("longitude")),
+
+                # address modal fields (strings)
+                "street": _sstrip(cd.get("street")) or "",
+                "purok_sitio": _sstrip(cd.get("purok_sitio")) or "",
+                "barangay": _sstrip(cd.get("barangay")) or "",
+                "city": _sstrip(cd.get("city")) or "",
+            }
+
+            # NOTE: We intentionally DO NOT put file objects (e.g., proof) in session.
+            # If you want to remember the chosen filename for UX:
+            if request.FILES.get("proof"):
+                payload["proof_name"] = request.FILES["proof"].name  # just for display; not the file itself
+            
+            payload = _json_safe(payload)
+
+            request.session["bizreg_business"] = payload
+            request.session.set_expiry(1800)  # 30 minutes
+
+            messages.success(request, "Business details saved.")
+            # Keep user on this page (safe redirect) or go to your next step if you have one:
+            return redirect("clerk:business_information_review")
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        saved = request.session.get("bizreg_business") or {}
+
+        # Convert back to proper field types for form initial
+        if "date_est" in saved:
+            saved["date_est"] = _parse_date_iso(saved["date_est"])
+        if "opt_start" in saved:
+            saved["opt_start"] = _parse_time_hms(saved["opt_start"])
+        if "opt_end" in saved:
+            saved["opt_end"] = _parse_time_hms(saved["opt_end"])
+
+        form = BusinessDetails(initial=saved or None)
+
     return render(
         request,
         "business/business_details.html",
@@ -1100,6 +1603,52 @@ def business_details(request: HttpRequest):
             "page_path": f"{user_role} / Business Records / Add Business / Business Information",
             "page_title": "Business Information",
             "form": form,
+            "owner": owner,
+        },
+    )
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+def business_information_review(request: HttpRequest):
+    user_role = _auth_role_name(request)
+
+    owner = request.session.get("bizreg_owner")
+    if not owner:
+        return redirect("clerk:business_owner_nonres")
+
+    business = request.session.get("bizreg_business")
+    if not business:
+        return redirect("clerk:business_details")
+    
+     # Normalize a few fields for nicer display on the review page
+    owner = dict(owner)  # shallow copy so we can tweak for display
+    if "dob" in owner:
+        owner["dob"] = _parse_date_iso(owner["dob"])
+
+    business = dict(business)
+    if "date_est" in business:
+        business["date_est"] = _parse_date_iso(business["date_est"])
+    if "opt_start" in business:
+        business["opt_start"] = _parse_time_hms(business["opt_start"])
+    if "opt_end" in business:
+        business["opt_end"] = _parse_time_hms(business["opt_end"])
+
+    maps = fetch_display_maps_from_forms()
+    owner_disp = build_owner_display(owner, maps)
+    biz_disp   = build_business_display(business, maps)
+
+        
+    return render(
+        request,
+        "business/business_information_review.html",
+        {
+            "page_path": f"{user_role} / Business Records / Add Business / Business Information",
+            "page_title": "Business Information",
+            "owner": owner,                 # raw for future DB insert
+            "business": business,           # raw for future DB insert
+            "owner_disp": owner_disp,       # labels for display
+            "biz_disp": biz_disp,           # labels for display
         },
     )
 
@@ -1195,20 +1744,6 @@ def business_information(request: HttpRequest, b_id: int):
         {
             "page_path": f"{user_role} / Business Records / Business Details : {b_id}",
             "page_title": f"Business Details : {b_id}",
-        },
-    )
-
-# Hannah's Code:
-def business_owner_nonresident(request: HttpRequest):
-    user_role = _auth_role_name(request)
-    form = BusinessOwnerInfo()
-    return render(
-        request,
-        "business/business_owner_nonres.html",
-        {
-            "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
-            "page_title": "Business Owner Information",
-            "form": form,
         },
     )
 

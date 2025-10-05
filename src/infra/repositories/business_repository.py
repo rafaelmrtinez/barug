@@ -1,10 +1,12 @@
 from src.app.transfer_objects.dto.business_dto import (
     BusinessListDTO,
-    ResidentOwnerDTO
+    ResidentOwnerDTO,
+    NonResidentOwnerDTO,
 )
 from src.domain.contracts.business_repository_contract import (
     IBusinessRepository,
-    IResidentOwnerRepository    
+    IResidentOwnerRepository,
+    INonResidentOwnerRepository,
 )
 from src.infra.contracts.connection_adapter import IConnectionAdapter
 from src.infra.exceptions.query_exec_exception import QueryExecutionException

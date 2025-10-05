@@ -194,7 +194,7 @@
         <button type="button" class="btn btn-reset" onclick="history.back()">Back</button>
         <a class="btn btn-submit"
           id="continueBtn"
-          href="{% url 'clerk:business_details' %}{% if selected %}?owner_id={{ selected.person_id }}{% elif search and results %}?owner_id={{ results.0.person_id }}{% endif %}">
+          href="{% url 'clerk:business_details' %}">
           Continue
         </a>
       </div>

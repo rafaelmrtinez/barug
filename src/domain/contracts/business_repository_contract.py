@@ -1,8 +1,11 @@
 from abc import ABC, abstractmethod
-
 from typing import Optional
-from src.app.transfer_objects.dto.business_dto import BusinessListDTO
-from src.app.transfer_objects.dto.business_dto import ResidentOwnerDTO
+from typing import Optional
+from src.app.transfer_objects.dto.business_dto import (
+    BusinessListDTO,
+    ResidentOwnerDTO,
+    NonResidentOwnerDTO
+)
 
 class IBusinessRepository(ABC):
 
@@ -40,4 +43,16 @@ class IResidentOwnerRepository(ABC):
         self,
         person_id: int,
     ) -> Optional[ResidentOwnerDTO]:
+        pass
+
+class INonResidentOwnerRepository(ABC):
+
+    @abstractmethod
+    def find_duplicate(self, *, email: Optional[str], mobile: Optional[str]) -> Optional[int]:
+        """Return person_id if an owner/person exists with same email/mobile, else None."""
+        pass
+
+    @abstractmethod
+    def insert_owner_details(self) -> NonResidentOwnerDTO:
+        """Call SQL register_owner_only(...) then select and return full DTO."""
         pass
