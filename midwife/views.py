@@ -24,6 +24,10 @@ from .forms import (
     WeekRangeActiveScheduleFilter,
     Reschedule,
     MaternalBhwIntakeForm,
+    SearchPerson,
+    ResidentProfileform,
+    ChooseRole,
+    StaffFilters,
 )
 
 # Service helpers (unchanged)
@@ -618,3 +622,101 @@ def child_new(request: HttpRequest) -> HttpResponse:
             "page_title": "New Child Health Record",
         },
     )
+
+
+# ---------------------------------
+
+def staff_selection(request):
+    return render(request, "acc_management/staff_selection.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Account Verification',
+        'page_title': 'Account Verification',
+        'user_role_template': user_role_template,
+    })
+
+def staff_selection_resident(request):
+    form = SearchPerson()
+    role_form = ChooseRole()
+    return render(request, "acc_management/staff_selection_resident.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Account Verification',
+        'page_title': 'Account Verification',
+        'user_role_template': user_role_template,
+        'form' : form,
+        'role_form': role_form,
+    })
+
+def staff_selection_nonres(request):
+    form = ResidentProfileform()
+    return render(request, "acc_management/staff_selection_nonresident.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Account Verification',
+        'page_title': 'Account Verification',
+        'user_role_template': user_role_template,
+        'form' : form,
+    })
+
+
+# def staff_selection_nonres_socio(request):
+#     form = ResidentProfileform()
+#     return render(request, "person/socioeconomic_info.html", {
+#         'user_fullname': user_fullname,
+#         'user_role': user_role,
+#         'page_path': f'{user_role} / Account Verification',
+#         'page_title': 'Account Verification',
+#         'user_role_template': user_role_template,
+#         'form' : form,
+#         'redirect' : 'staff_admin:staff_selection_non-resident_docs',
+#     })
+
+def staff_selection_nonres_docs(request):
+    form = ResidentProfileform()
+    return render(request, "acc_management/supporting_docs.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Account Verification',
+        'page_title': 'Account Verification',
+        'user_role_template': user_role_template,
+        'form' : form,
+    })
+
+def staff_selection_nonres_role_review(request):
+    role_form = ChooseRole()
+    return render(request, "acc_management/role.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Account Verification',
+        'page_title': 'Account Verification',
+        'user_role_template': user_role_template,
+        'role_form': role_form,
+    })
+
+def staff_list(request):
+    form = StaffFilters()
+
+    list = []
+    paginator = Paginator(list, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, "acc_management/staff_list.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Account Verification',
+        'page_title': 'Account Verification',
+        'user_role_template': user_role_template,
+        'form' : form,
+        'page_obj': page_obj,
+    })
+
+def staff_dets(request, staff_id):
+    return render(request, "person/staff_dets.html", {
+        'user_fullname' : user_fullname,
+        'user_role' : user_role,
+        'page_path' : f'{user_role} / Staff Details : {staff_id}',
+        'page_title' : f'Staff Details : {staff_id}',
+        'user_role_template' : user_role_template,
+    })
