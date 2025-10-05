@@ -1,8 +1,13 @@
 # midwife/views.py
 from __future__ import annotations
 
+import json
+
 from datetime import date
 from typing import Any, Dict, List, Optional, Tuple
+
+from django.views.decorators.http import require_http_methods
+from dependency_injector.wiring import inject, Provide
 
 from django.contrib import messages
 from django.core.paginator import Paginator
@@ -17,6 +22,8 @@ from django.template.loader import render_to_string
 
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
+from src.app.bootstrap.app_containers import AppContainer
+from src.domain.contracts.maternal_service import IMaternalService
 
 from .forms import (
     SearchActiveScheduleFilter,
@@ -620,3 +627,9 @@ def child_new(request: HttpRequest) -> HttpResponse:
             "page_title": "New Child Health Record",
         },
     )
+    
+@inject
+@require_http_methods(["POST"])
+def child_visit_http(request: HttpRequest, service: IMaternalService = Provide[AppContainer.maternal_service]) -> HttpResponse:
+    
+    return HttpResponse("Not implemented yet.", status=501)    
