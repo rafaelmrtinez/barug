@@ -107,16 +107,14 @@
 
             if (!res.ok) {
                 const errorData = await res.json();
-                console.error("Error:", errorData);
-                alert("An error occurred: " + (errorData.message || "Unknown error"));
+                alert("An error occurred: " + (errorData.error || "Unknown error"));
                 return;
             }
 
-            const data = await res.json();
-            console.log("Success:", data);
             alert("Data submitted successfully!");
+            window.location.reload();
         } catch (error) {
-            console.error("Error:", error);
+            alert("An unexpected error occurred. Please try again later.");
         }
     }
 

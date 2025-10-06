@@ -2,9 +2,11 @@ class MaternalDomainService:
 
     @staticmethod
     def determine_latest_immunization(immunization):
-        key = "pentavalent" if immunization.name == "penta" else ("hep bv" if immunization.name == "hepb" else immunization.name)
+        key = "pentavalent" if immunization.name == "penta" else (
+            "hep bv" if immunization.name == "hepb" else immunization.name)
 
-        doses = [immunization.d0, immunization.d1, immunization.d2, immunization.d3]
+        doses = [immunization.d0, immunization.d1,
+                 immunization.d2, immunization.d3]
         for stage, dose_date in reversed(list(enumerate(doses, start=1))):
             if dose_date:
                 return key.upper(), dose_date, stage
@@ -35,8 +37,10 @@ class MaternalDomainService:
         errors = []
 
         for record in immunization_data:
-            doses = [("d0", record.d0), ("d1", record.d1),
-                     ("d2", record.d2), ("d3", record.d3)]
+            doses = [
+                ("d0", record.d0), ("d1", record.d1),
+                ("d2", record.d2), ("d3", record.d3)
+            ]
             previous_given = True
 
             for dose_name, dose_value in doses:

@@ -22,6 +22,7 @@ from django.template.loader import render_to_string
 
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
+from barug.error_messages import SOMETHING_WENT_WRONG
 from midwife.utility.immunitization_utility import ImmunizationUtility
 from src.app.bootstrap.app_containers import AppContainer
 from src.app.exceptions.person_not_found import PersonNotFoundException
@@ -686,7 +687,12 @@ def child_visit_http(request: HttpRequest, service: IMaternalService = Provide[A
     
     try:
         res = service.execute_child_visit(initial_data, initial_immunization)
+        
+        if not res:
+            return JsonResponse({"error": "Failed to create child visit"}, status=500)
+
+        return JsonResponse({"message": "Child visit created successfully", "child_visit_id": res}, status=201)        
     except (PersonNotFoundException, PrescriptionException, ChildVisitException) as e:
         return JsonResponse({"error": str(e)}, status=500)
-
-    return JsonResponse({"success": True, "data": res}, status=201)
+    except Exception:
+        return JsonResponse({"error": SOMETHING_WENT_WRONG}, status=500)

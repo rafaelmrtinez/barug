@@ -60,7 +60,7 @@ class MaternalRepository(IMaternalRepository):
             if not row:
                 raise RuntimeError("No ID returned from insert_child_visit")
         
-            return row[0]
+            return row[0][0]
         
         except QueryExecutionException as e:
             if ChildVisitException.is_child_visit_exception(e.code):
