@@ -15,6 +15,12 @@ urlpatterns = [
     path("fees/add/", views.fee_add, name="fee_add"),
     path("fees/<str:fee_code>/edit/", views.fee_edit, name="fee_edit"),
 
+    # NEW: confirm + post OR for an already-paid request
+    path("requests/<int:doc_request_id>/confirm-or/", views.confirm_post_or, name="confirm_post_or"),
+
+    # NEW: mark a refund completed (manual finalize)
+    path("requests/<int:doc_request_id>/refund/complete/", views.treasurer_complete_refund, name="treasurer_complete_refund"),
+
     # Business-only queue
     path("business/requests/", views.business_queue, name="business_queue"),
     path("business/renewal/", views.business_renewal, name="business_renewal"),

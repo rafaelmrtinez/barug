@@ -106,13 +106,26 @@ def _make_or_number_fallback(event_ref: str) -> str:
     return f"OR-{event_ref}"
 
 
+from decimal import Decimal
+from typing import Optional
+from django.conf import settings
+
 def _finalize_doc_paid(doc_id: int, paid_dt, event_ref: str, provider_payment_id: Optional[str]):
     """
-    Idempotent finalizer for document payments.
-    Serializes on the latest payment_session row and avoids duplicate OR inserts.
-    Also: after marking PAID, move to FOR_CLERK_REVIEW (unless RECONCILE).
+    Idempotent finalizer for DOCUMENT requests paid online.
+
+    Steps:
+      0) Serialize on latest payment_session row (avoid double-finalize).
+      1) Mark latest payment_session as PAID (record provider_payment_id).
+      2) (OPTIONAL) Issue OR here only if PAYMENTS_AUTO_OR_FOR_DOCS=True.
+      3) Set doc_request_hdr to PAID (if not already).
+      4) If collected != server amount → set RECONCILE and stop.
+      5) Else advance to FOR CLERK REVIEW.
+
+    This function is safe to call multiple times.
     """
-    # --- 0) Lock latest session to serialize concurrent finalizers (webhook vs redirect)
+
+    # --- 0) Lock latest session to serialize concurrent webhook/redirect calls
     lock = exec_one("""
       select payment_session_id, status
         from payment_session
@@ -122,9 +135,9 @@ def _finalize_doc_paid(doc_id: int, paid_dt, event_ref: str, provider_payment_id
        for update
     """, [doc_id])
     if not lock:
-        return
+        return  # nothing to do
 
-    # If already paid AND an OR already exists, bail early
+    # If already paid AND an OR already exists, bail early (idempotent fast-path)
     already_or = exec_one("""
       select 1
         from official_receipt
@@ -134,7 +147,7 @@ def _finalize_doc_paid(doc_id: int, paid_dt, event_ref: str, provider_payment_id
     if lock["status"] == "PAID" and already_or:
         return
 
-    # --- 1) Mark latest session as PAID and fetch amounts
+    # --- 1) Mark latest session as PAID and capture amounts
     ps = exec_one("""
       with x as (
         select payment_session_id
@@ -151,11 +164,9 @@ def _finalize_doc_paid(doc_id: int, paid_dt, event_ref: str, provider_payment_id
        where ps.payment_session_id = x.payment_session_id
       returning ps.amount, ps.payment_session_id;
     """, [doc_id, paid_dt, provider_payment_id])
-
     if not ps:
         return
 
-    # log: session paid (SYSTEM performer => pass None)
     _log(
         "PAYMENT_SESSION_PAID",
         "payment_session",
@@ -170,52 +181,52 @@ def _finalize_doc_paid(doc_id: int, paid_dt, event_ref: str, provider_payment_id
         None,
     )
 
-    collected = Decimal(str(ps["amount"] or 0))
-    server    = exec_one("select _doc_request_amount(%s) as amt;", [doc_id])
-    server_amt = Decimal(str((server or {}).get("amt", 0)))
+    collected   = Decimal(str(ps["amount"] or 0))
+    srv_row     = exec_one("select _doc_request_amount(%s) as amt;", [doc_id])
+    server_amt  = Decimal(str((srv_row or {}).get("amt", 0)))
 
     pm_id  = _payment_method_online_id()
     or_no  = _make_or_number_fallback(event_ref)
-    issuer = None  # allowed to be NULL (schema changed)
+    issuer = None  # allowed to be NULL
 
-    # --- 2) If an OR already exists (race), skip issuing another
-    exists_or = exec_one("""
-      select or_id
-        from official_receipt
-       where doc_request_id=%s
-       order by issued_at desc
-       limit 1
-    """, [doc_id])
-    or_id = (exists_or or {}).get("or_id")
+    # --- 2) OR INSERT (DISABLED by default; Treasurer will post the OR)
+    if getattr(settings, "PAYMENTS_AUTO_OR_FOR_DOCS", False):
+        exists_or = exec_one("""
+          select or_id
+            from official_receipt
+           where doc_request_id=%s
+           order by issued_at desc
+           limit 1
+        """, [doc_id])
+        or_id = (exists_or or {}).get("or_id")
 
-    if not or_id:
-        # Issue OR for the collected amount (what the gateway charged)
-        or_row = exec_one("""
-          insert into official_receipt(
-            or_number, issued_by_staff_id, doc_request_id, payment_method_id,
-            amount_due, amount_paid, change_due
-          ) values (%s, %s, %s, %s, %s, %s, 0)
-          returning or_id;
-        """, [or_no, issuer, doc_id, pm_id, float(collected), float(collected)])
-        or_id = (or_row or {}).get("or_id")
+        if not or_id:
+            or_row = exec_one("""
+              insert into official_receipt(
+                or_number, issued_by_staff_id, doc_request_id, payment_method_id,
+                amount_due, amount_paid, change_due
+              ) values (%s, %s, %s, %s, %s, %s, 0)
+              returning or_id;
+            """, [or_no, issuer, doc_id, pm_id, float(collected), float(collected)])
+            or_id = (or_row or {}).get("or_id")
 
-        if or_id:
-            _log(
-                "PAYMENT_ACCEPTED",
-                "official_receipt",
-                or_id,
-                {
-                    "doc_request_id": doc_id,
-                    "or_number": or_no,
-                    "payment_method_id": pm_id,
-                    "amount_due": float(collected),
-                    "amount_paid": float(collected),
-                    "change_due": 0,
-                    "source": "ONLINE_PAYMENT",
-                },
-                None,
-                None,
-            )
+            if or_id:
+                _log(
+                    "PAYMENT_ACCEPTED",
+                    "official_receipt",
+                    or_id,
+                    {
+                        "doc_request_id": doc_id,
+                        "or_number": or_no,
+                        "payment_method_id": pm_id,
+                        "amount_due": float(collected),
+                        "amount_paid": float(collected),
+                        "change_due": 0,
+                        "source": "ONLINE_PAYMENT",
+                    },
+                    None,
+                    None,
+                )
 
     # --- 3) Always set to PAID first (idempotent)
     st_paid = _st("PAID")
@@ -242,12 +253,15 @@ def _finalize_doc_paid(doc_id: int, paid_dt, event_ref: str, provider_payment_id
             None,
         )
 
-    # --- 4) If mismatch → RECONCILE and stop here
+    # --- 4) Reconcile if collected != server amount
     if abs(collected - server_amt) > Decimal("0.01"):
-        exec_sql(
-            "update doc_request_hdr set request_status_id=%s, current_status_set_at=now() where doc_request_id=%s;",
-            [_st("RECONCILE"), doc_id],
-        )
+        exec_sql("""
+          update doc_request_hdr
+             set request_status_id=%s,
+                 current_status_set_at = now()
+           where doc_request_id=%s;
+        """, [_st("RECONCILE"), doc_id])
+
         _log(
             "STATUS_CHANGED",
             "doc_request_hdr",
@@ -261,9 +275,9 @@ def _finalize_doc_paid(doc_id: int, paid_dt, event_ref: str, provider_payment_id
             None,
             None,
         )
-        return  # don’t move to clerk review if reconciliation needed
+        return  # stop here; let back-office reconcile
 
-    # --- 5) Move to FOR_CLERK_REVIEW (idempotent)
+    # --- 5) Advance to FOR CLERK REVIEW (desired flow after online payment)
     try:
         st_review = _st("FOR CLERK REVIEW")
     except Exception:

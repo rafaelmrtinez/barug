@@ -65,7 +65,11 @@ from treasurer.services.requests_service import build_auth_links
 def titleize(s):
     txt = str(s or "")
     return " ".join(txt.replace("_", " ").replace("-", " ").split()).title()
-    
+
+def _norm(s) -> str:
+    """UPPER_CASE_WITH_UNDERSCORES normalizer for statuses/actions."""
+    return re.sub(r"[\s_]+", "_", str(s or "").strip().upper())
+
 # ────────────────────────────────────────────────────────────
 # SECTION: Logger + tiny email preview helpers
 # ────────────────────────────────────────────────────────────
@@ -462,11 +466,14 @@ def _resolve_actor_name(ev: dict, header: dict) -> str:
 
     return "SYSTEM"
 
-
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
 def detail(request: HttpRequest, doc_request_id: int):
+    # small local normalizer so we can compare values robustly
+    def _norm(s) -> str:
+        return re.sub(r"[\s_]+", "_", str(s or "").strip().upper())
+
     try:
         data: Dict[str, Any] = _fetch_bundle(doc_request_id)
     except APIError as e:
@@ -477,10 +484,17 @@ def detail(request: HttpRequest, doc_request_id: int):
     lines = data.get("lines", []) or []
     payments = data.get("payments", {}) or {}
     timeline = data.get("timeline", []) or []
-    # collect links for the Authorization Letter
-    auth_links = build_auth_links(settings, header, lines)  
-    ui = STATUS_UI.get(header.get("status")) or {"label": header.get("status") or "—", "cls": "badge text-bg-secondary"}
-    # After you fetch lines = data.get("lines", []) or []
+
+    # Authorization Letter assets (images / pdfs)
+    auth_links = build_auth_links(settings, header, lines)
+
+    # Status chip UI
+    ui = STATUS_UI.get(header.get("status")) or {
+        "label": header.get("status") or "—",
+        "cls": "badge text-bg-secondary"
+    }
+
+    # Enrich line items for display
     for l in lines:
         details = l.get("details") or {}
         # humanized purpose (fallback to details.purpose_code)
@@ -496,7 +510,7 @@ def detail(request: HttpRequest, doc_request_id: int):
             )
         )
 
-    # OR number and payment/receipt info (exposed for PDFs)
+    # OR number and receipt-ish fields exposed to UI/PDFs
     header["or_number"] = (
         payments.get("latest_or_number")
         or header.get("latest_or_number")
@@ -506,6 +520,7 @@ def detail(request: HttpRequest, doc_request_id: int):
     header["paid_amount"] = payments.get("latest_amount") or payments.get("amount")
     header["paid_date"]   = payments.get("latest_paid_at") or payments.get("paid_at") or payments.get("latest_or_time")
 
+    # Subject display fields
     subj = subject_view(header, {})
     header["is_on_behalf"] = subj["is_on_behalf"]
     header["subject_full_name"] = subj["full_name"]
@@ -514,7 +529,7 @@ def detail(request: HttpRequest, doc_request_id: int):
     header["subject_civil_status"] = subj["civil_status"]
     header["subject_nationality"] = subj["nationality"]
 
-    # --- NEW: CTC context for UI banner & modal ---
+    # --- CTC context for UI banner & modal (if any) ---
     ctc_mode = False
     ctc_of = None
     ctc_ref_request_id = None
@@ -534,7 +549,7 @@ def detail(request: HttpRequest, doc_request_id: int):
     except Exception:
         pass
 
-    # Preformat timestamps (Asia/Manila) for template
+    # Timestamps formatted for Asia/Manila
     header["created_fmt"] = _fmt_occured_at(header.get("created_at"))
 
     for ev in timeline:
@@ -543,11 +558,30 @@ def detail(request: HttpRequest, doc_request_id: int):
         )
         ev["display_actor"] = _resolve_actor_name(ev, header)
 
+    # === NEW: detect "paid" purely from status/timeline ===
+    was_marked_paid = False
+    if _norm(header.get("status")) == "PAID":
+        was_marked_paid = True
+    else:
+        for ev in timeline:
+            act = _norm(ev.get("action"))
+            to_status = _norm(ev.get("to_status"))
+            if (act == "STATUS_CHANGED" and to_status == "PAID") or act == "PAYMENT_ACCEPTED":
+                was_marked_paid = True
+                break
+
     return render(request, "clerk/detail.html", {
-        "header": header, "status_ui": ui, "lines": lines, "payments": payments, "timeline": timeline,
-        "ctc_mode": ctc_mode, "ctc_of": ctc_of,
-        "ctc_ref_request_id": ctc_ref_request_id, "ctc_ref_code": ctc_ref_code,
+        "header": header,
+        "status_ui": ui,
+        "lines": lines,
+        "payments": payments,
+        "timeline": timeline,
+        "ctc_mode": ctc_mode,
+        "ctc_of": ctc_of,
+        "ctc_ref_request_id": ctc_ref_request_id,
+        "ctc_ref_code": ctc_ref_code,
         "auth_links": auth_links,
+        "was_marked_paid": was_marked_paid,  # <-- used by the template
     })
 
 # ────────────────────────────────────────────────────────────
@@ -905,13 +939,94 @@ def mark_released(request: HttpRequest, doc_request_id: int):
         messages.success(request, "Marked as released.")
     return redirect("clerk:detail", doc_request_id=doc_request_id)
 
+
 @session_login_required
 @role_required(CLERK_ROLE)
 @require_POST
 def decline(request: HttpRequest, doc_request_id: int):
+    print("\n" + "="*72)
+    print("[DECLINE DEBUG] called")
     reason = (request.POST.get("reason") or "").strip() or None
-    err = _set_status(doc_request_id, "DECLINED", _staff_id(request), reason)
-    messages.error(request, f"Failed: {escape(err)}") if err else messages.success(request, "Request declined.")
+    staff_id = _staff_id(request)
+
+    print(f"[DECLINE DEBUG] doc_request_id = {doc_request_id}")
+    print(f"[DECLINE DEBUG] staff_id       = {staff_id}")
+    print(f"[DECLINE DEBUG] reason         = {reason!r}")
+
+    # Load bundle first so we can inspect status/timeline/payments
+    try:
+        bundle = _fetch_bundle(doc_request_id)
+    except APIError as e:
+        messages.error(request, f"Unable to load request: {escape(getattr(e,'message', str(e)))}")
+        print("[DECLINE DEBUG] ERROR: _fetch_bundle failed:", e)
+        print("="*72 + "\n")
+        return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+    header    = (bundle or {}).get("header", {}) or {}
+    payments  = (bundle or {}).get("payments", {}) or {}
+    timeline  = (bundle or {}).get("timeline", []) or []
+
+    # Snapshot for logs
+    print(f"[DECLINE DEBUG] header.request_code     = {header.get('request_code')}")
+    print(f"[DECLINE DEBUG] header.status           = {header.get('status')}")
+    print(f"[DECLINE DEBUG] header.or_number        = {header.get('or_number')}")
+    print(f"[DECLINE DEBUG] payments.total_paid     = {float(payments.get('total_paid') or 0)}")
+    print(f"[DECLINE DEBUG] header.amount_due       = {float(header.get('amount_due') or 0)}")
+
+    # Determine paid-ness (now also looks at status/timeline)
+    def _norm(s): return re.sub(r"[\s_]+", "_", str(s or "").strip().upper())
+    status_now = _norm(header.get("status"))
+    has_or     = bool(header.get("or_number"))
+    total_paid = float(payments.get("total_paid") or 0)
+
+    timeline_paid = False
+    for ev in (timeline or []):
+        act = _norm(ev.get("action"))
+        to_status = _norm(ev.get("to_status"))
+        if act == "PAYMENT_ACCEPTED" or (act == "STATUS_CHANGED" and to_status == "PAID"):
+            timeline_paid = True
+            break
+
+    is_paid = (status_now == "PAID") or timeline_paid or (total_paid > 0) or has_or
+    print(f"[DECLINE DEBUG] is_paid?                = {is_paid}")
+    if timeline_paid:
+        print("[DECLINE DEBUG] timeline shows a payment event (PAYMENT_ACCEPTED/→PAID).")
+
+    # Path A: NOT paid → simple decline
+    if not is_paid:
+        print("[DECLINE DEBUG] PATH: simple decline (no refund)")
+        print(f"[DECLINE DEBUG] CALL: _set_status(doc_request_id={doc_request_id}, status='DECLINED', staff_id={staff_id}, reason={reason!r})")
+        err = _set_status(doc_request_id, "DECLINED", staff_id, reason)
+        print(f"[DECLINE DEBUG] RESULT: err = {err!r}")
+        print("="*72 + "\n")
+        if err:
+            messages.error(request, f"Failed: {escape(err)}")
+        else:
+            messages.success(request, "Request declined.")
+        return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+    # Path B: PAID → decline + open refund ticket (amount NULL lets SQL compute)
+    print("[DECLINE DEBUG] PATH: decline with REFUND ticket")
+    try:
+        from .services.requests_service import decline_and_request_refund
+    except Exception as e:
+        print("[DECLINE DEBUG] import decline_and_request_refund failed:", e)
+        messages.error(request, "Server error (refund handler missing).")
+        print("="*72 + "\n")
+        return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+    print(f"[DECLINE DEBUG] CALL: decline_and_request_refund(doc_request_id={doc_request_id}, staff_id={staff_id}, reason={reason!r}, refund_amount=None)")
+    err, refund_id = decline_and_request_refund(doc_request_id, int(staff_id), reason, refund_amount=None)
+    print(f"[DECLINE DEBUG] RESULT: err={err!r}, refund_id={refund_id!r}")
+    print("="*72 + "\n")
+
+    if err:
+        messages.error(request, f"Decline failed: {escape(err)}")
+    else:
+        msg = "Request declined. Refund ticket created and sent for Treasurer processing."
+        if refund_id:
+            msg = f"Request declined. Refund ticket #{refund_id} created and sent for Treasurer processing."
+        messages.success(request, msg)
     return redirect("clerk:detail", doc_request_id=doc_request_id)
 
 # ────────────────────────────────────────────────────────────

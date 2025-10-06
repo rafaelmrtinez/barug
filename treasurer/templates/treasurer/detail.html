@@ -2,93 +2,50 @@
 {% block content %}
 
 <style>
-  :root {
+  :root{
     --brand:#7a1212; --brand-700:#4a0a0a; --accent:#f2c94c;
     --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --card:#fff; --wash:#fafafa;
   }
+  .hero{background:radial-gradient(120% 140% at 0% 0%,var(--brand) 0%,var(--brand-700) 70%);color:#fff;border-radius:16px;padding:18px 20px;box-shadow:0 12px 28px rgba(0,0,0,.15)}
+  .hero .brand-icon{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.08);box-shadow:0 0 0 3px rgba(122,18,18,.15);position:relative}
+  .hero .brand-icon::after{content:"";position:absolute;inset:8px;border-radius:50%;background:rgba(242,201,76,.18)}
+  .hero .brand-icon i.bi{color:#fff;position:relative;z-index:1}
+  .hero .chip{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:#f3f4f6;border-radius:999px;padding:6px 12px;font-size:.82rem;width:110px;text-align:center;font-weight:700}
 
-  .hero{
-    background:radial-gradient(120% 140% at 0% 0%,var(--brand) 0%,var(--brand-700) 70%);
-    color:#fff; border-radius:16px; padding:18px 20px; box-shadow:0 12px 28px rgba(0,0,0,.15);
-  }
-  .hero .brand-icon{
-    width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-    background:rgba(255,255,255,.08); box-shadow:0 0 0 3px rgba(122,18,18,.15); position:relative;
-  }
-  .hero .brand-icon::after{ content:""; position:absolute; inset:8px; border-radius:50%; background:rgba(242,201,76,.18); }
-  .hero .brand-icon i.bi{ color:#fff; position:relative; z-index:1; }
-  .hero .chip{ border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.08); color:#f3f4f6; border-radius:999px; padding:6px 12px; font-size:.82rem; width:110px; text-align:center; font-weight:700; }
+  .card-soft{border:0;border-radius:14px;box-shadow:0 10px 24px rgba(16,24,40,.06);background:#fff}
+  .section-title{font-weight:800;color:var(--ink);display:flex;align-items:center;gap:.5rem}
+  .section-title .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(242,201,76,.25)}
+  .small-muted{color:var(--muted)}
 
-  .card-soft{ border:0; border-radius:14px; box-shadow:0 10px 24px rgba(16,24,40,.06); background:#fff; }
-  .section-title{ font-weight:800; color:var(--ink); display:flex; align-items:center; gap:.5rem; }
-  .section-title .dot{ width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px rgba(242,201,76,.25); }
-  .small-muted{ color:var(--muted); }
+  .kv{list-style:none;padding:0;margin:0}
+  .kv li{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px dashed var(--line)}
+  .kv li:last-child{border-bottom:0}
+  .kv .label{color:var(--muted);min-width:130px}
+  .kv .value{font-weight:700;color:var(--ink)}
 
-  .kv{ list-style:none; padding:0; margin:0; }
-  .kv li{ display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px dashed var(--line); }
-  .kv li:last-child{ border-bottom:0; }
-  .kv .label{ color:var(--muted); min-width:130px; }
-  .kv .value{ font-weight:700; color:var(--ink); }
+  .table thead th{white-space:nowrap}
+  .table tbody tr:hover{background:#fff8eb}
 
-  .table thead th{ white-space:nowrap; }
-  .table tbody tr:hover{ background:#fff8eb; }
+  .amount-row{display:flex;justify-content:space-between;align-items:center;margin-top:.25rem;padding-top:.75rem;border-top:1px solid var(--line)}
 
-  .amount-row{ display:flex; justify-content:space-between; align-items:center; margin-top:.25rem; padding-top:.75rem; border-top:1px solid var(--line); }
+  .media-grid{display:flex;flex-wrap:wrap;gap:14px}
+  .media-thumb{width:160px;height:240px;object-fit:cover;border-radius:12px;border:1px solid var(--line);background:var(--wash);cursor:zoom-in;transition:transform .15s, box-shadow .15s}
+  .media-thumb:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(0,0,0,.12)}
+  .pdf-pill{width:160px;height:240px;border-radius:12px;border:1px dashed var(--line);background:#fff7e6;color:var(--brand);font-weight:800;display:flex;align-items:center;justify-content:center;text-decoration:none}
 
-  .media-grid{ display:flex; flex-wrap:wrap; gap:14px; }
-  .media-thumb{ width:160px; height:240px; object-fit:cover; border-radius:12px; border:1px solid var(--line); background:var(--wash); cursor:zoom-in; transition:transform .15s, box-shadow .15s; }
-  .media-thumb:hover{ transform:translateY(-2px); box-shadow:0 8px 18px rgba(0,0,0,.12); }
-  .pdf-pill{ width:160px; height:240px; border-radius:12px; border:1px dashed var(--line); background:#fff7e6; color:var(--brand); font-weight:800; display:flex; align-items:center; justify-content:center; text-decoration:none; }
+  .sticky-aside{position:sticky;top:84px}
+  .status-chip{border-radius:999px;padding:4px 10px;font-size:.8rem;background:#fff1}
 
-  .sticky-aside{ position:sticky; top:84px; }
-  .status-chip{ border-radius:999px; padding:4px 10px; font-size:.8rem; background:#fff1; }
+  .or-highlight{border:2px solid var(--accent);background:linear-gradient(180deg,#fffdf6,#fff);border-radius:12px;padding:10px 12px}
+  .or-highlight .or-badge{background:var(--accent);color:#000;font-weight:800;border-radius:6px;padding:2px 6px}
 
-  .or-highlight{ border:2px solid var(--accent); background:linear-gradient(180deg,#fffdf6,#fff); border-radius:12px; padding:10px 12px; }
-  .or-highlight .or-badge{ background:var(--accent); color:#000; font-weight:800; border-radius:6px; padding:2px 6px; }
-
-  /* === Timeline ===========================================================
-     ADJUSTMENT KNOBS:
-     - Change --dot-size to make the circles bigger or smaller.
-     - If you change size a lot, tweak --dot-left / --dot-top to keep them centered.
-     ====================================================================== */
-  .timeline{
-    position:relative;
-    margin-left:6px;
-    padding-left:64px;
-    --line-x: 30px;      /* vertical line X position relative to .timeline */
-    --dot-size: 32px;    /* <<< ADJUST HERE to resize the circles (e.g., 28px, 36px, 40px) */
-    --dot-left: -50px;   /* nudge horizontally when size changes (baseline for 32px) */
-    --dot-top: 21px;     /* nudge vertically so the dot centers on the event card */
-  }
-  .timeline:before{
-    content:""; position:absolute; left:var(--line-x); top:0; bottom:0;
-    width:3px; background:linear-gradient(180deg,#e9eef5,#e2e8f0); border-radius:3px;
-  }
-  .tl-item{
-    position:relative; margin-bottom:14px; border-radius:14px; padding:12px 14px;
-    background:#fff; border:1px solid #eef2f7; box-shadow:0 6px 16px rgba(16,24,40,.04)
-  }
-  .tl-item:last-child{ margin-bottom:0 }
-
-  .tl-dot{
-    position:absolute;
-    left:var(--dot-left);    /* ← Adjust with --dot-left if the circle drifts off the line */
-    top:var(--dot-top);      /* ← Adjust with --dot-top to vertically center it */
-    width:var(--dot-size);
-    height:var(--dot-size);
-    border-radius:50%;
-    display:grid; place-items:center;
-    color:#fff; border:3px solid #fff;
-    box-shadow:0 2px 8px rgba(2,6,23,.15);
-  }
-  .tl-dot i{ font-size: calc(var(--dot-size) * 0.40); } /* icon scales with circle size */
-
-  .tl-dot.primary{background:#6366f1}
-  .tl-dot.info{background:#0ea5e9}
-  .tl-dot.success{background:#10b981}
-  .tl-dot.warn{background:#f59e0b}
-  .tl-dot.muted{background:#94a3b8}
-
+  /* Timeline */
+  .timeline{position:relative;margin-left:6px;padding-left:64px;--line-x:30px;--dot-size:32px}
+  .timeline:before{content:"";position:absolute;left:var(--line-x);top:0;bottom:0;width:3px;background:linear-gradient(180deg,#e9eef5,#e2e8f0);border-radius:3px}
+  .tl-item{position:relative;margin-bottom:14px;border-radius:14px;padding:12px 14px;background:#fff;border:1px solid #eef2f7;box-shadow:0 6px 16px rgba(16,24,40,.04)}
+  .tl-item:last-child{margin-bottom:0}
+  .tl-dot{position:absolute;left:-50px;top:21px;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:#fff;border:3px solid #fff;box-shadow:0 2px 8px rgba(2,6,23,.15)}
+  .tl-dot.primary{background:#6366f1}.tl-dot.info{background:#0ea5e9}.tl-dot.success{background:#10b981}.tl-dot.warn{background:#f59e0b}.tl-dot.muted{background:#94a3b8}
   .tl-head{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
   .tl-title{font-weight:800;color:#0f172a;letter-spacing:.02em}
   .tl-when{margin-left:auto;color:#64748b;font-size:.82rem;white-space:nowrap}
@@ -102,10 +59,10 @@
   .help-text{font-size:.85rem;color:#64748b}
 </style>
 
-<div class="container py-3">
+<div class="container py-3" style="margin-top: 40">
   <!-- Hero -->
   <div class="hero mb-3 d-flex align-items-center gap-3">
-    <div class="brand-icon"><i class="bi bi-cash-coin fs-3" aria-hidden="true"></i></div>
+    <div class="brand-icon"><i class="bi bi-cash-coin fs-3" aria-hidden="true" style="margin-top: 10;"></i></div>
     <div class="me-auto">
       <div class="fw-bold">Request {{ header.request_code }}</div>
       <div class="text-white-50 small">{{ header.created_fmt }}</div>
@@ -177,10 +134,18 @@
             <div class="text-muted">No items.</div>
           {% endif %}
 
+          <!-- Amount Due (show PAID + method if known) -->
           <div class="amount-row">
             <div class="small-muted">Amount Due</div>
-            {% if payments.latest_or_number and status_ui.label == 'For Printing' %}
-              <div class="fs-5 fw-bold text-success">Paid</div>
+            {% if header.amount_due|floatformat:2 == "0.00" %}
+              <div class="fs-5 fw-bold text-success">WAIVED</div>
+            {% elif payments.latest_or_number or is_paid_no_or %}
+              <div class="text-end">
+                <div class="fs-5 fw-bold text-success">PAID</div>
+                {% if paid_method_label %}
+                  <div class="small-muted">Paid via {{ paid_method_label }}</div>
+                {% endif %}
+              </div>
             {% else %}
               <div class="fs-5 fw-bold text-danger">₱{{ header.amount_due|floatformat:2 }}</div>
             {% endif %}
@@ -256,7 +221,7 @@
         </div>
       </div>
 
-      <!-- Timeline (clerk-style) -->
+      <!-- Timeline -->
       <div class="card card-soft mb-3">
         <div class="card-body">
           <div class="section-title mb-2"><span class="dot"></span> Timeline</div>
@@ -268,13 +233,14 @@
                   <div class="tl-dot
                       {% if act == 'REQUEST_CREATED' or act == 'LINE_ADDED' %} primary
                       {% elif act == 'PAYMENT_INITIATED' %} info
-                      {% elif act == 'PAYMENT_ACCEPTED' %} success
+                      {% elif act == 'PAYMENT_ACCEPTED' or act == 'OR_ISSUED' %} success
                       {% elif act == 'STATUS_CHANGED' %} warn
                       {% else %} muted {% endif %}">
                     {% if act == 'REQUEST_CREATED' %}<i class="bi bi-file-earmark-plus"></i>
                     {% elif act == 'LINE_ADDED' %}<i class="bi bi-plus-lg"></i>
                     {% elif act == 'PAYMENT_INITIATED' %}<i class="bi bi-credit-card"></i>
                     {% elif act == 'PAYMENT_ACCEPTED' %}<i class="bi bi-cash-coin"></i>
+                    {% elif act == 'OR_ISSUED' %}<i class="bi bi-receipt"></i>
                     {% elif act == 'STATUS_CHANGED' %}<i class="bi bi-arrow-left-right"></i>
                     {% else %}<i class="bi bi-clock-history"></i>{% endif %}
                   </div>
@@ -283,35 +249,20 @@
                     <div class="tl-title">{{ e.action|default:"—" }}</div>
 
                     {% if act == 'STATUS_CHANGED' %}
-                      {% if e.from_status %}
-                        <span class="pill blue">From: {{ e.from_status }}</span>
-                        <i class="bi bi-arrow-right-short text-muted"></i>
-                      {% endif %}
-                      {% if e.to_status %}
-                        <span class="pill amber">To: {{ e.to_status }}</span>
-                      {% endif %}
+                      {% if e.from_status %}<span class="pill blue">From: {{ e.from_status }}</span><i class="bi bi-arrow-right-short text-muted"></i>{% endif %}
+                      {% if e.to_status %}<span class="pill amber">To: {{ e.to_status }}</span>{% endif %}
                     {% endif %}
 
-                    {% if act == 'PAYMENT_ACCEPTED' %}
-                      {% if e.or_number %}
-                        <span class="pill blue">OR: {{ e.or_number }}</span>
-                      {% endif %}
-                      {% if e.details.amount_paid %}
-                        <span class="pill green">₱{{ e.details.amount_paid|floatformat:2 }}</span>
-                      {% endif %}
-                      {% if e.details.payment_method %}
-                        <span class="pill gray">{{ e.details.payment_method }}</span>
-                      {% endif %}
+                    {% if act == 'PAYMENT_ACCEPTED' or act == 'OR_ISSUED' %}
+                      {% if e.or_number %}<span class="pill blue">OR: {{ e.or_number }}</span>{% endif %}
+                      {% if e.details.amount_paid %}<span class="pill green">₱{{ e.details.amount_paid|floatformat:2 }}</span>{% endif %}
+                      {% if e.details.payment_method %}<span class="pill gray">{{ e.details.payment_method }}</span>{% endif %}
                     {% endif %}
-
                     <div class="tl-when">{{ e.occur_fmt }}</div>
                   </div>
 
                   <div class="tl-meta">{{ e.display_actor }}</div>
-
-                  {% if e.reason %}
-                    <div class="tl-body">Reason: {{ e.reason }}</div>
-                  {% endif %}
+                  {% if e.reason %}<div class="tl-body">Reason: {{ e.reason }}</div>{% endif %}
                 </div>
                 {% endwith %}
               {% endfor %}
@@ -346,58 +297,162 @@
             <div class="mb-3 text-muted">None yet</div>
           {% endif %}
 
-          {% if header.amount_due|floatformat:2 == "0.00" %}
-            <div class="alert alert-success">
-              Fully waived / no payment required. Reasons are shown under each item.
+          <!-- ALWAYS VISIBLE: Confirm & Post OR (for online-paid, no OR yet) -->
+          <div class="mb-3">
+            <div class="alert alert-info mb-2">
+              Confirm &amp; Post OR — use for online payments when no OR exists yet.
+              {% if paid_method_label %}<br><span class="small-muted">Detected method: {{ paid_method_label }}</span>{% endif %}
             </div>
+            <form method="post" action="{% url 'treasurer:confirm_post_or' header.doc_request_id %}">
+              {% csrf_token %}
+              <div class="mb-2">
+                <label class="form-label">OR Payment Method</label>
+                <select class="form-select" name="payment_method_id" required>
+                  <option value="">Select…</option>
+                  {% for m in methods %}
+                    <option value="{{ m.payment_method_id }}"
+                      {% if m.payment_method_id == 5 or m.method_name|default_if_none:''|upper == 'ONLINE GCASH' or m.method_name|default_if_none:''|upper == 'ONLINE_GCASH' %}
+                        selected
+                      {% endif %}
+                    >{{ m.method_name }}</option>
+                  {% endfor %}
+                </select>
+                <div class="form-text">Amount: ₱{{ header.amount_due|floatformat:2 }}</div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">OR Number (optional)</label>
+                <input class="form-control" name="or_number" placeholder="Leave blank to auto-generate">
+              </div>
+              <button class="btn btn-primary w-100">Confirm &amp; Post OR → Move to Printing</button>
+            </form>
+          </div>
 
-            {% if not payments.latest_or_number %}
-              {% if waived_method_id %}
-                <form method="post" action="{% url 'treasurer:take_payment' header.doc_request_id %}" class="mb-2">
-                  {% csrf_token %}
-                  <input type="hidden" name="payment_method_id" value="{{ waived_method_id }}">
-                  <input type="hidden" name="amount_paid" value="0">
-                  <button class="btn btn-success w-100">
-                    Issue Waived OR (₱0.00) &amp; Move to Printing
-                  </button>
-                </form>
-              {% else %}
-                <div class="alert alert-warning">
-                  Payment method <strong>WAIVED</strong> was not found. Add it in the database, then reload.
-                </div>
-              {% endif %}
-            {% endif %}
+          <hr class="my-3">
 
-          {% else %}
-            {% if header.status == "PAID" %}
-              <div class="alert alert-success mb-0">Payment complete. No further action required.</div>
-            {% else %}
+          <!-- ALWAYS VISIBLE: Issue Waived OR -->
+          <div class="mb-3">
+            <div class="alert alert-success mb-2">
+              Issue Waived OR — use when fee is fully waived (₱0.00).
+            </div>
+            {% if waived_method_id %}
               <form method="post" action="{% url 'treasurer:take_payment' header.doc_request_id %}">
                 {% csrf_token %}
-                <div class="mb-2">
-                  <label class="form-label">Payment Method</label>
-                  <select class="form-select" name="payment_method_id" required>
-                    <option value="">Select…</option>
-                    {% for m in methods %}
-                      <option value="{{ m.payment_method_id }}">{{ m.method_name }}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">Amount Paid (₱)</label>
-                  <input class="form-control" name="amount_paid" type="number" step="0.01" min="0" required>
-                  {% if payments.latest_or_number and status_ui.label == 'For Printing' %}
-                    <div class="form-text">Paid</div>
-                  {% else %}
-                    <div class="form-text">Amount due: ₱{{ header.amount_due|floatformat:2 }}</div>
-                  {% endif %}
-                </div>
-                <button class="btn w-100" style="background: rgba(248, 150, 3, 0.904); color:#fff; border:0;">
-                  Accept Payment &amp; Post OR
-                </button>
+                <input type="hidden" name="payment_method_id" value="{{ waived_method_id }}">
+                <input type="hidden" name="amount_paid" value="0">
+                <button class="btn btn-success w-100">Issue Waived OR (₱0.00) &amp; Move to Printing</button>
               </form>
+            {% else %}
+              <div class="alert alert-warning">
+                Payment method <strong>WAIVED</strong> not found. Add it in the database.
+              </div>
             {% endif %}
-          {% endif %}
+          </div>
+
+          <hr class="my-3">
+
+          <!-- ALWAYS VISIBLE: Accept Payment (cash/in-person) -->
+          <div>
+            <div class="alert alert-warning mb-2">
+              Accept Payment &amp; Post OR — use for cash/in-person payments.
+            </div>
+            <form method="post" action="{% url 'treasurer:take_payment' header.doc_request_id %}">
+              {% csrf_token %}
+              <div class="mb-2">
+                <label class="form-label">Payment Method</label>
+                <select class="form-select" name="payment_method_id" required>
+                  <option value="">Select…</option>
+                  {% for m in methods %}
+                    <option value="{{ m.payment_method_id }}">{{ m.method_name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Amount Paid (₱)</label>
+                <input class="form-control" name="amount_paid" type="number" step="0.01" min="0" required>
+                <div class="form-text">Amount due: ₱{{ header.amount_due|floatformat:2 }}</div>
+              </div>
+              <button class="btn w-100" style="background: rgba(248, 150, 3, 0.904); color:#fff; border:0;">
+                Accept Payment &amp; Post OR
+              </button>
+            </form>
+          </div>
+
+{# --- REFUND AREA (uses latest_pending_refund / has_pending_refund / refunds_all / last_completed_refund) --- #}
+{% if latest_pending_refund %}
+  <hr class="my-3">
+  <div class="alert alert-warning">
+    <div class="fw-bold">Refund Pending</div>
+    <div class="small">
+      Ticket #{{ latest_pending_refund.payment_refund_id }} •
+      Amount: ₱{{ latest_pending_refund.refund_amount|floatformat:2 }} •
+      Status: {{ latest_pending_refund.status }}
+      {% if latest_pending_refund.reason %}
+        <br>Reason: {{ latest_pending_refund.reason }}
+      {% endif %}
+    </div>
+  </div>
+
+  <form method="post" action="{% url 'treasurer:treasurer_complete_refund' header.doc_request_id %}" class="mb-2">
+    {% csrf_token %}
+    <input type="hidden" name="refund_id" value="{{ latest_pending_refund.payment_refund_id }}">
+    <div class="mb-2">
+      <label class="form-label">Gateway Refund ID (optional)</label>
+      <input class="form-control" name="provider_refund_id" placeholder="e.g., PayMongo refund id">
+    </div>
+    <div class="mb-2">
+      <label class="form-label">Refund Receipt No. (optional)</label>
+      <input class="form-control" name="refund_receipt_no" placeholder="e.g., IR-000123">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Reason / Note (optional)</label>
+      <input class="form-control" name="reason" placeholder="e.g., gateway shows settled">
+    </div>
+    <button class="btn btn-outline-danger w-100">
+      <i class="bi bi-arrow-counterclockwise me-1"></i>
+      Mark Refund Completed
+    </button>
+  </form>
+
+{% elif has_pending_refund %}
+  <hr class="my-3">
+  <div class="alert alert-warning mb-2">
+    One or more refund tickets are pending. Select a ticket to complete below.
+  </div>
+  {% for r in refunds_pending %}
+    <form method="post" action="{% url 'treasurer:treasurer_complete_refund' header.doc_request_id %}" class="border rounded p-2 mb-2">
+      {% csrf_token %}
+      <input type="hidden" name="refund_id" value="{{ r.payment_refund_id }}">
+      <div class="small mb-2">
+        Ticket #{{ r.payment_refund_id }} • Amount: ₱{{ r.refund_amount|floatformat:2 }} • Status: {{ r.status }}
+      </div>
+      <div class="row g-2">
+        <div class="col-12 col-md-6">
+          <input class="form-control" name="provider_refund_id" placeholder="Gateway Refund ID (optional)">
+        </div>
+        <div class="col-12 col-md-6">
+          <input class="form-control" name="refund_receipt_no" placeholder="Refund Receipt No. (optional)">
+        </div>
+        <div class="col-12">
+          <input class="form-control" name="reason" placeholder="Reason / Note (optional)">
+        </div>
+      </div>
+      <button class="btn btn-outline-danger w-100 mt-2">Mark Refund Completed</button>
+    </form>
+  {% endfor %}
+
+{% elif last_completed_refund %}
+  <hr class="my-3">
+  <div class="alert alert-success mb-0">
+    <div class="fw-bold">Refund Completed</div>
+    <div class="small">
+      Ticket #{{ last_completed_refund.payment_refund_id }} • ₱{{ last_completed_refund.refund_amount|floatformat:2 }}
+      {% if last_completed_refund.refund_receipt_no %}• Receipt: {{ last_completed_refund.refund_receipt_no }}{% endif %}
+      {% if last_completed_refund.provider_refund_id %}• Gateway: {{ last_completed_refund.provider_refund_id }}{% endif %}
+    </div>
+  </div>
+{% endif %}
+
+
         </div>
       </div>
     </div>

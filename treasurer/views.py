@@ -2,37 +2,51 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, date
+import json
+import re
 
 from django.conf import settings
 from django.contrib import messages
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest
 from django.shortcuts import redirect, render
 from django.utils.html import escape
 from django.views.decorators.http import require_GET, require_POST
+from django.core.paginator import Paginator, EmptyPage
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime, parse_date
+from zoneinfo import ZoneInfo
 
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
-from authentication.supabase_client import supabase  # still used for the small OR fetch
+from authentication.supabase_client import supabase
 
-from .services.requests_service import list_requests, list_business_requests, fetch_detail_bundle, build_auth_links
-from .services.payments_service import list_payment_methods, accept_payment, mark_for_printing
+from .services.requests_service import (
+    list_requests, list_business_requests, fetch_detail_bundle, build_auth_links
+)
+from .services.payments_service import (
+    list_payment_methods, accept_payment, mark_for_printing, confirm_and_post_or
+)
 from .services.fees_service import (
     search_fee_items, recent_fee_changes, update_fee_amount,
     add_fee, fetch_fee_full, list_document_types, upsert_fee
 )
 from .utils.ui import STATUS_UI, ACTION_LABELS, titleize
 
+
 TREASURER_ROLE = "Barangay Treasurer"
-#1 
+PH_TZ = ZoneInfo("Asia/Manila")
+
+
 def _staff_id(request: HttpRequest) -> int | None:
-    # Prefer session-based id set at login; fallback to attached profile(s)
+    """Prefer the staff_id we stash in session; fallback to request.profile."""
     auth = request.session.get("auth") or {}
     sid = auth.get("staff_id")
     if sid:
         return sid
     prof = getattr(request, "profile", None) or getattr(request, "person_profile", None)
     return getattr(prof, "staff_id", None)
+
 
 # ========= DASHBOARD =========
 @session_login_required
@@ -47,7 +61,7 @@ def dashboard(request: HttpRequest):
     })
 
 
-# ========= Queue =========
+# ========= QUEUE =========
 @session_login_required
 @role_required(TREASURER_ROLE)
 @require_GET
@@ -57,7 +71,10 @@ def queue(request: HttpRequest):
 
     rows = list_requests(q, statuses, limit=50)
     for r in rows:
-        r["status_ui"] = STATUS_UI.get(r.get("status")) or {"label": r.get("status") or "—", "cls": "badge text-bg-secondary"}
+        r["status_ui"] = STATUS_UI.get(r.get("status")) or {
+            "label": r.get("status") or "—",
+            "cls": "badge text-bg-secondary"
+        }
         r["purposes_display"] = [titleize(p) for p in (r.get("purposes") or [])]
 
     status_options = [
@@ -72,15 +89,6 @@ def queue(request: HttpRequest):
         "status_options": status_options,
     })
 
-from django.utils.dateparse import parse_datetime
-# ========= Detail (with payment panel) =========
-
-from datetime import datetime
-from zoneinfo import ZoneInfo
-from django.utils import timezone
-from django.utils.dateparse import parse_datetime
-
-PH_TZ = ZoneInfo("Asia/Manila")
 
 def _fmt_occured_at(val) -> str:
     """Accepts a datetime or ISO string, returns a Manila-local formatted string."""
@@ -90,39 +98,47 @@ def _fmt_occured_at(val) -> str:
     if isinstance(val, datetime):
         dt = val
     elif isinstance(val, str):
-        dt = parse_datetime(val)  # handles '...+00:00' etc.
+        dt = parse_datetime(val)
     if not dt:
-        return val  # show raw if parsing fails
+        return str(val)
     if timezone.is_naive(dt):
         dt = timezone.make_aware(dt, timezone.utc)
-    # convert to Asia/Manila
     dt_local = timezone.localtime(dt, PH_TZ)
     return dt_local.strftime("%b %d, %Y • %I:%M %p")
 
+
 def _resolve_actor_name(ev: dict, header: dict) -> str:
     """Return a friendly actor name for a timeline event."""
-    # Prefer explicit names on the event
     for k in ("staff_name", "resident_name"):
         v = (ev.get(k) or "").strip()
         if v:
             return v
-
     actor = (ev.get("actor") or "").strip()
     if actor:
-        # If it's an ID like "4", show the requester's name instead
         if actor.isdigit() and header.get("requester_full_name"):
             return header["requester_full_name"]
         return actor
-
-    # Fallbacks by user type
     ut = (ev.get("user_type_name") or "").strip().upper()
     if ut == "PERSON" and header.get("requester_full_name"):
         return header["requester_full_name"]
-
-    # Last fallback
     return "SYSTEM"
 
 
+def _extract_payment_method_label(payments: dict, timeline: List[dict]) -> str | None:
+    # Try payments bundle first (common names: latest_method_name / latest_payment_method)
+    for k in ("latest_method_name", "latest_payment_method", "latest_method", "method_name"):
+        v = (payments or {}).get(k)
+        if v:
+            return str(v)
+    # Otherwise scan timeline for last event carrying details.payment_method
+    for e in reversed(timeline or []):
+        d = e.get("details") or {}
+        if d.get("payment_method"):
+            return str(d["payment_method"])
+    return None
+
+
+# ========= DETAIL =========
 @session_login_required
 @role_required(TREASURER_ROLE)
 @require_GET
@@ -137,48 +153,77 @@ def detail(request: HttpRequest, doc_request_id: int):
     lines: List[Dict[str, Any]] = data.get("lines", []) or []
     payments = data.get("payments", {}) or {}
     timeline: List[Dict[str, Any]] = data.get("timeline", []) or []
+
     # Preformat hero timestamp
     header["created_fmt"] = _fmt_occured_at(header.get("created_at"))
 
-    ui = STATUS_UI.get(header.get("status")) or {"label": header.get("status") or "—", "cls": "badge text-bg-secondary"}
+    ui = STATUS_UI.get(header.get("status")) or {
+        "label": header.get("status") or "—",
+        "cls": "badge text-bg-secondary"
+    }
 
-    # lines presentation
+    # line presentation
     for l in lines:
         l["purpose_display"] = titleize(l.get("purpose_code"))
         details = l.get("details") or {}
         l["reason_chips"] = list(l.get("reasons_applied") or details.get("reason_tags") or [])
         l["is_exempt"] = bool(l.get("is_exempt") or False)
 
-    # Timeline presentation
-    # Timeline presentation
-    # Timeline presentation
+    # timeline presentation
     for e in timeline:
         e["action_display"] = ACTION_LABELS.get(e.get("action")) or titleize(e.get("action"))
         to_status = e.get("to_status") or (e.get("details") or {}).get("to_status")
         if to_status:
             e["to_status_display"] = (STATUS_UI.get(to_status) or {"label": titleize(to_status)}).get("label")
-
-        # Parse + format datetime
         raw = e.get("occurred_at") or e.get("occurredAt") or e.get("occur_time")
         dt = raw if isinstance(raw, datetime) else (parse_datetime(raw) if raw else None)
         e["occurred_at"] = dt
         e["occur_fmt"] = _fmt_occured_at(dt or raw)
-
-        # NEW: friendly actor
         e["display_actor"] = _resolve_actor_name(e, header)
 
-
-    # Payment methods + find WAIVED id
+    # Payment methods list (and WAIVED id)
     methods = list_payment_methods()
     waived_method_id = next(
-        (m.get("payment_method_id") for m in methods if (m.get("method_name") or "").strip().upper() == "WAIVED"),
+        (m.get("payment_method_id") for m in methods
+         if (m.get("method_name") or "").strip().upper() == "WAIVED"),
         None
     )
 
     # Auth letter links
     auth_links = build_auth_links(settings, header, lines)
 
-    return render(request, "treasurer/detail.html", {
+    # Flags for paid/OR
+    def _to_f(x):
+        try:
+            return float(x)
+        except Exception:
+            return 0.0
+
+    amount_due = _to_f(header.get("amount_due"))
+    total_paid = _to_f((payments or {}).get("total_paid"))
+    latest_or = (payments or {}).get("latest_or_number") or ""
+    status = (header.get("status") or "").upper()
+
+    is_paid_no_or = ((status == "PAID") or (total_paid >= amount_due)) and (latest_or == "")
+    is_paid = bool(latest_or) or (status == "PAID") or is_paid_no_or
+    paid_method_label = _extract_payment_method_label(payments, timeline)
+
+    # --- Refund tickets for this request ---
+    try:
+        ref_q = (supabase.table("payment_refund")
+                 .select("*")
+                 .eq("doc_request_id", doc_request_id)
+                 .order("created_at", desc=True))
+        ref_res = ref_q.execute()
+        refunds_all = ref_res.data or []
+    except Exception:
+        refunds_all = []
+
+    refunds_pending = [r for r in refunds_all
+                       if (r.get("status") or "").upper() in ("CREATED", "PENDING", "REQUESTED")]
+    latest_pending_refund = refunds_pending[0] if refunds_pending else None
+
+    context = {
         "header": header,
         "status_ui": ui,
         "lines": lines,
@@ -187,11 +232,19 @@ def detail(request: HttpRequest, doc_request_id: int):
         "methods": methods,
         "waived_method_id": waived_method_id,
         "auth_links": auth_links,
-    })
+        "is_paid_no_or": is_paid_no_or,
+        "is_paid": is_paid,
+        "paid_method_label": paid_method_label,
+        "doc_request_id": doc_request_id,
+        "refunds_all": refunds_all,
+        "refunds_pending": refunds_pending,
+        "latest_pending_refund": latest_pending_refund,
+        "has_pending_refund": bool(refunds_pending),
+    }
+    return render(request, "treasurer/detail.html", context)
 
 
-
-# ========= Take payment (POST) =========
+# ========= TAKE PAYMENT (cash/in-person) =========
 @session_login_required
 @role_required(TREASURER_ROLE)
 @require_POST
@@ -216,11 +269,10 @@ def take_payment(request: HttpRequest, doc_request_id: int):
         messages.error(request, f"Payment failed: {escape(str(getattr(e, 'message', e)))}")
         return redirect("treasurer:detail", doc_request_id=doc_request_id)
 
-    # 2) Fetch OR details for toast (kept inline for brevity)
+    # 2) Toast with OR details if we can
     or_res = (supabase.table("official_receipt")
               .select("or_number, amount_paid, amount_due, change_due")
               .eq("or_id", or_id).single().execute())
-
     if getattr(or_res, "error", None) or not or_res.data:
         messages.success(request, f"Payment posted. OR id {or_id}.")
     else:
@@ -231,7 +283,7 @@ def take_payment(request: HttpRequest, doc_request_id: int):
             f"(due ₱{out.get('amount_due',0):,.2f}, change ₱{out.get('change_due',0):,.2f})."
         )
 
-    # 3) Move to FOR_PRINTING right away
+    # 3) Move to FOR_PRINTING
     try:
         mark_for_printing(doc_request_id=doc_request_id, staff_id=staff_id, reason="Auto-marked after payment")
         messages.info(request, "Request moved to FOR_PRINTING.")
@@ -240,39 +292,13 @@ def take_payment(request: HttpRequest, doc_request_id: int):
 
     return redirect("treasurer:detail", doc_request_id=doc_request_id)
 
-# ========= Fees search + update =========
-# treasurer/views.py
-from django.core.paginator import Paginator
-import re
 
-def _compact_page_range(page_number: int, total_pages: int, delta: int = 2):
-    """
-    Build a compact page list for the paginator UI: [1, None, 4,5,6, None, N]
-    None represents an ellipsis.
-    """
-    window = set([1, total_pages])
-    for n in range(max(1, page_number - delta), min(total_pages, page_number + delta) + 1):
-        window.add(n)
-    ordered = sorted(window)
-    out, prev = [], None
-    for n in ordered:
-        if prev is not None and n - prev > 1:
-            out.append(None)
-        out.append(n)
-        prev = n
-    return out
-
-# treasurer/views.py
-from django.core.paginator import Paginator, EmptyPage  # <-- add this import near the top
-
-# ========= Fees search + update =========
+# ========= FEES (search/update/add/edit) =========
 @session_login_required
 @role_required(TREASURER_ROLE)
 @require_GET
 def fees(request: HttpRequest):
-    # --- Query params ---
     q = (request.GET.get("q") or "").strip() or None
-    # per_page: default 5; clamp to allowed set
     try:
         per_page = int(request.GET.get("per_page", "5") or "5")
     except Exception:
@@ -280,22 +306,17 @@ def fees(request: HttpRequest):
     if per_page not in (5, 10, 25, 50):
         per_page = 5
 
-    # multi-select filters
     doc_types = [d.strip() for d in request.GET.getlist("doc_type") if d.strip()]
     fee_types = [k.strip() for k in request.GET.getlist("fee_type") if k.strip()]
     active_count = len(doc_types) + len(fee_types)
 
-    # --- Fetch all (optionally searched) ---
-    # Expected item shape includes: fee_code, name, current_amount, document_type, fee_type, description (optional)
     items_all = search_fee_items(q)
 
-    # --- Build filter option lists from the unfiltered set (sorted, unique) ---
     doc_types_all = sorted({(i.get("document_type") or "").strip()
                             for i in items_all if (i.get("document_type") or "").strip()})
     fee_types_all = sorted({(i.get("fee_type") or "").strip()
                             for i in items_all if (i.get("fee_type") or "").strip()})
 
-    # --- Apply filters (if any) ---
     def passes_filters(row: Dict[str, Any]) -> bool:
         dt = (row.get("document_type") or "").strip()
         ft = (row.get("fee_type") or "").strip()
@@ -307,11 +328,9 @@ def fees(request: HttpRequest):
 
     filtered = [r for r in items_all if passes_filters(r)]
 
-    # --- Split name into two nicer lines (e.g., "Barangay Business Clearance — Sari-Sari Store") ---
     for r in filtered:
         name = (r.get("name") or "").strip()
         main, sub = name, None
-        # Try EN dash / em dash / simple hyphen
         for sep in [" – ", " — ", " - "]:
             if sep in name:
                 parts = [p.strip() for p in name.split(sep, 1)]
@@ -321,9 +340,7 @@ def fees(request: HttpRequest):
         r["name_main"] = main
         r["name_sub"] = sub
 
-    # --- Paginate (safe) ---
     paginator = Paginator(filtered, per_page)
-    # read page and clamp to valid bounds
     try:
         page = int(request.GET.get("page", "1") or "1")
     except Exception:
@@ -332,37 +349,29 @@ def fees(request: HttpRequest):
         page = 1
     if paginator.num_pages >= 1 and page > paginator.num_pages:
         page = paginator.num_pages
-
     try:
         page_obj = paginator.page(page)
     except EmptyPage:
-        # Fallback (should be rare thanks to clamp)
         page_obj = paginator.page(1)
 
-    # --- Build compact page number list with ellipses (None) ---
     def build_page_numbers(curr: int, total: int, radius: int = 2):
         if total <= 1:
             return [1]
         nums = []
         left = max(1, curr - radius)
         right = min(total, curr + radius)
-
         if left > 1:
             nums.append(1)
             if left > 2:
-                nums.append(None)  # ellipsis
-
+                nums.append(None)
         nums.extend(range(left, right + 1))
-
         if right < total:
             if right < total - 1:
-                nums.append(None)  # ellipsis
+                nums.append(None)
             nums.append(total)
         return nums
 
     page_numbers = build_page_numbers(page_obj.number, paginator.num_pages)
-
-    # --- Recent changes (compact list) ---
     history = recent_fee_changes(limit=11)
 
     ctx = {
@@ -373,15 +382,14 @@ def fees(request: HttpRequest):
         "doc_types_all": doc_types_all,
         "fee_types_all": fee_types_all,
         "active_count": active_count,
-
         "is_paginated": paginator.num_pages > 1,
         "paginator": paginator,
         "page_obj": page_obj,
         "page_numbers": page_numbers,
-
         "history": history,
     }
     return render(request, "treasurer/fees.html", ctx)
+
 
 @session_login_required
 @role_required(TREASURER_ROLE)
@@ -407,12 +415,13 @@ def fee_update(request: HttpRequest):
         messages.error(request, f"Update failed: {escape(str(getattr(e, 'message', e)))}")
     return redirect("treasurer:fees")
 
-# ========= Add/Upsert Fee =========
+
 @session_login_required
 @role_required(TREASURER_ROLE)
 def fee_add(request: HttpRequest):
     doc_types = list_document_types()
-    units = ["per_doc", "per_copy", "per_event", "per_month", "per_year", "per_hour", "per_unit_per_day", "per_use"]
+    units = ["per_doc", "per_copy", "per_event", "per_month", "per_year",
+             "per_hour", "per_unit_per_day", "per_use"]
 
     if request.method != "POST":
         return render(request, "treasurer/fee_add.html", {"doc_types": doc_types, "units": units})
@@ -424,57 +433,49 @@ def fee_add(request: HttpRequest):
 
     use_new = (request.POST.get("use_new_doc") == "1")
     doc_type_name = (request.POST.get("doc_type_name_new") or "").strip() if use_new \
-                    else (request.POST.get("doc_type_name") or "").strip()
+        else (request.POST.get("doc_type_name") or "").strip()
 
-    fee_code  = (request.POST.get("fee_code") or "").strip()
-    fee_name  = (request.POST.get("fee_name") or "").strip()
-    unit      = (request.POST.get("unit") or "per_doc").strip()
+    fee_code = (request.POST.get("fee_code") or "").strip()
+    fee_name = (request.POST.get("fee_name") or "").strip()
+    unit = (request.POST.get("unit") or "per_doc").strip()
 
-    from decimal import Decimal as _D
     try:
-        current_amount = float(_D(request.POST.get("current_amount") or "0"))
+        current_amount = float(Decimal(request.POST.get("current_amount") or "0"))
     except Exception:
         current_amount = -1
     try:
-        max_amount_raw = request.POST.get("max_amount", "").strip()
-        max_amount = float(_D(max_amount_raw)) if max_amount_raw != "" else None
+        max_amount_raw = (request.POST.get("max_amount") or "").strip()
+        max_amount = float(Decimal(max_amount_raw)) if max_amount_raw != "" else None
     except Exception:
         max_amount = None
 
-    ex_ftj      = bool(request.POST.get("ex_ftj"))
-    ex_senior   = bool(request.POST.get("ex_senior"))
-    ex_pwd      = bool(request.POST.get("ex_pwd"))
+    ex_ftj = bool(request.POST.get("ex_ftj"))
+    ex_senior = bool(request.POST.get("ex_senior"))
+    ex_pwd = bool(request.POST.get("ex_pwd"))
     ex_indigent = bool(request.POST.get("ex_indigent"))
-    ex_student  = bool(request.POST.get("ex_student"))
-    is_active   = bool(request.POST.get("is_active")) if request.POST.get("is_active") is not None else True
+    ex_student = bool(request.POST.get("ex_student"))
+    is_active = bool(request.POST.get("is_active")) if request.POST.get("is_active") is not None else True
 
-    purpose_code   = (request.POST.get("purpose_code") or "").strip() or None
-    purpose_label  = (request.POST.get("purpose_label") or "").strip() or None
-    default_offense_no = request.POST.get("default_offense_no", "").strip()
+    purpose_code = (request.POST.get("purpose_code") or "").strip() or None
+    purpose_label = (request.POST.get("purpose_label") or "").strip() or None
+    default_offense_no = (request.POST.get("default_offense_no") or "").strip()
     default_offense_no = int(default_offense_no) if default_offense_no.isdigit() else None
 
-    import json as _json
     try:
-        default_details = _json.loads(request.POST.get("default_details") or "{}")
+        default_details = json.loads(request.POST.get("default_details") or "{}")
         if not isinstance(default_details, dict):
             default_details = {}
     except Exception:
         default_details = {}
 
-    s1 = (request.POST.get("s1") or "").strip()
-    s2 = (request.POST.get("s2") or "").strip()
-    s3 = (request.POST.get("s3") or "").strip()
     surcharges = []
-    from decimal import Decimal as _Dec
-    if s1:
-        try: surcharges.append({"offense_no": 1, "percent": float(_Dec(s1))})
-        except Exception: pass
-    if s2:
-        try: surcharges.append({"offense_no": 2, "percent": float(_Dec(s2))})
-        except Exception: pass
-    if s3:
-        try: surcharges.append({"offense_no": 3, "percent": float(_Dec(s3))})
-        except Exception: pass
+    for n, key in enumerate(("s1", "s2", "s3"), start=1):
+        val = (request.POST.get(key) or "").strip()
+        if val:
+            try:
+                surcharges.append({"offense_no": n, "percent": float(Decimal(val))})
+            except Exception:
+                pass
     p_surcharges = surcharges or None
 
     reason = (request.POST.get("reason") or "Initial create").strip() or "Initial create"
@@ -501,7 +502,7 @@ def fee_add(request: HttpRequest):
         "p_default_details": default_details,
         "p_default_offense_no": default_offense_no,
         "p_surcharges": p_surcharges,
-        "p_changed_by_staff_id": staff_id,
+        "p_changed_by_staff_id": _staff_id(request) or 0,
         "p_reason": reason,
     }
 
@@ -514,8 +515,6 @@ def fee_add(request: HttpRequest):
     messages.success(request, f"Saved: {fee_code} – {fee_name} (Type: {doc_type_name}, Amount ₱{current_amount:,.2f}).")
     return redirect(f"{settings.FORCE_SCRIPT_NAME or ''}/treasurer/fees/?q={fee_code}")
 
-# ========= Edit/Upsert Fee =========
-# ... keep your existing imports and code ...
 
 @session_login_required
 @role_required(TREASURER_ROLE)
@@ -530,8 +529,6 @@ def fee_edit(request: HttpRequest, fee_code: str):
     purposes = data.get("purposes") or []
     surcharges = data.get("surcharges") or []
     doc_types = list_document_types()
-
-    # ✅ add this list (same as in fee_add)
     units = ["per_doc", "per_copy", "per_event", "per_month", "per_year",
              "per_hour", "per_unit_per_day", "per_use"]
 
@@ -542,10 +539,9 @@ def fee_edit(request: HttpRequest, fee_code: str):
             "purposes": purposes,
             "surcharges": surcharges,
             "doc_types": doc_types,
-            "units": units,  # ✅ pass to template
+            "units": units,
         })
 
-    # ... keep the rest of your POST branch unchanged ...
     staff_id = _staff_id(request) or 0
     if staff_id <= 0:
         messages.error(request, "Staff session is required.")
@@ -568,7 +564,6 @@ def fee_edit(request: HttpRequest, fee_code: str):
         "p_reason": (request.POST.get("reason") or "").strip() or None,
     }
 
-    import json
     purp_rows = []
     idx = 0
     while True:
@@ -579,11 +574,13 @@ def fee_edit(request: HttpRequest, fee_code: str):
         det = (request.POST.get(f"purp_{idx}_details") or "").strip()
         off = (request.POST.get(f"purp_{idx}_offense") or "").strip()
         if not pc and not lbl and not det and not off and not dt_override:
-            if idx > 50: break
+            if idx > 50:
+                break
             continue
         try:
             details = json.loads(det) if det else {}
-            if not isinstance(details, dict): details = {}
+            if not isinstance(details, dict):
+                details = {}
         except Exception:
             details = {}
         purp_rows.append({
@@ -597,14 +594,15 @@ def fee_edit(request: HttpRequest, fee_code: str):
         payload["p_purposes"] = purp_rows
 
     sr = []
-    for k in ("1","2","3"):
+    for k in ("1", "2", "3"):
         val = (request.POST.get(f"surcharge_{k}") or "").strip()
         if val:
             try:
                 sr.append({"offense_no": int(k), "percent": float(Decimal(val))})
             except Exception:
                 pass
-    if sr: payload["p_surcharges"] = sr
+    if sr:
+        payload["p_surcharges"] = sr
 
     try:
         upsert_fee(payload)
@@ -615,7 +613,8 @@ def fee_edit(request: HttpRequest, fee_code: str):
     messages.success(request, f"{fee_code} saved.")
     return redirect("treasurer:fee_edit", fee_code=fee_code)
 
-# ---------- Business-only queue ----------
+
+# ---------- BUSINESS QUEUE ----------
 @session_login_required
 @role_required(TREASURER_ROLE)
 def business_queue(request: HttpRequest):
@@ -636,8 +635,6 @@ def business_queue(request: HttpRequest):
             }
             r["purposes_display"] = [titleize(p) for p in (r.get("purposes") or [])]
             r["doc_types"] = [d for d in docs if d in TARGET_DOCS]
-            # ensure both ids exist in each row
-            # expects your v_doc_request_list_ex_v2 (or updated view) to expose business_id
             rows.append(r)
 
     return render(request, "treasurer/business_queue.html", {
@@ -647,36 +644,32 @@ def business_queue(request: HttpRequest):
     })
 
 
-# ---------- Business detail (with payment panel) ----------
+# ---------- BUSINESS DETAIL ----------
 @session_login_required
 @role_required(TREASURER_ROLE)
 @require_GET
 def business_detail(request: HttpRequest, business_id: int, doc_request_id: int):
-    # 1) Business profile
     biz_res = supabase.rpc("get_business_details", {"p_business_id": business_id}).execute()
     biz = (biz_res.data[0] if (biz_res and getattr(biz_res, "data", None)) else {}) or {}
     biz["has_business_clearance"] = bool(
         biz.get("has_business_clearance") or biz.get("has_brgy_clearance")
     )
 
-    # 2) Doc request bundle (current request)
     header: Dict[str, Any] = {}
     payments: Dict[str, Any] = {}
     lines: List[Dict[str, Any]] = []
     try:
         bundle = fetch_detail_bundle(doc_request_id)
-        header   = bundle.get("header")   or {}
+        header = bundle.get("header") or {}
         payments = bundle.get("payments") or {}
-        lines    = bundle.get("lines")    or []
+        lines = bundle.get("lines") or []
     except Exception as e:
         messages.warning(request, f"Could not load request details: {escape(str(getattr(e,'message',e)))}")
 
-    # Identify document type for conditional UI
     document_type_name = None
     if lines:
         document_type_name = (lines[0].get("document_type_name") or "").strip()
 
-    # 2b) If this is a CTC, fetch the ORIGINAL (reference) clearance bundle
     ctc_mode = (document_type_name or "").upper() == "CERTIFIED TRUE COPY"
     ctc_ref_header: Dict[str, Any] = {}
     ctc_ref_lines: List[Dict[str, Any]] = []
@@ -684,7 +677,6 @@ def business_detail(request: HttpRequest, business_id: int, doc_request_id: int)
 
     if ctc_mode:
         try:
-            # pull from the first line details; fallback: scan all lines
             det = (lines[0].get("details") or {}) if lines else {}
             ctc_ref_request_id = int(det.get("reference_request_id") or 0) or None
             if not ctc_ref_request_id:
@@ -693,24 +685,21 @@ def business_detail(request: HttpRequest, business_id: int, doc_request_id: int)
                     if d.get("reference_request_id"):
                         ctc_ref_request_id = int(d["reference_request_id"])
                         break
-
             if ctc_ref_request_id:
                 ref_bundle = fetch_detail_bundle(ctc_ref_request_id)
                 ctc_ref_header = ref_bundle.get("header") or {}
-                ctc_ref_lines  = ref_bundle.get("lines")  or []
+                ctc_ref_lines = ref_bundle.get("lines") or []
             else:
                 messages.warning(request, "CTC: no reference_request_id found on line details.")
         except Exception as e:
             messages.warning(request, f"CTC: failed to load reference clearance details: {escape(str(getattr(e,'message',e)))}")
 
-    # 3) Payment methods + WAIVED id
     methods = list_payment_methods()
     waived_method_id = next(
         (m.get("payment_method_id") for m in methods if (m.get("method_name") or "").strip().upper() == "WAIVED"),
         None
     )
 
-    # 4) Release history + year status
     clr_res = supabase.rpc("list_business_clearances", {"p_business_id": business_id}).execute()
     clearances = (clr_res.data or []) if clr_res else []
     year = datetime.utcnow().year
@@ -736,7 +725,6 @@ def business_detail(request: HttpRequest, business_id: int, doc_request_id: int)
             "label": header.get("status") or "—",
             "cls": "badge text-bg-secondary"
         },
-        # 👇 extra context for CTC
         "ctc_mode": ctc_mode,
         "ctc_ref_request_id": ctc_ref_request_id,
         "ctc_ref_header": ctc_ref_header,
@@ -744,7 +732,7 @@ def business_detail(request: HttpRequest, business_id: int, doc_request_id: int)
     })
 
 
-# ---------- One-click: Pay -> set flag -> mark for printing ----------
+# ---------- PAY & PRINT (business shortcut) ----------
 @session_login_required
 @role_required(TREASURER_ROLE)
 @require_POST
@@ -754,7 +742,6 @@ def business_pay_and_print(request: HttpRequest, business_id: int, doc_request_i
         messages.error(request, "Staff session required.")
         return redirect("treasurer:business_detail", business_id=business_id, doc_request_id=doc_request_id)
 
-    # pull posted form fields
     try:
         method_id = int(request.POST.get("payment_method_id", "0") or 0)
         amount_paid = float(Decimal(request.POST.get("amount_paid", "0") or "0"))
@@ -762,7 +749,6 @@ def business_pay_and_print(request: HttpRequest, business_id: int, doc_request_i
         messages.error(request, "Invalid payment fields.")
         return redirect("treasurer:business_detail", business_id=business_id, doc_request_id=doc_request_id)
 
-    # STEP 1: Accept payment (fail fast)
     or_id = None
     try:
         or_id = accept_payment(
@@ -775,7 +761,6 @@ def business_pay_and_print(request: HttpRequest, business_id: int, doc_request_i
         messages.error(request, f"Payment failed: {escape(str(getattr(e, 'message', e)))}")
         return redirect("treasurer:business_detail", business_id=business_id, doc_request_id=doc_request_id)
 
-    # show OR info if we can
     try:
         or_res = (supabase.table("official_receipt")
                   .select("or_number, amount_paid, amount_due, change_due")
@@ -792,14 +777,12 @@ def business_pay_and_print(request: HttpRequest, business_id: int, doc_request_i
     except Exception:
         messages.success(request, f"Payment posted. OR id {or_id}.")
 
-    # STEP 2: Set has_business_clearance = TRUE
     try:
         supabase.rpc("set_business_has_clearance_true", {"p_business_id": business_id}).execute()
         messages.info(request, "Business flag set: has_business_clearance = TRUE.")
     except Exception as e:
         messages.warning(request, f"Payment ok, but failed to set business flag: {escape(str(getattr(e,'message',e)))}")
 
-    # STEP 3: Move to FOR_PRINTING
     try:
         mark_for_printing(
             doc_request_id=doc_request_id,
@@ -812,25 +795,16 @@ def business_pay_and_print(request: HttpRequest, business_id: int, doc_request_i
 
     return redirect("treasurer:business_detail", business_id=business_id, doc_request_id=doc_request_id)
 
-# treasurer/views.py
-from django.core.paginator import Paginator, EmptyPage
-from django.views.decorators.http import require_GET
 
+# ---------- BUSINESS RENEWAL LIST ----------
 @session_login_required
 @role_required(TREASURER_ROLE)
 @require_GET
 def business_renewal(request: HttpRequest):
-    """
-    Treasurer > Business > Renewal
-    Lists renewal_request rows with search + filters + pagination.
-    """
     q = (request.GET.get("q") or "").strip() or None
-
-    # Filters
     period_types = [p.strip().upper() for p in request.GET.getlist("period_type") if p.strip()]
     year = request.GET.get("year", "").strip()
-    paid_filters = [p.strip().lower() for p in request.GET.getlist("paid") if p.strip()]  # 'paid', 'unpaid'
-    # pagination (default 10 per your business pages; change to 5 if you prefer)
+    paid_filters = [p.strip().lower() for p in request.GET.getlist("paid") if p.strip()]
     try:
         per_page = int(request.GET.get("per_page", "10") or "10")
     except Exception:
@@ -838,28 +812,22 @@ def business_renewal(request: HttpRequest):
     if per_page not in (5, 10, 25, 50):
         per_page = 10
 
-    # ---- fetch from DB ----
-    # base query
     query = supabase.table("renewal_request").select("*").order("created_at", desc=True)
 
-    # Loose search on request_code/or_number; if q is digits, we'll also filter by period_year/business_id
     if q:
         or_parts = [f"request_code.ilike.%{q}%", f"or_number.ilike.%{q}%"]
         if q.isdigit():
             or_parts += [f"period_year.eq.{q}", f"business_id.eq.{q}"]
         query = query.or_(",".join(or_parts))
 
-    # Apply server-side filters when easy, else filter after fetch
     if year.isdigit():
         query = query.eq("period_year", int(year))
     if period_types:
         query = query.in_("period_type", period_types)
 
-    # Fetch a reasonable cap to paginate locally (adjust if you expect >500)
     res = query.limit(500).execute()
     rows = res.data or []
 
-    # Post-filter paid/unpaid (depends on paid_on)
     if paid_filters:
         want_paid = "paid" in paid_filters and "unpaid" not in paid_filters
         want_unpaid = "unpaid" in paid_filters and "paid" not in paid_filters
@@ -867,18 +835,14 @@ def business_renewal(request: HttpRequest):
             rows = [r for r in rows if r.get("paid_on")]
         elif want_unpaid:
             rows = [r for r in rows if not r.get("paid_on")]
-        # if both are present we keep all
 
-    # decorate rows for UI
-    STATUS_ID_MAP = {8: "FOR_TREASURER_REVIEW", 9: "PAID"}  # extend as needed
+    STATUS_ID_MAP = {8: "FOR_TREASURER_REVIEW", 9: "PAID"}
     for r in rows:
-        # status ui
         name = "PAID" if r.get("paid_on") else STATUS_ID_MAP.get(r.get("request_status_id"), "—")
         ui = STATUS_UI.get(name) or {"label": name, "cls": "badge text-bg-secondary"}
         r["status_name"] = name
         r["status_ui"] = ui
 
-        # period label
         ptype = (r.get("period_type") or "").upper()
         yr = r.get("period_year")
         qtr = r.get("period_quarter")
@@ -887,7 +851,6 @@ def business_renewal(request: HttpRequest):
         else:
             r["period_label"] = str(yr or "—")
 
-        # amounts as float for display
         def _to_float(v):
             try:
                 return float(v)
@@ -897,7 +860,6 @@ def business_renewal(request: HttpRequest):
         r["surcharge_quote_f"] = _to_float(r.get("surcharge_quote"))
         r["total_quote_f"] = _to_float(r.get("total_quote"))
 
-    # pagination
     paginator = Paginator(rows, per_page)
     try:
         page_num = int(request.GET.get("page", "1") or "1")
@@ -912,21 +874,17 @@ def business_renewal(request: HttpRequest):
     except EmptyPage:
         page_obj = paginator.page(1)
 
-    # compact page numbers with ellipses
     def build_page_numbers(curr: int, total: int, radius: int = 2):
         if total <= 1:
             return [1]
         nums = []
         left = max(1, curr - radius)
         right = min(total, curr + radius)
-
         if left > 1:
             nums.append(1)
             if left > 2:
                 nums.append(None)
-
         nums.extend(range(left, right + 1))
-
         if right < total:
             if right < total - 1:
                 nums.append(None)
@@ -934,22 +892,17 @@ def business_renewal(request: HttpRequest):
         return nums
 
     page_numbers = build_page_numbers(page_obj.number, paginator.num_pages)
-
-    # filter option sources (from what we actually have)
     period_type_all = sorted({(r.get("period_type") or "").upper() for r in rows if r.get("period_type")})
     year_all = sorted({int(r.get("period_year")) for r in rows if r.get("period_year")}, reverse=True)
 
     ctx = {
         "q": q or "",
         "per_page": per_page,
-
         "period_types": period_types,
         "paid_filters": paid_filters,
         "year": year,
-
         "period_type_all": period_type_all,
         "year_all": year_all,
-
         "rows": page_obj.object_list,
         "page_obj": page_obj,
         "paginator": paginator,
@@ -958,12 +911,12 @@ def business_renewal(request: HttpRequest):
     }
     return render(request, "treasurer/business_renewal.html", ctx)
 
-# treasurer/views.py (add below business_renewal)
+
+# ---------- BUSINESS RENEWAL DETAIL ----------
 @session_login_required
 @role_required(TREASURER_ROLE)
 @require_GET
 def business_renewal_detail(request: HttpRequest, renewal_request_id: int):
-    # Fetch single renewal
     res = (supabase.table("renewal_request")
            .select("*")
            .eq("renewal_request_id", renewal_request_id)
@@ -974,13 +927,10 @@ def business_renewal_detail(request: HttpRequest, renewal_request_id: int):
         return redirect("treasurer:business_renewal")
 
     r = res.data
-
-    # Determine status
     STATUS_ID_MAP = {8: "FOR_TREASURER_REVIEW", 9: "PAID"}
     status_name = "PAID" if r.get("paid_on") else STATUS_ID_MAP.get(r.get("request_status_id"), "—")
     status_ui = STATUS_UI.get(status_name) or {"label": status_name, "cls": "badge text-bg-secondary"}
 
-    # Period label
     ptype = (r.get("period_type") or "").upper()
     yr = r.get("period_year")
     qtr = r.get("period_quarter")
@@ -989,7 +939,6 @@ def business_renewal_detail(request: HttpRequest, renewal_request_id: int):
     else:
         period_label = str(yr or "—")
 
-    # Parse floats
     def _f(x):
         try:
             return float(x)
@@ -1001,64 +950,6 @@ def business_renewal_detail(request: HttpRequest, renewal_request_id: int):
     r["total_quote_f"] = _f(r.get("total_quote"))
     r["period_label"] = period_label
 
-    # Pull business snapshot
-    biz = {}
-    try:
-        biz_res = supabase.rpc("get_business_details", {"p_business_id": r["business_id"]}).execute()
-        if getattr(biz_res, "data", None):
-            biz = (biz_res.data[0] if isinstance(biz_res.data, list) else biz_res.data) or {}
-    except Exception:
-        biz = {}
-
-    return render(request, "treasurer/business_renewal_details.html", {
-        "renewal": r,
-        "status_ui": status_ui,
-        "biz": biz,
-    })
-# treasurer/views.py (add below business_renewal)
-@session_login_required
-@role_required(TREASURER_ROLE)
-@require_GET
-def business_renewal_detail(request: HttpRequest, renewal_request_id: int):
-    # Fetch single renewal
-    res = (supabase.table("renewal_request")
-           .select("*")
-           .eq("renewal_request_id", renewal_request_id)
-           .single()
-           .execute())
-    if getattr(res, "error", None) or not res.data:
-        messages.error(request, "Renewal request not found.")
-        return redirect("treasurer:business_renewal")
-
-    r = res.data
-
-    # Determine status
-    STATUS_ID_MAP = {8: "FOR_TREASURER_REVIEW", 9: "PAID"}
-    status_name = "PAID" if r.get("paid_on") else STATUS_ID_MAP.get(r.get("request_status_id"), "—")
-    status_ui = STATUS_UI.get(status_name) or {"label": status_name, "cls": "badge text-bg-secondary"}
-
-    # Period label
-    ptype = (r.get("period_type") or "").upper()
-    yr = r.get("period_year")
-    qtr = r.get("period_quarter")
-    if ptype == "QUARTERLY":
-        period_label = f"Q{qtr} {yr}" if (yr and qtr) else (ptype or "—")
-    else:
-        period_label = str(yr or "—")
-
-    # Parse floats
-    def _f(x):
-        try:
-            return float(x)
-        except Exception:
-            return None
-
-    r["base_fee_quote_f"] = _f(r.get("base_fee_quote"))
-    r["surcharge_quote_f"] = _f(r.get("surcharge_quote"))
-    r["total_quote_f"] = _f(r.get("total_quote"))
-    r["period_label"] = period_label
-
-    # Pull business snapshot
     biz = {}
     try:
         biz_res = supabase.rpc("get_business_details", {"p_business_id": r["business_id"]}).execute()
@@ -1073,15 +964,11 @@ def business_renewal_detail(request: HttpRequest, renewal_request_id: int):
         "biz": biz,
     })
 
-from django.views.decorators.http import require_POST
-from datetime import date
-from django.utils.dateparse import parse_date
 
 @session_login_required
 @role_required(TREASURER_ROLE)
 @require_POST
 def business_renewal_recalc(request: HttpRequest, renewal_request_id: int):
-    """Recalculate surcharge/total preview for a renewal and persist it."""
     asof_str = (request.POST.get("asof_date") or "").strip()
     asof_date = parse_date(asof_str) or date.today()
 
@@ -1096,17 +983,131 @@ def business_renewal_recalc(request: HttpRequest, renewal_request_id: int):
         messages.error(request, f"Recalculate failed: {escape(str(getattr(e, 'message', e)))}")
         return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)
 
-    # Optionally surface new values in a toast
     row = (res.data or {}) if isinstance(res.data, dict) else (res.data[0] if res.data else {})
     try:
         base = float(row.get("base_fee_quote", 0) or 0)
-        sur  = float(row.get("surcharge_quote", 0) or 0)
-        tot  = float(row.get("total_quote", 0) or 0)
+        sur = float(row.get("surcharge_quote", 0) or 0)
+        tot = float(row.get("total_quote", 0) or 0)
         messages.success(request, f"Preview updated — Base ₱{base:,.2f}, Surcharge ₱{sur:,.2f}, Total ₱{tot:,.2f}.")
     except Exception:
         messages.success(request, "Preview updated.")
-
     return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)
 
 
+# ========= CONFIRM & POST OR (online paid, no OR yet) =========
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_POST
+def confirm_post_or(request: HttpRequest, doc_request_id: int):
+    """
+    - Uses RPC treasurer_confirm_and_post_or to:
+      * create OR (uses supplied OR number, or auto-generate)
+      * mark PAID and advance to FOR_PRINTING
+      * log OR_ISSUED / STATUS_CHANGED timeline
+    - Default payment method is Online GCash (id=5)
+    """
+    staff_id = _staff_id(request) or 0
+    if staff_id <= 0:
+        messages.error(request, "Staff session required.")
+        return redirect("treasurer:detail", doc_request_id=doc_request_id)
 
+    or_number = (request.POST.get("or_number") or "").strip() or None
+    # Let the DB default this to 5, but we still pass 5 so the UI intent is clear.
+    payment_method_id = int(request.POST.get("payment_method_id", "5") or "5") or 5
+
+    try:
+        or_id = confirm_and_post_or(
+            doc_request_id=doc_request_id,
+            staff_id=staff_id,
+            or_number=or_number,
+            payment_method_id=payment_method_id,
+        )
+    except Exception as e:
+        messages.error(request, f"Confirm & Post OR failed: {escape(str(getattr(e, 'message', e)))}")
+        return redirect("treasurer:detail", doc_request_id=doc_request_id)
+
+    try:
+        or_res = (supabase.table("official_receipt")
+                  .select("or_number, amount_paid, amount_due")
+                  .eq("or_id", or_id).single().execute())
+        if getattr(or_res, "data", None):
+            o = or_res.data
+            messages.success(request, f"OR {o.get('or_number','—')} posted (₱{float(o.get('amount_paid',0) or 0):,.2f}).")
+        else:
+            messages.success(request, f"OR posted (id {or_id}).")
+    except Exception:
+        messages.success(request, f"OR posted (id {or_id}).")
+
+    messages.info(request, "Request moved to FOR_PRINTING.")
+    return redirect("treasurer:detail", doc_request_id=doc_request_id)
+
+
+# ========= REFUND COMPLETE =========
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_POST
+def treasurer_complete_refund(request: HttpRequest, doc_request_id: int):
+    print("\n" + "="*72)
+    print("[REFUND DEBUG] treasurer_complete_refund CALLED")
+    print(f"[REFUND DEBUG] doc_request_id = {doc_request_id}")
+
+    staff_id = _staff_id(request) or 0
+    print(f"[REFUND DEBUG] staff_id       = {staff_id}")
+
+    if staff_id <= 0:
+        print("[REFUND DEBUG] ERROR: No staff in session")
+        messages.error(request, "Staff session required.")
+        return redirect("treasurer:detail", doc_request_id=doc_request_id)
+
+    # capture raw POST (sanitized)
+    try:
+        safe_post = {
+            "refund_id": request.POST.get("refund_id"),
+            "provider_refund_id": request.POST.get("provider_refund_id"),
+            "refund_receipt_no": request.POST.get("refund_receipt_no"),
+        }
+        print("[REFUND DEBUG] POST payload   =", safe_post)
+    except Exception as e:
+        print("[REFUND DEBUG] Could not pretty-print POST:", e)
+
+    # the refund ticket to complete (e.g. from the page’s form)
+    try:
+        refund_id = int(request.POST.get("refund_id") or 0)
+    except Exception:
+        refund_id = 0
+    provider_refund_id = (request.POST.get("provider_refund_id") or "").strip() or None
+    refund_receipt_no  = (request.POST.get("refund_receipt_no")  or "").strip() or None
+
+    print(f"[REFUND DEBUG] refund_id            = {refund_id}")
+    print(f"[REFUND DEBUG] provider_refund_id   = {provider_refund_id!r}")
+    print(f"[REFUND DEBUG] refund_receipt_no    = {refund_receipt_no!r}")
+
+    if not refund_id:
+        print("[REFUND DEBUG] ERROR: Missing refund_id")
+        messages.error(request, "Missing refund ticket id.")
+        return redirect("treasurer:detail", doc_request_id=doc_request_id)
+
+    payload = {
+        "p_payment_refund_id":  refund_id,
+        "p_treasurer_staff_id": int(staff_id),
+        "p_provider_refund_id": provider_refund_id,
+        "p_refund_receipt_no":  refund_receipt_no,
+    }
+    print("[REFUND DEBUG] RPC payload      =", payload)
+
+    try:
+        res = supabase.rpc("treasurer_complete_refund", payload).execute()
+        print("[REFUND DEBUG] RPC .data       =", getattr(res, "data", None))
+        print("[REFUND DEBUG] RPC .error      =", getattr(res, "error", None))
+        if getattr(res, "error", None):
+            raise RuntimeError(res.error.message)
+    except Exception as e:
+        print("[REFUND DEBUG] EXCEPTION during RPC:", e)
+        messages.error(request, f"Failed to complete refund: {escape(str(e))}")
+        print("="*72 + "\n")
+        return redirect("treasurer:detail", doc_request_id=doc_request_id)
+
+    print("[REFUND DEBUG] SUCCESS: refund completed and logged.")
+    print("="*72 + "\n")
+    messages.success(request, "Refund completed and logged.")
+    return redirect("treasurer:detail", doc_request_id=doc_request_id)
