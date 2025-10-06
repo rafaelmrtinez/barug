@@ -11,8 +11,24 @@ class MaternalRepository(IMaternalRepository):
     def __init__(self, ctx: IConnectionAdapter) -> None:
         self._ctx = ctx
         
+    def get_immunization_stage_by_child_health_record_id(self, child_health_record_id: int) -> dict | None:
+        raw = """
+        SELECT immunization_stage_given.immunization_stage_name AS stage  FROM child_immunization
+        INNER JOIN immunization_stage_given
+        ON immunization_stage_given.immunization_stage_given_id = child_immunization.immunization_stage_given_id
+        WHERE child_record_id = %s;"""
+        params = [child_health_record_id]
+        return self._ctx.execute_query_to_dict(raw, params)[0] if self._ctx.execute_query_to_dict(raw, params) else None
+
+    def get_immunization_type_id_by_type_name(self, immunization_type_name: str) -> int:
+        raw = """
+            SELECT immunization_type_id FROM immunization_type WHERE immunization_type_name = %s;
+        """
+        params = [immunization_type_name]
+        result = self._ctx.execute_query_to_dict(raw, params)
+        return result[0]['immunization_type_id'] if result else 0
+
     def get_child_record_by_person_id(self, person_id: int) -> int:
-        print(f"Looking up child record for person_id: {person_id}")
         raw = """
             SELECT child_record_id FROM child_health_record WHERE person_id = %s;
         """

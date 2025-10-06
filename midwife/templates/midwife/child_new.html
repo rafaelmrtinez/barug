@@ -229,7 +229,7 @@
     </div>
 
     <!-- Feeding / NBS / Exclusive BF check -->
-    <div class="card mb-3">
+    <div class="card mb-3 b5-">
       <div class="card-body">
         <div class="row g-3">
           <div class="col-md-4">
@@ -248,10 +248,10 @@
           <div class="col-md-4">
             <label class="form-label">Exclusive BF check (dates)</label>
             <div class="d-flex gap-2">
-              <input type="date" class="form-control" name="bf_check_1">
-              <input type="date" class="form-control" name="bf_check_2">
-              <input type="date" class="form-control" name="bf_check_3">
-              <input type="date" class="form-control" name="bf_check_4">
+              <input type="date" class="form-control" name="bf_check_1" id="bf_check_1">
+              <input type="date" class="form-control" name="bf_check_2" id="bf_check_2">
+              <input type="date" class="form-control" name="bf_check_3" id="bf_check_3">
+              <input type="date" class="form-control" name="bf_check_4" id="bf_check_4">
             </div>
           </div>
         </div>
@@ -389,26 +389,60 @@
         </div>
 
         <div class="row g-3 mt-2">
+          
           <div class="col-md-2">
             <label class="form-label">Vit. A Given (1)</label>
             <input type="date" name="vita_1" id="vita_1" class="form-control">
           </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Vitamin (1) Dose Given (mg)</label>
+            <input type="number" name="vitamin_dose_1" id="vitamin_dose_1" class="form-control">
+          </div>
+
           <div class="col-md-2">
             <label class="form-label">Vit. A Given (2)</label>
             <input type="date" name="vita_2" id="vita_2" class="form-control">
           </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Vitamin (2) Dose Given (mg)</label>
+            <input type="number" name="vitamin_dose_2" id="vitamin_dose_2" class="form-control">
+          </div>
+
           <div class="col-md-2">
             <label class="form-label">Vit. A Given (3)</label>
             <input type="date" name="vita_3" id="vita_3" class="form-control">
           </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Vitamin Dose (3) Given (mg)</label>
+            <input type="number" name="vitamin_dose_3" id="vitamin_dose_3" class="form-control">
+          </div>
+
           <div class="col-md-3">
             <label class="form-label">Date iron started</label>
             <input type="date" name="iron_started" id="iron_started" class="form-control">
           </div>
           <div class="col-md-3">
-            <label class="form-label">Completed</label>
-            <input type="date" name="completed_date" id="completed_date" class="form-control">
+            <label class="form-label">Date iron Completed</label>
+            <input type="date" name="iron_completed_date" id="iron_completed_date" class="form-control">
           </div>
+
+          {% comment %} Commented out this block and added dose every after Vit. A Given.
+            Please check above with HTML or check UI.
+          {% endcomment %}
+
+          {% comment %} <div class="col-md-3">
+            <label class="form-label">Vitamin Dose Given (mg)</label>
+            <input type="number" name="vitamin_dose" id="vitamin_dose" class="form-control">
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Vitamin Dose Date Given</label>
+            <input type="date" name="vitamin_date_given" id="vitamin_date_given" class="form-control">
+          </div> {% endcomment %}
+
         </div>
       </div>
     </div>

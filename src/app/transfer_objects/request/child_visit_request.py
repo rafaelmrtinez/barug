@@ -10,6 +10,7 @@ from src.app.transfer_objects.request.child_vitamins_request import ChildVitamin
 
 @dataclass
 class ChildVisitRequest:
+    p_child_id: int | None = None
     p_child_record_id: int | None = None
     p_assessed_by_id: int | None = None
     p_visit_date: str | None = None

@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 class IMaternalService(ABC):
     
     @abstractmethod
-    def execute_child_visit(self, visit_data, person_id: int):
+    def execute_child_visit(self, visit_data, immunization_data):
         pass
 
     @abstractmethod
