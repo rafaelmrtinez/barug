@@ -70,7 +70,7 @@ class TestChildVisitRequest(TestCase):
             p_child_immunizations=self.child_immunizations,
             p_bf_checks=self.bf_checks,
             p_monitoring_logs=self.monitoring_logs,
-            p_screenings=self.screenings,
+            p_screening=self.screenings,
             p_iron_supplements=self.iron_supplements,
             p_vitamin_a=[self.vitamins, self.vitamins]
         )
@@ -87,6 +87,6 @@ class TestChildVisitRequest(TestCase):
         self.assertIsNotNone(self.child_visit_request.p_child_immunizations)
         self.assertIsNotNone(self.child_visit_request.p_bf_checks)
         self.assertIsNotNone(self.child_visit_request.p_monitoring_logs)
-        self.assertIsNotNone(self.child_visit_request.p_screenings)
+        self.assertIsNotNone(self.child_visit_request.p_screening)
         self.assertIsNotNone(self.child_visit_request.p_iron_supplements)
         self.assertIsNotNone(self.child_visit_request.p_vitamin_a)

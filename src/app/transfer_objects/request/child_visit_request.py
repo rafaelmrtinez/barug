@@ -19,7 +19,7 @@ class ChildVisitRequest:
     p_child_immunizations: list[ChildImmunizationRequest] | None = None
     p_bf_checks: list[BreastFeedingCheckRequest] | None = None
     p_monitoring_logs: list[ChildMonitoringRequest] | None = None
-    p_screenings: ChildScreeningRequest | None = None
+    p_screening: ChildScreeningRequest | None = None
     p_iron_supplements: ChildIronSupplementRequest | None = None
     p_vitamin_a: list[ChildVitaminsRequest] | None = None
     

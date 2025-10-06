@@ -2,6 +2,7 @@ from src.app.transfer_objects.request.child_visit_request import ChildVisitReque
 from src.app.transfer_objects.request.create_child_record_request import CreateChildRecordRequest
 from src.domain.contracts.maternal_repository import IMaternalRepository
 from src.infra.contracts.connection_adapter import IConnectionAdapter
+from src.infra.exceptions.child_visit_exception import ChildVisitException
 from src.infra.exceptions.maternal_exceptions import MaternalException
 from src.infra.exceptions.query_exec_exception import QueryExecutionException
 
@@ -49,7 +50,7 @@ class MaternalRepository(IMaternalRepository):
                 data.p_child_immunizations,
                 data.p_bf_checks,
                 data.p_monitoring_logs,
-                data.p_screenings,
+                data.p_screening,
                 data.p_iron_supplements,
                 data.p_vitamin_a
             ]
@@ -62,8 +63,9 @@ class MaternalRepository(IMaternalRepository):
             return row[0]
         
         except QueryExecutionException as e:
-            if MaternalException.is_maternal_exception(e.code):
-                raise MaternalException(e.message) from e
+            if ChildVisitException.is_child_visit_exception(e.code):
+                raise ChildVisitException(e.message) from e
+            raise
 
     def insert_child_record(self, request: CreateChildRecordRequest) -> int:
         try:

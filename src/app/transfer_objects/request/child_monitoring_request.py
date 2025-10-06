@@ -1,12 +1,12 @@
 from dataclasses import dataclass
-from datetime import date
+from datetime import datetime
 
 @dataclass
 class ChildMonitoringRequest:
-    check_date: date | None = None
+    check_date: datetime | None = None
     age: int | None = None
-    weight: float | None = None
-    temperature: float | None = None
-    height: float | None = None
+    wt: float | None = None
+    temp: float | None = None
+    ht: float | None = None
     findings: str | None = None
     notes: str | None = None

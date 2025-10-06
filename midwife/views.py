@@ -24,14 +24,18 @@ from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
 from midwife.utility.immunitization_utility import ImmunizationUtility
 from src.app.bootstrap.app_containers import AppContainer
+from src.app.exceptions.person_not_found import PersonNotFoundException
+from src.app.exceptions.prescription_exception import PrescriptionException
 from src.app.transfer_objects.request.breast_feeding_type_request import BreastFeedingCheckRequest
 from src.app.transfer_objects.request.child_immunization_request import ChildImmunizationRequest
 from src.app.transfer_objects.request.child_iron_supplement_request import ChildIronSupplementRequest
+from src.app.transfer_objects.request.child_monitoring_request import ChildMonitoringRequest
 from src.app.transfer_objects.request.child_screening_request import ChildScreeningRequest
 from src.app.transfer_objects.request.child_visit_request import ChildVisitRequest
 from src.app.transfer_objects.request.child_vitamins_request import ChildVitaminsRequest
 from src.app.transfer_objects.request.init_chilld_immunization_request import InitialChildImmunizationRequest
 from src.domain.contracts.maternal_service import IMaternalService
+from src.infra.exceptions.child_visit_exception import ChildVisitException
 
 from .forms import (
     SearchActiveScheduleFilter,
@@ -638,29 +642,32 @@ def child_new(request: HttpRequest) -> HttpResponse:
     
 @inject
 @require_http_methods(["POST"])
-def child_visit_http(request: HttpRequest, service: IMaternalService = Provide[AppContainer.maternal_service]) -> HttpResponse:
+def child_visit_http(request: HttpRequest, service: IMaternalService = Provide[AppContainer.maternal_service]) -> JsonResponse:
     
     if request.content_type != "application/json":
-        return HttpResponse("Unsupported Media Type", status=415)
+        return JsonResponse({"error": "Unsupported Media Type"}, status=415)
     
     try:
         data = json.loads(request.body)
         immunization_data = json.loads(data.get("p_child_immunizations", None))
+        monitoring_data = json.loads(data.get("child_monitoring", None))
     except json.JSONDecodeError:
-        return HttpResponse("Invalid JSON", status=400)
-    
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
     breast_feeding_checks = [BreastFeedingCheckRequest(**i) for i in data.get("p_bf_checks", [])]
     child_screening = ChildScreeningRequest(**data.get("screening", {}))
     iron_supplements = ChildIronSupplementRequest(**data.get("iron_supplements", {}))
     vitamins = [ChildVitaminsRequest(**i) for i in data.get("vitamins", [])]
     initial_immunization = ImmunizationUtility.parse_immunization_payload(immunization_data)
-
-    # print("Initial Immunization Data:", initial_immunization)
-    # print("Breast Feeding Checks:", breast_feeding_checks)
-    # print("Child Screening:", child_screening)
-    # print("Iron Supplements:", iron_supplements)
-    # print("Vitamins:", vitamins)
-    print(f"Monitoring Logs {data.get('child_monitoring', None)}")
+    monitoring = ChildMonitoringRequest(
+        check_date=monitoring_data[0].get("date", None),
+        age=monitoring_data[0].get("age", None),
+        wt=monitoring_data[0].get("wt", None),
+        temp=monitoring_data[0].get("temp", None),
+        ht=monitoring_data[0].get("ht", None),
+        findings=monitoring_data[0].get("findings", None),
+        notes=monitoring_data[0].get("notes", None),
+    )
     
     initial_data = ChildVisitRequest(
         p_child_id=data.get("p_child_id", None),
@@ -671,12 +678,15 @@ def child_visit_http(request: HttpRequest, service: IMaternalService = Provide[A
         p_referred_nbs_date=data.get("p_referred_nbs_date", None),
         p_child_immunizations=None,
         p_bf_checks=breast_feeding_checks,
-        p_monitoring_logs=None,
-        p_screenings=child_screening,
+        p_monitoring_logs=monitoring,
+        p_screening=child_screening,
         p_iron_supplements=iron_supplements,
         p_vitamin_a=vitamins,
     )
     
-    res = service.execute_child_visit(initial_data, initial_immunization)
+    try:
+        res = service.execute_child_visit(initial_data, initial_immunization)
+    except (PersonNotFoundException, PrescriptionException, ChildVisitException) as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
-    return HttpResponse("Not implemented yet.", status=501)    
+    return JsonResponse({"success": True, "data": res}, status=201)
