@@ -142,7 +142,7 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
 @require_http_methods(["GET", "POST"])  # accept POST if this form eventually submits here
 def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
     form = ResidentProfileform()
-    return render(request, "person/personal_info.html", {
+    return render(request, "staff/staff_selection_nonresident.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
         'page_path': f'{user_role} / Account Verification',

@@ -174,7 +174,7 @@
       </div>
 
       <!-- ONLY SHOW THIS PART AFTER SELECTING A RESIDENT-->
-      <!-- Staff Role (static-style input, like the search) -->
+
       <div class="rounded-3 border bg-light p-3 mt-4">
         <div class="row g-3 align-items-end">
           <!-- Role -->
@@ -187,66 +187,81 @@
             <div class="form-text">Choose the role to assign to this resident.</div>
           </div>
 
-          <!-- Purok/Sitio (shown only if BHW, add d-none to class if role is not BHW)  -->
+          <!-- ★ ADDED: wrapper to control Purok visibility without touching inner markup -->
           <div class="col-12 col-md-6">
-            <label class="form-label small">Assign to Purok/Sitio</label>
-            <div class="form-floating">
-              {{ role_form.purok_sitio }}
-              <label for="{{ role_form.purok_sitio.id_for_label }}">{{ role_form.purok_sitio.label }}</label>
-            </div>
-            <div class="form-text">Required for Barangay Health Worker.</div>
+            <!-- ★ ADDED: Purok visibility wrapper -->
+            <div id="purok-section"> <!-- ★ ADDED (open wrapper) -->
+              <!-- Purok/Sitio (shown only if BHW, add d-none to class if role is not BHW)  -->
+              <div class="col-12 col-md-12">
+                <label class="form-label small">Assign to Purok/Sitio</label>
+                <div class="form-floating">
+                  {{ role_form.purok_sitio }}
+                  <label for="{{ role_form.purok_sitio.id_for_label }}">{{ role_form.purok_sitio.label }}</label>
+                </div>
+                <div class="form-text">Required for Barangay Health Worker.</div>
+              </div>
+
+              <!-- ★ ADDED: Multi-purok controls (extra rows) -->
+              <div class="mt-2 d-flex justify-content-end">
+                <button type="button" class="btn btn-submit btn-sm" id="add-purok">+ Add purok</button> <!-- ★ ADDED -->
+              </div>
+              <div id="purok-list"></div> <!-- ★ ADDED: extra purok rows will appear here -->
+            </div> <!-- ★ ADDED (close wrapper) -->
           </div>
         </div>
       </div>
 
-      <div class="rounded-3 border bg-light p-3 mt-4">
-        <div class="d-flex justify-content-between align-items-center">
-          <h6 class="mb-0">Schedules for Selected Resident</h6>
-          <button type="button" class="btn btn-submit btn-sm" id="add-sched">+ Add schedule</button>
-        </div>
+      <!-- ★ ADDED: wrapper to control Schedule visibility without touching inner markup -->
+      <div id="sched-section"> <!-- ★ ADDED (open wrapper) -->
+        <div class="rounded-3 border bg-light p-3 mt-4">
+          <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">Schedules for Selected Resident</h6>
+            <button type="button" class="btn btn-submit btn-sm" id="add-sched">+ Add schedule</button>
+          </div>
 
-        <div id="sched-list">
-          <!-- Row 0 (uses your existing Django form fields) -->
-          <div class="sched-row rounded-3 border bg-white p-3 mt-3" data-index="0">
-            <div class="row g-3 align-items-end">
-              <!-- Day -->
-              <div class="col-12 col-md-4">
-                <label class="form-label small">Day</label>
-                <div class="form-floating">
-                  {{ sched_form.day }}
-                  <label for="{{ sched_form.day.id_for_label }}">{{ sched_form.day.label }}</label>
+          <div id="sched-list">
+            <!-- Row 0 (uses your existing Django form fields) -->
+            <div class="sched-row rounded-3 border bg-white p-3 mt-3" data-index="0">
+              <div class="row g-3 align-items-end">
+                <!-- Day -->
+                <div class="col-12 col-md-4">
+                  <label class="form-label small">Day</label>
+                  <div class="form-floating">
+                    {{ sched_form.day }}
+                    <label for="{{ sched_form.day.id_for_label }}">{{ sched_form.day.label }}</label>
+                  </div>
+                  <div class="form-text">Select the day for the schedule.</div>
                 </div>
-                <div class="form-text">Select the day for the schedule.</div>
+
+                <!-- Time Start -->
+                <div class="col-12 col-md-4">
+                  <label class="form-label small">Time Start</label>
+                  <div class="form-floating">
+                    {{ sched_form.time_start }}
+                    <label for="{{ sched_form.time_start.id_for_label }}">{{ sched_form.time_start.label }}</label>
+                  </div>
+                  <div class="form-text">Choose the start time.</div>
+                </div>
+
+                <!-- Time End -->
+                <div class="col-12 col-md-4">
+                  <label class="form-label small">Time End</label>
+                  <div class="form-floating">
+                    {{ sched_form.time_end }}
+                    <label for="{{ sched_form.time_end.id_for_label }}">{{ sched_form.time_end.label }}</label>
+                  </div>
+                  <div class="form-text">Choose the end time (after start).</div>
+                </div>
               </div>
 
-              <!-- Time Start -->
-              <div class="col-12 col-md-4">
-                <label class="form-label small">Time Start</label>
-                <div class="form-floating">
-                  {{ sched_form.time_start }}
-                  <label for="{{ sched_form.time_start.id_for_label }}">{{ sched_form.time_start.label }}</label>
-                </div>
-                <div class="form-text">Choose the start time.</div>
+              <div class="mt-2 d-flex justify-content-end">
+                <!-- Hidden for the first row so at least one remains -->
+                <button type="button" class="btn btn-reset btn-sm remove-sched d-none">Remove</button>
               </div>
-
-              <!-- Time End -->
-              <div class="col-12 col-md-4">
-                <label class="form-label small">Time End</label>
-                <div class="form-floating">
-                  {{ sched_form.time_end }}
-                  <label for="{{ sched_form.time_end.id_for_label }}">{{ sched_form.time_end.label }}</label>
-                </div>
-                <div class="form-text">Choose the end time (after start).</div>
-              </div>
-            </div>
-
-            <div class="mt-2 d-flex justify-content-end">
-              <!-- Hidden for the first row so at least one remains -->
-              <button type="button" class="btn btn-reset btn-sm remove-sched d-none">Remove</button>
             </div>
           </div>
         </div>
-      </div>
+      </div> <!-- ★ ADDED (close wrapper) -->
 
       <div class="mt-3 button-container justify-content-end mb-2 d-flex gap-2">
         <button type="button" class="btn btn-reset">Back</button>
@@ -350,4 +365,126 @@
 
 })();
 </script>
+
+<!-- ★ ADDED: Role/Purok/Day seeding + visibility + multi-purok repeater -->
+<script>
+// ★ ADDED: Use your seed values from screenshots
+const ROLE_OPTIONS = [
+  { id: 1,  name: 'SUPER ADMIN' },
+  { id: 2,  name: 'ADMIN' },
+  { id: 3,  name: 'BARANGAY CAPTAIN' },
+  { id: 4,  name: 'BARANGAY SECRETARY' },
+  { id: 5,  name: 'BARANGAY TREASURER' },
+  { id: 6,  name: 'BARANGAY CLERK' },
+  { id: 7,  name: 'BARANGAY LUPON PRESIDENT' },
+  { id: 8,  name: 'BARANGAY LUPON MEMBER' },   // ← used to show schedules
+  { id: 9,  name: 'BARANGAY HEALTH WORKER' },   // ← used to show purok multi-assign
+  { id: 10, name: 'NURSE' },
+  { id: 11, name: 'MIDWIFE' },
+  { id: 12, name: 'SYSTEM' }
+];
+
+const PUROK_OPTIONS = [
+  { id: 1, code: 'S01', name: 'KANIPAAN' },
+  { id: 2, code: 'S02', name: 'PAMPANGO' },
+  { id: 3, code: 'S03', name: 'LUTAW-LUTAW' },
+  { id: 4, code: 'S04', name: 'MAUCO' }
+];
+
+const DAY_OPTIONS = [
+  { val: 1, label: 'Monday' },
+  { val: 2, label: 'Tuesday' },
+  { val: 3, label: 'Wednesday' },
+  { val: 4, label: 'Thursday' },
+  { val: 5, label: 'Friday' },
+  { val: 6, label: 'Saturday' },
+  { val: 7, label: 'Sunday' }
+];
+
+(function enhance(){
+  // Grab current selects without changing markup
+  const roleSel  = document.getElementById('{{ role_form.role.id_for_label }}');
+  const purokSel = document.getElementById('{{ role_form.purok_sitio.id_for_label }}');
+  const daySel   = document.getElementById('{{ sched_form.day.id_for_label }}');
+
+  // Visibility wrappers
+  const purokSection = document.getElementById('purok-section'); // contains original purok + extra controls
+  const schedSection = document.getElementById('sched-section'); // wraps entire schedule section
+
+  // Multi-purok controls
+  const addPurokBtn = document.getElementById('add-purok');
+  const purokList   = document.getElementById('purok-list');
+
+  function fillSelect(select, items, { placeholder='— Select —', valueKey='id', labelKey='name' } = {}) {
+    if (!select) return;
+    const keep = select.value;
+    select.innerHTML = '';
+    const o0 = document.createElement('option');
+    o0.value = '';
+    o0.textContent = placeholder;
+    select.appendChild(o0);
+    items.forEach(it => {
+      const o = document.createElement('option');
+      o.value = String(it[valueKey]);
+      o.textContent = it[labelKey];
+      select.appendChild(o);
+    });
+    // try to keep previous
+    if ([...select.options].some(o => o.value === keep)) select.value = keep;
+  }
+
+  // Seed dropdowns (safe; original markup untouched)
+  if (roleSel) fillSelect(roleSel, ROLE_OPTIONS, { placeholder: '— Select Role —' });
+  if (purokSel) {
+    const items = PUROK_OPTIONS.map(p => ({ id: p.id, name: `${p.code} — ${p.name}` }));
+    fillSelect(purokSel, items, { placeholder: '— Select Purok/Sitio —' });
+  }
+  if (daySel) fillSelect(daySel, DAY_OPTIONS, { placeholder: '— Select Day —', valueKey: 'val', labelKey: 'label' });
+
+  // Create extra purok row (clones option list from original purok select)
+  function addPurokRow(){
+    if (!purokList || !purokSel) return;
+    const idx = purokList.children.length;
+    const row = document.createElement('div');
+    row.className = 'purok-row rounded-3 border bg-white p-2 mt-2';
+    row.innerHTML = `
+      <div class="form-floating">
+        <select class="form-select" name="purok_sitio_ids[]" id="purok_sitio_extra_${idx}">
+          ${purokSel.innerHTML}
+        </select>
+        <label for="purok_sitio_extra_${idx}">Purok/Sitio</label>
+      </div>
+      <div class="mt-2 d-flex justify-content-end">
+        <button type="button" class="btn btn-reset btn-sm remove-purok">Remove</button>
+      </div>
+    `;
+    purokList.appendChild(row);
+  }
+
+  if (addPurokBtn) addPurokBtn.addEventListener('click', addPurokRow);
+  if (purokList) {
+    purokList.addEventListener('click', (e) => {
+      const t = e.target;
+      if (t && t.classList.contains('remove-purok')) {
+        const row = t.closest('.purok-row');
+        if (row) row.remove();
+      }
+    });
+  }
+
+  // Role-based visibility
+  function applyRoleVisibility(){
+    const val = roleSel ? String(roleSel.value) : '';
+    const isBHW   = val === '9';
+    const isLupon = val === '8';
+
+    if (purokSection) purokSection.classList.toggle('d-none', !isBHW);
+    if (schedSection) schedSection.classList.toggle('d-none', !isLupon);
+  }
+
+  applyRoleVisibility();                       // initial
+  if (roleSel) roleSel.addEventListener('change', applyRoleVisibility);
+})();
+</script>
+
 {% endblock %}

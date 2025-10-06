@@ -1,10 +1,12 @@
 from django.shortcuts import render
 from django.core.paginator import Paginator
-from .forms import SearchPerson
-from .forms import ResidentProfileform
-from .forms import ChooseRole
-from .forms import StaffFilters
-from .forms import Schedule
+from .forms import (
+    SearchPerson,
+    ResidentProfileform,
+    ChooseRole,
+    StaffFilters,
+    Schedule,
+)
 
 #need back-end for proper assignment
 user_fullname = 'lname, fname mname suffix'
@@ -39,14 +41,13 @@ def staff_selection_resident(request):
 
 def staff_selection_nonres(request):
     form = ResidentProfileform()
-    return render(request, "person/personal_info.html", {
+    return render(request, "staff/staff_selection_nonresident.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
         'page_path': f'{user_role} / Account Verification',
         'page_title': 'Account Verification',
         'user_role_template': user_role_template,
         'form' : form,
-        'redirect' : 'staff_admin:staff_selection_non-resident_docs',
     })
 
 
