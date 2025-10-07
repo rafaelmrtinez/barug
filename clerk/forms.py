@@ -53,6 +53,26 @@ RELIGION_CHOICES = [
     (14, "OTHERS"),
 ]
 
+VALID_ID_TYPE_CHOICES = [
+    ("", "— Select ID Type —"),
+    (1,  "PHILIPPINE PASSPORT"),
+    (2,  "PHILIPPINE NATIONAL ID"),
+    (3,  "SSS/UMID CARD"),
+    (4,  "GSIS ECARD"),
+    (5,  "PRC ID"),
+    (6,  "DRIVER'S LICENSE"),
+    (7,  "PHILHEALTH ID"),
+    (8,  "VOTER'S ID"),
+    (9,  "POSTAL ID"),
+    (10, "SENIOR CITIZEN ID"),
+    (11, "PWD ID"),
+    (12, "OWWA ID"),
+    (13, "IBP ID"),
+    (14, "TIN ID"),
+    (15, "SCHOOL ID"),
+    (16, "EPHIL ID"),
+]
+
 BUSINESS_TYPE_CHOICES = [
     ("", "— All types —"),
     (1, "AGRICULTURE / AGRIBUSINESS"),
@@ -375,12 +395,12 @@ class BusinessOwnerInfo(forms.Form):
     )
     # SUPPORTING DOCUMENTS
     type_of_id = forms.ChoiceField(
-        choices= [], 
+        choices= VALID_ID_TYPE_CHOICES, 
         widget=forms.Select(attrs={
             'id' : 'type_of_id',
             'class' : 'form-select',
     }),
-        label= 'ID Type',
+        label= 'valid ID Type',
         required= True,
     )
     front_id = forms.ImageField(

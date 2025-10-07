@@ -1,5 +1,7 @@
 from django.urls import path
 from . import views
+from django.conf import settings
+from django.conf.urls.static import static
 
 app_name = 'clerk'
 
@@ -39,4 +41,4 @@ urlpatterns = [
 
     path("ajax/business_search/", views.ajax_business_search, name="ajax_business_search"),
      path("ajax/resident_owner_search/", views.ajax_owner_search, name="ajax_owner_search"),
-]
+]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

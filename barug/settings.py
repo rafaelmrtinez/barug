@@ -114,6 +114,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "authentication.context_processors.auth_context",
+                'django.template.context_processors.media',
             ],
         },
     },
@@ -228,6 +229,9 @@ CACHES = {
         "TIMEOUT": 300,  # 5 minutes default
     }
 }
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 
 # Static files (CSS, JavaScript, Images)

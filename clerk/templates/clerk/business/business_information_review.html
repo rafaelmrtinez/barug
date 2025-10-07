@@ -14,8 +14,6 @@
     <div class="col-12">
       <div class="card shadow-sm rounded-3">
         <div class="card-body">
-
-          <!-- Header with right-aligned button -->
           <div class="d-flex justify-content-between align-items-center">
             <h5 class="card-title d-flex align-items-center gap-2 mb-0">
               <i class="bi bi-person-fill text-primary"></i>
@@ -28,9 +26,7 @@
             {% endif %}
 
             <div class="d-flex gap-2">
-              <a class="btn btn-sm btn-submit" href="{{ owner_edit_url }}">
-                Edit Owner
-              </a>
+              <a class="btn btn-sm btn-submit" href="{{ owner_edit_url }}">Edit Owner</a>
             </div>
           </div>
 
@@ -43,7 +39,6 @@
                     <div class="small text-muted text-uppercase">{{ owner_disp.person_code|upper }}</div>
                   {% endif %}
                 </div>
-                {# Always show residency with a default #}
                 {% with res_name=owner_disp.residency_name|default:"NON-RESIDENT" %}
                   <span class="badge" style="background-color: var(--bs-danger-text-emphasis);">
                     {{ res_name|upper }}
@@ -87,8 +82,24 @@
                 </div>
                 <div class="col-12 col-md-6">
                   <div class="small text-muted">Email</div>
-                  <!-- keep original case -->
                   <div class="fw-semibold mb-0">{{ owner_disp.email }}</div>
+                </div>
+
+                <!-- Owner Valid ID (with modal trigger) -->
+                <div class="col-md-12">
+                  <small class="text-muted d-block">Owner Valid ID</small>
+                  <div class="fw-semibold mb-0">
+                    {{ owner_disp.valid_id_type_label }}
+                    {% if owner_disp.id_front_name or owner_disp.id_back_name or owner_disp.id_front_path or owner_disp.id_back_path or owner_disp.id_front_url or owner_disp.id_back_url %}
+                      <a href="#"
+                         class="ms-2 small text-decoration-none"
+                         style="color: var(--bs-danger-text-emphasis);"
+                         data-bs-toggle="modal"
+                         data-bs-target="#ownerIdPreviewModal">VIEW</a>
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </div>
                 </div>
               </div>
 
@@ -103,17 +114,13 @@
     <div class="col-12">
       <div class="card shadow-sm rounded-3">
         <div class="card-body">
-
-          <!-- Header with right-aligned button -->
           <div class="d-flex justify-content-between align-items-center">
             <h5 class="card-title d-flex align-items-center gap-2 mb-0">
               <i class="bi bi-briefcase-fill text-success"></i>
               <span>Business Details</span>
             </h5>
             <div class="d-flex gap-2">
-              <a class="btn btn-sm btn-submit" href="{% url 'clerk:business_details' %}">
-                Edit Business
-              </a>
+              <a class="btn btn-sm btn-submit" href="{% url 'clerk:business_details' %}">Edit Business</a>
             </div>
           </div>
 
@@ -216,8 +223,6 @@
             </div>
           </div>
         </div>
-
-        {# Removed footer button — will place outside the card #}
       </div>
     </div>
 
@@ -245,12 +250,173 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <div class="text-muted small">
-          Preview requires an accessible file URL. Stored filename:
-          <strong>{{ biz_disp.proof_name }}</strong>.
-        </div>
+        {% if biz_disp.proof_url %}
+          <img src="{{ biz_disp.proof_url }}" class="img-fluid rounded border" alt="Proof of Business" />
+        {% else %}
+          <div class="text-muted small">
+            Preview requires an accessible file URL. Stored filename:
+            <strong>{{ biz_disp.proof_name }}</strong>.
+          </div>
+        {% endif %}
       </div>
     </div>
   </div>
 </div>
+
+<!-- Owner Valid ID Preview Modal -->
+<div class="modal fade"
+     id="ownerIdPreviewModal"
+     tabindex="-1"
+     aria-labelledby="ownerIdPreviewLabel"
+     aria-hidden="true"
+     data-front-url="{{ owner_disp.id_front_url|default:'' }}"
+     data-front-path="{{ owner_disp.id_front_path|default:'' }}"
+     data-back-url="{{ owner_disp.id_back_url|default:'' }}"
+     data-back-path="{{ owner_disp.id_back_path|default:'' }}"
+     data-media-url="{{ MEDIA_URL }}">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="ownerIdPreviewLabel">Owner Valid ID</h5>
+          <div class="small text-muted">{{ owner_disp.valid_id_type_label }}</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="row g-3">
+          <!-- FRONT -->
+          <div class="col-12 col-md-6">
+            <div class="border rounded p-2 h-100">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <strong>Front</strong>
+                <a id="frontOpen" class="small text-decoration-none" href="#" target="_blank" rel="noopener" style="display:none;">Open</a>
+              </div>
+              <img id="frontImg" alt="ID Front" class="img-fluid rounded border" style="max-height:360px;object-fit:contain; display:none;">
+              <div id="frontNone" class="text-muted">—</div>
+            </div>
+          </div>
+
+          <!-- BACK -->
+          <div class="col-12 col-md-6">
+            <div class="border rounded p-2 h-100">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <strong>Back</strong>
+                <a id="backOpen" class="small text-decoration-none" href="#" target="_blank" rel="noopener" style="display:none;">Open</a>
+              </div>
+              <img id="backImg" alt="ID Back" class="img-fluid rounded border" style="max-height:360px;object-fit:contain; display:none;">
+              <div id="backNone" class="text-muted">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- File name hints -->
+        <div class="row mt-3">
+          <div class="col-12">
+            <div class="small text-muted">
+              {% if owner_disp.id_front_name or owner_disp.id_back_name %}
+                Files:
+                {% if owner_disp.id_front_name %}<code class="me-2">{{ owner_disp.id_front_name }}</code>{% endif %}
+                {% if owner_disp.id_back_name %}<code>{{ owner_disp.id_back_name }}</code>{% endif %}
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        {% if owner_edit_url %}
+          <a href="{{ owner_edit_url }}" class="btn btn-outline-secondary btn-sm">Replace ID</a>
+        {% endif %}
+        <button type="button" class="btn btn-submit btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // Safe URL join: handles trailing/leading slashes
+  function joinUrl(base, path){
+    if (!base) return String(path || '');
+    const b = String(base).replace(/\/+$/,'');      // trim trailing /
+    const p = String(path || '').replace(/^\/+/, ''); // trim leading /
+    return b + '/' + p;
+  }
+
+  // Resolve best image source:
+  // 1) explicit URL -> use it
+  // 2) path -> join with MEDIA_URL (or leave as-is if it starts with http(s) or /)
+  function resolveSrc(url, path, media) {
+    if (url) return url;
+    if (!path) return '';
+    const p = String(path);
+    if (/^https?:\/\//i.test(p) || p.startsWith('/')) return p;
+    return joinUrl(media || '/', p);
+  }
+
+  const ownerModal = document.getElementById('ownerIdPreviewModal');
+  ownerModal.addEventListener('show.bs.modal', function () {
+    // Make sure data-media-url has something sensible; default to {{ MEDIA_URL }} or '/'
+    const media = ownerModal.getAttribute('data-media-url') || '{{ MEDIA_URL|default:"/" }}';
+
+    const frontUrl  = ownerModal.getAttribute('data-front-url')  || '';
+    const frontPath = ownerModal.getAttribute('data-front-path') || '';
+    const backUrl   = ownerModal.getAttribute('data-back-url')   || '';
+    const backPath  = ownerModal.getAttribute('data-back-path')  || '';
+
+    const frontSrc = resolveSrc(frontUrl, frontPath, media);
+    const backSrc  = resolveSrc(backUrl,  backPath,  media);
+
+    const frontImg  = document.getElementById('frontImg');
+    const backImg   = document.getElementById('backImg');
+    const frontOpen = document.getElementById('frontOpen');
+    const backOpen  = document.getElementById('backOpen');
+    const frontNone = document.getElementById('frontNone');
+    const backNone  = document.getElementById('backNone');
+
+    // FRONT
+    if (frontSrc) {
+      frontImg.src = frontSrc;
+      frontImg.style.display = '';
+      frontNone.style.display = 'none';
+      if (!frontSrc.startsWith('data:')) {
+        frontOpen.href = frontSrc;
+        frontOpen.style.display = '';
+      } else {
+        frontOpen.removeAttribute('href');
+        frontOpen.style.display = 'none';
+      }
+    } else {
+      frontImg.removeAttribute('src');
+      frontImg.style.display = 'none';
+      frontOpen.style.display = 'none';
+      frontOpen.removeAttribute('href');
+      frontNone.style.display = '';
+    }
+
+    // BACK
+    if (backSrc) {
+      backImg.src = backSrc;
+      backImg.style.display = '';
+      backNone.style.display = 'none';
+      if (!backSrc.startsWith('data:')) {
+        backOpen.href = backSrc;
+        backOpen.style.display = '';
+      } else {
+        backOpen.removeAttribute('href');
+        backOpen.style.display = 'none';
+      }
+    } else {
+      backImg.removeAttribute('src');
+      backImg.style.display = 'none';
+      backOpen.style.display = 'none';
+      backOpen.removeAttribute('href');
+      backNone.style.display = '';
+    }
+  });
+})();
+</script>
+
 {% endblock %}

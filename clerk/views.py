@@ -3,10 +3,13 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple, Iterable
 import io, os, zipfile, json, re
 import traceback
+import uuid
 from datetime import datetime, date, time
+
 from decimal import Decimal
 from django.forms import Form
-
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect, HttpResponsePermanentRedirect, HttpResponseBadRequest
@@ -1115,6 +1118,7 @@ def fetch_display_maps_from_forms() -> Dict[str, Dict[Any, str]]:
         "civil_status": _field_map(owner_form, "civil_status"),
         "nationality": _field_map(owner_form, "nationality"),
         "religion": _field_map(owner_form, "religion"),
+        "valid_id_type": _field_map(owner_form, "type_of_id"),
 
         # Business-side lookups
         "business_type": _field_map(biz_form, "b_type"),
@@ -1163,6 +1167,14 @@ def build_owner_display(owner: dict, maps: Dict[str, Dict[Any, str]]) -> Dict[st
         owner.get("residency_name") or owner.get("residential_status_name")
     )
 
+    id_type_id = owner.get("valid_id_type_id")
+    id_type_label = maps.get("valid_id_type", {}).get(id_type_id) if id_type_id is not None else None
+    id_front_path = owner.get("id_front_path")
+    id_back_path  = owner.get("id_back_path")
+    id_front_name = os.path.basename(id_front_path) if id_front_path else None
+    id_back_name  = os.path.basename(id_back_path)  if id_back_path  else None
+
+
     return {
         "full_name": full_name,
         "person_code": owner.get("person_code"),
@@ -1175,6 +1187,11 @@ def build_owner_display(owner: dict, maps: Dict[str, Dict[Any, str]]) -> Dict[st
         "email": owner.get("email") or "—",
         "address_display": addr or (owner.get("address_line") or "—"),
         "residency_name": res_name,  # 👈 always a value
+        "valid_id_type_label": id_type_label or "—",
+        "id_front_name": id_front_name,
+        "id_back_name": id_back_name,
+        "id_front_path": id_front_path,
+        "id_back_path": id_back_path,
     }
 
 def build_business_display(biz: dict, maps: Dict[str, Dict[int, str]]) -> Dict[str, Any]:
@@ -1239,17 +1256,6 @@ def business_owner(request: HttpRequest):
             "page_title": "Business Owner",
         },
     )
-
-# def _to_int_or_none(val: str | None) -> int | None:
-#     if val is None:
-#         return None
-#     s = str(val).strip()
-#     if not s:
-#         return None
-#     try:
-#         return int(s)
-#     except ValueError:
-#         return None
     
 def _normalize_owner_rows(rows):
     """
@@ -1456,6 +1462,23 @@ def ajax_owner_search(
     payload = _normalize_owner_rows(rows)
     return JsonResponse({"results": payload})
 
+def _save_temp_upload(upload, subdir: str) -> str:
+    """
+    Persist an uploaded file under MEDIA_ROOT/tmp/<subdir>/<uuid>_<name>.
+    Returns the absolute path suitable for later re-read/forward to Supabase.
+    """
+    if not upload:
+        return ""
+    base = getattr(settings, "MEDIA_ROOT", "")
+    folder = os.path.join(base, "tmp", subdir)
+    os.makedirs(folder, exist_ok=True)
+    fname = f"{uuid.uuid4().hex}_{upload.name}"
+    rel_path = os.path.join("tmp", subdir, fname)          # relative under MEDIA_ROOT
+    full_path = os.path.join(base, "tmp", subdir, fname)   # absolute
+    # Use default_storage to be consistent with your storage backend
+    default_storage.save(rel_path, ContentFile(upload.read()))
+    return full_path
+
 @session_login_required
 @role_required(CLERK_ROLE)
 @csrf_protect
@@ -1464,11 +1487,19 @@ def business_owner_nonresident(request: HttpRequest) -> HttpResponse:
     user_role = _auth_role_name(request)
 
     if request.method == "POST":
-        form = BusinessOwnerInfo(request.POST)
+        form = BusinessOwnerInfo(request.POST, request.FILES or None)
         if form.is_valid():
 
             dob_val = form.cleaned_data["dob"]
             dob_str = dob_val.isoformat() if isinstance(dob_val, date) else str(dob_val)
+
+            type_of_id_id = int(form.cleaned_data["type_of_id"])
+            front_file = form.cleaned_data.get("front_id")
+            back_file  = form.cleaned_data.get("back_id")
+
+            front_path = _save_temp_upload(front_file, "biz_owner_id")
+            back_path  = _save_temp_upload(back_file,  "biz_owner_id") if back_file else None
+
 
             owner_payload: Dict[str, Any] = {
                 "owner_person_id": form.cleaned_data.get("owner_person_id") or None,
@@ -1488,6 +1519,10 @@ def business_owner_nonresident(request: HttpRequest) -> HttpResponse:
                 "purok_sitio": (form.cleaned_data.get("purok_sitio") or "").strip(),
                 "barangay": form.cleaned_data["barangay"].strip(),
                 "city": form.cleaned_data["city"].strip(),
+
+                "valid_id_type_id": type_of_id_id,
+                "id_front_path": front_path,   # absolute path under MEDIA_ROOT/tmp/…
+                "id_back_path": back_path,     # may be None
             }
 
             # Store and expire in 30 minutes
@@ -1648,6 +1683,10 @@ def business_information_review(
                 business=business,
                 performer_staff_id=_auth_staff_id(request),
                 proof_files_uploads=uploads,
+
+                owner_valid_id_type_id = owner.get("valid_id_type_id"),
+                owner_id_front_path    = owner.get("id_front_path"),
+                owner_id_back_path     = owner.get("id_back_path"),
             )
 
             try:

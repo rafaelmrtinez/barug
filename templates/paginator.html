@@ -1,38 +1,23 @@
-{% if page_obj.paginator.num_pages > 1 %}
-  {% with qstring=request.GET.urlencode %}
-    <nav aria-label="Page navigation">
-      <ul class="pagination justify-content-center mb-0">
-        {% if page_obj.has_previous %}
-          <li class="page-item">
-            <a class="page-link"
-               href="?page={{ page_obj.previous_page_number }}{% if qstring %}&{{ qstring|urlencode }}{% endif %}"
-               aria-label="Previous">&laquo;</a>
-          </li>
-        {% else %}
-          <li class="page-item disabled"><span class="page-link">&laquo;</span></li>
-        {% endif %}
+{# templates/paginator.html #}
+<nav aria-label="Pagination" class="pager" role="navigation">
+  <span class="pager-results">
+    Showing {{ page_obj.end_index }}
+    of {{ page_obj.paginator.count }} result(s)
+  </span>
 
-        {% for i in page_obj.paginator.page_range %}
-          {% if page_obj.number == i %}
-            <li class="page-item active"><span class="page-link">{{ i }}</span></li>
-          {% else %}
-            <li class="page-item">
-              <a class="page-link"
-                 href="?page={{ i }}{% if qstring %}&{{ qstring|urlencode }}{% endif %}">{{ i }}</a>
-            </li>
-          {% endif %}
-        {% endfor %}
+  <div>
+  {% if page_obj.has_previous %}
+    <a class="pager-btn" href="?page={{ page_obj.previous_page_number }}">&lt;</a>
+  {% else %}
+    <span class="pager-btn is-disabled" aria-disabled="true">&lt;</span>
+  {% endif %}
 
-        {% if page_obj.has_next %}
-          <li class="page-item">
-            <a class="page-link"
-               href="?page={{ page_obj.next_page_number }}{% if qstring %}&{{ qstring|urlencode }}{% endif %}"
-               aria-label="Next">&raquo;</a>
-          </li>
-        {% else %}
-          <li class="page-item disabled"><span class="page-link">&raquo;</span></li>
-        {% endif %}
-      </ul>
-    </nav>
-  {% endwith %}
-{% endif %}
+  <span class="pager-label">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+
+  {% if page_obj.has_next %}
+    <a class="pager-btn" href="?page={{ page_obj.next_page_number }}">></a>
+  {% else %}
+    <span class="pager-btn is-disabled" aria-disabled="true">></span>
+  {% endif %}
+  </div>
+</nav>
