@@ -21,4 +21,5 @@ urlpatterns = [
     path("child/new/", views.child_new, name="child_new"),
     
     path("child-visit/", views.child_visit_http, name="child_visit"),
+    path("child-basic-info/<int:q>/", views.child_basic_info_http, name="child_basic_info"),
 ]

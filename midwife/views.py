@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from django.views.decorators.http import require_http_methods
 from dependency_injector.wiring import inject, Provide
 
+from django.views.decorators.csrf import csrf_protect
+
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.http import (
@@ -25,6 +27,7 @@ from authentication.utils import nocache
 from barug.error_messages import SOMETHING_WENT_WRONG
 from midwife.utility.immunitization_utility import ImmunizationUtility
 from src.app.bootstrap.app_containers import AppContainer
+from src.app.contracts.child_services import IChildService
 from src.app.exceptions.person_not_found import PersonNotFoundException
 from src.app.exceptions.prescription_exception import PrescriptionException
 from src.app.transfer_objects.request.breast_feeding_type_request import BreastFeedingCheckRequest
@@ -641,8 +644,11 @@ def child_new(request: HttpRequest) -> HttpResponse:
         },
     )
     
-@inject
 @require_http_methods(["POST"])
+@session_login_required
+@role_required(*ROLE_MIDWIFE)
+@nocache
+@inject
 def child_visit_http(request: HttpRequest, service: IMaternalService = Provide[AppContainer.maternal_service]) -> JsonResponse:
     
     if request.content_type != "application/json":
@@ -696,3 +702,20 @@ def child_visit_http(request: HttpRequest, service: IMaternalService = Provide[A
         return JsonResponse({"error": str(e)}, status=500)
     except Exception:
         return JsonResponse({"error": SOMETHING_WENT_WRONG}, status=500)
+    
+
+@csrf_protect
+@require_http_methods(["GET"])
+@session_login_required
+@role_required(*ROLE_MIDWIFE)
+@nocache
+@inject
+def child_basic_info_http(
+    request: HttpRequest, 
+    q: int, 
+    service: IChildService = Provide[AppContainer.child_service]) -> JsonResponse:
+    try:
+        res = service.execute_get_child_basic_info(q)
+        return JsonResponse({"message": res.__dict__}, status=200)
+    except Exception as e:
+        return JsonResponse({"error": "Something went wrong, unable to retrieve child basic information"}, status=400)

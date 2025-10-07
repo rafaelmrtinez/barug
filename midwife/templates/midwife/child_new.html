@@ -95,11 +95,11 @@
         <div class="row g-3">
           <div class="col-md-4">
             <label class="form-label">Family No.</label>
-            <input type="text" class="form-control" name="family_no" placeholder="e.g., F-001">
+            <input type="text" class="form-control" name="family_no" placeholder="e.g., F-001" readonly>
           </div>
           <div class="col-md-4">
             <label class="form-label">UHC No.</label>
-            <input type="text" class="form-control" name="uhc_no" placeholder="">
+            <input type="text" class="form-control" name="uhc_no" placeholder="" readonly>
           </div>
           <div class="col-md-4 d-flex align-items-end">
             <span class="chip">{% bs_icon 'shield-check' %} Clinic copy – mirrors paper form</span>
@@ -149,7 +149,7 @@
             <div class="finder">
               <h6 class="mb-2">{% bs_icon 'person-heart' %} Find Mother</h6>
               <div class="input-group">
-                <input id="motherSearch" type="text" class="form-control" placeholder="Type at least 2 characters…">
+                <input id="motherSearch" type="text" class="form-control" placeholder="Type at least 2 characters…" readonly>
                 <button class="btn btn-outline-secondary" type="button" id="motherClear" title="Clear">{% bs_icon 'x' %}</button>
               </div>
               <div id="motherResults" class="mt-2 text-muted">No results yet.</div>
@@ -174,7 +174,7 @@
             <div class="finder">
               <h6 class="mb-2">{% bs_icon 'person' %} Find Father</h6>
               <div class="input-group">
-                <input id="fatherSearch" type="text" class="form-control" placeholder="Type at least 2 characters…">
+                <input id="fatherSearch" type="text" class="form-control" placeholder="Type at least 2 characters…" readonly>
                 <button class="btn btn-outline-secondary" type="button" id="fatherClear" title="Clear">{% bs_icon 'x' %}</button>
               </div>
               <div id="fatherResults" class="mt-2 text-muted">No results yet.</div>
@@ -199,15 +199,15 @@
         <div class="row g-3 mt-3">
           <div class="col-md-6">
             <label class="form-label">Complete Address w/ landmarks</label>
-            <input name="address_landmarks" id="address_landmarks" type="text" class="form-control" placeholder="Street, Purok/Sitio, Barangay, City – landmarks">
+            <input name="address_landmarks" id="address_landmarks" type="text" class="form-control" placeholder="Street, Purok/Sitio, Barangay, City – landmarks" readonly>
           </div>
           <div class="col-md-3">
             <label class="form-label">Birth Order</label>
-            <input name="birth_order" type="number" min="1" class="form-control" placeholder="e.g., 1">
+            <input name="birth_order" type="number" min="1" class="form-control" placeholder="e.g., 1" readonly>
           </div>
           <div class="col-md-3">
             <label class="form-label">Birth Weight (kg)</label>
-            <input name="birth_weight" id="birth_weight" type="number" step="0.01" min="0" class="form-control">
+            <input name="birth_weight" id="birth_weight" type="number" step="0.01" min="0" class="form-control" readonly>
           </div>
         </div>
 
@@ -215,12 +215,12 @@
           <div class="col-md-12">
             <label class="form-label d-block">Place of Delivery</label>
             <div class="d-flex flex-wrap gap-3">
-              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="hospital_govt"><label class="form-check-label">Hospital (Gov’t)</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="hospital_private"><label class="form-check-label">Hospital (Private)</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="home"><label class="form-check-label">Home</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="private_clinic"><label class="form-check-label">Private Clinic</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="lying_in"><label class="form-check-label">Lying-in</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="hc"><label class="form-check-label">HC</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="hospital_govt"><label class="form-check-label" readonly>Hospital (Gov’t)</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="hospital_private"><label class="form-check-label" readonly>Hospital (Private)</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="home"><label class="form-check-label" readonly>Home</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="private_clinic"><label class="form-check-label" readonly>Private Clinic</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="lying_in"><label class="form-check-label" readonly>Lying-in</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="hc"><label class="form-check-label" readonly>HC</label></div>
             </div>
           </div>
         </div>
@@ -706,4 +706,5 @@
 })();
 </script>
 <script defer src="{% static 'midwife/js/childVisit.js' %}"></script>
+<script defer src="{% static 'midwife/js/fetchChildInformation.js' %}"></script>
 {% endblock %}
