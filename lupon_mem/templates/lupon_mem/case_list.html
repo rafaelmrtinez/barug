@@ -1,0 +1,21 @@
+{% load static %}
+<div class="container py-3">
+  <h4 class="mb-3">Blotter Cases</h4>
+  <table class="table table-sm align-middle">
+    <thead><tr><th>No.</th><th>Name</th><th>Date Filed</th><th>Type</th><th>Nature</th><th></th></tr></thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td>{{ row.1 }}</td>
+        <td>{{ row.2 }}</td>
+        <td>{{ row.3 }}</td>
+        <td>{{ row.4 }}</td>
+        <td>{{ row.5 }}</td>
+        <td><a class="btn btn-primary btn-sm" href="{% url 'lupon_mem:case_detail' row.0 %}">Open</a></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" class="text-muted">No cases yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

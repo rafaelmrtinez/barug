@@ -1,0 +1,11 @@
+<div class="container py-3">
+  <h5>Attach a KP Form</h5>
+  <div class="list-group mt-3">
+    {% for fid, code, name in forms %}
+      <a class="list-group-item list-group-item-action"
+         href="{% url 'lupon_mem:form_builder' case_id fid %}">
+         <strong>{{ code }}</strong> — {{ name }}
+      </a>
+    {% endfor %}
+  </div>
+</div>

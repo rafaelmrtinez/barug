@@ -1,0 +1,138 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Build Form</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .split { display:flex; gap:1rem; height: calc(100vh - 120px); }
+    .left  { flex: 0 0 460px; overflow:auto; }
+    .right { flex: 1; background:#f7f7f8; border-radius: 12px; padding: 12px; position: relative; }
+    #pdfCanvas { width:100%; height: 100%; object-fit: contain; background:white; border:1px solid #e5e5e5; }
+    .sticky-actions { position: sticky; bottom:0; background: #fff; padding: .75rem 0; border-top:1px solid #eee; }
+    .field { margin-bottom:.75rem; }
+    .label-req::after { content: " *"; color:#d22; }
+  </style>
+</head>
+<body class="container-fluid py-3">
+
+  <div class="d-flex align-items-center mb-3">
+    <a class="btn btn-outline-secondary btn-sm me-2" href="{% url 'lupon_mem:case_detail' case_id %}">&larr; Back</a>
+    <h5 class="mb-0">Form Builder — {{ header.2|default:header.1 }}</h5>
+  </div>
+
+  <div class="split">
+    <!-- LEFT: dynamic fields -->
+    <div class="left">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <form id="formFields">
+            <input type="hidden" name="case_id" value="{{ case_id }}">
+            <input type="hidden" name="form_id" value="{{ form_id }}">
+            {% if submission_id %}<input type="hidden" name="submission_id" value="{{ submission_id }}">{% endif %}
+
+            {% for kff_id, field_id, label, type_name, is_required in fields %}
+              <div class="field">
+                <label class="form-label {% if is_required %}label-req{% endif %}">{{ label }}</label>
+                {% if type_name in "TEXT,EMAIL,PHONE,NUMBER,DATE,TIME,CURRENCY" %}
+                  <input class="form-control"
+                         data-field-id="{{ field_id }}"
+                         value="{{ answers|get_item:field_id|default:'' }}">
+                {% elif type_name in "TEXTAREA" %}
+                  <textarea class="form-control" rows="3" data-field-id="{{ field_id }}">{{ answers|get_item:field_id|default:'' }}</textarea>
+                {% else %}
+                  <!-- extend for SELECT/CHECKBOX/RADIO later -->
+                  <input class="form-control" data-field-id="{{ field_id }}" value="{{ answers|get_item:field_id|default:'' }}">
+                {% endif %}
+              </div>
+            {% endfor %}
+          </form>
+        </div>
+        <div class="card-footer sticky-actions d-flex justify-content-between">
+          <button id="saveBtn" class="btn btn-primary">Save Draft</button>
+          <button id="submitBtn" class="btn btn-success">Submit & Generate PDF</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: live PDF preview -->
+    <div class="right">
+      <img id="pdfCanvas" alt="Preview">
+    </div>
+  </div>
+
+<script>
+const qs = sel => document.querySelector(sel);
+const formEl = qs("#formFields");
+const imgEl  = qs("#pdfCanvas");
+
+let debounce;
+function collectAnswers(){
+  const obj = {};
+  formEl.querySelectorAll("[data-field-id]").forEach(i=>{
+    const fid = i.getAttribute("data-field-id");
+    obj[fid] = i.value;
+  });
+  return obj;
+}
+
+function refreshPreview(){
+  const params = new URLSearchParams();
+  params.set("form_id", formEl.elements.form_id.value);
+  if (formEl.elements.submission_id) params.set("submission_id", formEl.elements.submission_id.value);
+  params.set("answers", JSON.stringify(collectAnswers()));
+  imgEl.src = "{% url 'lupon_mem:preview_image' %}?" + params.toString();
+}
+
+formEl.addEventListener("input", ()=>{
+  clearTimeout(debounce);
+  debounce = setTimeout(refreshPreview, 300);
+});
+
+document.addEventListener("DOMContentLoaded", refreshPreview);
+
+qs("#saveBtn").addEventListener("click", async (e)=>{
+  e.preventDefault();
+  const fd = new FormData(formEl);
+  fd.set("answers", JSON.stringify(collectAnswers()));
+  const res = await fetch("{% url 'lupon_mem:save_answers' %}", { method:"POST", body:fd });
+  const j = await res.json();
+  if (j.ok) {
+    if (!formEl.elements.submission_id) {
+      const hid = document.createElement("input");
+      hid.type="hidden"; hid.name="submission_id"; hid.value=j.submission_id;
+      formEl.appendChild(hid);
+    }
+    alert("Saved!");
+  } else {
+    alert("Save failed.");
+  }
+});
+
+qs("#submitBtn").addEventListener("click", async (e)=>{
+  e.preventDefault();
+  if (!formEl.elements.submission_id){
+    // force a save first
+    await qs("#saveBtn").click();
+  }
+  const payload = {
+    submission_id: parseInt(formEl.elements.submission_id.value),
+    case_id: parseInt(formEl.elements.case_id.value)
+  };
+  const res = await fetch("{% url 'lupon_mem:submit_form' %}", {
+    method:"POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify(payload)
+  });
+  const j = await res.json();
+  if (j.ok) {
+    alert("Submitted! PDF generated: " + j.file);
+  } else {
+    alert("Submit failed.");
+  }
+});
+</script>
+
+</body>
+</html>
