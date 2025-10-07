@@ -27,6 +27,9 @@ CSRF_TRUSTED_ORIGINS = ["https://*.ngrok-free.app"]
 
 ANDROID_PACKAGE = "host.exp.exponent"
 
+SEMAPHORE_API_KEY = os.getenv("SEMAPHORE_API_KEY", "")
+SEMAPHORE_SENDER_NAME = os.getenv("SEMAPHORE_SENDER_NAME", "SEMAPHORE")
+
 # Email backend (Gmail SMTP)
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
