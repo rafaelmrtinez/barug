@@ -3,6 +3,8 @@ from dependency_injector import containers, providers
 from src.domain.contracts.family_repository import IFamilyRepository
 from src.domain.contracts.maternal_repository import IMaternalRepository
 from src.domain.contracts.scheduling_repository_contract import ISchedulingRepository
+from src.infra.contracts.child_repository import IChildRepository
+from src.infra.repositories.child_repository import ChildRepository
 from src.infra.repositories.family_repository import FamilyRepository
 from src.infra.repositories.household_info_repository import HouseholdInfoRepository
 from src.infra.repositories.maternal_repository import MaternalRepository
@@ -13,6 +15,11 @@ class InfraContainer(containers.DeclarativeContainer):
 
     config = providers.Configuration()
     context = providers.Object(None)
+    
+    child_repository: providers.Factory[IChildRepository] = providers.Factory(
+        ChildRepository,
+        ctx=context
+    )
     
     family_repository: providers.Factory[IFamilyRepository] = providers.Factory(
         FamilyRepository,

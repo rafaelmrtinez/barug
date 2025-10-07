@@ -418,7 +418,7 @@ def add_child(request: HttpRequest, service: IMaternalService = Provide[AppConta
             data.get("place_delivery"),
             data.get("family_no")
         )
-        id = service.insert_child_record(child_data)
+        id = service.execute_insert_child_record(child_data)
         
         if not id:
             return JsonResponse({"response": "Something went wrong."}, status=500)

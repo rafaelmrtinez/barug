@@ -70,6 +70,10 @@
   @keyframes spin{ to{ transform:rotate(360deg) } }
 
   input[readonly].form-control { background-color: var(--brand-050); border-color: rgba(0,0,0,.06); }
+
+  .readonly-radio input {
+  pointer-events: none !important;
+}
 </style>
 {% endblock %}
 
@@ -95,11 +99,11 @@
         <div class="row g-3">
           <div class="col-md-4">
             <label class="form-label">Family No.</label>
-            <input type="text" class="form-control" name="family_no" placeholder="e.g., F-001">
+            <input type="text" class="form-control" name="family_no" placeholder="e.g., F-001" readonly>
           </div>
           <div class="col-md-4">
             <label class="form-label">UHC No.</label>
-            <input type="text" class="form-control" name="uhc_no" placeholder="">
+            <input type="text" class="form-control" name="uhc_no" placeholder="" readonly>
           </div>
           <div class="col-md-4 d-flex align-items-end">
             <span class="chip">{% bs_icon 'shield-check' %} Clinic copy – mirrors paper form</span>
@@ -149,7 +153,7 @@
             <div class="finder">
               <h6 class="mb-2">{% bs_icon 'person-heart' %} Find Mother</h6>
               <div class="input-group">
-                <input id="motherSearch" type="text" class="form-control" placeholder="Type at least 2 characters…">
+                <input id="motherSearch" type="text" class="form-control" placeholder="Type at least 2 characters…" readonly>
                 <button class="btn btn-outline-secondary" type="button" id="motherClear" title="Clear">{% bs_icon 'x' %}</button>
               </div>
               <div id="motherResults" class="mt-2 text-muted">No results yet.</div>
@@ -174,7 +178,7 @@
             <div class="finder">
               <h6 class="mb-2">{% bs_icon 'person' %} Find Father</h6>
               <div class="input-group">
-                <input id="fatherSearch" type="text" class="form-control" placeholder="Type at least 2 characters…">
+                <input id="fatherSearch" type="text" class="form-control" placeholder="Type at least 2 characters…" readonly>
                 <button class="btn btn-outline-secondary" type="button" id="fatherClear" title="Clear">{% bs_icon 'x' %}</button>
               </div>
               <div id="fatherResults" class="mt-2 text-muted">No results yet.</div>
@@ -199,15 +203,15 @@
         <div class="row g-3 mt-3">
           <div class="col-md-6">
             <label class="form-label">Complete Address w/ landmarks</label>
-            <input name="address_landmarks" id="address_landmarks" type="text" class="form-control" placeholder="Street, Purok/Sitio, Barangay, City – landmarks">
+            <input name="address_landmarks" id="address_landmarks" type="text" class="form-control" placeholder="Street, Purok/Sitio, Barangay, City – landmarks" readonly>
           </div>
           <div class="col-md-3">
             <label class="form-label">Birth Order</label>
-            <input name="birth_order" type="number" min="1" class="form-control" placeholder="e.g., 1">
+            <input name="birth_order" type="number" min="1" class="form-control" placeholder="e.g., 1" readonly>
           </div>
           <div class="col-md-3">
             <label class="form-label">Birth Weight (kg)</label>
-            <input name="birth_weight" id="birth_weight" type="number" step="0.01" min="0" class="form-control">
+            <input name="birth_weight" id="birth_weight" type="number" step="0.01" min="0" class="form-control" readonly>
           </div>
         </div>
 
@@ -215,12 +219,12 @@
           <div class="col-md-12">
             <label class="form-label d-block">Place of Delivery</label>
             <div class="d-flex flex-wrap gap-3">
-              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="hospital_govt"><label class="form-check-label">Hospital (Gov’t)</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="hospital_private"><label class="form-check-label">Hospital (Private)</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="home"><label class="form-check-label">Home</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="private_clinic"><label class="form-check-label">Private Clinic</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="lying_in"><label class="form-check-label">Lying-in</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="hc"><label class="form-check-label">HC</label></div>
+              <div class="form-check readonly-radio"><input class="form-check-input" type="radio" name="place_delivery" value="hospital_govt"><label class="form-check-label" >Hospital (Gov’t)</label></div>
+              <div class="form-check readonly-radio"><input class="form-check-input" type="radio" name="place_delivery" value="hospital_private"><label class="form-check-label" >Hospital (Private)</label></div>
+              <div class="form-check readonly-radio"><input class="form-check-input" type="radio" name="place_delivery" value="home"><label class="form-check-label" >Home</label></div>
+              <div class="form-check readonly-radio"><input class="form-check-input" type="radio" name="place_delivery" value="private_clinic"><label class="form-check-label" >Private Clinic</label></div>
+              <div class="form-check readonly-radio"><input class="form-check-input" type="radio" name="place_delivery" value="lying_in"><label class="form-check-label" >Lying-in</label></div>
+              <div class="form-check readonly-radio"><input class="form-check-input" type="radio" name="place_delivery" value="hc"><label class="form-check-label" >HC</label></div>
             </div>
           </div>
         </div>
@@ -229,29 +233,29 @@
     </div>
 
     <!-- Feeding / NBS / Exclusive BF check -->
-    <div class="card mb-3">
+    <div class="card mb-3 b5-">
       <div class="card-body">
         <div class="row g-3">
           <div class="col-md-4">
             <label class="form-label">Type of Feeding</label>
-            <select name="feeding_type" class="form-select">
+            <select name="feeding_type" id="feeding_type" class="form-select">
               <option value="">—</option>
-              <option value="exclusive_bf">Exclusive BF</option>
-              <option value="mixed">Mixed</option>
-              <option value="formula">Formula</option>
+              <option value="1">Exclusive BF</option>
+              <option value="2">Mixed</option>
+              <option value="3">Formula</option>
             </select>
           </div>
           <div class="col-md-4">
             <label class="form-label">Date referred for newborn screening</label>
-            <input type="date" name="nbs_referral_date" class="form-control">
+            <input type="date" name="nbs_referral_date" id="nbs_referral_date" class="form-control">
           </div>
           <div class="col-md-4">
             <label class="form-label">Exclusive BF check (dates)</label>
             <div class="d-flex gap-2">
-              <input type="date" class="form-control" name="bf_check_1">
-              <input type="date" class="form-control" name="bf_check_2">
-              <input type="date" class="form-control" name="bf_check_3">
-              <input type="date" class="form-control" name="bf_check_4">
+              <input type="date" class="form-control" name="bf_check_1" id="bf_check_1">
+              <input type="date" class="form-control" name="bf_check_2" id="bf_check_2">
+              <input type="date" class="form-control" name="bf_check_3" id="bf_check_3">
+              <input type="date" class="form-control" name="bf_check_4" id="bf_check_4">
             </div>
           </div>
         </div>
@@ -282,50 +286,50 @@
               <tr data-vac="bcg">
                 <th>BCG</th>
                 <td><input name="wt24h_bcg" type="number" step="0.01" class="form-control" placeholder="kg"></td>
-                <td><input name="bcg_d0" type="date" class="form-control"></td>
-                <td><input name="bcg_d1" type="date" class="form-control"></td>
-                <td><input name="bcg_d2" type="date" class="form-control"></td>
-                <td><input name="bcg_d3" type="date" class="form-control"></td>
+                <td><input name="bcg_d0" id="bcg_d0" type="date" class="form-control"></td>
+                <td><input name="bcg_d1" id="bcg_d1" type="date" class="form-control"></td>
+                <td><input name="bcg_d2" id="bcg_d2" type="date" class="form-control"></td>
+                <td><input name="bcg_d3" id="bcg_d3" type="date" class="form-control"></td>
               </tr>
               <tr data-vac="hepb">
                 <th>Hep. B</th>
                 <td><input name="wt24h_hepb" type="number" step="0.01" class="form-control" placeholder="kg"></td>
-                <td><input name="hepb_d0" type="date" class="form-control"></td>
-                <td><input name="hepb_d1" type="date" class="form-control"></td>
-                <td><input name="hepb_d2" type="date" class="form-control"></td>
-                <td><input name="hepb_d3" type="date" class="form-control"></td>
+                <td><input name="hepb_d0" id="hepb_d0" type="date" class="form-control"></td>
+                <td><input name="hepb_d1" id="hepb_d1" type="date" class="form-control"></td>
+                <td><input name="hepb_d2" id="hepb_d2" type="date" class="form-control"></td>
+                <td><input name="hepb_d3" id="hepb_d3" type="date" class="form-control"></td>
               </tr>
               <tr data-vac="pcv">
                 <th>PCV</th>
                 <td><input name="wt24h_pcv" type="number" step="0.01" class="form-control" placeholder="kg"></td>
-                <td><input name="pcv_d0" type="date" class="form-control"></td>
-                <td><input name="pcv_d1" type="date" class="form-control"></td>
-                <td><input name="pcv_d2" type="date" class="form-control"></td>
-                <td><input name="pcv_d3" type="date" class="form-control"></td>
+                <td><input name="pcv_d0" id="pcv_d0" type="date" class="form-control"></td>
+                <td><input name="pcv_d1" id="pcv_d1" type="date" class="form-control"></td>
+                <td><input name="pcv_d2" id="pcv_d2" type="date" class="form-control"></td>
+                <td><input name="pcv_d3" id="pcv_d3" type="date" class="form-control"></td>
               </tr>
               <tr data-vac="opv">
                 <th>OPV</th>
                 <td><input name="wt24h_opv" type="number" step="0.01" class="form-control" placeholder="kg"></td>
-                <td><input name="opv_d0" type="date" class="form-control"></td>
-                <td><input name="opv_d1" type="date" class="form-control"></td>
-                <td><input name="opv_d2" type="date" class="form-control"></td>
-                <td><input name="opv_d3" type="date" class="form-control"></td>
+                <td><input name="opv_d0" id="opv_d0" type="date" class="form-control"></td>
+                <td><input name="opv_d1" id="opv_d1" type="date" class="form-control"></td>
+                <td><input name="opv_d2" id="opv_d2" type="date" class="form-control"></td>
+                <td><input name="opv_d3" id="opv_d3" type="date" class="form-control"></td>
               </tr>
               <tr data-vac="amv">
                 <th>AMV (Measles)</th>
                 <td><input name="wt24h_amv" type="number" step="0.01" class="form-control" placeholder="kg"></td>
-                <td><input name="amv_d0" type="date" class="form-control"></td>
-                <td><input name="amv_d1" type="date" class="form-control"></td>
-                <td><input name="amv_d2" type="date" class="form-control"></td>
-                <td><input name="amv_d3" type="date" class="form-control"></td>
+                <td><input name="amv_d0" id="amv_d0" type="date" class="form-control"></td>
+                <td><input name="amv_d1" id="amv_d1" type="date" class="form-control"></td>
+                <td><input name="amv_d2" id="amv_d2" type="date" class="form-control"></td>
+                <td><input name="amv_d3" id="amv_d3" type="date" class="form-control"></td>
               </tr>
               <tr data-vac="penta">
                 <th>Pentavalent</th>
                 <td><input name="wt24h_penta" type="number" step="0.01" class="form-control" placeholder="kg"></td>
-                <td><input name="penta_d0" type="date" class="form-control"></td>
-                <td><input name="penta_d1" type="date" class="form-control"></td>
-                <td><input name="penta_d2" type="date" class="form-control"></td>
-                <td><input name="penta_d3" type="date" class="form-control"></td>
+                <td><input name="penta_d0" id="penta_d0" type="date" class="form-control"></td>
+                <td><input name="penta_d1" id="penta_d1" type="date" class="form-control"></td>
+                <td><input name="penta_d2" id="penta_d2" type="date" class="form-control"></td>
+                <td><input name="penta_d3" id="penta_d3" type="date" class="form-control"></td>
               </tr>
             </tbody>
           </table>
@@ -341,7 +345,7 @@
         <div class="row g-3">
           <div class="col-md-3">
             <label class="form-label">Child protected at birth</label>
-            <select name="cpab" class="form-select">
+            <select name="cpab" id="cpab" class="form-select">
               <option value="">—</option>
               <option value="yes">Yes</option>
               <option value="no">No</option>
@@ -349,13 +353,18 @@
           </div>
           <div class="col-md-3">
             <label class="form-label">Date assessed</label>
-            <input type="date" name="cpab_date_assessed" class="form-control">
+            <input type="date" name="cpab_date_assessed" id="cpab_date_assessed" class="form-control">
           </div>
           <div class="col-md-3">
             <label class="form-label">TT status of mother</label>
             <select name="tt_status_mother" class="form-select">
               <option value="">—</option>
-              <option>TT1</option><option>TT2</option><option>TT3</option><option>TT4</option><option>TT5</option><option>FIM</option>
+              <option value="1">TT1</option>
+              <option value="2">TT2</option>
+              <option value="3">TT3</option>
+              <option value="4">TT4</option>
+              <option value="5">TT5</option>
+              <option value="6">FIM</option>
             </select>
           </div>
           <div class="col-md-3">
@@ -367,43 +376,77 @@
         <div class="row g-3 mt-2">
           <div class="col-md-3">
             <label class="form-label">Anemic children 2–59 mos. Seen</label>
-            <input type="date" name="anemic_seen_2_59" class="form-control">
+            <input type="date" name="anemic_seen_2_59" id="anemic_seen_2_59" class="form-control">
           </div>
           <div class="col-md-3">
             <label class="form-label">Anemic children 2–59 mos. Given iron</label>
-            <input type="date" name="anemic_given_2_59" class="form-control">
+            <input type="date" name="anemic_given_2_59" id="anemic_given_2_59" class="form-control">
           </div>
           <div class="col-md-3">
             <label class="form-label">2–6 mos. Seen</label>
-            <input type="date" name="seen_2_6" class="form-control">
+            <input type="date" name="seen_2_6" id="seen_2_6" class="form-control">
           </div>
           <div class="col-md-3">
             <label class="form-label">2–6 mos. Given iron</label>
-            <input type="date" name="iron_2_6" class="form-control">
+            <input type="date" name="iron_2_6" id="iron_2_6" class="form-control">
           </div>
         </div>
 
         <div class="row g-3 mt-2">
+          
           <div class="col-md-2">
             <label class="form-label">Vit. A Given (1)</label>
-            <input type="date" name="vita_1" class="form-control">
+            <input type="date" name="vita_1" id="vita_1" class="form-control">
           </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Vitamin (1) Dose Given (mg)</label>
+            <input type="number" name="vitamin_dose_1" id="vitamin_dose_1" class="form-control">
+          </div>
+
           <div class="col-md-2">
             <label class="form-label">Vit. A Given (2)</label>
-            <input type="date" name="vita_2" class="form-control">
+            <input type="date" name="vita_2" id="vita_2" class="form-control">
           </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Vitamin (2) Dose Given (mg)</label>
+            <input type="number" name="vitamin_dose_2" id="vitamin_dose_2" class="form-control">
+          </div>
+
           <div class="col-md-2">
             <label class="form-label">Vit. A Given (3)</label>
-            <input type="date" name="vita_3" class="form-control">
+            <input type="date" name="vita_3" id="vita_3" class="form-control">
           </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Vitamin Dose (3) Given (mg)</label>
+            <input type="number" name="vitamin_dose_3" id="vitamin_dose_3" class="form-control">
+          </div>
+
           <div class="col-md-3">
             <label class="form-label">Date iron started</label>
-            <input type="date" name="iron_started" class="form-control">
+            <input type="date" name="iron_started" id="iron_started" class="form-control">
           </div>
           <div class="col-md-3">
-            <label class="form-label">Completed</label>
-            <input type="date" name="completed_date" class="form-control">
+            <label class="form-label">Date iron Completed</label>
+            <input type="date" name="iron_completed_date" id="iron_completed_date" class="form-control">
           </div>
+
+          {% comment %} Commented out this block and added dose every after Vit. A Given.
+            Please check above with HTML or check UI.
+          {% endcomment %}
+
+          {% comment %} <div class="col-md-3">
+            <label class="form-label">Vitamin Dose Given (mg)</label>
+            <input type="number" name="vitamin_dose" id="vitamin_dose" class="form-control">
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Vitamin Dose Date Given</label>
+            <input type="date" name="vitamin_date_given" id="vitamin_date_given" class="form-control">
+          </div> {% endcomment %}
+
         </div>
       </div>
     </div>
@@ -666,4 +709,6 @@
   });
 })();
 </script>
+<script defer src="{% static 'midwife/js/childVisit.js' %}"></script>
+<script defer src="{% static 'midwife/js/fetchChildInformation.js' %}"></script>
 {% endblock %}

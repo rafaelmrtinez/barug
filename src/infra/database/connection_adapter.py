@@ -4,6 +4,10 @@ from django.db import InternalError, connection
 from src.infra.contracts.connection_adapter import IConnectionAdapter
 from src.infra.exceptions.query_exec_exception import QueryExecutionException
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class ConnectionAdapter(IConnectionAdapter):
     """
@@ -24,6 +28,7 @@ class ConnectionAdapter(IConnectionAdapter):
                 cursor.execute(sql, params)
                 return cursor.fetchall()
         except InternalError as e:
+            logger.error("Error executing query: %s", e)
             orig = getattr(e, "__cause__", None)
             if orig is not None and hasattr(orig, "diag"):
                 primary_message = orig.diag.message_primary

@@ -14,5 +14,6 @@ infra.context.override(ConnectionAdapter())
 app = AppContainer(infra=infra)
 
 app.wire(modules=[
-    "bhw.views"
+    "bhw.views",
+    "midwife.views",
 ])
