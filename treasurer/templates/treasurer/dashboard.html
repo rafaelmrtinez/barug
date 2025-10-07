@@ -79,15 +79,8 @@
 .status-rejected{ background:#fdecea; color:#b22d2d; }
 
 /* Charts */
-.chart-wrap{
-  position:relative;
-  height:clamp(320px, 40vh, 520px); /* Bigger and responsive */
-}
-.chart-wrap canvas{
-  width:100% !important;
-  height:100% !important; /* canvas visually fills the card */
-  display:block;
-}
+.chart-wrap{ position:relative; height:clamp(320px, 40vh, 520px); }
+.chart-wrap canvas{ width:100% !important; height:100% !important; display:block; }
 .legend-inline{ display:flex; gap:1rem; flex-wrap:wrap; }
 .legend-inline .legend-dot{
   width:.9rem;height:.9rem;border-radius:50%;display:inline-block;margin-right:.35rem;
@@ -147,23 +140,26 @@
         <div class="card-body d-flex flex-wrap align-items-center gap-2">
           <div class="filter">
             <label class="form-label small mb-1">Range</label>
-            <select class="form-select form-select-sm">
-              <option>Last 7 days</option>
-              <option>Last 30 days</option>
-              <option>Quarter to date</option>
-              <option>Year to date</option>
+            <select id="rangeSel" class="form-select form-select-sm">
+              <option value="7d" selected>Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="qtd">Quarter to date</option>
+              <option value="ytd">Year to date</option>
             </select>
           </div>
           <div class="filter">
             <label class="form-label small mb-1">Type</label>
-            <select class="form-select form-select-sm">
-              <option>All documents</option>
-              <option>Barangay Clearance</option>
-              <option>Residency</option>
-              <option>Indigency</option>
+            <select id="typeSel" class="form-select form-select-sm">
+              <option value="">All documents</option>
+              <option value="BARANGAY CLEARANCE">Barangay Clearance</option>
+              <option value="CERTIFICATE OF RESIDENCY">Residency</option>
+              <option value="CERTIFICATE OF INDIGENCY">Indigency</option>
+              <option value="BARANGAY BUSINESS CLEARANCE">Business Clearance</option>
             </select>
           </div>
-          <button class="btn btn-sm btn-outline-brand ms-auto" title="Refresh">{% bs_icon 'arrow-clockwise' %}</button>
+          <button id="refreshBtn" class="btn btn-sm btn-outline-brand ms-auto" title="Refresh">
+            {% bs_icon 'arrow-clockwise' %}
+          </button>
         </div>
       </div>
     </div>
@@ -177,8 +173,8 @@
           <div class="kpi-icon">{% bs_icon 'file-earmark-text' size='1.2em' %}</div>
           <div class="flex-grow-1">
             <div class="kpi-label">Document Requests (Today)</div>
-            <div class="kpi-value">{{ kpis.doc_requests_today|default:"27" }}</div>
-            <div class="kpi-sub text-success">{% bs_icon 'arrow-up-right' %} {{ kpis.doc_requests_delta|default:"+8%" }}</div>
+            <div class="kpi-value" id="kpiDocReq">—</div>
+            <div class="kpi-sub text-success" id="kpiDocReqDelta">{% bs_icon 'arrow-up-right' %} <span>+0%</span></div>
           </div>
         </div>
       </div>
@@ -189,8 +185,8 @@
           <div class="kpi-icon">{% bs_icon 'person-check' size='1.2em' %}</div>
           <div class="flex-grow-1">
             <div class="kpi-label">Pending Verifications</div>
-            <div class="kpi-value">{{ kpis.pending_verifications|default:"12" }}</div>
-            <div class="kpi-sub text-danger">{% bs_icon 'arrow-down-right' %} {{ kpis.verif_delta|default:"-5%" }}</div>
+            <div class="kpi-value" id="kpiPendingVerif">—</div>
+            <div class="kpi-sub text-danger" id="kpiVerifDelta">{% bs_icon 'arrow-down-right' %} <span>-0%</span></div>
           </div>
         </div>
       </div>
@@ -201,8 +197,8 @@
           <div class="kpi-icon">{% bs_icon 'buildings' size='1.2em' %}</div>
           <div class="flex-grow-1">
             <div class="kpi-label">Active Businesses</div>
-            <div class="kpi-value">{{ kpis.active_businesses|default:"48" }}</div>
-            <span class="badge rounded-pill kpi-pill">+{{ kpis.new_businesses_week|default:"3" }} this week</span>
+            <div class="kpi-value" id="kpiActiveBiz">—</div>
+            <span class="badge rounded-pill kpi-pill" id="kpiNewBiz">+0 this week</span>
           </div>
         </div>
       </div>
@@ -213,8 +209,8 @@
           <div class="kpi-icon">{% bs_icon 'people' size='1.2em' %}</div>
           <div class="flex-grow-1">
             <div class="kpi-label">Registered Residents</div>
-            <div class="kpi-value">{{ kpis.residents_total|default:"2,354" }}</div>
-            <span class="badge rounded-pill kpi-pill">{{ kpis.new_residents_month|default:"42" }} new</span>
+            <div class="kpi-value" id="kpiResidents">—</div>
+            <span class="badge rounded-pill kpi-pill" id="kpiNewResidents">0 new</span>
           </div>
         </div>
       </div>
@@ -226,8 +222,8 @@
     <div class="col-12">
       <div class="card section chart-section shadow-sm h-100">
         <div class="card-header d-flex align-items-center justify-content-between">
-          <h5 class="mb-0">Requests — Last 7 Days</h5>
-          <span class="small text-muted">All document types</span>
+          <h5 class="mb-0">Requests — <span id="rangeLabel">Last 7 Days</span></h5>
+          <span class="small text-muted" id="typeLabel">All document types</span>
         </div>
         <div class="card-body">
           <div class="chart-wrap">
@@ -282,15 +278,9 @@
           <a href="" class="link-brand small">Manage</a>
         </div>
         <div class="card-body">
-          <div class="panel-list" id="reqList">{% for r in recent_requests %}
-            <div class="item-row">
-              <div class="d-flex justify-content-between align-items-center">
-                <div class="fw-semibold">{{ r.doc_name }}</div>
-                <span class="badge rounded-pill status-badge status-{{ r.status|lower }}">{{ r.status }}</span>
-              </div>
-              <div class="small text-muted">{{ r.requestor }} — {{ r.code }}</div>
-            </div>
-          {% empty %}{% endfor %}</div>
+          <div class="panel-list" id="reqList">
+            <!-- Filled by renderRecentRequests() -->
+          </div>
         </div>
       </div>
     </div>
@@ -331,7 +321,7 @@
     {{ dashboard_json|json_script:"dash-data" }}
   {% endif %}
 
-  <!-- Inline, zero-dependency charts (professional line chart + donut, responsive) -->
+  <!-- Inline, zero-dependency charts + API wiring -->
   <script>
   (function(){
     const css = getComputedStyle(document.documentElement);
@@ -343,15 +333,33 @@
     const NEU300 = pick('--neutral-300') || '#d1d5db';
     const NEU500 = pick('--neutral-500') || '#6b7280';
     const hide = sel => document.querySelector(sel)?.classList.add('hidden');
+    const show = sel => document.querySelector(sel)?.classList.remove('hidden');
 
-    // Data (server json or demo)
     const dashEl = document.getElementById('dash-data');
-    const dash = dashEl ? JSON.parse(dashEl.textContent) : {
-      requestsTrend: { labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], data:[12,18,21,15,27,23,30] },
-      statusBreakdown: { labels:['Pending','Processing','Approved','Rejected'], data:[18,9,22,3] }
-    };
+    const initialDash = dashEl ? JSON.parse(dashEl.textContent) : null;
 
-    // Nice axis helpers
+    // ---- helpers ----
+    function text(elOrSel, v){ const el = typeof elOrSel==='string'?document.querySelector(elOrSel):elOrSel; if(el) el.textContent = v; }
+    function setTypeLabel(v){
+      text('#typeLabel', v ? v : 'All document types');
+    }
+    function setRangeLabel(token){
+      const map = { '7d':'Last 7 Days', '30d':'Last 30 Days', 'qtd':'Quarter to date', 'ytd':'Year to date' };
+      text('#rangeLabel', map[token] || 'Last 7 Days');
+    }
+
+    // ---- data -> UI renderers ----
+    function renderKPIs(k){
+      if(!k) return;
+      text('#kpiDocReq', (k.doc_requests_today ?? '—'));
+      text('#kpiPendingVerif', (k.pending_verifications ?? '—'));
+      text('#kpiActiveBiz', (k.active_businesses ?? '—'));
+      text('#kpiResidents', (k.residents_total ?? '—'));
+      // You can compute real deltas later; keep placeholders for now
+      text('#kpiNewBiz', `+${k.new_businesses_week ?? 0} this week`);
+      text('#kpiNewResidents', `${k.new_residents_month ?? 0} new`);
+    }
+
     function niceNum(range, round){
       const exp = Math.floor(Math.log10(range || 1));
       const f = range / Math.pow(10, exp);
@@ -374,25 +382,24 @@
     }
     function fmt(v){ return Math.round(v*10)/10; }
 
-    // Professional line chart
     function drawLine(canvas, labels, series){
       if (!canvas) return;
       const dpr = devicePixelRatio||1;
-      // make canvas fill container
       canvas.style.width='100%'; canvas.style.height='100%';
       const W = canvas.clientWidth||600, H = canvas.clientHeight||320;
       canvas.width = W*dpr; canvas.height=H*dpr;
       const ctx = canvas.getContext('2d'); ctx.scale(dpr,dpr);
 
-      // margins (room for y labels)
       const m = {l:48, r:18, t:18, b:32};
       const x0=m.l, x1=W-m.r, y0=H-m.b, y1=m.t;
 
       const data = series.slice();
-      const minV = Math.min(...data), maxV = Math.max(...data);
+      const minV = Math.min(...data, 0), maxV = Math.max(...data, 1);
       const pad = (maxV-minV) * 0.1 || 1;
       const scale = niceScale(minV-pad, maxV+pad, 5);
       const range = scale.niceMax - scale.niceMin;
+
+      ctx.clearRect(0,0,W,H);
 
       // grid + y labels
       ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif';
@@ -412,14 +419,14 @@
         if (n <= 10 || i%Math.ceil(n/7)===0) ctx.fillText(lbl, x, y0+8);
       });
 
-      // points coords
+      // points
       const pts = data.map((v,i)=>({
         x: x0 + (x1-x0)*(i/(Math.max(n-1,1))),
         y: y0 - ((v - scale.niceMin)/range)*(y0-y1),
         v
       }));
 
-      // gradient fill
+      // area
       const grad = ctx.createLinearGradient(0,y1,0,y0);
       grad.addColorStop(0, BRAND300);
       grad.addColorStop(1, 'rgba(0,0,0,0)');
@@ -427,7 +434,7 @@
       pts.forEach(p=>ctx.lineTo(p.x,p.y));
       ctx.lineTo(x1,y0); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
 
-      // smooth line
+      // line
       ctx.strokeStyle = BRAND700; ctx.lineWidth = 2;
       ctx.beginPath();
       for (let i=0;i<pts.length;i++){
@@ -441,21 +448,24 @@
       }
       ctx.stroke();
 
-      // average dashed line
-      const avg = data.reduce((a,b)=>a+b,0)/n;
+      // average dash
+      const avg = data.reduce((a,b)=>a+b,0)/Math.max(data.length,1);
       const yAvg = y0 - ((avg - scale.niceMin)/range)*(y0-y1);
       ctx.save(); ctx.setLineDash([6,6]); ctx.strokeStyle = BRAND500; ctx.lineWidth = 1.2;
       ctx.beginPath(); ctx.moveTo(x0,yAvg); ctx.lineTo(x1,yAvg); ctx.stroke(); ctx.restore();
 
-      // data points
+      // dots
       ctx.fillStyle = BRAND700;
       pts.forEach(p=>{ ctx.beginPath(); ctx.arc(p.x,p.y,2.5,0,Math.PI*2); ctx.fill(); });
 
-      // simple tooltip
-      const tip = document.createElement('div');
-      tip.style.cssText = 'position:absolute;padding:6px 8px;background:#fff;border:1px solid var(--border);color:#111;font:12px system-ui;border-radius:8px;box-shadow:var(--shadow);pointer-events:none;transform:translate(-50%,-140%);white-space:nowrap;display:none;';
-      canvas.parentElement.appendChild(tip);
-
+      // tooltip
+      let tip = canvas.parentElement.querySelector('.line-tip');
+      if(!tip){
+        tip = document.createElement('div');
+        tip.className='line-tip';
+        tip.style.cssText = 'position:absolute;padding:6px 8px;background:#fff;border:1px solid var(--border);color:#111;font:12px system-ui;border-radius:8px;box-shadow:var(--shadow);pointer-events:none;transform:translate(-50%,-140%);white-space:nowrap;display:none;';
+        canvas.parentElement.appendChild(tip);
+      }
       function nearest(x){
         let best=0, bestDx=1e9;
         pts.forEach((p,i)=>{ const dx=Math.abs(p.x-x); if(dx<bestDx){best=i;bestDx=dx;} });
@@ -468,26 +478,22 @@
         tip.style.display='block';
       }
       function hideTip(){ tip.style.display='none'; }
-
       canvas.onmousemove = (e)=>{
         const rect = canvas.getBoundingClientRect();
         const x = (e.clientX - rect.left) * (canvas.width / rect.width) / (devicePixelRatio||1);
         showTip(nearest(x));
       };
       canvas.onmouseleave = hideTip;
-
-      // redraw on resize
-      const ro = new ResizeObserver(()=>drawLine(canvas, labels, series));
-      ro.observe(canvas.parentElement);
     }
 
-    // Donut
     function drawDonut(canvas, labels, data, colors){
       if (!canvas) return;
       const dpr=devicePixelRatio||1;
       canvas.style.width='100%'; canvas.style.height='100%';
       const W=canvas.clientWidth||600, H=canvas.clientHeight||320;
       canvas.width=W*dpr; canvas.height=H*dpr; const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+
+      ctx.clearRect(0,0,W,H);
 
       const cx=W/2, cy=H/2, R=Math.min(W,H)/2-10, cut=R*0.62;
       const total = data.reduce((a,b)=>a+b,0) || 1;
@@ -501,59 +507,89 @@
       ctx.beginPath(); ctx.arc(cx,cy,cut,0,Math.PI*2); ctx.fill();
       ctx.globalCompositeOperation='source-over';
 
-      document.getElementById('statusLegend').innerHTML =
-        labels.map((t,i)=>`<span class="legend-dot" style="--dot:${colors[i%colors.length]}"></span><span class="legend-label">${t}</span>`).join('');
-
-      const ro = new ResizeObserver(()=>drawDonut(canvas, labels, data, colors));
-      ro.observe(canvas.parentElement);
+      const legend = document.getElementById('statusLegend');
+      legend.innerHTML = labels.map((t,i)=>`<span class="legend-dot" style="--dot:${colors[i%colors.length]}"></span><span class="legend-label">${t}</span>`).join('');
     }
 
-    // Fill lists/tables with demo if empty (so the whole UI is visible)
-    const verifHost=document.getElementById('verifList');
-    if (verifHost && !verifHost.querySelector('.item-row')) {
-      verifHost.innerHTML = [
-        {n:'Juan Dela Cruz', s:'ePhilID • 5m ago', st:'Pending'},
-        {n:'Maria Santos', s:'Driver’s License • 12m ago', st:'Pending'},
-        {n:'Pedro Reyes', s:'PhilID • 26m ago', st:'Processing'}
-      ].map(v=>`<div class="item-row d-flex justify-content-between align-items-center">
-        <div><div class="fw-semibold">${v.n}</div><div class="small text-muted">${v.s}</div></div>
-        <span class="badge rounded-pill status-badge status-${v.st.toLowerCase()}">${v.st}</span>
-      </div>`).join('');
-    }
-    const reqHost=document.getElementById('reqList');
-    if (reqHost && !reqHost.querySelector('.item-row')) {
-      reqHost.innerHTML = [
-        {d:'Barangay Clearance', w:'Juan Dela Cruz', c:'RES-00123', st:'Pending'},
-        {d:'Certificate of Residency', w:'Maria Santos', c:'RES-00124', st:'Approved'}
-      ].map(r=>`<div class="item-row">
-        <div class="d-flex justify-content-between align-items-center">
-          <div class="fw-semibold">${r.d}</div>
-          <span class="badge rounded-pill status-badge status-${r.st.toLowerCase()}">${r.st}</span>
-        </div><div class="small text-muted">${r.w} — ${r.c}</div>
-      </div>`).join('');
-    }
-    const bizBody=document.getElementById('bizTableBody');
-    if (bizBody && !bizBody.querySelector('tr')) {
-      bizBody.innerHTML = [
-        {n:'Velasco Sari-sari Store', o:'Rico Velasco', a:'Purok Kanipaan, Sto. Niño', e:'Oct 05'},
-        {n:'Uy Laundry', o:'Claire Uy', a:'Purok Mauco, Sto. Niño', e:'Oct 07'}
-      ].map(b=>`<tr>
-        <td><div class="fw-semibold">${b.n}</div><div class="small text-muted">${b.a}</div></td>
-        <td class="d-none d-sm-table-cell">${b.o}</td>
-        <td><span class="badge rounded-pill status-badge status-processing">${b.e}</span></td>
-        <td class="text-end"><a href="#" class="btn btn-sm btn-outline-brand">View</a></td>
-      </tr>`).join('');
+    function renderCharts(dash){
+      const lineCanvas=document.getElementById('requestsTrend');
+      const donutCanvas=document.getElementById('statusBreakdown');
+      show('.chart-skel-req'); show('.chart-skel-status');
+      // Defer slightly to allow skeleton paint in slower devices
+      requestAnimationFrame(()=>{
+        drawLine(lineCanvas, dash.requestsTrend.labels, dash.requestsTrend.data);
+        hide('.chart-skel-req');
+        const palette=[BRAND700, BRAND500, BRAND300, NEU300];
+        drawDonut(donutCanvas, dash.statusBreakdown.labels, dash.statusBreakdown.data, palette);
+        hide('.chart-skel-status');
+      });
     }
 
-    // Draw charts (line maximizes space)
-    const lineCanvas=document.getElementById('requestsTrend');
-    drawLine(lineCanvas, dash.requestsTrend.labels, dash.requestsTrend.data);
-    hide('.chart-skel-req');
+    function renderRecentRequests(list){
+      const host = document.getElementById('reqList');
+      if(!host) return;
+      const rows = (list||[]).map(r=>`
+        <div class="item-row">
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="fw-semibold">${(r.doc_name||'—')}</div>
+            <span class="badge rounded-pill status-badge status-${String(r.status||'').toLowerCase()}">${r.status||'—'}</span>
+          </div>
+          <div class="small text-muted">${r.requestor||'—'} — ${r.code||'—'}</div>
+        </div>
+      `).join('');
+      host.innerHTML = rows || `
+        <div class="text-muted small">No recent requests.</div>
+      `;
+    }
 
-    const donutCanvas=document.getElementById('statusBreakdown');
-    const palette=[BRAND700, BRAND500, BRAND300, NEU300];
-    drawDonut(donutCanvas, dash.statusBreakdown.labels, dash.statusBreakdown.data, palette);
-    hide('.chart-skel-status');
+    function renderAll(dash){
+      if(!dash) return;
+      renderKPIs(dash.kpis);
+      renderCharts(dash);
+      renderRecentRequests(dash.recentRequests);
+    }
+
+    // ---- API fetch wiring ----
+    async function fetchAndRender(){
+      const range = document.getElementById('rangeSel').value || '7d';
+      const dtype = document.getElementById('typeSel').value || '';
+      setRangeLabel(range); setTypeLabel(dtype);
+      try{
+        const url = new URL("{% url 'treasurer:dashboard_api' %}", window.location.origin);
+        url.searchParams.set('range', range);
+        if(dtype) url.searchParams.set('doc_type', dtype);
+        show('.chart-skel-req'); show('.chart-skel-status');
+        const res = await fetch(url.toString(), { headers: { 'X-Requested-With':'fetch' } });
+        const data = await res.json();
+        renderAll(data);
+      }catch(e){
+        console.error(e);
+      }finally{
+        hide('.chart-skel-req'); hide('.chart-skel-status');
+      }
+    }
+
+    // ---- boot ----
+    // first paint from server
+    if(initialDash){ renderAll(initialDash); }
+    else {
+      // fallback demo data (should rarely happen)
+      renderAll({
+        kpis:{ doc_requests_today:27, pending_verifications:12, active_businesses:48, residents_total:2354 },
+        requestsTrend:{ labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], data:[12,18,21,15,27,23,30] },
+        statusBreakdown:{ labels:['Pending','Processing','Approved','Rejected'], data:[18,9,22,3] },
+        recentRequests:[]
+      });
+    }
+
+    // events
+    document.getElementById('rangeSel')?.addEventListener('change', fetchAndRender);
+    document.getElementById('typeSel')?.addEventListener('change', fetchAndRender);
+    document.getElementById('refreshBtn')?.addEventListener('click', fetchAndRender);
+
+    // labels init
+    setRangeLabel(document.getElementById('rangeSel').value);
+    setTypeLabel(document.getElementById('typeSel').value);
   })();
   </script>
 </div>

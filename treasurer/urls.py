@@ -6,7 +6,7 @@ app_name = "treasurer"
 
 urlpatterns = [
     path("dashboard/", views.dashboard, name="dashboard"),
-
+    path("dashboard/api", views.dashboard_api, name="dashboard_api"),
     path("requests/", views.queue, name="queue"),
     path("requests/<int:doc_request_id>/", views.detail, name="detail"),
     path("requests/<int:doc_request_id>/pay/", views.take_payment, name="take_payment"),
@@ -14,6 +14,9 @@ urlpatterns = [
     path("fees/update/", views.fee_update, name="fee_update"),
     path("fees/add/", views.fee_add, name="fee_add"),
     path("fees/<str:fee_code>/edit/", views.fee_edit, name="fee_edit"),
+
+    # REFUND    
+    path("refunds/", views.payment_refunds, name="payment_refunds"),
 
     # NEW: confirm + post OR for an already-paid request
     path("requests/<int:doc_request_id>/confirm-or/", views.confirm_post_or, name="confirm_post_or"),

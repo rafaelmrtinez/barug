@@ -49,16 +49,37 @@ def _staff_id(request: HttpRequest) -> int | None:
 
 
 # ========= DASHBOARD =========
+# views.py (imports)
+from .services.dashboard_api import build_dashboard_payload, PH_TZ
+
 @session_login_required
 @role_required(TREASURER_ROLE)
 @nocache
 def dashboard(request: HttpRequest):
     auth = request.session.get("auth")
+    # initial snapshot -> template json_script
+    dash = build_dashboard_payload("7d", None)
     return render(request, "treasurer/dashboard.html", {
-        "page_path": f"Barangay Treasurer/Dashboard",
+        "page_path": "Barangay Treasurer/Dashboard",
         "page_title": "Dashboard",
-        "auth": auth
+        "auth": auth,
+        "today": timezone.now().astimezone(PH_TZ).strftime("%b %d, %Y"),
+        "dashboard_json": dash,
     })
+
+
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
+
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_GET
+def dashboard_api(request: HttpRequest):
+    rng = (request.GET.get("range") or "7d").lower()
+    dtype = (request.GET.get("doc_type") or "").strip() or None
+    data = build_dashboard_payload(rng, dtype)
+    return JsonResponse(data, safe=True)
+
 
 
 # ========= QUEUE =========
@@ -1111,3 +1132,162 @@ def treasurer_complete_refund(request: HttpRequest, doc_request_id: int):
     print("="*72 + "\n")
     messages.success(request, "Refund completed and logged.")
     return redirect("treasurer:detail", doc_request_id=doc_request_id)
+
+
+# ========= REFUNDS LIST (payment_refund table) =========
+# ========= REFUNDS LIST (payment_refund table) =========
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_GET
+def payment_refunds(request: HttpRequest):
+    """
+    Shows rows from payment_refund with search + filters.
+    """
+    q = (request.GET.get("q") or "").strip() or None
+    statuses = [s.strip().upper() for s in request.GET.getlist("status") if s.strip()]
+    method_ids_raw = [m.strip() for m in request.GET.getlist("method_id") if m.strip()]
+
+    # Page size
+    per_page_options = [5, 10, 25, 50, 100]
+    try:
+        per_page = int(request.GET.get("per_page", "10") or "10")
+    except Exception:
+        per_page = 10
+    if per_page not in per_page_options:
+        per_page = 10
+
+    # Map payment_method_id -> name (and build choices)
+    methods_all = list_payment_methods() or []
+    method_options = []
+    method_name_by_id = {}
+    for m in methods_all:
+        mid = m.get("payment_method_id")
+        name = (m.get("method_name") or "").strip() or f"Method {mid}"
+        if mid is not None:
+            mid_int = int(mid)
+            method_options.append({"id": mid_int, "label": name})
+            method_name_by_id[mid_int] = name
+
+    # Base query
+    query = (supabase
+             .table("payment_refund")
+             .select("*")
+             .order("created_at", desc=True))
+
+    # Search
+    if q:
+        ors = [f"reason.ilike.%{q}%", f"refund_receipt_no.ilike.%{q}%", f"provider_refund_id.ilike.%{q}%"]
+        if q.isdigit():
+            ors.append(f"doc_request_id.eq.{q}")
+            ors.append(f"payment_refund_id.eq.{q}")
+        query = query.or_(",".join(ors))
+
+    # Filters
+    if statuses:
+        query = query.in_("status", statuses)
+
+    method_ids: list[int] = []
+    for token in method_ids_raw:
+        if token.isdigit():
+            method_ids.append(int(token))
+    if method_ids:
+        query = query.in_("payment_method_id", method_ids)
+
+    # Pull rows
+    res = query.limit(1000).execute()
+    rows = res.data or []
+
+    # Massage rows for display
+    def _to_f(x):
+        try:
+            return float(x)
+        except Exception:
+            return None
+
+    for r in rows:
+        r["refund_amount_f"] = _to_f(r.get("refund_amount"))
+        r["created_fmt"] = _fmt_occured_at(r.get("created_at"))
+        r["completed_fmt"] = _fmt_occured_at(r.get("completed_at"))
+        r["approved_fmt"] = _fmt_occured_at(r.get("approved_at"))
+        mid = r.get("payment_method_id")
+        if isinstance(mid, str) and mid.isdigit():
+            mid = int(mid)
+        r["method_name"] = method_name_by_id.get(mid) if mid is not None else None
+
+        status = (r.get("status") or "").upper() or "—"
+        r["status_ui"] = STATUS_UI.get(status) or {
+            "label": status.replace("_", " ").title(),
+            "cls": "badge text-bg-secondary"
+        }
+
+        det = r.get("details") or {}
+        if isinstance(det, str):
+            try:
+                det = json.loads(det) or {}
+            except Exception:
+                det = {}
+        r["amount_due_f"] = _to_f(det.get("amount_due"))
+        or_numbers = det.get("or_numbers") or []
+        r["or_numbers_str"] = ", ".join([str(x) for x in or_numbers if x]) if isinstance(or_numbers, list) else None
+        r["online_paid_f"] = _to_f(det.get("online_paid"))
+        r["or_collected_f"] = _to_f(det.get("or_collected"))
+
+    # Pagination
+    paginator = Paginator(rows, per_page)
+    try:
+        page_num = int(request.GET.get("page", "1") or "1")
+    except Exception:
+        page_num = 1
+    if page_num < 1:
+        page_num = 1
+    if paginator.num_pages >= 1 and page_num > paginator.num_pages:
+        page_num = paginator.num_pages
+    try:
+        page_obj = paginator.page(page_num)
+    except EmptyPage:
+        page_obj = paginator.page(1)
+
+    def build_page_numbers(curr: int, total: int, radius: int = 2):
+        if total <= 1:
+            return [1]
+        nums = []
+        left = max(1, curr - radius)
+        right = min(total, curr + radius)
+        if left > 1:
+            nums.append(1)
+            if left > 2:
+                nums.append(None)
+        nums.extend(range(left, right + 1))
+        if right < total:
+            if right < total - 1:
+                nums.append(None)
+            nums.append(total)
+        return nums
+
+    page_numbers = build_page_numbers(page_obj.number, paginator.num_pages)
+
+    status_choices = ["CREATED", "REQUESTED", "PENDING", "APPROVED", "COMPLETED", "DECLINED"]
+    selected_methods = [opt for opt in method_options if opt["id"] in method_ids]
+    active_count = (1 if q else 0) + (1 if statuses else 0) + (1 if method_ids else 0)
+
+    ctx = {
+        "q": q or "",
+        "rows": page_obj.object_list,
+        "page_obj": page_obj,
+        "paginator": paginator,
+        "page_numbers": page_numbers,
+        "is_paginated": paginator.num_pages > 1,
+
+        "statuses": statuses,
+        "status_choices": status_choices,
+
+        "method_ids": method_ids,
+        "method_options": method_options,
+        "selected_methods": selected_methods,
+
+        "per_page": per_page,
+        "per_page_options": per_page_options,
+
+        "active_count": active_count,
+    }
+    return render(request, "treasurer/payment_refunds.html", ctx)

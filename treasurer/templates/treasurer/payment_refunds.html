@@ -1,0 +1,325 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<style>
+  :root{
+    --brand-900:#3a1217;
+    --brand-800:#561c24;
+    --brand-700:#6d2932;
+    --brand-600:#7a323b;
+    --brand-100:#f3eaeb;
+    --brand-050:#fbf6f6;
+  }
+  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
+  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
+  .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); background:#fff; }
+  .btn-outline-brand:hover{ background:var(--brand-700); color:#fff; }
+  .btn-brand-subtle{ background:var(--brand-100); color:var(--brand-700); border-color:var(--brand-100); }
+  .btn-brand-subtle:hover{ background:var(--brand-050); color:var(--brand-700); }
+
+  .form-control:focus, .form-select:focus, .form-check-input:focus{
+    border-color:var(--brand-700);
+    box-shadow:0 0 0 .25rem rgba(109,41,50,.25);
+    outline:none;
+  }
+  .form-check-input:checked{ background-color:var(--brand-700); border-color:var(--brand-700); }
+
+  .toolbar{ background:#fff; border:1px solid var(--bs-border-color,#dee2e6);
+            border-radius:1rem; padding:.75rem; gap:.5rem; }
+  .searchbox{ position:relative; flex:1; }
+  .searchbox .bi{ position:absolute; left:.8rem; top:50%; transform:translateY(-50%); opacity:.6; color:var(--brand-700); }
+  .searchbox input{ padding-left:2.35rem !important; }
+
+  .filters-bar{ gap:.5rem; }
+  .filter-chip{
+    display:inline-flex; align-items:center; gap:.4rem;
+    padding:.3rem .65rem; border-radius:999px; font-size:.8rem;
+    text-decoration:none; border:1px solid rgba(109,41,50,.18);
+    background:var(--brand-050); color:var(--brand-700);
+  }
+  .filter-chip:hover{ background:var(--brand-100); }
+
+  .table thead th{ border-bottom-width:2px; }
+  .table tbody tr:hover{ background:#fcfcfd; }
+
+  .mini-badge{ display:inline-block; padding:.28rem .6rem; border-radius:.5rem;
+               background:#fff; border:1px solid rgba(0,0,0,.08); font-size:.78rem; }
+  .code-badge{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+               font-size:.875rem; padding:.25rem .45rem; border-radius:.5rem;
+               background:#f5f2ee; border:1px solid rgba(0,0,0,.06); color:var(--brand-800); }
+
+  .offcanvas.filter-offcanvas{
+    width:420px; max-width:90vw;
+    --bs-offcanvas-bg:#fff;
+    background-color:var(--bs-offcanvas-bg)!important;
+    z-index:1200;
+    box-shadow:-2px 0 24px rgba(0,0,0,.12);
+    isolation:isolate;
+  }
+  .offcanvas.filter-offcanvas .offcanvas-header{ border-bottom:1px solid var(--bs-border-color); }
+  .offcanvas-footer{ position:sticky; bottom:-1px; background:#fff; border-top:1px solid var(--bs-border-color); padding-top:1rem; margin-top:1rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap" style="margin-top: 40;">
+  <div class="container-fluid pt-3 page-main">
+    <div class="row">
+      <div>
+
+        <!-- Toolbar -->
+        <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get" id="toolbarForm">
+          <div class="searchbox">
+            {% bs_icon 'search' extra_classes='bi' %}
+            <input
+              type="text"
+              class="form-control"
+              id="search"
+              name="q"
+              placeholder="Search reason, receipt no., provider id, or request id"
+              value="{{ q }}"
+            />
+          </div>
+
+          <select class="form-select w-auto" name="per_page" aria-label="Per page">
+            {% for n in per_page_options %}
+              <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{{ n }}/page</option>
+            {% endfor %}
+          </select>
+
+          <!-- hidden filters injected by JS on submit -->
+
+          <button type="submit" class="btn btn-brand d-flex align-items-center">
+            {% bs_icon 'search' extra_classes='me-2' %} Search
+          </button>
+
+          <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
+                  type="button"
+                  data-bs-toggle="offcanvas"
+                  data-bs-target="#filterPanel"
+                  aria-controls="filterPanel">
+            {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+            {% if active_count and active_count > 0 %}
+              <span class="badge rounded-pill text-bg-light ms-2">{{ active_count }}</span>
+            {% endif %}
+          </button>
+        </form>
+
+        <!-- Active filters summary -->
+        <div class="filters-bar d-flex flex-wrap align-items-center mb-3" id="activeChips">
+          {% if statuses or selected_methods %}
+            <span class="text-muted small me-1">Active:</span>
+            {% for s in statuses %}
+              <span class="filter-chip me-1">{{ s|lower|title }}</span>
+            {% endfor %}
+            {% for m in selected_methods %}
+              <span class="filter-chip me-1">{{ m.label }}</span>
+            {% endfor %}
+            <a class="btn btn-sm btn-outline-brand ms-1" href="{{ request.path }}?q={{ q|urlencode }}">
+              {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
+            </a>
+          {% else %}
+            <span class="text-muted small">No active filters.</span>
+          {% endif %}
+        </div>
+
+        <!-- Table -->
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead>
+              <tr>
+                <th>Refund ID</th>
+                <th>Doc Request</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Method</th>
+                <th>Created</th>
+                <th>Completed</th>
+                <th>Receipt / Provider Ref</th>
+                <th>Reason</th>
+                <th>Links</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if rows %}
+                {% for r in rows %}
+                  <tr>
+                    <td><span class="code-badge">{{ r.payment_refund_id }}</span></td>
+                    <td>
+                      <a href="{% url 'treasurer:detail' r.doc_request_id %}" class="text-decoration-none">
+                        #{{ r.doc_request_id }}
+                      </a>
+                    </td>
+                    <td>
+                      {% if r.refund_amount_f is not None %}
+                        ₱{{ r.refund_amount_f|floatformat:2 }}
+                      {% else %} — {% endif %}
+                    </td>
+                    <td><span class="{{ r.status_ui.cls }}">{{ r.status_ui.label }}</span></td>
+                    <td>
+                      {% if r.method_name %}
+                        <span class="mini-badge">{{ r.method_name }}</span>
+                      {% else %} — {% endif %}
+                    </td>
+                    <td>{{ r.created_fmt }}</td>
+                    <td>{{ r.completed_fmt }}</td>
+                    <td>
+                      {% if r.refund_receipt_no %}<div class="small">RR: {{ r.refund_receipt_no }}</div>{% endif %}
+                      {% if r.provider_refund_id %}<div class="text-muted small">Prov: {{ r.provider_refund_id }}</div>{% endif %}
+                      {% if r.or_numbers_str %}<div class="text-muted small">OR(s): {{ r.or_numbers_str }}</div>{% endif %}
+                    </td>
+                    <td class="text-break" style="max-width: 260px;">
+                      {{ r.reason|default:"—" }}
+                    </td>
+                    <td>
+                      <a class="btn btn-outline-brand btn-sm" href="{% url 'treasurer:detail' r.doc_request_id %}">
+                        {% bs_icon 'person-lines-fill' extra_classes='me-1' %} View Request
+                      </a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr><td colspan="10" class="text-center">No refund records found.</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+
+        {% if page_obj and page_obj.has_other_pages %}
+          <div class="page-pagination">
+            {% include 'paginator.html' with page_obj=page_obj %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Filters Offcanvas -->
+<div
+  class="offcanvas offcanvas-end filter-offcanvas"
+  id="filterPanel"
+  tabindex="-1"
+  aria-labelledby="filterPanelLabel"
+  data-bs-backdrop="false"
+  data-bs-scroll="true"
+  style="margin-top: 100;"
+>
+  <div class="offcanvas-header" style="margin-top: 50;">
+    <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+
+  <div class="offcanvas-body">
+    <form method="get" id="filterForm">
+      <input type="hidden" name="q" value="{{ q }}">
+
+      <!-- Status filter -->
+      <div class="mb-4">
+        <div class="form-label fw-semibold d-flex justify-content-between align-items-center">
+          <span>Refund Status</span>
+          <div class="small">
+            <a href="#" id="selectAllStatuses" class="me-2">Select all</a>
+            <a href="#" id="clearAllStatuses">None</a>
+          </div>
+        </div>
+        <div class="row row-cols-1">
+          {% for s in status_choices %}
+            {% with sid="st-"|add:s %}
+            <div class="col mb-2">
+              <div class="form-check">
+                <input class="form-check-input status-box" type="checkbox" name="status" value="{{ s }}" id="{{ sid }}"
+                       {% if s in statuses %}checked{% endif %}>
+                <label class="form-check-label" for="{{ sid }}">{{ s|lower|title }}</label>
+              </div>
+            </div>
+            {% endwith %}
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Payment method filter -->
+      <div class="mb-4">
+        <div class="form-label fw-semibold">Payment Method</div>
+        <div class="row row-cols-1">
+          {% for m in method_options %}
+            <div class="col mb-2">
+              <div class="form-check">
+                <input class="form-check-input method-box" type="checkbox" name="method_id" value="{{ m.id }}" id="pm-{{ m.id }}"
+                       {% if m.id in method_ids %}checked{% endif %}>
+                <label class="form-check-label" for="pm-{{ m.id }}">{{ m.label }}</label>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="offcanvas-footer">
+        <div class="d-flex gap-2">
+          <button class="btn btn-brand" type="submit">
+            {% bs_icon 'check2' extra_classes='me-1' %} Apply
+          </button>
+          <a class="btn btn-outline-brand" href="?q={{ q|urlencode }}">
+            {% bs_icon 'x-circle' extra_classes='me-1' %} Clear
+          </a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+  // Select all / none for statuses
+  (function(){
+    const selAll = document.getElementById('selectAllStatuses');
+    const clrAll = document.getElementById('clearAllStatuses');
+    const boxes = () => Array.from(document.querySelectorAll('.status-box'));
+    if(selAll) selAll.addEventListener('click', e => { e.preventDefault(); boxes().forEach(b => b.checked = true); });
+    if(clrAll) clrAll.addEventListener('click', e => { e.preventDefault(); boxes().forEach(b => b.checked = false); });
+  })();
+
+  // Persist current filters when pressing the Search button in the top toolbar
+  (function(){
+    const toolbarForm = document.getElementById('toolbarForm');
+    if(!toolbarForm) return;
+    toolbarForm.addEventListener('submit', () => {
+      // remove any old hidden inputs
+      toolbarForm.querySelectorAll('input[type="hidden"][name="status"]').forEach(n => n.remove());
+      toolbarForm.querySelectorAll('input[type="hidden"][name="method_id"]').forEach(n => n.remove());
+      toolbarForm.querySelectorAll('input[type="hidden"][name="per_page"]').forEach(n => n.remove());
+
+      // copy currently-checked boxes from the offcanvas into hidden fields
+      document.querySelectorAll('.status-box:checked').forEach(cb => {
+        const i = document.createElement('input'); i.type = 'hidden'; i.name = 'status'; i.value = cb.value;
+        toolbarForm.appendChild(i);
+      });
+      document.querySelectorAll('.method-box:checked').forEach(cb => {
+        const i = document.createElement('input'); i.type = 'hidden'; i.name = 'method_id'; i.value = cb.value;
+        toolbarForm.appendChild(i);
+      });
+      // include per_page
+      const sel = toolbarForm.querySelector('select[name="per_page"]');
+      if (sel) {
+        const i = document.createElement('input'); i.type = 'hidden'; i.name = 'per_page'; i.value = sel.value;
+        toolbarForm.appendChild(i);
+      }
+    });
+  })();
+
+  // Offcanvas backdrop safety
+  (function () {
+    const oc=document.getElementById('filterPanel');
+    if (!oc) return;
+    oc.addEventListener('show.bs.offcanvas',()=>{ document.querySelectorAll('.offcanvas-backdrop').forEach(b=>b.remove()); });
+    oc.addEventListener('hidden.bs.offcanvas',()=>{ document.body.classList.remove('offcanvas-open'); document.querySelectorAll('.offcanvas-backdrop').forEach(b=>b.remove()); });
+  })();
+</script>
+{% endblock %}
