@@ -70,6 +70,10 @@
   @keyframes spin{ to{ transform:rotate(360deg) } }
 
   input[readonly].form-control { background-color: var(--brand-050); border-color: rgba(0,0,0,.06); }
+
+  .readonly-radio input {
+  pointer-events: none !important;
+}
 </style>
 {% endblock %}
 
@@ -215,12 +219,12 @@
           <div class="col-md-12">
             <label class="form-label d-block">Place of Delivery</label>
             <div class="d-flex flex-wrap gap-3">
-              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="hospital_govt"><label class="form-check-label" readonly>Hospital (Gov’t)</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="hospital_private"><label class="form-check-label" readonly>Hospital (Private)</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="home"><label class="form-check-label" readonly>Home</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="private_clinic"><label class="form-check-label" readonly>Private Clinic</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="lying_in"><label class="form-check-label" readonly>Lying-in</label></div>
-              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="hc"><label class="form-check-label" readonly>HC</label></div>
+              <div class="form-check readonly-radio"><input class="form-check-input" type="radio" name="place_delivery" value="hospital_govt"><label class="form-check-label" >Hospital (Gov’t)</label></div>
+              <div class="form-check readonly-radio"><input class="form-check-input" type="radio" name="place_delivery" value="hospital_private"><label class="form-check-label" >Hospital (Private)</label></div>
+              <div class="form-check readonly-radio"><input class="form-check-input" type="radio" name="place_delivery" value="home"><label class="form-check-label" >Home</label></div>
+              <div class="form-check readonly-radio"><input class="form-check-input" type="radio" name="place_delivery" value="private_clinic"><label class="form-check-label" >Private Clinic</label></div>
+              <div class="form-check readonly-radio"><input class="form-check-input" type="radio" name="place_delivery" value="lying_in"><label class="form-check-label" >Lying-in</label></div>
+              <div class="form-check readonly-radio"><input class="form-check-input" type="radio" name="place_delivery" value="hc"><label class="form-check-label" >HC</label></div>
             </div>
           </div>
         </div>
