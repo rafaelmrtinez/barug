@@ -27,6 +27,7 @@ from authentication.utils import nocache
 from barug.error_messages import SOMETHING_WENT_WRONG
 from midwife.utility.immunitization_utility import ImmunizationUtility
 from src.app.bootstrap.app_containers import AppContainer
+from src.app.contracts.antenatal_service import IAntenatalCareService
 from src.app.contracts.child_services import IChildService
 from src.app.exceptions.person_not_found import PersonNotFoundException
 from src.app.exceptions.prescription_exception import PrescriptionException
@@ -719,3 +720,22 @@ def child_basic_info_http(
         return JsonResponse({"message": res.__dict__}, status=200)
     except Exception as e:
         return JsonResponse({"error": "Something went wrong, unable to retrieve child basic information"}, status=400)
+
+@require_http_methods(["POST"])
+@session_login_required
+@role_required(*ROLE_MIDWIFE)
+@nocache
+@inject
+def anc_care_http(request: HttpRequest, service: IAntenatalCareService = Provide[AppContainer.antenatal_care_service]) -> JsonResponse:
+    
+    if request.content_type != "application/json":
+        return JsonResponse({"error": "Unsupported Media Type"}, status=415)
+    
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    
+    # Placeholder: Implement the actual logic to handle ANC Care using the service
+    
+    return JsonResponse({"message": "ANC Care RPC endpoint placeholder"}, status=200)
