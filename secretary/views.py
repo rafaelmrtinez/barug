@@ -1,11 +1,12 @@
 # secretary/views.py (final)
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 from django.shortcuts import render, redirect
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.contrib import messages
 from django.views.decorators.http import require_GET, require_http_methods
+from django.core.paginator import Paginator
 
 from secretary.models import Secretary
 from .forms import ResidentProfileform
@@ -16,6 +17,14 @@ from .forms import Schedule
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
 from authentication.supabase_client import supabase  # kept for parity / future use
+
+# NEW
+from .services.residents import (
+    list_residents_minimal,
+    get_resident_full_profile,
+    build_fullname,
+    build_address_line,
+)
 
 # ─────────────────────────────
 # Constants (mirror clerk style)
@@ -168,7 +177,8 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
         'form': form,
     })
 
-def staff_selection_nonres_role_review(request):
+
+def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
     role_form = ChooseRole()
     sched_form = Schedule()
     return render(request, "staff/role.html", {
@@ -181,11 +191,12 @@ def staff_selection_nonres_role_review(request):
         'sched_form': sched_form,
     })
 
-def staff_list(request):
+
+def staff_list(request: HttpRequest) -> HttpResponse:
     form = StaffFilters()
 
-    list = []
-    paginator = Paginator(list, 10)
+    data = []
+    paginator = Paginator(data, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
@@ -195,15 +206,76 @@ def staff_list(request):
         'page_path': f'{user_role} / Account Verification',
         'page_title': 'Account Verification',
         'user_role_template': user_role_template,
-        'form' : form,
+        'form': form,
         'page_obj': page_obj,
     })
 
-def staff_dets(request, staff_id):
+
+def staff_dets(request: HttpRequest, staff_id: str) -> HttpResponse:
     return render(request, "person/staff_dets.html", {
-        'user_fullname' : user_fullname,
-        'user_role' : user_role,
-        'page_path' : f'{user_role} / Staff Details : {staff_id}',
-        'page_title' : f'Staff Details : {staff_id}',
-        'user_role_template' : user_role_template,
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Staff Details : {staff_id}',
+        'page_title': f'Staff Details : {staff_id}',
+        'user_role_template': user_role_template,
+    })
+
+
+# ─────────────────────────────────────────────────────────────
+# NEW: Residents list (minimal) + view profile (RPC-backed)
+# ─────────────────────────────────────────────────────────────
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@require_GET
+def residents_list(request: HttpRequest) -> HttpResponse:
+    """Minimal residents table: Name | Address | Actions"""
+    q = (request.GET.get("q") or "").strip()
+    page = int(request.GET.get("page") or 1)
+    page_size = 15
+
+    try:
+        rows, total = list_residents_minimal(search=q, page=page, page_size=page_size)
+    except Exception as e:
+        messages.error(request, f"Failed to load residents: {e}")
+        rows, total = [], 0
+
+    paginator = Paginator(range(total), page_size)  # fake range to drive page controls
+    page_obj = paginator.get_page(page)
+
+    return render(request, "secretary/residents_list.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Residents',
+        'page_title': 'Residents',
+        'user_role_template': user_role_template,
+        'rows': rows,
+        'q': q,
+        'page_obj': page_obj,
+    })
+
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@require_GET
+def resident_profile(request: HttpRequest, person_id: int) -> HttpResponse:
+    """Uses RPC get_specific_resident_full_profile for details."""
+    try:
+        profile = get_resident_full_profile(person_id)
+        if not profile:
+            messages.error(request, "Resident not found.")
+            return redirect("secretary:residents_list")
+    except Exception as e:
+        messages.error(request, f"Failed to open profile: {e}")
+        return redirect("secretary:residents_list")
+
+    return render(request, "secretary/resident_profile.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Residents / Profile',
+        'page_title': 'Resident Profile',
+        'user_role_template': user_role_template,
+        'profile': profile,
     })
