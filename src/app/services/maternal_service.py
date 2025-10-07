@@ -1,14 +1,15 @@
 from src.app.transfer_objects.request.create_child_record_request import CreateChildRecordRequest
-from src.infra.repositories.family_repository import FamilyRepository
+from src.domain.contracts.family_repository import IFamilyRepository
+from src.domain.contracts.maternal_service import IMaternalService
 from src.infra.repositories.maternal_repository import MaternalRepository
 
 
-class MaternalService:
+class MaternalService(IMaternalService):
     
     def __init__(
         self, 
         maternal_repository: MaternalRepository,
-        family_repository: FamilyRepository
+        family_repository: IFamilyRepository
     ):
         self._maternal_repository = maternal_repository
         self._family_repository = family_repository

@@ -11,9 +11,10 @@ from django.views.decorators.csrf import csrf_protect, csrf_exempt
 from django.views.decorators.http import require_http_methods
 from authentication.guards import role_required, session_login_required
 from src.app.bootstrap.app_containers import AppContainer
-from src.app.contracts.household_info_service_contract import IHouseholdInfoService
-from src.app.contracts.scheduling_service_contract import ISchedulingService
+from src.domain.contracts.household_info_service_contract import IHouseholdInfoService
+from src.domain.contracts.scheduling_service_contract import ISchedulingService
 from src.app.transfer_objects.request.create_child_record_request import CreateChildRecordRequest
+from src.domain.contracts.maternal_service import IMaternalService
 from src.infra.exceptions.maternal_exceptions import MaternalException
 from src.infra.exceptions.rescheduling_exception import ReschedulingException
 
@@ -21,6 +22,7 @@ from .forms import SearchActiveScheduleFilter
 from .forms import StatusActiveScheduleFilter
 from .forms import WeekRangeActiveScheduleFilter
 from .forms import Reschedule
+from .forms import ChildHealtheRecordForm
 
 
 # Raph
@@ -388,8 +390,10 @@ def child_new(request: HttpRequest) -> HttpResponse:
     
 @csrf_exempt
 @require_http_methods(["POST"])
+@role_required(*ROLE_BHW)
+@session_login_required
 @inject
-def add_child(request: HttpRequest, service = Provide[AppContainer.maternal_service]) -> HttpResponse:
+def add_child(request: HttpRequest, service: IMaternalService = Provide[AppContainer.maternal_service]) -> HttpResponse:
     try:
         if request.content_type == "application/json":
             try:
@@ -399,16 +403,11 @@ def add_child(request: HttpRequest, service = Provide[AppContainer.maternal_serv
         else:
             return JsonResponse({"response": "Unsupported content type."}, status=415)
         
-        if not data.get("family_no"):
-            return JsonResponse({"response": "Family Number is required."}, status=400)
-        if not data.get("child_id"):
-            return JsonResponse({"response": "Child full name is required."}, status=400)
-        if not data.get("mother_id"):
-            return JsonResponse({"response": "Mother full name is required."}, status=400)
-        if not data.get("birth_order"):
-            return JsonResponse({"response": "Birth order is required."}, status=400)
-        if not data.get("place_delivery"):
-            return JsonResponse({"response": "Place of delivery is required."}, status=400)
+        form = ChildHealtheRecordForm(data)
+        
+        if not form.is_valid():
+            print(f'form data is not valid: {form.errors}')
+            return JsonResponse({"response": form.errors}, status=400)
             
         child_data = CreateChildRecordRequest(
             request.session.get("auth", {}).get("staff_id"),

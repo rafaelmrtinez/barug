@@ -40,8 +40,11 @@
 
             if (!res.ok) {
                 const data = await res.json();
-                console.error("Error submitting form:", data);
-                alert(data.response);
+                const errors = data["response"];
+                const errorMessages = Object.entries(errors)
+                    .map(([field, messages]) => `${messages.join(', ')}`)
+                    .join('\n');
+                alert(errorMessages || 'An error occurred while submitting the form.');
                 return;
             }
 
