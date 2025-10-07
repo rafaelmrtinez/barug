@@ -15,6 +15,9 @@ urlpatterns = [
     path("fees/add/", views.fee_add, name="fee_add"),
     path("fees/<str:fee_code>/edit/", views.fee_edit, name="fee_edit"),
 
+    # FINANCIAL REPORT
+    path("financial-report/", views.financial_report, name="financial_report"),
+
     # REFUND    
     path("refunds/", views.payment_refunds, name="payment_refunds"),
 

@@ -50,7 +50,7 @@ def _staff_id(request: HttpRequest) -> int | None:
 
 # ========= DASHBOARD =========
 # views.py (imports)
-from .services.dashboard_api import build_dashboard_payload, PH_TZ
+from treasurer.services.dashboard_api import build_dashboard_payload, PH_TZ
 
 @session_login_required
 @role_required(TREASURER_ROLE)
@@ -1291,3 +1291,56 @@ def payment_refunds(request: HttpRequest):
         "active_count": active_count,
     }
     return render(request, "treasurer/payment_refunds.html", ctx)
+
+
+from treasurer.services.finreport_service import build_financial_report_payload
+
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_GET
+@nocache
+def financial_report(request):
+    q = (request.GET.get("q") or "").strip() or None
+    doc_type = (request.GET.get("doc_type") or "").strip() or None
+    pm_raw = (request.GET.get("payment_method_id") or "").strip()
+    payment_method_id = int(pm_raw) if pm_raw.isdigit() else None
+    start_date = (request.GET.get("start_date") or "").strip() or None
+    end_date = (request.GET.get("end_date") or "").strip() or None
+
+    payload = build_financial_report_payload(start_date, end_date, q, doc_type, payment_method_id)
+
+    # Paginate rows
+    try:
+        per_page = int(request.GET.get("per_page") or "25")
+    except Exception:
+        per_page = 25
+    per_page = per_page if per_page in (10, 25, 50, 100) else 25
+
+    paginator = Paginator(payload["rows"], per_page)
+    try:
+        page = int(request.GET.get("page") or "1")
+    except Exception:
+        page = 1
+
+    try:
+        page_obj = paginator.page(page)
+    except EmptyPage:
+        page_obj = paginator.page(1)
+
+    return render(
+        request,
+        "treasurer/financial_report.html",
+        {
+            "rows": page_obj.object_list,
+            "page_obj": page_obj,
+            "paginator": paginator,
+            "per_page": per_page,
+            "q": q or "",
+            "doc_type": doc_type or "",
+            "payment_method_id": payment_method_id or "",
+            "start_date": start_date or "",
+            "end_date": end_date or "",
+            "filters": payload["filters"],
+            "totals": payload["totals"],
+        },
+    )
