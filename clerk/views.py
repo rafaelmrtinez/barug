@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple, Iterable
 import io, os, zipfile, json, re
+import traceback
 from datetime import datetime, date, time
 from decimal import Decimal
 from django.forms import Form
@@ -52,7 +53,11 @@ from dependency_injector.wiring import inject, Provide
 from src.app.bootstrap.app_containers import AppContainer
 from src.app.contracts.business_service_contract import (
     IBusinessService,
-    IResidentOwnerService
+    IResidentOwnerService,
+    IBusinessRegistrationService,
+)
+from src.app.transfer_objects.commands.business_cmd import (
+    RegisterBusinessProfileCmd
 )
 
 def _auth_role_name(request: HttpRequest) -> str:
@@ -949,6 +954,8 @@ def walkin_create(request: HttpRequest):
 # =========================
 # Business screens (stubs; clerk-only)
 # =========================
+def _auth_staff_id(request: HttpRequest) -> Optional[int]:
+    return ((request.session.get("auth") or {}).get("staff_id")) or None
 
 def _sstrip(v: Any) -> Optional[str]:
     """Strip only if string; return None for empty strings; pass through other types."""
@@ -1112,10 +1119,9 @@ def fetch_display_maps_from_forms() -> Dict[str, Dict[Any, str]]:
         # Business-side lookups
         "business_type": _field_map(biz_form, "b_type"),
         "ownership_type": _field_map(biz_form, "ownership_type"),
+        "business_category": _field_map(biz_form, "b_category"),
 
-        # Operating day labels if your BusinessDetails uses these choice fields
-        # (IDs likely 1..7 → "Mon", "Tue", ...). If you don't have them as ChoiceFields,
-        # this will just return {} and our fallback will kick in.
+        # Operating day labels (fallback if one is missing)
         "operating_day": _field_map(biz_form, "opt_days_start") or _field_map(biz_form, "opt_days_end"),
     }
 
@@ -1177,6 +1183,7 @@ def build_business_display(biz: dict, maps: Dict[str, Dict[int, str]]) -> Dict[s
     """
     btype_name = maps.get("business_type", {}).get(biz.get("b_type")) or biz.get("b_type_name")
     owner_type_name = maps.get("ownership_type", {}).get(biz.get("ownership_type")) or biz.get("ownership_type_name")
+    cat_name = maps.get("business_category", {}).get(biz.get("b_category")) or biz.get("b_category_name")  # 👈 NEW
 
     # Operating day labels from form choices (fallback to raw if missing)
     day_map = maps.get("operating_day", {}) or {}
@@ -1195,6 +1202,9 @@ def build_business_display(biz: dict, maps: Dict[str, Dict[int, str]]) -> Dict[s
         "b_type_name": btype_name or biz.get("b_type") or "—",
         "b_nature": biz.get("b_nature") or "—",
         "ownership_type_name": owner_type_name or biz.get("ownership_type") or "—",
+        "b_category_name": cat_name or biz.get("b_category") or "—",  # 👈 NEW (label-first, raw fallback)
+        "b_category": biz.get("b_category"),                           # 👈 NEW (raw id)
+
         "address_display": addr or "—",
         "latitude": biz.get("latitude"),
         "longitude": biz.get("longitude"),
@@ -1205,6 +1215,7 @@ def build_business_display(biz: dict, maps: Dict[str, Dict[int, str]]) -> Dict[s
         "prevgross_display": _fmt_peso(biz.get("prevgross")),
         "inc_est": _fmt_peso(biz.get("inc_est")),
         "employees_display": biz.get("emp_num") or "—",
+
         # expose both label and raw for completeness
         "opt_days_start_name": opt_days_start_lbl,
         "opt_days_end_name": opt_days_end_lbl,
@@ -1212,7 +1223,7 @@ def build_business_display(biz: dict, maps: Dict[str, Dict[int, str]]) -> Dict[s
         "opt_days_end": biz.get("opt_days_end"),
         "opt_start": biz.get("opt_start"),
         "opt_end": biz.get("opt_end"),
-        "proof_name": biz.get("proof_name") or "—",  # keep original case in template
+        "proof_name": biz.get("proof_name") or "—",
     }
 
 @session_login_required
@@ -1308,7 +1319,6 @@ def _normalize_residency_name(s: Optional[str]) -> str:
     if x in {"NON RESIDENT", "NON-RESIDENT", "NONRESIDENT", "NR"}: return "NON-RESIDENT"
     if x in {"TRANSIENT", "T"}: return "TRANSIENT"
     return x or "NON-RESIDENT"
-
 
 def _owner_payload_common_from_dict(src: Any) -> Dict[str, Any]:
     d = _asdict_loose(src)
@@ -1483,7 +1493,7 @@ def business_owner_nonresident(request: HttpRequest) -> HttpResponse:
             # Store and expire in 30 minutes
             request.session["bizreg_owner"] = owner_payload
             request.session.set_expiry(1800)
-            owner_payload["residency_name"] = "NON-ESIDENT"
+            owner_payload["residency_name"] = "NON-RESIDENT"
             # Optional success flash
             messages.success(request, "Owner info saved. Continue with business details.")
 
@@ -1542,6 +1552,7 @@ def business_details(request: HttpRequest):
                 # choice/ids
                 "b_type": _to_int_or_none(cd.get("b_type")),
                 "ownership_type": _to_int_or_none(cd.get("ownership_type")),
+                "b_category": _to_int_or_none(cd.get("b_category")),
 
                 # numbers (keep JSON-safe as strings)
                 "capital_invested": _to_str_num(cd.get("capital_invested"), "0"),
@@ -1569,7 +1580,6 @@ def business_details(request: HttpRequest):
             }
 
             # NOTE: We intentionally DO NOT put file objects (e.g., proof) in session.
-            # If you want to remember the chosen filename for UX:
             if request.FILES.get("proof"):
                 payload["proof_name"] = request.FILES["proof"].name  # just for display; not the file itself
             
@@ -1579,7 +1589,6 @@ def business_details(request: HttpRequest):
             request.session.set_expiry(1800)  # 30 minutes
 
             messages.success(request, "Business details saved.")
-            # Keep user on this page (safe redirect) or go to your next step if you have one:
             return redirect("clerk:business_information_review")
         else:
             messages.error(request, "Please correct the errors below.")
@@ -1610,7 +1619,11 @@ def business_details(request: HttpRequest):
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
-def business_information_review(request: HttpRequest):
+@inject
+def business_information_review(
+    request: HttpRequest,
+    business_registration_service: IBusinessRegistrationService = Provide[AppContainer.business_registration_service],
+):
     user_role = _auth_role_name(request)
 
     owner = request.session.get("bizreg_owner")
@@ -1620,6 +1633,35 @@ def business_information_review(request: HttpRequest):
     business = request.session.get("bizreg_business")
     if not business:
         return redirect("clerk:business_details")
+    
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").lower()
+        if action == "confirm_add":
+            # Accept single or multiple files (template may use name="proof")
+            uploads = []
+            if "proof" in request.FILES:
+                # getlist works even if single file
+                uploads = request.FILES.getlist("proof")
+
+            cmd = RegisterBusinessProfileCmd(
+                owner=owner,
+                business=business,
+                performer_staff_id=_auth_staff_id(request),
+                proof_files_uploads=uploads,
+            )
+
+            try:
+                business_id, owner_person_id = business_registration_service.business_registration(cmd)
+                request.session.pop("bizreg_owner", None)
+                request.session.pop("bizreg_business", None)
+                messages.success(request, f'Business #{business_id} created for owner #{owner_person_id}.')
+                return redirect("clerk:business_list")
+            except Exception as e:
+                print("[business_information_review] Failed to register business:", e, flush=True)
+                traceback.print_exc()
+                messages.error(request, f"Failed to register business: {e}")
+                return redirect("clerk:business_information_review")
+
     
      # Normalize a few fields for nicer display on the review page
     owner = dict(owner)  # shallow copy so we can tweak for display

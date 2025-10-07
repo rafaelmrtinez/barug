@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional
-from datetime import date
+from datetime import date, time
 
 @dataclass(frozen=True)
 class BusinessListDTO:
@@ -40,8 +40,6 @@ class ResidentOwnerDTO:
 
 @dataclass(frozen=True)
 class NonResidentOwnerDTO:
-    person_id: int
-    person_code: str
     last_name: str
     first_name: str
     middle_name: Optional[str]
@@ -49,16 +47,20 @@ class NonResidentOwnerDTO:
 
     sex_id: int
     sex_name: str
+
     date_of_birth: date
+
     civil_status_id: int
     civil_status_name: str
+
     nationality_id: int
     nationality_name: str
+
     religion_id: int
     religion_name: str
 
-    email: Optional[str]
-    mobile: Optional[str]
+    email: str
+    mobile: str
 
     address_id: int
     street: str
@@ -68,3 +70,33 @@ class NonResidentOwnerDTO:
     city: str
     latitude: Optional[float]
     longitude: Optional[float]
+
+@dataclass(frozen=True)
+class BusinessInfoDTO:
+    b_name: str
+    ownership_type: int
+    b_type: int
+    b_category: int
+    b_nature: str
+    date_est: date
+
+    dti: str
+    capital_invested: str
+    prev_gross: str
+    monthly_est: str
+    emp_num: int
+
+    street: str
+    purok_sitio: str
+    barangay: str
+    city: str
+    latitude: float
+    longitude: float
+    loc_desc: str
+
+    opt_days_start: int
+    opt_days_end: int
+    opt_hrs_start: time
+    opt_hrs_end: time
+
+    proof_name: str

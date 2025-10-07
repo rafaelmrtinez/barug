@@ -7,11 +7,13 @@ from src.app.services.scheduling_service import SchedulingService
 
 from src.app.contracts.business_service_contract import (
     IBusinessService,
-    IResidentOwnerService
+    IResidentOwnerService,
+    IBusinessRegistrationService,
 )
 from src.app.services.business_service import (
     BusinessService,
-    ResidentOwnerService
+    ResidentOwnerService,
+    BusinessRegistrationService,
 )
 
 
@@ -44,4 +46,9 @@ class AppContainer(containers.DeclarativeContainer):
     resident_owner_service: providers.Factory[IResidentOwnerService] = providers.Factory(
         ResidentOwnerService,
         resident_owner_repository=infra.resident_owner
+    )
+
+    business_registration_service: providers.Provider[IBusinessRegistrationService] = providers.Factory(
+        BusinessRegistrationService,
+        registration_repo=infra.business_registration_service
     )

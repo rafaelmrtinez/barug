@@ -43,9 +43,12 @@
                     <div class="small text-muted text-uppercase">{{ owner_disp.person_code|upper }}</div>
                   {% endif %}
                 </div>
-                {% if owner_disp.residency_name %}
-                  <span class="badge" style="background-color: var(--bs-danger-text-emphasis);">{{ owner_disp.residency_name|upper }}</span>
-                {% endif %}
+                {# Always show residency with a default #}
+                {% with res_name=owner_disp.residency_name|default:"NON-RESIDENT" %}
+                  <span class="badge" style="background-color: var(--bs-danger-text-emphasis);">
+                    {{ res_name|upper }}
+                  </span>
+                {% endwith %}
               </div>
 
               <hr class="my-3">
@@ -191,6 +194,11 @@
             </div>
 
             <div class="col-md-6">
+              <small class="text-muted">Business Category</small>
+              <p class="fw-semibold mb-0 text-uppercase">{{ biz_disp.b_category_name|upper }}</p>
+            </div>
+
+            <div class="col-md-6">
               <small class="text-muted">No. of Employees</small>
               <p class="fw-semibold mb-0 text-uppercase">{{ biz_disp.employees_display|upper }}</p>
             </div>
@@ -207,10 +215,22 @@
               </p>
             </div>
           </div>
-
-          {# Footer buttons removed (moved to headers) #}
         </div>
+
+        {# Removed footer button — will place outside the card #}
       </div>
+    </div>
+
+    <!-- OUTSIDE THE CARD: right-aligned Add Business CTA -->
+    <div class="col-12">
+      <form method="post" action="" enctype="multipart/form-data" class="d-flex justify-content-end">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="confirm_add">
+        <button type="submit" class="btn btn-submit">
+          <i class="bi bi-plus-circle me-2"></i>
+          Add Business
+        </button>
+      </form>
     </div>
 
   </div>

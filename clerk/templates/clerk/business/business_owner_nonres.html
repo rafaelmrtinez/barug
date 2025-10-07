@@ -143,6 +143,29 @@
             </div>
 
         </div>
+
+        <div class="row">
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.type_of_id}}
+                    <label for="{{ form.type_of_id.id_for_label }}">{{ form.type_of_id.label }}</label>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.front_id}}
+                    <label for="{{ form.front_id.id_for_label }}">{{ form.front_id.label }}</label>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.back_id}}
+                    <label for="{{ form.back_id.id_for_label }}">{{ form.back_id.label }}</label>
+                </div>
+            </div>
+        </div>
         
         <div class="mt-auto button-container">
             <button class="btn btn-reset">Clear</button>

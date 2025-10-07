@@ -68,6 +68,35 @@ BUSINESS_TYPE_CHOICES = [
     (11, "OTHERS"),
 ]
 
+BUSINESS_CATEGORY_CHOICES = [
+    ("", "— Select category —"),
+    (49, "Night Market"),
+    (48, "Special Permit"),
+    (47, "Sari-Sari Store"),
+    (46, "Tailoring Services and the like"),
+    (45, "Dry Goods and the like"),
+    (44, "Water Refilling Stations"),
+    (43, "Fitness Gyms and the like"),
+    (42, "General Merchandise"),
+    (4,  "Groceries Store and the like"),
+    (40, "Bakeries, Pastry Shop and the like"),
+    (39, "Cellphones and Gadget Stores and the like"),
+    (38, "Computer Shops and the like"),
+    (37, "Vehicle Services, Auto Repair Shop and the like"),
+    (36, "Educational Institutions (Private)"),
+    (35, "Restaurants, Canteens and the like"),
+    (34, "Hotels, Apartments and the like"),
+    (33, "Motorcycle/Bicycle Supplies Stores and the like"),
+    (32, "Furniture Shops, Appliance Store and the like"),
+    (31, "Firearms Stores and the like"),
+    (30, "Specialization Clinics such as Dental Clinics, ENT, Pedia Clinics and the like"),
+    (29, "Motorcycle and other Vehicle Dealers"),
+    (28, "Gasoline Stations and the like"),
+    (27, "Commercial Stalls for Rent and the like"),
+    (26, "Videoke Bars and the like"),
+    (25, "Financial Institutions (Lending Companies)"),
+]
+
 OWNERSHIP_TYPE_CHOICES = [
     ("", "— All ownerships —"),
     (1, "SOLE PROPRIETORSHIP"),
@@ -344,6 +373,32 @@ class BusinessOwnerInfo(forms.Form):
         label= 'Mobile Number',
         required= True,
     )
+    # SUPPORTING DOCUMENTS
+    type_of_id = forms.ChoiceField(
+        choices= [], 
+        widget=forms.Select(attrs={
+            'id' : 'type_of_id',
+            'class' : 'form-select',
+    }),
+        label= 'ID Type',
+        required= True,
+    )
+    front_id = forms.ImageField(
+        widget=forms.ClearableFileInput(attrs={
+            'id' : 'front_id',
+            'class' : 'form-control',
+    }),
+        label= 'Front of the ID',
+        required= True, 
+    )
+    back_id = forms.ImageField(
+        widget=forms.ClearableFileInput(attrs={
+            'id' : 'back_id',
+            'class' : 'form-control',
+    }),
+        label= 'Back of the ID',
+        required= True, 
+    )
 
 class BusinessDetails(forms.Form):
     b_name = forms.CharField(
@@ -380,6 +435,15 @@ class BusinessDetails(forms.Form):
             'class' : 'form-select',
     }),
         label= 'Ownership Type',
+        required= True,
+    )
+    b_category = forms.ChoiceField(
+        choices= BUSINESS_CATEGORY_CHOICES, 
+        widget=forms.Select(attrs={
+            'id' : 'b_category',
+            'class' : 'form-select',
+    }),
+        label= 'Business Category',
         required= True,
     )
     b_address = forms.CharField(

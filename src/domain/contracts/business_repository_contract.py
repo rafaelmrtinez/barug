@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 from typing import Optional
+from src.app.transfer_objects.commands.business_cmd import(
+    RegisterBusinessProfileCmd
+)
 from src.app.transfer_objects.dto.business_dto import (
     BusinessListDTO,
     ResidentOwnerDTO,
@@ -27,6 +30,10 @@ class IBusinessRepository(ABC):
 
     @abstractmethod
     def sort_status(self, status: int) -> list[BusinessListDTO]:
+        pass
+
+    @abstractmethod
+    def register_business(slf, cmd: RegisterBusinessProfileCmd) -> tuple[int,int]:
         pass
 
 class IResidentOwnerRepository(ABC):

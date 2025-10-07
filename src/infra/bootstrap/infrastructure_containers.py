@@ -38,3 +38,8 @@ class InfraContainer(containers.DeclarativeContainer):
         ResidentOwnerRepository,
         ctx=context
     )
+
+    business_registration_service: providers.Provider[IBusinessRepository] = providers.Factory(
+        BusinessRepository,
+        ctx=context
+    )

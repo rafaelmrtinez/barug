@@ -1,3 +1,11 @@
+from typing import Tuple, Any, Dict, List, Optional
+from django.db import connection
+from datetime import date, time, datetime
+from decimal import Decimal
+from pprint import pformat
+from src.app.transfer_objects.commands.business_cmd import (
+    RegisterBusinessProfileCmd
+)
 from src.app.transfer_objects.dto.business_dto import (
     BusinessListDTO,
     ResidentOwnerDTO,
@@ -10,6 +18,29 @@ from src.domain.contracts.business_repository_contract import (
 )
 from src.infra.contracts.connection_adapter import IConnectionAdapter
 from src.infra.exceptions.query_exec_exception import QueryExecutionException
+
+try:
+    from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
+except Exception:
+    InMemoryUploadedFile = TemporaryUploadedFile = tuple()
+
+def _serialize_arg_for_log(v):
+    """Make any value safe and readable for printing."""
+    if isinstance(v, (datetime, date, time, Decimal)):
+        return str(v)
+    if isinstance(v, (list, tuple)):
+        return [_serialize_arg_for_log(x) for x in v]
+    if isinstance(v, dict):
+        return {k: _serialize_arg_for_log(val) for k, val in v.items()}
+    if isinstance(v, (InMemoryUploadedFile, TemporaryUploadedFile)):
+        return {
+            "filename": getattr(v, "name", None),
+            "size": getattr(v, "size", None),
+            "content_type": getattr(v, "content_type", None),
+        }
+    return v
+
+PROC_NAME = "register_business_and_owner"
 
 class BusinessRepository(IBusinessRepository):
     def __init__(self, ctx: IConnectionAdapter):
@@ -77,7 +108,235 @@ class BusinessRepository(IBusinessRepository):
                 )
             )
         return mapped
+
+    def _to_decimal(self, v: Any) -> Optional[Decimal]:
+        if v in (None, "", "None"):
+            return None
+        try:
+            return Decimal(str(v).replace(",", ""))
+        except Exception:
+            return None
+        
+    def _to_date(self, s: Any) -> Optional[date]:
+        try:
+            if isinstance(s, date):
+                return s
+            if isinstance(s, str) and s:
+                return date.fromisoformat(s)
+        except Exception:
+            return None
+        return None
     
+    def _to_time(self, s: Any) -> Optional[time]:
+        if isinstance(s, time):
+            return s
+        if isinstance(s, str) and s:
+            try:
+                parts = s.split(":")
+                h = int(parts[0])
+                m = int(parts[1])
+                sec = int(parts[2]) if len(parts) > 2 else 0
+                return time(h, m, sec)
+            except Exception:
+                return None
+        return None
+    
+    def _to_int(self, v: Any) -> Optional[int]:
+        if v in (None, "", "None"):
+            return None
+        try:
+            return int(v)
+        except Exception:
+            return None
+        
+    def _upper_or_none(self, v: Any) -> Optional[str]:
+        if v in (None, "", "None"):
+            return None
+        s = str(v).strip()
+        return s.upper() if s else None
+    
+    def _upper_or_blank(self, v: Any) -> str:
+        if v in (None, "", "None"):
+            return ""
+        return str(v).strip().upper()
+    
+    def register_business(self, cmd: RegisterBusinessProfileCmd) -> Tuple[int, int]:
+        """
+        Calls the RPC to register a business profile.
+
+        Behavior:
+          • If owner_person_id exists → treat as RESIDENT owner; only pass p_owner_person_id.
+          • If owner_person_id is missing/empty/0 → treat as NON-RESIDENT; pass full personal info to create the person first.
+
+        Returns:
+          (business_id, owner_person_id)
+        """
+        
+        o = cmd.owner or {}
+        b = cmd.business or {}
+        # proofs: List[str] = cmd.proof_attachment or []
+
+        proofs: List[str] = list(
+            getattr(cmd, "proof_files_saved", []) or getattr(cmd, "proof_attachment", []) or []
+        )
+
+        owner_person_id = self._to_int(o.get("owner_person_id") or o.get("person_id"))
+        is_resident_owner = bool(owner_person_id)
+
+        args: Dict[str, Any] = {
+            "p_performer_staff_id": self._to_int(cmd.performer_staff_id),
+
+            "p_owner_person_id" : owner_person_id,
+
+            #business core
+            "p_business_name": self._upper_or_blank(b.get("b_name")),
+            "p_business_location_desc": b.get("b_desc"),
+            "p_business_nature": b.get("b_nature"),
+            "p_prev_yr_total_gross_sales": self._to_decimal(b.get("prevgross")),
+            "p_date_est": self._to_date(b.get("date_est")),
+            "p_dti_sec_reg_num": b.get("dti"),
+            "p_capital_invested": self._to_decimal(b.get("capital_invested")),
+            "p_mnthly_gross_incom_est": self._to_decimal(b.get("inc_est")),
+            "p_num_of_emp": self._to_int(b.get("emp_num")),
+            "p_business_type_id": self._to_int(b.get("b_type")),
+            "p_ownership_type_id": self._to_int(b.get("ownership_type")),
+            "p_operating_day_start": self._to_int(b.get("opt_days_start")),
+            "p_operating_day_end": self._to_int(b.get("opt_days_end")),
+            "p_operating_hour_start": self._to_time(b.get("opt_start")),
+            "p_operating_hour_end": self._to_time(b.get("opt_end")),
+            "p_business_city": self._upper_or_blank(b.get("city")),
+            "p_business_barangay": self._upper_or_blank(b.get("barangay")),
+            "p_business_street": self._upper_or_blank(b.get("street")),
+            "p_business_purok_sitio_name": (b.get("purok_sitio") or None),
+            "p_business_latitude": b.get("latitude"),
+            "p_business_longitude": b.get("longitude"),
+            "p_business_proof_files": proofs if proofs else None,
+            "p_business_category_id": self._to_int(b.get("b_category")),
+        }
+
+        if is_resident_owner:
+            args.update({
+                "p_owner_last_name": None,
+                "p_owner_first_name": None,
+                "p_owner_middle_name": None,
+                "p_owner_suffix": None,
+                "p_owner_birthdate": None,
+                "p_owner_email": None,
+                "p_owner_mobile": None,
+                "p_owner_sex_id": None,
+                "p_owner_civil_status_id": None,
+                "p_owner_nationality_id": None,
+                "p_owner_religion_id": None,
+                "p_owner_city": None,
+                "p_owner_barangay": None,
+                "p_owner_street": None,
+                "p_owner_purok_sitio_name": None,
+                "p_owner_valid_id_front": None,
+                "p_owner_valid_id_back": None,
+                "p_owner_valid_id_type_id": None,
+            })
+        else:
+            args.update({
+                "p_owner_last_name": None,
+                "p_owner_first_name": None,
+                "p_owner_middle_name": None,
+                "p_owner_suffix": None,
+                "p_owner_birthdate": None,
+                "p_owner_email": None,
+                "p_owner_mobile": None,
+                "p_owner_sex_id": None,
+                "p_owner_civil_status_id": None,
+                "p_owner_nationality_id": None,
+                "p_owner_religion_id": None,
+                "p_owner_city": None,
+                "p_owner_barangay": None,
+                "p_owner_street": None,
+                "p_owner_purok_sitio_name": None,
+                "p_owner_valid_id_front": None,
+                "p_owner_valid_id_back": None,
+                "p_owner_valid_id_type_id": None,
+            })
+
+        param_order = [
+            "p_performer_staff_id",
+
+            # ===== Business =====
+            "p_business_name",
+            "p_business_location_desc",
+            "p_business_nature",
+            "p_prev_yr_total_gross_sales",
+            "p_date_est",
+            "p_dti_sec_reg_num",
+            "p_capital_invested",
+            "p_mnthly_gross_incom_est",
+            "p_num_of_emp",
+            "p_business_type_id",
+            "p_ownership_type_id",
+
+            # operating schedule
+            "p_operating_day_start",
+            "p_operating_day_end",
+            "p_operating_hour_start",
+            "p_operating_hour_end",
+
+            # business address (+ geo)
+            "p_business_city",
+            "p_business_barangay",
+            "p_business_street",
+            "p_business_purok_sitio_name",
+            "p_business_latitude",
+            "p_business_longitude",
+
+            # multi-image proof files
+            "p_business_proof_files",
+
+            # optional business category
+            "p_business_category_id",
+
+            # use this if owner already exists
+            "p_owner_person_id",
+
+            # ===== Owner (creation only) =====
+            "p_owner_last_name",
+            "p_owner_first_name",
+            "p_owner_middle_name",
+            "p_owner_suffix",
+            "p_owner_birthdate",
+            "p_owner_email",
+            "p_owner_mobile",
+            "p_owner_sex_id",
+            "p_owner_civil_status_id",
+            "p_owner_nationality_id",
+            "p_owner_religion_id",
+
+            # Owner address
+            "p_owner_city",
+            "p_owner_barangay",
+            "p_owner_street",
+            "p_owner_purok_sitio_name",
+
+            # Optional files for owner
+            "p_owner_valid_id_front",
+            "p_owner_valid_id_back",
+            "p_owner_valid_id_type_id",
+        ]
+
+        placeholders = ", ".join([f"%({k})s" for k in param_order])
+        # sql = f"SELECT * FROM {PROC_NAME}({placeholders}) AS t(business_id INT, owner_person_id INT)"
+        sql = f"SELECT * FROM {PROC_NAME}({placeholders})"
+
+        safe_args = {k: _serialize_arg_for_log(v) for k, v in (args or {}).items()}
+        print(f"\n[{PROC_NAME}] About to execute:")
+        print(f"SQL : {sql}")
+        print(f"ARGS: {pformat(safe_args, width=100)}\n")
+
+        with connection.cursor() as cur:
+            cur.execute(sql, args)
+            row = cur.fetchone()
+            if not row:
+                raise RuntimeError("Stored procedure returned no rows.")
+            return int(row[0]), int(row[1])
+
 class ResidentOwnerRepository(IResidentOwnerRepository):
     def __init__(self, ctx: IConnectionAdapter):
         self._ctx = ctx

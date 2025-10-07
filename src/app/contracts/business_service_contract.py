@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
 
 from typing import Any, Dict, List, Optional, Tuple
+from src.app.transfer_objects.commands.business_cmd import (
+  RegisterBusinessProfileCmd
+)
 from src.app.transfer_objects.dto.business_dto import (
   ResidentOwnerDTO,
   NonResidentOwnerDTO
@@ -53,3 +56,8 @@ class INonResidentOwnerService(ABC):
         Raise a ValueError (or domain error) on duplicates/validation problems.
         """
         pass
+    
+class IBusinessRegistrationService(ABC):
+    @abstractmethod
+    def business_registration(self, cmd: RegisterBusinessProfileCmd) -> tuple[int, int]:
+      pass

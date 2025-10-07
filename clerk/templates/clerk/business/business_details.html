@@ -178,6 +178,13 @@
 
             <div class="col-lg-8 col-md-6 col-sm-12">
                 <div class="form-floating mb-3">
+                    {{form.b_category}}
+                    <label for="{{ form.b_category.id_for_label }}">{{ form.b_category.label }}</label>
+                </div>
+            </div>
+
+            <div class="col-lg-8 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
                     {{form.proof}}
                     <label for="{{ form.proof.id_for_label }}">{{ form.proof.label }}</label>
                 </div>
