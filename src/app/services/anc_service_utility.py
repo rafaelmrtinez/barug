@@ -2,7 +2,7 @@ from src.app.transfer_objects.request.anc_labolatory_results_request import ANCL
 from src.app.transfer_objects.request.tetanus_toxoid_request import TetanusToxoidRequest
 
 
-class ANCViewUtility:
+class ANCServiceUtility:
     
     @staticmethod
     def laboratory_results_obj_converter(obj: dict) -> None | ANCLaboratoryResultsRequest:

@@ -26,7 +26,7 @@ from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
 from barug.error_messages import SOMETHING_WENT_WRONG
 from barug.utility.json_utility import JSONCustomUtility
-from midwife.utility.anc_view_utility import ANCViewUtility
+from src.app.services.anc_service_utility import ANCServiceUtility
 from midwife.utility.immunitization_view_utility import ImmunizationViewUtility
 from src.app.bootstrap.app_containers import AppContainer
 from src.app.contracts.antenatal_service import IAntenatalCareService
@@ -743,23 +743,27 @@ def anc_care_http(request: HttpRequest, service: IAntenatalCareService = Provide
         return JsonResponse({"error": "Unsupported Media Type"}, status=415)
     
     try:
-        
         data = json.loads(request.body)
-        raw_lab_results = json.loads(data.get("p_lab_results", None))
-        tities_vacc = json.loads(data.get("p_tt_vaccines", None))
         
-        clean_data = JSONCustomUtility.clean_empty_strings(data)
-        tits = ANCViewUtility.match_those_tities(tities_vacc)
-        lab_results = ANCViewUtility.laboratory_results_obj_converter(raw_lab_results)
+        raw_lab_results = data.get("p_lab_results")
+        tities_vacc = data.get("p_tt_vaccines")
 
-        data = AntenatalCareRequest(**clean_data)
+        if isinstance(raw_lab_results, str):
+            raw_lab_results = json.loads(raw_lab_results)
 
-        data.p_assessed_by_id = request.session.get("auth", None).get("staff_id", None)
+        if isinstance(tities_vacc, str):
+            tities_vacc = json.loads(tities_vacc)
 
-        data.p_lab_results = lab_results if lab_results else None
-        data.p_tt_vaccines = tits if tits else None
+        data = JSONCustomUtility.clean_empty_strings(data)
+        
+        init_data = AntenatalCareRequest(**data)
+        init_data.p_assessed_by_id = request.session.get("auth", None).get("staff_id", None)
 
-        res = service.execute(data)
+        res = service.execute(init_data, raw_lab_results, tities_vacc)
+        
+        if not res:
+            return JsonResponse({"error": "Failed to process ANC Care"}, status=500)
+
         return JsonResponse({"message": "ANC Care RPC endpoint placeholder"}, status=200)
 
     except json.JSONDecodeError:
