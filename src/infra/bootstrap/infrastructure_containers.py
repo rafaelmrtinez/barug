@@ -3,6 +3,8 @@ from dependency_injector import containers, providers
 from src.domain.contracts.scheduling_repository_contract import ISchedulingRepository
 from src.infra.repositories.household_info_repository import HouseholdInfoRepository
 from src.infra.repositories.scheduling_repository import ActiveScheduleRepository
+from src.infra.storage.supabase_storage import SupabaseStorage
+from authentication.supabase_client import supabase
 
 from src.domain.contracts.business_repository_contract import (
     IBusinessRepository,
@@ -10,7 +12,8 @@ from src.domain.contracts.business_repository_contract import (
 )
 from src.infra.repositories.business_repository import (
     BusinessRepository,
-    ResidentOwnerRepository
+    ResidentOwnerRepository,
+    OwnerBusinessInformationRepository
 )
 
 
@@ -18,6 +21,7 @@ class InfraContainer(containers.DeclarativeContainer):
 
     config = providers.Configuration()
     context = providers.Object(None)
+    supabase_client = providers.Object(supabase)
     
     household_info = providers.Factory(
         HouseholdInfoRepository,
@@ -42,4 +46,14 @@ class InfraContainer(containers.DeclarativeContainer):
     business_registration_service: providers.Provider[IBusinessRepository] = providers.Factory(
         BusinessRepository,
         ctx=context
+    )
+
+    owner_business_info= providers.Factory(
+        OwnerBusinessInformationRepository,
+        ctx=context
+    )
+
+    storage = providers.Factory(
+        SupabaseStorage,
+        _supabase=supabase_client
     )

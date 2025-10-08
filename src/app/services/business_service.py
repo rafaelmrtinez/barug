@@ -7,6 +7,7 @@ from dataclasses import asdict
 from django.conf import settings
 from dataclasses import replace
 from authentication.supabase_client import supabase
+from src.infra.exceptions.query_exec_exception import QueryExecutionException
 # from src.app.transfer_objects.dto.business_dto import BusinessListDTO
 # from src.app.contracts.business_service_contract import IBusinessService
 # from src.domain.contracts.business_repository_contract import IBusinessRepository
@@ -17,16 +18,22 @@ from src.app.transfer_objects.commands.business_cmd import (
 from src.app.transfer_objects.dto.business_dto import (
     BusinessListDTO,
     ResidentOwnerDTO,
+    OwnerBusinessDTO
 )
 from src.app.contracts.business_service_contract import (
     IBusinessService,
     IResidentOwnerService,
     IBusinessRegistrationService,
+    IBusinessInfoService,
 )
 from src.domain.contracts.business_repository_contract import (
     IBusinessRepository,
     IResidentOwnerRepository,
 )
+from src.infra.repositories.business_repository import (
+    OwnerBusinessInformationRepository,
+)
+from src.infra.storage.supabase_storage import SupabaseStorage
 
 class BusinessService(IBusinessService): 
     def __init__(
@@ -185,3 +192,103 @@ class BusinessRegistrationService(IBusinessRegistrationService):
     
         # 3) Hand off to repo
         return self._registration_repo.register_business(cmd2)
+
+class OwnerBusinessInfoService(IBusinessInfoService):
+    def __init__(
+        self,
+        owner_business_repo: OwnerBusinessInformationRepository,
+        storage_repo: Optional[SupabaseStorage] = None,
+    ):
+        self._owner_business_repo = owner_business_repo
+        self._storage = storage_repo or SupabaseStorage()
+
+    # ---------- helpers for fallbacks ----------
+    @staticmethod
+    def _files_from_paths(paths: list[str] | None) -> list[dict]:
+        """
+        Normalize a list of file paths (from DB arrays) to the unified item shape.
+        (No signing here because we don't know the bucket/object key reliably.)
+        """
+        files = []
+        if not paths:
+            return files
+        for p in paths:
+            if not p:
+                continue
+            name = p.split("/")[-1]
+            # Keep shape consistent with storage results
+            files.append({
+                "name": name,
+                "path": p,
+                "size": None,
+                "updated_at": None,
+                "signed_url": None,  # unknown bucket/key; UI can still open if public URL
+            })
+        return files
+    
+    @staticmethod
+    def _merge_owner_id_block(storage_block: dict, owner_row: dict) -> dict:
+        """
+        If storage is empty, fall back to valid_id_files[]/selfie_file from owner_row.
+        Returns {"files": [...]} or {}.
+        """
+        # Prefer storage
+        if storage_block and storage_block.get("files"):
+            return storage_block
+
+        files: list[dict] = []
+
+        # Fallback: array of file paths
+        valid_id_files = owner_row.get("valid_id_files") if owner_row else None
+        files.extend(OwnerBusinessInfoService._files_from_paths(valid_id_files))
+
+        # Optional: include selfie_file as a single-item entry
+        selfie_path = owner_row.get("selfie_file") if owner_row else None
+        if selfie_path:
+            files.extend(OwnerBusinessInfoService._files_from_paths([selfie_path]))
+
+        return {"files": files} if files else {}
+    
+    @staticmethod
+    def _merge_business_proof_block(storage_block: dict, biz_row: dict) -> dict:
+        """
+        If storage is empty, fall back to proof_images[] from business_row.
+        Returns {"files": [...]} or {}.
+        """
+        if storage_block and storage_block.get("files"):
+            return storage_block
+
+        proof_images = biz_row.get("proof_images") if biz_row else None
+        files = OwnerBusinessInfoService._files_from_paths(proof_images)
+        return {"files": files} if files else {}
+
+    def execute(self, person_id: int, business_id: int) -> OwnerBusinessDTO:
+        # 1) DB rows
+        owner_row = self._owner_business_repo.get_owner_information(person_id)
+        business_row = self._owner_business_repo.get_business_information(business_id)
+
+        # 2) Storage lookups (Supabase)
+        # Get supabase_uid if your get_details returns it; if not, consider adding it there.
+        supabase_uid = (owner_row or {}).get("supabase_uid")
+        owner_person_id = (owner_row or {}).get("person_id")
+        storage_owner_id = self._storage.get_owner_id_assets_any(supabase_uid, owner_person_id)
+        storage_biz_proof = self._storage.get_business_proof_assets(business_id)
+
+        # 3) Merge with fallbacks
+        owner_id_block = self._merge_owner_id_block(storage_owner_id, owner_row or {})
+        business_proof_block = self._merge_business_proof_block(storage_biz_proof, business_row or {})
+
+        return OwnerBusinessDTO(
+            owner= owner_row or {},
+            business= business_row or {},
+            owner_id= owner_id_block or {},
+            business_proof= business_proof_block or {},
+        )
+    
+    def execute_by_business_id(self, business_id: int) -> OwnerBusinessDTO:
+        biz = self._owner_business_repo.get_business_information(business_id) or {}
+        person_id = biz.get("owner_person_id")
+        if not person_id:
+            # If your DB function uses a different field name, adjust here
+            raise QueryExecutionException("Owner (person_id) not found for this business.")
+        return self.execute(person_id=int(person_id), business_id=business_id)

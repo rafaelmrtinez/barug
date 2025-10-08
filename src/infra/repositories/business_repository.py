@@ -10,6 +10,7 @@ from src.app.transfer_objects.dto.business_dto import (
     BusinessListDTO,
     ResidentOwnerDTO,
     NonResidentOwnerDTO,
+    OwnerBusinessDTO,
 )
 from src.domain.contracts.business_repository_contract import (
     IBusinessRepository,
@@ -431,3 +432,25 @@ class ResidentOwnerRepository(IResidentOwnerRepository):
             )
         except Exception as e:
             raise QueryExecutionException(f"get_owner_details failed: {e}") from e
+        
+class OwnerBusinessInformationRepository:
+    def __init__(self, ctx:IConnectionAdapter):
+        self._ctx = ctx
+
+    def get_business_information(self, business_id: int) -> list[OwnerBusinessDTO]:
+        try:
+            sql = "SELECT * FROM get_business_details(%s)"
+            rows = self._ctx.execute_query_to_dict(sql, [business_id]) or []
+
+            return rows[0] if rows else {}
+        except Exception as e:
+            raise QueryExecutionException(f"get_business_information failed: {e}") from e
+        
+    def get_owner_information(self, person_id: int) -> list[OwnerBusinessDTO]:
+        try:
+            sql = "SELECT * FROM get_details(%s)"
+            rows = self._ctx.execute_query_to_dict(sql, [person_id]) or []
+
+            return rows[0] if rows else {}
+        except Exception as e:
+            raise QueryExecutionException(f"get_owner_information failed: {e}") from e

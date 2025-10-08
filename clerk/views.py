@@ -58,6 +58,7 @@ from src.app.contracts.business_service_contract import (
     IBusinessService,
     IResidentOwnerService,
     IBusinessRegistrationService,
+    IBusinessInfoService,
 )
 from src.app.transfer_objects.commands.business_cmd import (
     RegisterBusinessProfileCmd
@@ -1817,14 +1818,40 @@ def ajax_business_search(
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
-def business_information(request: HttpRequest, b_id: int):
+@inject
+def business_information(
+    request, 
+    b_id: int,
+    business_info: IBusinessInfoService = Provide[
+        AppContainer.owner_business_service]) -> HttpResponse:
     user_role = _auth_role_name(request)
+    
+    person_id = request.GET.get("owner")
+    person_id = int(person_id) if person_id and str(person_id).isdigit() else None
+
+    dto = (
+        business_info.execute(person_id=person_id, business_id=b_id)
+        if person_id is not None
+        else business_info.execute_by_business_id(b_id)  # see helper below
+    )
+
+    operating_days = (dto.business.get("operating_days") or "").strip()  # e.g., "Mon, Tue, Wed"
+    days = [d.strip() for d in operating_days.split(",")] if operating_days else []
+    operating_days_start_name = days[0] if days else None
+    operating_days_end_name = days[-1] if days else None
+
     return render(
         request,
         "business/business_information.html",
         {
             "page_path": f"{user_role} / Business Records / Business Details : {b_id}",
             "page_title": f"Business Details : {b_id}",
+            "owner": dto.owner,
+            "business": dto.business,
+            "owner_files": (dto.owner_id or {}).get("files") or [],
+            "business_files": (dto.business_proof or {}).get("files") or [],
+            "operating_days_start_name": operating_days_start_name,
+            "operating_days_end_name": operating_days_end_name,
         },
     )
 

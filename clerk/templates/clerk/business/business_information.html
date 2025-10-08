@@ -24,9 +24,11 @@
             <div class="d-flex justify-content-between align-items-start">
                 <div>
                 <h5 class="card-title mb-1">DELA CRUZ, JUAN S.</h5>
-                <div class="small text-muted">P07-R123</div>
+                <div class="small text-muted">{{ owner.person_code|default:"—"}}</div>
                 </div>
-                <span class="badge" style="background-color: var(--bs-danger-text-emphasis);">RESIDENT</span>
+                <span class="badge" style="background-color: var(--bs-danger-text-emphasis);">
+                  {{ owner.residential_status|default:"—" }}
+                </span>
             </div>
 
             <hr class="my-3">
@@ -34,11 +36,11 @@
             <div class="row g-3">
                 <div class="col-12 col-md-6">
                 <div class="small text-muted">Sex</div>
-                <div>Male</div>
+                <div>{{ owner.sex|default:"—" }}</div>
                 </div>
                 <div class="col-12 col-md-6">
                 <div class="small text-muted">Date of Birth</div>
-                <div>1992-05-18</div>
+                <div>{{ owner.birthdate|default:"—" }}</div>
                 </div>
                 <div class="col-12 col-md-6">
                 <div class="small text-muted">Address</div>
@@ -46,25 +48,44 @@
                 </div>
                 <div class="col-12 col-md-6">
                 <div class="small text-muted">Civil Status</div>
-                <div>Married</div>
+                <div>{{ owner.civil_status|default:"—" }}</div>
                 </div>
                 <div class="col-12 col-md-6">
                 <div class="small text-muted">Nationality</div>
-                <div>Filipino</div>
+                <div>{{ owner.nationality|default:"—" }}</div>
                 </div>
                 <div class="col-12 col-md-6">
                 <div class="small text-muted">Religion</div>
-                <div>Roman Catholic</div>
+                <div>{{ owner.religion|default:"—" }}</div>
                 </div>
                 <div class="col-12 col-md-6">
                 <div class="small text-muted">Mobile</div>
-                <div>+63 917 555 1234</div>
+                <div>{{ owner.mobile_num|default:"—" }}</div>
                 </div>
                 <div class="col-12 col-md-6">
                 <div class="small text-muted">Email</div>
-                <div>juan.delacruz@example.com</div>
+                <div>{{ owner.email|default:"—" }}</div>
                 </div>
             </div>
+
+            {% if owner_files %}
+                <hr class="my-3">
+                <div>
+                  <div class="small text-muted mb-2">Owner ID / Selfie Files</div>
+                  <ul class="list-group list-group-flush">
+                    {% for f in owner_files %}
+                      <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>{{ f.name }}</span>
+                        {% if f.signed_url %}
+                          <a class="btn btn-sm btn-outline-primary" href="{{ f.signed_url }}" target="_blank" rel="noopener">Open</a>
+                        {% else %}
+                          <span class="text-muted small">no signed url</span>
+                        {% endif %}
+                      </li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endif %}
 
             </div>
           </div>
@@ -85,88 +106,96 @@
           <div class="row mt-3 g-3">
             <div class="col-md-6">
               <small class="text-muted">Business Name</small>
-              <p class="fw-semibold mb-0">Dela Cruz Sari-Sari Store</p>
+              <p class="fw-semibold mb-0">{{ business.business_name|default:"—" }}</p>
             </div>
             <div class="col-md-6">
               <small class="text-muted">Business Type</small>
-              <p class="fw-semibold mb-0">Micro Enterprise</p>
+              <p class="fw-semibold mb-0">{{ business.business_type|default:"—" }}</p>
             </div>
             <div class="col-md-6">
               <small class="text-muted">Nature of Business</small>
-              <p class="fw-semibold mb-0">Retail — General Merchandise</p>
+              <p class="fw-semibold mb-0">{{ business.business_nature|default:"—" }}</p>
             </div>
             <div class="col-md-6">
               <small class="text-muted">Ownership Type</small><br>
-              <p class="fw-semibold mb-0">Single Proprietorship</p>
+              <p class="fw-semibold mb-0">{{ business.ownership_type|default:"—" }}</p>
             </div>
 
             <div class="col-12">
               <small class="text-muted">Business Address</small>
               <p class="fw-semibold mb-1">
-                Purok 2, Barangay Sto. Niño, Cityville
+                {{ business.business_address|default:"—" }}
               </p>
             </div>
 
             <div class="col-12">
               <small class="text-muted">Description</small>
               <p class="fw-semibold mb-0">
-                Convenience retail of daily household items, snacks, and mobile load.
+                {{ business.description|default:"—" }}
               </p>
             </div>
 
             <div class="col-md-6">
               <small class="text-muted">Date Established</small>
-              <p class="fw-semibold mb-0">2018-03-10</p>
+              <p class="fw-semibold mb-0">{{ business.date_established|date:"Y-m-d"|default:"—" }}</p>
             </div>
             <div class="col-md-6">
               <small class="text-muted">DTI/SEC Registration No.</small>
-              <p class="fw-semibold mb-0">DTI-1234567890</p>
+              <p class="fw-semibold mb-0">{{ business.dti_reg_num|default:"—" }}</p>
             </div>
 
             <div class="col-md-6">
               <small class="text-muted">Capital Invested</small>
-              <p class="fw-semibold mb-0">₱ 80,000.00</p>
+              <p class="fw-semibold mb-0">{{ business.capital_invested|default:"—" }}</p>
             </div>
             <div class="col-md-6">
               <small class="text-muted">Previous Year Gross Sales</small>
-              <p class="fw-semibold mb-0">₱ 350,000.00</p>
+              <p class="fw-semibold mb-0">{{ business.prev_year_gross_sales|default:"—" }}</p>
             </div>
 
             <div class="col-md-6">
               <small class="text-muted d-block">Operating Days</small>
-              <div class="d-flex flex-wrap gap-2 mt-1">
-                <span class="badge bg-light text-dark border">Mon</span>
-                <span class="badge bg-light text-dark border">Tue</span>
-                <span class="badge bg-light text-dark border">Wed</span>
-                <span class="badge bg-light text-dark border">Thu</span>
-                <span class="badge bg-light text-dark border">Fri</span>
-                <span class="badge bg-light text-dark border">Sat</span>
-                <span class="badge bg-light text-dark border">Sun</span>
-              </div>
+              <p class="fw-semibold mb-0 mt-1 text-uppercase">
+                {% if operating_days_start_name and operating_days_end_name %}
+                  {{ operating_days_start_name|upper }} — {{ operating_days_end_name|upper }}
+                {% else %}
+                  —
+                {% endif %}
+              </p>
             </div>
 
             <div class="col-md-6">
               <small class="text-muted d-block">Operating Hours</small>
-              <p class="fw-semibold mb-0 mt-1">08:00 — 20:00</p>
+              <p class="fw-semibold mb-0 mt-1">{{ business.operating_hours|default:"—" }}</p>
+            </div>
+
+            <div class="col-md-6">
+              <small class="text-muted">Business Category</small>
+              <p class="fw-semibold mb-0">{{ business.business_category|default:"—" }}</p>
             </div>
 
             <div class="col-md-6">
               <small class="text-muted">No. of Employees</small>
-              <p class="fw-semibold mb-0">2</p>
+              <p class="fw-semibold mb-0">{{ business.num_of_employees|default:"—" }}</p>
             </div>
 
-            <div class="col-md-6">
-              <small class="text-muted">Previous Barangay Clearance</small>
-              <p class="fw-semibold mb-0">Yes</p>
-            </div>
-            <div class="col-md-6">
-              <small class="text-muted">Proof of Business</small>
-              <p class="fw-semibold mb-0">
-                receipt_clearance_2024.jpg
-                <a href="#" class="ms-2 small text-decoration-none" style="color: var(--bs-danger-text-emphasis);"
-                   data-bs-toggle="modal" data-bs-target="#proofPreviewModal">View</a>
-              </p>
-            </div>
+            {% if business_files %}
+              <div class="col-12">
+                <small class="text-muted">Proof of Business</small>
+                <ul class="list-group list-group-flush">
+                  {% for f in business_files %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                      <span>{{ f.name }}</span>
+                      {% if f.signed_url %}
+                        <a class="btn btn-sm btn-outline-primary" href="{{ f.signed_url }}" target="_blank" rel="noopener">View</a>
+                      {% else %}
+                        <span class="text-muted small">no signed url</span>
+                      {% endif %}
+                    </li>
+                  {% endfor %}
+                </ul>
+              </div>
+            {% endif %}
           </div>
 
           <div class="text-end border-top pt-3 mt-2">
@@ -181,17 +210,19 @@
 
 
 <!-- Proof Preview Modal -->
+{% if business_files %}
 <div class="modal fade" id="proofPreviewModal" tabindex="-1" aria-labelledby="proofPreviewLabel" aria-hidden="true">
   <div class="modal-dialog modal-md modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="proofPreviewLabel">Proof of Previous Clearance</h5>
+        <h5 class="modal-title" id="proofPreviewLabel">Proof of Business</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <img src="{% static 'images/receipt_clearance_2024.jpg' %}" alt="Proof Image" class="img-fluid rounded w-100" />
+        <img src="{{ business_files.0.signed_url|default:'' }}" alt="Proof Image" class="img-fluid rounded w-100" />
       </div>
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}

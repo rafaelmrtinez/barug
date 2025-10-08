@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Any
 from datetime import date, time
 
 @dataclass(frozen=True)
@@ -100,3 +100,10 @@ class BusinessInfoDTO:
     opt_hrs_end: time
 
     proof_name: str
+
+@dataclass(frozen=True)
+class OwnerBusinessDTO:
+    owner: dict[str, Any]
+    business: dict[str, Any]
+    owner_id: dict[str, Any]
+    business_proof: dict[str, Any]

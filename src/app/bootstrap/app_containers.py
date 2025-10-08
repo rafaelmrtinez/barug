@@ -14,6 +14,7 @@ from src.app.services.business_service import (
     BusinessService,
     ResidentOwnerService,
     BusinessRegistrationService,
+    OwnerBusinessInfoService
 )
 
 
@@ -51,4 +52,10 @@ class AppContainer(containers.DeclarativeContainer):
     business_registration_service: providers.Provider[IBusinessRegistrationService] = providers.Factory(
         BusinessRegistrationService,
         registration_repo=infra.business_registration_service
+    )
+
+    owner_business_service= providers.Factory(
+        OwnerBusinessInfoService,
+        owner_business_repo=infra.owner_business_info,
+        storage_repo=infra.storage
     )

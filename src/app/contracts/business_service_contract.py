@@ -6,7 +6,8 @@ from src.app.transfer_objects.commands.business_cmd import (
 )
 from src.app.transfer_objects.dto.business_dto import (
   ResidentOwnerDTO,
-  NonResidentOwnerDTO
+  NonResidentOwnerDTO,
+  OwnerBusinessDTO,
 )  
 
 # from supabase_auth import Optional
@@ -61,3 +62,12 @@ class IBusinessRegistrationService(ABC):
     @abstractmethod
     def business_registration(self, cmd: RegisterBusinessProfileCmd) -> tuple[int, int]:
       pass
+
+class IBusinessInfoService(ABC):
+    @abstractmethod
+    def execute(self, person_id: int, business_id: int) -> OwnerBusinessDTO:
+        pass
+    
+    @abstractmethod
+    def execute_by_business_id(self, business_id: int) -> OwnerBusinessDTO:
+        pass
