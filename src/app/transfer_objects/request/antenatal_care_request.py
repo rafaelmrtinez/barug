@@ -1,9 +1,11 @@
-from dataclasses import dataclass
 from datetime import date
+import json
+from typing import Any
+from pydantic import BaseModel, field_validator
 
+from src.app.transfer_objects.request.anc_labolatory_results_request import ANCLaboratoryResultsRequest
 
-@dataclass
-class AntenatalCareRequest:
+class AntenatalCareRequest(BaseModel):
     p_maternal_record_id: int | None = None
     p_assessed_by_id: int | None = None
     p_visit_date: date | None = None
@@ -17,7 +19,7 @@ class AntenatalCareRequest:
     p_num_stillbirth: int | None = None
     p_num_large_babies: int | None = None
     p_has_diabetes: bool | None = None
-    p_prev_pregs: dict | None = None
+    p_prev_pregs: list[dict] | None = None
     p_weight: float | None = None
     p_height: float | None = None
     p_bmi_status_id: int | None = None
@@ -29,10 +31,20 @@ class AntenatalCareRequest:
     p_is_preterm: bool | None = None
     p_lmp: date | None = None
     p_edc: date | None = None
-    p_lab_results: dict | None = None
+    p_lab_results: list[dict] | list[ANCLaboratoryResultsRequest] | None = None
     p_checklist_item_ids: list[int] | None = None
     p_risk_category_ids: list[int] | None = None
-    p_tt_vaccines: dict | None = None
+    p_tt_vaccines: list[dict] | None = None
     p_iron_start_date: date | None = None
     p_iron_end_date: date | None = None
     p_deworming_date: date | None = None
+    
+    @field_validator("p_prev_pregs", "p_lab_results", "p_checklist_item_ids", "p_tt_vaccines", mode="before")
+    @classmethod
+    def parse_json_fields(cls, v: Any):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except Exception:
+                return None
+        return v

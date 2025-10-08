@@ -36,8 +36,10 @@ class ConnectionAdapter(IConnectionAdapter):
             else:
                 primary_message = str(e)
                 code = None
-
             raise QueryExecutionException(primary_message, code)
+        except Exception as e:
+            logger.critical(str(e))
+            raise
         
     def execute_query_to_dict(self, sql: str, params: Sequence[Any] | None = None) -> list[dict]:
         try:

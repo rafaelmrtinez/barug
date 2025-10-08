@@ -3,7 +3,7 @@ from typing import Any
 
 from src.app.transfer_objects.request.init_chilld_immunization_request import InitialChildImmunizationRequest
 
-class ImmunizationUtility:
+class ImmunizationViewUtility:
 
     @staticmethod
     def parse_immunization_payload(payload: dict[str, Any]) -> list[InitialChildImmunizationRequest]:
@@ -12,10 +12,10 @@ class ImmunizationUtility:
         for vaccine_name, data in payload.items():
             dto = InitialChildImmunizationRequest(
                 name=vaccine_name,
-                d0=ImmunizationUtility.__parse_date(data.get("d0")),
-                d1=ImmunizationUtility.__parse_date(data.get("d1")),
-                d2=ImmunizationUtility.__parse_date(data.get("d2")),
-                d3=ImmunizationUtility.__parse_date(data.get("d3")),
+                d0=ImmunizationViewUtility.__parse_date(data.get("d0")),
+                d1=ImmunizationViewUtility.__parse_date(data.get("d1")),
+                d2=ImmunizationViewUtility.__parse_date(data.get("d2")),
+                d3=ImmunizationViewUtility.__parse_date(data.get("d3")),
                 wt24h=data.get("wt24h")
             )
             result.append(dto)
