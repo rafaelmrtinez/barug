@@ -1,0 +1,14 @@
+<div class="border rounded p-2">
+  <div class="d-flex justify-content-between">
+    <div>
+      <div class="fw-semibold">YAWA</div>
+      <div class="small text-muted">
+        {% if p.person_code %}<span class="me-2">Code: <b>{{ p.person_code }} {{ p.first_name }}</b></span>{% endif %}
+        {{ p.full_address|default:"" }}
+      </div>
+      {% if p.email %}
+        <div class="small text-muted">{{ p.email }}</div>
+      {% endif %}
+    </div>
+  </div>
+</div>

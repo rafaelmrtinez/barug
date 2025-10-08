@@ -431,7 +431,7 @@ class BusinessDetails(forms.Form):
         required= True,
     )
     b_type = forms.ChoiceField(
-        choices= BUSINESS_TYPE_CHOICES, 
+        choices= BUSINESS_TYPE_CHOICES,  
         widget=forms.Select(attrs={
             'id' : 'b_type',
             'class' : 'form-select',
@@ -442,6 +442,8 @@ class BusinessDetails(forms.Form):
     b_nature = forms.CharField( 
         widget=forms.TextInput(attrs={
             'id' : 'b_nature',
+            'class' : 'form-control',
+            'placeholder' : 'Nature of Business (e.g., Sari-Sari Store, Eatery, etc.)',
             'class' : 'form-control',
             'placeholder' : 'Nature of Business (e.g., Sari-Sari Store, Eatery, etc.)',
     }),
@@ -529,6 +531,19 @@ class BusinessDetails(forms.Form):
         decimal_places=7,
         widget=forms.HiddenInput(attrs={'id': 'longitude'}),
     )
+    # Hidden fields filled by the map script
+    latitude = forms.DecimalField(
+        required=False,
+        max_digits=10,
+        decimal_places=7,
+        widget=forms.HiddenInput(attrs={'id': 'latitude'}),
+    )
+    longitude = forms.DecimalField(
+        required=False,
+        max_digits=10,
+        decimal_places=7,
+        widget=forms.HiddenInput(attrs={'id': 'longitude'}),
+    )
     b_desc = forms.CharField(
         widget=forms.Textarea(attrs={
             'id' : 'b_desc',
@@ -580,6 +595,19 @@ class BusinessDetails(forms.Form):
             'inputmode' : 'decimal',
         }),
         label= 'Total Gross Sales of Previous Year',
+        required= True,
+        min_value=Decimal('0.00'),
+        decimal_places=2,
+        max_digits=14,
+    )
+    inc_est = forms.DecimalField(
+        widget=forms.NumberInput(attrs={
+            'id' : 'inc_est',
+            'class' : 'form-control',
+            'placeholder' : 'Monthly Gross Income Estimate',
+            'inputmode' : 'decimal',
+        }),
+        label= 'Monthly Gross Income Estimate',
         required= True,
         min_value=Decimal('0.00'),
         decimal_places=2,
@@ -660,6 +688,7 @@ class BusinessDetails(forms.Form):
         widget=forms.ClearableFileInput(attrs={
             'id' : 'proof',
             'class' : 'form-control',
+            'accept': 'image/*,application/pdf',
             'accept': 'image/*,application/pdf',
         }),
         label= 'Proof of Business (lease, photos, permit, etc.)',

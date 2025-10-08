@@ -1,7 +1,19 @@
+# ============================================================ 
+# views.py — Clerk flows + Printing with Business Clearance map
+# ============================================================
+
 from __future__ import annotations
 
+# ────────────────────────────────────────────────────────────
+# SECTION: Imports
+# ────────────────────────────────────────────────────────────
+import datetime as dt
+from uuid import uuid4
 from typing import Any, Dict, List, Optional, Tuple, Iterable
 import io, os, zipfile, json, re
+from datetime import datetime
+from decimal import Decimal
+import logging
 import traceback
 import uuid
 from datetime import datetime, date, time
@@ -25,29 +37,50 @@ from django.views.decorators.http import require_GET
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
 from authentication.supabase_client import supabase
-
+from django.views.decorators.http import require_POST
 from .forms import (
-    SearchVerificationRequest, SearchBusinessOwner, BusinessOwnerInfo,
+    SearchVerificationRequest, SearchBusinessOwner, SelectOwnerForm , BusinessOwnerInfo,
     BusinessDetails, BusinessFilters, RequestedDocsFilters, SelectOwnerForm
 )
-
-import logging
 
 # ---- email helper (uses your custom Gmail SMTP backend) ----
 from common.send_email import send_email
 
-# ---- services ----
-from .services.requests_service import _fetch_bundle, _set_status
+# ---- services (PDF, request bundles, subject resolver, ID verification) ----
+# existing imports above…
+
+from .services.requests_service import (
+    _fetch_bundle,
+    _set_status,
+    confirm_and_send_to_printing,
+    confirm_forward_treasurer as svc_confirm_forward_treasurer,
+)
+
 from .services.subject_service import subject_view
 from .services.pdf_service import (
     _pdf_templates_dir, _get_all_pdf_field_names, _fill_pdf_with_values,
-    _choose_template, _safe_str, _fill_fields_for_line
+    _choose_template, _safe_str, _fill_fields_for_line,
+    BUSINESS_CLEARANCE_FIELD_MAP,  # field map from pdf_service
 )
 from .services.id_verification_service import (
     fetch_id_verification_requests,
     get_verification_status_for_person,
 )
 
+from treasurer.services.requests_service import build_auth_links
+
+
+def titleize(s):
+    txt = str(s or "")
+    return " ".join(txt.replace("_", " ").replace("-", " ").split()).title()
+
+def _norm(s) -> str:
+    """UPPER_CASE_WITH_UNDERSCORES normalizer for statuses/actions."""
+    return re.sub(r"[\s_]+", "_", str(s or "").strip().upper())
+
+# ────────────────────────────────────────────────────────────
+# SECTION: Logger + tiny email preview helpers
+# ────────────────────────────────────────────────────────────
 import logging
 log = logging.getLogger(__name__)
 from dataclasses import is_dataclass, asdict as dc_asdict
@@ -82,7 +115,7 @@ def _format_rcpt(rcpt: Any) -> str:
     return str(rcpt)
 
 def _debug_email_preview(subject: str, to_list: List[Any], body_txt: str, body_html: str | None):
-    """Pretty-print what we're about to send (always prints; you can comment out if noisy)."""
+    """Pretty-print what we're about to send."""
     try:
         print("\n" + "=" * 72)
         print("[EMAIL DEBUG] Ready-for-pickup payload")
@@ -99,18 +132,20 @@ def _debug_email_preview(subject: str, to_list: List[Any], body_txt: str, body_h
     except Exception as e:
         logger.warning("Failed to print email preview: %s", e)
 
-# =========================
-# UI helpers / constants
-# =========================
+# ────────────────────────────────────────────────────────────
+# SECTION: UI constants
+# ────────────────────────────────────────────────────────────
 STATUS_UI: Dict[str, Dict[str, str]] = {
     "FOR_TREASURER_REVIEW": {"label": "For Treasurer Review", "cls": "badge bg-warning-subtle text-warning-emphasis"},
+    "FOR CLERK REVIEW":     {"label": "For Clerk Review",     "cls": "badge bg-secondary-subtle text-secondary-emphasis"},
     "PAID":                 {"label": "Paid",                 "cls": "badge bg-primary-subtle text-primary-emphasis"},
     "FOR_PRINTING":         {"label": "For Printing",         "cls": "badge bg-info-subtle text-info-emphasis"},
     "READY_FOR_PICKUP":     {"label": "Ready for Pickup",     "cls": "badge bg-warning-subtle text-warning-emphasis"},
     "RELEASED":             {"label": "Released",             "cls": "badge bg-success-subtle text-success-emphasis"},
     "DECLINED":             {"label": "Declined",             "cls": "badge bg-danger-subtle text-danger-emphasis"},
 }
-CLERK_STATUSES_ALL = ["PAID", "FOR_PRINTING", "RELEASED", "DECLINED"]
+# include clerk-review in default list shown on queue if you want
+CLERK_STATUSES_ALL = ["FOR CLERK REVIEW", "PAID", "FOR_PRINTING", "RELEASED", "DECLINED"]
 CLERK_ROLE = "Barangay Clerk"
 
 def _titleize(s: str | None) -> str:
@@ -125,20 +160,86 @@ def _staff_id(request: HttpRequest) -> int | None:
     prof = getattr(request, "profile", None) or getattr(request, "person_profile", None)
     return getattr(prof, "staff_id", None)
 
-# ---------------------------------------------------------------------
-# Email-related helpers
-# ---------------------------------------------------------------------
-# --- add this helper near your email helpers ---
+# ────────────────────────────────────────────────────────────
+# SECTION: Business Clearance constants
+# ────────────────────────────────────────────────────────────
+BRGY_BUSINESS_DOC_NAME = "BARANGAY BUSINESS CLEARANCE"     # must match request_document_type_name
+BRGY_BUSINESS_PDF_FILE = "barangay-business-clearance.pdf" # the uploaded template filename
 
-# --- add this helper near your email helpers ---
+# ────────────────────────────────────────────────────────────
+# SECTION: Missing-value advice (for logs)
+# ────────────────────────────────────────────────────────────
+_BC_ADVICE: Dict[str, str] = {
+    "applicant_full_name":   "Pull from person(first_name,last_name) where person_id = subject_person_id (or requested_by).",
+    "applicant_age":         "Compute from person.birthdate (see _age_from_birthdate).",
+    "applicant_nationality": "Join person.nationality_id → nationality.nationality_name.",
+    "business_name_style":   "From business.business_name for the selected business_id.",
+    "business_address":      "From business.address_id → address(street,purok_sitio,barangay,city).",
+    "capital_invested":      "From business.capital_invested.",
+    "gross_sales_prev_year": "From business.prev_yr_total_gross_sales.",
+    "lines_of_business_1":   "Split business.business_nature by comma, first item.",
+    "lines_of_business_2":   "Split business.business_nature by comma, second item.",
+    "lines_of_business_3":   "Split business.business_nature by comma, third item.",
+    "lines_of_business_4":   "Split business.business_nature by comma, fourth item.",
+    "lines_of_business_5":   "Split business.business_nature by comma, fifth item.",
+    "requestor_full_name":   "From subject_view(header,line)['full_name'] or person(first_name,last_name).",
+    "requestor_addr":        "From subject_view(header,line)['address'] or person address.",
+    "doc_purpose":           "From line.purpose_code/label or details.purpose_code.",
+    "or_number":             "From payments.latest_or_number or header.or_number.",
+    "paid_amount":           "From payments.latest_amount or payments.amount.",
+    "paid_date":             "From payments.latest_paid_at or payments.paid_at (or payments.latest_or_time).",
+    "numbersixteen":         "Punong Barangay name, e.g. settings.BRGY_CAPTAIN_NAME or header.captain_name.",
+    "numberfour":            "Application/Request No. Use header.request_code (fallback: doc_request_id).",
+    "numberfour=":           "Same as numberfour; normalize to header.request_code.",
+    "numberfive":            "Date Applied. Use header.created_at/created_ts/date_created (format to text).",
+    "year_issued":           "Current year or from issue date.",
+}
+
+# ────────────────────────────────────────────────────────────
+# SECTION: Date helpers (NEW)
+# ────────────────────────────────────────────────────────────
+def _parse_dt_any(val: Any) -> Optional[datetime]:
+    """Accept datetime/date/iso string and return a datetime (UTC-aware if possible)."""
+    try:
+        if isinstance(val, datetime):
+            return val
+        if isinstance(val, dt.date) and not isinstance(val, datetime):
+            return datetime(val.year, val.month, val.day, tzinfo=timezone.get_current_timezone())
+        if isinstance(val, str):
+            s = val.strip().replace("Z", "+00:00")
+            try:
+                return datetime.fromisoformat(s)
+            except Exception:
+                # try plain date
+                try:
+                    d = dt.date.fromisoformat(s[:10])
+                    return datetime(d.year, d.month, d.day, tzinfo=timezone.get_current_timezone())
+                except Exception:
+                    return None
+    except Exception:
+        return None
+    return None
+
+def _friendly_date_text(val: Any) -> Optional[str]:
+    """Return 'September 27, 2025' for provided datetime-like value; None if cannot parse."""
+    d = _parse_dt_any(val)
+    if not d:
+        return None
+    try:
+        # use local time if aware; otherwise leave as is
+        try:
+            d_local = timezone.localtime(d)
+        except Exception:
+            d_local = d
+        return d_local.strftime("%B %d, %Y")
+    except Exception:
+        return None
+
+# ────────────────────────────────────────────────────────────
+# SECTION: Email helpers
+# ────────────────────────────────────────────────────────────
 def _resolve_person_id_from_header(header: Dict[str, Any]) -> Optional[int]:
-    """
-    Find the most appropriate person_id in the header payload.
-    Order:
-      - requested_by_person_id (the requester)
-      - on_behalf_of_person_id (if someone requested for someone else)
-      - requester_person_id / subject_person_id / resident_person_id / person_id (fallbacks)
-    """
+    """Find the most appropriate person_id in the header payload."""
     candidates = [
         header.get("requested_by_person_id"),
         header.get("on_behalf_of_person_id"),
@@ -153,17 +254,15 @@ def _resolve_person_id_from_header(header: Dict[str, Any]) -> Optional[int]:
     return None
 
 def _send_ready_for_pickup_email(header: Dict[str, Any], lines: List[Dict[str, Any]]) -> Tuple[bool, str]:
-    # resolve person id correctly (this was the bug)
     person_id = _resolve_person_id_from_header(header)
     print(f"[EMAIL DEBUG] resolved person_id from header -> {person_id!r}")
-
     full_name, email = _lookup_person_contact(person_id)
     if not email:
         print("[EMAIL DEBUG] no email found on file; skipping send.")
         return False, "No email on file for this resident. Notification not sent."
 
     req_code = header.get("request_code") or f"REQ-{header.get('doc_request_id','')}"
-    doc_names = [(l.get("document_type_name") or "").strip() for l in (lines or [])]
+    doc_names = [ (l.get("document_type_name") or "").strip() for l in (lines or []) ]
     doc_names = [d for d in doc_names if d]
     docs_str = ", ".join(doc_names) if doc_names else "your requested document(s)"
 
@@ -188,7 +287,6 @@ def _send_ready_for_pickup_email(header: Dict[str, Any], lines: List[Dict[str, A
     )
     to_list = [(full_name or "", email)]
 
-    # show payload
     _debug_email_preview(subject, to_list, body_txt, body_html)
 
     try:
@@ -198,7 +296,7 @@ def _send_ready_for_pickup_email(header: Dict[str, Any], lines: List[Dict[str, A
             body_text=body_txt,
             body_html=body_html,
             from_name=barangay_name,
-            fail_silently=False,  # keep False until verified
+            fail_silently=False,
         )
         print(f"[EMAIL DEBUG] send_email result -> ok={getattr(result,'ok',None)!r}, detail={getattr(result,'detail',None)!r}")
         return (True, f"Email notification sent to {email}.") if getattr(result, "ok", False) \
@@ -207,8 +305,6 @@ def _send_ready_for_pickup_email(header: Dict[str, Any], lines: List[Dict[str, A
         print(f"[EMAIL DEBUG] send_email raised: {e}")
         logger.exception("send_email raised")
         return False, f"Email not sent: {e}"
-
-
 
 def _lookup_person_contact(person_id: Optional[int]) -> Tuple[Optional[str], Optional[str]]:
     """Return (full_name, email) for a given person_id from the `person` table."""
@@ -229,8 +325,6 @@ def _lookup_person_contact(person_id: Optional[int]) -> Tuple[Optional[str], Opt
         last  = (row.get("last_name") or "").strip()
         full  = f"{first} {last}".strip() or None
         email = (row.get("email") or "").strip() or None
-
-        # --- DEBUG print ---
         print(f"[EMAIL DEBUG] lookup person_id={person_id} -> full_name={full!r}, email={email!r}")
         return full, email
     except Exception as e:
@@ -238,58 +332,178 @@ def _lookup_person_contact(person_id: Optional[int]) -> Tuple[Optional[str], Opt
         print(f"[EMAIL DEBUG] lookup failed for person_id={person_id}: {e}")
         return None, None
 
+# ────────────────────────────────────────────────────────────
+# SECTION: Doc-type cache helper
+# ────────────────────────────────────────────────────────────
+_DOC_TYPES_ALL_CACHE: List[str] = []
 
-# =========================
-# Clerk — Queue / List of document requests
-# =========================
+def _fetch_doc_types_all() -> List[str]:
+    """Get the full list of document type names for the filter panel."""
+    global _DOC_TYPES_ALL_CACHE
+    if _DOC_TYPES_ALL_CACHE:
+        return _DOC_TYPES_ALL_CACHE
+    try:
+        res = (
+            supabase.table("request_document_type")
+            .select("request_document_type_name")
+            .order("request_document_type_name")
+            .execute()
+        )
+        names = [
+            (r.get("request_document_type_name") or "").strip()
+            for r in (res.data or [])
+            if (r.get("request_document_type_name") or "").strip()
+        ]
+        _DOC_TYPES_ALL_CACHE = names
+        return names
+    except Exception as e:
+        logger.warning("Failed to fetch doc types list: %s", e)
+        return []
+
+# ────────────────────────────────────────────────────────────
+# SECTION: Clerk Queue + Detail screens
+# ────────────────────────────────────────────────────────────
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
 def queue(request: HttpRequest):
     q = (request.GET.get("q") or "").strip() or None
 
+    # status filter
     statuses = request.GET.getlist("status")
     if not statuses:
         raw = (request.GET.get("status") or "").strip()
         statuses = [s for s in raw.split(",") if s] if raw else CLERK_STATUSES_ALL[:2]
 
-    query = supabase.table("v_doc_request_list_ex").select("*").order("doc_request_id", desc=True)
+    # doc-type filter
+    doc_types = request.GET.getlist("doc_type")
+    if not doc_types:
+        raw_dt = (request.GET.get("doc_type") or "").strip()
+        doc_types = [s for s in raw_dt.split(",") if s]
+
+    # base query
+    query = (
+        supabase.table("v_doc_request_list_ex")
+        .select("*")
+        .order("doc_request_id", desc=True)
+    )
     if statuses:
         query = query.in_("status", statuses)
     if q:
         array_probe = "{" + q + "}"
-        query = query.or_(f"request_code.ilike.%{q}%,doc_types.ov.{array_probe},purposes.ov.{array_probe}")
+        query = query.or_(
+            f"request_code.ilike.%{q}%,doc_types.ov.{array_probe},purposes.ov.{array_probe}"
+        )
 
     res = query.limit(200).execute()
     rows: List[Dict[str, Any]] = res.data or []
+
+    # in-memory filter for selected doc types
+    if doc_types:
+        selected = {str(d).strip().lower() for d in doc_types}
+        def _overlaps(row: Dict[str, Any]) -> bool:
+            vals = row.get("doc_types") or []
+            have = {str(v).strip().lower() for v in vals if v}
+            return bool(have & selected)
+        rows = [r for r in rows if _overlaps(r)]
+
+    # UI adornments
     for r in rows:
         r["status_ui"] = STATUS_UI.get(r.get("status")) or {"label": r.get("status") or "—", "cls": "badge text-bg-secondary"}
         r["purposes_display"] = [_titleize(p) for p in (r.get("purposes") or [])]
+
         fn = (r.get("requester_first_name") or r.get("first_name") or "").strip()
         ln = (r.get("requester_last_name") or r.get("last_name") or "").strip()
         full = (r.get("requester_full_name") or r.get("resident_name") or "").strip() or " ".join([fn, ln]).strip()
         r["requester_display"] = full or None
+
         created_at = r.get("created_at") or r.get("created_ts") or r.get("date_created")
         try:
             r["created_fmt"] = created_at.strftime("%b %d, %Y %H:%M")  # type: ignore
         except Exception:
             r["created_fmt"] = str(created_at)
 
+    # list of doc types for filter panel
+    doc_types_all = _fetch_doc_types_all()
+    if not doc_types_all:
+        seen: set[str] = set()
+        for r in rows:
+            for name in (r.get("doc_types") or []):
+                name = (name or "").strip()
+                if name:
+                    seen.add(name)
+        doc_types_all = sorted(seen)
+
     paginator = Paginator(rows, 10)
     page_obj = paginator.get_page(request.GET.get("page"))
+
     return render(request, "clerk/queue.html", {
-        "page_obj": page_obj, "rows": page_obj.object_list,
-        "q": q or "", "statuses": statuses, "statuses_all": CLERK_STATUSES_ALL,
-        "active_count": len(statuses),
+        "page_obj": page_obj,
+        "rows": page_obj.object_list,
+        "q": q or "",
+        "statuses": statuses,
+        "statuses_all": CLERK_STATUSES_ALL,
+        "doc_types": doc_types,
+        "doc_types_all": doc_types_all,
+        "active_count": len(statuses) + len(doc_types),
     })
 
-# =========================
-# Clerk — Detail of a document request
-# =========================
+
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+
+PH_TZ = ZoneInfo("Asia/Manila")
+
+def _fmt_occured_at(val) -> str:
+    """Accepts a datetime or ISO string, returns a Manila-local formatted string."""
+    if not val:
+        return "—"
+    dt = None
+    if isinstance(val, datetime):
+        dt = val
+    elif isinstance(val, str):
+        dt = parse_datetime(val)  # handles '...+00:00' etc.
+    if not dt:
+        return val  # show raw if parsing fails
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.utc)
+    # convert to Asia/Manila
+    dt_local = timezone.localtime(dt, PH_TZ)
+    return dt_local.strftime("%b %d, %Y • %I:%M %p")
+
+
+def _resolve_actor_name(ev: dict, header: dict) -> str:
+    """Return a friendly actor name for a timeline event."""
+    # Prefer explicit names on the event
+    for k in ("staff_name", "resident_name"):
+        v = (ev.get(k) or "").strip()
+        if v:
+            return v
+
+    actor = (ev.get("actor") or "").strip()
+    if actor:
+        # If it's an ID like "4", show the requester's name instead
+        if actor.isdigit() and header.get("requester_full_name"):
+            return header["requester_full_name"]
+        return actor
+
+    # Fallbacks by user type
+    ut = (ev.get("user_type_name") or "").strip().upper()
+    if ut == "PERSON" and header.get("requester_full_name"):
+        return header["requester_full_name"]
+
+    return "SYSTEM"
+
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
 def detail(request: HttpRequest, doc_request_id: int):
+    # small local normalizer so we can compare values robustly
+    def _norm(s) -> str:
+        return re.sub(r"[\s_]+", "_", str(s or "").strip().upper())
+
     try:
         data: Dict[str, Any] = _fetch_bundle(doc_request_id)
     except APIError as e:
@@ -301,23 +515,42 @@ def detail(request: HttpRequest, doc_request_id: int):
     payments = data.get("payments", {}) or {}
     timeline = data.get("timeline", []) or []
 
-    ui = STATUS_UI.get(header.get("status")) or {"label": header.get("status") or "—", "cls": "badge text-bg-secondary"}
+    # Authorization Letter assets (images / pdfs)
+    auth_links = build_auth_links(settings, header, lines)
+
+    # Status chip UI
+    ui = STATUS_UI.get(header.get("status")) or {
+        "label": header.get("status") or "—",
+        "cls": "badge text-bg-secondary"
+    }
+
+    # Enrich line items for display
     for l in lines:
-        l["purpose_display"] = _titleize(l.get("purpose_code"))
-        l["doc_purpose"] = (
-            l.get("purpose_display")
-            or l.get("purpose_label")
-            or l.get("purpose")
-            or (l.get("details") or {}).get("purpose_code")
+        details = l.get("details") or {}
+        # humanized purpose (fallback to details.purpose_code)
+        l["purpose_display"] = titleize(l.get("purpose_code") or details.get("purpose_code"))
+        # show applied waiver reasons as chips
+        l["reason_chips"] = list(l.get("reasons_applied") or details.get("reason_tags") or [])
+        # flag for full exemption (or explicit boolean if your backend sets it)
+        l["is_exempt"] = bool(
+            l.get("is_exempt")
+            or (
+                (l.get("waived_amount") or 0) > 0
+                and (l.get("base_amount") or 0) <= (l.get("waived_amount") or 0)
+            )
         )
 
+    # OR number and receipt-ish fields exposed to UI/PDFs
     header["or_number"] = (
         payments.get("latest_or_number")
         or header.get("latest_or_number")
         or header.get("or_number")
         or ""
     )
+    header["paid_amount"] = payments.get("latest_amount") or payments.get("amount")
+    header["paid_date"]   = payments.get("latest_paid_at") or payments.get("paid_at") or payments.get("latest_or_time")
 
+    # Subject display fields
     subj = subject_view(header, {})
     header["is_on_behalf"] = subj["is_on_behalf"]
     header["subject_full_name"] = subj["full_name"]
@@ -326,19 +559,69 @@ def detail(request: HttpRequest, doc_request_id: int):
     header["subject_civil_status"] = subj["civil_status"]
     header["subject_nationality"] = subj["nationality"]
 
+    # --- CTC context for UI banner & modal (if any) ---
+    ctc_mode = False
+    ctc_of = None
+    ctc_ref_request_id = None
+    ctc_ref_code = None
+    try:
+        for l in lines:
+            if (l.get("document_type_name") or "").strip().upper() == "CERTIFIED TRUE COPY":
+                ctc_mode = True
+                det = l.get("details") or {}
+                ctc_of = (det.get("ctc_of") or "").strip() or None
+                ctc_ref_request_id = det.get("reference_request_id")
+                break
+        if ctc_mode and ctc_ref_request_id:
+            ref_bundle = _fetch_bundle(int(ctc_ref_request_id))
+            ref_header = ref_bundle.get("header") or {}
+            ctc_ref_code = ref_header.get("request_code")
+    except Exception:
+        pass
+
+    # Timestamps formatted for Asia/Manila
+    header["created_fmt"] = _fmt_occured_at(header.get("created_at"))
+
+    for ev in timeline:
+        ev["occur_fmt"] = _fmt_occured_at(
+            ev.get("occurred_at") or ev.get("occurredAt") or ev.get("occur_time")
+        )
+        ev["display_actor"] = _resolve_actor_name(ev, header)
+
+    # === NEW: detect "paid" purely from status/timeline ===
+    was_marked_paid = False
+    if _norm(header.get("status")) == "PAID":
+        was_marked_paid = True
+    else:
+        for ev in timeline:
+            act = _norm(ev.get("action"))
+            to_status = _norm(ev.get("to_status"))
+            if (act == "STATUS_CHANGED" and to_status == "PAID") or act == "PAYMENT_ACCEPTED":
+                was_marked_paid = True
+                break
+
     return render(request, "clerk/detail.html", {
-        "header": header, "status_ui": ui, "lines": lines, "payments": payments, "timeline": timeline,
+        "header": header,
+        "status_ui": ui,
+        "lines": lines,
+        "payments": payments,
+        "timeline": timeline,
+        "ctc_mode": ctc_mode,
+        "ctc_of": ctc_of,
+        "ctc_ref_request_id": ctc_ref_request_id,
+        "ctc_ref_code": ctc_ref_code,
+        "auth_links": auth_links,
+        "was_marked_paid": was_marked_paid,  # <-- used by the template
     })
 
-# =========================
-# Clerk — Actions (status + printing)
-# =========================
+# ────────────────────────────────────────────────────────────
+# SECTION: Status change actions
+# ────────────────────────────────────────────────────────────
 @session_login_required
 @role_required(CLERK_ROLE)
 @require_POST
 def mark_request_ready_for_pickup(request: HttpRequest, doc_request_id: int):
     print(f"[EMAIL DEBUG] mark_request_ready_for_pickup called for doc_request_id={doc_request_id}")
-    # Fetch minimal details first for email context
     try:
         bundle = _fetch_bundle(doc_request_id)
     except APIError as e:
@@ -380,36 +663,146 @@ def mark_request_ready_for_pickup(request: HttpRequest, doc_request_id: int):
 
     return redirect("clerk:detail", doc_request_id=doc_request_id)
 
+# ────────────────────────────────────────────────────────────
+# SECTION: Printing helpers (Business Clearance mapping)
+# ────────────────────────────────────────────────────────────
+def _apply_pdf_field_mapping(
+    doc_name: str,
+    field_names: List[str],
+    values: Dict[str, Any],
+    include_debug: bool=False
+) -> Dict[str, Any]:
+    """
+    Map semantic → PDF field names for Business Clearance with
+    logging + advice on how to fetch missing data.
+    """
+    nm = (doc_name or "").strip().upper()
+    if nm == BRGY_BUSINESS_DOC_NAME:
+        # Advice per semantic key (for helpful logs)
+        advice = {
+          "applicant_nationality": "Join person.nationality_id → nationality.nationality_name.",
+          "applicant_full_name":   "From person(first_name,last_name) of subject/requester.",
+          "applicant_age":         "Compute from person.birthdate.",
+          "business_name_style":   "From business.business_name.",
+          "business_address":      "From business.address_id → address(street,purok_sitio,barangay,city).",
+          "capital_invested":      "From business.capital_invested.",
+          "gross_sales_prev_year": "From business.prev_yr_total_gross_sales.",
+          "lines_of_business_1":   "Split business.business_nature by comma (1st).",
+          "lines_of_business_2":   "Split business.business_nature by comma (2nd).",
+          "lines_of_business_3":   "Split business.business_nature by comma (3rd).",
+          "lines_of_business_4":   "Split business.business_nature by comma (4th).",
+          "lines_of_business_5":   "Split business.business_nature by comma (5th).",
+          "paid_amount":           "From payments.latest_amount or payments.amount.",
+        }
+        mapped: Dict[str, Any] = {}
+        for skey, pdf_field in BUSINESS_CLEARANCE_FIELD_MAP.items():
+            if pdf_field not in field_names:
+                continue
+            val = values.get(skey)
+            if val is None or str(val).strip() == "":
+                # label field name when missing to aid discovery
+                if include_debug:
+                    mapped.setdefault(pdf_field, pdf_field)
+                print(f"[PRINT MAP] {nm}: {skey} → {pdf_field} = {pdf_field!r} [MISSING→printing field name]")
+                if skey in advice:
+                    print(f"[PRINT ADVICE] Missing '{skey}'. How to get it: {advice[skey]}")
+            else:
+                mapped[pdf_field] = val
+                print(f"[PRINT MAP] {nm}: {skey} → {pdf_field} = {val!r}")
+        return mapped
+
+    # Non-business-clearance: return only matching keys as-is
+    return {fn: values.get(fn) for fn in field_names}
+
+# ────────────────────────────────────────────────────────────
+# SECTION: Printing action
+# ────────────────────────────────────────────────────────────
 @session_login_required
 @role_required(CLERK_ROLE)
 @require_POST
 def mark_for_printing(request: HttpRequest, doc_request_id: int):
     include_debug = (request.POST.get("debug") == "1")
 
+    def _override_if_blank(d: Dict[str, Any], key: str, fallback: Any):
+        cur = d.get(key)
+        cur_blank = (cur is None) or (str(cur).strip() == "")
+        if cur_blank and fallback is not None and str(fallback).strip() != "":
+            d[key] = fallback
+
+    # ---- Load the primary (this CTC) bundle
     try:
-        data: Dict[str, Any] = _fetch_bundle(doc_request_id)
+        data_raw = _fetch_bundle(doc_request_id)
+        data = (data_raw[0] if isinstance(data_raw, list) and data_raw else data_raw) or {}
     except APIError as e:
         messages.error(request, f"Supabase error: {escape(getattr(e, 'message', str(e)))}")
         return redirect("clerk:detail", doc_request_id=doc_request_id)
 
-    header = data.get("header", {}) or {}
-    lines: List[Dict[str, Any]] = data.get("lines", []) or []
-    payments = data.get("payments", {}) or {}
+    header: Dict[str, Any]   = data.get("header", {}) or {}
+    lines: List[Dict[str,Any]] = data.get("lines", []) or []
+    payments: Dict[str, Any] = data.get("payments", {}) or {}
 
-    header["or_number"] = (
-        payments.get("latest_or_number")
-        or payments.get("or_number")
-        or _safe_str(header.get("or_number"))
-    )
+    # Expose receipt info to PDFs (from THIS request – the CTC usually has the OR)
+    line_total = sum(float(l.get("line_total", 0) or 0) for l in lines)
+    header["or_number"]   = payments.get("latest_or_number") or payments.get("or_number") or _safe_str(header.get("or_number"))
+    header["paid_amount"] = line_total or payments.get("amount")
+    header["paid_date"]   = payments.get("latest_paid_at") or payments.get("paid_at") or payments.get("latest_or_time")
+
+    print("[PRINT DEBUG] header snapshot:", json.dumps({
+        "request_code": header.get("request_code"),
+        "or_number": header.get("or_number"),
+        "paid_amount": header.get("paid_amount"),
+        "paid_date": str(header.get("paid_date")),
+    }, indent=2, default=str))
 
     outputs: List[tuple[str, bytes]] = []
     debug_items: List[Dict[str, Any]] = []
     base_dir = _pdf_templates_dir()
 
     for idx, line in enumerate(lines, start=1):
-        doc_name = _safe_str(line.get("document_type_name") or f"doc-{idx}")
-        template_file = _choose_template(doc_name, False)
+        original_doc_name = _safe_str(line.get("document_type_name") or f"doc-{idx}")
+        is_ctc = (original_doc_name.strip().upper() == "CERTIFIED TRUE COPY")
+
+        # ---------- If CTC, load the ORIGINAL request it's certifying ----------
+        ref_header: Dict[str, Any] = {}
+        ref_line: Dict[str, Any]   = {}
+        ref_payments: Dict[str, Any] = {}
+        if is_ctc:
+            det = (line.get("details") or {})
+            ctc_of = (det.get("ctc_of") or "").strip().upper() or None
+            ref_id = det.get("reference_request_id") or det.get("reference_doc_request_id")
+            try:
+                if ref_id:
+                    rb_raw = _fetch_bundle(int(ref_id))
+                    rb = (rb_raw[0] if isinstance(rb_raw, list) and rb_raw else rb_raw) or {}
+                    ref_header   = rb.get("header", {}) or {}
+                    ref_lines    = rb.get("lines", []) or []
+                    ref_payments = rb.get("payments", {}) or {}
+                    # choose the referenced line (same doc) or first
+                    for rl in ref_lines:
+                        if ctc_of and (str(rl.get("document_type_name") or "").strip().upper() == ctc_of):
+                            ref_line = rl
+                            break
+                    if not ref_line and ref_lines:
+                        ref_line = ref_lines[0]
+            except Exception as e:
+                print(f"[CTC DEBUG] Could not load reference bundle for CTC: {e}")
+
+        # The document to PRINT (for CTC we print the original's document)
+        doc_name_print = _safe_str(ref_line.get("document_type_name")) if (is_ctc and ref_line) else original_doc_name
+        doc_name_upper = doc_name_print.strip().upper()
+
+        # Is this a (CTC of) Barangay Business Clearance?
+        is_bc = (
+            doc_name_upper == BRGY_BUSINESS_DOC_NAME
+            or (is_ctc and ((line.get("details") or {}).get("ctc_of","").strip().upper() == BRGY_BUSINESS_DOC_NAME))
+        )
+
+        # Template selection
+        template_file = _choose_template(doc_name_print, False)
+        if is_bc or (line.get("details") or {}).get("template_override") == BRGY_BUSINESS_PDF_FILE:
+            template_file = BRGY_BUSINESS_PDF_FILE
         template_path = os.path.join(base_dir, template_file)
+        print(f"[PRINT DEBUG] doc='{doc_name_print}' (from='{original_doc_name}') -> template='{template_file}' (CTC={is_ctc})")
 
         if not os.path.exists(template_path):
             alt = os.path.join(settings.BASE_DIR, "clerk", "pdf_templates", template_file)
@@ -417,27 +810,81 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
                 template_path = alt
             else:
                 print(json.dumps({
-                    "doc_index": idx, "doc_name": doc_name, "template_file": template_file,
+                    "doc_index": idx, "doc_name": doc_name_print, "template_file": template_file,
                     "template_path": template_path, "exists": False, "reason": "Template not found"
                 }, indent=2))
                 continue
 
-        base_values = _fill_fields_for_line(header, line)
-        field_names = _get_all_pdf_field_names(template_path)
-        merged = {name: (base_values.get(name) if str(base_values.get(name) or "").strip() else "No data")
-                  for name in field_names}
-        missing = [n for n in field_names if n not in base_values or str(base_values.get(n) or "").strip() == ""]
+        # ---------- Build values ----------
+        if is_ctc and ref_header and ref_line:
+            base_values   = _fill_fields_for_line(ref_header, ref_line)
+            detail_values = (ref_line.get("details") or {})
+            combined_values = {**detail_values, **base_values}
+            # Helpful CTC stamps (if any template uses them)
+            combined_values["is_ctc"] = True
+            combined_values["ctc_reference_code"] = ref_header.get("request_code")
+            ref_created = ref_header.get("created_at") or ref_header.get("created_ts") or ref_header.get("date_created")
+            combined_values["ctc_reference_date"] = _friendly_date_text(ref_created) or _safe_str(ref_created)
 
-        print(json.dumps({
-            "doc_index": idx,
-            "doc_name": doc_name,
-            "template_file": template_file,
-            "template_path": template_path,
-            "field_count": len(field_names),
-            "missing_count": len(missing),
-            "missing_fields": missing,
-            "sample_values": {k: merged[k] for k in list(merged)[:10]}
-        }, indent=2, default=str))
+            # If original has blanks, override from **this CTC's** header/payments
+            _override_if_blank(combined_values, "or_number", header.get("or_number") or payments.get("latest_or_number"))
+            _override_if_blank(combined_values, "paid_amount", header.get("paid_amount") or payments.get("latest_amount"))
+            _override_if_blank(combined_values, "paid_date", _friendly_date_text(header.get("paid_date") or payments.get("latest_or_time")))
+        else:
+            base_values   = _fill_fields_for_line(header, line)
+            detail_values = (line.get("details") or {})
+            combined_values = {**detail_values, **base_values}
+            _override_if_blank(combined_values, "or_number", header.get("or_number") or payments.get("latest_or_number"))
+            _override_if_blank(combined_values, "paid_amount", header.get("paid_amount") or payments.get("latest_amount"))
+            _override_if_blank(combined_values, "paid_date", _friendly_date_text(header.get("paid_date") or payments.get("latest_or_time")))
+
+        # Subject fallbacks
+        try:
+            _subj = subject_view(ref_header if (is_ctc and ref_header) else header,
+                                 ref_line   if (is_ctc and ref_line)   else line)
+            combined_values.setdefault("applicant_full_name", _safe_str(_subj.get("full_name")))
+            combined_values.setdefault("applicant_age", _safe_str(_subj.get("age")))
+            combined_values.setdefault("applicant_nationality", _safe_str(_subj.get("nationality")))
+        except Exception as e:
+            print(f"[PRINT DEBUG] subject fallbacks failed: {e}")
+
+        # BC meta boxes (request code/date from the bundle we’re printing)
+        use_header = ref_header if (is_ctc and ref_header) else header
+        created_any = use_header.get("created_at") or use_header.get("created_ts") or use_header.get("date_created")
+        combined_values["numberfour"]  = use_header.get("request_code")
+        combined_values["numberfive"]  = _friendly_date_text(created_any) or _safe_str(created_any)
+        combined_values.setdefault("numbersixteen", use_header.get("captain_name") or "Lourdes R. Ramirez")
+        combined_values.setdefault("year_issued", timezone.localtime().strftime("%Y"))
+
+        # Enrich Business Clearance fields if needed
+        if is_bc:
+            bc_keys = ["business_name_style","business_address","capital_invested","gross_sales_prev_year"]
+            if any(not _safe_str(combined_values.get(k)).strip() for k in bc_keys):
+                bid = use_header.get("business_id")
+                if not bid:
+                    try:
+                        r = (supabase.table("document_request")
+                             .select("business_id").eq("doc_request_id", doc_request_id)
+                             .limit(1).execute())
+                        bid = ((r.data or [{}])[0] or {}).get("business_id")
+                    except Exception as e:
+                        print(f"[PRINT DEBUG] could not fetch business_id for request {doc_request_id}: {e}")
+                subj_pid = use_header.get("subject_person_id") or use_header.get("requested_by_person_id")
+                if bid:
+                    try:
+                        bc_enrich = _fetch_business_clearance_fields(int(bid), int(subj_pid) if subj_pid else None)
+                        combined_values = {**bc_enrich, **combined_values}
+                    except Exception as e:
+                        print(f"[PRINT DEBUG] business fallback failed: {e}")
+
+        # ---------- Map & fill PDF ----------
+        field_names = _get_all_pdf_field_names(template_path)
+        # IMPORTANT: if this is (CTC of) Business Clearance, use the BC mapping name
+        mapping_doc_name = BRGY_BUSINESS_DOC_NAME if is_bc else doc_name_print
+        values_mapped = _apply_pdf_field_mapping(mapping_doc_name, field_names, combined_values, include_debug)
+
+        merged = {name: (values_mapped.get(name) if str(values_mapped.get(name) or "").strip() else "No data")
+                  for name in field_names}
 
         try:
             pdf_bytes = _fill_pdf_with_values(template_path, merged)
@@ -445,12 +892,14 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
             with open(template_path, "rb") as f:
                 pdf_bytes = f.read()
 
-        safe_name = doc_name.lower().replace(" ", "-")
-        out_name = f"{header.get('request_code','REQ')}-{safe_name}.pdf"
+        # Output filename (add ctc-of-… when applicable)
+        safe_name = doc_name_print.lower().replace(" ", "-")
+        out_name = (f"{header.get('request_code','REQ')}-ctc-of-{safe_name}.pdf"
+                    if is_ctc else f"{header.get('request_code','REQ')}-{safe_name}.pdf")
         outputs.append((out_name, pdf_bytes))
         debug_items.append({
             "output_filename": out_name,
-            "doc_name": doc_name,
+            "doc_name": doc_name_print,
             "template_file": template_file,
             "template_path": template_path,
             "field_names": field_names,
@@ -474,8 +923,7 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
 
     zbuf = io.BytesIO()
     with zipfile.ZipFile(zbuf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for fname, b in outputs:
-            zf.writestr(fname, b)
+        for fname, b in outputs: zf.writestr(fname, b)
         if include_debug and debug_items:
             debug_payload = {
                 "request_code": header.get("request_code"),
@@ -487,9 +935,12 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
 
     req_code = header.get("request_code", "REQ")
     resp = HttpResponse(zbuf.getvalue(), content_type="application/zip")
-    resp["Content-Disposition"] = f'attachment; filename="{req_code}-documents.zip"'
+    resp["Content-Disposition"] = f'attachment; filename="{req_code}-documents.zip'
     return resp
 
+# ────────────────────────────────────────────────────────────
+# SECTION: Release / Decline
+# ────────────────────────────────────────────────────────────
 @session_login_required
 @role_required(CLERK_ROLE)
 @require_POST
@@ -518,18 +969,99 @@ def mark_released(request: HttpRequest, doc_request_id: int):
         messages.success(request, "Marked as released.")
     return redirect("clerk:detail", doc_request_id=doc_request_id)
 
+
 @session_login_required
 @role_required(CLERK_ROLE)
 @require_POST
 def decline(request: HttpRequest, doc_request_id: int):
+    print("\n" + "="*72)
+    print("[DECLINE DEBUG] called")
     reason = (request.POST.get("reason") or "").strip() or None
-    err = _set_status(doc_request_id, "DECLINED", _staff_id(request), reason)
-    messages.error(request, f"Failed: {escape(err)}") if err else messages.success(request, "Request declined.")
+    staff_id = _staff_id(request)
+
+    print(f"[DECLINE DEBUG] doc_request_id = {doc_request_id}")
+    print(f"[DECLINE DEBUG] staff_id       = {staff_id}")
+    print(f"[DECLINE DEBUG] reason         = {reason!r}")
+
+    # Load bundle first so we can inspect status/timeline/payments
+    try:
+        bundle = _fetch_bundle(doc_request_id)
+    except APIError as e:
+        messages.error(request, f"Unable to load request: {escape(getattr(e,'message', str(e)))}")
+        print("[DECLINE DEBUG] ERROR: _fetch_bundle failed:", e)
+        print("="*72 + "\n")
+        return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+    header    = (bundle or {}).get("header", {}) or {}
+    payments  = (bundle or {}).get("payments", {}) or {}
+    timeline  = (bundle or {}).get("timeline", []) or []
+
+    # Snapshot for logs
+    print(f"[DECLINE DEBUG] header.request_code     = {header.get('request_code')}")
+    print(f"[DECLINE DEBUG] header.status           = {header.get('status')}")
+    print(f"[DECLINE DEBUG] header.or_number        = {header.get('or_number')}")
+    print(f"[DECLINE DEBUG] payments.total_paid     = {float(payments.get('total_paid') or 0)}")
+    print(f"[DECLINE DEBUG] header.amount_due       = {float(header.get('amount_due') or 0)}")
+
+    # Determine paid-ness (now also looks at status/timeline)
+    def _norm(s): return re.sub(r"[\s_]+", "_", str(s or "").strip().upper())
+    status_now = _norm(header.get("status"))
+    has_or     = bool(header.get("or_number"))
+    total_paid = float(payments.get("total_paid") or 0)
+
+    timeline_paid = False
+    for ev in (timeline or []):
+        act = _norm(ev.get("action"))
+        to_status = _norm(ev.get("to_status"))
+        if act == "PAYMENT_ACCEPTED" or (act == "STATUS_CHANGED" and to_status == "PAID"):
+            timeline_paid = True
+            break
+
+    is_paid = (status_now == "PAID") or timeline_paid or (total_paid > 0) or has_or
+    print(f"[DECLINE DEBUG] is_paid?                = {is_paid}")
+    if timeline_paid:
+        print("[DECLINE DEBUG] timeline shows a payment event (PAYMENT_ACCEPTED/→PAID).")
+
+    # Path A: NOT paid → simple decline
+    if not is_paid:
+        print("[DECLINE DEBUG] PATH: simple decline (no refund)")
+        print(f"[DECLINE DEBUG] CALL: _set_status(doc_request_id={doc_request_id}, status='DECLINED', staff_id={staff_id}, reason={reason!r})")
+        err = _set_status(doc_request_id, "DECLINED", staff_id, reason)
+        print(f"[DECLINE DEBUG] RESULT: err = {err!r}")
+        print("="*72 + "\n")
+        if err:
+            messages.error(request, f"Failed: {escape(err)}")
+        else:
+            messages.success(request, "Request declined.")
+        return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+    # Path B: PAID → decline + open refund ticket (amount NULL lets SQL compute)
+    print("[DECLINE DEBUG] PATH: decline with REFUND ticket")
+    try:
+        from .services.requests_service import decline_and_request_refund
+    except Exception as e:
+        print("[DECLINE DEBUG] import decline_and_request_refund failed:", e)
+        messages.error(request, "Server error (refund handler missing).")
+        print("="*72 + "\n")
+        return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+    print(f"[DECLINE DEBUG] CALL: decline_and_request_refund(doc_request_id={doc_request_id}, staff_id={staff_id}, reason={reason!r}, refund_amount=None)")
+    err, refund_id = decline_and_request_refund(doc_request_id, int(staff_id), reason, refund_amount=None)
+    print(f"[DECLINE DEBUG] RESULT: err={err!r}, refund_id={refund_id!r}")
+    print("="*72 + "\n")
+
+    if err:
+        messages.error(request, f"Decline failed: {escape(err)}")
+    else:
+        msg = "Request declined. Refund ticket created and sent for Treasurer processing."
+        if refund_id:
+            msg = f"Request declined. Refund ticket #{refund_id} created and sent for Treasurer processing."
+        messages.success(request, msg)
     return redirect("clerk:detail", doc_request_id=doc_request_id)
 
-# =========================
-# Identity verification
-# =========================
+# ────────────────────────────────────────────────────────────
+# SECTION: Identity verification screens
+# ────────────────────────────────────────────────────────────
 STATUS_APPROVED = 3
 STATUS_REJECTED = 4
 STATUS_DECLINE  = 7
@@ -541,6 +1073,7 @@ def dashboard(request: HttpRequest):
     auth = request.session.get("auth")
     profile = getattr(request, "person_profile", None)
     return render(request, "clerk/dashboard.html", {
+        "page_path": f"Barangay Clerk/Dashboard",
         "page_title": "Dashboard",
         "profile": profile,
         "auth": auth
@@ -548,7 +1081,11 @@ def dashboard(request: HttpRequest):
 
 @session_login_required
 @role_required(CLERK_ROLE)
+@role_required(CLERK_ROLE)
 @nocache
+def review_approve(request: HttpRequest):
+    """List of ID verification requests."""
+    profile = getattr(request, "person_profile", None)
 def review_approve(request: HttpRequest):
     """List of ID verification requests."""
     profile = getattr(request, "person_profile", None)
@@ -562,10 +1099,33 @@ def review_approve(request: HttpRequest):
             supabase.rpc("get_id_validation_requests", {}).execute()
         except APIError as e:
             messages.error(request, f"Supabase error: {escape(getattr(e, 'message', str(e)))}")
+    form = SearchVerificationRequest(request.GET or None)
+    search = (form.cleaned_data.get("search") or "").strip() if (request.GET and form.is_valid()) else ""
+
+    rows = fetch_id_verification_requests(supabase, search=search)
+    if not rows and search == "":
+        try:
+            supabase.rpc("get_id_validation_requests", {}).execute()
+        except APIError as e:
+            messages.error(request, f"Supabase error: {escape(getattr(e, 'message', str(e)))}")
 
     paginator = Paginator(rows, 10)
     page_obj = paginator.get_page(request.GET.get("page"))
+    page_obj = paginator.get_page(request.GET.get("page"))
 
+    return render(
+        request,
+        "clerk/resident/identity_verification_list.html",
+        {
+            "page_path": "Barangay Clerk / Account Verification",
+            "page_title": "Account Verification",
+            "page_obj": page_obj,
+            "rows": page_obj.object_list,
+            "form": form,
+            "profile": profile,
+            "auth": auth,
+        },
+    )
     return render(
         request,
         "clerk/resident/identity_verification_list.html",
@@ -582,7 +1142,10 @@ def review_approve(request: HttpRequest):
 
 @session_login_required
 @role_required(CLERK_ROLE)
+@role_required(CLERK_ROLE)
 @nocache
+def person_submission_dets(request: HttpRequest, req_id: int):
+    """Details of a single person's submitted verification + latest status."""
 def person_submission_dets(request: HttpRequest, req_id: int):
     """Details of a single person's submitted verification + latest status."""
     resp = supabase.rpc("get_details", {"p_person_id": req_id}).execute()
@@ -593,8 +1156,8 @@ def person_submission_dets(request: HttpRequest, req_id: int):
 
     raw_dt = person.get("date_requested")
     try:
-        dt = datetime.fromisoformat(str(raw_dt).replace("Z", "+00:00"))
-        person["submitted_fmt"] = timezone.localtime(dt).strftime("%b %d, %Y %I:%M %p")
+        dt_ = datetime.fromisoformat(str(raw_dt).replace("Z", "+00:00"))
+        person["submitted_fmt"] = timezone.localtime(dt_).strftime("%b %d, %Y %I:%M %p")
     except Exception:
         person["submitted_fmt"] = raw_dt or "—"
 
@@ -618,6 +1181,8 @@ def person_submission_dets(request: HttpRequest, req_id: int):
     if status_row:
         person["latest_status"]  = status_row.get("status_text") or person.get("latest_status") or "Pending"
         person["remarks"]        = status_row.get("latest_remarks") or person.get("remarks")
+        person["latest_status"]  = status_row.get("status_text") or person.get("latest_status") or "Pending"
+        person["remarks"]        = status_row.get("latest_remarks") or person.get("remarks")
 
     return render(request, "clerk/resident/person_submission_dets.html", {
         "page_path": f"Clerk / Account Verification : {req_id}",
@@ -625,8 +1190,9 @@ def person_submission_dets(request: HttpRequest, req_id: int):
         "person": person,
     })
 
-
-# --- AJAX helpers (same file as your walk-in views) ---
+# ────────────────────────────────────────────────────────────
+# SECTION: AJAX helpers (search and purposes)
+# ────────────────────────────────────────────────────────────
 from django.template.loader import render_to_string
 from django.http import JsonResponse
 
@@ -642,7 +1208,6 @@ def ajax_purpose_options(request: HttpRequest):
     purposes = _fetch_purposes_by_request_type(req_type_id) if req_type_id else []
     html = render_to_string("clerk/doc_req/_purpose_options.html", {"purposes": purposes})
     return HttpResponse(html)
-
 
 @session_login_required
 @role_required(CLERK_ROLE)
@@ -679,20 +1244,11 @@ def ajax_purposes(request: HttpRequest):
     })
     return HttpResponse(html)
 
-# =========================
-# Walk-in Document Request (Clerk)
-# =========================
-# --- Walk-in Request (Clerk) — request_document_type-first --------------------
-from typing import Any, Dict, List, Optional
-import json
-
-BRGY_BUSINESS_DOC_NAME = "BARANGAY BUSINESS CLEARANCE"  # must match your request_document_type_name
-
+# ────────────────────────────────────────────────────────────
+# SECTION: Walk-in Document Request (with BC enrichment)
+# ────────────────────────────────────────────────────────────
 def _fetch_request_doc_types() -> List[Dict[str, Any]]:
-    """
-    Exactly mirrors the mobile `getDocumentTypes()`:
-    request_document_type(request_document_type_id, request_document_type_name)
-    """
+    """Mirror of mobile getDocumentTypes()."""
     res = (
         supabase.table("request_document_type")
         .select("request_document_type_id, request_document_type_name")
@@ -702,11 +1258,7 @@ def _fetch_request_doc_types() -> List[Dict[str, Any]]:
     return res.data or []
 
 def _fetch_purposes_by_request_type(req_doc_type_id: int) -> List[Dict[str, Any]]:
-    """
-    Mirrors mobile `getPurposesByDocumentType()`, but your `document_purpose`
-    already carries fee_item_id & default fields (per screenshot).
-    We join fee_item to expose flags and current_amount (used by the UI).
-    """
+    """Mirror of mobile getPurposesByDocumentType(), plus fee flags/amount."""
     q = (
         supabase.table("document_purpose")
         .select(
@@ -749,11 +1301,8 @@ def walkin_new(request: HttpRequest):
       - ?request_document_type_id= preselects doc type and loads purposes
     """
     q = (request.GET.get("q") or "").strip()
-
-    # load document types for the dropdown
     doc_types = _fetch_request_doc_types()
 
-    # selected request_document_type_id (if any)
     try:
         chosen_req_type_id = int(request.GET.get("request_document_type_id") or 0) or None
     except Exception:
@@ -782,14 +1331,121 @@ def walkin_new(request: HttpRequest):
         "residents": residents,
     })
 
+# ────────────────────────────────────────────────────────────
+# SECTION: Business Clearance field derivation
+# ────────────────────────────────────────────────────────────
+def _age_from_birthdate(bd: Optional[str | dt.date]) -> Optional[int]:
+    try:
+        if not bd:
+            return None
+        if isinstance(bd, str):
+            bd = dt.date.fromisoformat(bd)
+        today = dt.date.today()
+        return today.year - bd.year - ((today.month, today.day) < (bd.month, bd.day))
+    except Exception:
+        return None
+
+def _fetch_business_clearance_fields(business_id: int, subject_person_id: Optional[int]) -> Dict[str, Any]:
+    """
+    Pull business + address + subject basics and return the semantic keys
+    that the Business Clearance PDF expects (before mapping).
+    """
+    # Business core + address
+    try:
+        bq = (
+            supabase.table("business")
+            .select(
+                "business_name, business_nature, capital_invested, prev_yr_total_gross_sales, "
+                "address:address_id(street, barangay, city, purok_sitio:purok_sitio_id(purok_sitio_name))"
+            )
+            .eq("business_id", business_id)
+            .limit(1)
+            .execute()
+        )
+        b = (bq.data or [None])[0] or {}
+    except Exception as e:
+        print(f"[WALKIN DEBUG] fetch business failed: {e}")
+        b = {}
+
+    # Subject/applicant info
+    subj: Dict[str, Any] = {}
+    if subject_person_id:
+        try:
+            pq = (
+                supabase.table("person")
+                .select("first_name,last_name,birthdate, nationality:nationality_id(nationality_name)")
+                .eq("person_id", subject_person_id)
+                .limit(1)
+                .execute()
+            )
+            pr = (pq.data or [None])[0] or {}
+            full = f"{(pr.get('first_name') or '').strip()} {(pr.get('last_name') or '').strip()}".strip()
+            subj = {
+                "applicant_full_name": full or None,
+                "applicant_age": _age_from_birthdate(pr.get("birthdate")),
+                "applicant_nationality": (((pr.get("nationality") or {}) or {}).get("nationality_name")) or None
+            }
+        except Exception as e:
+            print(f"[WALKIN DEBUG] fetch subject failed: {e}")
+
+    # Address compose
+    addr = b.get("address") or {}
+    purok = (((addr.get("purok_sitio") or {}) or {}).get("purok_sitio_name")) or ""
+    parts = [addr.get("street"), purok, addr.get("barangay"), addr.get("city")]
+    business_address = ", ".join([str(p).strip() for p in parts if p])
+
+    # Lines of business: split into up to 5 bullets
+    nature = (b.get("business_nature") or "").strip()
+    lob = [s.strip() for s in nature.split(",") if s.strip()]
+    while len(lob) < 5:
+        lob.append("")
+
+    details = {
+        **subj,
+        "business_name_style": b.get("business_name"),
+        "business_address": business_address or None,
+        "capital_invested": b.get("capital_invested"),
+        "gross_sales_prev_year": b.get("prev_yr_total_gross_sales"),
+        "lines_of_business_1": lob[0] if lob else None,
+        "lines_of_business_2": lob[1] if lob else None,
+        "lines_of_business_3": lob[2] if lob else None,
+        "lines_of_business_4": lob[3] if lob else None,
+        "lines_of_business_5": lob[4] if lob else None,
+        # Hint the printing stage to use the correct PDF
+        "template_override": BRGY_BUSINESS_PDF_FILE,
+    }
+    print("[WALKIN DEBUG] derived Business Clearance details:", json.dumps(details, indent=2, default=str))
+    print("[WALKIN DEBUG] raw business row:", json.dumps(b, indent=2, default=str))
+    return details
+
+# ────────────────────────────────────────────────────────────
+# SECTION: Walk-in create (payload builder + BC enrichment)
+# ────────────────────────────────────────────────────────────
+
 @session_login_required
 @role_required(CLERK_ROLE)
 @require_POST
 def walkin_create(request: HttpRequest):
+    """POST handler that builds the same payload the mobile sends, but routes through
+    create_document_request_walkin so we tag channel=WALKIN and filed_by clerk staff.
     """
-    POST handler that builds the same payload the mobile sends into
-    `create_document_request`.
-    """
+    # DEBUG: dump important POST data (sanitized)
+    try:
+        safe_post = {
+            "requested_by_person_id": request.POST.get("requested_by_person_id"),
+            "is_on_behalf": request.POST.get("is_on_behalf"),
+            "on_behalf_of_person_id": request.POST.get("on_behalf_of_person_id"),
+            "business_id": request.POST.get("business_id"),
+            "request_document_type_id": request.POST.get("request_document_type_id"),
+            "purpose_notes": request.POST.get("purpose_notes"),
+            "line_document_purpose_id[]": request.POST.getlist("line_document_purpose_id[]"),
+            "line_quantity[]": request.POST.getlist("line_quantity[]"),
+            "line_offense_no[]": request.POST.getlist("line_offense_no[]"),
+        }
+        print("\n[WALKIN DEBUG] raw POST (sanitized):\n", json.dumps(safe_post, indent=2))
+    except Exception as e:
+        print("[WALKIN DEBUG] could not pretty-print POST:", e)
+
     # 1) Subject / requester
     try:
         requested_by = int(request.POST.get("requested_by_person_id") or 0)
@@ -832,10 +1488,7 @@ def walkin_create(request: HttpRequest):
         return redirect(f"{request.path.replace('/create/','/')}?request_document_type_id={req_doc_type_id or ''}")
 
     # Map document_purpose_id -> meta (for purpose_code & defaults)
-    purpose_rows = {
-        r["document_purpose_id"]: r
-        for r in _fetch_purposes_by_request_type(req_doc_type_id)
-    }
+    purpose_rows = { r["document_purpose_id"]: r for r in _fetch_purposes_by_request_type(req_doc_type_id) }
 
     lines: List[Dict[str, Any]] = []
     for i, raw_dp in enumerate(dp_ids):
@@ -874,22 +1527,31 @@ def walkin_create(request: HttpRequest):
             "details": details,
         })
 
-    # Optional soft warning for Business Clearance without business_id
+    # Identify the doc type name & inject Business Clearance details if needed
     try:
-        dt = (
+        dt_row = (
             supabase.table("request_document_type")
             .select("request_document_type_name")
             .eq("request_document_type_id", req_doc_type_id)
             .limit(1)
             .execute()
         )
-        name = ((dt.data or [{}])[0] or {}).get("request_document_type_name") or ""
-        if name == BRGY_BUSINESS_DOC_NAME and not business_id:
-            messages.warning(request, "Business ID is empty for Business Clearance. Treasurer may reject.")
+        doc_type_name = (((dt_row.data or [{}])[0]) or {}).get("request_document_type_name") or ""
     except Exception:
-        pass
+        doc_type_name = ""
 
-    payload = {
+    if doc_type_name.strip().upper() in {BRGY_BUSINESS_DOC_NAME, "CERTIFIED TRUE COPY"}:
+        if not business_id:
+            messages.error(request, "Business is required for Barangay Business Clearance.")
+            return redirect(f"{request.path.replace('/create/','/')}?request_document_type_id={req_doc_type_id or ''}")
+        # Merge business/applicant fields into each line.details and tag the template override
+        bc_details = _fetch_business_clearance_fields(business_id, subject_id or requested_by)
+        for ln in lines:
+            ln["details"] = {**(ln.get("details") or {}), **bc_details}
+        print("[WALKIN DEBUG] lines after Business Clearance enrichment:\n", json.dumps(lines, indent=2, default=str))
+
+    # Debug preview in client-shape for parity with mobile logs
+    payload_client_shape = {
         "requested_by": requested_by,
         "on_behalf_of": (subject_id if (is_on_behalf and subject_id) else None),
         "is_on_behalf": is_on_behalf,
@@ -897,33 +1559,29 @@ def walkin_create(request: HttpRequest):
         "purpose_notes": purpose_notes,
         "lines": lines,
     }
+    print("\n[WALKIN DEBUG] (client-shape) create_document_request_walkin payload:\n",
+          json.dumps(payload_client_shape, indent=2, default=str))
 
-    # --- DEBUG: show exactly what we will send (client-shape) ---
-    print("\n[WALKIN DEBUG] (client-shape) create_document_request payload:\n",
-        json.dumps({
-            "requested_by": requested_by,
-            "on_behalf_of": (subject_id if (is_on_behalf and subject_id) else None),
-            "is_on_behalf": is_on_behalf,
-            "business_id": business_id,
-            "purpose_notes": purpose_notes,
-            "lines": lines,
-        }, indent=2))
+    # ==== CALL THE WALK-IN RPC (NEW) ====
+    staff_id = (request.session.get("auth") or {}).get("staff_id") or _staff_id(request)
+    if not staff_id:
+        messages.error(request, "Missing staff context. Please login again.")
+        return redirect("clerk:walkin_new")
 
-    # --- CALL THE RPC WITH THE NAMES YOUR FUNCTION EXPECTS ---
-    rpc_args = {
-        "p_requested_by": requested_by,
-        "p_on_behalf_of": (subject_id if (is_on_behalf and subject_id) else None),
-        "p_is_on_behalf": is_on_behalf,
-        "p_business_id": business_id,
-        "p_purpose_notes": purpose_notes,
-        "p_lines": lines,  # supabase client will JSON-encode this list into jsonb
+    walkin_args = {
+        "p_requester_person_id": int(requested_by),
+        "p_subject_person_id":   int(subject_id or requested_by),
+        "p_business_id":         business_id,        # may be None
+        "p_purpose_notes":       purpose_notes,      # may be None
+        "p_lines":               lines,              # list; Supabase will JSON-encode to jsonb
+        "p_clerk_user_id":       int(staff_id),
     }
 
-    print("[WALKIN DEBUG] (rpc-shape) args sent to create_document_request:\n",
-        json.dumps(rpc_args, indent=2, default=str))
+    print("[WALKIN DEBUG] (rpc-shape) args sent to create_document_request_walkin:\n",
+          json.dumps(walkin_args, indent=2, default=str))
 
     try:
-        res = supabase.rpc("create_document_request", rpc_args).execute()
+        res = supabase.rpc("create_document_request_walkin", walkin_args).execute()
         print("[WALKIN DEBUG] RPC result .data :", getattr(res, "data", None))
         print("[WALKIN DEBUG] RPC result .error:", getattr(res, "error", None))
     except Exception as e:
@@ -931,20 +1589,20 @@ def walkin_create(request: HttpRequest):
         messages.error(request, f"RPC failed: {e}")
         return redirect("clerk:walkin_new")
 
-    # Supabase can return a scalar or a 1-row list depending on driver
     if getattr(res, "error", None):
         messages.error(request, f"Supabase error: {escape(res.error.message)}")
         return redirect("clerk:walkin_new")
 
+    # Function RETURNS int, but be defensive about shapes
     data = res.data
     new_id = None
-    if isinstance(data, list) and data:
-        new_id = data[0]
-    elif isinstance(data, dict) and "doc_request_id" in data:
-        new_id = data["doc_request_id"]
-    else:
-        # plain scalar int
+    if isinstance(data, int):
         new_id = data
+    elif isinstance(data, list) and data:
+        first = data[0]
+        new_id = first if isinstance(first, int) else (first.get("doc_request_id") if isinstance(first, dict) else None)
+    elif isinstance(data, dict):
+        new_id = data.get("doc_request_id") or data.get("id")
 
     if not new_id:
         messages.error(request, "Could not obtain new request ID from RPC.")
@@ -953,11 +1611,123 @@ def walkin_create(request: HttpRequest):
     messages.success(request, f"Walk-in request created. ID: {new_id}")
     return redirect("clerk:detail", doc_request_id=new_id)
 
+def _rpc_approve_person_by_clerk(request: HttpRequest, person_id: int, status_id: int, remarks: str | None):
+    auth = request.session.get("auth") or {}
+    staff_id = auth.get("staff_id") or _staff_id(request)
+    if not staff_id:
+        raise Http404("Staff not found in session.")
+    payload = {"p_clerk_staff_id": staff_id, "p_person_id": person_id, "p_status_id": status_id, "p_remarks": remarks}
+    try:
+        return supabase.rpc("approve_person_by_clerk", payload).execute()
+    except APIError as e:
+        try:
+            msg = e.message.get("message")
+        except Exception:
+            msg = str(e)
+        raise APIError({"message": msg or "Update failed."})
 
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_POST
+def approve_request(request: HttpRequest, req_id: int):
+    try:
+        _rpc_approve_person_by_clerk(request, req_id, STATUS_APPROVED, None)
+        messages.success(request, "Request approved.")
+    except APIError as e:
+        try:
+            messages.warning(request, e.message.get("message"))
+        except Exception:
+            messages.warning(request, "This request cannot be approved.")
+    return redirect("clerk:person_details", req_id=req_id)
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_POST
+def decision_request(request: HttpRequest, req_id: int):
+    action = (request.POST.get("action") or "").lower()
+    remarks = (request.POST.get("remarks") or "").strip()
+    if action not in ("reject","decline"):
+        messages.error(request, "Invalid action.")
+        return redirect("clerk:person_details", req_id=req_id)
+    if not remarks:
+        messages.error(request, "Remarks are required.")
+        return redirect("clerk:person_details", req_id=req_id)
+    status_id = STATUS_REJECTED if action == "reject" else STATUS_DECLINE
+    try:
+        _rpc_approve_person_by_clerk(request, req_id, status_id, remarks)
+        messages.success(request, f"Request marked as {'Rejected' if status_id==STATUS_REJECTED else 'Declined'}.")
+    except APIError as e:
+        try:
+            messages.warning(request, e.message.get("message"))
+        except Exception:
+            messages.warning(request, "This request cannot be updated right now.")
+    return redirect("clerk:person_details", req_id=req_id)
+
+# ────────────────────────────────────────────────────────────
+# SECTION: Confirm (PAID → FOR_PRINTING)
+# ────────────────────────────────────────────────────────────
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_POST
+def confirm_request(request: HttpRequest, doc_request_id: int):
+    """
+    Confirm (PAID → FOR_PRINTING). If not fully paid, do nothing and advise to use
+    the 'Confirm & Forward to Treasurer' action.
+    """
+    try:
+        bundle = _fetch_bundle(doc_request_id)
+    except APIError as e:
+        messages.error(request, f"Unable to load request: {e}")
+        return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+    header = (bundle or {}).get("header", {}) or {}
+    payments = (bundle or {}).get("payments", {}) or {}
+
+    amount_due  = float(header.get("amount_due") or 0)
+    total_paid  = float(payments.get("total_paid") or 0)
+
+    if total_paid + 1e-6 < amount_due:
+        messages.warning(
+            request,
+            "This request is not fully paid yet. Use “Confirm & Forward to Treasurer”."
+        )
+        return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+    # fully paid → move to FOR_PRINTING
+    staff_id = 2
+    err = confirm_and_send_to_printing(doc_request_id, int(staff_id), notes="Clerk confirmed (paid)")
+    if err:
+        messages.error(request, f"Failed to move to FOR PRINTING: {err}")
+    else:
+        messages.success(request, "Confirmed. Status is now FOR PRINTING.")
+    return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+# ────────────────────────────────────────────────────────────
+# NEW: Confirm & Forward to Treasurer (FOR_CLERK_REVIEW/PAID → FOR_TREASURER_REVIEW)
+# ────────────────────────────────────────────────────────────
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_POST
+def confirm_forward_treasurer(request: HttpRequest, doc_request_id: int):
+    """
+    Clerk confirm (FOR CLERK REVIEW/PAID → FOR_TREASURER_REVIEW).
+    Always routes through the RPC that logs CONFIRMED_BY_CLERK and sets status.
+    """
+    staff_id = (request.session.get("auth") or {}).get("staff_id") or _staff_id(request)
+    notes = (request.POST.get("reason") or "").strip() or None
+
+    err = svc_confirm_forward_treasurer(doc_request_id, int(staff_id), notes)
+    if err:
+        messages.error(request, f"Failed to forward to Treasurer: {err}")
+    else:
+        messages.success(request, "Confirmed. Sent to Treasurer for payment review.")
+    return redirect("clerk:detail", doc_request_id=doc_request_id)
 
 # =========================
 # Business screens (stubs; clerk-only)
 # =========================
+
 def _auth_staff_id(request: HttpRequest) -> Optional[int]:
     return ((request.session.get("auth") or {}).get("staff_id")) or None
 
@@ -1854,55 +2624,3 @@ def business_information(
             "operating_days_end_name": operating_days_end_name,
         },
     )
-
-def _rpc_approve_person_by_clerk(request: HttpRequest, person_id: int, status_id: int, remarks: str | None):
-    auth = request.session.get("auth") or {}
-    staff_id = auth.get("staff_id") or _staff_id(request)
-    if not staff_id:
-        raise Http404("Staff not found in session.")
-    payload = {"p_clerk_staff_id": staff_id, "p_person_id": person_id, "p_status_id": status_id, "p_remarks": remarks}
-    try:
-        return supabase.rpc("approve_person_by_clerk", payload).execute()
-    except APIError as e:
-        try:
-            msg = e.message.get("message")
-        except Exception:
-            msg = str(e)
-        raise APIError({"message": msg or "Update failed."})
-
-@session_login_required
-@role_required(CLERK_ROLE)
-@require_POST
-def approve_request(request: HttpRequest, req_id: int):
-    try:
-        _rpc_approve_person_by_clerk(request, req_id, STATUS_APPROVED, None)
-        messages.success(request, "Request approved.")
-    except APIError as e:
-        try:
-            messages.warning(request, e.message.get("message"))
-        except Exception:
-            messages.warning(request, "This request cannot be approved.")
-    return redirect("clerk:person_details", req_id=req_id)
-
-@session_login_required
-@role_required(CLERK_ROLE)
-@require_POST
-def decision_request(request: HttpRequest, req_id: int):
-    action = (request.POST.get("action") or "").lower()
-    remarks = (request.POST.get("remarks") or "").strip()
-    if action not in ("reject","decline"):
-        messages.error(request, "Invalid action.")
-        return redirect("clerk:person_details", req_id=req_id)
-    if not remarks:
-        messages.error(request, "Remarks are required.")
-        return redirect("clerk:person_details", req_id=req_id)
-    status_id = STATUS_REJECTED if action == "reject" else STATUS_DECLINE
-    try:
-        _rpc_approve_person_by_clerk(request, req_id, status_id, remarks)
-        messages.success(request, f"Request marked as {'Rejected' if status_id==STATUS_REJECTED else 'Declined'}.")
-    except APIError as e:
-        try:
-            messages.warning(request, e.message.get("message"))
-        except Exception:
-            messages.warning(request, "This request cannot be updated right now.")
-    return redirect("clerk:person_details", req_id=req_id)

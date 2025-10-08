@@ -1,188 +1,445 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block content %}
-<div class="container py-3">
-  <h4 class="mb-3">Walk-in Document Request</h4>
+{% block css %}
+<style>
+  /* ───────── Brand tokens (flat, no gradients) ───────── */
+  :root{
+    --brand-900:#3a1217;
+    --brand-800:#561c24;
+    --brand-700:#6d2932;
+    --brand-400:#c7b7a3;
+    --brand-200:#f3ece3;
 
-  <form method="post" action="{% url 'clerk:walkin_create' %}">
+    --ink-900:#1f2328;  /* headings */
+    --ink-700:#343a40;  /* text */
+    --ink-500:#6c757d;  /* muted */
+    --line:#e5e7eb;     /* borders */
+    --bg:#fafafa;       /* page */
+    --white:#ffffff;
+  }
+
+  body{ background: var(--bg); }
+
+  /* Section panel (flat) */
+  .panel{
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: .75rem;
+  }
+  .panel--bar{
+    border: 2px solid var(--brand-800);
+  }
+  .section-head{
+    padding: .9rem 1rem;
+    border-bottom: 1px solid var(--line);
+    font-weight: 600;
+    color: var(--ink-900);
+    letter-spacing:.2px;
+  }
+  .section-body{ padding: 1rem; }
+
+  /* Focus states (brand) */
+  .form-control:focus,
+  .form-select:focus{
+    border-color: var(--brand-800);
+    box-shadow: 0 0 0 .25rem rgba(86,28,36,.15);
+  }
+
+  /* Buttons (flat) */
+  .btn-brand{
+    --bs-btn-bg: var(--brand-700);
+    --bs-btn-border-color: var(--brand-700);
+    --bs-btn-hover-bg: var(--brand-800);
+    --bs-btn-hover-border-color: var(--brand-800);
+    --bs-btn-active-bg: var(--brand-900);
+    --bs-btn-active-border-color: var(--brand-900);
+    color: #fff;
+  }
+  .btn-outline-brand{
+    --bs-btn-color: var(--brand-800);
+    --bs-btn-border-color: var(--brand-800);
+    --bs-btn-hover-bg: var(--brand-800);
+    --bs-btn-hover-border-color: var(--brand-800);
+    --bs-btn-hover-color: #fff;
+  }
+
+  /* Labels & help */
+  .label-req::after{ content:" *"; color:#dc3545; }
+  .help{ color: var(--ink-500); font-size:.875rem; }
+
+  /* Resident search results */
+  #residentResults .result{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:.6rem .75rem; border:1px solid var(--line); border-radius:.5rem; margin-bottom:.5rem;
+    background:#fff;
+  }
+  #residentResults .result:hover{ border-color: var(--brand-400); }
+  #residentSpinner .spinner-border{ width:1rem; height:1rem; }
+
+  /* Two-column split */
+  .layout{
+    display:grid; grid-template-columns: 1fr; gap:1rem;
+  }
+  @media (min-width: 992px){
+    .layout{ grid-template-columns: 1.4fr .8fr; }
+    .aside-sticky{ position: sticky; top: 72px; }
+  }
+
+  /* Summary card */
+  .summary-list{ margin:0; padding:0; list-style:none; }
+  .summary-list li{
+    display:flex; justify-content:space-between; gap:.75rem;
+    padding:.5rem 0; border-bottom:1px dashed var(--line);
+  }
+  .summary-list li:last-child{ border-bottom:0; }
+  .summary-key{ color:var(--ink-500); }
+  .summary-val{ color:var(--ink-900); font-weight:500; }
+
+  /* Sticky actions on mobile */
+  @media (max-width: 575.98px){
+    .sticky-actions{
+      position: sticky; bottom:0; z-index:100; padding:.75rem; margin-left:-.75rem; margin-right:-.75rem;
+      background:#fff; border-top:1px solid var(--line);
+    }
+  }
+
+  .d-hidden{ display:none !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-3" margin>
+
+  <form id="walkinForm" method="post" action="{% url 'clerk:walkin_create' %}" autocomplete="off">
     {% csrf_token %}
 
-    <!-- 1) Resident search/select -->
-    <div class="card mb-3" id="residentSearchPanel">
-      <div class="card-body">
-        <h6 class="mb-2">Find Resident</h6>
-        <div class="row g-2 align-items-center">
-          <div class="col-sm-8 col-md-6">
-            <div class="position-relative">
-              <input id="residentSearch" type="search" class="form-control" placeholder="Search by code or name… (min 2 chars)">
-              <div id="residentSpinner" class="position-absolute top-50 end-0 translate-middle-y me-3" style="display:none;">
-                <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+    <div id="formAlert" class="alert alert-danger d-hidden" role="alert"></div>
+
+    <div class="layout">
+      <!-- ===== LEFT: Main form ===== -->
+      <div class="stack">
+        <!-- Resident search -->
+        <section class="panel panel--bar mb-3" id="residentSearchPanel">
+          <div class="section-head">Find Resident</div>
+          <div class="section-body">
+            <div class="row g-2 align-items-center">
+              <div class="col-sm-9 col-md-7">
+                <div class="position-relative">
+                  <label for="residentSearch" class="form-label label-req mb-1">Search</label>
+                  <input id="residentSearch" type="search" class="form-control" placeholder="Search by code or name (min 2 chars)" autocomplete="off">
+                  <div id="residentSpinner" class="position-absolute top-50 end-0 translate-middle-y me-3 d-hidden">
+                    <div class="spinner-border spinner-border-sm text-secondary" role="status" aria-label="Searching"></div>
+                  </div>
+                </div>
+                <div class="help mt-1">Type at least 2 characters. Click a result to select.</div>
+              </div>
+            </div>
+            <div id="residentResults" class="mt-3 help">Waiting for input…</div>
+          </div>
+        </section>
+
+        <!-- Selected requester & on-behalf -->
+        <section class="panel panel--bar mb-3">
+          <div class="section-head">Requester</div>
+          <div class="section-body">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+              <div>
+                <div class="help">Selected Resident</div>
+                <div id="resident_label" class="fw-semibold">— none selected —</div>
+              </div>
+              <button class="btn btn-sm btn-outline-brand d-hidden" type="button" id="changeResidentBtn">Change</button>
+            </div>
+            <input type="hidden" id="requested_by_person_id" name="requested_by_person_id">
+
+            <hr class="my-3">
+
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="is_on_behalf" name="is_on_behalf">
+              <label class="form-check-label" for="is_on_behalf">File on behalf of another resident</label>
+            </div>
+
+            <div id="onBehalfRow" class="row g-3 mt-1 d-hidden">
+              <div class="col-md-6">
+                <label class="form-label">On-behalf Person ID</label>
+                <input class="form-control" name="on_behalf_of_person_id" inputmode="numeric" pattern="[0-9]*" placeholder="Person ID">
+              </div>
+              <div class="col-md-6" id="businessCol">
+                <label class="form-label">Business ID (optional)</label>
+                <input class="form-control" name="business_id" inputmode="numeric" pattern="[0-9]*" placeholder="Business ID">
+                <div class="help">Provide only for Business Clearance.</div>
               </div>
             </div>
           </div>
-        </div>
-        <div id="residentResults" class="mt-3"></div>
-      </div>
-    </div>
+        </section>
 
-    <!-- Selected resident (always visible once chosen) -->
-    <div class="card mb-3">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center">
-          <div>
-            <div class="small text-muted">Selected Resident (Requester)</div>
-            <div id="resident_label" class="fw-semibold">—</div>
-          </div>
-          <button class="btn btn-sm btn-outline-secondary d-none" type="button" id="changeResidentBtn">Change</button>
-        </div>
-        <input type="hidden" id="requested_by_person_id" name="requested_by_person_id">
+        <!-- Document & Purpose -->
+        <section class="panel panel--bar mb-3">
+          <div class="section-head">Document & Purpose</div>
+          <div class="section-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label label-req" for="reqDocType">Document Type</label>
+                <select class="form-select" id="reqDocType" name="request_document_type_id" required>
+                  <option value="">— choose —</option>
+                  {% for dt in doc_types %}
+                    <option value="{{ dt.request_document_type_id }}">{{ dt.request_document_type_name }}</option>
+                  {% endfor %}
+                </select>
+                <div class="help">Purposes will load after selecting a document.</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label label-req" for="purposeSelect">Purpose</label>
+                <select class="form-select" id="purposeSelect" name="line_document_purpose_id[]" disabled required>
+                  <option value="">— select document first —</option>
+                </select>
+              </div>
+            </div>
 
-        <div class="form-check mt-3 mb-2">
-          <input class="form-check-input" type="checkbox" id="is_on_behalf" name="is_on_behalf">
-          <label class="form-check-label" for="is_on_behalf">File on behalf of another resident</label>
-        </div>
-        <div class="row g-2">
-          <div class="col-md-5">
-            <input class="form-control" name="on_behalf_of_person_id" placeholder="On-behalf person_id (optional)">
+            <div class="row g-3 mt-1">
+              <div class="col-6 col-md-2">
+                <label class="form-label label-req" for="qtyInput">Qty</label>
+                <input id="qtyInput" class="form-control" type="number" min="1" value="1" name="line_quantity[]" required>
+              </div>
+              <div class="col-6 col-md-3" id="offenseWrap">
+                <label class="form-label" for="offenseInput">Offense No</label>
+                <input id="offenseInput" class="form-control" type="number" min="1" max="3" name="line_offense_no[]" placeholder="auto">
+                <div class="help">Shown for clearance-type documents.</div>
+              </div>
+            </div>
           </div>
-          <div class="col-md-5">
-            <input class="form-control" name="business_id" placeholder="Business ID (optional)">
-          </div>
-        </div>
-        <div class="form-text">For Business Clearance, provide Business ID if known.</div>
-      </div>
-    </div>
+        </section>
 
-    <!-- 2) Document & Purpose (purpose auto-populates) -->
-    <div class="card mb-3">
-      <div class="card-body">
-        <h6 class="mb-3">Document &amp; Purpose</h6>
+        <!-- Notes -->
+        <section class="panel panel--bar mb-4">
+          <div class="section-head">Notes</div>
+          <div class="section-body">
+            <label class="form-label" for="notesArea">Notes to Treasurer/Clerk (optional)</label>
+            <textarea id="notesArea" class="form-control" rows="2" name="purpose_notes" placeholder="Any remarks…"></textarea>
+          </div>
+        </section>
 
-        <div class="row g-2 align-items-end">
-          <div class="col-md-6">
-            <label class="form-label" for="reqDocType">Document Type</label>
-            <select class="form-select" id="reqDocType" name="request_document_type_id">
-              <option value="">— choose —</option>
-              {% for dt in doc_types %}
-                <option value="{{ dt.request_document_type_id }}">{{ dt.request_document_type_name }}</option>
-              {% endfor %}
-            </select>
-            <div class="form-text">Purposes will load automatically.</div>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label" for="purposeSelect">Purpose</label>
-            <select class="form-select" id="purposeSelect" name="line_document_purpose_id[]" disabled>
-              <option value="">— select document first —</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="row g-2 mt-2">
-          <div class="col-md-2">
-            <label class="form-label">Qty</label>
-            <input class="form-control" type="number" min="1" value="1" name="line_quantity[]">
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">Offense No</label>
-            <input class="form-control" type="number" min="1" max="3" name="line_offense_no[]" placeholder="auto">
-          </div>
+        <div class="d-flex gap-2 sticky-actions">
+          <a class="btn btn-outline-brand" href="{% url 'clerk:queue' %}">Cancel</a>
+          <button id="submitBtn" class="btn btn-brand">
+            <span class="btn-label">Create Request</span>
+            <span class="btn-spinner d-hidden"><span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Submitting…</span>
+          </button>
         </div>
       </div>
-    </div>
 
-    <!-- 3) Notes -->
-    <div class="card mb-3">
-      <div class="card-body">
-        <label class="form-label">Notes to Treasurer/Clerk (optional)</label>
-        <textarea class="form-control" rows="2" name="purpose_notes" placeholder="Any remarks…"></textarea>
-      </div>
-    </div>
-
-    <div class="d-flex gap-2">
-      <a class="btn btn-outline-secondary" href="{% url 'clerk:queue' %}">Cancel</a>
-      <button class="btn btn-primary">Create Request</button>
+      <!-- ===== RIGHT: Sticky summary ===== -->
+      <aside class="aside-sticky">
+        <section class="panel panel--bar">
+          <div class="section-head">Summary</div>
+          <div class="section-body">
+            <ul class="summary-list">
+              <li><span class="summary-key">Requester</span><span id="sumRequester" class="summary-val">—</span></li>
+              <li><span class="summary-key">On-behalf</span><span id="sumBehalf" class="summary-val">—</span></li>
+              <li><span class="summary-key">Business ID</span><span id="sumBiz" class="summary-val">—</span></li>
+              <li><span class="summary-key">Document</span><span id="sumDoc" class="summary-val">—</span></li>
+              <li><span class="summary-key">Purpose</span><span id="sumPurpose" class="summary-val">—</span></li>
+              <li><span class="summary-key">Qty</span><span id="sumQty" class="summary-val">1</span></li>
+              <!-- <li><span class="summary-key">Offense</span><span id="sumOffense" class="summary-val">auto</span></li> -->
+            </ul>
+          </div>
+        </section>
+      </aside>
     </div>
   </form>
 </div>
 
 <script>
-(function() {
-  // ---------- Live resident search ----------
-  const input   = document.getElementById('residentSearch');
-  const wrap    = document.getElementById('residentResults');
-  const spinner = document.getElementById('residentSpinner');
-  const panel   = document.getElementById('residentSearchPanel');
-  const btnChange = document.getElementById('changeResidentBtn');
+(() => {
+  "use strict";
+
+  // ------- Elements -------
+  const input           = document.getElementById('residentSearch');
+  const wrap            = document.getElementById('residentResults');
+  const spinner         = document.getElementById('residentSpinner');
+  const panel           = document.getElementById('residentSearchPanel');
+  const btnChange       = document.getElementById('changeResidentBtn');
+  const residentLabel   = document.getElementById('resident_label');
+  const personHidden    = document.getElementById('requested_by_person_id');
+  const form            = document.getElementById('walkinForm');
+  const formAlert       = document.getElementById('formAlert');
+
+  const docSel          = document.getElementById('reqDocType');
+  const purSel          = document.getElementById('purposeSelect');
+  const qtyInput        = document.getElementById('qtyInput');
+
+  const offenseWrap     = document.getElementById('offenseWrap');
+  const offenseInput    = document.getElementById('offenseInput');
+
+  const isOnBehalf      = document.getElementById('is_on_behalf');
+  const onBehalfRow     = document.getElementById('onBehalfRow');
+  const businessCol     = document.getElementById('businessCol');
+
+  const submitBtn       = document.getElementById('submitBtn');
+  const btnLabel        = submitBtn.querySelector('.btn-label');
+  const btnSpinner      = submitBtn.querySelector('.btn-spinner');
+
+  // Summary fields
+  const sumRequester = document.getElementById('sumRequester');
+  const sumBehalf    = document.getElementById('sumBehalf');
+  const sumBiz       = document.getElementById('sumBiz');
+  const sumDoc       = document.getElementById('sumDoc');
+  const sumPurpose   = document.getElementById('sumPurpose');
+  const sumQty       = document.getElementById('sumQty');
+  const sumOffense   = document.getElementById('sumOffense');
+
   const URL_SEARCH  = "{% url 'clerk:ajax_resident_search' %}";
   const URL_PURPOSE = "{% url 'clerk:ajax_purpose_options' %}";
 
+  // ------- Helpers -------
   let t = null;
-  function debounce(fn, ms){ return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+  const debounce = (fn, ms) => (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+  const showSpinner = () => spinner.classList.remove('d-hidden');
+  const hideSpinner = () => spinner.classList.add('d-hidden');
 
+  const setAlert = (msg) => { formAlert.textContent = msg; formAlert.classList.remove('d-hidden'); };
+  const clearAlert = () => { formAlert.textContent = ''; formAlert.classList.add('d-hidden'); };
+
+  const startBtnLoading = () => { submitBtn.disabled = true; btnLabel.classList.add('d-hidden'); btnSpinner.classList.remove('d-hidden'); };
+  const stopBtnLoading  = () => { submitBtn.disabled = false; btnSpinner.classList.add('d-hidden'); btnLabel.classList.remove('d-hidden'); };
+
+  const isBusinessDoc   = (text) => (text||'').toLowerCase().includes('business');
+  const isClearanceDoc  = (text) => (text||'').toLowerCase().includes('clearance');
+
+  const updateSummary = () => {
+    sumRequester.textContent = residentLabel.textContent.trim() || '—';
+    sumDoc.textContent       = docSel.options[docSel.selectedIndex]?.text || '—';
+    sumPurpose.textContent   = purSel.options[purSel.selectedIndex]?.text || '—';
+    sumQty.textContent       = qtyInput.value || '1';
+    sumOffense.textContent   = offenseInput.value || 'auto';
+
+    const ob = onBehalfRow.querySelector('[name="on_behalf_of_person_id"]');
+    const biz = onBehalfRow.querySelector('[name="business_id"]');
+    sumBehalf.textContent = (isOnBehalf.checked && ob?.value) ? ob.value : (isOnBehalf.checked ? '—' : 'n/a');
+    sumBiz.textContent    = (isOnBehalf.checked && !businessCol.classList.contains('d-hidden') && biz?.value) ? biz.value : (isOnBehalf.checked ? '—' : 'n/a');
+  };
+
+  // ------- Resident search -------
   async function doSearch(q) {
     if (!q || q.trim().length < 2) {
-      wrap.innerHTML = '<div class="text-muted small py-2">Type at least 2 characters…</div>';
-      spinner.style.display = 'none';
-      return;
+      wrap.innerHTML = '<div class="help">Type at least 2 characters…</div>';
+      hideSpinner(); return;
     }
-    spinner.style.display = '';
-    try {
+    showSpinner();
+    try{
       const resp = await fetch(`${URL_SEARCH}?q=${encodeURIComponent(q)}`, { headers: { "X-Requested-With":"fetch" } });
-      wrap.innerHTML = await resp.text();
-    } catch {
-      wrap.innerHTML = '<div class="alert alert-warning small mb-0">Search failed. Please try again.</div>';
-    } finally {
-      spinner.style.display = 'none';
+      const html = await resp.text();
+      wrap.innerHTML = html || '<div class="help">No results.</div>';
+    }catch{
+      wrap.innerHTML = '<div class="text-danger small">Search failed. Please try again.</div>';
+    }finally{
+      hideSpinner();
     }
   }
-
   if (input) input.addEventListener('input', debounce(e => doSearch(e.target.value), 250));
 
-  // pick resident -> fill, close panel
-  wrap.addEventListener('click', function(ev) {
+  // pick resident (delegate)
+  wrap.addEventListener('click', (ev) => {
     const btn = ev.target.closest('.pick-resident');
     if (!btn) return;
     const id  = btn.getAttribute('data-person-id');
     const txt = btn.getAttribute('data-display');
-    document.getElementById('requested_by_person_id').value = id;
-    document.getElementById('resident_label').innerText = txt || `ID ${id}`;
-    // clear & close search
+
+    document.getElementById('requested_by_person_id').value = id || '';
+    residentLabel.textContent = (txt && txt.trim()) ? txt : `ID ${id}`;
+    sumRequester.textContent  = residentLabel.textContent;
+
+    // close panel
     input.value = '';
-    wrap.innerHTML = '';
+    wrap.innerHTML = '<div class="help">Selected. Use “Change” to pick someone else.</div>';
     panel.classList.add('d-none');
-    btnChange.classList.remove('d-none');
+    document.getElementById('changeResidentBtn').classList.remove('d-hidden');
+
+    clearAlert();
   });
 
-  // change resident -> reopen search
+  // change resident
   btnChange.addEventListener('click', () => {
     panel.classList.remove('d-none');
     input.focus();
-    btnChange.classList.add('d-none');
+    btnChange.classList.add('d-hidden');
   });
 
-  // ---------- Purpose auto-populate ----------
-  const docSel = document.getElementById('reqDocType');
-  const purSel = document.getElementById('purposeSelect');
-
-  async function loadPurposes(docTypeId) {
+  // ------- Purpose auto-load -------
+  async function loadPurposes(docTypeId){
     purSel.innerHTML = '<option value="">Loading…</option>';
     purSel.disabled = true;
-    if (!docTypeId) {
+    if (!docTypeId){
       purSel.innerHTML = '<option value="">— select document first —</option>';
-      return;
+      updateSummary(); return;
     }
-    try {
+    try{
       const resp = await fetch(`${URL_PURPOSE}?request_document_type_id=${encodeURIComponent(docTypeId)}`, { headers: { "X-Requested-With":"fetch" } });
       const html = await resp.text();
-      purSel.innerHTML = html;
+      purSel.innerHTML = html || '<option value="">No purposes found</option>';
       purSel.disabled = false;
-    } catch {
+    }catch{
       purSel.innerHTML = '<option value="">Failed to load purposes</option>';
+    }finally{
+      updateSummary();
     }
   }
 
-  if (docSel) docSel.addEventListener('change', e => loadPurposes(e.target.value));
+  function updateDocDependentToggles(){
+    const selectedText = docSel.options[docSel.selectedIndex]?.text || '';
+    offenseWrap.classList.toggle('d-hidden', !isClearanceDoc(selectedText));
+    businessCol.classList.toggle('d-hidden', !isBusinessDoc(selectedText));
+    updateSummary();
+  }
+
+  // listeners
+  if (docSel){
+    docSel.addEventListener('change', e => { loadPurposes(e.target.value); updateDocDependentToggles(); clearAlert(); });
+  }
+  purSel.addEventListener('change', updateSummary);
+  qtyInput.addEventListener('input', updateSummary);
+  offenseInput.addEventListener('input', updateSummary);
+
+  // on-behalf toggling
+  isOnBehalf.addEventListener('change', () => {
+    onBehalfRow.classList.toggle('d-hidden', !isOnBehalf.checked);
+    if (!isOnBehalf.checked){
+      const ob = onBehalfRow.querySelector('[name="on_behalf_of_person_id"]');
+      const biz = onBehalfRow.querySelector('[name="business_id"]');
+      if (ob) ob.value = '';
+      if (biz) biz.value = '';
+    }
+    updateSummary();
+  });
+  onBehalfRow.addEventListener('input', updateSummary);
+
+  // init
+  updateDocDependentToggles();
+  updateSummary();
+
+  // ------- Validation & submit -------
+  form.addEventListener('submit', (e) => {
+    clearAlert();
+    const errors = [];
+
+    if (!personHidden.value){ errors.push('Please select a resident (requester).'); }
+    if (!docSel.value){ errors.push('Please choose a document type.'); docSel.classList.add('is-invalid'); }
+    else{ docSel.classList.remove('is-invalid'); }
+
+    if (!purSel.value || purSel.disabled){ errors.push('Please choose a purpose.'); purSel.classList.add('is-invalid'); }
+    else{ purSel.classList.remove('is-invalid'); }
+
+    if (!qtyInput.value || Number(qtyInput.value) < 1){ errors.push('Quantity must be at least 1.'); qtyInput.classList.add('is-invalid'); }
+    else{ qtyInput.classList.remove('is-invalid'); }
+
+    if (errors.length){
+      e.preventDefault();
+      setAlert(errors.join(' '));
+      form.scrollIntoView({ behavior:'smooth', block:'start' });
+      return;
+    }
+    startBtnLoading();
+  });
 })();
 </script>
 {% endblock %}

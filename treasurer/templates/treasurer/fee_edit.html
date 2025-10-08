@@ -1,47 +1,125 @@
+{# templates/treasurer/fee_edit.html #}
 {% extends "base.html" %}
+{% load bootstrap_icons %}
+{% load static %}
+
+{% block css %}
+<style>
+  :root{
+    --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932; --brand-600:#7a323b;
+    --brand-100:#f3eaeb; --brand-050:#fbf6f6; --accent:#f2c94c;
+    --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --card:#fff; --wash:#fafafa;
+  }
+  .container-xxl,.container{ max-width: 1280px; }
+
+  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
+  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
+  .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); background:#fff; }
+  .btn-outline-brand:hover{ background:var(--brand-700); color:#fff; }
+
+  .form-control:focus, .form-select:focus, .form-check-input:focus{
+    border-color:var(--brand-700);
+    box-shadow:0 0 0 .25rem rgba(109,41,50,.18);
+    outline:none;
+  }
+  .form-check-input:checked{ background-color:var(--brand-700); border-color:var(--brand-700); }
+
+  /* Hero */
+  .hero{
+    background: radial-gradient(130% 160% at 0% 0%, var(--brand-700) 0%, var(--brand-900) 70%);
+    color:#fff; border-radius:16px; padding:18px 22px; box-shadow:0 10px 24px rgba(0,0,0,.18);
+  }
+  .hero .brand-icon{
+    width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,.08); position:relative;
+  }
+  .hero .brand-icon::after{ content:""; position:absolute; inset:8px; border-radius:50%; background:rgba(242,201,76,.18); }
+  .code-badge{
+    font-family: ui-monospace, Menlo, Consolas, "Liberation Mono", monospace;
+    font-weight:700; background:#fff; color:var(--brand-800);
+    border-radius:.5rem; padding:.25rem .5rem; border:1px solid rgba(0,0,0,.08);
+  }
+  .subtle{ color:rgba(255,255,255,.82); }
+
+  .card-soft{ border:0; border-radius:14px; background:var(--card); box-shadow:0 8px 20px rgba(16,24,40,.06); }
+  .section-title{ font-weight:800; color:var(--ink); display:flex; align-items:center; gap:.5rem; }
+  .section-title .dot{ width:10px;height:10px;border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px rgba(242,201,76,.25); }
+  .small-muted{ color:var(--muted); }
+  .divider{ height:1px; background:var(--line); margin:.5rem 0 1rem; }
+
+  .input-money .input-group-text{ background:#fff; border-right:0; }
+  .input-money input{ border-left:0; }
+
+  .switch-grid{ display:grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap:.5rem; }
+  @media (max-width: 992px){ .switch-grid{ grid-template-columns: repeat(3, minmax(0,1fr)); } }
+  @media (max-width: 576px){ .switch-grid{ grid-template-columns: repeat(2, minmax(0,1fr)); } }
+
+  .table thead th{ border-bottom-width:2px; white-space:nowrap; }
+  .table tbody tr:hover{ background:#fffaf0; }
+  .json-input{ font-family: ui-monospace, Menlo, Consolas, "Liberation Mono", monospace; }
+
+  .actionbar{
+    position: sticky; bottom: 0; z-index: 100;
+    background:#fff; border:1px solid var(--line); border-radius:12px; padding:.6rem .75rem;
+    box-shadow:0 10px 20px rgba(0,0,0,.04);
+  }
+  .hint{ font-size:.82rem; color:var(--muted); }
+  .callout{ border-left:4px solid var(--brand-700); background:var(--brand-050); padding:.75rem .9rem; border-radius:8px; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container py-3">
-  <div class="d-flex align-items-center justify-content-between mb-3">
-    <h1 class="h4 mb-0">Edit Fee: <code>{{ fee_code }}</code></h1>
-    <div class="d-flex gap-2">
-      <a class="btn btn-outline-secondary" href="{% url 'treasurer:fees' %}">Back to Fees</a>
+<div class="container py-3" style="margin-top:40px">
+
+  <!-- Hero -->
+  <div class="hero mb-3 d-flex align-items-center gap-3">
+    <div class="brand-icon"><i class="bi bi-pencil-square fs-4" aria-hidden="true"></i></div>
+    <div class="me-auto">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div class="fw-bold fs-5">Edit Fee</div>
+        <span class="code-badge">{{ fee_code }}</span>
+      </div>
+      <div class="subtle small">Update details, purposes, exemptions, and audit notes</div>
     </div>
+    <a class="btn btn-outline-brand" href="{% url 'treasurer:fees' %}">{% bs_icon 'arrow-left' extra_classes='me-1' %} Back to Fees</a>
   </div>
 
   <form method="post">
     {% csrf_token %}
 
     <div class="row g-3">
+      <!-- Main -->
       <div class="col-lg-8">
-        <div class="card">
+        <div class="card card-soft">
           <div class="card-body">
-            <h5 class="mb-3">Basics</h5>
+            <div class="section-title mb-1"><span class="dot"></span> Basics</div>
+            <div class="divider"></div>
+
             <div class="row g-3">
               <div class="col-md-8">
                 <label class="form-label">Fee Name</label>
-                <input class="form-control" name="fee_name" value="{{ fee.name }}">
+                <input class="form-control" name="fee_name" value="{{ fee.name }}" placeholder="e.g., Barangay Business Clearance – Sari-Sari Store">
+                <div class="hint mt-1">Tip: Use “Main – Subcategory” so it splits nicely in listings.</div>
               </div>
-              <div class="col-md-4">
-                <label class="form-label">Unit</label>
-                <input class="form-control" name="unit" value="{{ fee.unit|default:'per_doc' }}">
-              </div>
+
+              <!-- Unit REMOVED by requirement -->
+
               <div class="col-md-4">
                 <label class="form-label">Current Amount</label>
-                <input class="form-control" name="current_amount" type="number" step="0.01"
-                       value="{{ fee.current_amount }}">
+                <div class="input-group input-money">
+                  <span class="input-group-text">₱</span>
+                  <input class="form-control" name="current_amount" type="number" step="0.01" value="{{ fee.current_amount }}" id="amtNow">
+                </div>
               </div>
-              <div class="col-md-4">
-                <label class="form-label">Max Amount</label>
-                <input class="form-control" name="max_amount" type="number" step="0.01"
-                       value="{{ fee.max_amount }}">
-              </div>
+
+              <!-- Max Amount REMOVED by requirement -->
+
               <div class="col-md-4">
                 <label class="form-label">Document Type</label>
                 <select class="form-select" name="doc_type_name">
                   <option value="">(keep as is)</option>
                   {% for t in doc_types %}
-                    <option value="{{ t.document_type_name }}"
-                      {% if t.document_type_name == fee.request_document_type_name %}selected{% endif %}>
+                    <option value="{{ t.document_type_name }}" {% if t.document_type_name == fee.request_document_type_name %}selected{% endif %}>
                       {{ t.document_type_name }}
                     </option>
                   {% endfor %}
@@ -49,62 +127,60 @@
               </div>
             </div>
 
-            <hr class="my-3">
-
-            <h6 class="mb-2">Exemptions & Status</h6>
-            <div class="row g-3">
-              <div class="col-md-2 form-check">
-                <input class="form-check-input" type="checkbox" name="ex_ftj" id="ex_ftj"
-                       {% if fee.exempt_ftj %}checked{% endif %}>
-                <label for="ex_ftj" class="form-check-label">FTJ</label>
-              </div>
-              <div class="col-md-2 form-check">
-                <input class="form-check-input" type="checkbox" name="ex_senior" id="ex_senior"
-                       {% if fee.exempt_senior %}checked{% endif %}>
-                <label for="ex_senior" class="form-check-label">Senior</label>
-              </div>
-              <div class="col-md-2 form-check">
-                <input class="form-check-input" type="checkbox" name="ex_pwd" id="ex_pwd"
-                       {% if fee.exempt_pwd %}checked{% endif %}>
-                <label for="ex_pwd" class="form-check-label">PWD</label>
-              </div>
-              <div class="col-md-3 form-check">
-                <input class="form-check-input" type="checkbox" name="ex_indigent" id="ex_indigent"
-                       {% if fee.exempt_indigent %}checked{% endif %}>
-                <label for="ex_indigent" class="form-check-label">Indigent</label>
-              </div>
-              <div class="col-md-3 form-check">
-                <input class="form-check-input" type="checkbox" name="ex_student" id="ex_student"
-                       {% if fee.exempt_student %}checked{% endif %}>
-                <label for="ex_student" class="form-check-label">Student</label>
-              </div>
-
-              <div class="col-12 form-check mt-2">
-                <input class="form-check-input" type="checkbox" name="is_active" id="is_active"
-                       {% if fee.is_active %}checked{% endif %}>
-                <label for="is_active" class="form-check-label">Active</label>
-              </div>
+            <div class="callout mt-3">
+              {% bs_icon 'info-circle' extra_classes='me-1' %}
+              Changes here affect new transactions immediately. Keep a short audit reason below.
             </div>
           </div>
         </div>
 
-        <div class="card mt-3">
+        <!-- Exemptions -->
+        <div class="card card-soft mt-3">
+          <div class="card-body">
+            <div class="section-title mb-1"><span class="dot"></span> Exemptions & Status</div>
+            <div class="divider"></div>
+
+            <div class="switch-grid">
+              <!-- Only PWD, Senior, Student per requirement -->
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="ex_senior" id="ex_senior" {% if fee.exempt_senior %}checked{% endif %}>
+                <label class="form-check-label" for="ex_senior">Senior</label>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="ex_pwd" id="ex_pwd" {% if fee.exempt_pwd %}checked{% endif %}>
+                <label class="form-check-label" for="ex_pwd">PWD</label>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="ex_student" id="ex_student" {% if fee.exempt_student %}checked{% endif %}>
+                <label class="form-check-label" for="ex_student">Student</label>
+              </div>
+            </div>
+
+            <div class="form-check form-switch mt-2">
+              <input class="form-check-input" type="checkbox" name="is_active" id="is_active" {% if fee.is_active %}checked{% endif %}>
+              <label class="form-check-label" for="is_active">Active</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Purposes -->
+        <div class="card card-soft mt-3">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-center">
-              <h5 class="mb-0">Purposes</h5>
-              <button class="btn btn-sm btn-outline-primary" type="button" id="addRow">
-                <i class="bi bi-plus"></i> Add Purpose
+              <div class="section-title mb-0"><span class="dot"></span> Purposes</div>
+              <button class="btn btn-sm btn-outline-brand" type="button" id="addRow">
+                {% bs_icon 'plus' extra_classes='me-1' %} Add Purpose
               </button>
             </div>
-            <div class="table-responsive mt-2">
+            <div class="divider"></div>
+
+            <div class="table-responsive">
               <table class="table align-middle" id="purpTbl">
                 <thead class="table-light">
                   <tr>
                     <th style="min-width:160px;">Purpose Code</th>
                     <th>Label</th>
-                    <th style="min-width:180px;">Doc Type (override)</th>
-                    <th style="min-width:220px;">Default Details (JSON)</th>
-                    <th style="min-width:120px;">Offense No</th>
+                    <th style="min-width:200px;">Doc Type (override)</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -117,109 +193,143 @@
                         <select class="form-select" name="purp_{{ forloop.counter }}_dtype">
                           <option value=""></option>
                           {% for t in doc_types %}
-                            <option value="{{ t.document_type_name }}"
-                              {% if t.document_type_name == p.request_document_type_name %}selected{% endif %}>
+                            <option value="{{ t.document_type_name }}" {% if t.document_type_name == p.request_document_type_name %}selected{% endif %}>
                               {{ t.document_type_name }}
                             </option>
                           {% endfor %}
                         </select>
                       </td>
-                      <td><input class="form-control" name="purp_{{ forloop.counter }}_details" value='{{ p.default_details|default:"{}" }}'></td>
-                      <td><input class="form-control" name="purp_{{ forloop.counter }}_offense" value="{{ p.default_offense_no }}"></td>
-                      <td><button class="btn btn-sm btn-outline-danger remove-row" type="button">&times;</button></td>
+                      <td class="text-end">
+                        <button class="btn btn-sm btn-outline-danger remove-row" type="button">{% bs_icon 'x' %}</button>
+                      </td>
                     </tr>
                   {% empty %}
-                    <tr class="empty-row"><td colspan="6" class="text-muted">No purposes yet. Click “Add Purpose”.</td></tr>
+                    <tr class="empty-row">
+                      <td colspan="4" class="text-center small-muted">No purposes yet. Click “Add Purpose”.</td>
+                    </tr>
                   {% endfor %}
                 </tbody>
               </table>
             </div>
+
+            <div class="hint mt-2">Only code, label, and optional document type override are editable here.</div>
           </div>
         </div>
 
-        <div class="card mt-3">
-          <div class="card-body">
-            <h5 class="mb-3">Surcharge Ladder</h5>
-            <div class="row g-3">
-              <div class="col-md-4">
-                <label class="form-label">1st Offense %</label>
-                <input class="form-control" name="surcharge_1"
-                       value="{% for s in surcharges %}{% if s.offense_no == 1 %}{{ s.percent }}{% endif %}{% endfor %}">
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">2nd Offense %</label>
-                <input class="form-control" name="surcharge_2"
-                       value="{% for s in surcharges %}{% if s.offense_no == 2 %}{{ s.percent }}{% endif %}{% endfor %}">
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">3rd Offense %</label>
-                <input class="form-control" name="surcharge_3"
-                       value="{% for s in surcharges %}{% if s.offense_no == 3 %}{{ s.percent }}{% endif %}{% endfor %}">
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- Surcharge Ladder REMOVED by requirement -->
 
-        <div class="card mt-3">
+        <!-- Audit -->
+        <div class="card card-soft mt-3">
           <div class="card-body">
             <label class="form-label">Reason / Note (audit)</label>
             <input class="form-control" name="reason" placeholder="Why this change?">
+            <div class="hint mt-1">Example: “Align with Ordinance 2025-12”</div>
           </div>
         </div>
 
-        <div class="mt-3 d-flex gap-2">
-          <button class="btn btn-dark"><i class="bi bi-save me-1"></i> Save</button>
-          <a class="btn btn-outline-secondary" href="{% url 'treasurer:fees' %}">Cancel</a>
+        <!-- Sticky actionbar -->
+        <div class="actionbar mt-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div class="small-muted">Current amount preview: <span class="fw-bold">₱<span id="amtPreview">{{ fee.current_amount|floatformat:2 }}</span></span></div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-brand">{% bs_icon 'save' extra_classes='me-1' %} Save</button>
+            <a class="btn btn-outline-brand" href="{% url 'treasurer:fees' %}">{% bs_icon 'x-circle' extra_classes='me-1' %} Cancel</a>
+          </div>
         </div>
       </div>
 
+      <!-- Sidebar -->
       <div class="col-lg-4">
-        <div class="card">
+        <div class="card card-soft">
           <div class="card-body">
-            <h6 class="mb-2 text-muted">Current</h6>
-            <div><strong>Name:</strong> {{ fee.name }}</div>
-            <div><strong>Type:</strong> {{ fee.request_document_type_name|default:"—" }}</div>
-            <div><strong>Amount:</strong> ₱{{ fee.current_amount|floatformat:2 }}</div>
+            <div class="section-title mb-1"><span class="dot"></span> Current Snapshot</div>
+            <div class="divider"></div>
+
+            <div class="mb-2"><span class="small-muted">Name</span><div class="fw-semibold">{{ fee.name }}</div></div>
+            <div class="mb-2"><span class="small-muted">Document Type</span><div>{{ fee.request_document_type_name|default:"—" }}</div></div>
+            <div class="mb-2"><span class="small-muted">Amount</span><div class="fw-semibold">₱{{ fee.current_amount|floatformat:2 }}</div></div>
+            <!-- Unit display REMOVED -->
+
+            <div class="mt-3 small-muted">Shortcuts</div>
+            <ul class="small mt-1 mb-0">
+              <li><kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>S</kbd> to save</li>
+              <li>“Add Purpose” to create a new purpose row</li>
+            </ul>
           </div>
         </div>
       </div>
     </div>
   </form>
 </div>
+{% endblock %}
 
+{% block js %}
 <script>
-  const tbl = document.getElementById('purpTbl').querySelector('tbody');
-  const addRow = document.getElementById('addRow');
-  function rowCount(){ return tbl.querySelectorAll('tr').length; }
-  function makeRow(idx){
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><input class="form-control" name="purp_${idx}_code" placeholder="e.g., EMPLOYMENT"></td>
-      <td><input class="form-control" name="purp_${idx}_label" placeholder="e.g., Employment"></td>
-      <td>
-        <select class="form-select" name="purp_${idx}_dtype">
-          <option value=""></option>
-          {% for t in doc_types %}
-            <option value="{{ t.document_type_name }}">{{ t.document_type_name }}</option>
-          {% endfor %}
-        </select>
-      </td>
-      <td><input class="form-control" name="purp_${idx}_details" placeholder='{"key":"value"}'></td>
-      <td><input class="form-control" name="purp_${idx}_offense" placeholder="1..3"></td>
-      <td><button class="btn btn-sm btn-outline-danger remove-row" type="button">&times;</button></td>
-    `;
-    return tr;
-  }
-  addRow.addEventListener('click', () => {
-    const empty = tbl.querySelector('.empty-row');
-    if (empty) empty.remove();
-    const idx = rowCount() + 1;
-    tbl.appendChild(makeRow(idx));
-  });
-  tbl.addEventListener('click', e => {
-    const btn = e.target.closest('.remove-row');
-    if (!btn) return;
-    btn.closest('tr').remove();
-  });
+  // Live ₱ preview
+  (function(){
+    const input = document.getElementById('amtNow');
+    const out   = document.getElementById('amtPreview');
+    if(!input || !out) return;
+    const fmt = n => {
+      if(isNaN(n)) return '0.00';
+      return Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+    };
+    input.addEventListener('input', () => out.textContent = fmt(input.value || 0));
+  })();
+
+  // Purposes: add/remove rows (only Code, Label, Doc Type override)
+  (function(){
+    const tblWrap = document.getElementById('purpTbl');
+    if(!tblWrap) return;
+    const tbl = tblWrap.querySelector('tbody');
+    const addBtn = document.getElementById('addRow');
+
+    function rowCount(){ return tbl.querySelectorAll('tr:not(.empty-row)').length; }
+
+    function makeRow(idx){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input class="form-control" name="purp_${idx}_code" placeholder="e.g., EMPLOYMENT"></td>
+        <td><input class="form-control" name="purp_${idx}_label" placeholder="e.g., Employment"></td>
+        <td>
+          <select class="form-select" name="purp_${idx}_dtype">
+            <option value=""></option>
+            {% for t in doc_types %}<option value="{{ t.document_type_name }}">{{ t.document_type_name }}</option>{% endfor %}
+          </select>
+        </td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-danger remove-row" type="button">{% bs_icon 'x' %}</button>
+        </td>
+      `;
+      return tr;
+    }
+
+    addBtn?.addEventListener('click', () => {
+      const empty = tbl.querySelector('.empty-row'); if (empty) empty.remove();
+      const idx = rowCount() + 1;
+      tbl.appendChild(makeRow(idx));
+      tbl.lastElementChild.scrollIntoView({behavior:'smooth', block:'nearest'});
+    });
+
+    tbl.addEventListener('click', e => {
+      const btn = e.target.closest('.remove-row'); if (!btn) return;
+      const tr = btn.closest('tr'); tr.remove();
+      if (!rowCount()) {
+        const er = document.createElement('tr');
+        er.className='empty-row';
+        er.innerHTML = '<td colspan="4" class="text-center small-muted">No purposes yet. Click “Add Purpose”.</td>';
+        tbl.appendChild(er);
+      }
+    });
+  })();
+
+  // Save shortcut
+  (function(){
+    document.addEventListener('keydown', function(e){
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){
+        e.preventDefault();
+        const form = document.querySelector('form'); if (form) form.submit();
+      }
+    });
+  })();
 </script>
 {% endblock %}

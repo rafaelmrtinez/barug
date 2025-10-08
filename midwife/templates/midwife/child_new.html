@@ -1,0 +1,669 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<style>
+  :root{
+    --brand-900:#3b1016;
+    --brand-800:#4b171f;
+    --brand-700:#6d2932;
+    --brand-600:#561c24;
+    --brand-300:#cda4aa;
+    --brand-100:#f3eaeb;
+    --brand-050:#fbf6f6;
+    --panel-bg:#fff5f6;
+  }
+
+  .card{
+    background: var(--panel-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius:1rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,.03);
+  }
+  .card-body{ padding: 1.25rem; }
+
+  .section-title{
+    font-weight: 800; letter-spacing:.2px;
+    display:flex; align-items:center; gap:.5rem;
+    padding:.35rem .75rem; border-radius:.75rem;
+    background:rgba(0,0,0,.03); color:var(--brand-800);
+    border: 1px solid rgba(0,0,0,.05); width: fit-content;
+  }
+  .helper{ color:#6c757d; font-size:.87rem; }
+
+  .finder{
+    border:1px solid var(--bs-border-color); border-radius:.9rem; padding:1rem; background:#fff;
+  }
+  .mini-card{
+    border:1px solid var(--bs-border-color); border-radius:.8rem; padding:.85rem;
+    background:#fff; margin-top:.65rem;
+  }
+  .mini-card .resident-name{ font-weight:800; letter-spacing:.15px; }
+  .mini-card .code-pill{
+    display:inline-block; padding:.125rem .5rem; border-radius:999px; font-size:.78rem;
+    background:var(--brand-100); color:var(--brand-700); border:1px solid var(--brand-300);
+  }
+
+  .matrix th, .matrix td{ vertical-align: middle; }
+  .matrix th{ white-space: nowrap; }
+  .matrix .dose-cell{ min-width: 8.5rem; }
+  .matrix .dose-cell input[type="date"]{ width: 100%; }
+
+  .table-visit th{ white-space: nowrap; }
+  .table-visit input { min-width: 7rem; }
+  .table-visit td.notes input{ min-width: 16rem; }
+
+  .chip{
+    display:inline-flex; align-items:center; gap:.4rem;
+    padding:.35rem .6rem; border-radius:999px; background:#fff;
+    border:1px dashed rgba(0,0,0,.12); font-size:.85rem; margin-right:.4rem; color:#343a40;
+  }
+  .spinner-inline{
+    display:inline-block; width:1rem; height:1rem;
+    border:.15rem solid #ddd; border-top-color:var(--brand-700);
+    border-radius:50%; animation:spin 0.8s linear infinite; vertical-align:-.2rem;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg) } }
+
+  input[readonly].form-control { background-color: var(--brand-050); border-color: rgba(0,0,0,.06); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'midwife:dashboard' %}">Dashboard</a></li>
+      <li class="breadcrumb-item active" aria-current="page">New Child Health Record</li>
+    </ol>
+  </nav>
+
+  {% if messages %}{% for m in messages %}
+    <div class="alert alert-{{ m.tags|default:'info' }} mb-3">{{ m }}</div>
+  {% endfor %}{% endif %}
+
+  <form id="childForm" method="post" novalidate autocomplete="off">
+    {% csrf_token %}
+
+    <!-- Header identifiers -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Family No.</label>
+            <input type="text" class="form-control" name="family_no" placeholder="e.g., F-001">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">UHC No.</label>
+            <input type="text" class="form-control" name="uhc_no" placeholder="">
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <span class="chip">{% bs_icon 'shield-check' %} Clinic copy – mirrors paper form</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Child, Mother, Father pickers -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="section-title mb-3">
+          {% bs_icon 'person' %} Child / Parents
+        </div>
+        <div class="row g-4">
+          <!-- Child -->
+          <div class="col-lg-4">
+            <div class="finder">
+              <h6 class="mb-2">{% bs_icon 'search' %} Find Child</h6>
+              <div class="input-group">
+                <input id="childSearch" type="text" class="form-control" placeholder="Type at least 2 characters…">
+                <button class="btn btn-outline-secondary" type="button" id="childClear" title="Clear">{% bs_icon 'x' %}</button>
+              </div>
+              <div id="childResults" class="mt-2 text-muted">No results yet.</div>
+              <input type="hidden" id="child_id" name="child_id">
+              <div id="childCard" class="mini-card d-none"></div>
+
+              <div class="row g-2 mt-2">
+                <div class="col-6">
+                  <label class="form-label">Name</label>
+                  <input id="child_name" type="text" class="form-control" readonly>
+                </div>
+                <div class="col-3">
+                  <label class="form-label">Sex</label>
+                  <input id="child_sex" type="text" class="form-control" readonly>
+                </div>
+                <div class="col-3">
+                  <label class="form-label">Birthdate</label>
+                  <input id="child_dob" type="date" class="form-control" readonly>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mother -->
+          <div class="col-lg-4">
+            <div class="finder">
+              <h6 class="mb-2">{% bs_icon 'person-heart' %} Find Mother</h6>
+              <div class="input-group">
+                <input id="motherSearch" type="text" class="form-control" placeholder="Type at least 2 characters…">
+                <button class="btn btn-outline-secondary" type="button" id="motherClear" title="Clear">{% bs_icon 'x' %}</button>
+              </div>
+              <div id="motherResults" class="mt-2 text-muted">No results yet.</div>
+              <input type="hidden" id="mother_id" name="mother_id">
+              <div id="motherCard" class="mini-card d-none"></div>
+
+              <div class="row g-2 mt-2">
+                <div class="col-6">
+                  <label class="form-label">Mother</label>
+                  <input id="mother_name" type="text" class="form-control" readonly>
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Age</label>
+                  <input id="mother_age" type="number" class="form-control" readonly>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Father -->
+          <div class="col-lg-4">
+            <div class="finder">
+              <h6 class="mb-2">{% bs_icon 'person' %} Find Father</h6>
+              <div class="input-group">
+                <input id="fatherSearch" type="text" class="form-control" placeholder="Type at least 2 characters…">
+                <button class="btn btn-outline-secondary" type="button" id="fatherClear" title="Clear">{% bs_icon 'x' %}</button>
+              </div>
+              <div id="fatherResults" class="mt-2 text-muted">No results yet.</div>
+              <input type="hidden" id="father_id" name="father_id">
+              <div id="fatherCard" class="mini-card d-none"></div>
+
+              <div class="row g-2 mt-2">
+                <div class="col-6">
+                  <label class="form-label">Father</label>
+                  <input id="father_name" type="text" class="form-control" readonly>
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Age</label>
+                  <input id="father_age" type="number" class="form-control" readonly>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Address & Birth Details -->
+        <div class="row g-3 mt-3">
+          <div class="col-md-6">
+            <label class="form-label">Complete Address w/ landmarks</label>
+            <input name="address_landmarks" id="address_landmarks" type="text" class="form-control" placeholder="Street, Purok/Sitio, Barangay, City – landmarks">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Birth Order</label>
+            <input name="birth_order" type="number" min="1" class="form-control" placeholder="e.g., 1">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Birth Weight (kg)</label>
+            <input name="birth_weight" id="birth_weight" type="number" step="0.01" min="0" class="form-control">
+          </div>
+        </div>
+
+        <div class="row g-3 mt-2">
+          <div class="col-md-12">
+            <label class="form-label d-block">Place of Delivery</label>
+            <div class="d-flex flex-wrap gap-3">
+              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="hospital_govt"><label class="form-check-label">Hospital (Gov’t)</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="hospital_private"><label class="form-check-label">Hospital (Private)</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="home"><label class="form-check-label">Home</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="private_clinic"><label class="form-check-label">Private Clinic</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="lying_in"><label class="form-check-label">Lying-in</label></div>
+              <div class="form-check"><input class="form-check-input" type="radio" name="place_delivery" value="hc"><label class="form-check-label">HC</label></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Feeding / NBS / Exclusive BF check -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Type of Feeding</label>
+            <select name="feeding_type" class="form-select">
+              <option value="">—</option>
+              <option value="exclusive_bf">Exclusive BF</option>
+              <option value="mixed">Mixed</option>
+              <option value="formula">Formula</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Date referred for newborn screening</label>
+            <input type="date" name="nbs_referral_date" class="form-control">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Exclusive BF check (dates)</label>
+            <div class="d-flex gap-2">
+              <input type="date" class="form-control" name="bf_check_1">
+              <input type="date" class="form-control" name="bf_check_2">
+              <input type="date" class="form-control" name="bf_check_3">
+              <input type="date" class="form-control" name="bf_check_4">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Immunization Matrix -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="section-title mb-3">
+          {% bs_icon 'capsule' %} Immunizations
+        </div>
+
+        <div class="table-responsive">
+          <table class="table matrix align-middle">
+            <thead>
+              <tr>
+                <th>Type of Immunization</th>
+                <th class="dose-cell">Wt. in 24 hrs.</th>
+                <th class="dose-cell">24 hrs.</th>
+                <th class="dose-cell">1st</th>
+                <th class="dose-cell">2nd</th>
+                <th class="dose-cell">3rd</th>
+              </tr>
+            </thead>
+            <tbody id="immTbody">
+              {% comment %} Keep vaccine keys stable for JSON snapshot {% endcomment %}
+              <tr data-vac="bcg">
+                <th>BCG</th>
+                <td><input name="wt24h_bcg" type="number" step="0.01" class="form-control" placeholder="kg"></td>
+                <td><input name="bcg_d0" type="date" class="form-control"></td>
+                <td><input name="bcg_d1" type="date" class="form-control"></td>
+                <td><input name="bcg_d2" type="date" class="form-control"></td>
+                <td><input name="bcg_d3" type="date" class="form-control"></td>
+              </tr>
+              <tr data-vac="hepb">
+                <th>Hep. B</th>
+                <td><input name="wt24h_hepb" type="number" step="0.01" class="form-control" placeholder="kg"></td>
+                <td><input name="hepb_d0" type="date" class="form-control"></td>
+                <td><input name="hepb_d1" type="date" class="form-control"></td>
+                <td><input name="hepb_d2" type="date" class="form-control"></td>
+                <td><input name="hepb_d3" type="date" class="form-control"></td>
+              </tr>
+              <tr data-vac="pcv">
+                <th>PCV</th>
+                <td><input name="wt24h_pcv" type="number" step="0.01" class="form-control" placeholder="kg"></td>
+                <td><input name="pcv_d0" type="date" class="form-control"></td>
+                <td><input name="pcv_d1" type="date" class="form-control"></td>
+                <td><input name="pcv_d2" type="date" class="form-control"></td>
+                <td><input name="pcv_d3" type="date" class="form-control"></td>
+              </tr>
+              <tr data-vac="opv">
+                <th>OPV</th>
+                <td><input name="wt24h_opv" type="number" step="0.01" class="form-control" placeholder="kg"></td>
+                <td><input name="opv_d0" type="date" class="form-control"></td>
+                <td><input name="opv_d1" type="date" class="form-control"></td>
+                <td><input name="opv_d2" type="date" class="form-control"></td>
+                <td><input name="opv_d3" type="date" class="form-control"></td>
+              </tr>
+              <tr data-vac="amv">
+                <th>AMV (Measles)</th>
+                <td><input name="wt24h_amv" type="number" step="0.01" class="form-control" placeholder="kg"></td>
+                <td><input name="amv_d0" type="date" class="form-control"></td>
+                <td><input name="amv_d1" type="date" class="form-control"></td>
+                <td><input name="amv_d2" type="date" class="form-control"></td>
+                <td><input name="amv_d3" type="date" class="form-control"></td>
+              </tr>
+              <tr data-vac="penta">
+                <th>Pentavalent</th>
+                <td><input name="wt24h_penta" type="number" step="0.01" class="form-control" placeholder="kg"></td>
+                <td><input name="penta_d0" type="date" class="form-control"></td>
+                <td><input name="penta_d1" type="date" class="form-control"></td>
+                <td><input name="penta_d2" type="date" class="form-control"></td>
+                <td><input name="penta_d3" type="date" class="form-control"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <input type="hidden" id="immunizations_json" name="immunizations_json">
+      </div>
+    </div>
+
+    <!-- Protection/Anemia/Vit A -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">Child protected at birth</label>
+            <select name="cpab" class="form-select">
+              <option value="">—</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Date assessed</label>
+            <input type="date" name="cpab_date_assessed" class="form-control">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">TT status of mother</label>
+            <select name="tt_status_mother" class="form-select">
+              <option value="">—</option>
+              <option>TT1</option><option>TT2</option><option>TT3</option><option>TT4</option><option>TT5</option><option>FIM</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">If low birth wt.</label>
+            <input type="text" name="low_bw_action" class="form-control" placeholder="Notes / action">
+          </div>
+        </div>
+
+        <div class="row g-3 mt-2">
+          <div class="col-md-3">
+            <label class="form-label">Anemic children 2–59 mos. Seen</label>
+            <input type="date" name="anemic_seen_2_59" class="form-control">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Anemic children 2–59 mos. Given iron</label>
+            <input type="date" name="anemic_given_2_59" class="form-control">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">2–6 mos. Seen</label>
+            <input type="date" name="seen_2_6" class="form-control">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">2–6 mos. Given iron</label>
+            <input type="date" name="iron_2_6" class="form-control">
+          </div>
+        </div>
+
+        <div class="row g-3 mt-2">
+          <div class="col-md-2">
+            <label class="form-label">Vit. A Given (1)</label>
+            <input type="date" name="vita_1" class="form-control">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Vit. A Given (2)</label>
+            <input type="date" name="vita_2" class="form-control">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Vit. A Given (3)</label>
+            <input type="date" name="vita_3" class="form-control">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Date iron started</label>
+            <input type="date" name="iron_started" class="form-control">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Completed</label>
+            <input type="date" name="completed_date" class="form-control">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Follow-up Visits -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="section-title mb-3">
+          {% bs_icon 'clipboard2-pulse' %} Visit Log
+        </div>
+
+        <div class="d-flex gap-2 mb-2">
+          <button type="button" id="visitAddRow" class="btn btn-sm btn-outline-primary">
+            {% bs_icon 'plus' %} Add Visit
+          </button>
+          <div class="helper">Track Date, Age, Wt, Temp, Ht, Findings, Notes</div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table align-middle table-visit">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Age</th>
+                <th>Wt.</th>
+                <th>Temp.</th>
+                <th>Ht.</th>
+                <th>Findings</th>
+                <th class="notes">Notes</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="visitTbody"></tbody>
+          </table>
+        </div>
+
+        <input type="hidden" id="visits_json" name="visits_json">
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">{% bs_icon 'check2' extra_classes='me-2' %} Save</button>
+      <a class="btn btn-outline-secondary" href="{% url 'midwife:dashboard' %}">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+(function(){
+  const SEARCH_URL   = "{% url 'midwife:ajax_resident_search' %}";
+  const CARD_URL     = "{% url 'midwife:ajax_person_card' %}";
+  const DETAILS_URL  = "{% url 'midwife:ajax_person_details' %}";
+
+  function styleMiniCard(host){
+    if (!host) return;
+    const nameEl = host.querySelector('strong, .resident-name') || host.firstElementChild;
+    if (nameEl && !nameEl.classList.contains('resident-name')) nameEl.classList.add('resident-name');
+    host.querySelectorAll('small, .badge').forEach(el=>{
+      if (!el.classList.contains('code-pill')) el.classList.add('code-pill');
+    });
+  }
+  function blockEnter(el){ el?.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); } }); }
+  function setResultsHost($host, html){ $host.innerHTML = html; }
+
+  function injectCardActions($card, {onChange, onRemove}) {
+    const actions = document.createElement('div');
+    actions.className = 'actions mt-2 d-flex gap-2';
+    actions.innerHTML = `
+      <button type="button" class="btn btn-sm btn-outline-secondary finder-change">{% bs_icon 'arrow-repeat' %} Change</button>
+      <button type="button" class="btn btn-sm btn-outline-danger finder-remove">{% bs_icon 'trash' %} Remove</button>
+    `;
+    $card.appendChild(actions);
+    $card.addEventListener('click', (e) => {
+      const changeBtn = e.target.closest('.finder-change');
+      const removeBtn = e.target.closest('.finder-remove');
+      if (changeBtn) onChange?.();
+      if (removeBtn) onRemove?.();
+    });
+  }
+
+  function personName(p){
+    const first = p?.first_name || '';
+    const last  = p?.last_name || '';
+    return (first || last) ? `${first} ${last}`.trim() : '';
+  }
+
+  function bindFinder({inputId, resultsId, hiddenId, cardId, clearBtnId, onDetails}){
+    const $input   = document.getElementById(inputId);
+    const $results = document.getElementById(resultsId);
+    const $hidden  = document.getElementById(hiddenId);
+    const $card    = document.getElementById(cardId);
+    const $clear   = document.getElementById(clearBtnId);
+
+    if (!($input && $results && $hidden)) return;
+    blockEnter($input);
+
+    let timer = null;
+    const showNoResults = () => setResultsHost($results, '<div class="text-muted">No results yet.</div>');
+    const showTypeMore  = () => setResultsHost($results, '<div class="text-muted">Type at least 2 characters…</div>');
+
+    function closeSearchUI(){ $results.classList.add('d-none'); $input.readOnly = true; }
+    function openSearchUI(){ $results.classList.remove('d-none'); $input.readOnly = false; showTypeMore(); $input.focus(); }
+
+    $input.addEventListener('input', () => {
+      const q = $input.value.trim();
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (q.length < 2) { showTypeMore(); return; }
+        setResultsHost($results, '<div class="py-2 text-center"><span class="spinner-inline"></span> Searching…</div>');
+        fetch(SEARCH_URL + '?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+          .then(r => r.json())
+          .then(j => setResultsHost($results, j.ok ? j.html : '<div class="text-danger">Search failed.</div>'))
+          .catch(() => setResultsHost($results, '<div class="text-danger">Search failed.</div>'));
+      }, 250);
+    });
+
+    $results.addEventListener('click', (e) => {
+      const btn = e.target.closest('.pick-resident');
+      if (!btn) return;
+      const pid = btn.getAttribute('data-person-id');
+      if (!pid) return;
+
+      $hidden.value = pid;
+
+      if ($card) {
+        $card.classList.remove('d-none');
+        $card.innerHTML = '<div class="text-muted">Loading…</div>';
+        fetch(CARD_URL + '?person_id=' + encodeURIComponent(pid), { credentials: 'same-origin' })
+          .then(r => r.json())
+          .then(j => {
+            $card.innerHTML = j.html;
+            styleMiniCard($card);
+            injectCardActions($card, {
+              onChange: () => openSearchUI(),
+              onRemove: () => {
+                $hidden.value = ''; $input.value = '';
+                $card.classList.add('d-none'); $card.innerHTML = '';
+                openSearchUI(); showNoResults();
+              }
+            });
+          });
+      }
+
+      fetch(DETAILS_URL + '?person_id=' + encodeURIComponent(pid), { credentials: 'same-origin' })
+        .then(r => r.json())
+        .then(j => { if (j.ok) onDetails?.(j.person || {}); });
+
+      closeSearchUI();
+    });
+
+    $clear?.addEventListener('click', () => {
+      $input.value = ''; $hidden.value = '';
+      if ($card){ $card.classList.add('d-none'); $card.innerHTML = ''; }
+      openSearchUI(); showNoResults();
+    });
+
+    showNoResults();
+  }
+
+  // Child details
+  bindFinder({
+    inputId:'childSearch', resultsId:'childResults', hiddenId:'child_id', cardId:'childCard', clearBtnId:'childClear',
+    onDetails:(p)=>{
+      document.getElementById('child_name').value = personName(p);
+      document.getElementById('child_sex').value  = p?.sex || '';
+      document.getElementById('child_dob').value  = p?.birthdate || '';
+      // inject address into main address if blank
+      const adr = document.getElementById('address_landmarks');
+      if (adr && !adr.value) adr.value = p?.address || '';
+    }
+  });
+
+  // Mother
+  bindFinder({
+    inputId:'motherSearch', resultsId:'motherResults', hiddenId:'mother_id', cardId:'motherCard', clearBtnId:'motherClear',
+    onDetails:(p)=>{
+      document.getElementById('mother_name').value = personName(p);
+      document.getElementById('mother_age').value  = (p?.age ?? '');
+    }
+  });
+
+  // Father
+  bindFinder({
+    inputId:'fatherSearch', resultsId:'fatherResults', hiddenId:'father_id', cardId:'fatherCard', clearBtnId:'fatherClear',
+    onDetails:(p)=>{
+      document.getElementById('father_name').value = personName(p);
+      document.getElementById('father_age').value  = (p?.age ?? '');
+    }
+  });
+
+  /* ---------- Immunization & Visits JSON Snapshots ---------- */
+  const immTbody = document.getElementById('immTbody');
+  const immJson  = document.getElementById('immunizations_json');
+
+  function snapshotImmunizations(){
+    const rows = {};
+    immTbody.querySelectorAll('tr[data-vac]').forEach(tr=>{
+      const key = tr.getAttribute('data-vac');
+      rows[key] = {
+        wt24h: tr.querySelector(`[name="wt24h_${key}"]`)?.value || null,
+        d0:    tr.querySelector(`[name="${key}_d0"]`)?.value || null,
+        d1:    tr.querySelector(`[name="${key}_d1"]`)?.value || null,
+        d2:    tr.querySelector(`[name="${key}_d2"]`)?.value || null,
+        d3:    tr.querySelector(`[name="${key}_d3"]`)?.value || null,
+      };
+    });
+    if (immJson) immJson.value = JSON.stringify(rows);
+  }
+  immTbody?.addEventListener('input', snapshotImmunizations);
+  snapshotImmunizations();
+
+  const visitTbody = document.getElementById('visitTbody');
+  const visitAdd   = document.getElementById('visitAddRow');
+  const visitsJson = document.getElementById('visits_json');
+
+  function visitRow(){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="date" class="form-control" name="v_date[]"></td>
+      <td><input type="text" class="form-control" name="v_age[]" placeholder="e.g., 6 mos"></td>
+      <td><input type="number" step="0.01" class="form-control" name="v_wt[]" placeholder="kg"></td>
+      <td><input type="number" step="0.1" class="form-control" name="v_temp[]" placeholder="°C"></td>
+      <td><input type="number" step="0.1" class="form-control" name="v_ht[]" placeholder="cm"></td>
+      <td><input type="text" class="form-control" name="v_findings[]" placeholder=""></td>
+      <td class="notes"><input type="text" class="form-control" name="v_notes[]" placeholder=""></td>
+      <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger v-remove">{% bs_icon 'trash' %}</button></td>
+    `;
+    return tr;
+  }
+  function snapshotVisits(){
+    const rows = Array.from(visitTbody.querySelectorAll('tr')).map(tr => ({
+      date: tr.querySelector('[name="v_date[]"]').value || null,
+      age: tr.querySelector('[name="v_age[]"]').value || null,
+      wt: tr.querySelector('[name="v_wt[]"]').value || null,
+      temp: tr.querySelector('[name="v_temp[]"]').value || null,
+      ht: tr.querySelector('[name="v_ht[]"]').value || null,
+      findings: tr.querySelector('[name="v_findings[]"]').value || null,
+      notes: tr.querySelector('[name="v_notes[]"]').value || null,
+    }));
+    if (visitsJson) visitsJson.value = JSON.stringify(rows);
+  }
+  visitAdd?.addEventListener('click', () => { visitTbody.appendChild(visitRow()); snapshotVisits(); });
+  visitTbody?.addEventListener('input', snapshotVisits);
+  visitTbody?.addEventListener('click', (e) => {
+    if (e.target.closest('.v-remove')) { e.target.closest('tr')?.remove(); snapshotVisits(); }
+  });
+  snapshotVisits();
+
+  /* ---------- Submit guard ---------- */
+  document.getElementById('childForm')?.addEventListener('submit', (e) => {
+    snapshotImmunizations();
+    snapshotVisits();
+    // Minimal guard: require a child selection
+    const childId = document.getElementById('child_id')?.value;
+    if (!childId){
+      e.preventDefault();
+      alert('Please select the child resident first.');
+      document.getElementById('childSearch')?.focus();
+    }
+  });
+})();
+</script>
+{% endblock %}

@@ -7,25 +7,75 @@
 <link rel="stylesheet" href="{% static 'css/table.css' %}">
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
 <link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<style>
+  /* ─────────── Brand tokens (BARUG maroon) ─────────── */
+  :root{
+    --brand-900:#3a1217;
+    --brand-800:#561c24;
+    --brand-700:#6d2932;    /* primary */
+    --brand-600:#7a323b;
+    --brand-100:#f3eaeb;    /* soft bg */
+    --brand-050:#fbf6f6;    /* very soft bg */
+  }
+
+  /* Buttons */
+  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
+  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
+  .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); background:#fff; }
+  .btn-outline-brand:hover{ background:var(--brand-700); color:#fff; }
+
+  /* Inputs / focus ring */
+  .form-control:focus, .form-select:focus, .form-check-input:focus{
+    border-color:var(--brand-700);
+    box-shadow:0 0 0 .25rem rgba(109,41,50,.25);
+    outline:none;
+  }
+  .form-check-input:checked{ background-color:var(--brand-700); border-color:var(--brand-700); }
+
+  /* Toolbar (search like Requests page) */
+  .toolbar{
+    background:#fff;
+    border:1px solid var(--bs-border-color,#dee2e6);
+    border-radius:1rem;
+    padding:.75rem;
+    gap:.5rem;
+  }
+  .searchbox{ position:relative; flex:1; min-width:280px; }
+  .searchbox .bi{
+    position:absolute; left:.8rem; top:50%;
+    transform:translateY(-50%); opacity:.65; color:var(--brand-700);
+    pointer-events:none;
+  }
+  /* ensure left padding for whatever widget the form renders */
+  .searchbox :where(input,.form-control){ padding-left:2.35rem !important; }
+</style>
 {% endblock %}
 
 {% block content %}
 <div class="page-wrap">
 
-  <div class="container-fluid pt-3 page-main" style="margin-top:40px;">
+  <div class="container-fluid pt-3 page-main">
     <div class="row g-3">
 
-      <!-- Search (GET) -->
-      <form method="get" class="d-flex gap-2 flex-wrap">
-        <div class="form-floating" style="min-width:280px;">
+      <!-- Toolbar: search like the “nice” bar -->
+      <form method="get" class="toolbar d-flex align-items-center flex-wrap mb-1">
+        <div class="searchbox">
+          {% bs_icon 'search' extra_classes='bi' %}
+          {# Use your bound form field so validation & value persist #}
           {{ form.search }}
-          <label for="{{ form.search.id_for_label }}">{{ form.search.label }}</label>
+          <label for="{{ form.search.id_for_label }}" class="visually-hidden">
+            {{ form.search.label|default:"Search" }}
+          </label>
         </div>
-        <button class="btn btn-primary" type="submit">
-          {% bs_icon 'search' size='1em' %} Search
+
+        <button class="btn btn-brand d-flex align-items-center" type="submit">
+          {% bs_icon 'search' extra_classes='me-2' %} Search
         </button>
+
         {% if request.GET %}
-          <a class="btn btn-outline-secondary" href="{% url 'clerk:identity_verification' %}">Reset</a>
+          <a class="btn btn-outline-brand ms-2" href="{% url 'clerk:identity_verification' %}">
+            {% bs_icon 'x-circle' extra_classes='me-1' %} Reset
+          </a>
         {% endif %}
       </form>
 
@@ -63,13 +113,15 @@
                         <td>
                           <div class="d-flex gap-1">
                             {% if r.requester_person_id %}
-                              <a class="btn btn-icon" title="View submission"
+                              <a class="btn btn-outline-brand btn-sm"
+                                 title="View submission"
                                  href="{% url 'clerk:person_details' r.requester_person_id %}">
-                                {% bs_icon 'person-lines-fill' size='1em' %}
+                                {% bs_icon 'person-lines-fill' extra_classes='me-1' %} Open
                               </a>
                             {% else %}
-                              <button class="btn btn-icon" disabled title="No person id available">
-                                {% bs_icon 'person-lines-fill' size='1em' %}
+                              <button class="btn btn-outline-brand btn-sm" disabled
+                                      title="No person id available">
+                                {% bs_icon 'person-lines-fill' extra_classes='me-1' %} Open
                               </button>
                             {% endif %}
                           </div>
@@ -98,6 +150,18 @@
 
     </div>
   </div>
+            {% if page_obj.has_other_pages %}
+              <div class="page-pagination">
+                {% include 'paginator.html' %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
 
 </div>
 {% endblock %}
+

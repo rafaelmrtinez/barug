@@ -15,6 +15,20 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY")
+PAYMENTS_DEV_BYPASS = os.getenv("PAYMENTS_DEV_BYPASS", "false").lower() in ("1","true","yes")
+PAYMONGO_SECRET_KEY    = os.getenv("PAYMONGO_SECRET_KEY")
+PAYMONGO_WEBHOOK_SECRET= os.getenv("PAYMONGO_WEBHOOK_SECRET")
+STAFF_SYSTEM_ID        =13
+
+DEBUG = True
+ALLOWED_HOSTS = ["*", "localhost", "127.0.0.1", ".ngrok-free.app"]
+CSRF_TRUSTED_ORIGINS = ["https://*.ngrok-free.app"]
+
+ANDROID_PACKAGE = "host.exp.exponent"
+
+SEMAPHORE_API_KEY = os.getenv("SEMAPHORE_API_KEY", "")
+SEMAPHORE_SENDER_NAME = os.getenv("SEMAPHORE_SENDER_NAME", "SEMAPHORE")
 
 # Email backend (Gmail SMTP)
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
@@ -48,7 +62,7 @@ if isProduction != None and isProduction == "True":
     ALLOWED_HOSTS = ["barug-development.onrender.com"]
 else:
     DEBUG = True
-    ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -74,6 +88,9 @@ INSTALLED_APPS = [
     "secretary",
     "staff_admin",
     "treasurer",
+    "midwife",
+    "payments",
+    "notifications",
 ]
 
 MIDDLEWARE = [
@@ -106,6 +123,7 @@ TEMPLATES = [
             BASE_DIR / "secretary/templates/secretary",
             BASE_DIR / "staff_admin/templates/staff_admin",
             BASE_DIR / "treasurer/templates/treasurer",
+            BASE_DIR / "midwife/templates/midwife",
         ],
         "APP_DIRS": True,
         "OPTIONS": {
@@ -136,19 +154,23 @@ WSGI_APPLICATION = "barug.wsgi.application"
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET")
 SUPABASE_ID_UPLOADS_BUCKET = os.getenv("SUPABASE_ID_UPLOADS_BUCKET", "id-uploads")
+SUPABASE_OCR_TEST_BUCKET = os.getenv("SUPABASE_OCR_TEST_BUCKET ", "ocr-testing")
 SUPABASE_BUSINESS_PROOF_BUCKET = os.getenv("SUPABASE_BUSINESS_PROOF_BUCKET")
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv("DB_NAME"),
-        'USER': os.getenv("DB_USER"),
-        'PASSWORD': os.getenv("DB_PASSWORD"),
-        'HOST': os.getenv("DB_HOST"),
-        'PORT': os.getenv("DB_PORT")
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("DB_NAME"),
+        "USER": os.getenv("DB_USER"),
+        "PASSWORD": os.getenv("DB_PASSWORD"),
+        "HOST": os.getenv("DB_HOST"),
+        "PORT": os.getenv("DB_PORT"),
+        "OPTIONS": {"sslmode": "require"},  # <-- add this for Supabase
     }
 }
+
 
 
 # Password validation

@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import web_views
 from django.conf import settings
 from django.conf.urls.static import static
 
@@ -8,12 +9,18 @@ app_name = 'clerk'
 urlpatterns = [
     # document requests
     path("requests/", views.queue, name="queue"),
+
     path("requests/<int:doc_request_id>/", views.detail, name="detail"),
+
+    # ✅ FIXED: confirm should call views.confirm_request (not detail)
+    path("requests/<int:doc_request_id>/confirm/", views.confirm_request, name="confirm_request"),
+    path("requests/<int:doc_request_id>/confirm-forward-treasurer/", views.confirm_forward_treasurer, name="confirm_forward_treasurer"),
+
     path("requests/<int:doc_request_id>/mark-printing/", views.mark_for_printing, name="mark_printing"),
     path("requests/<int:doc_request_id>/mark-ready-for-pickup/", views.mark_request_ready_for_pickup, name="mark_ready_for_pickup"),
     path("requests/<int:doc_request_id>/mark-released/", views.mark_released, name="mark_released"),
     path("requests/<int:doc_request_id>/decline/", views.decline, name="decline"),
-    
+
     path("walkin/", views.walkin_new, name="walkin_new"),
     path("walkin/create/", views.walkin_create, name="walkin_create"),
 
@@ -39,6 +46,11 @@ urlpatterns = [
     path("business_list/", views.business_list, name="business_list"),
     path("business_information/<int:b_id>/", views.business_information, name="business_information"),
 
+    # OCR
+    path('upload-id/', web_views.upload_valid_id_files, name='upload_id_files'),
+    path("valid-id/upload/", web_views.upload_valid_id_files, name="valid_id_upload"),
+    path("valid-id/test/", web_views.upload_valid_id_test_page, name="valid_id_test"),
+
     path("ajax/business_search/", views.ajax_business_search, name="ajax_business_search"),
-     path("ajax/resident_owner_search/", views.ajax_owner_search, name="ajax_owner_search"),
+    path("ajax/resident_owner_search/", views.ajax_owner_search, name="ajax_owner_search"),
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

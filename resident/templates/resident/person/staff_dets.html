@@ -14,20 +14,7 @@
     <div class="col-12">
       <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
         <h4><strong>Raphael H. Bellosillo</strong></h4>
-        <div class="meta d-flex gap-4">
-          <div>
-            <div class="section-title mb-1">Date Submitted</div>
-            <div>{% bs_icon 'calendar-event-fill' size='1em' %} 
-              <b>August 16, 2025</b>
-            </div>
-          </div>
-          <div>
-            <div class="section-title mb-1">Status</div>
-            <div>{% bs_icon 'reception-2' size='1.2em' %} 
-              <b>Pending</b>
-            </div>
-          </div>
-        </div>
+        <span class="badge" style="background-color: var(--bs-danger-text-emphasis);">RESIDENT</span>
       </div>
 
       <div class="divider"></div>
@@ -52,18 +39,18 @@
             </div>
             </div>
 
-            <!-- Socioeconomic Information -->
             <div class="col-md-6">
-                <div class="section-title mb-2">Socioeconomic Information</div>
+                <div class="section-title mb-2">Staff Information</div>
                 <div class="kv">
-                    <div class="kv-item"><span class="kv-key">Educational Attainment</span><span class="kv-val">Undergraduate Studies</span></div>
-                    <div class="kv-item"><span class="kv-key">Employment Status</span><span class="kv-val">Employed</span></div>
-                    <div class="kv-item"><span class="kv-key">Occupation</span><span class="kv-val">Software Developer</span></div>
-                    <div class="kv-item"><span class="kv-key">Monthly Personal Income</span><span class="kv-val">₱35,000</span></div>
-                    <div class="kv-item"><span class="kv-key">Government Program</span><span class="kv-val">PhilHealth, SSS</span></div>
+                    <div class="kv-item"><span class="kv-key">Role</span><span class="kv-val">Undergraduate Studies</span></div>
+                    <!-- if bhw -->
+                    <div class="kv-item"><span class="kv-key">Assigned Purok / Sitio</span><span class="kv-val">Employed</span></div>
+                    <!-- if lupon member -->
+                    <div class="kv-item"><span class="kv-key">Schedule</span><span class="kv-val">Software Developer</span></div>
+                    <!-- PLEASE INCLUDE THE OTHER INFORMATION THAT IS NEEDED TO BE SHOW FOR A BARANGAY STAFF (EXAMPLE: RELEVANT STATUS FOR A BARANGAY STAFF) -->
                 </div>
 
-                <div class="section-title mb-2 pt-4">Supporting Document</div>
+                <div class="section-title mb-2 pt-4">Supporting Documents</div>
                 <div class="kv">
                     <div class="kv-item"><span class="kv-key">ID Type</span><span class="kv-val">15 years</span></div>
                     <div class="doc-carousel carousel slide" id="docCarousel" data-bs-ride="false" aria-label="Supporting documents">
@@ -103,8 +90,7 @@
       <div class="divider"></div>
 
       <div class="mt-auto button-container justify-content-end mb-2">
-        <button type="reset" class="btn btn-reset">Decline</button>
-        <button type="button" class="btn btn-submit">Approve</button>
+        <button type="button" class="btn btn-submit">Update</button>
       </div>
     </div>
   </div>
