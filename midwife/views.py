@@ -26,7 +26,7 @@ from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
 from barug.error_messages import SOMETHING_WENT_WRONG
 from barug.utility.json_utility import JSONCustomUtility
-from src.app.services.anc_service_utility import ANCServiceUtility
+from midwife.utility.anc_view_utility import ANCViewUtility
 from midwife.utility.immunitization_view_utility import ImmunizationViewUtility
 from src.app.bootstrap.app_containers import AppContainer
 from src.app.contracts.antenatal_service import IAntenatalCareService
@@ -746,20 +746,23 @@ def anc_care_http(request: HttpRequest, service: IAntenatalCareService = Provide
         data = json.loads(request.body)
         
         raw_lab_results = data.get("p_lab_results")
-        tities_vacc = data.get("p_tt_vaccines")
+        raw_tt_vacc = data.get("p_tt_vaccines")
 
         if isinstance(raw_lab_results, str):
             raw_lab_results = json.loads(raw_lab_results)
 
-        if isinstance(tities_vacc, str):
-            tities_vacc = json.loads(tities_vacc)
+        if isinstance(raw_tt_vacc, str):
+            raw_tt_vacc = json.loads(raw_tt_vacc)
 
         data = JSONCustomUtility.clean_empty_strings(data)
         
-        init_data = AntenatalCareRequest(**data)
-        init_data.p_assessed_by_id = request.session.get("auth", None).get("staff_id", None)
+        staff_id = request.session.get("auth", None).get("staff_id", None)
+        
+        init_data = AntenatalCareRequest(**data, p_assessed_by_id=staff_id)
+        tt_vaccines = ANCViewUtility.tt_vaccines_obj_converter(raw_tt_vacc)
+        lab_results = ANCViewUtility.laboratory_results_obj_converter(raw_lab_results)
 
-        res = service.execute(init_data, raw_lab_results, tities_vacc)
+        res = service.execute(init_data, lab_results, tt_vaccines)
         
         if not res:
             return JsonResponse({"error": "Failed to process ANC Care"}, status=500)
@@ -767,11 +770,11 @@ def anc_care_http(request: HttpRequest, service: IAntenatalCareService = Provide
         return JsonResponse({"message": "ANC Care RPC endpoint placeholder"}, status=200)
 
     except json.JSONDecodeError:
-        logger.error(f"View (anc_care_http) = {e}")
+        logger.error("View (anc_care_http) encountered an exception", exc_info=True)
         return JsonResponse({"error": "Invalid JSON"}, status=400)
     except ANCVisitException as e:
-        logger.error(f"View (anc_care_http) = {e}")
+        logger.error("View (anc_care_http) encountered an exception", exc_info=True)
         return JsonResponse({"error": str(e)}, status=400)
     except Exception as e:
-        logger.critical(f"View (anc_care_http) = {e}")
+        logger.critical("View (anc_care_http) encountered an exception", exc_info=True)
         return JsonResponse({"error": "Unexpected error encountered. Please try again."}, status=500)
