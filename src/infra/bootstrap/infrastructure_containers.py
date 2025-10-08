@@ -28,6 +28,11 @@ class InfraContainer(containers.DeclarativeContainer):
         ctx=context
     )
     
+    child_repository: providers.Factory[IChildRepository] = providers.Factory(
+        ChildRepository,
+        ctx=context
+    )
+    
     family_repository: providers.Factory[IFamilyRepository] = providers.Factory(
         FamilyRepository,
         ctx=context
