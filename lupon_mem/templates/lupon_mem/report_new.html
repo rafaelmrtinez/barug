@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% load static bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<style>
+  :root{ --brand-700:#6d2932; --brand-800:#561c24; --brand-100:#f3eaeb; }
+  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
+  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
+  .card{ border-radius: 1rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap" style="margin-top: 40;">
+  <div class="container-fluid pt-3 page-main">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">{{ page_title }}</h4>
+      <a href="{% url 'lupon_mem:report_list' %}" class="btn btn-outline-brand">{% bs_icon 'arrow-left' extra_classes='me-1' %} Back</a>
+    </div>
+
+    <form method="post" class="needs-validation" novalidate>
+      {% csrf_token %}
+      <div class="card shadow-sm mb-3"><div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Incident Subject</label>
+            <input class="form-control" name="incident_subject" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Date</label>
+            <input type="date" class="form-control" name="incident_date">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Time</label>
+            <input type="time" class="form-control" name="incident_time">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Narrative</label>
+            <textarea class="form-control" name="incident_desc" rows="4"></textarea>
+          </div>
+        </div>
+      </div></div>
+
+      <div class="card shadow-sm mb-3"><div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Incident Address ID (optional)</label>
+            <input class="form-control" name="incident_address_id" placeholder="e.g., 101">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Complainant Person ID</label>
+            <input class="form-control" name="complainant_id" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Respondent IDs (comma-separated)</label>
+            <input class="form-control" name="respondent_ids" placeholder="1002,1003">
+          </div>
+        </div>
+      </div></div>
+
+      <div class="d-flex justify-content-end">
+        <button class="btn btn-brand">{% bs_icon 'save' extra_classes='me-2' %} Save Report</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,138 +1,583 @@
 {% load static %}
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Build Form</title>
+  <title>Form Builder</title>
+
+  <!-- Bootstrap & Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
   <style>
-    .split { display:flex; gap:1rem; height: calc(100vh - 120px); }
-    .left  { flex: 0 0 460px; overflow:auto; }
-    .right { flex: 1; background:#f7f7f8; border-radius: 12px; padding: 12px; position: relative; }
-    #pdfCanvas { width:100%; height: 100%; object-fit: contain; background:white; border:1px solid #e5e5e5; }
-    .sticky-actions { position: sticky; bottom:0; background: #fff; padding: .75rem 0; border-top:1px solid #eee; }
-    .field { margin-bottom:.75rem; }
-    .label-req::after { content: " *"; color:#d22; }
+    :root{
+      --brand:#7B1E22; --brand-700:#6a1a1e; --accent:#D4AF37;
+      --ink:#212529; --muted:#6c757d; --card:#ffffff; --bg:#faf9f8; --ring:rgba(123,30,34,.25);
+      --dropdown-bg:#ffffff; --dropdown-border:#c7c7c7; --dropdown-hover:#f3efe9; --dropdown-active:#eadfcd;
+      --dropdown-shadow: 0 10px 24px rgba(0,0,0,.12), 0 2px 6px rgba(0,0,0,.06);
+    }
+    html,body{ background: var(--bg); }
+    .page-wrap{ max-width:1120px; margin:0 auto; padding:1.25rem; }
+    .hero{ border-radius:16px; background:#fff; border:1px solid rgba(0,0,0,.06); padding:1rem 1.25rem; }
+    .hero .title{ font-weight:700; letter-spacing:.2px; margin:0; }
+    .hero .eyebrow{ text-transform:uppercase; font-size:.75rem; color:var(--muted); letter-spacing:.18rem; }
+    .badge-code{ display:inline-flex; gap:.35rem; font:500 12px ui-monospace,Menlo,Consolas,monospace;
+      padding:.35rem .55rem; border-radius:.5rem; background:#f7f4ef; color:var(--brand); border:1px solid rgba(0,0,0,.06); }
+    .hash{ opacity:.65; }
+
+    .card{ border:1px solid rgba(0,0,0,.06); border-radius:16px; background:var(--card);
+      box-shadow:0 2px 8px rgba(0,0,0,.03), 0 1px 0 rgba(212,175,55,.12) inset; }
+    .card .card-header{ background:#fff; border-bottom:1px solid rgba(0,0,0,.06); border-radius:16px 16px 0 0!important; padding:.9rem 1rem; }
+    .card .card-body{ padding:1.1rem; }
+
+    .form-label{ font-weight:600; color:var(--ink); }
+    .label-req::after{ content:" *"; color:#dc3545; }
+    .form-control,.input-group-text{ border-radius:.65rem; border-color:rgba(0,0,0,.12); }
+    .form-control:focus{ border-color:var(--brand); box-shadow:0 0 0 .2rem var(--ring); }
+
+    .row.g-3 > [class*="col-"]{ scroll-margin-top:100px; }
+
+    .sticky-actions{ position:sticky; bottom:0; background:#fff; border-top:1px solid rgba(0,0,0,.06);
+      padding:.8rem 1rem; display:flex; justify-content:space-between; gap:.75rem; border-radius:0 0 16px 16px; }
+    .hint{ color:var(--muted); font-size:.9rem; }
+
+    .btn-brand{ --bs-btn-bg:var(--brand); --bs-btn-border-color:var(--brand);
+      --bs-btn-hover-bg:var(--brand-700); --bs-btn-hover-border-color:var(--brand-700);
+      --bs-btn-focus-shadow-rgb:123,30,34; --bs-btn-active-bg:var(--brand-700); --bs-btn-active-border-color:var(--brand-700); color:#fff; }
+    .btn-outline-brand{ --bs-btn-color:var(--brand); --bs-btn-border-color:var(--brand);
+      --bs-btn-hover-bg:var(--brand); --bs-btn-hover-border-color:var(--brand);
+      --bs-btn-active-bg:var(--brand); --bs-btn-active-border-color:var(--brand); color:var(--brand); }
+    .btn i{ vertical-align:-1px; }
+    .btn-link-compact{ border-radius:12px; border:1px solid rgba(0,0,0,.08); padding:.45rem .7rem; color:var(--ink); background:#fff; }
+    .btn-link-compact:hover{ border-color:var(--brand); color:var(--brand); }
+    .subtle{ color:var(--muted); }
+
+    /* Typeahead */
+    .typeahead-wrap{ position:relative; }
+    .typeahead-dropdown{
+      position:absolute; left:0; right:0; top:100%;
+      background:var(--dropdown-bg);
+      border:1px solid var(--dropdown-border);
+      border-radius:.65rem;
+      box-shadow: var(--dropdown-shadow);
+      margin-top:.25rem;
+      max-height: 280px;
+      overflow:auto;
+      z-index: 1050;
+      display:none;
+    }
+    .typeahead-item{
+      padding:.55rem .75rem;
+      font-size:.95rem;
+      line-height:1.2;
+      color:#1b1b1b;
+      background:transparent;
+      border:0;
+      text-align:left;
+      width:100%;
+    }
+    .typeahead-item:hover{ background:var(--dropdown-hover); }
+    .typeahead-item.active,
+    .typeahead-item:focus{ background:var(--dropdown-active); outline:none; }
+    .typeahead-empty{ padding:.6rem .8rem; color:#666; font-size:.9rem; }
+
+    .kbd{
+      display:inline-block; padding:0 .35rem; border:1px solid #c9c9c9; border-bottom-width:2px; border-radius:4px;
+      font:500 12px ui-monospace, Menlo, Consolas, monospace; color:#333; background:#f8f8f8;
+    }
+    .help-hint,.kp-hint{ color:#6a6a6a; font-size:.86rem; margin-top:.25rem; display:block; }
+
+    /* KP-9 helpers */
+    .kp-field .kp-hint{ display:block; }
+    .kp-chip-row .btn{ border-radius:999px; }
   </style>
 </head>
-<body class="container-fluid py-3">
 
-  <div class="d-flex align-items-center mb-3">
-    <a class="btn btn-outline-secondary btn-sm me-2" href="{% url 'lupon_mem:case_detail' case_id %}">&larr; Back</a>
-    <h5 class="mb-0">Form Builder — {{ header.2|default:header.1 }}</h5>
-  </div>
-
-  <div class="split">
-    <!-- LEFT: dynamic fields -->
-    <div class="left">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <form id="formFields">
-            <input type="hidden" name="case_id" value="{{ case_id }}">
-            <input type="hidden" name="form_id" value="{{ form_id }}">
-            {% if submission_id %}<input type="hidden" name="submission_id" value="{{ submission_id }}">{% endif %}
-
-            {% for kff_id, field_id, label, type_name, is_required in fields %}
-              <div class="field">
-                <label class="form-label {% if is_required %}label-req{% endif %}">{{ label }}</label>
-                {% if type_name in "TEXT,EMAIL,PHONE,NUMBER,DATE,TIME,CURRENCY" %}
-                  <input class="form-control"
-                         data-field-id="{{ field_id }}"
-                         value="{{ answers|get_item:field_id|default:'' }}">
-                {% elif type_name in "TEXTAREA" %}
-                  <textarea class="form-control" rows="3" data-field-id="{{ field_id }}">{{ answers|get_item:field_id|default:'' }}</textarea>
-                {% else %}
-                  <!-- extend for SELECT/CHECKBOX/RADIO later -->
-                  <input class="form-control" data-field-id="{{ field_id }}" value="{{ answers|get_item:field_id|default:'' }}">
-                {% endif %}
-              </div>
-            {% endfor %}
-          </form>
-        </div>
-        <div class="card-footer sticky-actions d-flex justify-content-between">
-          <button id="saveBtn" class="btn btn-primary">Save Draft</button>
-          <button id="submitBtn" class="btn btn-success">Submit & Generate PDF</button>
-        </div>
+<body>
+<div class="page-wrap">
+  <!-- Header -->
+  <div class="hero mb-3 d-flex align-items-center justify-content-between">
+    <div>
+      <div class="eyebrow">BARANGAY SEÑOR SANTO NIÑO</div>
+      <h4 class="title mb-1">Lupong Tagapamayapa</h4>
+      <div class="d-flex flex-wrap align-items-center gap-2 subtle" style="margin-top:10px;">
+        <span class="badge-code"><span class="hash">KP Form No. </span>{{ form_id }}</span>
+        <span>— {{ header.2|default:header.1 }}</span>
+        {% if submission_id %}
+          <span class="ms-1">Editing submission
+            <span class="badge-code"><span class="hash">#</span>{{ submission_id }}</span>
+          </span>
+        {% endif %}
       </div>
     </div>
-
-    <!-- RIGHT: live PDF preview -->
-    <div class="right">
-      <img id="pdfCanvas" alt="Preview">
+    <div class="d-flex align-items-center gap-2">
+      <a href="{% url 'lupon_mem:case_detail' case_id %}" class="btn btn-link-compact">
+        <i class="bi bi-arrow-left me-1"></i> Back to Case
+      </a>
     </div>
   </div>
 
+  <!-- Builder card -->
+  <div class="card">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-ui-checks-grid text-warning"></i>
+        <strong>Fill out fields</strong>
+      </div>
+      <div class="small subtle">Case <span class="badge-code"><span class="hash">#</span>{{ case_id }}</span></div>
+    </div>
+
+    <div class="card-body">
+      <form id="formFields" class="needs-validation" novalidate autocomplete="off">
+        {% csrf_token %}
+        <input type="hidden" name="case_id" value="{{ case_id }}">
+        <input type="hidden" name="form_id" value="{{ form_id }}">
+        {% if submission_id %}<input type="hidden" name="submission_id" value="{{ submission_id }}">{% endif %}
+
+        <div class="row g-3">
+          <div class="col-12"><h6 class="text-uppercase text-muted mb-2">Page 1</h6><hr class="mt-0"></div>
+
+          {% with 1 as page %}
+          {% for kff_id, field_id, label, type_name, is_required, value, field_code in fields %}
+            {% if field_code == "served_to" %}
+              <div class="col-12 mt-2"><h6 class="text-uppercase text-muted mb-2">Page 2 — Officer’s Return</h6><hr class="mt-0"></div>
+            {% endif %}
+
+            {% if type_name == "TEXTAREA" %}
+              <div class="col-12">
+            {% else %}
+              <div class="col-12 col-md-6">
+            {% endif %}
+              <div class="kp-field" data-code="{{ field_code|lower }}">
+                <label class="form-label {% if is_required %}label-req{% endif %}" for="f_{{ field_id }}">{{ label }}</label>
+
+                {% if type_name == "TEXT" and field_code == "offcr_name" %}
+                  <div class="typeahead-wrap" id="officerTA">
+                    <input id="f_{{ field_id }}" type="text" class="form-control"
+                           data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                           value="{{ value|default:'' }}" {% if is_required %}required{% endif %}
+                           placeholder="Type a staff name…">
+                    <div class="typeahead-dropdown" id="officerDropdown" role="listbox" aria-label="Staff suggestions"></div>
+                    <div class="help-hint">Start typing to search staff. Use <span class="kbd">↑</span>/<span class="kbd">↓</span>, <span class="kbd">Enter</span> to select.</div>
+                  </div>
+
+                {% elif type_name == "TEXT" %}
+                  <input id="f_{{ field_id }}" type="text" class="form-control"
+                         data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                         value="{{ value|default:'' }}" {% if is_required %}required{% endif %}>
+
+                {% elif type_name == "EMAIL" %}
+                  <input id="f_{{ field_id }}" type="email" class="form-control"
+                         data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                         value="{{ value|default:'' }}" {% if is_required %}required{% endif %}>
+
+                {% elif type_name == "PHONE" %}
+                  <input id="f_{{ field_id }}" type="tel" class="form-control"
+                         data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                         value="{{ value|default:'' }}" placeholder="09XXXXXXXXX"
+                         {% if is_required %}required{% endif %}>
+
+                {% elif type_name == "NUMBER" %}
+                  <input id="f_{{ field_id }}" type="number" class="form-control"
+                         data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                         value="{{ value|default:'' }}" {% if is_required %}required{% endif %}>
+
+                {% elif type_name == "DATE" %}
+                  <input id="f_{{ field_id }}" type="date" class="form-control"
+                         data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                         value="{{ value|default:'' }}" {% if is_required %}required{% endif %}>
+
+                {% elif type_name == "TIME" %}
+                  <input id="f_{{ field_id }}" type="time" class="form-control"
+                         data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                         value="{{ value|default:'' }}" {% if is_required %}required{% endif %}>
+
+                {% elif type_name == "CURRENCY" %}
+                  <div class="input-group">
+                    <span class="input-group-text">₱</span>
+                    <input id="f_{{ field_id }}" type="number" step="0.01" class="form-control"
+                           data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                           value="{{ value|default:'' }}" {% if is_required %}required{% endif %}>
+                  </div>
+
+                {% elif type_name == "TEXTAREA" %}
+                  <textarea id="f_{{ field_id }}" class="form-control" rows="4"
+                            data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                            {% if is_required %}required{% endif %}>{{ value|default:'' }}</textarea>
+
+                {% else %}
+                  <input id="f_{{ field_id }}" type="text" class="form-control"
+                         data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                         value="{{ value|default:'' }}" {% if is_required %}required{% endif %}>
+                  <div class="form-text">Unsupported type <code>{{ type_name }}</code> (rendered as text)</div>
+                {% endif %}
+
+                <div class="invalid-feedback">This field is required.</div>
+              </div>
+            </div>
+          {% endfor %}
+          {% endwith %}
+        </div>
+      </form>
+    </div>
+
+    <div class="sticky-actions">
+      <div class="hint"><i class="bi bi-info-circle me-1"></i> You can save a draft first, then submit later.</div>
+      <div class="d-flex gap-2">
+        <a href="{% url 'lupon_mem:case_detail' case_id %}" class="btn btn-outline-brand"><i class="bi bi-x-circle me-1"></i> Cancel</a>
+        <button id="saveBtn" class="btn btn-outline-brand">
+          <span class="when-idle"><i class="bi bi-cloud-arrow-up me-1"></i> Save Draft</span>
+          <span class="when-busy d-none"><span class="spinner-border spinner-border-sm me-1"></span> Saving…</span>
+        </button>
+        <button id="submitBtn" class="btn btn-brand">
+          <span class="when-idle"><i class="bi bi-check2-square me-1"></i> Submit &amp; Generate PDF</span>
+          <span class="when-busy d-none"><span class="spinner-border spinner-border-sm me-1"></span> Submitting…</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div class="toast-container position-fixed top-0 end-0 p-3">
+  <div id="toastOk" class="toast align-items-center text-bg-success border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body"><i class="bi bi-check2-circle me-1"></i><span class="msg">Saved.</span></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+  <div id="toastWarn" class="toast align-items-center text-bg-danger border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body"><i class="bi bi-exclamation-octagon me-1"></i><span class="msg">Something went wrong.</span></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-const qs = sel => document.querySelector(sel);
-const formEl = qs("#formFields");
-const imgEl  = qs("#pdfCanvas");
-
-let debounce;
-function collectAnswers(){
-  const obj = {};
-  formEl.querySelectorAll("[data-field-id]").forEach(i=>{
-    const fid = i.getAttribute("data-field-id");
-    obj[fid] = i.value;
-  });
-  return obj;
-}
-
-function refreshPreview(){
-  const params = new URLSearchParams();
-  params.set("form_id", formEl.elements.form_id.value);
-  if (formEl.elements.submission_id) params.set("submission_id", formEl.elements.submission_id.value);
-  params.set("answers", JSON.stringify(collectAnswers()));
-  imgEl.src = "{% url 'lupon_mem:preview_image' %}?" + params.toString();
-}
-
-formEl.addEventListener("input", ()=>{
-  clearTimeout(debounce);
-  debounce = setTimeout(refreshPreview, 300);
-});
-
-document.addEventListener("DOMContentLoaded", refreshPreview);
-
-qs("#saveBtn").addEventListener("click", async (e)=>{
-  e.preventDefault();
-  const fd = new FormData(formEl);
-  fd.set("answers", JSON.stringify(collectAnswers()));
-  const res = await fetch("{% url 'lupon_mem:save_answers' %}", { method:"POST", body:fd });
-  const j = await res.json();
-  if (j.ok) {
-    if (!formEl.elements.submission_id) {
-      const hid = document.createElement("input");
-      hid.type="hidden"; hid.name="submission_id"; hid.value=j.submission_id;
-      formEl.appendChild(hid);
-    }
-    alert("Saved!");
-  } else {
-    alert("Save failed.");
+  // --- CSRF ---
+  function getCookie(name){
+    const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return m ? decodeURIComponent(m[2]) : null;
   }
-});
+  const CSRF = getCookie('csrftoken');
 
-qs("#submitBtn").addEventListener("click", async (e)=>{
-  e.preventDefault();
-  if (!formEl.elements.submission_id){
-    // force a save first
-    await qs("#saveBtn").click();
+  const qs = s => document.querySelector(s);
+  const formEl    = qs("#formFields");
+  const saveBtn   = qs("#saveBtn");
+  const submitBtn = qs("#submitBtn");
+  const toastOk   = new bootstrap.Toast(qs("#toastOk"), { delay: 2200 });
+  const toastWarn = new bootstrap.Toast(qs("#toastWarn"), { delay: 3000 });
+
+  function collectAnswers(){
+    const obj = {};
+    formEl.querySelectorAll("[data-field-id]").forEach(i=>{
+      const fid = i.getAttribute("data-field-id");
+      obj[fid] = i.value;
+    });
+    return obj;
   }
-  const payload = {
-    submission_id: parseInt(formEl.elements.submission_id.value),
-    case_id: parseInt(formEl.elements.case_id.value)
+  function setBusy(btn, busy){
+    btn.querySelector(".when-idle").classList.toggle("d-none", busy);
+    btn.querySelector(".when-busy").classList.toggle("d-none", !busy);
+    btn.disabled = busy;
+  }
+  function showOk(msg){ qs("#toastOk .msg").textContent = msg || "Saved."; toastOk.show(); }
+  function showWarn(msg){ qs("#toastWarn .msg").textContent = msg || "Something went wrong."; toastWarn.show(); }
+
+  // -------- Helpers --------
+  const today = new Date();
+  const todayISO = today.toISOString().slice(0,10); // yyyy-mm-dd
+  const monthName = (y, m) => new Date(y, m-1, 1).toLocaleString('en-US',{month:'long'});
+
+  function ymd(dateStr){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(dateStr||"")) return null;
+    const [y,m,d] = dateStr.split("-");
+    return { y, m: String(parseInt(m,10)), d: String(parseInt(d,10)) };
+  }
+  function w(code){ return document.querySelector('.kp-field[data-code="'+code+'"]'); }
+  function input(code){
+    const wrap = w(code);
+    if(!wrap) return null;
+    return wrap.querySelector('input,textarea,select');
+  }
+  function setVal(code, val){
+    const el = input(code);
+    if(!el) return;
+    el.value = val;
+    el.dispatchEvent(new Event('input',{bubbles:true}));
+    el.dispatchEvent(new Event('change',{bubbles:true}));
+  }
+  function getVal(code){ const el=input(code); return el?el.value:""; }
+
+  // -------- Label/Hints cleanup for KP-9 --------
+  const FRIENDLY = {
+    brgy_capt:               { label:"Brgy Captain",                   hint:"Auto-filled from Punong Barangay. You may override if needed." },
+    curr_date:               { label:"Current Day",                    hint:"Auto-filled to today (for Officer’s Return)." },
+    curr_month:              { label:"Current Month",                  hint:"Auto-filled to current month." },
+    curr_year:               { label:"Current Year",                   hint:"Auto-filled to current year." },
+    served_to:               { label:"Served To (1)",                  hint:"Enter the respondent’s name here for item 1." },
+    served_to_2:             { label:"Served To (2)",                  hint:"Enter the respondent/representative here for item 2." },
+    served_to_3:             { label:"Served To (3)",                  hint:"Enter the person at the dwelling who received the summons." },
+    served_to_4:             { label:"Served To (4)",                  hint:"Enter the person at the office/place of business who received the summons." },
+    respondent_names_one:    { label:"Respondent Name (1)",            hint:"Click a chip to fill quickly." },
+    respondent_names_two:    { label:"Respondent Name (2)",            hint:"Click a chip to fill quickly." },
+    respondent_names_three:  { label:"Respondent Name (3)",            hint:"Click a chip to fill quickly." },
+    proxy_name_one:          { label:"Proxy Name (1)",                 hint:"Representative (if applicable)." },
+    proxy_name_two:          { label:"Proxy Name (2)",                 hint:"Representative (if applicable)." },
+    offcr_name:              { label:"Officer Name",                   hint:"Pick from staff or type the officer’s full name." },
+    date_offcret:            { label:"Officer’s Return: Day",          hint:"Derived from Officer Served: Date." },
+    month_offcret:           { label:"Officer’s Return: Month",        hint:"Derived from Officer Served: Date." },
+    ofcret_year:             { label:"Officer’s Return: Year",         hint:"Derived from Officer Served: Date." },
+    offcret_serve_date:      { label:"Officer Served: Date",           hint:"Date when summons was served." },
+    offcret_serve_month:     { label:"Officer Served: Month",          hint:"Auto from date." },
+    offcret_serve_year:      { label:"Officer Served: Year",           hint:"Auto from date." },
+    date_signed_one:         { label:"Date Signed (1)",                hint:"Auto-filled to today if 1 or 2 is selected." },
+    date_signed_two:         { label:"Date Signed (2)",                hint:"Optional second signature date." }
   };
-  const res = await fetch("{% url 'lupon_mem:submit_form' %}", {
-    method:"POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify(payload)
-  });
-  const j = await res.json();
-  if (j.ok) {
-    alert("Submitted! PDF generated: " + j.file);
-  } else {
-    alert("Submit failed.");
+  function setFriendly(code, label, hint){
+    const wrap=w(code);
+    if(!wrap) return;
+    const lab = wrap.querySelector('label.form-label');
+    if(lab && label) lab.textContent = label;
+    if(hint){
+      let small = wrap.querySelector('.kp-hint');
+      if(!small){ small=document.createElement('small'); small.className='kp-hint'; wrap.appendChild(small); }
+      small.textContent = hint;
+    }
   }
-});
-</script>
+  const isKP9 = !!w('served_to');
+  if(isKP9){ Object.entries(FRIENDLY).forEach(([c, v])=> setFriendly(c, v.label, v.hint)); }
 
+  // -------- Prefill: Summons date → month/year --------
+  function syncDateTriplet(prefix){
+    const d = input(prefix+'_date');
+    if(!d) return;
+    d.addEventListener('change', ()=>{
+      const parts = ymd(d.value); if(!parts) return;
+      setVal(prefix+'_month', monthName(parts.y, parts.m));
+      setVal(prefix+'_year',  parts.y);
+    });
+  }
+  syncDateTriplet('summon');     // Summons Date -> Summons Month/Year
+  syncDateTriplet('curr');       // Current Day -> Current Month/Year (kept for completeness)
+
+  // -------- Officer Served Date → Officer’s Return Day/Month/Year --------
+  const servedDateEl = input('offcret_serve_date');
+  if(servedDateEl){
+    servedDateEl.addEventListener('change', ()=>{
+      const parts = ymd(servedDateEl.value); if(!parts) return;
+      // fill served month/year fields
+      setVal('offcret_serve_month', monthName(parts.y, parts.m));
+      setVal('offcret_serve_year',  parts.y);
+      // mirror to Officer’s Return triplet
+      setVal('date_offcret',  servedDateEl.value);     // Day (date input)
+      setVal('month_offcret', monthName(parts.y, parts.m));
+      setVal('ofcret_year',   parts.y);
+    });
+  }
+
+  // -------- Brgy Captain mirrors Punong Barangay on UI too --------
+  // If form has a punong barangay field (label or code), keep brgy_capt synced when PB changes.
+  const pbEl = document.querySelector('[data-code="punong_barangay"], input[aria-label="punong barangay"]');
+  const brgyEl = input('brgy_capt');
+  if(pbEl && brgyEl){
+    pbEl.addEventListener('change', ()=>{ if(!brgyEl.value) setVal('brgy_capt', pbEl.value); });
+  }
+
+  // -------- Build respondent list (for chips/typeahead) --------
+  function splitNames(val){
+    return (val||'').split(',').map(s=>s.trim()).filter(Boolean);
+  }
+  const respondents = splitNames(getVal('respondents'));
+  const complainants = splitNames(getVal('complainants'));
+  const PARTY_SOURCE = Array.from(new Set([].concat(respondents, complainants))).filter(Boolean);
+
+  // Quick chips under selected fields
+  function addChips(code){
+    const wrap=w(code); if(!wrap||!PARTY_SOURCE.length) return;
+    let zone=wrap.querySelector('.kp-chip-row');
+    if(!zone){ zone=document.createElement('div'); zone.className='kp-chip-row d-flex flex-wrap gap-2 mt-2'; wrap.appendChild(zone); }
+    zone.innerHTML='';
+    PARTY_SOURCE.forEach(name=>{
+      const b=document.createElement('button'); b.type='button'; b.className='btn btn-sm btn-outline-secondary'; b.textContent=name;
+      b.addEventListener('click', ()=> setVal(code, name));
+      zone.appendChild(b);
+    });
+  }
+  ['respondent_names_one','respondent_names_two','respondent_names_three','served_to','served_to_2','served_to_3','served_to_4'].forEach(addChips);
+
+  // Lightweight local typeahead (for 3 & 4)
+  function attachLocalTypeahead(code){
+    const el=input(code); if(!el) return;
+    const wrap=w(code);
+    const dd=document.createElement('div'); dd.className='typeahead-dropdown'; wrap.appendChild(dd);
+    function show(items){
+      if(!items.length){ dd.innerHTML='<div class="typeahead-empty">No matches.</div>'; dd.style.display='block'; return; }
+      dd.innerHTML = items.map((n,i)=>`<button type="button" class="typeahead-item ${i===0?'active':''}" data-name="${n}">${n}</button>`).join('');
+      dd.style.display='block';
+    }
+    function close(){ dd.style.display='none'; }
+    function doFilter(){
+      const q=(el.value||'').toLowerCase().trim();
+      if(q.length<1){ close(); return; }
+      const items = PARTY_SOURCE.filter(n=>n.toLowerCase().includes(q)).slice(0,20);
+      show(items);
+    }
+    el.addEventListener('input', doFilter);
+    el.addEventListener('focus', doFilter);
+    dd.addEventListener('click', e=>{
+      const btn=e.target.closest('.typeahead-item'); if(!btn) return;
+      setVal(code, btn.dataset.name); close();
+    });
+    document.addEventListener('click', e=>{ if(!wrap.contains(e.target)) close(); });
+  }
+  attachLocalTypeahead('served_to_3');
+  attachLocalTypeahead('served_to_4');
+
+  // “How was the summons served?”
+  if(isKP9){
+    const served1Wrap = w('served_to');
+    if(served1Wrap){
+      const blk=document.createElement('div');
+      blk.className='alert alert-light border mt-2';
+      blk.innerHTML=`
+        <div class="fw-semibold mb-2">How was the summons served?</div>
+        <div class="d-flex flex-column gap-1">
+          <label class="d-flex align-items-center gap-2"><input type="radio" name="kp9_sv_mode" value="1"> <span>1) Handing to him/them said summons in person.</span></label>
+          <label class="d-flex align-items-center gap-2"><input type="radio" name="kp9_sv_mode" value="2"> <span>2) Handing to/them said summons and he/they refused to receive it.</span></label>
+          <label class="d-flex align-items-center gap-2"><input type="radio" name="kp9_sv_mode" value="3"> <span>3) Leaving said summons at his/their dwelling with ______.</span></label>
+          <label class="d-flex align-items-center gap-2"><input type="radio" name="kp9_sv_mode" value="4"> <span>4) Leaving said summons at his/their office/place of business with ______.</span></label>
+        </div>
+        <small class="text-muted d-block mt-2">Selecting an option focuses the corresponding “Served To (n)” field. Chips and search help you insert a name.</small>
+      `;
+      served1Wrap.parentNode.insertBefore(blk, served1Wrap.nextSibling);
+
+      function focusCode(code){ const el=input(code); if(el){ el.focus(); el.scrollIntoView({block:'nearest'}); } }
+      function ensureFirstResp(targetCode){
+        const first = respondents[0];
+        if(first){
+          const el = input(targetCode);
+          if(el && !el.value){ setVal(targetCode, first); }
+        }
+      }
+      blk.addEventListener('change', (e)=>{
+        if(e.target && e.target.name==='kp9_sv_mode'){
+          const v=String(e.target.value);
+          if(v==='1'){ focusCode('served_to');   ensureFirstResp('served_to');   setVal('date_signed_one', todayISO); }
+          if(v==='2'){ focusCode('served_to_2'); ensureFirstResp('served_to_2'); setVal('date_signed_one', todayISO); }
+          if(v==='3'){ focusCode('served_to_3'); }
+          if(v==='4'){ focusCode('served_to_4'); }
+        }
+      });
+
+      // default: select 1 and prefill Served To (1) with first respondent
+      const r1 = blk.querySelector('input[value="1"]');
+      if(r1){ r1.checked = true; ensureFirstResp('served_to'); }
+    }
+  }
+
+  // ---- Staff search for Officer Name (server endpoint) ----
+  const offcrInput   = document.querySelector(`[data-code="offcr_name"]`);
+  const drop         = document.getElementById("officerDropdown");
+  const taWrap       = document.getElementById("officerTA");
+
+  function debounce(fn, ms=220){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+  async function fetchStaff(q){
+    if (!q || q.trim().length < 2) return [];
+    const res = await fetch("{% url 'lupon_mem:staff_suggest' %}?q="+encodeURIComponent(q.trim()));
+    if (!res.ok) return [];
+    const j = await res.json();
+    return j.results || [];
+  }
+  function render(items){
+    if (!drop) return;
+    if (!items.length){ drop.innerHTML = `<div class="typeahead-empty">No matches. Keep typing…</div>`; drop.style.display = "block"; return; }
+    drop.innerHTML = items.map((r,i)=>`
+      <button type="button" role="option" class="typeahead-item ${i===0?'active':''}" data-name="${r.name}">${r.name}</button>
+    `).join("");
+    drop.style.display = "block";
+  }
+  function closeDrop(){ if(drop){ drop.style.display="none"; } }
+  function pick(name){ if(offcrInput){ offcrInput.value=name; offcrInput.dispatchEvent(new Event('change',{bubbles:true})); } closeDrop(); }
+  function moveActive(delta){
+    const btns = Array.from(drop.querySelectorAll(".typeahead-item")); if(!btns.length) return;
+    let idx = btns.findIndex(b=>b.classList.contains("active")); if (idx === -1) idx = 0;
+    const next = (idx + delta + btns.length) % btns.length;
+    btns.forEach(b=>b.classList.remove("active")); btns[next].classList.add("active"); btns[next].scrollIntoView({ block:"nearest" });
+  }
+
+  const doTypeahead = debounce(async ()=>{
+    const q = offcrInput?.value || "";
+    const items = await fetchStaff(q);
+    render(items);
+  }, 250);
+
+  if (offcrInput && drop && taWrap){
+    offcrInput.addEventListener("input", doTypeahead);
+    offcrInput.addEventListener("focus", doTypeahead);
+    drop.addEventListener("click", (e)=>{ const btn=e.target.closest(".typeahead-item"); if(btn) pick(btn.dataset.name); });
+    offcrInput.addEventListener("keydown", (e)=>{
+      if (drop.style.display !== "block") return;
+      if (e.key === "ArrowDown"){ e.preventDefault(); moveActive(+1); }
+      else if (e.key === "ArrowUp"){ e.preventDefault(); moveActive(-1); }
+      else if (e.key === "Enter"){ e.preventDefault(); const a=drop.querySelector(".typeahead-item.active"); if(a) pick(a.dataset.name); }
+      else if (e.key === "Escape"){ closeDrop(); }
+    });
+    document.addEventListener("click", (e)=>{ if (!taWrap.contains(e.target)) closeDrop(); });
+  }
+
+  // ---- Save
+  async function doSave(){
+    if (!formEl.checkValidity()){
+      formEl.classList.add('was-validated');
+      showWarn("Please complete required fields.");
+      throw new Error("Invalid form");
+    }
+    try{
+      setBusy(saveBtn, true);
+      const fd = new FormData(formEl);
+      fd.set("answers", JSON.stringify(collectAnswers()));
+      const res = await fetch("{% url 'lupon_mem:save_answers' %}", { method:"POST", headers: { "X-CSRFToken": CSRF }, body: fd });
+      if(!res.ok) throw new Error("HTTP " + res.status);
+      const j = await res.json();
+      if (j.ok) {
+        if (!formEl.elements.submission_id) {
+          const hid = document.createElement("input");
+          hid.type="hidden"; hid.name="submission_id"; hid.value=j.submission_id;
+          formEl.appendChild(hid);
+        }
+        showOk("Draft saved.");
+        return j;
+      } else {
+        throw new Error("Save failed.");
+      }
+    }catch(err){
+      showWarn(err.message || "Save failed.");
+      throw err;
+    }finally{
+      setBusy(saveBtn, false);
+    }
+  }
+
+  saveBtn.addEventListener("click", async (e)=>{ e.preventDefault(); await doSave(); });
+
+  submitBtn.addEventListener("click", async (e)=>{
+    e.preventDefault();
+    try{
+      setBusy(submitBtn, true);
+      if (!formEl.elements.submission_id){ await doSave(); }
+      else if (!formEl.checkValidity()) { formEl.classList.add('was-validated'); showWarn("Please complete required fields."); return; }
+      const payload = { submission_id: parseInt(formEl.elements.submission_id.value), case_id: parseInt(formEl.elements.case_id.value) };
+      const res = await fetch("{% url 'lupon_mem:submit_form' %}", { method:"POST", headers: { "Content-Type":"application/json", "X-CSRFToken": CSRF }, body: JSON.stringify(payload) });
+      if(!res.ok) throw new Error("HTTP " + res.status);
+      const j = await res.json();
+      if (j.ok) { window.location.href = j.download_url; } else { showWarn("Submit failed."); }
+    }catch(err){ showWarn(err.message || "Submit failed."); }
+    finally{ setBusy(submitBtn, false); }
+  });
+</script>
 </body>
 </html>

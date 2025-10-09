@@ -95,6 +95,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "django.middleware.gzip.GZipMiddleware",       # <-- add
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -155,7 +156,7 @@ SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET")
 SUPABASE_ID_UPLOADS_BUCKET = os.getenv("SUPABASE_ID_UPLOADS_BUCKET", "id-uploads")
-SUPABASE_OCR_TEST_BUCKET = os.getenv("SUPABASE_OCR_TEST_BUCKET ", "ocr-testing")
+SUPABASE_OCR_TEST_BUCKET = os.getenv("SUPABASE_OCR_TEST_BUCKET", "ocr-testing")
 
 DATABASES = {
     "default": {
@@ -165,7 +166,13 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD"),
         "HOST": os.getenv("DB_HOST"),
         "PORT": os.getenv("DB_PORT"),
-        "OPTIONS": {"sslmode": "require"},  # <-- add this for Supabase
+        # "OPTIONS": {"sslmode": "require"},  # <-- add this for Supabase
+        "OPTIONS": {
+            "sslmode": "require",
+            "connect_timeout": 5,     # fail fast instead of hanging
+            "options": "-c statement_timeout=5000"  # 5s cap per statement (protects slow queries)
+        },  # <-- add this for Supabase
+        "CONN_MAX_AGE": 120,
     }
 }
 

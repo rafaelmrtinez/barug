@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+{% load static bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<style>
+  :root{ --brand-700:#6d2932; --brand-800:#561c24; }
+  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
+  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
+  .mini-badge{ display:inline-block; padding:.28rem .6rem; border-radius:.5rem;
+               background:#fff; border:1px solid rgba(0,0,0,.08); font-size:.78rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap" style="margin-top: 40;">
+  <div class="container-fluid pt-3 page-main">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">{{ page_title }}</h4>
+      <a href="{% url 'lupon_mem:report_list' %}" class="btn btn-outline-brand">{% bs_icon 'arrow-left' extra_classes='me-1' %} Back</a>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <h6 class="mb-2">Report #{{ rpt.0 }} — {{ rpt.1 }}</h6>
+        <p class="mb-1"><strong>Date/Time:</strong> {{ rpt.3 }} {{ rpt.4 }}</p>
+        <p class="mb-0"><strong>Description:</strong> {{ rpt.2 }}</p>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <h6 class="mb-3">Parties</h6>
+        {% for p in parties %}
+          <span class="mini-badge">{{ p.2 }}: #{{ p.0 }} {{ p.1 }}</span>
+        {% empty %}
+          <div class="text-muted">No parties linked.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <form method="post" class="needs-validation" novalidate>
+      {% csrf_token %}
+      <div class="card shadow-sm mb-3"><div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Case Name</label>
+            <input class="form-control" name="case_name" required value="People vs.">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Complaint Title</label>
+            <select class="form-select" name="complaint_title_id">
+              {% for id,name in complaint_titles %}<option value="{{ id }}">{{ name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Case Nature</label>
+            <select class="form-select" name="case_nature_id">
+              {% for id,name in case_natures %}<option value="{{ id }}">{{ name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Settlement Status</label>
+            <select class="form-select" name="settlement_status_id">
+              {% for id,name in settlement_statuses %}<option value="{{ id }}">{{ name }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+      </div></div>
+
+      <div class="card shadow-sm mb-3"><div class="card-body">
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" id="with_payment" name="with_payment">
+          <label class="form-check-label" for="with_payment">Record payment now</label>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">OR / Receipt No.</label>
+            <input class="form-control" name="payment_receipt">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Amount</label>
+            <input class="form-control" name="payment_amount" placeholder="0.00">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Payment Status</label>
+            <select class="form-select" name="payment_status">
+              <option>PAID</option><option>PARTIALLY PAID</option><option>UNPAID</option><option>REFUNDED</option><option>WAIVED</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Paid By (Person ID)</label>
+            <input class="form-control" name="paid_by_person_id">
+          </div>
+        </div>
+      </div></div>
+
+      <div class="d-flex justify-content-end">
+        <button class="btn btn-brand">{% bs_icon 'check2' extra_classes='me-2' %} Confirm & Create Case</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
