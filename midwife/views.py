@@ -1,6 +1,7 @@
 # midwife/views.py
 from __future__ import annotations
 
+from dataclasses import asdict
 import json
 
 from datetime import date
@@ -44,6 +45,7 @@ from src.app.transfer_objects.request.child_visit_request import ChildVisitReque
 from src.app.transfer_objects.request.child_vitamins_request import ChildVitaminsRequest
 from src.app.transfer_objects.request.init_chilld_immunization_request import InitialChildImmunizationRequest
 from src.app.transfer_objects.request.tetanus_toxoid_request import TetanusToxoidRequest
+from src.app.transfer_objects.response.maternal_record import MaternalRecordResponse
 from src.domain.contracts.maternal_service import IMaternalService
 from src.infra.exceptions.anc_visit_exception import ANCVisitException
 from src.infra.exceptions.child_visit_exception import ChildVisitException
@@ -441,7 +443,32 @@ def record_detail(request: HttpRequest, kind: str, record_id: int) -> HttpRespon
             "record_id": record_id,  # provided for completeness
         },
     )
-
+    
+@require_http_methods(["GET"])
+@session_login_required
+@role_required(*ROLE_MIDWIFE)
+@nocache
+@inject
+def maternal_record_http(
+    request: HttpRequest, 
+    id: int, 
+    service: IMaternalService = Provide[AppContainer.maternal_service]) -> JsonResponse:
+    try:
+        print(f"Fetching Maternal Record for ID: {id}")
+        if not id:
+            return JsonResponse({"message": "No record found."}, status=400)    
+        
+        result: MaternalRecordResponse = service.execute_fetch_maternal_record(id)
+        
+        if not result:
+            return JsonResponse({"message": "No record found."}, status=404)
+        
+        print(f"Maternal Record Result: {result}")
+        
+        return JsonResponse({"message": json.dumps(asdict(result), default=str)}, status=200)
+    except Exception as e:
+        logger.exception(e)
+        return JsonResponse({"message": SOMETHING_WENT_WRONG}, status=500)
 
 @session_login_required
 @role_required(*ROLE_MIDWIFE)

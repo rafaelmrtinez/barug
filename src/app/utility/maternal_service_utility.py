@@ -14,7 +14,7 @@ class MaternalServiceUtility:
             result = MaternalDomainService.determine_latest_immunization(immunization)
             if result:
                 key, date_given, stage = result
-                immunization_type_id = repo.get_immunization_type_id_by_type_name(key)
+                immunization_type_id = repo.fetch_immunization_type_id_by_type_name(key)
                 actual_immunization.append(
                     ChildImmunizationRequest(
                         immunization_type_id=immunization_type_id,

@@ -23,4 +23,5 @@ urlpatterns = [
     path("child-visit/", views.child_visit_http, name="child_visit"),
     path("child-basic-info/<int:q>/", views.child_basic_info_http, name="child_basic_info"),
     path("anc-care/", views.anc_care_http, name="anc_care"),
+    path("maternal-record/<int:id>/", views.maternal_record_http, name="maternal_record"),
 ]

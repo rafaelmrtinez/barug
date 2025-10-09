@@ -12,6 +12,6 @@ class PersonLookUpTest(TestCase):
         )
         
     def test_get_child_record_by_person_id(self):
-        id = self.repo.get_child_record_by_person_id(person_id=181)
+        id = self.repo.fetch_child_record_by_person_id(person_id=181)
         print(f"Record found with record id: {id}")
         self.assertIsInstance(id, int)

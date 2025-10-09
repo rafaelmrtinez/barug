@@ -157,7 +157,7 @@
                 }
                 console.log(res);
                 alert("ANC visit submitted successfully.");
-                // window.location.reload();
+                window.location.reload();
 
             } catch {
                 alert("Failed to submit ANC visit. Please try again.");

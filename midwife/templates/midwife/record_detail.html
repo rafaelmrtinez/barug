@@ -77,12 +77,12 @@
     <div class="hero mb-4">
       <div class="d-flex flex-wrap align-items-center gap-3">
         <div class="flex-grow-1">
-          <div class="name">{{ person_name|default:"Maria Santos" }}</div>
+          <div class="name" id="record_pname">{{ person_name|default:"Maria Santos" }}</div>
           <div class="meta small">
-            MHR #<strong>{{ mhr_number|default:"1032" }}</strong> ·
-            Family #<strong>{{ family_no|default:"F-001" }}</strong> ·
-            LMP <strong>{{ lmp|default:"2025-05-01" }}</strong> ·
-            EDD <strong>{{ edd|default:"2026-02-05" }}</strong>
+            MHR Number: <strong id="mhr_number">{{ mhr_number|default:"1032" }}</strong> ·
+            Family Number: <strong id="family_no">{{ family_no|default:"F-001" }}</strong> ·
+            LMP: <strong id="lmp">{{ lmp|default:"2025-05-01" }}</strong> ·
+            EDD: <strong id="edd">{{ edd|default:"2026-02-05" }}</strong>
           </div>
         </div>
         <div class="d-flex align-items-center gap-2 ms-auto">
@@ -100,22 +100,31 @@
         <div class="card p-3 mb-3">
           <div class="d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0">ANC Visits</h5>
-            <small class="text-muted">Last updated: {{ last_updated|default:"2025-06-10" }}</small>
+            <small class="text-muted" id="last-updated">Last updated: {{ last_updated|default:"2025-06-10" }}</small>
           </div>
           <div class="table-responsive mt-2">
             <table class="table table-sm visit-table align-middle">
               <thead>
-                <tr><th>Date</th><th>GA</th><th>Trimester</th><th>BP</th><th>Weight</th><th>FHR</th><th>Danger</th><th></th></tr>
+                <tr>
+                  <th>Date</th>
+                  {% comment %} <th>GA</th> {% endcomment %}
+                  <th>Trimester</th>
+                  {% comment %} <th>BP</th> {% endcomment %}
+                  <th>Weight</th>
+                  {% comment %} <th>FHR</th> {% endcomment %}
+                  <th>Danger</th>
+                  <th></th>
+                </tr>
               </thead>
               <tbody id="visitsTbody">
                 {% for v in visits %}
                   <tr>
                     <td>{{ v.date }}</td>
-                    <td>{{ v.ga_weeks|default:"—" }}{% if v.ga_weeks %} wks{% endif %}</td>
+                    {% comment %} <td>{{ v.ga_weeks|default:"—" }}{% if v.ga_weeks %} wks{% endif %}</td> {% endcomment %}
                     <td>{{ v.trimester|default:"—" }}</td>
-                    <td>{{ v.bp|default:"—" }}</td>
+                    {% comment %} <td>{{ v.bp|default:"—" }}</td> {% endcomment %}
                     <td>{{ v.weight|default:"—" }}</td>
-                    <td>{{ v.fhr|default:"—" }}</td>
+                    {% comment %} <td>{{ v.fhr|default:"—" }}</td> {% endcomment %}
                     <td>
                       {% if v.has_danger %}<span class="badge text-bg-danger">Flag</span>
                       {% else %}<span class="badge text-bg-success">None</span>{% endif %}
@@ -136,8 +145,8 @@
         <div class="card p-3 mb-3">
           <h6 class="card-title mb-2">Episode Plan</h6>
           <div class="small">
-            <div class="kpi"><span>Delivery Plan</span><span>{{ delivery_plan|default:"NSVD — District Hospital" }}</span></div>
-            <div class="kpi"><span>Newborn Screening</span><span>{{ nbs_plan|default:"Planned" }}</span></div>
+            <div class="kpi"><span>Delivery Plan</span><span id="ep_delivery_plan">{{ delivery_plan|default:"NSVD — District Hospital" }}</span></div>
+            <div class="kpi"><span>Newborn Screening</span><span id="ep_nbs_plan">{{ nbs_plan|default:"Planned" }}</span></div>
           </div>
         </div>
 
@@ -146,18 +155,20 @@
           <div class="small">
             <div class="kpi"><span>Height</span><span id="h-val">{{ height_cm|default:"154" }} cm</span></div>
             <div class="kpi"><span>Weight</span><span id="w-val">{{ weight_kg|default:"54" }} kg</span></div>
-            <div class="kpi"><span>BMI</span><span id="bmi-val">—</span></div>
-            <div class="kpi"><span>BMI Status</span><span>{{ bmi_status|default:"Normal" }}</span></div>
+            {% comment %} <div class="kpi"><span>BMI</span><span id="bmi-val" >—</span></div> {% endcomment %}
+            <div class="kpi"><span>BMI Status</span><span id="an_bmi_stat">{{ bmi_status|default:"Normal" }}</span></div>
           </div>
         </div>
 
         <div class="card p-3">
           <h6 class="card-title mb-2">Last Visit Snapshot</h6>
           <div class="small">
-            <div class="kpi"><span>Date</span><span>{{ last_visit_date|default:"2025-06-10" }}</span></div>
-            <div class="kpi"><span>GA</span><span>{{ last_ga|default:"8 wks (1st)" }}</span></div>
-            <div class="kpi"><span>BP</span><span>{{ last_bp|default:"110/70" }}</span></div>
-            <div class="kpi"><span>FHR</span><span>{{ last_fhr|default:"—" }}</span></div>
+            <div class="kpi"><span>Date</span><span id="lv_date">{{ last_visit_date|default:"2025-06-10" }}</span></div>
+            {% comment %} <div class="kpi"><span>GA</span><span>{{ last_ga|default:"8 wks (1st)" }}</span></div> {% endcomment %}
+            {% comment %} <div class="kpi"><span>BP</span><span>{{ last_bp|default:"110/70" }}</span></div> {% endcomment %}
+            {% comment %} <div class="kpi"><span>FHR</span><span>{{ last_fhr|default:"—" }}</span></div> {% endcomment %}
+            <div class="kpi"><span>Trimester</span><span id="lv_trimester">1st</span></div>
+            <div class="kpi"><span>Weight</span><span id="lv_weight">45.5 KG</span></div>
             <div class="kpi"><span>Danger</span><span>{{ last_danger|default:"None" }}</span></div>
           </div>
         </div>
@@ -485,7 +496,7 @@
     const w = Number($('#w-val')?.textContent.replace(/[^\d.]/g,'')||0);
     if(h && w){
       const meters = h>3 ? h/100 : h;
-      $('#bmi-val').textContent = (w/(meters*meters)).toFixed(1);
+      {% comment %} $('#bmi-val').textContent = (w/(meters*meters)).toFixed(1); {% endcomment %}
     }
   })();
 
@@ -853,4 +864,5 @@
 })();
 </script>
 <script defer src="{% static 'midwife/js/anc.js' %}"></script>
+<script defer src="{% static 'midwife/js/fetchMaternalRecord.js' %}"></script>
 {% endblock %}

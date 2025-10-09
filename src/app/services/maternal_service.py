@@ -4,6 +4,7 @@ from src.app.exceptions.prescription_exception import PrescriptionException
 from src.app.transfer_objects.request.child_visit_request import ChildVisitRequest
 from src.app.transfer_objects.request.create_child_record_request import CreateChildRecordRequest
 from src.app.transfer_objects.request.init_chilld_immunization_request import InitialChildImmunizationRequest
+from src.app.transfer_objects.response.maternal_record import MaternalRecordResponse
 from src.app.utility.maternal_service_utility import MaternalServiceUtility
 from src.domain.contracts.family_repository import IFamilyRepository
 from src.domain.contracts.maternal_repository import IMaternalRepository
@@ -22,8 +23,27 @@ class MaternalService(IMaternalService):
         self._maternal_repository = maternal_repository
         self._family_repository = family_repository
         
+    def execute_fetch_maternal_record(self, maternal_record_id: int) -> MaternalRecordResponse | None:
+        current_record = self._maternal_repository.fetch_current_maternal_record_by_maternal_visit_id(maternal_record_id)
+        prev_record = self._maternal_repository.fetch_previous_maternal_record_by_maternal_visit_id(maternal_record_id)
+        history_records = self._maternal_repository.fetch_maternal_record_history_by_maternal_record_id(maternal_record_id)
+        
+        if not current_record and not prev_record:
+            return None
+        
+        family_id = self._maternal_repository.fetch_family_number_by_person_id(current_record.person_id)
+        
+        records = MaternalRecordResponse(
+            current_materrnal_record=current_record, 
+            previous_maternal_records=prev_record, 
+            family_id=family_id,
+            record_history=history_records
+        )
+        
+        return records
+
     def execute_child_visit(self, initial_visit_data: ChildVisitRequest, immunization_data: list[InitialChildImmunizationRequest]):
-        record_id = self._maternal_repository.get_child_record_by_person_id(person_id=initial_visit_data.p_child_id)
+        record_id = self._maternal_repository.fetch_child_record_by_person_id(person_id=initial_visit_data.p_child_id)
 
         if not record_id:
             raise PersonNotFoundException(f"No record found!")
