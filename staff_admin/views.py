@@ -6,6 +6,7 @@ from .forms import (
     ChooseRole,
     StaffFilters,
     Schedule,
+    UpdateInfo,
 )
 
 #need back-end for proper assignment
@@ -106,10 +107,12 @@ def staff_list(request):
     })
 
 def staff_dets(request, staff_id):
-    return render(request, "person/staff_dets.html", {
+    form= UpdateInfo()
+    return render(request, "staff/person_dets.html", {
         'user_fullname' : user_fullname,
         'user_role' : user_role,
         'page_path' : f'{user_role} / Staff Details : {staff_id}',
         'page_title' : f'Staff Details : {staff_id}',
         'user_role_template' : user_role_template,
+        'form': form,
     })

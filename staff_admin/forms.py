@@ -1,5 +1,83 @@
 from django import forms
 
+from django import forms
+
+class UpdateInfo(forms.Form):
+    role = forms.ChoiceField(
+        choices=[],
+        widget=forms.Select(attrs={
+            "id": "role",
+            "class": "form-select",
+            "disabled": "disabled",        # make read-only (for <select>)
+            "aria-disabled": "true",
+            "tabindex": "-1",
+        }),
+        label="Select a Role",
+        required=True,
+    )
+    purok_sitio = forms.ChoiceField(
+        choices=[],
+        widget=forms.Select(attrs={
+            "id": "purok_sitio",
+            "class": "form-select",
+            "disabled": "disabled",        # make read-only (for <select>)
+            "aria-disabled": "true",
+            "tabindex": "-1",
+        }),
+        label="Assign to Purok/Sitio",
+        required=False,
+    )
+    day = forms.ChoiceField(
+        choices=[],
+        widget=forms.Select(attrs={
+            "id": "day",
+            "class": "form-select",
+            "disabled": "disabled",        # make read-only (for <select>)
+            "aria-disabled": "true",
+            "tabindex": "-1",
+        }),
+        label="Select a Day",
+        required=True,
+    )
+    time_start = forms.TimeField(
+        widget=forms.TimeInput(attrs={
+            "id": "time_start",
+            "class": "form-control",
+            "type": "time",
+            "step": "300",
+            "readonly": "readonly",        # make read-only (for <input>)
+            "tabindex": "-1",
+        }),
+        input_formats=["%H:%M", "%H:%M:%S"],
+        label="Time-in",
+        required=False,
+    )
+    time_end = forms.TimeField(
+        widget=forms.TimeInput(attrs={
+            "id": "time_end",
+            "class": "form-control",
+            "type": "time",
+            "step": "300",
+            "readonly": "readonly",        # make read-only (for <input>)
+            "tabindex": "-1",
+        }),
+        input_formats=["%H:%M", "%H:%M:%S"],
+        label="Time-out",
+        required=False,
+    )
+    status = forms.ChoiceField(
+        choices=[],
+        widget=forms.Select(attrs={
+            "id": "status",
+            "class": "form-select",
+            "disabled": "disabled",        # make read-only (for <select>)
+            "aria-disabled": "true",
+            "tabindex": "-1",
+        }),
+        label="Status",
+        required=False,
+    )
+
 class Schedule(forms.Form):
     day = forms.ChoiceField(
         choices = [],
