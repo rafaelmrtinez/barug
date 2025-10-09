@@ -206,7 +206,14 @@
                   <div class="col-6 col-md-3"><label class="form-label">Large Babies (&gt;8 lbs)</label><input id="ob_large" type="number" class="form-control" min="0"></div>
                   <div class="col-6 col-md-3"><label class="form-label">Abortions</label><input id="ob_abortions" type="number" class="form-control" min="0"></div>
                   <div class="col-6 col-md-3"><label class="form-label">Stillbirths</label><input id="ob_stillbirths" type="number" class="form-control" min="0"></div>
+                  <div class="col-6 col-md-3"><label class="form-label">Estimated Date of Confinement (EDC):</label><input id="ob_edc" type="date" class="form-control"></div>
+                  <div class="col-6 col-md-3"><label class="form-label">Last Menstrual Period (LMP):</label><input id="ob_lmp" type="date" class="form-control"></div>
                 </div>
+
+                {% comment %} <div class="row g-2">
+                  <div class="col-6 col-md-3"><label class="form-label">Estimated Date of Confinement (EDC):</label><input id="ob_edc" type="date" class="form-control"></div>
+                  <div class="col-6 col-md-3"><label class="form-label">Last Menstrual Period (LMP):</label><input id="ob_lmp" type="date" class="form-control"></div>
+                </div> {% endcomment %}
 
                 <hr class="my-4">
 
@@ -298,24 +305,15 @@
                   </div>
                 </div>
 
-                <div class="row g-3 mt-1">
-                  <div class="col-md-6">
-                    <div class="fw-semibold mb-1">Risk Codes — Obstetric</div>
-                    <div class="d-flex flex-column gap-1 small">
-                      <div class="form-check"><input class="form-check-input" type="checkbox" id="risk_prev_cs"><label class="form-check-label" for="risk_prev_cs">Previous caesarian section</label></div>
-                      <div class="form-check"><input class="form-check-input" type="checkbox" id="risk_three_miscarriages"><label class="form-check-label" for="risk_three_miscarriages">3 consecutive miscarriages / stillborn baby</label></div>
-                      <div class="form-check"><input class="form-check-input" type="checkbox" id="risk_pph"><label class="form-check-label" for="risk_pph">Postpartum hemorrhage</label></div>
-                    </div>
+                <div class="fw-semibold mb-1">Risk Codes</div>
+                <div class="d-flex align-items-center gap-3 mt-1">
+                  <div class="form-check m-0">
+                    <input class="form-check-input" type="checkbox" id="risk_obstetric" value="1">
+                    <label class="form-check-label" for="risk_obstetric">Obstetric</label>
                   </div>
-                  <div class="col-md-6">
-                    <div class="fw-semibold mb-1">Risk Codes — Medical Conditions</div>
-                    <div class="d-flex flex-column gap-1 small">
-                      <div class="form-check"><input class="form-check-input" type="checkbox" id="risk_tb"><label class="form-check-label" for="risk_tb">Tuberculosis</label></div>
-                      <div class="form-check"><input class="form-check-input" type="checkbox" id="risk_hd"><label class="form-check-label" for="risk_hd">Heart disease</label></div>
-                      <div class="form-check"><input class="form-check-input" type="checkbox" id="risk_dm"><label class="form-check-label" for="risk_dm">Diabetes</label></div>
-                      <div class="form-check"><input class="form-check-input" type="checkbox" id="risk_asthma"><label class="form-check-label" for="risk_asthma">Bronchial asthma</label></div>
-                      <div class="form-check"><input class="form-check-input" type="checkbox" id="risk_goiter"><label class="form-check-label" for="risk_goiter">Goiter</label></div>
-                    </div>
+                  <div class="form-check m-0">
+                    <input class="form-check-input" type="checkbox" id="risk_medical" value="2">
+                    <label class="form-check-label" for="risk_medical">Medical Condition</label>
                   </div>
                 </div>
 
@@ -325,7 +323,7 @@
                 <div class="section-title">Visit Basics</div>
                 <div class="section-sub">Vitals and GA (trimester auto).</div>
                 <div class="row g-3">
-                  <div class="col-6 col-md-6"><label class="form-label">Visit Date <span class="text-danger">*</span></label><input name="visit_date" type="date" class="form-control" required></div>
+                  <div class="col-6 col-md-6"><label class="form-label">Visit Date <span class="text-danger">*</span></label><input name="visit_date" id="visit_date" type="date" class="form-control" required></div>
                   <div class="col-6 col-md-6">
                     <label class="form-label">GA (weeks)</label>
                     <div class="input-group">
@@ -333,13 +331,22 @@
                       <span class="input-group-text" id="triBadgeInline">—</span>
                     </div>
                   </div>
-                  <div class="col-6 col-md-6"><label class="form-label">BP Systolic</label><input name="bp_sys" type="number" class="form-control" min="50" max="260" step="1" placeholder="110"></div>
-                  <div class="col-6 col-md-6"><label class="form-label">BP Diastolic</label><input name="bp_dia" type="number" class="form-control" min="30" max="160" step="1" placeholder="70"></div>
-                  <div class="col-6 col-md-6"><label class="form-label">Weight (kg)</label><input name="weight_kg" type="number" class="form-control" step="0.1" placeholder="54.0"></div>
-                  <div class="col-6 col-md-6"><label class="form-label">Fundic Height (cm)</label><input name="fundic_height_cm" type="number" class="form-control" step="1" placeholder="24"></div>
-                  <div class="col-6 col-md-6"><label class="form-label">FHR (bpm)</label><input name="fhr_bpm" type="number" class="form-control" step="1" placeholder="148"></div>
-                  <div class="col-6 col-md-6"><label class="form-label">Assessed by (Staff ID)</label><input name="assessed_by_id" type="number" class="form-control" placeholder="12"></div>
-                  <div class="col-12"><label class="form-label">Encounter notes</label><textarea name="notes" class="form-control" rows="2" placeholder="Free text notes…"></textarea></div>
+                  <div class="col-6 col-md-6"><label class="form-label">BP Systolic</label><input name="bp_sys" id="bp_sys" type="number" class="form-control" min="50" max="260" step="1" placeholder="110"></div>
+                  <div class="col-6 col-md-6"><label class="form-label">BP Diastolic</label><input name="bp_dia" id="bp_dia" type="number" class="form-control" min="30" max="160" step="1" placeholder="70"></div>
+                  <div class="col-6 col-md-6"><label class="form-label">Weight (kg)</label><input name="weight_kg" id="weight_kg" type="number" class="form-control" step="0.1" placeholder="54.0"></div>
+                  <div class="col-6 col-md-6"><label class="form-label">Fundic Height (cm)</label><input name="fundic_height_cm" id="fundic_height_cm" type="number" class="form-control" step="1" placeholder="24"></div>
+                  <div class="col-6 col-md-6"><label class="form-label">FHR (bpm)</label><input name="fhr_bpm" id="fhr_bpm" type="number" class="form-control" step="1" placeholder="148"></div>
+                  <div class="col-6 col-md-6"><label class="form-label">Assessed by (Staff ID)</label><input name="assessed_by_id" id="assessed_by_id" type="number" class="form-control" placeholder="12"></div>
+                  <div class="col-12"><label class="form-label">Encounter notes</label><textarea name="notes" id="notes" class="form-control" rows="2" placeholder="Free text notes…"></textarea></div>
+                  
+                  <div class="col-6 col-md-6">
+                    <label class="form-label">Last Menstrual Period (LMP)</label>
+                    <input name="lmp" id="lmp" type="date" class="form-control">
+                  </div>
+                  <div class="col-6 col-md-6">
+                    <label class="form-label">Estimated Date of Confinement (EDC)</label>
+                    <input name="edc" id="edc" type="date" class="form-control">
+                  </div>
                 </div>
 
                 <hr class="my-4">
@@ -362,10 +369,22 @@
                       <div class="input-group mb-2">
                         <label class="input-group-text" for="lab_type">Type</label>
                         <select class="form-select" id="lab_type">
-                          <option value="URINE">Urinalysis</option>
-                          <option value="HGB">Hemoglobin</option>
-                          <option value="BS">Blood Sugar</option>
+                          <option value="1">URINALYSIS</option>
+                          <option value="2">CBC</option>
+                          <option value="3">SGOT/SGPT</option>
+                          <option value="4">CREATININE SERUM</option>
+                          <option value="5">BUA/BUN</option>
+                          <option value="6">SYPHILIS</option>
+                          <option value="7">HIV TEST</option>
+                          <option value="8">HEPA B</option>
+                          <option value="9">BLOOD TYPING</option>
+                          <option value="10">OGCT 50g (24–28 wks)</option>
+                          <option value="11">OGTT 100g</option>
                         </select>
+                      </div>
+                      <div class="input-group mb-2">
+                        <label class="input-group-text" for="lab_date">Date</label>
+                        <input id="lab_date" class="form-control" type="date">
                       </div>
                       <div class="input-group mb-2">
                         <label class="input-group-text" for="lab_result">Result</label>
@@ -432,6 +451,8 @@
             </div> <!-- /row -->
           </div>
 
+          <input type="hidden" id="record_id" name="record_id" value="{% if record_id %}{{ record_id }}{% endif %}">
+
           <div class="sticky-footer">
             <div class="text-muted small d-none d-md-block"><span class="kbd">ESC</span> disabled · static backdrop · “discard changes” guard</div>
             <div class="d-flex gap-2">
@@ -485,7 +506,7 @@
     {code:'BLURRED_VISION',label:'Blurred vision'},
     {code:'EDEMA',label:'Generalized edema'},
     {code:'FEVER',label:'Fever'},
-    {code:'NO_FM',label:'No fetal movement'},
+    {code:'NO_FM',label:' fetal movement'},
     {code:'NONE',label:'No danger signs'}
   ];
   function buildPills(){
@@ -519,7 +540,7 @@
   }
 
   // ------- checklist pills (like danger signs) -------
-  const CHK_ITEMS = [
+  {% comment %} const CHK_ITEMS = [
     {code:'INC_BP',        label:'Increased BP'},
     {code:'EPIGPAIN',      label:'Epigastric pain'},
     {code:'NAUSEA',        label:'Nausea/Vomiting'},
@@ -532,7 +553,18 @@
     {code:'BREATHING',     label:'Difficulty in breathing'},
     {code:'VARICOSITIES',  label:'Varicosities'},
     {code:'ABD_PAIN',      label:'Abdominal pain'}
+  ]; {% endcomment %}
+
+  const CHK_ITEMS = [
+    {code:'1',        label:'PREECLAMPSIA'},
+    {code:'2',      label:'ABNORMAL VAGINAL DISCHARGES'},
+    {code:'3',        label:'VAGINAL BLEEDING'},
+    {code:'4',          label:'CHILLS & FEVER'},
+    {code:'5',         label:'DIFFICULTY IN BREATHING'},
+    {code:'6',      label:'VARICOSITIES'},
+    {code:'7',     label:'ABDOMINAL PAIN'}
   ];
+
   function buildChecklistPills(){
     const wrap = $('#chkPills'); if(!wrap) return;
     wrap.innerHTML='';
@@ -570,14 +602,16 @@
     const toggleTtBtn=()=>{ addTtBtn.disabled = !$('#tt_date').value; };
     const toggleSuppBtn=()=>{ addSuppBtn.disabled = (parseInt($('#supp_qty').value||'0',10)<=0); };
     $('#lab_result').addEventListener('input', toggleLabBtn); toggleLabBtn();
+    $('#lab_date').addEventListener('input', toggleLabBtn); toggleLabBtn();
     ttDate.addEventListener('input', toggleTtBtn);           toggleTtBtn();
     $('#supp_qty').addEventListener('input', toggleSuppBtn); toggleSuppBtn();
 
-    addLabBtn.onclick = ()=>{ const type=$('#lab_type').value, result=$('#lab_result').value.trim(); if(!result) return;
-      labs.push({type,result}); $('#lab_result').value=''; toggleLabBtn(); markDirty(); renderSummary();
+    addLabBtn.onclick = ()=>{ const type=$('#lab_type').value, result=$('#lab_result').value.trim(), date=$('#lab_date').value||null; if(!result) return;
+      labs.push({type,result,date}); $('#lab_result').value=''; $('#lab_date').value = ''; toggleLabBtn(); markDirty(); renderSummary();
       renderList($('#labsList'), labs, (l,i)=>`
         <tr><td class="col-val"><span class="badge text-bg-light border">${l.type}</span></td>
         <td><strong>${l.result}</strong></td>
+        <td>${l.date ? new Date(l.date).toLocaleDateString() : ''}</td>
         <td class="text-end"><button class="btn btn-sm btn-outline-danger" data-k="lab" data-i="${i}">{% bs_icon 'x-lg' %}</button></td></tr>`);
     };
     $('#labsList').onclick = e=>{ const b=e.target.closest('button[data-k="lab"]'); if(!b) return;
@@ -585,6 +619,7 @@
       renderList($('#labsList'), labs, (l,i)=>`
         <tr><td class="col-val"><span class="badge text-bg-light border">${l.type}</span></td>
         <td><strong>${l.result}</strong></td>
+        <td>${l.date ? new Date(l.date).toLocaleDateString() : ''}</td>
         <td class="text-end"><button class="btn btn-sm btn-outline-danger" data-k="lab" data-i="${i}">{% bs_icon 'x-lg' %}</button></td></tr>`);
     };
 
@@ -674,8 +709,8 @@
   function collectChecklist(){
     const danger_flags = Array.from(document.querySelectorAll('#chkPills .btn-check:checked'))
       .map(cb => cb.value);
-    const risks_ob = ['prev_cs','three_miscarriages','pph'].filter(k => $('#risk_'+k)?.checked);
-    const risks_med = ['tb','hd','dm','asthma','goiter'].filter(k => $('#risk_'+k)?.checked);
+    const risks_ob = ['obstetric'].filter(k => $('#risk_'+k)?.checked);
+    const risks_med = ['medical'].filter(k => $('#risk_'+k)?.checked);
     const nbs = $('#chk_nbs_yes')?.checked ? 'YES' : ($('#chk_nbs_no')?.checked ? 'NO' : null);
     return {
       danger_flags,
@@ -749,8 +784,12 @@
     if(chk.ifa_date_started) tags.push(`IFA start ${chk.ifa_date_started}`);
     if(chk.ifa_date_completed) tags.push(`IFA done ${chk.ifa_date_completed}`);
     if(chk.deworming_date) tags.push(`Deworm ${chk.deworming_date}`);
-    if(tags.length) line('bi-check2-square','Checklist', tags.join(' · '));
 
+    if (chk.risk_codes?.obstetric?.length) tags.push('Risk: Obstetric');
+    if (chk.risk_codes?.medical?.length)   tags.push('Risk: Medical');
+
+    if(tags.length) line('bi-check2-square','Checklist', tags.join(' · '));
+    
     // Visit basics
     if(ga || tri){
       const delta = (ga && last.ga!=null) ? ` (${ga>=last.ga?'+':''}${(ga-last.ga)||0} wks vs last)` : '';
@@ -787,7 +826,7 @@
   }
 
   // Submit (demo adds row)
-  $('#visitForm').addEventListener('submit', e=>{
+  {% comment %} $('#visitForm').addEventListener('submit', e=>{
     e.preventDefault();
     const f = e.currentTarget;
     const row = document.createElement('tr');
@@ -807,11 +846,11 @@
       <td class="text-end"><button class="btn btn-outline-secondary btn-sm" disabled><i class="bi bi-eye"></i></button></td>`;
     $('#visitsTbody').prepend(row);
     dirty=false; bootstrap.Modal.getInstance($('#visitModal')).hide();
-  });
-
+  }); {% endcomment %}
   // Extra safety
   $('#openVisit')?.addEventListener('click', ()=> bootstrap.Modal.getOrCreateInstance('#visitModal').show());
 
 })();
 </script>
+<script defer src="{% static 'midwife/js/anc.js' %}"></script>
 {% endblock %}

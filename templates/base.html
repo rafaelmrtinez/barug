@@ -23,7 +23,7 @@
 <body>
     {% include 'header.html' %}
     {% comment %} {% include 'account_management/'|add:user_role_template|add:'.html' %} {% endcomment %}
-    {% include 'page_title.html' %}
+    {% comment %} {% include 'page_title.html' %} {% endcomment %}
 
     {% block content %}{% endblock%}
         {# ⬇️ add this just before </body> ⬇️ #}

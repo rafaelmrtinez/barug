@@ -11,6 +11,11 @@ from src.infra.exceptions.json_conversion_exception import JSONConversionExcepti
 class JSONConverterUtility:
     
     @staticmethod
+    def pydantic_object_to_json(list_of_obj: list[object]) -> str:
+        """CONVERTS A LIST OF PYDANTIC OBJECTS TO JSON STRING"""
+        return json.dumps([obj.model_dump() for obj in list_of_obj], default=str)
+    
+    @staticmethod
     def to_json_object(value) -> Json:
         return Json(value)
     

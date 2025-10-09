@@ -25,11 +25,16 @@ from django.template.loader import render_to_string
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
 from barug.error_messages import SOMETHING_WENT_WRONG
-from midwife.utility.immunitization_utility import ImmunizationUtility
+from barug.utility.json_utility import JSONCustomUtility
+from midwife.utility.anc_view_utility import ANCViewUtility
+from midwife.utility.immunitization_view_utility import ImmunizationViewUtility
 from src.app.bootstrap.app_containers import AppContainer
+from src.app.contracts.antenatal_service import IAntenatalCareService
 from src.app.contracts.child_services import IChildService
 from src.app.exceptions.person_not_found import PersonNotFoundException
 from src.app.exceptions.prescription_exception import PrescriptionException
+from src.app.transfer_objects.request.anc_labolatory_results_request import ANCLaboratoryResultsRequest
+from src.app.transfer_objects.request.antenatal_care_request import AntenatalCareRequest
 from src.app.transfer_objects.request.breast_feeding_type_request import BreastFeedingCheckRequest
 from src.app.transfer_objects.request.child_immunization_request import ChildImmunizationRequest
 from src.app.transfer_objects.request.child_iron_supplement_request import ChildIronSupplementRequest
@@ -38,7 +43,9 @@ from src.app.transfer_objects.request.child_screening_request import ChildScreen
 from src.app.transfer_objects.request.child_visit_request import ChildVisitRequest
 from src.app.transfer_objects.request.child_vitamins_request import ChildVitaminsRequest
 from src.app.transfer_objects.request.init_chilld_immunization_request import InitialChildImmunizationRequest
+from src.app.transfer_objects.request.tetanus_toxoid_request import TetanusToxoidRequest
 from src.domain.contracts.maternal_service import IMaternalService
+from src.infra.exceptions.anc_visit_exception import ANCVisitException
 from src.infra.exceptions.child_visit_exception import ChildVisitException
 
 from .forms import (
@@ -63,6 +70,10 @@ from .services import (
 
 # Two AJAX helpers use RPC directly
 from common.supabase_client import supabase
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 # -------------------- Role / UI globals (unchanged) --------------------
 ROLE_MIDWIFE = ("MIDWIFE", "Midwife", "midwife")
@@ -665,7 +676,7 @@ def child_visit_http(request: HttpRequest, service: IMaternalService = Provide[A
     child_screening = ChildScreeningRequest(**data.get("screening", {}))
     iron_supplements = ChildIronSupplementRequest(**data.get("iron_supplements", {}))
     vitamins = [ChildVitaminsRequest(**i) for i in data.get("vitamins", [])]
-    initial_immunization = ImmunizationUtility.parse_immunization_payload(immunization_data)
+    initial_immunization = ImmunizationViewUtility.parse_immunization_payload(immunization_data)
     monitoring = ChildMonitoringRequest(
         check_date=monitoring_data[0].get("date", None),
         age=monitoring_data[0].get("age", None),
@@ -719,3 +730,51 @@ def child_basic_info_http(
         return JsonResponse({"message": res.__dict__}, status=200)
     except Exception as e:
         return JsonResponse({"error": "Something went wrong, unable to retrieve child basic information"}, status=400)
+
+@require_http_methods(["POST"])
+@session_login_required
+@role_required(*ROLE_MIDWIFE)
+@csrf_protect
+@nocache
+@inject
+def anc_care_http(request: HttpRequest, service: IAntenatalCareService = Provide[AppContainer.antenatal_care_service]) -> JsonResponse:
+    
+    if request.content_type != "application/json":
+        return JsonResponse({"error": "Unsupported Media Type"}, status=415)
+    
+    try:
+        data = json.loads(request.body)
+        
+        raw_lab_results = data.get("p_lab_results")
+        raw_tt_vacc = data.get("p_tt_vaccines")
+
+        if isinstance(raw_lab_results, str):
+            raw_lab_results = json.loads(raw_lab_results)
+
+        if isinstance(raw_tt_vacc, str):
+            raw_tt_vacc = json.loads(raw_tt_vacc)
+
+        data = JSONCustomUtility.clean_empty_strings(data)
+        
+        staff_id = request.session.get("auth", None).get("staff_id", None)
+        
+        init_data = AntenatalCareRequest(**data, p_assessed_by_id=staff_id)
+        tt_vaccines = ANCViewUtility.tt_vaccines_obj_converter(raw_tt_vacc)
+        lab_results = ANCViewUtility.laboratory_results_obj_converter(raw_lab_results)
+
+        res = service.execute(init_data, lab_results, tt_vaccines)
+        
+        if not res:
+            return JsonResponse({"error": "Failed to process ANC Care"}, status=500)
+
+        return JsonResponse({"message": "ANC Care RPC endpoint placeholder"}, status=200)
+
+    except json.JSONDecodeError:
+        logger.error("View (anc_care_http) encountered an exception", exc_info=True)
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    except ANCVisitException as e:
+        logger.error("View (anc_care_http) encountered an exception", exc_info=True)
+        return JsonResponse({"error": str(e)}, status=400)
+    except Exception as e:
+        logger.critical("View (anc_care_http) encountered an exception", exc_info=True)
+        return JsonResponse({"error": "Unexpected error encountered. Please try again."}, status=500)
