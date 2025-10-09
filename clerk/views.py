@@ -96,6 +96,8 @@ from src.app.contracts.business_service_contract import (
 from src.app.transfer_objects.commands.business_cmd import (
     RegisterBusinessProfileCmd
 )
+from src.app.services.business_notification import notify_registration_received
+from common.send_sms import send_sms
 
 def _auth_role_name(request: HttpRequest) -> str:
     return (((request.session.get("auth") or {}).get("role_name")) or "Staff").title()
@@ -2462,6 +2464,27 @@ def business_information_review(
 
             try:
                 business_id, owner_person_id = business_registration_service.business_registration(cmd)
+
+                try:
+                    notify_registration_received(owner=owner, business=business, business_id=business_id)
+                except Exception:
+                    pass
+
+                try:
+                    owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
+                    if owner_mobile:
+                        bname = (business.get("b_name") or "your business").strip()
+                        msg = (
+                            f"BARUG: Business Registration received for '{bname}'.\n"
+                            f"Ref: {business_id}.\n"
+                            f"Sign in to the mobile app to request the necessary business documents."
+                        )
+                        # fail_silently so we don't break the user flow
+                        send_sms(owner_mobile, msg, fail_silently=True)
+                except Exception:
+                    # fully swallow—logging optional
+                    pass
+
                 request.session.pop("bizreg_owner", None)
                 request.session.pop("bizreg_business", None)
                 messages.success(request, f'Business #{business_id} created for owner #{owner_person_id}.')
