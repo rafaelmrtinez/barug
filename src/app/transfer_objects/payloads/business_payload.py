@@ -18,6 +18,6 @@ class OwnerPayload(TypedDict, total=False):
     purok_sitio_name: Optional[str]  # or use *_id if that’s your form
     barangay: str
     city: str
-    valid_id_type_id: Optional[int]
-    valid_id_front: Optional[str]
-    valid_id_back: Optional[str]
+    # valid_id_type_id: Optional[int]
+    # valid_id_front: Optional[str]
+    # valid_id_back: Optional[str]

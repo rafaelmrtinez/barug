@@ -143,41 +143,6 @@
             </div>
 
         </div>
-
-        <div class="row">
-            <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                    {{form.type_of_id}}
-                    <label for="{{ form.type_of_id.id_for_label }}">{{ form.type_of_id.label }}</label>
-                </div>
-            </div>
-
-            <!-- FRONT ID with preview -->
-            <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="form-floating mb-2">
-                {{ form.front_id }}
-                <label for="{{ form.front_id.id_for_label }}">{{ form.front_id.label }}</label>
-                </div>
-                <div class="image-preview mb-3" id="frontPreviewBox" {% if not form.instance.front_id and not front_preview_url %}style="display:none"{% endif %}>
-                <img id="frontPreviewImg"
-                    src="{% if front_preview_url %}{{ front_preview_url }}{% elif form.instance.front_id %}{{ form.instance.front_id.url }}{% endif %}"
-                    alt="Front ID preview">
-                </div>
-            </div>
-
-            <!-- BACK ID with preview -->
-            <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="form-floating mb-2">
-                {{ form.back_id }}
-                <label for="{{ form.back_id.id_for_label }}">{{ form.back_id.label }}</label>
-                </div>
-                <div class="image-preview mb-3" id="backPreviewBox" {% if not form.instance.back_id and not back_preview_url %}style="display:none"{% endif %}>
-                <img id="backPreviewImg"
-                    src="{% if back_preview_url %}{{ back_preview_url }}{% elif form.instance.back_id %}{{ form.instance.back_id.url }}{% endif %}"
-                    alt="Back ID preview">
-                </div>
-            </div>
-        </div>
         
         <div class="mt-auto button-container">
             <button class="btn btn-reset">Clear</button>
@@ -185,45 +150,6 @@
         </div>
 
     </form>
-
-<script>
-(function() {
-  function bindPreview(fileInputId, boxId, imgId) {
-    const input = document.getElementById(fileInputId);
-    const box = document.getElementById(boxId);
-    const img = document.getElementById(imgId);
-    if (!input) return;
-
-    input.addEventListener('change', function() {
-      const file = this.files && this.files[0];
-      if (!file) {
-        box && (box.style.display = 'none');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        if (img) img.src = e.target.result;
-        if (box) box.style.display = '';
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  // These IDs are Django's auto IDs unless you overrode widgets.
-  bindPreview('{{ form.front_id.id_for_label }}', 'frontPreviewBox', 'frontPreviewImg');
-  bindPreview('{{ form.back_id.id_for_label }}',  'backPreviewBox',  'backPreviewImg');
-
-  // Clear button also clears previews
-  const btnClear = document.getElementById('btnClear');
-  if (btnClear) {
-    btnClear.addEventListener('click', function() {
-      // Hide previews (server-side existing previews will reappear only after reload)
-      const boxes = ['frontPreviewBox','backPreviewBox'];
-      boxes.forEach(id => { const el = document.getElementById(id); if (el) el.style.display='none'; });
-    });
-  }
-})();
-</script>
 
 </div>
 {% endblock %}

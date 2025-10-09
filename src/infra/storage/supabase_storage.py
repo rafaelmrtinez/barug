@@ -14,7 +14,7 @@ class SupabaseStorage:
     """
 
     # ---- CONFIG (adjust if your buckets/paths differ) ----
-    PERSON_BUCKET = "id-uploads"          # e.g., 'id-uploads'
+    # PERSON_BUCKET = "id-uploads"          # e.g., 'id-uploads'
     BUSINESS_BUCKET = "business-proofs"   # e.g., 'business-proofs'
     SIGNED_URL_EXPIRES = 60 * 15          # 15 minutes
 
@@ -95,32 +95,32 @@ class SupabaseStorage:
             return None
 
     # ---- High-level getters ----
-    def get_owner_id_assets_any(self, supabase_uid: Optional[str], person_id: Optional[int]) -> Dict[str, Any]:
-        prefix = self.person_root_path_any(supabase_uid, person_id)
-        if not prefix:
-            return {}
-        items = self.list_folder(self.PERSON_BUCKET, prefix) or []
-        files: List[Dict[str, Any]] = []
+    # def get_owner_id_assets_any(self, supabase_uid: Optional[str], person_id: Optional[int]) -> Dict[str, Any]:
+    #     prefix = self.person_root_path_any(supabase_uid, person_id)
+    #     if not prefix:
+    #         return {}
+    #     items = self.list_folder(self.PERSON_BUCKET, prefix) or []
+    #     files: List[Dict[str, Any]] = []
 
-        for it in items:
-            name = (it or {}).get("name")
-            if not name:
-                continue
-            # filter to common previewable/docs
-            if not name.lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".pdf")):
-                continue
-            path = f"{self._norm_folder(prefix)}/{name}"
-            files.append(
-                {
-                    "name": name,
-                    "path": path,
-                    "size": ((it.get("metadata") or {}).get("size")),
-                    "updated_at": it.get("updated_at"),
-                    "signed_url": self.sign_url(self.PERSON_BUCKET, path),
-                }
-            )
+    #     for it in items:
+    #         name = (it or {}).get("name")
+    #         if not name:
+    #             continue
+    #         # filter to common previewable/docs
+    #         if not name.lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".pdf")):
+    #             continue
+    #         path = f"{self._norm_folder(prefix)}/{name}"
+    #         files.append(
+    #             {
+    #                 "name": name,
+    #                 "path": path,
+    #                 "size": ((it.get("metadata") or {}).get("size")),
+    #                 "updated_at": it.get("updated_at"),
+    #                 "signed_url": self.sign_url(self.PERSON_BUCKET, path),
+    #             }
+    #         )
 
-        return {"files": files} if files else {}
+    #     return {"files": files} if files else {}
 
     def get_business_proof_assets(self, business_id: int) -> Dict[str, Any]:
         """

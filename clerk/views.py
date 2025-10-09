@@ -1881,7 +1881,6 @@ def fetch_display_maps_from_forms() -> Dict[str, Dict[Any, str]]:
     Build all needed {id: label} maps directly from your static Django forms.
     Adjust field names if yours differ.
     """
-    from .forms import BusinessOwnerInfo, BusinessDetails  # import here to avoid circulars
     owner_form = BusinessOwnerInfo()
     biz_form = BusinessDetails()
 
@@ -1891,7 +1890,6 @@ def fetch_display_maps_from_forms() -> Dict[str, Dict[Any, str]]:
         "civil_status": _field_map(owner_form, "civil_status"),
         "nationality": _field_map(owner_form, "nationality"),
         "religion": _field_map(owner_form, "religion"),
-        "valid_id_type": _field_map(owner_form, "type_of_id"),
 
         # Business-side lookups
         "business_type": _field_map(biz_form, "b_type"),
@@ -1935,18 +1933,9 @@ def build_owner_display(owner: dict, maps: Dict[str, Dict[Any, str]]) -> Dict[st
         owner.get("city") or "",
     ])
 
-    # 👇 normalize for display even if session is old and lacks the field
     res_name = _normalize_residency_name(
         owner.get("residency_name") or owner.get("residential_status_name")
     )
-
-    id_type_id = owner.get("valid_id_type_id")
-    id_type_label = maps.get("valid_id_type", {}).get(id_type_id) if id_type_id is not None else None
-    id_front_path = owner.get("id_front_path")
-    id_back_path  = owner.get("id_back_path")
-    id_front_name = os.path.basename(id_front_path) if id_front_path else None
-    id_back_name  = os.path.basename(id_back_path)  if id_back_path  else None
-
 
     return {
         "full_name": full_name,
@@ -1959,12 +1948,7 @@ def build_owner_display(owner: dict, maps: Dict[str, Dict[Any, str]]) -> Dict[st
         "mobile": owner.get("mobile") or "—",
         "email": owner.get("email") or "—",
         "address_display": addr or (owner.get("address_line") or "—"),
-        "residency_name": res_name,  # 👈 always a value
-        "valid_id_type_label": id_type_label or "—",
-        "id_front_name": id_front_name,
-        "id_back_name": id_back_name,
-        "id_front_path": id_front_path,
-        "id_back_path": id_back_path,
+        "residency_name": res_name,
     }
 
 def build_business_display(biz: dict, maps: Dict[str, Dict[int, str]]) -> Dict[str, Any]:
@@ -2235,22 +2219,27 @@ def ajax_owner_search(
     payload = _normalize_owner_rows(rows)
     return JsonResponse({"results": payload})
 
-def _save_temp_upload(upload, subdir: str) -> str:
+def _save_temp_upload(upload, subdir: str) -> dict:
     """
-    Persist an uploaded file under MEDIA_ROOT/tmp/<subdir>/<uuid>_<name>.
-    Returns the absolute path suitable for later re-read/forward to Supabase.
+    Save an uploaded file to default_storage under tmp/<subdir>/<uuid>_<name>.
+    Returns a dict with storage 'path' plus metadata for later preview/upload.
     """
     if not upload:
-        return ""
-    base = getattr(settings, "MEDIA_ROOT", "")
-    folder = os.path.join(base, "tmp", subdir)
-    os.makedirs(folder, exist_ok=True)
+        return {}
+
+    # Build a storage-relative path like: "tmp/bizproof/uuid_name.jpg"
     fname = f"{uuid.uuid4().hex}_{upload.name}"
-    rel_path = os.path.join("tmp", subdir, fname)          # relative under MEDIA_ROOT
-    full_path = os.path.join(base, "tmp", subdir, fname)   # absolute
-    # Use default_storage to be consistent with your storage backend
-    default_storage.save(rel_path, ContentFile(upload.read()))
-    return full_path
+    storage_path = "/".join(["tmp", subdir.strip("/"), fname])
+
+    # Write into whatever backend default_storage is configured to use
+    default_storage.save(storage_path, ContentFile(upload.read()))
+
+    return {
+        "path": storage_path,                      # <-- use this everywhere
+        "name": upload.name,
+        "ctype": getattr(upload, "content_type", None),
+        "size": getattr(upload, "size", None),
+    }
 
 @session_login_required
 @role_required(CLERK_ROLE)
@@ -2265,13 +2254,6 @@ def business_owner_nonresident(request: HttpRequest) -> HttpResponse:
 
             dob_val = form.cleaned_data["dob"]
             dob_str = dob_val.isoformat() if isinstance(dob_val, date) else str(dob_val)
-
-            type_of_id_id = int(form.cleaned_data["type_of_id"])
-            front_file = form.cleaned_data.get("front_id")
-            back_file  = form.cleaned_data.get("back_id")
-
-            front_path = _save_temp_upload(front_file, "biz_owner_id")
-            back_path  = _save_temp_upload(back_file,  "biz_owner_id") if back_file else None
 
 
             owner_payload: Dict[str, Any] = {
@@ -2292,10 +2274,6 @@ def business_owner_nonresident(request: HttpRequest) -> HttpResponse:
                 "purok_sitio": (form.cleaned_data.get("purok_sitio") or "").strip(),
                 "barangay": form.cleaned_data["barangay"].strip(),
                 "city": form.cleaned_data["city"].strip(),
-
-                "valid_id_type_id": type_of_id_id,
-                "id_front_path": front_path,   # absolute path under MEDIA_ROOT/tmp/…
-                "id_back_path": back_path,     # may be None
             }
 
             # Store and expire in 30 minutes
@@ -2339,7 +2317,7 @@ def business_details(request: HttpRequest):
     owner = request.session.get("bizreg_owner")
     if not owner:
         messages.warning(request, "No owner info found. Please fill the form first.")
-        return redirect("clerk:business_owner_nonresident")
+        return redirect("clerk:business_owner")
     
     if request.method == "POST":
         form = BusinessDetails(request.POST, request.FILES or None)
@@ -2387,10 +2365,20 @@ def business_details(request: HttpRequest):
                 "city": _sstrip(cd.get("city")) or "",
             }
 
-            # NOTE: We intentionally DO NOT put file objects (e.g., proof) in session.
-            if request.FILES.get("proof"):
-                payload["proof_name"] = request.FILES["proof"].name  # just for display; not the file itself
+            proof_pairs = []
+            if request.FILES:
+                files = request.FILES.getlist("proof") if "proof" in request.FILES else []
+                for up in files:
+                    info = _save_temp_upload(up, "bizproof")  # stores under tmp/bizproof/...
+                    if info and info.get("path"):
+                        proof_pairs.append(info)
             
+            if proof_pairs:
+                # human label; keep for the details card
+                payload["proof_name"] = ", ".join(p["name"] for p in proof_pairs)
+                # ✅ store temp info for preview/submit later
+                payload["proof_tmp_pairs"] = proof_pairs
+
             payload = _json_safe(payload)
 
             request.session["bizreg_business"] = payload
@@ -2436,7 +2424,7 @@ def business_information_review(
 
     owner = request.session.get("bizreg_owner")
     if not owner:
-        return redirect("clerk:business_owner_nonres")
+        return redirect("clerk:business_owner")
 
     business = request.session.get("bizreg_business")
     if not business:
@@ -2448,42 +2436,56 @@ def business_information_review(
             # Accept single or multiple files (template may use name="proof")
             uploads = []
             if "proof" in request.FILES:
-                # getlist works even if single file
                 uploads = request.FILES.getlist("proof")
+
+            if not uploads:
+                for p in (business or {}).get("proof_tmp_pairs", []) or []:
+                    spath = p.get("path")
+                    if not spath:
+                        continue
+                    try:
+                        # default_storage.open works across any backend (local/S3/Supabase)
+                        uploads.append(default_storage.open(spath, "rb"))
+                    except Exception:
+                        pass
 
             cmd = RegisterBusinessProfileCmd(
                 owner=owner,
                 business=business,
                 performer_staff_id=_auth_staff_id(request),
                 proof_files_uploads=uploads,
-
-                owner_valid_id_type_id = owner.get("valid_id_type_id"),
-                owner_id_front_path    = owner.get("id_front_path"),
-                owner_id_back_path     = owner.get("id_back_path"),
             )
 
             try:
                 business_id, owner_person_id = business_registration_service.business_registration(cmd)
 
-                try:
-                    notify_registration_received(owner=owner, business=business, business_id=business_id)
-                except Exception:
-                    pass
+                for p in (business or {}).get("proof_tmp_pairs", []) or []:
+                    spath = p.get("path")
+                    if spath:
+                        try:
+                            default_storage.delete(spath)
+                        except Exception:
+                            pass
 
-                try:
-                    owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
-                    if owner_mobile:
-                        bname = (business.get("b_name") or "your business").strip()
-                        msg = (
-                            f"BARUG: Business Registration received for '{bname}'.\n"
-                            f"Ref: {business_id}.\n"
-                            f"Sign in to the mobile app to request the necessary business documents."
-                        )
-                        # fail_silently so we don't break the user flow
-                        send_sms(owner_mobile, msg, fail_silently=True)
-                except Exception:
-                    # fully swallow—logging optional
-                    pass
+                # try:
+                #     notify_registration_received(owner=owner, business=business, business_id=business_id)
+                # except Exception:
+                #     pass
+
+                # try:
+                #     owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
+                #     if owner_mobile:
+                #         bname = (business.get("b_name") or "your business").strip()
+                #         msg = (
+                #             f"BARUG: Business Registration received for '{bname}'.\n"
+                #             f"Ref: {business_id}.\n"
+                #             f"Sign in to the mobile app to request the necessary business documents."
+                #         )
+                #         # fail_silently so we don't break the user flow
+                #         send_sms(owner_mobile, msg, fail_silently=True)
+                # except Exception:
+                #     # fully swallow—logging optional
+                #     pass
 
                 request.session.pop("bizreg_owner", None)
                 request.session.pop("bizreg_business", None)
@@ -2513,6 +2515,19 @@ def business_information_review(
     owner_disp = build_owner_display(owner, maps)
     biz_disp   = build_business_display(business, maps)
 
+    tmp_pairs = (business.get("proof_tmp_pairs") or [])
+    proof_urls = []
+    for p in tmp_pairs:
+        spath = p.get("path")
+        if not spath:
+            continue
+        try:
+            proof_urls.append(default_storage.url(spath))
+        except Exception:
+            # If your storage backend has no .url(), fall back to MEDIA_URL (dev only)
+            url = (getattr(settings, "MEDIA_URL", "/media/").rstrip("/") + "/" + spath)
+            proof_urls.append(url)
+
         
     return render(
         request,
@@ -2524,6 +2539,7 @@ def business_information_review(
             "business": business,           # raw for future DB insert
             "owner_disp": owner_disp,       # labels for display
             "biz_disp": biz_disp,           # labels for display
+            "proof_urls": proof_urls,
         },
     )
 
@@ -2541,13 +2557,13 @@ def business_list(
     form = BusinessFilters(request.GET or None)
 
     search = request.GET.get("search")
-    b_type = _to_int_or_none(request.GET.get("b_type"))
+    b_category = _to_int_or_none(request.GET.get("b_category"))
     ownership_type = _to_int_or_none(request.GET.get("ownership_type"))
     status = _to_int_or_none(request.GET.get("status"))
 
     rows = business_service.execute(
         search= search,
-        b_type= b_type,
+        b_category= b_category,
         ownership_type= ownership_type,
         status= status,
     )
@@ -2556,7 +2572,7 @@ def business_list(
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
-    if (search or b_type is not None or ownership_type is not None or status is not None) and not form.is_valid():
+    if (search or b_category is not None or ownership_type is not None or status is not None) and not form.is_valid():
         form = BusinessFilters()
 
     return render(request, "business/business_list.html", {
@@ -2566,7 +2582,7 @@ def business_list(
         'page_obj' : page_obj,
         'filters' : {
             'search' : search,
-            'b_type' : b_type,
+            'b_category' : b_category,
             'ownership_type' :ownership_type,
             'status' : status,
         }

@@ -6,7 +6,7 @@ from datetime import date, time
 class BusinessListDTO:
     business_id: int
     business_name: str
-    business_type_name: str
+    business_category_name: str
     business_nature: str
     business_owner_name: str
     business_address: str
@@ -75,7 +75,6 @@ class NonResidentOwnerDTO:
 class BusinessInfoDTO:
     b_name: str
     ownership_type: int
-    b_type: int
     b_category: int
     b_nature: str
     date_est: date
@@ -105,5 +104,5 @@ class BusinessInfoDTO:
 class OwnerBusinessDTO:
     owner: dict[str, Any]
     business: dict[str, Any]
-    owner_id: dict[str, Any]
+    # owner_id: dict[str, Any]
     business_proof: dict[str, Any]

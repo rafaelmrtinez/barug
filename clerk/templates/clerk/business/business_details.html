@@ -12,6 +12,7 @@
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
     <script src="{% static 'clerk/js/map_registration.js' %}"></script>
+    <script src="{% static 'clerk/js/proof_modal.js' %}"></script>
 {% endblock %}
 
 {% block content %}
@@ -41,13 +42,6 @@
                 <div class="form-floating mb-3">
                 {{ form.b_name }}
                 <label for="{{ form.b_name.id_for_label }}">{{ form.b_name.label }}</label>
-                </div>
-            </div>
-
-            <div class="col-lg-4 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                {{ form.b_type }}
-                <label for="{{ form.b_type.id_for_label }}">{{ form.b_type.label }}</label>
                 </div>
             </div>
 
@@ -188,6 +182,20 @@
                     {{form.proof}}
                     <label for="{{ form.proof.id_for_label }}">{{ form.proof.label }}</label>
                 </div>
+
+                <div class="d-flex gap-2 align-items-center mt-2">
+                    <button
+                        id="openProofModalBtn"
+                        type="button"
+                        class="btn btn-outline-primary btn-sm d-none"
+                        data-bs-toggle="modal"
+                        data-bs-target="#proofModal"
+                        >
+                        Preview selected images
+                    </button>
+
+                    <span id="proofMeta" class="small text-muted"></span>
+                </div>
             </div>
         </div>
 
@@ -254,10 +262,46 @@
             </div>
         </div>
 
+        <!-- Proof Preview Modal -->
+        <div class="modal fade" id="proofModal" tabindex="-1" aria-labelledby="proofModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+            <div class="modal-header">
+                <h5 id="proofModalLabel" class="modal-title">Selected Proof Images</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <div id="proofModalGrid" class="row g-3"></div>
+            </div>
+
+            <div class="modal-footer">
+                <div class="me-auto">
+                <span id="proofModalMeta" class="small text-muted"></span>
+                </div>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Done</button>
+            </div>
+            </div>
+        </div>
+        </div>
+
+        <!-- Optional: Lightbox for full-size view -->
+        <div class="modal fade" id="proofLightbox" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content bg-dark">
+            <div class="modal-body p-0 d-flex justify-content-center align-items-center">
+                <img id="lightboxImg" src="" alt="Preview" class="img-fluid" style="max-height: 90vh;">
+            </div>
+            </div>
+        </div>
+        </div>
+
+
         <div class="mt-auto button-container">
             <button type="reset" class="btn btn-reset">Clear</button>
             <button type="submit" class="btn btn-submit">Submit</button>
         </div>
     </form>
 </div>
+
 {% endblock %}

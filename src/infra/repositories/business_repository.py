@@ -100,7 +100,7 @@ class BusinessRepository(IBusinessRepository):
                 BusinessListDTO(
                     business_id=r["business_id"],
                     business_name=r["business_name"],
-                    business_type_name=r["business_type_name"],
+                    business_category_name=r["business_category_name"],
                     business_nature=r["business_nature"],
                     business_owner_name=r["business_owner_name"],
                     business_address=r["business_address"],
@@ -199,7 +199,6 @@ class BusinessRepository(IBusinessRepository):
             "p_capital_invested": self._to_decimal(b.get("capital_invested")),
             "p_mnthly_gross_incom_est": self._to_decimal(b.get("inc_est")),
             "p_num_of_emp": self._to_int(b.get("emp_num")),
-            "p_business_type_id": self._to_int(b.get("b_type")),
             "p_ownership_type_id": self._to_int(b.get("ownership_type")),
             "p_operating_day_start": self._to_int(b.get("opt_days_start")),
             "p_operating_day_end": self._to_int(b.get("opt_days_end")),
@@ -232,9 +231,9 @@ class BusinessRepository(IBusinessRepository):
                 "p_owner_barangay": None,
                 "p_owner_street": None,
                 "p_owner_purok_sitio_name": None,
-                "p_owner_valid_id_front": None,
-                "p_owner_valid_id_back": None,
-                "p_owner_valid_id_type_id": None,
+                # "p_owner_valid_id_front": None,
+                # "p_owner_valid_id_back": None,
+                # "p_owner_valid_id_type_id": None,
             })
         else:
             o: NonResidentOwnerDTO = cmd.owner
@@ -257,9 +256,9 @@ class BusinessRepository(IBusinessRepository):
                 "p_owner_purok_sitio_name": (o.get("purok_sitio") or None),
 
                 # ✅ ID docs
-                "p_owner_valid_id_front":   (o.get("id_front_path") or cmd.owner_id_front_path),
-                "p_owner_valid_id_back":    (o.get("id_back_path")  or cmd.owner_id_back_path),
-                "p_owner_valid_id_type_id": self._to_int(o.get("valid_id_type_id") or cmd.owner_valid_id_type_id),
+                # "p_owner_valid_id_front":   (o.get("id_front_path") or cmd.owner_id_front_path),
+                # "p_owner_valid_id_back":    (o.get("id_back_path")  or cmd.owner_id_back_path),
+                # "p_owner_valid_id_type_id": self._to_int(o.get("valid_id_type_id") or cmd.owner_valid_id_type_id),
             })
         param_order = [
             "p_performer_staff_id",
@@ -274,7 +273,6 @@ class BusinessRepository(IBusinessRepository):
             "p_capital_invested",
             "p_mnthly_gross_incom_est",
             "p_num_of_emp",
-            "p_business_type_id",
             "p_ownership_type_id",
 
             # operating schedule
@@ -320,9 +318,9 @@ class BusinessRepository(IBusinessRepository):
             "p_owner_purok_sitio_name",
 
             # Optional files for owner
-            "p_owner_valid_id_front",
-            "p_owner_valid_id_back",
-            "p_owner_valid_id_type_id",
+            # "p_owner_valid_id_front",
+            # "p_owner_valid_id_back",
+            # "p_owner_valid_id_type_id",
         ]
 
         placeholders = ", ".join([f"%({k})s" for k in param_order])

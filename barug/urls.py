@@ -18,6 +18,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from authentication import views as auth_view
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path("", auth_view.login, name="login"),
@@ -37,3 +39,6 @@ urlpatterns = [
     path("payments/", include("payments.urls", namespace="payments")),
     path("notifications/", include("notifications.urls", namespace="notifications")),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

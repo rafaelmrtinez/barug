@@ -45,14 +45,14 @@ class BusinessService(IBusinessService):
     def execute(
         self,
         search: Optional[str] = None,
-        b_type: Optional[str] = None,
+        b_category: Optional[str] = None,
         ownership_type: Optional[str] = None,
         status: Optional[str] = None,
     ) -> list[BusinessListDTO]:
         if search:
             return self._business_repo.search_business(search)
-        if b_type is not None:
-            return self._business_repo.sort_b_type(b_type)
+        if b_category is not None:
+            return self._business_repo.sort_b_type(b_category)
         if ownership_type is not None:
             return self._business_repo.sort_ownership_type(ownership_type)
         if status is not None:
@@ -226,28 +226,28 @@ class OwnerBusinessInfoService(IBusinessInfoService):
             })
         return files
     
-    @staticmethod
-    def _merge_owner_id_block(storage_block: dict, owner_row: dict) -> dict:
-        """
-        If storage is empty, fall back to valid_id_files[]/selfie_file from owner_row.
-        Returns {"files": [...]} or {}.
-        """
-        # Prefer storage
-        if storage_block and storage_block.get("files"):
-            return storage_block
+    # @staticmethod
+    # def _merge_owner_id_block(storage_block: dict, owner_row: dict) -> dict:
+    #     """
+    #     If storage is empty, fall back to valid_id_files[]/selfie_file from owner_row.
+    #     Returns {"files": [...]} or {}.
+    #     """
+    #     # Prefer storage
+    #     if storage_block and storage_block.get("files"):
+    #         return storage_block
 
-        files: list[dict] = []
+    #     files: list[dict] = []
 
-        # Fallback: array of file paths
-        valid_id_files = owner_row.get("valid_id_files") if owner_row else None
-        files.extend(OwnerBusinessInfoService._files_from_paths(valid_id_files))
+    #     # Fallback: array of file paths
+    #     valid_id_files = owner_row.get("valid_id_files") if owner_row else None
+    #     files.extend(OwnerBusinessInfoService._files_from_paths(valid_id_files))
 
-        # Optional: include selfie_file as a single-item entry
-        selfie_path = owner_row.get("selfie_file") if owner_row else None
-        if selfie_path:
-            files.extend(OwnerBusinessInfoService._files_from_paths([selfie_path]))
+    #     # Optional: include selfie_file as a single-item entry
+    #     selfie_path = owner_row.get("selfie_file") if owner_row else None
+    #     if selfie_path:
+    #         files.extend(OwnerBusinessInfoService._files_from_paths([selfie_path]))
 
-        return {"files": files} if files else {}
+    #     return {"files": files} if files else {}
     
     @staticmethod
     def _merge_business_proof_block(storage_block: dict, biz_row: dict) -> dict:
@@ -269,19 +269,17 @@ class OwnerBusinessInfoService(IBusinessInfoService):
 
         # 2) Storage lookups (Supabase)
         # Get supabase_uid if your get_details returns it; if not, consider adding it there.
-        supabase_uid = (owner_row or {}).get("supabase_uid")
-        owner_person_id = (owner_row or {}).get("person_id")
-        storage_owner_id = self._storage.get_owner_id_assets_any(supabase_uid, owner_person_id)
+        # supabase_uid = (owner_row or {}).get("supabase_uid")
+        # owner_person_id = (owner_row or {}).get("person_id")
+        # storage_owner_id = self._storage.get_owner_id_assets_any(supabase_uid, owner_person_id)
         storage_biz_proof = self._storage.get_business_proof_assets(business_id)
 
         # 3) Merge with fallbacks
-        owner_id_block = self._merge_owner_id_block(storage_owner_id, owner_row or {})
         business_proof_block = self._merge_business_proof_block(storage_biz_proof, business_row or {})
 
         return OwnerBusinessDTO(
             owner= owner_row or {},
             business= business_row or {},
-            owner_id= owner_id_block or {},
             business_proof= business_proof_block or {},
         )
     

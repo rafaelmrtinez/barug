@@ -73,21 +73,6 @@ VALID_ID_TYPE_CHOICES = [
     (16, "EPHIL ID"),
 ]
 
-BUSINESS_TYPE_CHOICES = [
-    ("", "— All types —"),
-    (1, "AGRICULTURE / AGRIBUSINESS"),
-    (2, "EDUCATION & TRAINING"),
-    (3, "FINANCIAL SERVICES"),
-    (4, "FOOD & BEVERAGE"),
-    (5, "HEALTH & WELLNESS"),
-    (6, "MANUFACTURING / PRODUCTION"),
-    (7, "REAL ESTATE & LEASING"),
-    (8, "SERVICES"),
-    (9, "TOURISM, TRAVEL & ENTERTAINMENT"),
-    (10, "TRADING / RETAIL"),
-    (11, "OTHERS"),
-]
-
 BUSINESS_CATEGORY_CHOICES = [
     ("", "— Select category —"),
     (49, "Night Market"),
@@ -198,10 +183,10 @@ class BusinessFilters(forms.Form):
         label= 'Search',
         required= False,
     )
-    b_type = forms.ChoiceField(
-        choices= BUSINESS_TYPE_CHOICES,
+    b_category = forms.ChoiceField(
+        choices= BUSINESS_CATEGORY_CHOICES,
         widget=forms.Select(attrs={
-            'id' : 'b_type',
+            'id' : 'b_category',
             'class' : 'form-select',
         }),
         label= 'Business Type',
@@ -394,31 +379,55 @@ class BusinessOwnerInfo(forms.Form):
         required= True,
     )
     # SUPPORTING DOCUMENTS
-    type_of_id = forms.ChoiceField(
-        choices= VALID_ID_TYPE_CHOICES, 
-        widget=forms.Select(attrs={
-            'id' : 'type_of_id',
-            'class' : 'form-select',
-    }),
-        label= 'valid ID Type',
-        required= True,
-    )
-    front_id = forms.ImageField(
-        widget=forms.ClearableFileInput(attrs={
-            'id' : 'front_id',
-            'class' : 'form-control',
-    }),
-        label= 'Front of the ID',
-        required= True, 
-    )
-    back_id = forms.ImageField(
-        widget=forms.ClearableFileInput(attrs={
-            'id' : 'back_id',
-            'class' : 'form-control',
-    }),
-        label= 'Back of the ID',
-        required= True, 
-    )
+    # type_of_id = forms.ChoiceField(
+    #     choices= VALID_ID_TYPE_CHOICES, 
+    #     widget=forms.Select(attrs={
+    #         'id' : 'type_of_id',
+    #         'class' : 'form-select',
+    # }),
+    #     label= 'valid ID Type',
+    #     required= True,
+    # )
+    # front_id = forms.ImageField(
+    #     widget=forms.ClearableFileInput(attrs={
+    #         'id' : 'front_id',
+    #         'class' : 'form-control',
+    # }),
+    #     label= 'Front of the ID',
+    #     required= True, 
+    # )
+    # back_id = forms.ImageField(
+    #     widget=forms.ClearableFileInput(attrs={
+    #         'id' : 'back_id',
+    #         'class' : 'form-control',
+    # }),
+    #     label= 'Back of the ID',
+    #     required= True, 
+    # )
+
+class MultiFileInput(forms.ClearableFileInput):
+    # 🔑 This is what enables <input multiple>
+    allow_multiple_selected = True
+
+class MultiFileField(forms.FileField):
+    widget = MultiFileInput
+
+    def clean(self, data, initial=None):
+        """
+        Return a list of cleaned UploadedFile objects.
+        """
+        if not data and self.required:
+            raise forms.ValidationError(self.error_messages['required'], code='required')
+
+        # Normalize to a list
+        files = data if isinstance(data, (list, tuple)) else ([data] if data else [])
+        cleaned = []
+        for f in files:
+            if f:  # skip Nones
+                cleaned.append(super().clean(f, initial))
+        if self.required and not cleaned:
+            raise forms.ValidationError(self.error_messages['required'], code='required')
+        return cleaned
 
 class BusinessDetails(forms.Form):
     b_name = forms.CharField(
@@ -428,15 +437,6 @@ class BusinessDetails(forms.Form):
             'placeholder' : 'Business Name',
         }),
         label= 'Business Name',
-        required= True,
-    )
-    b_type = forms.ChoiceField(
-        choices= BUSINESS_TYPE_CHOICES,  
-        widget=forms.Select(attrs={
-            'id' : 'b_type',
-            'class' : 'form-select',
-    }),
-        label= 'Business Type',
         required= True,
     )
     b_nature = forms.CharField( 
@@ -684,13 +684,13 @@ class BusinessDetails(forms.Form):
     #     label= 'Has previous Barangay Clearance?',
     #     required= True,
     # )
-    proof = forms.FileField(
-        widget=forms.ClearableFileInput(attrs={
-            'id' : 'proof',
-            'class' : 'form-control',
+    proof = MultiFileField(
+        label='Proof of Business (lease, photos, permit, etc.)',
+        required=True,
+        widget=MultiFileInput(attrs={
+            'id': 'proof',
+            'class': 'form-control',
             'accept': 'image/*,application/pdf',
-            'accept': 'image/*,application/pdf',
+            'multiple': True,
         }),
-        label= 'Proof of Business (lease, photos, permit, etc.)',
-        required= True, 
     )

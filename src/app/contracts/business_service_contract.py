@@ -16,14 +16,14 @@ class IBusinessService(ABC):
     @abstractmethod
     def execute(self, 
         search:Optional[str], 
-        b_type: Optional[str] , 
+        b_category: Optional[str] , 
         ownership_type:Optional[str], 
         status:Optional[str]
     ) -> Tuple[List[Dict[str, Any]], Dict[str, List[tuple[str, str]]], Optional[str]]:
         """
         Returns:
           rows:    filtered business rows
-          choices: {'b_type': [...], 'ownership_type': [...], 'status': [...]}
+          choices: {'b_category': [...], 'ownership_type': [...], 'status': [...]}
           error:   error string if something failed, else None
         """
         pass
