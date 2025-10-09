@@ -18,7 +18,6 @@
                 }
 
                 const obj = JSON.parse(res.message);
-                console.log("Maternal Record Response:", obj);
 
                 // target tbody
                 const tbody = document.getElementById("visitsTbody");
@@ -31,17 +30,17 @@
                         : `<span class="badge text-bg-success">None</span>`;
 
                     return `
-    <tr>
-      <td>${visit.visit_date || "—"}</td>
-      <td>${visit.trimester_stage_name || visit.trimester || "—"}</td>
-      <td>${visit.weight ? visit.weight + " kg" : "—"}</td>
-      <td>${dangerBadge}</td>
-      <td class="text-end">
-        <button class="btn btn-outline-secondary btn-sm" disabled>
-          <i class="bi bi-eye"></i>
-        </button>
-      </td>
-    </tr>`;
+                        <tr>
+                        <td>${visit.visit_date || "—"}</td>
+                        <td>${visit.trimester_stage_name || visit.trimester || "—"}</td>
+                        <td>${visit.weight ? visit.weight + " kg" : "—"}</td>
+                        <td>${dangerBadge}</td>
+                        <td class="text-end">
+                            <button class="btn btn-outline-secondary btn-sm" disabled>
+                            <i class="bi bi-eye"></i>
+                            </button>
+                        </td>
+                        </tr>`;
                 };
 
                 // current record (always first)
@@ -61,7 +60,6 @@
                     tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted">No visits yet.</td></tr>`;
                 }
 
-
                 document.getElementById("record_pname").textContent = obj.current_materrnal_record.full_name || "N/A";
                 document.getElementById("mhr_number").textContent = obj.current_materrnal_record.maternal_record_id || "N/A";
                 document.getElementById("family_no").textContent = obj.family_id || "N/A";
@@ -77,8 +75,8 @@
                 document.getElementById("lv_weight").textContent = obj.previous_maternal_records && obj.previous_maternal_records.weight ? `${obj.previous_maternal_records.weight} KG` : "N/A";
                 document.getElementById("last-updated").textContent = `Last updated: ${obj.current_materrnal_record.visit_date ? obj.current_materrnal_record.visit_date : "N/A"}`;
 
-            } catch (error) {
-                console.error("Error fetching maternal record:", error);
+            } catch {
+                console.error("Error fetching maternal record");
             }
         }
         fetchData();

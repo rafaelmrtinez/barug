@@ -454,7 +454,6 @@ def maternal_record_http(
     id: int, 
     service: IMaternalService = Provide[AppContainer.maternal_service]) -> JsonResponse:
     try:
-        print(f"Fetching Maternal Record for ID: {id}")
         if not id:
             return JsonResponse({"message": "No record found."}, status=400)    
         
@@ -462,8 +461,6 @@ def maternal_record_http(
         
         if not result:
             return JsonResponse({"message": "No record found."}, status=404)
-        
-        print(f"Maternal Record Result: {result}")
         
         return JsonResponse({"message": json.dumps(asdict(result), default=str)}, status=200)
     except Exception as e:
