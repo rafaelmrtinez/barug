@@ -3,6 +3,14 @@ from abc import abstractmethod, ABC
 class IMaternalRepository(ABC):
     
     @abstractmethod
+    def fetch_maternal_record_id_by_child_record_id(self, id: int) -> int | None:
+        pass
+    
+    @abstractmethod
+    def fetch_maternal_child_record_by_person_record_id_and_maternal_record_id(self, person_record_id: int, maternal_record_id: int):
+        pass
+    
+    @abstractmethod
     def fetch_maternal_record_history_by_maternal_record_id(self, id: int):
         pass
     

@@ -8,6 +8,12 @@ class ChildRepository(IChildRepository):
     def __init__(self, ctx: IConnectionAdapter) -> None:
         self.ctx = ctx
         
+    def fetch_child_health_record_by_person_id(self, id: int) -> int:
+        raw = """
+        SELECT child_record_id FROM child_health_record WHERE person_id = %s;"""
+        params = [id]
+        return self.ctx.execute_query_to_dict(raw, params)[0]["child_record_id"]
+
     def get_child_basic_info_by_person_id(self, id: int) -> BasicInformationResponse:
         
         raw = """

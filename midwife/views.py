@@ -466,6 +466,30 @@ def maternal_record_http(
     except Exception as e:
         logger.exception(e)
         return JsonResponse({"message": SOMETHING_WENT_WRONG}, status=500)
+    
+@require_http_methods(["GET"])
+@session_login_required
+@role_required(*ROLE_MIDWIFE)
+@nocache
+@inject
+def maternal_record_for_new_child_http(
+    request: HttpRequest, 
+    child_id: int, 
+    service: IMaternalService = Provide[AppContainer.maternal_service]) -> JsonResponse:
+    try:
+        if not child_id:
+            return JsonResponse({"error": "No record found."}, status=400)    
+
+        result: MaternalRecordResponse = service.execute_fetch_maternal_for_new_child(child_id)
+
+        if not result:
+            return JsonResponse({"error": "No record found."}, status=404)
+
+        return JsonResponse({"message": result.model_dump()}, status=200, safe=False)
+
+    except Exception as e:
+        logger.exception(e)
+        return JsonResponse({"error": SOMETHING_WENT_WRONG}, status=500)
 
 @session_login_required
 @role_required(*ROLE_MIDWIFE)

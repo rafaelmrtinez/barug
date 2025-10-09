@@ -10,6 +10,7 @@ from src.domain.contracts.family_repository import IFamilyRepository
 from src.domain.contracts.maternal_repository import IMaternalRepository
 from src.domain.contracts.maternal_service import IMaternalService
 from src.domain.services.maternal_immunization_service import MaternalDomainService
+from src.infra.contracts.child_repository import IChildRepository
 from src.infra.utilities.json_deep_conversion import JSONConverterUtility
 
 
@@ -18,10 +19,25 @@ class MaternalService(IMaternalService):
     def __init__(
         self, 
         maternal_repository: IMaternalRepository,
-        family_repository: IFamilyRepository
+        family_repository: IFamilyRepository,
+        child_repository: IChildRepository
     ):
         self._maternal_repository = maternal_repository
         self._family_repository = family_repository
+        self._child_repository = child_repository
+
+    def execute_fetch_maternal_for_new_child(self, person_record_id: int) -> None | MaternalRecordResponse:
+        child_health_record_id = self._child_repository.fetch_child_health_record_by_person_id(person_record_id)
+        
+        if not child_health_record_id:
+            return None
+
+        maternal_record_id = self._maternal_repository.fetch_maternal_record_id_by_child_record_id(child_health_record_id)
+        
+        if not maternal_record_id:
+            return None
+        
+        return self._maternal_repository.fetch_maternal_child_record_by_person_record_id_and_maternal_record_id(child_health_record_id, maternal_record_id)
         
     def execute_fetch_maternal_record(self, maternal_record_id: int) -> MaternalRecordResponse | None:
         current_record = self._maternal_repository.fetch_current_maternal_record_by_maternal_visit_id(maternal_record_id)

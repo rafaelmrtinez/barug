@@ -31,7 +31,8 @@ class AppContainer(containers.DeclarativeContainer):
     maternal_service: providers.Factory[IMaternalService] = providers.Factory(
         MaternalService,
         maternal_repository=infra.maternal_repository,
-        family_repository=infra.family_repository
+        family_repository=infra.family_repository,
+        child_repository=infra.child_repository
     )
 
     household_info_service: providers.Factory[IHouseholdInfoService]  = providers.Factory(
