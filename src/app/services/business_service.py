@@ -88,111 +88,120 @@ class BusinessRegistrationService(IBusinessRegistrationService):
         self._registration_repo = registration_repo
 
     def _bucket_name(self) -> str:
-        return getattr(settings, "SUPABASE__BUSINESS_PROOF_BUCKET","business-proofs",)
+        return getattr(settings, "SUPABASE_BUSINESS_PROOF_BUCKET","business-proofs",)
     
-    def _ensure_bucket(
-        self,
-        bucket: str,
-        public: bool = True,
-    ) -> None:
-        """
-        Best effort: create bucket if missing. Requires service key.
-        Safe to no-op if bucket already exists or perms are limited.
-        """
+    def _ensure_bucket(self, bucket: str, public: bool = True) -> None:
         try:
-            # supabase-py v2
-            existing = [b.name if hasattr(b, "name") else b["name"] for b in supabase.storage.list_buckets()]
-            if bucket not in existing:
+            # list_buckets needs SERVICE key
+            res = supabase.storage.list_buckets()
+            names = [getattr(b, "name", None) or (b.get("name") if isinstance(b, dict) else None) for b in (res or [])]
+            if bucket not in names:
                 try:
                     supabase.storage.create_bucket(bucket, public=public)
-                except Exception:
-                    # If you don't have permission or it already exists, just continue.
-                    pass
-        except Exception:
-            # Older client fallback: ignore
-            pass
+                except Exception as e:
+                    # If concurrent create or perms issue, just log and continue
+                    print("[storage] create_bucket error:", e, flush=True)
+        except Exception as e:
+            # If list_buckets fails (permissions), you’re not using the service key
+            print("[storage] list_buckets failed (service key?)", e, flush=True)
 
-    def _upload_file(self, bucket: str, uf) -> Optional[str]:
+    def _upload_temp(self, bucket: str, uf) -> str | None:
+        """Upload a single file to a temp folder. Returns its temp key (no domain)."""
         if not uf:
             return None
-
         from datetime import datetime
-        _, ext = os.path.splitext(uf.name or "")
+        import os, uuid
+        _, ext = os.path.splitext(getattr(uf, "name", "") or "")
         ext = (ext or "").lower()
         key = f"{uuid.uuid4().hex}{ext}"
-        path_in_bucket = f"{datetime.utcnow():%Y/%m/%d}/{key}"
+        temp_key = f"tmp/inbox/{datetime.utcnow():%Y/%m/%d}/{key}"
 
         data = uf.read()
         content_type = getattr(uf, "content_type", None) or "application/octet-stream"
 
         try:
+            # supabase-py v2 style
             supabase.storage.from_(bucket).upload(
                 file=data,
-                path=path_in_bucket,
+                path=temp_key,
                 file_options={"contentType": content_type, "upsert": True},
             )
         except TypeError:
-            supabase.storage.from_(bucket).upload(
-                path_in_bucket, data, {"content-type": content_type, "x-upsert": "true"}
-            )
-        except Exception:
-            return None
-        
-        logger.info("Uploaded to '%s': %s", bucket, path_in_bucket)
-        print(f"[UPLOAD] {bucket}/{path_in_bucket}") 
-        # ✅ return ONLY the path inside the bucket
-        return path_in_bucket
+            # older signature fallback
+            supabase.storage.from_(bucket).upload(temp_key, data, {"content-type": content_type, "x-upsert": "true"})
+        return temp_key
     
-    def _save_to_supabase(self, uploads: Optional[List]) -> List[str]:
+    def _upload_many_temp(self, uploads: list) -> list[str]:
         if not uploads:
             return []
         bucket = self._bucket_name()
         self._ensure_bucket(bucket, public=True)
-
-        saved: List[str] = []
-        for uf in (uploads if isinstance(uploads, (list, tuple)) else [uploads]):
-            p = self._upload_file(bucket, uf)
-            if p:
-                saved.append(p)
-                public_url = f"/storage/v1/object/public/{bucket}/{p}"
-                logger.info("Public URL: %s", public_url)
-                print(f"[PUBLIC URL] {public_url}")
-        return saved
+        keys: list[str] = []
+        for uf in uploads:
+            try:
+                k = self._upload_temp(bucket, uf)
+                if k:
+                    keys.append(k)
+            finally:
+                try:
+                    uf.close()
+                except Exception:
+                    pass
+        return keys
     
-    def _save_proofs(self, uploads) -> List[str]:
-        if not uploads:
+    def _final_folder(self, business_id: int) -> str:
+        return f"business/{business_id}/proofs"
+
+    def _move_to_final(self, temp_keys: list[str], business_id: int) -> list[str]:
+        """Move each temp object into business/<id>/proofs. Returns final keys."""
+        if not temp_keys:
             return []
-        saved = []
-        for f in uploads:
-            # Save each file to your storage; return a stable key/path
-            # Example placeholder:
-            key = f"business-proofs/{f.name}"
-            # self.storage.storage.from_("business-proofs").upload(key, f)   # your real save
-            saved.append(key)
-        return saved
-    
-    def business_registration(self, cmd: RegisterBusinessProfileCmd) -> Tuple[int, int]:
-        # 1) Upload any provided files to Supabase
-        # saved_paths = self._save_to_supabase(cmd.proof_files_uploads)
+        bucket = self._bucket_name()
+        dest_folder = self._final_folder(business_id)
+        finals: list[str] = []
+        for src in temp_keys:
+            name = src.rsplit("/", 1)[-1]
+            dst = f"{dest_folder}/{name}"
+            try:
+                # supabase-py exposes move in v2; if unavailable, copy+remove
+                supabase.storage.from_(bucket).move(src, dst)
+            except Exception:
+                try:
+                    # copy then remove as a fallback
+                    supabase.storage.from_(bucket).copy(src, dst)
+                    supabase.storage.from_(bucket).remove([src])
+                except Exception:
+                    continue
+            finals.append(dst)
+        return finals
 
-        # 1) Save uploads (if any) and collect final keys/paths
-        saved_paths: List[str] = self._save_proofs(cmd.proof_files_uploads)
+    def business_registration(self, cmd: RegisterBusinessProfileCmd) -> tuple[int, int]:
+        """
+        1) Upload proofs to temp
+        2) Create business in DB
+        3) Move proofs under business/<id>/proofs
+        4) Pass the FINAL keys to DB (if you want them stored), or skip if your UI lists from storage anyway.
+        """
+        # 1) upload to temp
+        temp_keys = self._upload_many_temp(cmd.proof_files_uploads)
 
-        # 2) Hand the saved storage paths to the repo (TEXT[] into your SQL function)
-        # cmd.proof_files_saved = saved_paths
+        # 2) make initial DB record first (without proofs)
+        cmd_no_proofs = replace(cmd, proof_files_saved=tuple())
+        business_id, owner_person_id = self._registration_repo.register_business(cmd_no_proofs)
 
-        logger.info("Saved proof paths: %s", saved_paths)
-        print(f"[SAVED PATHS] {saved_paths}")
+        # 3) move to final folder tied to business_id
+        final_keys = self._move_to_final(temp_keys, business_id)
 
-        # 2) DO NOT mutate cmd; create a new one with the saved paths
-        cmd2 = replace(cmd, proof_files_saved=tuple(saved_paths))
-
-        # 3) Proceed with DB registration
-        # return self._registration_repo.register_business(cmd)
-    
-        # 3) Hand off to repo
-        return self._registration_repo.register_business(cmd2)
-
+        # 4) optionally, persist final_keys back to DB. If your RPC supports a separate
+        #    "attach proofs" step, call it here. Otherwise, re-call register with proofs OR
+        #    skip storing and rely on storage listing in your UI.
+        #
+        # If you want the keys stored, and your RPC accepts them, do:
+        #   self._registration_repo.attach_business_proofs(business_id, final_keys)
+        #
+        # For your current UI, OwnerBusinessInfoService lists directly from storage,
+        # so storing is optional. Still, we’ll return the same pair:
+        return business_id, owner_person_id
 class OwnerBusinessInfoService(IBusinessInfoService):
     def __init__(
         self,
