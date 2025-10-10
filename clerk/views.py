@@ -1892,7 +1892,6 @@ def fetch_display_maps_from_forms() -> Dict[str, Dict[Any, str]]:
         "religion": _field_map(owner_form, "religion"),
 
         # Business-side lookups
-        "business_type": _field_map(biz_form, "b_type"),
         "ownership_type": _field_map(biz_form, "ownership_type"),
         "business_category": _field_map(biz_form, "b_category"),
 
@@ -1955,7 +1954,6 @@ def build_business_display(biz: dict, maps: Dict[str, Dict[int, str]]) -> Dict[s
     """
     Return a label-rich dict strictly for display.
     """
-    btype_name = maps.get("business_type", {}).get(biz.get("b_type")) or biz.get("b_type_name")
     owner_type_name = maps.get("ownership_type", {}).get(biz.get("ownership_type")) or biz.get("ownership_type_name")
     cat_name = maps.get("business_category", {}).get(biz.get("b_category")) or biz.get("b_category_name")  # 👈 NEW
 
@@ -1973,7 +1971,6 @@ def build_business_display(biz: dict, maps: Dict[str, Dict[int, str]]) -> Dict[s
 
     return {
         "b_name": biz.get("b_name") or "—",
-        "b_type_name": btype_name or biz.get("b_type") or "—",
         "b_nature": biz.get("b_nature") or "—",
         "ownership_type_name": owner_type_name or biz.get("ownership_type") or "—",
         "b_category_name": cat_name or biz.get("b_category") or "—",  # 👈 NEW (label-first, raw fallback)
@@ -2336,7 +2333,6 @@ def business_details(request: HttpRequest):
                 "inc_est": _sstrip(cd.get("inc_est")),
 
                 # choice/ids
-                "b_type": _to_int_or_none(cd.get("b_type")),
                 "ownership_type": _to_int_or_none(cd.get("ownership_type")),
                 "b_category": _to_int_or_none(cd.get("b_category")),
 
@@ -2601,7 +2597,7 @@ def ajax_business_search(
         return HttpResponseBadRequest("XHR required")
 
     q = request.GET.get("q", "") or None
-    b_type = request.GET.get("b_type")
+    b_category = request.GET.get("b_category")
     ownership_type = request.GET.get("ownership_type")
     status = request.GET.get("status")
 
@@ -2613,7 +2609,7 @@ def ajax_business_search(
 
     rows = business_service.execute(
         search=q,
-        b_type=to_int_or_none(b_type),
+        b_category=to_int_or_none(b_category),
         ownership_type=to_int_or_none(ownership_type),
         status=to_int_or_none(status),
     )

@@ -51,6 +51,7 @@ class BusinessRepository(IBusinessRepository):
         try:
             sql = "SELECT * FROM get_business_summary();"
             rows = self._ctx.execute_query_to_dict(sql, [])
+            print("SAMPLE ROW KEYS FETCH:", list(rows[0].keys()) if rows else [], flush=True)
 
             return self._map(rows)
         except Exception as e:
@@ -60,24 +61,27 @@ class BusinessRepository(IBusinessRepository):
         try:
             sql = "SELECT * FROM search_business_summaries(%s)"
             rows = self._ctx.execute_query_to_dict(sql, [search])
+            print("SAMPLE ROW KEYS SEARCH:", list(rows[0].keys()) if rows else [], flush=True)
 
             return self._map(rows)
         except Exception as e:
             raise QueryExecutionException(f"search_business failed: {e}") from e
         
-    def sort_b_type(self, b_type_id: int) -> list[BusinessListDTO]:
+    def sort_b_category(self, b_category_id: int) -> list[BusinessListDTO]:
         try:
-            sql = "SELECT * FROM filter_business_summaries_by_type(%s)"
-            rows = self._ctx.execute_query_to_dict(sql, [b_type_id])
+            sql = "SELECT * FROM filter_business_summaries_by_category(%s)"
+            rows = self._ctx.execute_query_to_dict(sql, [b_category_id])
+            print("SAMPLE ROW KEYS CATEGORY:", list(rows[0].keys()) if rows else [], flush=True)
 
             return self._map(rows)
         except Exception as e:
-            raise QueryExecutionException(f"sort_b_type failed: {e}") from e
+            raise QueryExecutionException(f"sort_b_category failed: {e}") from e
         
     def sort_ownership_type(self, ownership_type_id: int) -> list[BusinessListDTO]:
         try:
             sql ="SELECT * FROM filter_business_summaries_by_ownership(%s)"
             rows = self._ctx.execute_query_to_dict(sql, [ownership_type_id])
+            print("SAMPLE ROW KEYS OWNERSHIP:", list(rows[0].keys()) if rows else [], flush=True)
 
             return self._map(rows)
         except Exception as e:
@@ -87,6 +91,7 @@ class BusinessRepository(IBusinessRepository):
         try:
             sql = "SELECT * FROM filter_business_summaries_by_status(%s)"
             rows = self._ctx.execute_query_to_dict(sql, [status_id])
+            print("SAMPLE ROW KEYS STATUS:", list(rows[0].keys()) if rows else [], flush=True)
 
             return self._map(rows)
         except Exception as e:

@@ -47,11 +47,12 @@
 
       {# ─── Active filter chips (show selected labels) ─── #}
       <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
-        {% if request.GET.b_type or request.GET.ownership_type or request.GET.status %}
+        {% if request.GET.b_category or request.GET.ownership_type or request.GET.status %}
           <span class="text-muted me-1">Active:</span>
 
-          {% if request.GET.b_type %}
-            {% with label=form.b_type|choice_label:request.GET.b_type %}
+          {# Business Category chip #}
+          {% if request.GET.b_category %}
+            {% with label=form.b_category|choice_label:request.GET.b_category %}
               <a class="filter-chip"
                 href="?search={{ request.GET.search|urlencode }}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}">
                 {{ label }}
@@ -60,20 +61,22 @@
             {% endwith %}
           {% endif %}
 
+          {# Ownership Type chip #}
           {% if request.GET.ownership_type %}
             {% with label=form.ownership_type|choice_label:request.GET.ownership_type %}
               <a class="filter-chip"
-                href="?search={{ request.GET.search|urlencode }}{% if request.GET.b_type %}&b_type={{ request.GET.b_type|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}">
+                href="?search={{ request.GET.search|urlencode }}{% if request.GET.b_category %}&b_category={{ request.GET.b_category|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}">
                 {{ label }}
                 <span class="x" aria-hidden="true">×</span>
               </a>
             {% endwith %}
           {% endif %}
 
+          {# Status chip #}
           {% if request.GET.status %}
             {% with label=form.status|choice_label:request.GET.status %}
               <a class="filter-chip"
-                href="?search={{ request.GET.search|urlencode }}{% if request.GET.b_type %}&b_type={{ request.GET.b_type|urlencode }}{% endif %}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}">
+                href="?search={{ request.GET.search|urlencode }}{% if request.GET.b_category %}&b_category={{ request.GET.b_category|urlencode }}{% endif %}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}">
                 {{ label }}
                 <span class="x" aria-hidden="true">×</span>
               </a>
@@ -87,6 +90,7 @@
           <span class="text-muted small">No active filters.</span>
         {% endif %}
       </div>
+
 
       <div class="table-responsive">
         <table class="table align-middle">

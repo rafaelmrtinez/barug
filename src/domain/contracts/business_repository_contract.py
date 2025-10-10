@@ -21,7 +21,7 @@ class IBusinessRepository(ABC):
         pass
 
     @abstractmethod
-    def sort_b_type(self, b_type: int) -> list[BusinessListDTO]:
+    def sort_b_category(self, b_type: int) -> list[BusinessListDTO]:
         pass
     
     @abstractmethod

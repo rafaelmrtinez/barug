@@ -52,7 +52,7 @@ class BusinessService(IBusinessService):
         if search:
             return self._business_repo.search_business(search)
         if b_category is not None:
-            return self._business_repo.sort_b_type(b_category)
+            return self._business_repo.sort_b_category(b_category)
         if ownership_type is not None:
             return self._business_repo.sort_ownership_type(ownership_type)
         if status is not None:
