@@ -1,5 +1,10 @@
+# lupon_mem/views.py
 from __future__ import annotations
 from typing import Any, Dict, List, Tuple, Optional
+from notifications.service import notify_user
+from common.send_sms import send_sms
+
+from lupon_mem.services.forms.kp8 import KP8Handler  # reuse its normalization
 
 from django.shortcuts import render, redirect
 from django.http import (
@@ -21,6 +26,12 @@ from common.supabase_client import supabase
 from lupon_mem.services.form_renderer import render_preview_png, render_final_pdf
 from django.core.exceptions import ValidationError
 from lupon_mem.constants import KP_FORMS_CATALOG   # static chooser catalog
+
+from django.db.models import Prefetch
+from django.views.generic import TemplateView, View
+from django.shortcuts import get_object_or_404, redirect
+from .models import BlotterKpSubmission, KpFormField, KpField, BlotterKpAnswer
+
 
 # caching / logging
 from django.core.cache import cache
@@ -50,6 +61,115 @@ def _slice_until_code(fields_with_values: List[tuple], stop_code: str) -> List[t
     return out
 
 
+def _get_person_mobile_number(person_id: int) -> str | None:
+    """
+    Returns a raw contact number (best effort) for a person.
+    send_sms() will normalize it to 63XXXXXXXXXX.
+    """
+    try:
+        with connection.cursor() as cur:
+            # Try common columns on person
+            cur.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name='person'
+                  AND column_name IN (
+                    'mobile_number','mobile','phone','contact_no',
+                    'contact','cellphone','cell_no','cellphone_no'
+                  )
+            """)
+            cols = [r[0] for r in cur.fetchall()]
+
+            if cols:
+                selects = " , ".join([f"NULLIF({c},'') AS {c}" for c in cols])
+                cur.execute(f"SELECT {selects} FROM person WHERE person_id=%s", [person_id])
+                row = cur.fetchone()
+                if row:
+                    for val in row:
+                        if isinstance(val, str) and val.strip():
+                            return val.strip()
+
+            # Optional: separate contact table (ignore if missing)
+            try:
+                cur.execute("""
+                    SELECT NULLIF(c.contact_value,'')
+                    FROM person_contact c
+                    WHERE c.person_id=%s
+                      AND LOWER(c.contact_type) IN ('mobile','phone','cell','cellphone')
+                    ORDER BY c.person_contact_id DESC
+                    LIMIT 1
+                """, [person_id])
+                r2 = cur.fetchone()
+                if r2 and r2[0]:
+                    return r2[0].strip()
+            except Exception:
+                pass
+    except Exception:
+        return None
+    return None
+
+
+
+
+# start of the views (not helpers)
+def _load_submission(pk: int):
+    sub = (BlotterKpSubmission.objects
+           .select_related("form")
+           .prefetch_related(
+               Prefetch("form__form_fields",
+                        queryset=KpFormField.objects.select_related("field", "field__field_type")
+                                .order_by("sort_order", "kp_form_field_id")),
+               Prefetch("answers", queryset=BlotterKpAnswer.objects.only("field_id","value_json"))
+           ).get(pk=pk))
+    ans_map = {a.field_id: a.value_json for a in sub.answers.all()}
+    items = []
+    for ff in sub.form.form_fields.all():
+        f = ff.field
+        items.append({
+            "kp_form_field_id": ff.pk,
+            "field_id": f.pk,
+            "code": f.field_code,
+            "label": ff.label_override or f.base_label,
+            "type": f.field.field_type.field_type_name,
+            "value": ans_map.get(f.pk),
+        })
+    return sub, items
+
+class SubmissionView(TemplateView):
+    template_name = "lupon_mem/submission_detail.html"
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        sub, items = _load_submission(self.kwargs["pk"])
+        ctx.update({"mode":"view","submission":sub,"render_fields":items})
+        return ctx
+
+class SubmissionEdit(TemplateView):
+    template_name = "lupon_mem/submission_detail.html"
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        sub, items = _load_submission(self.kwargs["pk"])
+        ctx.update({"mode":"edit","submission":sub,"render_fields":items})
+        return ctx
+
+class SubmissionUpdate(View):
+    def post(self, request, pk):
+        sub = get_object_or_404(BlotterKpSubmission, pk=pk)
+        incoming = {k: v for k, v in request.POST.items() if k.startswith("field_")}
+        # Upsert answers
+        existing = {a.field_id: a for a in BlotterKpAnswer.objects.filter(submission_id=pk)}
+        to_create, to_update = [], []
+        for k, v in incoming.items():
+            field_id = int(k.split("_",1)[1])
+            if field_id in existing:
+                obj = existing[field_id]
+                obj.value_json = v
+                to_update.append(obj)
+            else:
+                to_create.append(BlotterKpAnswer(submission_id=pk, field_id=field_id, value_json=v))
+        if to_create: BlotterKpAnswer.objects.bulk_create(to_create, batch_size=200)
+        if to_update: BlotterKpAnswer.objects.bulk_update(to_update, ["value_json"], batch_size=200)
+        return redirect("kp_submission_view", pk=pk)
+    
 # --- list cases (with safe search) ---
 @session_login_required
 @role_required(*LUPON_ROLES)
@@ -187,8 +307,9 @@ def form_builder(request, case_id: int, form_id: int = None, submission_id: int 
       • KP-9 page-2 split via first 'served_to'.
       • Default KP-7 view shows until 'solutions_seeked' (overridable with ?show_until=...).
       • NEW (KP-9): curr_date/curr_month/curr_year = TODAY; brgy_capt mirrors PB; respondent_names_* mirror respondents.
+      • NEW (KP-9 Minimal): show only summons date & time with clearer labels.
     """
-    from datetime import date as _date, datetime as _dt
+
 
     with connection.cursor() as cur:
         # Header
@@ -271,7 +392,7 @@ def form_builder(request, case_id: int, form_id: int = None, submission_id: int 
             complaint_title_name, case_nature_name, blotter_report_id
         ) = row if row else (None,)*9
 
-        # Resolve address: prefer bc.incident_location; else from report → addresss + purok_sitio
+        # Resolve address (via blotter_report->addresss) if needed
         incident_addr_text = None
         if not incident_loc_raw and blotter_report_id:
             cur.execute(
@@ -365,27 +486,28 @@ def form_builder(request, case_id: int, form_id: int = None, submission_id: int 
             return f"{a} - {b}" if a and b else (a or b or "")
 
         # Date sources
-        src_date = date_filed or incident_date or _date.today()  # used for KP-7 etc.
+        from datetime import date as _date_cls, datetime as _dt_cls
+        src_date = date_filed or incident_date or _date_cls.today()  # used for KP-7 etc.
         try:
             if isinstance(src_date, str):
                 for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"):
                     try:
-                        src_date = _dt.strptime(src_date, fmt).date()
+                        src_date = _dt_cls.strptime(src_date, fmt).date()
                         break
                     except Exception:
                         pass
             if not hasattr(src_date, "year"):
-                src_date = _date.today()
+                src_date = _date_cls.today()
         except Exception:
-            src_date = _date.today()
+            src_date = _date_cls.today()
 
-        date_created_iso = _iso_date(src_date) or _date.today().isoformat()
+        date_created_iso = _iso_date(src_date) or _date_cls.today().isoformat()
         month_created    = src_date.strftime("%B")
         year_received    = str(src_date.year)
         month_received   = month_created
 
         # --- TODAY (KP-9 "current" stamps) ---
-        today = _date.today()
+        today = _date_cls.today()
         curr_date_iso = today.isoformat()
         curr_month    = today.strftime("%B")
         curr_year     = str(today.year)
@@ -517,20 +639,26 @@ def form_builder(request, case_id: int, form_id: int = None, submission_id: int 
         for (kff_id, field_id, label, type_name, is_required, field_code) in fields
     ]
 
-    # KP-9 page 2 split
+    # KP-9 page 2 split (for full mode)
     page2_index = None
     for idx, (_kff, _fid, _lbl, _typ, _req, _val, code) in enumerate(fields_with_values, start=1):
         if (code or "").strip().lower() == "served_to":
             page2_index = idx
             break
 
-    # NEW: show only until a specific field_code
+    # NEW: show only until a specific field_code (default for KP-7)
     stop_code = request.GET.get("show_until")
-    # default for KP-7 is up to 'solutions_seeked'
     if not stop_code and str(fid) == "7":
         stop_code = "solutions_seeked"
     if stop_code:
         fields_with_values = _slice_until_code(fields_with_values, stop_code)
+
+    # -----------------------------
+    # NEW: KP-9 Minimal UI
+    # -----------------------------
+    # UI-only flag: hide non-summons fields in the template (keep all fields here)
+    kp9_ui_minimal = (str(form_code).strip().upper() == "KP-9")
+    kp8_ui_minimal = (str(form_code).strip().upper() == "KP-8")  # <— add this
 
     return render(
         request,
@@ -544,6 +672,8 @@ def form_builder(request, case_id: int, form_id: int = None, submission_id: int 
             "answers": answers,
             "page2_index": page2_index,
             "stop_code": stop_code,          # pass to template for hint
+            "kp9_ui_minimal": kp9_ui_minimal,  # UI-only flag; no field pruning
+            "kp8_ui_minimal": kp8_ui_minimal,  # <— add this
         },
     )
 
@@ -591,6 +721,7 @@ def save_answers(request: HttpRequest):
 
 
 # --- AJAX: submit & generate PDF ---
+# --- AJAX: submit & generate PDF ---
 @role_required(*LUPON_ROLES)
 @session_login_required
 def submit_form(request: HttpRequest):
@@ -598,23 +729,68 @@ def submit_form(request: HttpRequest):
         return HttpResponseBadRequest("Method not allowed")
 
     import json as _json
+    import logging
+    log = logging.getLogger(__name__)
 
     data = _json.loads(request.body.decode())
     submission_id = int(data["submission_id"])
     case_id = int(data["case_id"])
 
+    # --- Helper: best-effort pull of a person's mobile number (raw; send_sms will normalize)
+    def _get_person_mobile_number(person_id: int) -> str | None:
+        try:
+            with connection.cursor() as cur:
+                # Try common columns on person
+                cur.execute("""
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name='person'
+                      AND column_name IN (
+                        'mobile_num'
+                      )
+                """)
+                cols = [r[0] for r in cur.fetchall()]
+                if cols:
+                    selects = " , ".join([f"NULLIF({c},'') AS {c}" for c in cols])
+                    cur.execute(f"SELECT {selects} FROM person WHERE person_id=%s", [person_id])
+                    row = cur.fetchone()
+                    if row:
+                        for val in row:
+                            if isinstance(val, str) and val.strip():
+                                return val.strip()
+
+                # Optional: separate contact table (ignore if missing)
+                try:
+                    cur.execute("""
+                        SELECT NULLIF(c.contact_value,'')
+                        FROM person_contact c
+                        WHERE c.person_id=%s
+                          AND LOWER(c.contact_type) IN ('mobile','phone','cell','cellphone')
+                        ORDER BY c.person_contact_id DESC
+                        LIMIT 1
+                    """, [person_id])
+                    r2 = cur.fetchone()
+                    if r2 and r2[0]:
+                        return r2[0].strip()
+                except Exception:
+                    pass
+        except Exception:
+            return None
+        return None
+
+    # --- Render the final PDF bytes & filename
     try:
         pdf_bytes, filename = render_final_pdf(submission_id=submission_id)
     except ValidationError as e:
+        # Validation errors should surface to the UI
         return JsonResponse({"ok": False, "error": str(e)}, status=400)
     except Exception:
-        return JsonResponse(
-            {"ok": False, "error": "Failed to generate PDF."}, status=500
-        )
+        log.exception("submit_form render_final_pdf failed")
+        return JsonResponse({"ok": False, "error": "Failed to generate PDF."}, status=500)
 
+    # --- Upload to Supabase (best-effort; we still return the local download link)
     bucket = getattr(settings, "SUPABASE_BUCKET", "documents")
     path = f"blotter/{case_id}/{filename}"
-
     storage_url = None
     try:
         supabase.storage.from_(bucket).upload(
@@ -625,7 +801,6 @@ def submit_form(request: HttpRequest):
                 "upsert": "true",
             },
         )
-
         try:
             pub = supabase.storage.from_(bucket).get_public_url(path)
             if isinstance(pub, dict):
@@ -637,9 +812,7 @@ def submit_form(request: HttpRequest):
 
         if not storage_url:
             try:
-                signed = supabase.storage.from_(bucket).create_signed_url(
-                    path, 60 * 60 * 24 * 7
-                )
+                signed = supabase.storage.from_(bucket).create_signed_url(path, 60 * 60 * 24 * 7)
                 if isinstance(signed, dict):
                     storage_url = (
                         signed.get("signedURL")
@@ -648,20 +821,362 @@ def submit_form(request: HttpRequest):
                     )
             except Exception:
                 storage_url = None
-
     except Exception:
         storage_url = None
 
+    # --- Mark submission as submitted
     with connection.cursor() as cur:
         cur.execute(
             "UPDATE blotter_kp_submission SET status='SUBMITTED', submitted_at=now() WHERE submission_id=%s",
             [submission_id],
         )
 
+    # --- Build local download URL (always available)
     local_download = request.build_absolute_uri(
         reverse("lupon_mem:submission_pdf", args=[submission_id])
     )
 
+    # --- KP-8 notifications (in-app + SMS via Semaphore)
+    # --- KP-8 notifications (in-app + SMS via Semaphore)
+    try:
+        with connection.cursor() as cur:
+            cur.execute("""
+                SELECT s.form_id, kf.form_code
+                FROM blotter_kp_submission s
+                JOIN kp_form kf ON kf.form_id = s.form_id
+                WHERE s.submission_id=%s
+            """, [submission_id])
+            row = cur.fetchone()
+        form_id, form_code = (int(row[0]), str(row[1]).upper()) if row else (None, "")
+
+        if form_code == "KP-8":
+            # Build name→value map via the handler (mirrors what the PDF used)
+            nv = KP8Handler().build_name_value_map(form_id=form_id, submission_id=submission_id)
+            # ---- DEBUG / INSPECTION LOGS ----
+            def _tap(label, payload):
+                try:
+                    log.info("KP-8 DEBUG | %s: %s", label, payload)
+                finally:
+                    # also print to console (manage.py runserver)
+                    print(f"KP-8 DEBUG | {label}: {payload}")
+
+            # 1) what was submitted (or derived) onto the PDF
+            _tap("NV.appearance_date",  nv.get("appearance_date"))
+            _tap("NV.appearance_month", nv.get("appearance_month"))
+            _tap("NV.appearance_year",  nv.get("appearance_year"))
+            _tap("NV.appearance_time",  nv.get("appearance_time"))
+            _tap("NV.recipient",        nv.get("recipient"))
+            _tap("NV.recipient_2",      nv.get("recipient_2"))
+            _tap("NV.respondents",      nv.get("respondents"))
+            _tap("NV.complainants",     nv.get("complainants"))
+            _tap("NV.complainants_2",   nv.get("complainants_2"))
+
+            # ... (keep your existing code that builds when_text/title/body here)
+
+            # -------- collect target person_ids --------
+            person_ids: set[int] = set()
+
+            # 2) respondents on the case
+            with connection.cursor() as cur:
+                cur.execute("""
+                    SELECT p.person_id, trim(coalesce(p.first_name,'') || ' ' || coalesce(p.last_name,''))
+                    FROM respondent_case rc
+                    JOIN person p ON p.person_id = rc.person_id
+                    WHERE rc.blotter_case_id = %s
+                """, [case_id])
+                resp_rows = cur.fetchall()
+                for pid, full_name in resp_rows:
+                    if pid:
+                        person_ids.add(int(pid))
+                _tap("RESPONDENTS.person_ids", [int(pid) for pid, _ in resp_rows if pid])
+                _tap("RESPONDENTS.names",      [nm for _, nm in resp_rows])
+
+            # 3) complainants on the case (if you want them included)
+            with connection.cursor() as cur:
+                cur.execute("""
+                    SELECT p.person_id, trim(coalesce(p.first_name,'') || ' ' || coalesce(p.last_name,''))
+                    FROM complainant_case cc
+                    JOIN person p ON p.person_id = cc.person_id
+                    WHERE cc.blotter_case_id = %s
+                """, [case_id])
+                cmp_rows = cur.fetchall()
+                for pid, full_name in cmp_rows:
+                    if pid:
+                        person_ids.add(int(pid))
+                _tap("COMPLAINANTS.person_ids", [int(pid) for pid, _ in cmp_rows if pid])
+                _tap("COMPLAINANTS.names",      [nm for _, nm in cmp_rows])
+
+            # 4) names typed/prefilled on KP-8 → resolve to person_id
+            name_blobs = [
+                nv.get("recipient") or "",
+                nv.get("recipient_2") or "",
+                nv.get("respondents") or "",
+                nv.get("complainants") or "",
+                nv.get("complainants_2") or "",
+            ]
+            raw_names: list[str] = []
+            for blob in name_blobs:
+                for piece in (blob or "").replace(";", ",").split(","):
+                    nm = piece.strip()
+                    if nm:
+                        raw_names.append(nm)
+            _tap("NAMES.from_form", raw_names)
+
+            def _find_person_id_by_name(name: str) -> Optional[int]:
+                try:
+                    parts = [p for p in name.split() if p]
+                    with connection.cursor() as cur:
+                        if len(parts) >= 2:
+                            first, last = parts[0], parts[-1]
+                            cur.execute("""
+                                SELECT person_id
+                                FROM person
+                                WHERE (first_name ILIKE %s AND last_name ILIKE %s)
+                                   OR ( (first_name || ' ' || COALESCE(middle_name,'') || ' ' || last_name) ILIKE %s )
+                                ORDER BY person_id DESC
+                                LIMIT 1
+                            """, [first, last, f"%{name}%"])
+                        else:
+                            cur.execute("""
+                                SELECT person_id
+                                FROM person
+                                WHERE (first_name || ' ' || last_name) ILIKE %s
+                                   OR last_name ILIKE %s
+                                ORDER BY person_id DESC
+                                LIMIT 1
+                            """, [f"%{name}%", f"%{name}%"])
+                        r = cur.fetchone()
+                        return int(r[0]) if r and r[0] else None
+                except Exception:
+                    return None
+
+            resolved = []
+            for nm in raw_names:
+                pid = _find_person_id_by_name(nm)
+                if pid:
+                    person_ids.add(pid)
+                    resolved.append({"name": nm, "person_id": pid})
+                else:
+                    resolved.append({"name": nm, "person_id": None})
+            _tap("RESOLVED.name_to_person_id", resolved)
+
+            # Final deduped list of targets
+            person_ids_list = sorted(person_ids)
+            _tap("TARGET.person_ids_final", person_ids_list)
+
+            # -------- collect mobile numbers (map) --------
+            numbers = []
+            num_map = []  # [{'person_id': 1, 'number': '09...'}, ...]
+            for pid in person_ids_list:
+                raw = _get_person_mobile_number(pid)
+                if raw:
+                    numbers.append(raw)
+                    num_map.append({"person_id": pid, "number": raw})
+                else:
+                    num_map.append({"person_id": pid, "number": None})
+            _tap("TARGET.mobile_numbers", num_map)
+            _tap("TARGET.mobile_numbers_flat", numbers)
+
+            # Extract schedule pieces exactly as placed on PDF
+            day   = (nv.get("appearance_date")  or "").strip()
+            month = (nv.get("appearance_month") or "").strip()
+            year  = (nv.get("appearance_year")  or "").strip()
+            time_ = (nv.get("appearance_time")  or "").strip()
+
+            # Optional extras: venue/appear_to if present on KP-8
+            venue = (nv.get("appear_to") or nv.get("venue") or "").strip()
+
+            # Human-friendly string (e.g., "October 07, 2025 at 14:00")
+            parts = []
+            if month and day and year:
+                try:
+                    parts.append(f"{month} {int(day):02d}, {year}")
+                except Exception:
+                    parts.append(f"{month} {day}, {year}")
+            elif month and day:
+                parts.append(f"{month} {day}")
+            elif month and year:
+                parts.append(f"{month} {year}")
+            elif year:
+                parts.append(year)
+            if time_:
+                parts.append(f"at {time_}")
+            if venue:
+                parts.append(f"({venue})")
+            when_text = " ".join(parts) if parts else "on the scheduled date"
+
+            # Case number for context
+            with connection.cursor() as cur:
+                cur.execute("SELECT blotter_case_num FROM blotter_case WHERE blotter_case_id=%s", [case_id])
+                r_case = cur.fetchone()
+            case_no = r_case[0] if r_case else None
+
+            title = f"Notice of Hearing — Case {case_no}" if case_no else "Notice of Hearing"
+            body_app = f"You are required to appear {when_text} for your mediation hearing."
+            if case_no:
+                body_app += f" (Case {case_no})"
+
+            body_sms = f"Barangay Notice: Hearing {when_text}. Please appear."
+            if case_no:
+                body_sms += f" Case {case_no}."
+
+            # -------- collect target person_ids --------
+            person_ids: set[int] = set()
+
+            # 1) respondents on the case
+            with connection.cursor() as cur:
+                cur.execute("""
+                    SELECT p.person_id
+                    FROM respondent_case rc
+                    JOIN person p ON p.person_id = rc.person_id
+                    WHERE rc.blotter_case_id = %s
+                """, [case_id])
+                person_ids.update(int(r[0]) for r in cur.fetchall() if r and r[0])
+
+            # 2) complainants on the case (include if you also want them notified)
+            with connection.cursor() as cur:
+                cur.execute("""
+                    SELECT p.person_id
+                    FROM complainant_case cc
+                    JOIN person p ON p.person_id = cc.person_id
+                    WHERE cc.blotter_case_id = %s
+                """, [case_id])
+                person_ids.update(int(r[0]) for r in cur.fetchall() if r and r[0])
+
+            # 3) names typed/prefilled on KP-8 → resolve to person_id
+            name_blobs = [
+                nv.get("recipient") or "",
+                nv.get("recipient_2") or "",
+                nv.get("respondents") or "",
+                nv.get("complainants") or "",
+                nv.get("complainants_2") or "",
+            ]
+            # split on commas/semicolons and strip
+            raw_names: list[str] = []
+            for blob in name_blobs:
+                for piece in (blob or "").replace(";", ",").split(","):
+                    nm = piece.strip()
+                    if nm:
+                        raw_names.append(nm)
+
+            def _find_person_id_by_name(name: str) -> Optional[int]:
+                """
+                Best-effort: try exact first/last, then fuzzy on full name.
+                Returns first match (stable enough for barangay datasets).
+                """
+                try:
+                    parts = [p for p in name.split() if p]
+                    with connection.cursor() as cur:
+                        if len(parts) >= 2:
+                            first = parts[0]
+                            last  = parts[-1]
+                            cur.execute("""
+                                SELECT person_id
+                                FROM person
+                                WHERE (first_name ILIKE %s AND last_name ILIKE %s)
+                                   OR ( (first_name || ' ' || COALESCE(middle_name,'') || ' ' || last_name) ILIKE %s )
+                                ORDER BY person_id DESC
+                                LIMIT 1
+                            """, [first, last, f"%{name}%"])
+                        else:
+                            # single token: try fuzzy on full display name
+                            cur.execute("""
+                                SELECT person_id
+                                FROM person
+                                WHERE (first_name || ' ' || last_name) ILIKE %s
+                                   OR last_name ILIKE %s
+                                ORDER BY person_id DESC
+                                LIMIT 1
+                            """, [f"%{name}%", f"%{name}%"])
+                        r = cur.fetchone()
+                        return int(r[0]) if r and r[0] else None
+                except Exception:
+                    return None
+
+            for nm in raw_names:
+                pid = _find_person_id_by_name(nm)
+                if pid:
+                    person_ids.add(pid)
+
+            # Log who we think will be notified
+            person_ids_list = sorted(person_ids)
+            log.info("KP-8 notify targets (case_id=%s): %s", case_id, person_ids_list)
+
+            # -------- send in-app notifications --------
+            for pid in person_ids_list:
+                try:
+                    notify_user(
+                        user_type_id=1,     # 1 = RESIDENT
+                        person_id=pid,
+                        staff_id=None,
+                        title=title,
+                        body=body_app,
+                        deep_link=f"/resident/cases/{case_id}"
+                    )
+                except Exception:
+                    log.exception("notify_user failed for person_id=%s case_id=%s", pid, case_id)
+
+            # -------- collect mobile numbers + send SMS (Semaphore) --------
+            # -------- collect mobile numbers + send SMS (Semaphore) --------
+            numbers = []
+            for pid in person_ids_list:
+                raw = _get_person_mobile_number(pid)  # uses the helper above
+                if raw:
+                    numbers.append(raw)
+
+            # print + log what we’re about to send
+            print(f"KP-8 SMS about to send | case_id={case_id} | numbers={numbers} | body={body_sms!r}")
+            log.info("KP-8 SMS about to send | case_id=%s | numbers=%s", case_id, numbers)
+
+            numbers = None
+            if numbers:
+                try:
+                    # remove in actual
+                    numbers = [] 
+                    res = send_sms(
+                        to=numbers,
+                        message=body_sms,
+                        fail_silently=True,   # don’t break the request
+                        dry_run=False,        # set True to test w/o hitting API
+                    )
+                    ok     = getattr(res, "ok", False)
+                    status = getattr(res, "status", None)
+                    detail = getattr(res, "detail", None)
+                    data   = getattr(res, "data", None)
+
+                    # console prints (always visible on runserver)
+                    print(f"KP-8 SMS result | ok={ok} status={status} detail={detail} data={data}")
+
+                    # standard logs too
+                    log.info("KP-8 SMS result ok=%s status=%s detail=%s data=%s", ok, status, detail, data)
+                except Exception as e:
+                    print(f"KP-8 SMS send raised unexpectedly: {e!r}")
+                    log.exception("KP-8 SMS send raised unexpectedly")
+            else:
+                print(f"\nKP-8 SMS skipped | no mobile numbers found | case_id={case_id}")
+                log.info("KP-8: no mobile numbers found for any targets (case_id=%s)", case_id)
+
+            log.info("KP-8 SMS numbers (case_id=%s): %s", case_id, numbers)
+
+            if numbers:
+                try:
+                    res = send_sms(
+                        to=numbers,
+                        message=body_sms,
+                        fail_silently=True  # never block the request
+                    )
+                    ok = getattr(res, "ok", False)
+                    detail = getattr(res, "detail", None)
+                    log.info("KP-8 SMS result ok=%s detail=%s", ok, detail)
+                except Exception:
+                    log.exception("KP-8 SMS send raised unexpectedly")
+            else:
+                log.info("KP-8: no mobile numbers found for any targets (case_id=%s)", case_id)
+
+    except Exception:
+        log.exception("KP-8 notifications failed for submission %s", submission_id)
+
+    # --- Done
     return JsonResponse(
         {
             "ok": True,
@@ -670,6 +1185,8 @@ def submit_form(request: HttpRequest):
             "storage_url": storage_url,
         }
     )
+
+
 
 
 # --- preview image (PNG) ---

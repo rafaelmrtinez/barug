@@ -36,7 +36,6 @@ def _normalize_ph_number(msisdn: str) -> str:
     # Fallback: return as-is (Semaphore will reject if invalid)
     return msisdn
 
-
 def send_sms(
     to: Union[str, Iterable[str]],
     message: str,
@@ -44,21 +43,11 @@ def send_sms(
     sender_name: Optional[str] = None,
     fail_silently: bool = False,
     dry_run: bool = False,
-    throttle_per_sec: float = 0.0,  # simple throttle between requests if sending individually
+    throttle_per_sec: float = 0.0,
 ) -> SimpleNamespace:
     """
     Send an SMS using Semaphore.
-
-    Args:
-      to: single number or list/iterable of numbers
-      message: text content
-      sender_name: overrides SEMAPHORE_SENDER_NAME
-      fail_silently: swallow exceptions and return ok=False instead of raising
-      dry_run: if True, skip HTTP call (for tests); returns ok=True with mocked data
-      throttle_per_sec: sleep seconds between chunked calls (if very large batches)
-
-    Returns:
-      SimpleNamespace(ok, status, data, detail, error_code)
+    Returns: SimpleNamespace(ok, status, data, detail, error_code)
     """
     try:
         api_key = SEMAPHORE_API_KEY
@@ -73,11 +62,11 @@ def send_sms(
         else:
             numbers = [_normalize_ph_number(x) for x in to]
 
+        numbers = [n for n in numbers if n]  # drop empties
         if not numbers:
             raise ValueError("No recipient numbers provided")
 
-        # Semaphore accepts either single "number" or multiple "numbers[]"
-        payload = {
+        payload_base = {
             "apikey": api_key,
             "message": message,
             "sendername": sender,
@@ -92,38 +81,91 @@ def send_sms(
                 error_code=None,
             )
 
-        # If <= 1000 numbers, we can send as one call using numbers[]
-        # (Semaphore supports bulk via numbers[]). For very large sets, chunk.
-        CHUNK = 900
-        all_results = []
-        for i in range(0, len(numbers), CHUNK):
-            chunk = numbers[i : i + CHUNK]
-            data = payload.copy()
-            if len(chunk) == 1:
-                data["number"] = chunk[0]
-            else:
-                # multiple — use repeated key 'numbers[]'
-                # requests handles list expansion automatically if we pass list at that key
-                data["numbers[]"] = chunk
-
+        # --- helper to call API once
+        def _post(data: dict) -> tuple[int, object, str | None, int | None]:
             resp = requests.post(SEMAPHORE_URL, data=data, timeout=SEMAPHORE_TIMEOUT)
             status = resp.status_code
-
-            # Semaphore returns JSON array on success; error has {"error":"...", "code":...}
             try:
                 body = resp.json()
             except Exception:
                 body = {"raw": resp.text}
+            # Extract common error/detail
+            detail = None
+            code = None
+            if isinstance(body, dict):
+                # v4 error shape
+                detail = body.get("error") or body.get("message")
+                code = body.get("code")
+                # Field-level errors (e.g., {"number":["The number field is required."]})
+                if not detail:
+                    # flatten first field error for visibility
+                    for k, v in body.items():
+                        if isinstance(v, list) and v and isinstance(v[0], str):
+                            detail = f"{k}: {v[0]}"
+                            break
+            return status, body, detail, code
 
-            if status >= 200 and status < 300 and isinstance(body, list):
+        CHUNK = 900
+        all_results = []
+
+        for i in range(0, len(numbers), CHUNK):
+            chunk = numbers[i:i+CHUNK]
+
+            # Primary shape:
+            #  - single  => "number"
+            #  - multiple => "numbers" (comma-separated)
+            if len(chunk) == 1:
+                data = {**payload_base, "number": chunk[0]}
+            else:
+                data = {**payload_base, "numbers": ",".join(chunk)}
+
+            status, body, detail, code = _post(data)
+
+            # Success when HTTP 2xx AND body is a list of message receipts
+            if 200 <= status < 300 and isinstance(body, list):
                 all_results.extend(body)
             else:
-                # Error shape
-                detail = body.get("error") if isinstance(body, dict) else str(body)
-                code = body.get("code") if isinstance(body, dict) else None
-                if fail_silently:
-                    return SimpleNamespace(ok=False, status=status, data=body, detail=detail, error_code=code)
-                raise RuntimeError(f"Semaphore SMS failed: {detail} (status {status}, code={code})")
+                # Retry with alternative shapes if it looks like a param error
+                retried = False
+                # Try numbers[] form for bulk
+                if len(chunk) > 1:
+                    alt = {**payload_base, "numbers[]": chunk}
+                    status2, body2, detail2, code2 = _post(alt)
+                    retried = True
+                    if 200 <= status2 < 300 and isinstance(body2, list):
+                        all_results.extend(body2)
+                    else:
+                        # Try per-number single sends (last resort)
+                        indiv_results = []
+                        ok_all = True
+                        for n in chunk:
+                            status3, body3, detail3, code3 = _post({**payload_base, "number": n})
+                            if 200 <= status3 < 300 and isinstance(body3, list):
+                                indiv_results.extend(body3)
+                            else:
+                                ok_all = False
+                                # Keep first visible error
+                                if not detail:
+                                    detail = detail3 or str(body3)
+                                if code is None:
+                                    code = code3
+                        if ok_all and indiv_results:
+                            all_results.extend(indiv_results)
+                        else:
+                            if fail_silently:
+                                return SimpleNamespace(ok=False, status=status2, data=body2, detail=detail2 or detail, error_code=code2 or code)
+                            raise RuntimeError(f"Semaphore SMS failed: {detail2 or detail} (status {status2}, code={code2 or code})")
+                else:
+                    # Single number failed — try with 'numbers' just in case
+                    alt = {**payload_base, "numbers": chunk[0]}
+                    status2, body2, detail2, code2 = _post(alt)
+                    retried = True
+                    if 200 <= status2 < 300 and isinstance(body2, list):
+                        all_results.extend(body2)
+                    else:
+                        if fail_silently:
+                            return SimpleNamespace(ok=False, status=status2, data=body2, detail=detail2 or detail, error_code=code2 or code)
+                        raise RuntimeError(f"Semaphore SMS failed: {detail2 or detail} (status {status2}, code={code2 or code})")
 
             if throttle_per_sec and (i + CHUNK) < len(numbers):
                 time.sleep(throttle_per_sec)

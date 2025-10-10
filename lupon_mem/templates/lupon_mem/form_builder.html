@@ -66,30 +66,24 @@
       z-index: 1050;
       display:none;
     }
-    .typeahead-item{
-      padding:.55rem .75rem;
-      font-size:.95rem;
-      line-height:1.2;
-      color:#1b1b1b;
-      background:transparent;
-      border:0;
-      text-align:left;
-      width:100%;
-    }
+    .typeahead-item{ padding:.55rem .75rem; font-size:.95rem; line-height:1.2; color:#1b1b1b; background:transparent; border:0; text-align:left; width:100%; }
     .typeahead-item:hover{ background:var(--dropdown-hover); }
-    .typeahead-item.active,
-    .typeahead-item:focus{ background:var(--dropdown-active); outline:none; }
+    .typeahead-item.active,.typeahead-item:focus{ background:var(--dropdown-active); outline:none; }
     .typeahead-empty{ padding:.6rem .8rem; color:#666; font-size:.9rem; }
 
-    .kbd{
-      display:inline-block; padding:0 .35rem; border:1px solid #c9c9c9; border-bottom-width:2px; border-radius:4px;
-      font:500 12px ui-monospace, Menlo, Consolas, monospace; color:#333; background:#f8f8f8;
-    }
+    .kbd{ display:inline-block; padding:0 .35rem; border:1px solid #c9c9c9; border-bottom-width:2px; border-radius:4px;
+      font:500 12px ui-monospace, Menlo, Consolas, monospace; color:#333; background:#f8f8f8; }
     .help-hint,.kp-hint{ color:#6a6a6a; font-size:.86rem; margin-top:.25rem; display:block; }
 
-    /* KP-9 helpers */
-    .kp-field .kp-hint{ display:block; }
-    .kp-chip-row .btn{ border-radius:999px; }
+    /* visually hide but keep inputs posting */
+    .kp-offscreen{
+      position:absolute !important;
+      left:-10000px !important;
+      top:auto !important;
+      width:1px !important;
+      height:1px !important;
+      overflow:hidden !important;
+    }
   </style>
 </head>
 
@@ -128,6 +122,20 @@
     </div>
 
     <div class="card-body">
+
+      {# KP-8 minimal banner #}
+      {% if kp8_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-calendar2-event" style="font-size:1.1rem;"></i>
+          <strong>Please set the Hearing Date and the Hearing Time</strong>
+        </div>  
+            <div class="mt-1" style="opacity:.95">
+            For <strong>KP Form No. 8</strong>, you are required to set the <strong>Hearing Date</strong> and <strong>Hearing Time</strong>.
+            </div>
+      </div>
+      {% endif %}
+
       <form id="formFields" class="needs-validation" novalidate autocomplete="off">
         {% csrf_token %}
         <input type="hidden" name="case_id" value="{{ case_id }}">
@@ -135,86 +143,131 @@
         {% if submission_id %}<input type="hidden" name="submission_id" value="{{ submission_id }}">{% endif %}
 
         <div class="row g-3">
-          <div class="col-12"><h6 class="text-uppercase text-muted mb-2">Page 1</h6><hr class="mt-0"></div>
-
           {% with 1 as page %}
           {% for kff_id, field_id, label, type_name, is_required, value, field_code in fields %}
-            {% if field_code == "served_to" %}
-              <div class="col-12 mt-2"><h6 class="text-uppercase text-muted mb-2">Page 2 — Officer’s Return</h6><hr class="mt-0"></div>
-            {% endif %}
+            {# Lower-cased code for comparisons #}
+            {% with field_code|lower as code %}
 
-            {% if type_name == "TEXTAREA" %}
-              <div class="col-12">
-            {% else %}
-              <div class="col-12 col-md-6">
-            {% endif %}
-              <div class="kp-field" data-code="{{ field_code|lower }}">
-                <label class="form-label {% if is_required %}label-req{% endif %}" for="f_{{ field_id }}">{{ label }}</label>
+              {# Layout: textarea = full width; others = half width #}
+              {% if type_name == "TEXTAREA" %}
+                <div class="col-12{% if kp8_ui_minimal and code != 'hearing_date' and code != 'hearing_time' and code != 'place_of_hearing' %} kp-offscreen{% endif %}">
+              {% else %}
+                <div class="col-12 col-md-6{% if kp8_ui_minimal and code != 'hearing_date' and code != 'hearing_time' and code != 'place_of_hearing' %} kp-offscreen{% endif %}">
+              {% endif %}
+                <div class="kp-field" data-code="{{ code }}">
 
-                {% if type_name == "TEXT" and field_code == "offcr_name" %}
-                  <div class="typeahead-wrap" id="officerTA">
+                  {# Label: mark required only for the 3 visible fields in minimal mode #}
+                  <label class="form-label
+                    {% if is_required %}
+                      {% if kp8_ui_minimal %}
+                        {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %} label-req {% endif %}
+                      {% else %}
+                        label-req
+                      {% endif %}
+                    {% endif %}"
+                    for="f_{{ field_id }}">
+                    {{ label }}
+                  </label>
+
+                  {% if type_name == "TEXT" %}
                     <input id="f_{{ field_id }}" type="text" class="form-control"
                            data-field-id="{{ field_id }}" data-code="{{ field_code }}"
-                           value="{{ value|default:'' }}" {% if is_required %}required{% endif %}
-                           placeholder="Type a staff name…">
-                    <div class="typeahead-dropdown" id="officerDropdown" role="listbox" aria-label="Staff suggestions"></div>
-                    <div class="help-hint">Start typing to search staff. Use <span class="kbd">↑</span>/<span class="kbd">↓</span>, <span class="kbd">Enter</span> to select.</div>
-                  </div>
+                           value="{{ value|default:'' }}"
+                           {% if is_required %}
+                             {% if kp8_ui_minimal %}
+                               {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %}required{% endif %}
+                             {% else %}required{% endif %}
+                           {% endif %}>
 
-                {% elif type_name == "TEXT" %}
-                  <input id="f_{{ field_id }}" type="text" class="form-control"
-                         data-field-id="{{ field_id }}" data-code="{{ field_code }}"
-                         value="{{ value|default:'' }}" {% if is_required %}required{% endif %}>
-
-                {% elif type_name == "EMAIL" %}
-                  <input id="f_{{ field_id }}" type="email" class="form-control"
-                         data-field-id="{{ field_id }}" data-code="{{ field_code }}"
-                         value="{{ value|default:'' }}" {% if is_required %}required{% endif %}>
-
-                {% elif type_name == "PHONE" %}
-                  <input id="f_{{ field_id }}" type="tel" class="form-control"
-                         data-field-id="{{ field_id }}" data-code="{{ field_code }}"
-                         value="{{ value|default:'' }}" placeholder="09XXXXXXXXX"
-                         {% if is_required %}required{% endif %}>
-
-                {% elif type_name == "NUMBER" %}
-                  <input id="f_{{ field_id }}" type="number" class="form-control"
-                         data-field-id="{{ field_id }}" data-code="{{ field_code }}"
-                         value="{{ value|default:'' }}" {% if is_required %}required{% endif %}>
-
-                {% elif type_name == "DATE" %}
-                  <input id="f_{{ field_id }}" type="date" class="form-control"
-                         data-field-id="{{ field_id }}" data-code="{{ field_code }}"
-                         value="{{ value|default:'' }}" {% if is_required %}required{% endif %}>
-
-                {% elif type_name == "TIME" %}
-                  <input id="f_{{ field_id }}" type="time" class="form-control"
-                         data-field-id="{{ field_id }}" data-code="{{ field_code }}"
-                         value="{{ value|default:'' }}" {% if is_required %}required{% endif %}>
-
-                {% elif type_name == "CURRENCY" %}
-                  <div class="input-group">
-                    <span class="input-group-text">₱</span>
-                    <input id="f_{{ field_id }}" type="number" step="0.01" class="form-control"
+                  {% elif type_name == "EMAIL" %}
+                    <input id="f_{{ field_id }}" type="email" class="form-control"
                            data-field-id="{{ field_id }}" data-code="{{ field_code }}"
-                           value="{{ value|default:'' }}" {% if is_required %}required{% endif %}>
-                  </div>
+                           value="{{ value|default:'' }}"
+                           {% if is_required %}
+                             {% if kp8_ui_minimal %}
+                               {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %}required{% endif %}
+                             {% else %}required{% endif %}
+                           {% endif %}>
 
-                {% elif type_name == "TEXTAREA" %}
-                  <textarea id="f_{{ field_id }}" class="form-control" rows="4"
-                            data-field-id="{{ field_id }}" data-code="{{ field_code }}"
-                            {% if is_required %}required{% endif %}>{{ value|default:'' }}</textarea>
+                  {% elif type_name == "PHONE" %}
+                    <input id="f_{{ field_id }}" type="tel" class="form-control"
+                           data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                           value="{{ value|default:'' }}" placeholder="09XXXXXXXXX"
+                           {% if is_required %}
+                             {% if kp8_ui_minimal %}
+                               {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %}required{% endif %}
+                             {% else %}required{% endif %}
+                           {% endif %}>
 
-                {% else %}
-                  <input id="f_{{ field_id }}" type="text" class="form-control"
-                         data-field-id="{{ field_id }}" data-code="{{ field_code }}"
-                         value="{{ value|default:'' }}" {% if is_required %}required{% endif %}>
-                  <div class="form-text">Unsupported type <code>{{ type_name }}</code> (rendered as text)</div>
-                {% endif %}
+                  {% elif type_name == "NUMBER" %}
+                    <input id="f_{{ field_id }}" type="number" class="form-control"
+                           data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                           value="{{ value|default:'' }}"
+                           {% if is_required %}
+                             {% if kp8_ui_minimal %}
+                               {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %}required{% endif %}
+                             {% else %}required{% endif %}
+                           {% endif %}>
 
-                <div class="invalid-feedback">This field is required.</div>
+                  {% elif type_name == "DATE" %}
+                    <input id="f_{{ field_id }}" type="date" class="form-control"
+                           data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                           value="{{ value|default:'' }}"
+                           {% if is_required %}
+                             {% if kp8_ui_minimal %}
+                               {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %}required{% endif %}
+                             {% else %}required{% endif %}
+                           {% endif %}>
+
+                  {% elif type_name == "TIME" %}
+                    <input id="f_{{ field_id }}" type="time" class="form-control"
+                           data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                           value="{{ value|default:'' }}"
+                           {% if is_required %}
+                             {% if kp8_ui_minimal %}
+                               {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %}required{% endif %}
+                             {% else %}required{% endif %}
+                           {% endif %}>
+
+                  {% elif type_name == "CURRENCY" %}
+                    <div class="input-group">
+                      <span class="input-group-text">₱</span>
+                      <input id="f_{{ field_id }}" type="number" step="0.01" class="form-control"
+                             data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                             value="{{ value|default:'' }}"
+                             {% if is_required %}
+                               {% if kp8_ui_minimal %}
+                                 {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %}required{% endif %}
+                               {% else %}required{% endif %}
+                             {% endif %}>
+                    </div>
+
+                  {% elif type_name == "TEXTAREA" %}
+                    <textarea id="f_{{ field_id }}" class="form-control" rows="4"
+                              data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                              {% if is_required %}
+                                {% if kp8_ui_minimal %}
+                                  {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %}required{% endif %}
+                                {% else %}required{% endif %}
+                              {% endif %}>{{ value|default:'' }}</textarea>
+
+                  {% else %}
+                    <input id="f_{{ field_id }}" type="text" class="form-control"
+                           data-field-id="{{ field_id }}" data-code="{{ field_code }}"
+                           value="{{ value|default:'' }}"
+                           {% if is_required %}
+                             {% if kp8_ui_minimal %}
+                               {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %}required{% endif %}
+                             {% else %}required{% endif %}
+                           {% endif %}>
+                    <div class="form-text">Unsupported type <code>{{ type_name }}</code> (rendered as text)</div>
+                  {% endif %}
+
+                  <div class="invalid-feedback">This field is required.</div>
+                </div>
               </div>
-            </div>
+
+            {% endwith %}
           {% endfor %}
           {% endwith %}
         </div>
@@ -257,7 +310,7 @@
 <!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-  // --- CSRF ---
+  // CSRF
   function getCookie(name){
     const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
     return m ? decodeURIComponent(m[2]) : null;
@@ -287,249 +340,7 @@
   function showOk(msg){ qs("#toastOk .msg").textContent = msg || "Saved."; toastOk.show(); }
   function showWarn(msg){ qs("#toastWarn .msg").textContent = msg || "Something went wrong."; toastWarn.show(); }
 
-  // -------- Helpers --------
-  const today = new Date();
-  const todayISO = today.toISOString().slice(0,10); // yyyy-mm-dd
-  const monthName = (y, m) => new Date(y, m-1, 1).toLocaleString('en-US',{month:'long'});
-
-  function ymd(dateStr){
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(dateStr||"")) return null;
-    const [y,m,d] = dateStr.split("-");
-    return { y, m: String(parseInt(m,10)), d: String(parseInt(d,10)) };
-  }
-  function w(code){ return document.querySelector('.kp-field[data-code="'+code+'"]'); }
-  function input(code){
-    const wrap = w(code);
-    if(!wrap) return null;
-    return wrap.querySelector('input,textarea,select');
-  }
-  function setVal(code, val){
-    const el = input(code);
-    if(!el) return;
-    el.value = val;
-    el.dispatchEvent(new Event('input',{bubbles:true}));
-    el.dispatchEvent(new Event('change',{bubbles:true}));
-  }
-  function getVal(code){ const el=input(code); return el?el.value:""; }
-
-  // -------- Label/Hints cleanup for KP-9 --------
-  const FRIENDLY = {
-    brgy_capt:               { label:"Brgy Captain",                   hint:"Auto-filled from Punong Barangay. You may override if needed." },
-    curr_date:               { label:"Current Day",                    hint:"Auto-filled to today (for Officer’s Return)." },
-    curr_month:              { label:"Current Month",                  hint:"Auto-filled to current month." },
-    curr_year:               { label:"Current Year",                   hint:"Auto-filled to current year." },
-    served_to:               { label:"Served To (1)",                  hint:"Enter the respondent’s name here for item 1." },
-    served_to_2:             { label:"Served To (2)",                  hint:"Enter the respondent/representative here for item 2." },
-    served_to_3:             { label:"Served To (3)",                  hint:"Enter the person at the dwelling who received the summons." },
-    served_to_4:             { label:"Served To (4)",                  hint:"Enter the person at the office/place of business who received the summons." },
-    respondent_names_one:    { label:"Respondent Name (1)",            hint:"Click a chip to fill quickly." },
-    respondent_names_two:    { label:"Respondent Name (2)",            hint:"Click a chip to fill quickly." },
-    respondent_names_three:  { label:"Respondent Name (3)",            hint:"Click a chip to fill quickly." },
-    proxy_name_one:          { label:"Proxy Name (1)",                 hint:"Representative (if applicable)." },
-    proxy_name_two:          { label:"Proxy Name (2)",                 hint:"Representative (if applicable)." },
-    offcr_name:              { label:"Officer Name",                   hint:"Pick from staff or type the officer’s full name." },
-    date_offcret:            { label:"Officer’s Return: Day",          hint:"Derived from Officer Served: Date." },
-    month_offcret:           { label:"Officer’s Return: Month",        hint:"Derived from Officer Served: Date." },
-    ofcret_year:             { label:"Officer’s Return: Year",         hint:"Derived from Officer Served: Date." },
-    offcret_serve_date:      { label:"Officer Served: Date",           hint:"Date when summons was served." },
-    offcret_serve_month:     { label:"Officer Served: Month",          hint:"Auto from date." },
-    offcret_serve_year:      { label:"Officer Served: Year",           hint:"Auto from date." },
-    date_signed_one:         { label:"Date Signed (1)",                hint:"Auto-filled to today if 1 or 2 is selected." },
-    date_signed_two:         { label:"Date Signed (2)",                hint:"Optional second signature date." }
-  };
-  function setFriendly(code, label, hint){
-    const wrap=w(code);
-    if(!wrap) return;
-    const lab = wrap.querySelector('label.form-label');
-    if(lab && label) lab.textContent = label;
-    if(hint){
-      let small = wrap.querySelector('.kp-hint');
-      if(!small){ small=document.createElement('small'); small.className='kp-hint'; wrap.appendChild(small); }
-      small.textContent = hint;
-    }
-  }
-  const isKP9 = !!w('served_to');
-  if(isKP9){ Object.entries(FRIENDLY).forEach(([c, v])=> setFriendly(c, v.label, v.hint)); }
-
-  // -------- Prefill: Summons date → month/year --------
-  function syncDateTriplet(prefix){
-    const d = input(prefix+'_date');
-    if(!d) return;
-    d.addEventListener('change', ()=>{
-      const parts = ymd(d.value); if(!parts) return;
-      setVal(prefix+'_month', monthName(parts.y, parts.m));
-      setVal(prefix+'_year',  parts.y);
-    });
-  }
-  syncDateTriplet('summon');     // Summons Date -> Summons Month/Year
-  syncDateTriplet('curr');       // Current Day -> Current Month/Year (kept for completeness)
-
-  // -------- Officer Served Date → Officer’s Return Day/Month/Year --------
-  const servedDateEl = input('offcret_serve_date');
-  if(servedDateEl){
-    servedDateEl.addEventListener('change', ()=>{
-      const parts = ymd(servedDateEl.value); if(!parts) return;
-      // fill served month/year fields
-      setVal('offcret_serve_month', monthName(parts.y, parts.m));
-      setVal('offcret_serve_year',  parts.y);
-      // mirror to Officer’s Return triplet
-      setVal('date_offcret',  servedDateEl.value);     // Day (date input)
-      setVal('month_offcret', monthName(parts.y, parts.m));
-      setVal('ofcret_year',   parts.y);
-    });
-  }
-
-  // -------- Brgy Captain mirrors Punong Barangay on UI too --------
-  // If form has a punong barangay field (label or code), keep brgy_capt synced when PB changes.
-  const pbEl = document.querySelector('[data-code="punong_barangay"], input[aria-label="punong barangay"]');
-  const brgyEl = input('brgy_capt');
-  if(pbEl && brgyEl){
-    pbEl.addEventListener('change', ()=>{ if(!brgyEl.value) setVal('brgy_capt', pbEl.value); });
-  }
-
-  // -------- Build respondent list (for chips/typeahead) --------
-  function splitNames(val){
-    return (val||'').split(',').map(s=>s.trim()).filter(Boolean);
-  }
-  const respondents = splitNames(getVal('respondents'));
-  const complainants = splitNames(getVal('complainants'));
-  const PARTY_SOURCE = Array.from(new Set([].concat(respondents, complainants))).filter(Boolean);
-
-  // Quick chips under selected fields
-  function addChips(code){
-    const wrap=w(code); if(!wrap||!PARTY_SOURCE.length) return;
-    let zone=wrap.querySelector('.kp-chip-row');
-    if(!zone){ zone=document.createElement('div'); zone.className='kp-chip-row d-flex flex-wrap gap-2 mt-2'; wrap.appendChild(zone); }
-    zone.innerHTML='';
-    PARTY_SOURCE.forEach(name=>{
-      const b=document.createElement('button'); b.type='button'; b.className='btn btn-sm btn-outline-secondary'; b.textContent=name;
-      b.addEventListener('click', ()=> setVal(code, name));
-      zone.appendChild(b);
-    });
-  }
-  ['respondent_names_one','respondent_names_two','respondent_names_three','served_to','served_to_2','served_to_3','served_to_4'].forEach(addChips);
-
-  // Lightweight local typeahead (for 3 & 4)
-  function attachLocalTypeahead(code){
-    const el=input(code); if(!el) return;
-    const wrap=w(code);
-    const dd=document.createElement('div'); dd.className='typeahead-dropdown'; wrap.appendChild(dd);
-    function show(items){
-      if(!items.length){ dd.innerHTML='<div class="typeahead-empty">No matches.</div>'; dd.style.display='block'; return; }
-      dd.innerHTML = items.map((n,i)=>`<button type="button" class="typeahead-item ${i===0?'active':''}" data-name="${n}">${n}</button>`).join('');
-      dd.style.display='block';
-    }
-    function close(){ dd.style.display='none'; }
-    function doFilter(){
-      const q=(el.value||'').toLowerCase().trim();
-      if(q.length<1){ close(); return; }
-      const items = PARTY_SOURCE.filter(n=>n.toLowerCase().includes(q)).slice(0,20);
-      show(items);
-    }
-    el.addEventListener('input', doFilter);
-    el.addEventListener('focus', doFilter);
-    dd.addEventListener('click', e=>{
-      const btn=e.target.closest('.typeahead-item'); if(!btn) return;
-      setVal(code, btn.dataset.name); close();
-    });
-    document.addEventListener('click', e=>{ if(!wrap.contains(e.target)) close(); });
-  }
-  attachLocalTypeahead('served_to_3');
-  attachLocalTypeahead('served_to_4');
-
-  // “How was the summons served?”
-  if(isKP9){
-    const served1Wrap = w('served_to');
-    if(served1Wrap){
-      const blk=document.createElement('div');
-      blk.className='alert alert-light border mt-2';
-      blk.innerHTML=`
-        <div class="fw-semibold mb-2">How was the summons served?</div>
-        <div class="d-flex flex-column gap-1">
-          <label class="d-flex align-items-center gap-2"><input type="radio" name="kp9_sv_mode" value="1"> <span>1) Handing to him/them said summons in person.</span></label>
-          <label class="d-flex align-items-center gap-2"><input type="radio" name="kp9_sv_mode" value="2"> <span>2) Handing to/them said summons and he/they refused to receive it.</span></label>
-          <label class="d-flex align-items-center gap-2"><input type="radio" name="kp9_sv_mode" value="3"> <span>3) Leaving said summons at his/their dwelling with ______.</span></label>
-          <label class="d-flex align-items-center gap-2"><input type="radio" name="kp9_sv_mode" value="4"> <span>4) Leaving said summons at his/their office/place of business with ______.</span></label>
-        </div>
-        <small class="text-muted d-block mt-2">Selecting an option focuses the corresponding “Served To (n)” field. Chips and search help you insert a name.</small>
-      `;
-      served1Wrap.parentNode.insertBefore(blk, served1Wrap.nextSibling);
-
-      function focusCode(code){ const el=input(code); if(el){ el.focus(); el.scrollIntoView({block:'nearest'}); } }
-      function ensureFirstResp(targetCode){
-        const first = respondents[0];
-        if(first){
-          const el = input(targetCode);
-          if(el && !el.value){ setVal(targetCode, first); }
-        }
-      }
-      blk.addEventListener('change', (e)=>{
-        if(e.target && e.target.name==='kp9_sv_mode'){
-          const v=String(e.target.value);
-          if(v==='1'){ focusCode('served_to');   ensureFirstResp('served_to');   setVal('date_signed_one', todayISO); }
-          if(v==='2'){ focusCode('served_to_2'); ensureFirstResp('served_to_2'); setVal('date_signed_one', todayISO); }
-          if(v==='3'){ focusCode('served_to_3'); }
-          if(v==='4'){ focusCode('served_to_4'); }
-        }
-      });
-
-      // default: select 1 and prefill Served To (1) with first respondent
-      const r1 = blk.querySelector('input[value="1"]');
-      if(r1){ r1.checked = true; ensureFirstResp('served_to'); }
-    }
-  }
-
-  // ---- Staff search for Officer Name (server endpoint) ----
-  const offcrInput   = document.querySelector(`[data-code="offcr_name"]`);
-  const drop         = document.getElementById("officerDropdown");
-  const taWrap       = document.getElementById("officerTA");
-
-  function debounce(fn, ms=220){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
-  async function fetchStaff(q){
-    if (!q || q.trim().length < 2) return [];
-    const res = await fetch("{% url 'lupon_mem:staff_suggest' %}?q="+encodeURIComponent(q.trim()));
-    if (!res.ok) return [];
-    const j = await res.json();
-    return j.results || [];
-  }
-  function render(items){
-    if (!drop) return;
-    if (!items.length){ drop.innerHTML = `<div class="typeahead-empty">No matches. Keep typing…</div>`; drop.style.display = "block"; return; }
-    drop.innerHTML = items.map((r,i)=>`
-      <button type="button" role="option" class="typeahead-item ${i===0?'active':''}" data-name="${r.name}">${r.name}</button>
-    `).join("");
-    drop.style.display = "block";
-  }
-  function closeDrop(){ if(drop){ drop.style.display="none"; } }
-  function pick(name){ if(offcrInput){ offcrInput.value=name; offcrInput.dispatchEvent(new Event('change',{bubbles:true})); } closeDrop(); }
-  function moveActive(delta){
-    const btns = Array.from(drop.querySelectorAll(".typeahead-item")); if(!btns.length) return;
-    let idx = btns.findIndex(b=>b.classList.contains("active")); if (idx === -1) idx = 0;
-    const next = (idx + delta + btns.length) % btns.length;
-    btns.forEach(b=>b.classList.remove("active")); btns[next].classList.add("active"); btns[next].scrollIntoView({ block:"nearest" });
-  }
-
-  const doTypeahead = debounce(async ()=>{
-    const q = offcrInput?.value || "";
-    const items = await fetchStaff(q);
-    render(items);
-  }, 250);
-
-  if (offcrInput && drop && taWrap){
-    offcrInput.addEventListener("input", doTypeahead);
-    offcrInput.addEventListener("focus", doTypeahead);
-    drop.addEventListener("click", (e)=>{ const btn=e.target.closest(".typeahead-item"); if(btn) pick(btn.dataset.name); });
-    offcrInput.addEventListener("keydown", (e)=>{
-      if (drop.style.display !== "block") return;
-      if (e.key === "ArrowDown"){ e.preventDefault(); moveActive(+1); }
-      else if (e.key === "ArrowUp"){ e.preventDefault(); moveActive(-1); }
-      else if (e.key === "Enter"){ e.preventDefault(); const a=drop.querySelector(".typeahead-item.active"); if(a) pick(a.dataset.name); }
-      else if (e.key === "Escape"){ closeDrop(); }
-    });
-    document.addEventListener("click", (e)=>{ if (!taWrap.contains(e.target)) closeDrop(); });
-  }
-
-  // ---- Save
+  // Save / Submit
   async function doSave(){
     if (!formEl.checkValidity()){
       formEl.classList.add('was-validated');
@@ -540,20 +351,19 @@
       setBusy(saveBtn, true);
       const fd = new FormData(formEl);
       fd.set("answers", JSON.stringify(collectAnswers()));
-      const res = await fetch("{% url 'lupon_mem:save_answers' %}", { method:"POST", headers: { "X-CSRFToken": CSRF }, body: fd });
+      const res = await fetch("{% url 'lupon_mem:save_answers' %}", { method:"POST", headers:{"X-CSRFToken":CSRF}, body:fd });
       if(!res.ok) throw new Error("HTTP " + res.status);
       const j = await res.json();
-      if (j.ok) {
-        if (!formEl.elements.submission_id) {
+      if (j.ok){
+        if (!formEl.elements.submission_id){
           const hid = document.createElement("input");
           hid.type="hidden"; hid.name="submission_id"; hid.value=j.submission_id;
           formEl.appendChild(hid);
         }
         showOk("Draft saved.");
         return j;
-      } else {
-        throw new Error("Save failed.");
       }
+      throw new Error("Save failed.");
     }catch(err){
       showWarn(err.message || "Save failed.");
       throw err;
@@ -569,12 +379,13 @@
     try{
       setBusy(submitBtn, true);
       if (!formEl.elements.submission_id){ await doSave(); }
-      else if (!formEl.checkValidity()) { formEl.classList.add('was-validated'); showWarn("Please complete required fields."); return; }
+      else if (!formEl.checkValidity()){ formEl.classList.add('was-validated'); showWarn("Please complete required fields."); return; }
       const payload = { submission_id: parseInt(formEl.elements.submission_id.value), case_id: parseInt(formEl.elements.case_id.value) };
-      const res = await fetch("{% url 'lupon_mem:submit_form' %}", { method:"POST", headers: { "Content-Type":"application/json", "X-CSRFToken": CSRF }, body: JSON.stringify(payload) });
+      const res = await fetch("{% url 'lupon_mem:submit_form' %}", { method:"POST", headers:{ "Content-Type":"application/json", "X-CSRFToken":CSRF }, body:JSON.stringify(payload) });
       if(!res.ok) throw new Error("HTTP " + res.status);
       const j = await res.json();
-      if (j.ok) { window.location.href = j.download_url; } else { showWarn("Submit failed."); }
+      if (j.ok){ window.location.href = j.download_url; }
+      else { showWarn("Submit failed."); }
     }catch(err){ showWarn(err.message || "Submit failed."); }
     finally{ setBusy(submitBtn, false); }
   });
