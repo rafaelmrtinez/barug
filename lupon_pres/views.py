@@ -4,6 +4,7 @@ from .forms import SearchPerson
 from .forms import ResidentProfileform
 from .forms import Schedule
 from .forms import StaffFilters
+from .forms import UpdateInfo
 
 #need back-end for proper assignment
 user_fullname = 'lname, fname mname suffix'
@@ -99,10 +100,12 @@ def members_list(request):
     })
 
 def member_dets(request, mem_id):
-    return render(request, "person/staff_dets.html", {
+    form = UpdateInfo()
+    return render(request, "members/member_dets.html", {
         'user_fullname' : user_fullname,
         'user_role' : user_role,
         'page_path' : f'{user_role} / Staff Details : {mem_id}',
         'page_title' : f'Staff Details : {mem_id}',
         'user_role_template' : user_role_template,
+        'form' : form,
     })
