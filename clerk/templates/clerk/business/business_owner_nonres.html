@@ -6,6 +6,9 @@
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
 <link rel="stylesheet" href="{% static 'css/modal.css' %}">
 <link rel="stylesheet" href="{% static 'css/progress_bar.css' %}">
+
+<script src="{% static 'js/business_owner_resident.js' %}" defer></script>
+<script src="{% static 'js/clear_button.js' %}" defer></script>
 <style>
   .results-viewport{
     height: 250px;
@@ -13,23 +16,28 @@
     background: var(--bs-body-bg);
     border: 1px solid var(--bs-border-color);
     border-radius: .75rem;
-    padding: .75rem;
   }
 
+  /* add space below every result item */
+  .results-viewport .result-item { margin-bottom: .75rem; }
+
+  /* optional: keep a little breathing room at the very bottom */
+  .results-viewport { padding-bottom: .5rem; }
+
   /* Ensure outlined vs filled look matches brand */
-  .btn-submit{
+  .btn-fill-up{
     background: var(--brand,#7B1E22);
     border: 1px solid var(--brand,#7B1E22);
     color: #fff;
   }
-  .btn-submit:hover{ background: var(--brand-700,#6a1a1e); border-color: var(--brand-700,#6a1a1e); color:#fff; }
+  .btn-fill-up:hover{ background: var(--brand-700,#6a1a1e); border-color: var(--brand-700,#6a1a1e); color:#fff; }
 
-  .btn-reset{
+  .btn-search{
     background: transparent;
     border: 1px solid var(--brand,#7B1E22);
     color: var(--brand,#7B1E22);
   }
-  .btn-reset:hover{ background: rgba(123,30,34,.08); color: var(--brand,#7B1E22); }
+  .btn-search:hover{ background: rgba(123,30,34,.08); color: var(--brand,#7B1E22); }
 
   /* Prevent hover "jump" (overrides any global .btn hover transforms) */
 #search-tab, #create-tab,
@@ -58,11 +66,11 @@
   <!-- Toggle buttons -->
   <div class="mb-3 d-flex gap-2">
     <!-- default: outlined (will be switched by JS) -->
-    <button id="search-tab" type="button" class="btn btn-reset">
+    <button id="search-tab" type="button" class="btn btn-search">
       <i class="bi bi-search me-1"></i> Search existing non-resident owner
     </button>
     <!-- default: filled (will be switched by JS) -->
-    <button id="create-tab" type="button" class="btn btn-submit">
+    <button id="create-tab" type="button" class="btn btn-fill-up">
       <i class="bi bi-person-plus me-1"></i> Fill-up owner credentials
     </button>
   </div>
@@ -77,7 +85,7 @@
           <div class="container px-3 py-3">
             <h3 class="fw-semibold">Account Management — Business Owners</h3>
             <p class="mt-1 small text-muted">
-              Link a resident as a business owner by searching their record in the barangay system.
+              Link a existing non-resident as a business owner by searching their record in the barangay system.
             </p>
           </div>
         </div>
@@ -85,7 +93,7 @@
         <div class="container px-3 py-4">
           <section class="rounded-3 border bg-white p-4 shadow-sm">
             <div class="d-flex align-items-center gap-2 mb-3">
-              <h2 class="fs-5 fw-semibold mb-0">Resident Owner Linking</h2>
+              <h2 class="fs-5 fw-semibold mb-0">Non-Resident Owner Linking</h2>
             </div>
             <p class="small text-muted mb-4">
               Search for a resident in the barangay records and assign them as the owner of a business.
@@ -95,10 +103,10 @@
             <form method="get" class="rounded-3 border bg-light p-3" id="ownerSearchForm">
               <div class="d-flex align-items-end justify-content-between gap-3">
                 <div class="flex-grow-1">
-                  <label class="form-label small" for="{{ form.search.id_for_label }}">Find Resident Record</label>
+                  <label class="form-label small" for="{{ search_form.search.id_for_label }}">Find Non-Resident Record</label>
                   <div class="form-floating">
-                    {{ form.search }}
-                    <label for="{{ form.search.id_for_label }}">{{ form.search.label }}</label>
+                    {{ search_form.search }}
+                    <label for="{{ search_form.search.id_for_label }}">{{ search_form.search.label }}</label>
                   </div>
                   <div class="form-text">
                     Type a Resident Code (e.g., P07-R123) or name (e.g., Juan Dela Cruz).
@@ -230,7 +238,7 @@
                         {{ selected.full_name|default:"—"|upper }} — {{ selected.person_code|default:"—" }}
                       </strong>
                     </div>
-                    <a href="{% url 'clerk:business_owner_resident' %}"
+                    <a href="{% url 'clerk:business_owner_nonres' %}"
                        id="changeSelected"
                        class="small text-decoration-none"
                        style="color: var(--bs-danger-text-emphasis);">
@@ -393,7 +401,7 @@
                 </div>
 
                 <div class="mt-auto button-container">
-                  <button class="btn btn-reset">Clear</button>
+                  <button id="ClearBtn" type="button" class="btn btn-reset">Clear</button>
                   <button type="submit" class="btn btn-submit">Continue</button>
                 </div>
 
@@ -410,47 +418,61 @@
 
 </div>
 
+<div id="ownerPage"
+     data-search-url="{% url 'clerk:ajax_nonresident_owner_search' %}"
+     data-continue-base="{% url 'clerk:business_details' %}"
+     data-has-selected="{{ selected|yesno:'true,false' }}"
+     data-initial-search="{{ search|default_if_none:'' }}">
+</div>
+
 <script>
-  (function () {
-    const btnSearch = document.getElementById('search-tab');
-    const btnCreate = document.getElementById('create-tab');
-    const paneSearch = document.getElementById('search-pane');
-    const paneCreate = document.getElementById('create-pane');
+// Controls the Search/Create tabs on the non-resident owner page.
+(function () {
+  const btnSearch  = document.getElementById('search-tab');
+  const btnCreate  = document.getElementById('create-tab');
+  const paneSearch = document.getElementById('search-pane');
+  const paneCreate = document.getElementById('create-pane');
+  const pageRoot   = document.getElementById('ownerPage');
 
-    function swapButtonStyles(isSearchActive){
-      // Active tab = filled (btn-submit); Inactive = outlined (btn-reset)
-      btnSearch.classList.toggle('btn-submit', isSearchActive);
-      btnSearch.classList.toggle('btn-reset', !isSearchActive);
+  function applyButtonStyle(btn, isActive) {
+    btn.classList.toggle('btn-fill-up', isActive); // filled
+    btn.classList.toggle('btn-search',  !isActive); // outlined
+  }
 
-      btnCreate.classList.toggle('btn-submit', !isSearchActive);
-      btnCreate.classList.toggle('btn-reset', isSearchActive);
-    }
+  function setActiveTab(which) {
+    const isSearch = which === 'search';
 
-    function activate(which) {
-      const isSearch = which === 'search';
+    // panes
+    paneSearch.classList.toggle('show',   isSearch);
+    paneSearch.classList.toggle('active', isSearch);
+    paneCreate.classList.toggle('show',   !isSearch);
+    paneCreate.classList.toggle('active', !isSearch);
 
-      // panes
-      paneSearch.classList.toggle('show', isSearch);
-      paneSearch.classList.toggle('active', isSearch);
-      paneCreate.classList.toggle('show', !isSearch);
-      paneCreate.classList.toggle('active', !isSearch);
+    // buttons
+    applyButtonStyle(btnSearch,  isSearch);
+    applyButtonStyle(btnCreate, !isSearch);
 
-      // buttons (filled vs outlined)
-      swapButtonStyles(isSearch);
-    }
+    // a11y
+    btnSearch.setAttribute('aria-pressed',  String(isSearch));
+    btnCreate.setAttribute('aria-pressed',  String(!isSearch));
+  }
 
-    // Click handlers
-    btnSearch.addEventListener('click', function (e) {
-      e.preventDefault();
-      activate('search');
-    });
-    btnCreate.addEventListener('click', function (e) {
-      e.preventDefault();
-      activate('create');
-    });
+  // Click handlers
+  btnSearch?.addEventListener('click', (e) => { e.preventDefault(); setActiveTab('search'); });
+  btnCreate?.addEventListener('click', (e) => { e.preventDefault(); setActiveTab('create'); });
 
-    // Initial view: Fill-up active (filled), Search outlined
-    activate('create');
-  })();
+  // -------- Initial tab decision --------
+  // Prefer Search if a result is selected OR if there is a search term.
+  const hasSelected   = (pageRoot?.dataset.hasSelected || 'false') === 'true';
+  const initialSearch = (pageRoot?.dataset.initialSearch || '').trim();
+
+  if (hasSelected || initialSearch) {
+    setActiveTab('search');
+  } else {
+    setActiveTab('create');
+  }
+})();
+
 </script>
+
 {% endblock %}

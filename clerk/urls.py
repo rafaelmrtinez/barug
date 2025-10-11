@@ -53,4 +53,5 @@ urlpatterns = [
 
     path("ajax/business_search/", views.ajax_business_search, name="ajax_business_search"),
     path("ajax/resident_owner_search/", views.ajax_owner_search, name="ajax_owner_search"),
+    path("ajax/nonresident_owner_search/", views.ajax_nonresident_owner_search, name="ajax_nonresident_owner_search"),
 ]

@@ -70,10 +70,11 @@ class ResidentOwnerService(IResidentOwnerService):
     def execute(
         self, 
         search: Optional[str] = None, 
+        only_nonresident: bool = False,
     ) -> list[ResidentOwnerDTO]:
         if not search or not str(search).strip():
             return []
-        return self._residentowner_repo.search_owner(search=search.strip())
+        return self._residentowner_repo.search_owner(search=search.strip(), only_nonresident=only_nonresident)
     
     def get_owner_details(self, person_id: int)-> Optional[ResidentOwnerDTO]:
         if not person_id:

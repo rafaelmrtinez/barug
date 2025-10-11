@@ -17,7 +17,7 @@
 
 {% block content %}
 <div class="container-fluid pt-3 d-flex flex-column flex-grow-1" style="margin-top: 40px;">
-    <form method="post" enctype="multipart/form-data" class="d-flex flex-column flex-grow-1">
+    <form id="businessForm" method="post" enctype="multipart/form-data" class="d-flex flex-column flex-grow-1">
         {% csrf_token %}
 
         {% if form.errors %}
@@ -298,10 +298,102 @@
 
 
         <div class="mt-auto button-container">
-            <button type="reset" class="btn btn-reset">Clear</button>
+            <button id="ClearBtn" type="button" class="btn btn-reset">Clear</button>
             <button type="submit" class="btn btn-submit">Submit</button>
         </div>
     </form>
 </div>
+
+<script>
+    // static/js/clear_business_form.js
+(function () {
+  const clearBtn = document.getElementById('ClearBtn');
+  const form =
+    document.getElementById('businessForm') ||
+    document.querySelector('form'); // fallback
+
+  if (!clearBtn || !form) return;
+
+  function clearFormFields(formEl) {
+    const elements = formEl.querySelectorAll('input, select, textarea');
+
+    elements.forEach((el) => {
+      const tag = el.tagName.toLowerCase();
+      const type = (el.type || '').toLowerCase();
+
+      // Skip CSRF token
+      if (el.name === 'csrfmiddlewaretoken') return;
+
+      if (tag === 'select') {
+        el.selectedIndex = 0;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+
+      if (type === 'checkbox' || type === 'radio') {
+        el.checked = false;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+
+      if (type === 'file') {
+        el.value = ''; // clear chosen files
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+
+      // text, email, number, date, time, hidden, textarea, etc.
+      el.value = '';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    // Remove Bootstrap validation states
+    formEl.classList.remove('was-validated');
+    formEl.querySelectorAll('.is-invalid, .is-valid').forEach((x) => {
+      x.classList.remove('is-invalid', 'is-valid');
+    });
+  }
+
+  function clearProofUI() {
+    // Optional: proof preview UI if present
+    const proofMeta = document.getElementById('proofMeta');
+    const openBtn = document.getElementById('openProofModalBtn');
+    const grid = document.getElementById('proofModalGrid');
+    const modalMeta = document.getElementById('proofModalMeta');
+
+    if (proofMeta) proofMeta.textContent = '';
+    if (openBtn) openBtn.classList.add('d-none');
+    if (grid) grid.innerHTML = '';
+    if (modalMeta) modalMeta.textContent = '';
+  }
+
+  function clearMapRelated() {
+    // If your map script reads these hidden fields:
+    const lat = form.querySelector('input[name="latitude"]');
+    const lng = form.querySelector('input[name="longitude"]');
+    if (lat) lat.value = '';
+    if (lng) lng.value = '';
+
+    // If map code supports a public reset, call it; otherwise dispatch an event
+    if (typeof window.resetBusinessMap === 'function') {
+      try { window.resetBusinessMap(); } catch {}
+    } else {
+      window.dispatchEvent(new CustomEvent('business:clear'));
+    }
+  }
+
+  clearBtn.addEventListener('click', () => {
+    clearFormFields(form);
+    clearProofUI();
+    clearMapRelated();
+
+    // Focus first input for convenience
+    const first = form.querySelector('input:not([type="hidden"]), select, textarea');
+    first?.focus();
+  });
+})();
+
+</script>
 
 {% endblock %}

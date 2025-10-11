@@ -8,6 +8,7 @@ from __future__ import annotations
 # SECTION: Imports
 # ────────────────────────────────────────────────────────────
 import datetime as dt
+import copy
 from uuid import uuid4
 from typing import Any, Dict, List, Optional, Tuple, Iterable
 import io, os, zipfile, json, re
@@ -92,6 +93,7 @@ from src.app.contracts.business_service_contract import (
     IResidentOwnerService,
     IBusinessRegistrationService,
     IBusinessInfoService,
+    INonResidentOwnerService,
 )
 from src.app.transfer_objects.commands.business_cmd import (
     RegisterBusinessProfileCmd
@@ -2242,58 +2244,128 @@ def _save_temp_upload(upload, subdir: str) -> dict:
 @role_required(CLERK_ROLE)
 @csrf_protect
 @nocache
-def business_owner_nonresident(request: HttpRequest) -> HttpResponse:
+@inject
+def business_owner_nonresident(
+    request: HttpRequest,
+    resident_owner_service: IResidentOwnerService = Provide[AppContainer.resident_owner_service],
+) -> HttpResponse:
     user_role = _auth_role_name(request)
 
-    if request.method == "POST":
-        form = BusinessOwnerInfo(request.POST, request.FILES or None)
-        if form.is_valid():
+    # Forms
+    search_form = SearchBusinessOwner(request.GET or None)
+    select_form = SelectOwnerForm(request.POST or None)  # for "Select as Owner" button
+    create_form: BusinessOwnerInfo | None = None         # for Fill-up tab
 
-            dob_val = form.cleaned_data["dob"]
-            dob_str = dob_val.isoformat() if isinstance(dob_val, date) else str(dob_val)
+    # Single source of truth for the current search term
+    search = (request.GET.get("search") or request.POST.get("search") or "").strip()
 
+    # --- SEARCH (non-residents only) ---
+    results_payload: list[dict] = []
+    if search:
+        try:
+            # Prefer kwarg if the service supports it, else fall back to a dedicated method
+            try:
+                rows = resident_owner_service.execute(search=search, only_nonresident=True)
+            except TypeError:
+                rows = getattr(resident_owner_service, "execute_nonresident")(search=search)
 
-            owner_payload: Dict[str, Any] = {
-                "owner_person_id": form.cleaned_data.get("owner_person_id") or None,
-                "last_name": form.cleaned_data["last_name"].strip(),
-                "first_name": form.cleaned_data["first_name"].strip(),
-                "middle_name": (form.cleaned_data.get("middle_name") or "").strip() or None,
-                "suffix": (form.cleaned_data.get("suffix") or "").strip() or None,
-                # ensure your form field is named 'dob' and is a DateField or "YYYY-MM-DD" string
-                "dob": dob_str,
-                "email": (form.cleaned_data.get("email") or "").strip() or None,
-                "mobile": (form.cleaned_data.get("mob_num") or "").strip() or None,
-                "sex_id": int(form.cleaned_data["sex"]),
-                "civil_status_id": int(form.cleaned_data["civil_status"]),
-                "nationality_id": int(form.cleaned_data["nationality"]),
-                "religion_id": int(form.cleaned_data["religion"]),
-                "street": form.cleaned_data["street"].strip(),
-                "purok_sitio": (form.cleaned_data.get("purok_sitio") or "").strip(),
-                "barangay": form.cleaned_data["barangay"].strip(),
-                "city": form.cleaned_data["city"].strip(),
-            }
+            # Normalize to the payload the template/JS expects
+            results_payload = _normalize_owner_rows(rows)
 
-            # Store and expire in 30 minutes
+            # DEBUG: log if no results so you can see what was searched
+            if not results_payload:
+                # use both print (visible in runserver) and logger (if configured)
+                msg = f"[nonresident search] No results. term={search!r}, only_nonresident=True"
+                print(msg, flush=True)
+                log.info(msg)
+
+        except Exception as e:
+            # Keep the page responsive even if the repository errors out
+            log.exception("Non-resident search failed for %r: %s", search, e)
+            print(f"[nonresident search] ERROR for {search!r}: {e}", flush=True)
+            results_payload = []
+
+    selected = None
+
+    if request.method == "POST" and "owner_person_id" in request.POST:
+        # --- PATH A: selecting an existing person from search results ---
+        if select_form.is_valid():
+            try:
+                owner_id = int(select_form.cleaned_data["owner_person_id"])
+                selected = resident_owner_service.get_owner_details(owner_id)
+            except Exception:
+                log.exception(
+                    "Fetching non-resident owner details failed for id=%s",
+                    request.POST.get("owner_person_id"),
+                )
+                selected = None
+
+        if selected:
+            owner_payload = _owner_payload_common_from_dict(selected)
+            # ensure display badge stays consistent
+            owner_payload["residency_name"] = _normalize_residency_name(
+                owner_payload.get("residency_name") or "NON-RESIDENT"
+            )
+            # Store ONLY JSON-safe types in session
             request.session["bizreg_owner"] = owner_payload
             request.session.set_expiry(1800)
-            owner_payload["residency_name"] = "NON-RESIDENT"
-            # Optional success flash
-            messages.success(request, "Owner info saved. Continue with business details.")
+            messages.success(request, "Owner selected. Continue with business details.")
+        # If invalid, fall through and re-render with errors on search tab.
 
-            # Redirect to the next step (ensure this URL name exists)
+    elif request.method == "POST":
+        # --- PATH B: fill-up / create flow ---
+        create_form = BusinessOwnerInfo(request.POST, request.FILES or None)
+        if create_form.is_valid():
+            cd = create_form.cleaned_data
+            dob_val = cd["dob"]
+            dob_str = dob_val.isoformat() if isinstance(dob_val, date) else str(dob_val)
+
+            owner_payload: Dict[str, Any] = {
+                "owner_person_id": cd.get("owner_person_id") or None,  # usually None for brand-new
+                "last_name": cd["last_name"].strip(),
+                "first_name": cd["first_name"].strip(),
+                "middle_name": (cd.get("middle_name") or "").strip() or None,
+                "suffix": (cd.get("suffix") or "").strip() or None,
+                "dob": dob_str,  # JSON-safe string
+                "email": (cd.get("email") or "").strip() or None,
+                "mobile": (cd.get("mob_num") or "").strip() or None,
+                "sex_id": int(cd["sex"]),
+                "civil_status_id": int(cd["civil_status"]),
+                "nationality_id": int(cd["nationality"]),
+                "religion_id": int(cd["religion"]),
+                "street": cd["street"].strip(),
+                "purok_sitio": (cd.get("purok_sitio") or "").strip(),
+                "barangay": cd["barangay"].strip(),
+                "city": cd["city"].strip(),
+                "residency_name": "NON-RESIDENT",
+            }
+
+            request.session["bizreg_owner"] = owner_payload
+            request.session.set_expiry(1800)
+            messages.success(request, "Owner info saved. Continue with business details.")
             return redirect("clerk:business_details")
         else:
+            # form errors: stay on create tab and show errors
             messages.error(request, "Please correct the errors below.")
-    else:
-        # GET — prefill from session if present; convert dob string back to a date for the DateField
-        saved = request.session.get("bizreg_owner") or {}
+
+    # Default create_form on GET (or when selection path used)
+    if create_form is None:
+        # IMPORTANT: copy before converting strings to date objects for form initial
+        saved_raw = request.session.get("bizreg_owner") or {}
+        saved = copy.deepcopy(saved_raw)  # <- do NOT mutate the session dict
+
+        # Convert ISO string -> date only for the initial dict (keeps session JSON-safe)
         if "dob" in saved and isinstance(saved["dob"], str):
             try:
                 saved["dob"] = date.fromisoformat(saved["dob"])
             except ValueError:
-                # leave as-is if parsing fails; the form will show the raw string
                 pass
-        form = BusinessOwnerInfo(initial=saved or None)
+
+        create_form = BusinessOwnerInfo(initial=saved or None)
+
+    # Keep search form pristine if invalid in GET
+    if search and not search_form.is_valid():
+        search_form = SearchBusinessOwner()
 
     return render(
         request,
@@ -2301,9 +2373,36 @@ def business_owner_nonresident(request: HttpRequest) -> HttpResponse:
         {
             "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
             "page_title": "Business Owner Information",
-            "form": form,
+            # Search tab context
+            "search_form": search_form,
+            "search": search,
+            "results": results_payload,
+            "selected": selected,
+            # Create tab context
+            "form": create_form,
         },
     )
+
+@require_GET
+@inject
+def ajax_nonresident_owner_search(
+    request: HttpRequest,
+    resident_owner_service: IResidentOwnerService = Provide[AppContainer.resident_owner_service],
+):
+    q = (request.GET.get("search") or "").strip()
+    if not q:
+        return JsonResponse({"results": []})
+
+    try:
+        rows = resident_owner_service.execute(search=q, only_nonresident=True)
+    except TypeError:
+        # Service doesn’t accept the kwarg; try a dedicated nonresident method if present
+        fn = getattr(resident_owner_service, "execute_nonresident", None)
+        rows = fn(search=q) if callable(fn) else []
+    except Exception:
+        rows = []
+
+    return JsonResponse({"results": _normalize_owner_rows(rows)})
 
 @session_login_required
 @role_required(CLERK_ROLE)

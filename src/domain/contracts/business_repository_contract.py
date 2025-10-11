@@ -42,6 +42,8 @@ class IResidentOwnerRepository(ABC):
     def search_owner(
        self,
        search: str,
+       * ,
+       only_nonresident: bool = False
     ) -> list[ResidentOwnerDTO]:
         pass
     

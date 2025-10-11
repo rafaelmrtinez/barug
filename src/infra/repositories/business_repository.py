@@ -348,10 +348,15 @@ class ResidentOwnerRepository(IResidentOwnerRepository):
     def __init__(self, ctx: IConnectionAdapter):
         self._ctx = ctx
 
-    def search_owner(self, search: str) -> list[ResidentOwnerDTO]:
+    def search_owner(self, search: str, *, only_nonresident: bool = False) -> list[ResidentOwnerDTO]:
         try: 
-            sql = "SELECT * FROM search_person_by_code_or_name(%s)"
-            rows = self._ctx.execute_query_to_dict(sql, [search])
+            if only_nonresident:
+                sql = "SELECT * FROM search_person_by_code_or_name(%s)"
+                rows = self._ctx.execute_query_to_dict(sql, [search])
+
+            else:
+                sql = "SELECT * FROM search_person_by_code_or_name(%s)"
+                rows = self._ctx.execute_query_to_dict(sql, [search])
 
             def _addr(r: dict) -> str | None:
                 parts = [r.get("street"), r.get("purok"), r.get("barangay"), r.get("city")]

@@ -14,7 +14,12 @@
     border: 1px solid var(--bs-border-color);
     border-radius: .75rem;
   }
-  .results-viewport .result-item + .result-item{ margin-top: .5rem; }
+
+  /* add space below every result item */
+  .results-viewport .result-item { margin-bottom: .75rem; }
+
+  /* optional: keep a little breathing room at the very bottom */
+  .results-viewport { padding-bottom: .5rem; }
 </style>
 {% endblock %}
 
