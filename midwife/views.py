@@ -739,15 +739,15 @@ def child_visit_http(request: HttpRequest, service: IMaternalService = Provide[A
         p_child_id=data.get("p_child_id", None),
         p_child_record_id=None,
         p_assessed_by_id=request.session.get("auth", None).get("staff_id", None),
-        p_visit_date=data.get("p_visit_date", None),
+        p_visit_date=data.get("p_visit_date", None) or None,
         p_feeding_type_id=data.get("p_feeding_type_id", None),
-        p_referred_nbs_date=data.get("p_referred_nbs_date", None),
+        p_referred_nbs_date=data.get("p_referred_nbs_date", None) or None,
         p_child_immunizations=None,
-        p_bf_checks=breast_feeding_checks,
-        p_monitoring_logs=monitoring,
-        p_screening=child_screening,
-        p_iron_supplements=iron_supplements,
-        p_vitamin_a=vitamins,
+        p_bf_checks=breast_feeding_checks or None,
+        p_monitoring_logs=monitoring or None,
+        p_screening=child_screening or None,
+        p_iron_supplements=iron_supplements or None,
+        p_vitamin_a=vitamins or None,
     )
     
     try:

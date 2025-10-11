@@ -10,16 +10,19 @@
         try {
             const response = await fetch(`/midwife/maternal-child/${childId}`);
 
-            const data = await response.json();
 
             if (!response.ok) {
-                console.error('Error fetching data:', data.error);
+                console.error('No record entry found for the selected child.');
                 return;
             }
+
+            const data = await response.json();
 
             const feeding_type = validateFeedingType(data);
 
             document.getElementById("feeding_type").value = feeding_type;
+
+
             document.getElementById("nbs_referral_date").value = data.message.referred_newborn_screening_date || null;
 
             renderBreastFeedingDates(data);
@@ -41,30 +44,38 @@
             if (data.message.monitoring_logs && data.message.monitoring_logs.length > 0) {
                 data.message.monitoring_logs.forEach(log => {
                     const row = document.createElement("tr");
-
                     row.innerHTML = `
-                        <td>${log.check_date || "-"}</td>
-                        <td>${log.age ?? "-"}</td>
-                        <td>${log.weight ?? "-"}</td>
-                        <td>${log.temperature ?? "-"}</td>
-                        <td>${log.height ?? "-"}</td>
-                        <td>${log.findings ?? "-"}</td>
-                        <td>${log.notes ?? "-"}</td>
-                        <td></td>
-                    `;
-
+                        <td><input type="date" class="form-control" name="v_date[]" value="${escapeHtml(log.check_date)}"></td>
+                        <td><input type="text" class="form-control" name="v_age[]" value="${escapeHtml(log.age)}" placeholder="e.g., 6 mos"></td>
+                        <td><input type="number" step="0.01" class="form-control" name="v_wt[]" value="${escapeHtml(log.weight)}" placeholder="kg"></td>
+                        <td><input type="number" step="0.1" class="form-control" name="v_temp[]" value="${escapeHtml(log.temperature)}" placeholder="°C"></td>
+                        <td><input type="number" step="0.1" class="form-control" name="v_ht[]" value="${escapeHtml(log.height)}" placeholder="cm"></td>
+                        <td><input type="text" class="form-control" name="v_findings[]" value="${escapeHtml(log.findings)}"></td>
+                        <td class="notes"><input type="text" class="form-control" name="v_notes[]" value="${escapeHtml(log.notes)}"></td>
+                        <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger v-remove">🗑</button></td>
+                        `;
                     visitTbody.appendChild(row);
                 });
 
-                immunizationRenderer(data);
-            } else {
+            }
+            else {
                 const emptyRow = document.createElement("tr");
                 emptyRow.innerHTML = `<td colspan="8" class="text-center">No monitoring logs available</td>`;
                 visitTbody.appendChild(emptyRow);
             }
+            immunizationRenderer(data);
 
         } catch {
             console.error('Error fetching data');
+        }
+
+        function escapeHtml(s) { 
+            return String(s ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;'); 
         }
 
         function immunizationRenderer(data) {

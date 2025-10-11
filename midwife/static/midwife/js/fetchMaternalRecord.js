@@ -11,11 +11,13 @@
         const fetchData = async () => {
             try {
                 const response = await fetch(`/midwife/maternal-record/${record_id}/`);
-                const res = await response.json();
+                
                 if (!response.ok) {
                     console.error("Failed to fetch maternal record.");
                     return;
                 }
+
+                const res = await response.json();
 
                 const obj = JSON.parse(res.message);
 
@@ -75,8 +77,8 @@
                 document.getElementById("lv_weight").textContent = obj.previous_maternal_records && obj.previous_maternal_records.weight ? `${obj.previous_maternal_records.weight} KG` : "N/A";
                 document.getElementById("last-updated").textContent = `Last updated: ${obj.current_materrnal_record.visit_date ? obj.current_materrnal_record.visit_date : "N/A"}`;
 
-            } catch {
-                console.error("Error fetching maternal record");
+            } catch(error) {
+                console.error("Error fetching maternal record", error);
             }
         }
         fetchData();

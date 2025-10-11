@@ -4,7 +4,7 @@
     const fetchData = async () => {
         try {
             const child_id = childIdField.value;
-            
+
             if (!child_id) {
                 return;
             }
@@ -12,14 +12,19 @@
             const url = `/midwife/child-basic-info/${child_id}/`;
             const response = await fetch(url);
 
-            if (!response.ok) {
+            let res;
+            try {
                 res = await response.json();
-                alert(res.error || "Failed to fetch child information");
+            } catch {
+                res = null;
+            }
+
+            if (!response.ok) {
+                alert(res?.error || "No record of child information found.");
                 return;
             }
-            
-            const data = await response.json();
-            const message = data.message;
+
+            const message = res.message;
 
             document.querySelector('input[name="family_no"]').value = message.fam_number || "";
 

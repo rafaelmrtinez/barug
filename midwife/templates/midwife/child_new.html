@@ -699,13 +699,6 @@
   document.getElementById('childForm')?.addEventListener('submit', (e) => {
     snapshotImmunizations();
     snapshotVisits();
-    // Minimal guard: require a child selection
-    const childId = document.getElementById('child_id')?.value;
-    if (!childId){
-      e.preventDefault();
-      alert('Please select the child resident first.');
-      document.getElementById('childSearch')?.focus();
-    }
   });
 })();
 </script>
