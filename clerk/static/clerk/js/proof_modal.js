@@ -1,146 +1,195 @@
 // static/clerk/js/proof_modal.js
-// Requires Bootstrap JS on the page (bootstrap.Modal). Safe with multiple forms per page if IDs are unique.
+// Requires Bootstrap JS (v5). Works with your modal markup that contains:
+// #proofCarousel, #proofCarouselInner, #proofCarouselIndicators, #proofEmptyState, #proofModalMeta
+// Also supports optional #proofLightbox + #lightboxImg for full-screen viewing.
 
 (function () {
   function fmtBytes(bytes) {
     if (!bytes) return '0 B';
-    const k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    const k = 1024, sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.min(sizes.length - 1, Math.floor(Math.log(bytes) / Math.log(k)));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   }
 
   function initProofModalPreview(opts = {}) {
+    // Elements
     const input =
       opts.inputEl ||
-      document.querySelector('input[name="proof"]'); // fallback by name
+      document.querySelector('input[name="proof"]'); // Django form field: name="proof"
 
-    const btnOpen   = opts.btnOpenEl   || document.getElementById('openProofModalBtn');
-    const metaInline= opts.metaInlineEl|| document.getElementById('proofMeta');
+    const btnOpen    = opts.btnOpenEl     || document.getElementById('openProofModalBtn');
+    const metaInline = opts.metaInlineEl  || document.getElementById('proofMeta');
+    const metaModal  = opts.metaModalEl   || document.getElementById('proofModalMeta');
 
-    const grid      = opts.gridEl      || document.getElementById('proofModalGrid');
-    const metaModal = opts.metaModalEl || document.getElementById('proofModalMeta');
+    const carousel        = opts.carouselEl       || document.getElementById('proofCarousel');
+    const inner           = opts.innerEl          || document.getElementById('proofCarouselInner');
+    const indicators      = opts.indicatorsEl     || document.getElementById('proofCarouselIndicators');
+    const emptyState      = opts.emptyStateEl     || document.getElementById('proofEmptyState');
 
-    const lightbox  = opts.lightboxEl  || document.getElementById('proofLightbox');
-    const lightboxImg = opts.lightboxImgEl || document.getElementById('lightboxImg');
+    const proofModal      = opts.proofModalEl     || document.getElementById('proofModal');
+    const lightbox        = opts.lightboxEl       || document.getElementById('proofLightbox');
+    const lightboxImg     = opts.lightboxImgEl    || document.getElementById('lightboxImg');
 
-    const proofModal = opts.proofModalEl || document.getElementById('proofModal');
+    if (!input || !btnOpen || !carousel || !inner || !indicators || !proofModal) return;
 
-    if (!input || !btnOpen || !grid || !proofModal) return;
-
-    // Ensure input accepts multiple images
+    // Ensure input accepts images & multiple
     input.setAttribute('accept', 'image/*');
     input.setAttribute('multiple', 'multiple');
 
-    function updateButtonState(files) {
-      const has = files && files.length > 0;
+    // Keep track of object URLs to revoke later
+    let createdURLs = [];
+    let imgCount = 0;
 
-      // show/hide the button (button is hidden by default via d-none in template)
-      btnOpen.classList.toggle('d-none', !has);
+    function clearCarousel() {
+      // Revoke blob URLs
+      createdURLs.forEach(url => { try { URL.revokeObjectURL(url); } catch(_){}; });
+      createdURLs = [];
 
-      // update inline and modal meta text
-      let total = 0, count = 0;
-      Array.from(files || []).forEach(f => { total += f.size; count++; });
-      const summary = has ? `${count} image${count > 1 ? 's' : ''} • ${fmtBytes(total)} total` : '';
-      if (metaInline) metaInline.textContent = summary;
-      if (metaModal)  metaModal.textContent  = summary;
+      // Clear DOM
+      inner.innerHTML = '';
+      indicators.innerHTML = '';
+      imgCount = 0;
+
+      // States
+      if (emptyState) emptyState.classList.add('d-none');
+      if (metaModal) metaModal.textContent = '';
     }
 
-    function renderModalGrid(files) {
-      grid.innerHTML = '';
-      Array.from(files || []).forEach((file, idx) => {
-        if (!file.type || !file.type.startsWith('image/')) return;
+    function updateSummaryInline(files, imageOnlyCount) {
+      let totalBytes = 0, totalCount = 0;
+      Array.from(files || []).forEach(f => { totalBytes += f.size; totalCount++; });
 
+      const ignored = totalCount - imageOnlyCount;
+      const summary = imageOnlyCount
+        ? `${imageOnlyCount} image${imageOnlyCount > 1 ? 's' : ''} • ${fmtBytes(totalBytes)} total${ignored > 0 ? ` (${ignored} non-image ignored)` : ''}`
+        : (totalCount ? `0 images • ${fmtBytes(totalBytes)} total (${ignored} non-image ignored)` : '');
+
+      if (metaInline) metaInline.textContent = summary;
+      if (metaModal)  metaModal.textContent  = imageOnlyCount ? `Image 1 of ${imageOnlyCount}` : summary;
+    }
+
+    function buildCarouselFromFiles(fileList) {
+      clearCarousel();
+
+      if (!fileList || fileList.length === 0) {
+        if (btnOpen) btnOpen.classList.add('d-none');
+        if (emptyState) emptyState.classList.remove('d-none');
+        updateSummaryInline([], 0);
+        return;
+      }
+
+      const images = Array.from(fileList).filter(f => f.type && f.type.startsWith('image/'));
+      imgCount = images.length;
+
+      if (imgCount === 0) {
+        if (btnOpen) btnOpen.classList.add('d-none');
+        if (emptyState) emptyState.classList.remove('d-none');
+        updateSummaryInline(fileList, 0);
+        return;
+      }
+
+      // Show the preview button
+      if (btnOpen) btnOpen.classList.remove('d-none');
+
+      // Build indicators + items
+      images.forEach((file, idx) => {
         const url = URL.createObjectURL(file);
+        createdURLs.push(url);
 
-        const col = document.createElement('div');
-        col.className = 'col-12 col-sm-6 col-md-4';
+        // Indicator
+        const ind = document.createElement('button');
+        ind.type = 'button';
+        ind.setAttribute('data-bs-target', '#proofCarousel');
+        ind.setAttribute('data-bs-slide-to', String(idx));
+        ind.setAttribute('aria-label', `Slide ${idx + 1}`);
+        if (idx === 0) ind.classList.add('active');
+        indicators.appendChild(ind);
 
-        const card = document.createElement('div');
-        card.className = 'card h-100 shadow-sm';
+        // Item
+        const item = document.createElement('div');
+        item.className = `carousel-item${idx === 0 ? ' active' : ''}`;
 
         const img = document.createElement('img');
-        img.className = 'card-img-top img-fluid';
-        img.alt = file.name;
-        img.loading = 'lazy';
         img.src = url;
-        img.style.objectFit = 'cover';
-        img.style.height = '200px';
-        img.style.cursor = 'zoom-in';
+        img.alt = file.name;
+        img.className = 'd-block w-100';
+        img.style.maxHeight = '300px';
+        img.style.objectFit = 'contain';
+        img.loading = 'lazy';
 
-        // Full-size lightbox
+        // Click to open lightbox
         if (lightbox && lightboxImg && window.bootstrap?.Modal) {
+          img.style.cursor = 'zoom-in';
           img.addEventListener('click', () => {
             lightboxImg.src = url;
-            const m = new bootstrap.Modal(lightbox);
+            const m = bootstrap.Modal.getOrCreateInstance(lightbox);
             m.show();
           });
         }
 
-        const body = document.createElement('div');
-        body.className = 'card-body p-2';
-
-        const name = document.createElement('div');
-        name.className = 'small text-truncate';
-        name.title = file.name;
-        name.textContent = file.name;
-
-        const size = document.createElement('div');
-        size.className = 'text-muted small';
-        size.textContent = fmtBytes(file.size);
-
-        const actions = document.createElement('div');
-        actions.className = 'mt-2 d-flex justify-content-end gap-2';
-
-        // Remove button (rebuild FileList)
-        const btnRemove = document.createElement('button');
-        btnRemove.type = 'button';
-        btnRemove.className = 'btn btn-sm btn-outline-danger';
-        btnRemove.textContent = 'Remove';
-        btnRemove.addEventListener('click', function () {
-          const dt = new DataTransfer();
-          Array.from(input.files).forEach((f, j) => { if (j !== idx) dt.items.add(f); });
-          input.files = dt.files;
-          updateButtonState(input.files);
-          renderModalGrid(input.files);
+        // Revoke URL after image has loaded into DOM (optional; we'll also revoke on clear)
+        img.addEventListener('load', () => {
+          // keep URL alive for lightbox/carousel session; we'll revoke on clear
         });
 
-        actions.appendChild(btnRemove);
-        body.appendChild(name);
-        body.appendChild(size);
-
-        card.appendChild(img);
-        card.appendChild(body);
-        card.appendChild(actions);
-        col.appendChild(card);
-        grid.appendChild(col);
-
-        img.addEventListener('load', () => URL.revokeObjectURL(url));
+        item.appendChild(img);
+        inner.appendChild(item);
       });
+
+      // Bootstrap carousel instance (no auto-slide)
+      const bsCarousel = bootstrap.Carousel.getOrCreateInstance(carousel, { interval: false, ride: false });
+
+      // Update modal footer meta on slide
+      carousel.addEventListener('slid.bs.carousel', () => {
+        const activeIdx = Array.from(inner.children).findIndex(el => el.classList.contains('active'));
+        if (metaModal && imgCount > 0) {
+          metaModal.textContent = `Image ${activeIdx + 1} of ${imgCount}`;
+        }
+      }, { once: false });
+
+      // Initial inline+modal summary
+      updateSummaryInline(fileList, imgCount);
     }
 
     // Events
     input.addEventListener('change', () => {
-      updateButtonState(input.files);
-      if (document.body.classList.contains('modal-open')) {
-        renderModalGrid(input.files);
-      }
+      buildCarouselFromFiles(input.files);
     });
 
+    // Build when the modal is opened (useful for bfcache or pre-selected files)
     proofModal.addEventListener('show.bs.modal', () => {
-      renderModalGrid(input.files || []);
+      buildCarouselFromFiles(input.files || []);
     });
 
-    // Initial (in case of bfcache restore)
-    if (input.files && input.files.length) updateButtonState(input.files);
-    else updateButtonState([]);
+    // Optional: clear lightbox src when hidden
+    if (lightbox) {
+      lightbox.addEventListener('hidden.bs.modal', () => {
+        if (lightboxImg) lightboxImg.src = '';
+      });
+    }
+
+    // Initial state (e.g., bfcache)
+    if (input.files && input.files.length) {
+      buildCarouselFromFiles(input.files);
+    } else {
+      buildCarouselFromFiles([]);
+    }
+
+    // Expose a tiny API if you ever need it elsewhere
+    return {
+      rebuild: () => buildCarouselFromFiles(input.files || []),
+      clear: () => {
+        input.value = '';
+        buildCarouselFromFiles([]);
+      }
+    };
   }
 
   // Auto-init on DOM ready
   document.addEventListener('DOMContentLoaded', () => {
-    // Default init with standard IDs / name="proof"
-    initProofModalPreview();
+    window.__proofPreview = initProofModalPreview();
   });
 
-  // Expose for custom init if needed elsewhere
+  // Public export
   window.initProofModalPreview = initProofModalPreview;
 })();

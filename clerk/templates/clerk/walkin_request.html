@@ -109,7 +109,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="container py-3" margin>
+<div class="container py-3" margin style="margin-top: 40px;">
 
   <form id="walkinForm" method="post" action="{% url 'clerk:walkin_create' %}" autocomplete="off">
     {% csrf_token %}

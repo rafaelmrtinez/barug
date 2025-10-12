@@ -3,397 +3,494 @@
 {% load bootstrap_icons %}
 
 {% block css %}
-    <link rel="stylesheet" href="{% static 'css/form.css' %}">
-    <link rel="stylesheet" href="{% static 'css/button.css' %}">
-    <link rel="stylesheet" href="{% static 'css/modal.css' %}">
-    <link rel="stylesheet" href="{% static 'css/map_registration.css' %}">
-    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"/>
+  <link rel="stylesheet" href="{% static 'css/form.css' %}">
+  <link rel="stylesheet" href="{% static 'css/button.css' %}">
+  <link rel="stylesheet" href="{% static 'css/modal.css' %}">
+  <link rel="stylesheet" href="{% static 'css/map_registration.css' %}">
+  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"/>
 
-    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
-    <script src="{% static 'clerk/js/map_registration.js' %}"></script>
-    <script src="{% static 'clerk/js/proof_modal.js' %}"></script>
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+  <script src="{% static 'clerk/js/map_registration.js' %}"></script>
+  <script src="{% static 'clerk/js/proof_modal.js' %}"></script>
+
+  <style>
+    :root{
+    --brand-900:#3a1217;
+    --brand-800:#561c24;
+    --brand-700:#6d2932;    /* primary */
+    --brand-600:#7a323b;
+    --brand-100:#f3eaeb;    /* soft bg */
+    --brand-050:#fbf6f6;    /* very soft bg */
+  }
+
+    .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); background:#fff; }
+    .btn-outline-brand:hover{ background:var(--brand-700); color:#fff; }
+
+    #proofCarousel .carousel-control-prev-icon,
+    #proofCarousel .carousel-control-next-icon{
+    filter: none !important;          /* neutralize Bootstrap default */
+    background-size: 100% 100%;
+    background-color: transparent;
+    }
+
+    /* Black LEFT arrow */
+    #proofCarousel .carousel-control-prev-icon{
+    background-image: url("data:image/svg+xml;charset=utf-8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23000'><path d='M11.354 1.646a.5.5 0 0 1 0 .708L6.707 7l4.647 4.646a.5.5 0 0 1-.708.708l-5-5a.5.5 0 0 1 0-.708l5-5a.5.5 0 0 1 .708 0z'/></svg>") !important;
+    }
+
+    /* Black RIGHT arrow */
+    #proofCarousel .carousel-control-next-icon{
+    background-image: url("data:image/svg+xml;charset=utf-8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23000'><path d='M4.646 1.646a.5.5 0 0 1 .708 0l5 5a.5.5 0 0 1 0 .708l-5 5a.5.5 0 1 1-.708-.708L9.293 7 4.646 2.354a.5.5 0 0 1 0-.708z'/></svg>") !important;
+    }
+
+    /* Larger tap area (optional) */
+    #proofCarousel .carousel-control-prev,
+    #proofCarousel .carousel-control-next{
+    opacity: .9;
+    width: 4rem;
+    }
+    #proofCarousel .carousel-control-prev:hover,
+    #proofCarousel .carousel-control-next:hover{
+    opacity: 1;
+    }
+  </style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid pt-3 d-flex flex-column flex-grow-1" style="margin-top: 40px;">
-    <form id="businessForm" method="post" enctype="multipart/form-data" class="d-flex flex-column flex-grow-1">
+<div class="min-vh-100 w-100 bg-white text-dark" style="margin-top:40px;">
+
+  <div class="container px-3 py-4">
+    <!-- Rounded box containing the whole form -->
+    <section class="rounded-3 border bg-white p-4 shadow-sm">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <h2 class="fs-5 fw-semibold mb-0">Business Information</h2>
+      </div>
+      <p class="small text-muted mb-4">
+        Enter the business information below to register the business.
+      </p>
+
+      <form id="businessForm" method="post" enctype="multipart/form-data" class="d-flex flex-column flex-grow-1">
         {% csrf_token %}
 
         {% if form.errors %}
-        <div class="alert alert-danger">
+          <div class="alert alert-danger">
             <ul class="mb-0">
-            {% for field in form %}
+              {% for field in form %}
                 {% for err in field.errors %}
-                <li><strong>{{ field.label }}:</strong> {{ err }}</li>
+                  <li><strong>{{ field.label }}:</strong> {{ err }}</li>
                 {% endfor %}
-            {% endfor %}
-            {% for err in form.non_field_errors %}
+              {% endfor %}
+              {% for err in form.non_field_errors %}
                 <li>{{ err }}</li>
-            {% endfor %}
+              {% endfor %}
             </ul>
-        </div>
+          </div>
         {% endif %}
 
-
-        <h5>Business Information</h5>
-        <div class="row">
-            <div class="col-lg-4 col-md-6 col-sm-12">
+        <!-- ========== 1) Business Identity ========== -->
+        <div class="card shadow-sm mb-4">
+          <div class="card-header bg-white">
+            <h5 class="mb-0 d-flex align-items-center gap-2">
+              <i class="bi bi-building"></i>
+              <span>1) Business Identity</span>
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-lg-4 col-md-6 col-sm-12">
                 <div class="form-floating mb-3">
-                {{ form.b_name }}
-                <label for="{{ form.b_name.id_for_label }}">{{ form.b_name.label }}</label>
+                  {{ form.b_name }}
+                  <label for="{{ form.b_name.id_for_label }}">Business Name</label>
                 </div>
+              </div>
+              <div class="col-lg-4 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                  {{ form.ownership_type }}
+                  <label for="{{ form.ownership_type.id_for_label }}">Ownership Type</label>
+                </div>
+              </div>
+              <div class="col-lg-4 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                  {{ form.b_category }}
+                  <label for="{{ form.b_category.id_for_label }}">Business Category</label>
+                </div>
+              </div>
             </div>
 
-            <div class="col-lg-4 col-md-6 col-sm-12">
+            <div class="row">
+              <div class="col-lg-4 col-md-6 col-sm-12">
                 <div class="form-floating mb-3">
-                {{ form.b_nature }}
-                <label for="{{ form.b_nature.id_for_label }}">{{ form.b_nature.label }}</label>
+                  {{ form.b_nature }}
+                  <label for="{{ form.b_nature.id_for_label }}">Nature of Business</label>
                 </div>
+              </div>
+              <div class="col-lg-4 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                  {{ form.date_est }}
+                  <label for="{{ form.date_est.id_for_label }}">Date Established</label>
+                </div>
+              </div>
             </div>
+          </div>
         </div>
 
-        <div class="row">
-            <div class="col-lg-4 col-md-6 col-sm-12">
+        <!-- ========== 2) Registration & Financials ========== -->
+        <div class="card shadow-sm mb-4">
+          <div class="card-header bg-white">
+            <h5 class="mb-0 d-flex align-items-center gap-2">
+              <i class="bi bi-cash-coin"></i>
+              <span>2) Registration & Financials</span>
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-lg-4 col-md-6 col-sm-12">
                 <div class="form-floating mb-3">
-                {{ form.ownership_type }}
-                <label for="{{ form.ownership_type.id_for_label }}">{{ form.ownership_type.label }}</label>
+                  {{ form.capital_invested }}
+                  <label for="{{ form.capital_invested.id_for_label }}">Capital Invested</label>
                 </div>
+              </div>
+              <div class="col-lg-4 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                  {{ form.prevgross }}
+                  <label for="{{ form.prevgross.id_for_label }}">Total Gross Sales of Previous Year</label>
+                </div>
+              </div>
+              <div class="col-lg-4 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                  {{ form.inc_est }}
+                  <label for="{{ form.inc_est.id_for_label }}">Monthly Gross Estimate</label>
+                </div>
+              </div>
             </div>
 
-            <div class="col-lg-8 col-md-6 col-sm-12">
+            <div class="row">
+              <div class="col-lg-4 col-md-6 col-sm-12">
                 <div class="form-floating mb-3">
-                {{ form.b_address }}
-                <label for="{{ form.b_address.id_for_label }}">{{ form.b_address.label }}</label>
+                  {{ form.dti }}
+                  <label for="{{ form.dti.id_for_label }}">DTI/SEC Registration Number</label>
                 </div>
+              </div>
+              <div class="col-lg-4 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                  {{ form.emp_num }}
+                  <label for="{{ form.emp_num.id_for_label }}">Number of Employees</label>
+                </div>
+              </div>
             </div>
+          </div>
         </div>
 
-        {{ form.latitude }}
-        {{ form.longitude }}
-
-        <div class="row">
-            <div class="col-lg-6 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                {{ form.b_desc }}
-                <label for="{{ form.b_desc.id_for_label }}">{{ form.b_desc.label }}</label>
+        <!-- ========== 3) Location ========== -->
+        <div class="card shadow-sm mb-4">
+          <div class="card-header bg-white">
+            <h5 class="mb-0 d-flex align-items-center gap-2">
+              <i class="bi bi-geo-alt"></i>
+              <span>3) Location</span>
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row align-items-start">
+              <div class="col-lg-6 col-md-7 col-sm-12">
+                <div class="form-floating mb-2">
+                  {{ form.b_address }}
+                  <label for="{{ form.b_address.id_for_label }}">Business Address</label>
                 </div>
+                <button type="button" class="btn btn-outline-brand btn-sm mb-3" data-bs-toggle="modal" data-bs-target="#address_modal">
+                  <i class="bi bi-map"></i> Pick on map
+                </button>
+              </div>
+
+              <div class="col-lg-6 col-md-5 col-sm-12">
+                <div class="form-floating mb-3">
+                  {{ form.b_desc }}
+                  <label for="{{ form.b_desc.id_for_label }}">Location Description</label>
+                </div>
+              </div>
             </div>
 
-            <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                {{ form.date_est }}
-                <label for="{{ form.date_est.id_for_label }}">{{ form.date_est.label }}</label>
-                </div>
-            </div>
-
-            <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                {{ form.dti }}
-                <label for="{{ form.dti.id_for_label }}">{{ form.dti.label }}</label>
-                </div>
-            </div>
+            {{ form.latitude }}
+            {{ form.longitude }}
+          </div>
         </div>
 
-        <div class="row">
-            <div class="col-lg-4 col-md-6 col-sm-12">
+        <!-- ========== 4) Operating Schedule ========== -->
+        <div class="card shadow-sm mb-4">
+          <div class="card-header bg-white">
+            <h5 class="mb-0 d-flex align-items-center gap-2">
+              <i class="bi bi-clock-history"></i>
+              <span>4) Operating Schedule</span>
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-lg-6 col-md-6 col-sm-12">
                 <div class="form-floating mb-3">
-                {{ form.capital_invested }}
-                <label for="{{ form.capital_invested.id_for_label }}">{{ form.capital_invested.label }}</label>
+                  {{ form.opt_days_start }}
+                  <label for="{{ form.opt_days_start.id_for_label }}">Operating Days: Start</label>
                 </div>
+              </div>
+              <div class="col-lg-6 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                  {{ form.opt_days_end }}
+                  <label for="{{ form.opt_days_end.id_for_label }}">Operating Days: End</label>
+                </div>
+              </div>
             </div>
 
-            <div class="col-lg-4 col-md-6 col-sm-12">
+            <div class="row">
+              <div class="col-lg-6 col-md-6 col-sm-12">
                 <div class="form-floating mb-3">
-                {{ form.prevgross }}
-                <label for="{{ form.prevgross.id_for_label }}">{{ form.prevgross.label }}</label>
+                  {{ form.opt_start }}
+                  <label for="{{ form.opt_start.id_for_label }}">Operating Hours: Start</label>
                 </div>
-            </div>
-
-            <div class="col-lg-4 col-md-6 col-sm-12">
+              </div>
+              <div class="col-lg-6 col-md-6 col-sm-12">
                 <div class="form-floating mb-3">
-                {{ form.emp_num }}
-                <label for="{{ form.emp_num.id_for_label }}">{{ form.emp_num.label }}</label>
+                  {{ form.opt_end }}
+                  <label for="{{ form.opt_end.id_for_label }}">Operating Hours: End</label>
                 </div>
+              </div>
             </div>
+          </div>
         </div>
 
-        <div class="row">
-            <div class="col-lg-4 col-md-6 col-sm-12">
+        <!-- ========== 5) Proof / Attachments ========== -->
+        <div class="card shadow-sm mb-4">
+          <div class="card-header bg-white">
+            <h5 class="mb-0 d-flex align-items-center gap-2">
+              <i class="bi bi-paperclip"></i>
+              <span>5) Proof / Attachments</span>
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-lg-6 col-md-6 col-sm-12">
                 <div class="form-floating mb-3">
-                    {{form.opt_days_start}}
-                    <label for="{{ form.opt_days_start.id_for_label }}">{{ form.opt_days_start.label }}</label>
-                </div> 
-            </div>
-
-            <div class="col-lg-4 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                    {{form.opt_days_end}}
-                    <label for="{{ form.opt_days_end.id_for_label }}">{{ form.opt_days_end.label }}</label>
-                </div> 
-            </div>
-        </div>
-
-        <div class="row">
-            <div class="col-lg-4 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                {{ form.opt_start }}
-                <label for="{{ form.opt_start.id_for_label }}">{{ form.opt_start.label }}</label>
-                </div>
-            </div>
-
-            <div class="col-lg-4 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                {{ form.opt_end }}
-                <label for="{{ form.opt_end.id_for_label }}">{{ form.opt_end.label }}</label>
-                </div>
-            </div>
-
-            <div class="col-lg-4 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                {{ form.inc_est }}
-                <label for="{{ form.inc_est.id_for_label }}">{{ form.inc_est.label }}</label>
-                </div>
-            </div>
-        </div>
-
-        <div class="row">
-            <!-- <div class="col-lg-4 col-md-6 col-sm-12">
-                <div class="mb-3">
-                <p class="form-label d-block">{{ form.prev_clearance.label }}</p>
-                {% for radio in form.prev_clearance %}
-                    <div class="form-check form-check-inline">
-                    {{ radio.tag }}
-                    <label class="form-check-label" for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
-                    </div>
-                {% endfor %}
-                </div>
-            </div> -->
-
-            <div class="col-lg-8 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                    {{form.b_category}}
-                    <label for="{{ form.b_category.id_for_label }}">{{ form.b_category.label }}</label>
-                </div>
-            </div>
-
-            <div class="col-lg-8 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                    {{form.proof}}
-                    <label for="{{ form.proof.id_for_label }}">{{ form.proof.label }}</label>
+                  {{ form.proof }}
+                  <label for="{{ form.proof.id_for_label }}">Proof of Business (upload: DTI/SEC certificate, Mayor’s Permit, photos, etc.)</label>
                 </div>
 
                 <div class="d-flex gap-2 align-items-center mt-2">
-                    <button
-                        id="openProofModalBtn"
-                        type="button"
-                        class="btn btn-outline-primary btn-sm d-none"
-                        data-bs-toggle="modal"
-                        data-bs-target="#proofModal"
-                        >
-                        Preview selected images
-                    </button>
-
-                    <span id="proofMeta" class="small text-muted"></span>
+                  <button id="openProofModalBtn" type="button" class="btn btn-outline-brand btn-sm d-none" data-bs-toggle="modal" data-bs-target="#proofModal">
+                    Preview selected images
+                  </button>
+                  <span id="proofMeta" class="small text-muted"></span>
                 </div>
+              </div>
             </div>
+          </div>
         </div>
 
-        <!-- Address Modal (same UX as Personal Information) -->
-        <div class="modal fade" id="address_modal" tabindex="-1" aria-labelledby="home_address" aria-hidden="true">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="home_address">Business Address</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-
-                <div class="modal-body">
-                    <div class="row">
-                    <div class="col">
-                        <div class="map-container">
-                        <div id="map"></div>
-                        <div class="control">
-                            <select id="style-selector">
-                            <option value="mapbox/streets-v11">Streets</option>
-                            <option value="mapbox/satellite-streets-v11">Satellite Streets</option>
-                            </select>
-                        </div>
-                        </div>
-                    </div>
-
-                    <div class="col">
-                        <div class="col-lg-12 col-md-12 col-sm-12">
-                        <div class="form-floating mb-3">
-                            {{ form.street }}
-                            <label for="{{ form.street.id_for_label }}">{{ form.street.label }}</label>
-                        </div>  
-                        </div>
-
-                        <div class="col-lg-12 col-md-12 col-sm-12">
-                        <div class="form-floating mb-3">
-                            {{ form.purok_sitio }}
-                            <label for="{{ form.purok_sitio.id_for_label }}">{{ form.purok_sitio.label }}</label>
-                        </div>   
-                        </div>
-
-                        <div class="col-lg-12 col-md-12 col-sm-12">
-                        <div class="form-floating mb-3">
-                            {{ form.barangay }}
-                            <label for="{{ form.barangay.id_for_label }}">{{ form.barangay.label }}</label>
-                        </div>   
-                        </div>
-
-                        <div class="col-lg-12 col-md-12 col-sm-12">
-                        <div class="form-floating mb-3">
-                            {{ form.city }}
-                            <label for="{{ form.city.id_for_label }}">{{ form.city.label }}</label>
-                        </div>   
-                        </div>
-                    </div>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button class="btn btn-reset" type="button" onclick="clear_address_fields()">Clear</button>
-                    <button class="btn btn-submit" type="button" onclick="fill_b_address()" data-bs-dismiss="modal">Save</button>
-                </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Proof Preview Modal -->
-        <div class="modal fade" id="proofModal" tabindex="-1" aria-labelledby="proofModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
-            <div class="modal-content">
-            <div class="modal-header">
-                <h5 id="proofModalLabel" class="modal-title">Selected Proof Images</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-
-            <div class="modal-body">
-                <div id="proofModalGrid" class="row g-3"></div>
-            </div>
-
-            <div class="modal-footer">
-                <div class="me-auto">
-                <span id="proofModalMeta" class="small text-muted"></span>
-                </div>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Done</button>
-            </div>
-            </div>
-        </div>
-        </div>
-
-        <!-- Optional: Lightbox for full-size view -->
-        <div class="modal fade" id="proofLightbox" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-xl modal-dialog-centered">
-            <div class="modal-content bg-dark">
-            <div class="modal-body p-0 d-flex justify-content-center align-items-center">
-                <img id="lightboxImg" src="" alt="Preview" class="img-fluid" style="max-height: 90vh;">
-            </div>
-            </div>
-        </div>
-        </div>
-
-
+        <!-- Actions -->
         <div class="mt-auto button-container">
-            <button id="ClearBtn" type="button" class="btn btn-reset">Clear</button>
-            <button type="submit" class="btn btn-submit">Submit</button>
+          <button id="ClearBtn" type="button" class="btn btn-reset">Clear</button>
+          <button type="submit" class="btn btn-submit">Submit</button>
         </div>
-    </form>
+      </form>
+    </section>
+
+    <!-- ===== Modals (kept on the same page) ===== -->
+
+    <!-- Address Modal -->
+    <div class="modal fade" id="address_modal" tabindex="-1" aria-labelledby="home_address" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="home_address">Business Address</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+
+          <div class="modal-body">
+            <div class="row">
+              <div class="col">
+                <div class="map-container">
+                  <div id="map"></div>
+                  <div class="control">
+                    <select id="style-selector">
+                      <option value="mapbox/streets-v11">Streets</option>
+                      <option value="mapbox/satellite-streets-v11">Satellite Streets</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col">
+                <div class="col-lg-12 col-md-12 col-sm-12">
+                  <div class="form-floating mb-3">
+                    {{ form.street }}
+                    <label for="{{ form.street.id_for_label }}">{{ form.street.label }}</label>
+                  </div>
+                </div>
+                <div class="col-lg-12 col-md-12 col-sm-12">
+                  <div class="form-floating mb-3">
+                    {{ form.purok_sitio }}
+                    <label for="{{ form.purok_sitio.id_for_label }}">{{ form.purok_sitio.label }}</label>
+                  </div>
+                </div>
+                <div class="col-lg-12 col-md-12 col-sm-12">
+                  <div class="form-floating mb-3">
+                    {{ form.barangay }}
+                    <label for="{{ form.barangay.id_for_label }}">{{ form.barangay.label }}</label>
+                  </div>
+                </div>
+                <div class="col-lg-12 col-md-12 col-sm-12">
+                  <div class="form-floating mb-3">
+                    {{ form.city }}
+                    <label for="{{ form.city.id_for_label }}">{{ form.city.label }}</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button class="btn btn-reset" type="button" onclick="clear_address_fields()">Clear</button>
+            <button class="btn btn-submit" type="button" onclick="fill_b_address()" data-bs-dismiss="modal">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Proof Preview Modal (Carousel) -->
+    <div class="modal fade" id="proofModal" tabindex="-1" aria-labelledby="proofModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-md modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 id="proofModalLabel" class="modal-title">Selected Proof Images</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+
+          <div class="modal-body">
+            <div id="proofCarousel" class="carousel slide" data-bs-ride="false">
+              <div class="carousel-indicators" id="proofCarouselIndicators"></div>
+              <div class="carousel-inner" id="proofCarouselInner"></div>
+
+              <button class="carousel-control-prev" type="button" data-bs-target="#proofCarousel" data-bs-slide="prev">
+                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Previous</span>
+              </button>
+
+              <button class="carousel-control-next" type="button" data-bs-target="#proofCarousel" data-bs-slide="next">
+                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Next</span>
+              </button>
+            </div>
+
+            <div id="proofEmptyState" class="text-center text-muted py-4 d-none">
+              No image selected. Choose image files to preview here.
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <div class="me-auto">
+              <span id="proofModalMeta" class="small text-muted"></span>
+            </div>
+            <button type="button" class="btn btn-submit" data-bs-dismiss="modal">Done</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lightbox -->
+    <div class="modal fade" id="proofLightbox" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content bg-dark">
+          <div class="modal-body p-0 d-flex justify-content-center align-items-center">
+            <img id="lightboxImg" src="" alt="Preview" class="img-fluid" style="max-height: 90vh;">
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div> <!-- /container -->
 </div>
 
 <script>
-    // static/js/clear_business_form.js
-(function () {
-  const clearBtn = document.getElementById('ClearBtn');
-  const form =
-    document.getElementById('businessForm') ||
-    document.querySelector('form'); // fallback
+  // static/js/clear_business_form.js
+  (function () {
+    const clearBtn = document.getElementById('ClearBtn');
+    const form =
+      document.getElementById('businessForm') ||
+      document.querySelector('form'); // fallback
 
-  if (!clearBtn || !form) return;
+    if (!clearBtn || !form) return;
 
-  function clearFormFields(formEl) {
-    const elements = formEl.querySelectorAll('input, select, textarea');
+    function clearFormFields(formEl) {
+      const elements = formEl.querySelectorAll('input, select, textarea');
 
-    elements.forEach((el) => {
-      const tag = el.tagName.toLowerCase();
-      const type = (el.type || '').toLowerCase();
+      elements.forEach((el) => {
+        const tag = el.tagName.toLowerCase();
+        const type = (el.type || '').toLowerCase();
 
-      // Skip CSRF token
-      if (el.name === 'csrfmiddlewaretoken') return;
+        // Skip CSRF token
+        if (el.name === 'csrfmiddlewaretoken') return;
 
-      if (tag === 'select') {
-        el.selectedIndex = 0;
+        if (tag === 'select') {
+          el.selectedIndex = 0;
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          return;
+        }
+
+        if (type === 'checkbox' || type === 'radio') {
+          el.checked = false;
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          return;
+        }
+
+        if (type === 'file') {
+          el.value = '';
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          return;
+        }
+
+        // text, email, number, date, time, hidden, textarea, etc.
+        el.value = '';
+        el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
-        return;
-      }
+      });
 
-      if (type === 'checkbox' || type === 'radio') {
-        el.checked = false;
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-        return;
-      }
-
-      if (type === 'file') {
-        el.value = ''; // clear chosen files
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-        return;
-      }
-
-      // text, email, number, date, time, hidden, textarea, etc.
-      el.value = '';
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-
-    // Remove Bootstrap validation states
-    formEl.classList.remove('was-validated');
-    formEl.querySelectorAll('.is-invalid, .is-valid').forEach((x) => {
-      x.classList.remove('is-invalid', 'is-valid');
-    });
-  }
-
-  function clearProofUI() {
-    // Optional: proof preview UI if present
-    const proofMeta = document.getElementById('proofMeta');
-    const openBtn = document.getElementById('openProofModalBtn');
-    const grid = document.getElementById('proofModalGrid');
-    const modalMeta = document.getElementById('proofModalMeta');
-
-    if (proofMeta) proofMeta.textContent = '';
-    if (openBtn) openBtn.classList.add('d-none');
-    if (grid) grid.innerHTML = '';
-    if (modalMeta) modalMeta.textContent = '';
-  }
-
-  function clearMapRelated() {
-    // If your map script reads these hidden fields:
-    const lat = form.querySelector('input[name="latitude"]');
-    const lng = form.querySelector('input[name="longitude"]');
-    if (lat) lat.value = '';
-    if (lng) lng.value = '';
-
-    // If map code supports a public reset, call it; otherwise dispatch an event
-    if (typeof window.resetBusinessMap === 'function') {
-      try { window.resetBusinessMap(); } catch {}
-    } else {
-      window.dispatchEvent(new CustomEvent('business:clear'));
+      // Remove Bootstrap validation states
+      formEl.classList.remove('was-validated');
+      formEl.querySelectorAll('.is-invalid, .is-valid').forEach((x) => {
+        x.classList.remove('is-invalid', 'is-valid');
+      });
     }
-  }
 
-  clearBtn.addEventListener('click', () => {
-    clearFormFields(form);
-    clearProofUI();
-    clearMapRelated();
+    function clearProofUI() {
+      const proofMeta = document.getElementById('proofMeta');
+      const openBtn = document.getElementById('openProofModalBtn');
+      const grid = document.getElementById('proofModalGrid');
+      const modalMeta = document.getElementById('proofModalMeta');
 
-    // Focus first input for convenience
-    const first = form.querySelector('input:not([type="hidden"]), select, textarea');
-    first?.focus();
-  });
-})();
+      if (proofMeta) proofMeta.textContent = '';
+      if (openBtn) openBtn.classList.add('d-none');
+      if (grid) grid.innerHTML = '';
+      if (modalMeta) modalMeta.textContent = '';
+    }
 
+    function clearMapRelated() {
+      const lat = form.querySelector('input[name="latitude"]');
+      const lng = form.querySelector('input[name="longitude"]');
+      if (lat) lat.value = '';
+      if (lng) lng.value = '';
+
+      if (typeof window.resetBusinessMap === 'function') {
+        try { window.resetBusinessMap(); } catch {}
+      } else {
+        window.dispatchEvent(new CustomEvent('business:clear'));
+      }
+    }
+
+    clearBtn.addEventListener('click', () => {
+      clearFormFields(form);
+      clearProofUI();
+      clearMapRelated();
+
+      const first = form.querySelector('input:not([type="hidden"]), select, textarea');
+      first?.focus();
+    });
+  })();
 </script>
-
 {% endblock %}
