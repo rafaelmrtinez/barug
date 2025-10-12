@@ -1,3 +1,4 @@
+{# templates/lupon_mem/case_detail.html #}
 {% extends 'base.html' %}
 {% load static bootstrap_icons %}
 
@@ -36,7 +37,7 @@
 
   /* Status pill styles */
   .status-pill{
-    display:inline-block; font-size:.75rem; padding:.2rem .5rem; border-radius:999px; font-weight:600;
+    display:inline-block; font-size:.75rem; padding:.2rem .6rem; border-radius:999px; font-weight:700;
     border:1px solid;
   }
   .status-draft     { color:#8a6d3b; background:#fffaf0; border-color:#f0e1b9; }
@@ -44,13 +45,13 @@
   .status-cancelled { color:#721c24; background:#fff5f5; border-color:#f0c7cb; }
   .status-pending   { color:#0c5460; background:#f1fbfd; border-color:#b8e7ef; }
 
-  .kv{
-    display:flex; gap:.75rem; align-items:center; flex-wrap:wrap;
-  }
+  .settle-neutral{ color:#0c5460; background:#f1fbfd; border-color:#b8e7ef; }
+  .settle-good   { color:#155724; background:#f0fff4; border-color:#bfe3c6; }
+  .settle-bad    { color:#721c24; background:#fff5f5; border-color:#f0c7cb; }
+
+  .kv{ display:flex; gap:1rem; align-items:center; flex-wrap:wrap; }
   .kv .label{ color:#6c757d; font-size:.85rem; }
   .kv .value{ font-weight:600; }
-
-  .section-title{ font-size:1rem; font-weight:700; opacity:.9; }
 
   /* Page-loading overlay for navigation feedback */
   #pageLoading {
@@ -74,6 +75,22 @@
         <div><span class="label">Date Filed:</span> <span class="value">{{ case.3 }}</span></div>
         <div><span class="label">Type:</span> <span class="value">{{ case.5 }}</span></div>
         <div><span class="label">Nature:</span> <span class="value">{{ case.6 }}</span></div>
+        <div>
+          <span class="label">Settlement:</span>
+          {% with case.7|default:"PENDING" as sett %}
+            {% with sett|upper as S %}
+              {% if "PENDING" in S %}
+                <span class="status-pill settle-neutral">{{ sett }}</span>
+              {% elif "SETTLED" in S or "AMICABLE" in S %}
+                <span class="status-pill settle-good">{{ sett }}</span>
+              {% elif "DISMISSED" in S or "FAILED" in S %}
+                <span class="status-pill settle-bad">{{ sett }}</span>
+              {% else %}
+                <span class="status-pill settle-neutral">{{ sett }}</span>
+              {% endif %}
+            {% endwith %}
+          {% endwith %}
+        </div>
       </div>
     </div>
 
@@ -81,9 +98,15 @@
       <a class="btn btn-outline-brand d-flex align-items-center" href="{% url 'lupon_mem:case_list' %}">
         {% bs_icon 'arrow-left' extra_classes='me-2' %} Back to Cases
       </a>
-      <!-- Add id so we can hook immediate overlay + hover prefetch -->
+
+      <!-- Update Settlement button (modal trigger) -->
+      <button class="btn btn-outline-brand d-flex align-items-center" data-bs-toggle="modal" data-bs-target="#settlementModal">
+        {% bs_icon 'arrow-repeat' extra_classes='me-2' %} Update Settlement
+      </button>
+
+      <!-- Add Form -->
       <a id="addFormLink" class="btn btn-brand d-flex align-items-center"
-         href="{% url 'lupon_mem:add_form_choose_static' case_id %}"">
+         href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
         {% bs_icon 'plus' extra_classes='me-2' %} Add Form
       </a>
     </div>
@@ -92,7 +115,7 @@
   <!-- Incident description -->
   {% if case.4 %}
   <div class="page-card mb-4">
-    <div class="section-title mb-2">{% bs_icon 'info-circle' extra_classes='me-2' %} Incident Description</div>
+    <div class="fw-bold mb-2">{% bs_icon 'info-circle' extra_classes='me-2' %} Incident Description</div>
     <div class="text-muted">{{ case.4 }}</div>
   </div>
   {% endif %}
@@ -100,7 +123,7 @@
   <!-- Attached KP Forms -->
   <div class="page-card">
     <div class="d-flex justify-content-between align-items-center mb-2">
-      <div class="section-title mb-0">{% bs_icon 'files' extra_classes='me-2' %} Attached KP Forms</div>
+      <div class="fw-bold mb-0">{% bs_icon 'files' extra_classes='me-2' %} Attached KP Forms</div>
     </div>
 
     <div class="table-responsive">
@@ -144,7 +167,7 @@
             <td colspan="5" class="text-center py-5">
               <div class="text-muted">No forms yet.</div>
               <div class="mt-2">
-                <a id="addFormLinkEmpty" class="btn btn-brand btn-sm" href="{% url 'lupon_mem:add_form_choose' case_id %}">
+                <a id="addFormLinkEmpty" class="btn btn-brand btn-sm" href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
                   {% bs_icon 'plus' extra_classes='me-1' %} Attach a form
                 </a>
               </div>
@@ -161,6 +184,41 @@
 <!-- Loading overlay -->
 <div id="pageLoading">
   <div class="spinner-border text-danger" role="status" aria-label="Loading"></div>
+</div>
+
+<!-- Update Settlement Modal -->
+<div class="modal fade" id="settlementModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form method="post" action="{% url 'lupon_mem:case_settlement_update' case_id %}" class="modal-content">
+      {% csrf_token %}
+      <div class="modal-header">
+        <h5 class="modal-title">{% bs_icon 'arrow-repeat' extra_classes='me-2' %} Update Settlement Status</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Settlement Status</label>
+          <select name="settlement_status" class="form-select" required>
+            {% for name in settlement_choices %}
+              <option value="{{ name }}" {% if name == case.7 %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-0">
+          <label class="form-label">Remarks (optional)</label>
+          <textarea name="remarks" rows="3" class="form-control" placeholder="Add a note (optional)"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-brand">
+          {% bs_icon 'check2-circle' extra_classes='me-2' %} Save
+        </button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <script>

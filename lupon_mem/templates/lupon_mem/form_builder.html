@@ -1,4 +1,4 @@
-{% load static %}
+{% load static %} 
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -53,7 +53,7 @@
     .subtle{ color:var(--muted); }
 
     /* Typeahead */
-    .typeahead-wrap{ position:relative; }
+    .typeahead-wrap{ position:relative; } /* anchor */
     .typeahead-dropdown{
       position:absolute; left:0; right:0; top:100%;
       background:var(--dropdown-bg);
@@ -68,12 +68,7 @@
     }
     .typeahead-item{ padding:.55rem .75rem; font-size:.95rem; line-height:1.2; color:#1b1b1b; background:transparent; border:0; text-align:left; width:100%; }
     .typeahead-item:hover{ background:var(--dropdown-hover); }
-    .typeahead-item.active,.typeahead-item:focus{ background:var(--dropdown-active); outline:none; }
     .typeahead-empty{ padding:.6rem .8rem; color:#666; font-size:.9rem; }
-
-    .kbd{ display:inline-block; padding:0 .35rem; border:1px solid #c9c9c9; border-bottom-width:2px; border-radius:4px;
-      font:500 12px ui-monospace, Menlo, Consolas, monospace; color:#333; background:#f8f8f8; }
-    .help-hint,.kp-hint{ color:#6a6a6a; font-size:.86rem; margin-top:.25rem; display:block; }
 
     /* visually hide but keep inputs posting */
     .kp-offscreen{
@@ -92,8 +87,10 @@
   <!-- Header -->
   <div class="hero mb-3 d-flex align-items-center justify-content-between">
     <div>
-      <div class="eyebrow">BARANGAY SEÑOR SANTO NIÑO</div>
-      <h4 class="title mb-1">Lupong Tagapamayapa</h4>
+      <div class="eyebrow" style="color:#FC9700; letter-spacing:.42em; text-transform:uppercase;">
+        BARANGAY SEÑOR SANTO NIÑO
+      </div>
+      <h4 class="title mb-1" style="color: #7B1E22;">LUPONG TAGAPAMAYAPA</h4>
       <div class="d-flex flex-wrap align-items-center gap-2 subtle" style="margin-top:10px;">
         <span class="badge-code"><span class="hash">KP Form No. </span>{{ form_id }}</span>
         <span>— {{ header.2|default:header.1 }}</span>
@@ -123,16 +120,75 @@
 
     <div class="card-body">
 
-      {# KP-8 minimal banner #}
       {% if kp8_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2">
           <i class="bi bi-calendar2-event" style="font-size:1.1rem;"></i>
           <strong>Please set the Hearing Date and the Hearing Time</strong>
-        </div>  
-            <div class="mt-1" style="opacity:.95">
-            For <strong>KP Form No. 8</strong>, you are required to set the <strong>Hearing Date</strong> and <strong>Hearing Time</strong>.
-            </div>
+        </div>
+        <div class="mt-1" style="opacity:.95">
+          For <strong>KP Form No. 8</strong>, you are required to set the <strong>Hearing Date</strong> and <strong>Hearing Time</strong>.
+        </div>
+      </div>
+      {% endif %}
+
+      {% if kp10_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-calendar2-week" style="font-size:1.1rem;"></i>
+          <strong>Set the Hearing Details, Time, and Addressed To</strong>
+        </div>
+        <div class="mt-1" style="opacity:.95">
+          For <strong>KP Form No. 10</strong>, choose the <strong>Hearing Details (date)</strong>, the <strong>Hearing Time</strong>, and search a person for <strong>Addressed To</strong>.
+        </div>
+      </div>
+      {% endif %}
+
+      {% if kp11_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-people" style="font-size:1.1rem;"></i>
+          <strong>Select the Pangkat Member</strong>
+        </div>
+        <div class="mt-1" style="opacity:.95">
+          For <strong>KP Form No. 11</strong>, search and pick the <strong>Pangkat Member Name</strong>. Other fields are auto-filled.
+        </div>
+      </div>
+      {% endif %}
+
+      {% if kp12_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-clock-history" style="font-size:1.1rem;"></i>
+          <strong>Fill only the Created Day and Time</strong>
+        </div>
+        <div class="mt-1" style="opacity:.95">
+          For <strong>KP Form No. 12</strong>, just set <strong>Date Created (day)</strong> and <strong>Time Created</strong>. Other fields are auto-filled.
+        </div>
+      </div>
+      {% endif %}
+
+      {% if kp13_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-send-check" style="font-size:1.1rem;"></i>
+          <strong>Fill only: Subpoena To, Witness, Appearance Date & Time</strong>
+        </div>
+        <div class="mt-1" style="opacity:.95">
+          For <strong>KP Form No. 13</strong>, only these four fields are required and shown.
+        </div>
+      </div>
+      {% endif %}
+
+      {% if kp14_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-file-earmark-text" style="font-size:1.1rem;"></i>
+          <strong>Everything is already filled.</strong>
+        </div>
+        <div class="mt-1" style="opacity:.95">
+          Click <strong>Submit &amp; Generate PDF</strong> to create the <strong>Agreement for Arbitration</strong>.
+        </div>
       </div>
       {% endif %}
 
@@ -145,22 +201,41 @@
         <div class="row g-3">
           {% with 1 as page %}
           {% for kff_id, field_id, label, type_name, is_required, value, field_code in fields %}
-            {# Lower-cased code for comparisons #}
             {% with field_code|lower as code %}
-
-              {# Layout: textarea = full width; others = half width #}
               {% if type_name == "TEXTAREA" %}
-                <div class="col-12{% if kp8_ui_minimal and code != 'hearing_date' and code != 'hearing_time' and code != 'place_of_hearing' %} kp-offscreen{% endif %}">
+                <div class="col-12
+                  {% if kp8_ui_minimal and code != 'hearing_date' and code != 'hearing_time' and code != 'place_of_hearing' %} kp-offscreen{% endif %}
+                  {% if kp10_ui_minimal and code != 'appearance_date' and code != 'appearance_time' and code != 'addr_to' %} kp-offscreen{% endif %}
+                  {% if kp11_ui_minimal and code != 'pangkat_member_name' %} kp-offscreen{% endif %}
+                  {% if kp12_ui_minimal and code != 'date_created' and code != 'time_created' %} kp-offscreen{% endif %}
+                  {% if kp13_ui_minimal and code != 'subpoena_to' and code != 'subpoena_witness' and code != 'appearance_date' and code != 'appearance_time' %} kp-offscreen{% endif %}
+                  {% if kp14_ui_minimal %} kp-offscreen{% endif %}
+                  {% if kp16_ui_minimal and code != 'settlement_statement' %} kp-offscreen{% endif %}">
               {% else %}
-                <div class="col-12 col-md-6{% if kp8_ui_minimal and code != 'hearing_date' and code != 'hearing_time' and code != 'place_of_hearing' %} kp-offscreen{% endif %}">
+                <div class="col-12 col-md-6
+                  {% if kp8_ui_minimal and code != 'hearing_date' and code != 'hearing_time' and code != 'place_of_hearing' %} kp-offscreen{% endif %}
+                  {% if kp10_ui_minimal and code != 'appearance_date' and code != 'appearance_time' and code != 'addr_to' %} kp-offscreen{% endif %}
+                  {% if kp11_ui_minimal and code != 'pangkat_member_name' %} kp-offscreen{% endif %}
+                  {% if kp12_ui_minimal and code != 'date_created' and code != 'time_created' %} kp-offscreen{% endif %}
+                  {% if kp13_ui_minimal and code != 'subpoena_to' and code != 'subpoena_witness' and code != 'appearance_date' and code != 'appearance_time' %} kp-offscreen{% endif %}
+                  {% if kp14_ui_minimal %} kp-offscreen{% endif %}
+                  {% if kp16_ui_minimal and code != 'settlement_statement' %} kp-offscreen{% endif %}">
               {% endif %}
                 <div class="kp-field" data-code="{{ code }}">
-
-                  {# Label: mark required only for the 3 visible fields in minimal mode #}
                   <label class="form-label
                     {% if is_required %}
                       {% if kp8_ui_minimal %}
                         {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %} label-req {% endif %}
+                      {% elif kp10_ui_minimal %}
+                        {% if code == 'appearance_date' or code == 'appearance_time' or code == 'addr_to' %} label-req {% endif %}
+                      {% elif kp11_ui_minimal %}
+                        {% if code == 'pangkat_member_name' %} label-req {% endif %}
+                      {% elif kp12_ui_minimal %}
+                        {% if code == 'date_created' or code == 'time_created' %} label-req {% endif %}
+                      {% elif kp13_ui_minimal %}
+                        {% if code == 'subpoena_to' or code == 'subpoena_witness' or code == 'appearance_date' or code == 'appearance_time' %} label-req {% endif %}
+                      {% elif kp16_ui_minimal %}
+                        {% if code == 'settlement_statement' %} label-req {% endif %}
                       {% else %}
                         label-req
                       {% endif %}
@@ -176,6 +251,16 @@
                            {% if is_required %}
                              {% if kp8_ui_minimal %}
                                {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %}required{% endif %}
+                             {% elif kp10_ui_minimal %}
+                               {% if code == 'appearance_date' or code == 'appearance_time' or code == 'addr_to' %}required{% endif %}
+                             {% elif kp11_ui_minimal %}
+                               {% if code == 'pangkat_member_name' %}required{% endif %}
+                             {% elif kp12_ui_minimal %}
+                               {% if code == 'date_created' or code == 'time_created' %}required{% endif %}
+                             {% elif kp13_ui_minimal %}
+                               {% if code == 'subpoena_to' or code == 'subpoena_witness' or code == 'appearance_date' or code == 'appearance_time' %}required{% endif %}
+                             {% elif kp16_ui_minimal %}
+                               {% if code == 'settlement_statement' %}required{% endif %}
                              {% else %}required{% endif %}
                            {% endif %}>
 
@@ -186,6 +271,16 @@
                            {% if is_required %}
                              {% if kp8_ui_minimal %}
                                {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %}required{% endif %}
+                             {% elif kp10_ui_minimal %}
+                               {% if code == 'appearance_date' or code == 'appearance_time' or code == 'addr_to' %}required{% endif %}
+                             {% elif kp11_ui_minimal %}
+                               {% if code == 'pangkat_member_name' %}required{% endif %}
+                             {% elif kp12_ui_minimal %}
+                               {% if code == 'date_created' or code == 'time_created' %}required{% endif %}
+                             {% elif kp13_ui_minimal %}
+                               {% if code == 'subpoena_to' or code == 'subpoena_witness' or code == 'appearance_date' or code == 'appearance_time' %}required{% endif %}
+                             {% elif kp16_ui_minimal %}
+                               {% if code == 'settlement_statement' %}required{% endif %}
                              {% else %}required{% endif %}
                            {% endif %}>
 
@@ -196,6 +291,16 @@
                            {% if is_required %}
                              {% if kp8_ui_minimal %}
                                {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %}required{% endif %}
+                             {% elif kp10_ui_minimal %}
+                               {% if code == 'appearance_date' or code == 'appearance_time' or code == 'addr_to' %}required{% endif %}
+                             {% elif kp11_ui_minimal %}
+                               {% if code == 'pangkat_member_name' %}required{% endif %}
+                             {% elif kp12_ui_minimal %}
+                               {% if code == 'date_created' or code == 'time_created' %}required{% endif %}
+                             {% elif kp13_ui_minimal %}
+                               {% if code == 'subpoena_to' or code == 'subpoena_witness' or code == 'appearance_date' or code == 'appearance_time' %}required{% endif %}
+                             {% elif kp16_ui_minimal %}
+                               {% if code == 'settlement_statement' %}required{% endif %}
                              {% else %}required{% endif %}
                            {% endif %}>
 
@@ -206,6 +311,16 @@
                            {% if is_required %}
                              {% if kp8_ui_minimal %}
                                {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %}required{% endif %}
+                             {% elif kp10_ui_minimal %}
+                               {% if code == 'appearance_date' or code == 'appearance_time' or code == 'addr_to' %}required{% endif %}
+                             {% elif kp11_ui_minimal %}
+                               {% if code == 'pangkat_member_name' %}required{% endif %}
+                             {% elif kp12_ui_minimal %}
+                               {% if code == 'date_created' or code == 'time_created' %}required{% endif %}
+                             {% elif kp13_ui_minimal %}
+                               {% if code == 'subpoena_to' or code == 'subpoena_witness' or code == 'appearance_date' or code == 'appearance_time' %}required{% endif %}
+                             {% elif kp16_ui_minimal %}
+                               {% if code == 'settlement_statement' %}required{% endif %}
                              {% else %}required{% endif %}
                            {% endif %}>
 
@@ -216,6 +331,16 @@
                            {% if is_required %}
                              {% if kp8_ui_minimal %}
                                {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %}required{% endif %}
+                             {% elif kp10_ui_minimal %}
+                               {% if code == 'appearance_date' or code == 'appearance_time' or code == 'addr_to' %}required{% endif %}
+                             {% elif kp11_ui_minimal %}
+                               {% if code == 'pangkat_member_name' %}required{% endif %}
+                             {% elif kp12_ui_minimal %}
+                               {% if code == 'date_created' or code == 'time_created' %}required{% endif %}
+                             {% elif kp13_ui_minimal %}
+                               {% if code == 'appearance_date' %}required{% endif %}
+                             {% elif kp16_ui_minimal %}
+                               {% if code == 'settlement_statement' %}required{% endif %}
                              {% else %}required{% endif %}
                            {% endif %}>
 
@@ -226,6 +351,16 @@
                            {% if is_required %}
                              {% if kp8_ui_minimal %}
                                {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %}required{% endif %}
+                             {% elif kp10_ui_minimal %}
+                               {% if code == 'appearance_date' or code == 'appearance_time' or code == 'addr_to' %}required{% endif %}
+                             {% elif kp11_ui_minimal %}
+                               {% if code == 'pangkat_member_name' %}required{% endif %}
+                             {% elif kp12_ui_minimal %}
+                               {% if code == 'date_created' or code == 'time_created' %}required{% endif %}
+                             {% elif kp13_ui_minimal %}
+                               {% if code == 'appearance_time' %}required{% endif %}
+                             {% elif kp16_ui_minimal %}
+                               {% if code == 'settlement_statement' %}required{% endif %}
                              {% else %}required{% endif %}
                            {% endif %}>
 
@@ -238,6 +373,16 @@
                              {% if is_required %}
                                {% if kp8_ui_minimal %}
                                  {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %}required{% endif %}
+                               {% elif kp10_ui_minimal %}
+                                 {% if code == 'appearance_date' or code == 'appearance_time' or code == 'addr_to' %}required{% endif %}
+                               {% elif kp11_ui_minimal %}
+                                 {% if code == 'pangkat_member_name' %}required{% endif %}
+                               {% elif kp12_ui_minimal %}
+                                 {% if code == 'date_created' or code == 'time_created' %}required{% endif %}
+                               {% elif kp13_ui_minimal %}
+                                 {% if code == 'subpoena_to' or code == 'subpoena_witness' or code == 'appearance_date' or code == 'appearance_time' %}required{% endif %}
+                               {% elif kp16_ui_minimal %}
+                                 {% if code == 'settlement_statement' %}required{% endif %}
                                {% else %}required{% endif %}
                              {% endif %}>
                     </div>
@@ -248,6 +393,16 @@
                               {% if is_required %}
                                 {% if kp8_ui_minimal %}
                                   {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %}required{% endif %}
+                                {% elif kp10_ui_minimal %}
+                                  {% if code == 'appearance_date' or code == 'appearance_time' or code == 'addr_to' %}required{% endif %}
+                                {% elif kp11_ui_minimal %}
+                                  {% if code == 'pangkat_member_name' %}required{% endif %}
+                                {% elif kp12_ui_minimal %}
+                                  {% if code == 'date_created' or code == 'time_created' %}required{% endif %}
+                                {% elif kp13_ui_minimal %}
+                                  {% if code == 'subpoena_to' or code == 'subpoena_witness' or code == 'appearance_date' or code == 'appearance_time' %}required{% endif %}
+                                {% elif kp16_ui_minimal %}
+                                  {% if code == 'settlement_statement' %}required{% endif %}
                                 {% else %}required{% endif %}
                               {% endif %}>{{ value|default:'' }}</textarea>
 
@@ -258,6 +413,16 @@
                            {% if is_required %}
                              {% if kp8_ui_minimal %}
                                {% if code == 'hearing_date' or code == 'hearing_time' or code == 'place_of_hearing' %}required{% endif %}
+                             {% elif kp10_ui_minimal %}
+                               {% if code == 'appearance_date' or code == 'appearance_time' or code == 'addr_to' %}required{% endif %}
+                             {% elif kp11_ui_minimal %}
+                               {% if code == 'pangkat_member_name' %}required{% endif %}
+                             {% elif kp12_ui_minimal %}
+                               {% if code == 'date_created' or code == 'time_created' %}required{% endif %}
+                             {% elif kp13_ui_minimal %}
+                               {% if code == 'subpoena_to' or code == 'subpoena_witness' or code == 'appearance_date' or code == 'appearance_time' %}required{% endif %}
+                             {% elif kp16_ui_minimal %}
+                               {% if code == 'settlement_statement' %}required{% endif %}
                              {% else %}required{% endif %}
                            {% endif %}>
                     <div class="form-text">Unsupported type <code>{{ type_name }}</code> (rendered as text)</div>
@@ -266,7 +431,6 @@
                   <div class="invalid-feedback">This field is required.</div>
                 </div>
               </div>
-
             {% endwith %}
           {% endfor %}
           {% endwith %}
@@ -377,6 +541,12 @@
   submitBtn.addEventListener("click", async (e)=>{
     e.preventDefault();
     try{
+      {% if kp14_ui_minimal %}
+      // Confirmation for KP-14 before generating the PDF
+      const ok = window.confirm("Everything is already filled. Do you want to proceed and generate the Agreement for Arbitration PDF?");
+      if (!ok) { return; }
+      {% endif %}
+
       setBusy(submitBtn, true);
       if (!formEl.elements.submission_id){ await doSave(); }
       else if (!formEl.checkValidity()){ formEl.classList.add('was-validated'); showWarn("Please complete required fields."); return; }
@@ -389,6 +559,296 @@
     }catch(err){ showWarn(err.message || "Submit failed."); }
     finally{ setBusy(submitBtn, false); }
   });
+
+  /* ---------- KP-10 UI Auto-Derivation ---------- */
+  (function kp10Derivations(){
+    const dateEl =
+      document.querySelector('[data-code="appearance_date"] input, [data-code="appearance_date"] textarea, [data-code="appearance_date"] select, input[data-code="appearance_date"], textarea[data-code="appearance_date"]');
+    if (!dateEl) return;
+
+    function byCode(code){
+      return document.querySelector(
+        `[data-code="${code}"] input, [data-code="${code}"] textarea, [data-code="${code}"] select, input[data-code="${code}"], textarea[data-code="${code}"], select[data-code="${code}"]`
+      );
+    }
+
+    const dayTargets = ['day_of','appearance_day'].map(byCode);
+    const yearEls = ['current_year','current_year_2','current_year_3'].map(byCode);
+    const todayEl = byCode('date_today');
+    const notifEl = byCode('date_notified');
+    const nDayEl  = byCode('notified_day_of');
+
+    const monthTargets = ['appearance_month','current_month','month_today','notified_month'].map(byCode);
+
+    const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    const iso = d => d.toISOString().slice(0,10);
+
+    function deriveFromAppearance(){
+      const v = (dateEl.value || '').trim();
+      if (!v) return;
+      const parts = v.split('-').map(Number);
+      if (parts.length === 3 && parts.every(Number.isFinite)){
+        const [Y, M, D] = parts;
+        dayTargets.forEach(el => { if (el && !el.value) el.value = String(D); });
+        monthTargets.forEach(el => { if (el && !el.value) el.value = MONTHS[M-1]; });
+        yearEls.forEach(el => { if (el && !el.value) el.value = String(Y); });
+      }
+    }
+
+    function fillTodayDefaults(){
+      const now = new Date();
+      if (todayEl && !todayEl.value) todayEl.value = iso(now);
+      if (notifEl && !notifEl.value) notifEl.value = iso(now);
+      if (nDayEl  && !nDayEl.value)  nDayEl.value  = String(now.getDate());
+      yearEls.forEach(el => { if (el && !el.value) el.value = String(now.getFullYear()); });
+      monthTargets.forEach(el => { if (el && !el.value) el.value = MONTHS[now.getMonth()]; });
+    }
+
+    fillTodayDefaults();
+    deriveFromAppearance();
+    dateEl.addEventListener('change', deriveFromAppearance);
+
+    {% if kp10_ui_minimal %}
+    const wrapDate = document.querySelector('[data-code="appearance_date"]');
+    if (wrapDate){
+      const lbl = wrapDate.querySelector('label.form-label');
+      if (lbl){ lbl.textContent = 'Hearing Details'; lbl.classList.add('label-req'); }
+    }
+    {% endif %}
+  })();
+
+  /* ---------- KP-10 minimal: Addressed To typeahead (uses staff_suggest) ---------- */
+  {% if kp10_ui_minimal %}
+  (function(){
+    const wrap = document.querySelector('[data-code="addr_to"]');
+    const addr = document.querySelector(
+      `[data-code="addr_to"] input, [data-code="addr_to"] textarea, input[data-code="addr_to"], textarea[data-code="addr_to"]`
+    );
+    if(!wrap || !addr) return;
+
+    wrap.classList.add('typeahead-wrap');
+
+    const dd = document.createElement('div');
+    dd.id = 'kp10_addr_to_dd';
+    dd.className = 'typeahead-dropdown';
+    wrap.appendChild(dd);
+
+    let timer = null, items = [], idx = -1;
+
+    function openDD(){ dd.style.display='block'; }
+    function closeDD(){ dd.style.display='none'; dd.innerHTML=''; idx = -1; items = []; }
+
+    function render(list){
+      if(!list.length){ dd.innerHTML = '<div class="typeahead-empty">No matches</div>'; openDD(); return; }
+      dd.innerHTML = list.map((r,i)=>`<button type="button" class="typeahead-item" data-i="${i}">${r.name}</button>`).join('');
+      openDD();
+    }
+
+    function fetchSuggest(q){
+      const url = "{% url 'lupon_mem:staff_suggest' %}?q=" + encodeURIComponent(q);
+      fetch(url, {headers:{'X-Requested-With':'fetch'}})
+        .then(r=>r.json())
+        .then(j=>{ items = j.results || []; render(items); })
+        .catch(()=> closeDD());
+    }
+
+    function choose(i){
+      const row = items[i]; if(!row) return;
+      addr.value = row.name;
+      closeDD();
+    }
+
+    addr.addEventListener('input', () => {
+      const q = addr.value.trim();
+      if(q.length < 2){ closeDD(); return; }
+      clearTimeout(timer);
+      timer = setTimeout(()=>fetchSuggest(q), 180);
+    });
+
+    dd.addEventListener('click', (e)=>{
+      const btn = e.target.closest('.typeahead-item'); if(!btn) return;
+      choose(parseInt(btn.getAttribute('data-i'),10));
+    });
+
+    document.addEventListener('click', (e)=>{
+      if(!dd.contains(e.target) && e.target !== addr){ closeDD(); }
+    });
+  })();
+  {% endif %}
+
+  /* ---------- KP-11 minimal: Pangkat member typeahead (uses staff_suggest) ---------- */
+  {% if kp11_ui_minimal %}
+  (function(){
+    const wrap = document.querySelector('[data-code="pangkat_member_name"]');
+    const input = document.querySelector(
+      `[data-code="pangkat_member_name"] input, [data-code="pangkat_member_name"] textarea, input[data-code="pangkat_member_name"], textarea[data-code="pangkat_member_name"]`
+    );
+    if(!wrap || !input) return;
+
+    wrap.classList.add('typeahead-wrap');
+
+    const dd = document.createElement('div');
+    dd.id = 'kp11_pangkat_dd';
+    dd.className = 'typeahead-dropdown';
+    wrap.appendChild(dd);
+
+    let timer=null, items=[], idx=-1;
+
+    function openDD(){ dd.style.display='block'; }
+    function closeDD(){ dd.style.display='none'; dd.innerHTML=''; idx=-1; items=[]; }
+
+    function render(list){
+      if(!list.length){ dd.innerHTML = '<div class="typeahead-empty">No matches</div>'; openDD(); return; }
+      dd.innerHTML = list.map((r,i)=>`<button type="button" class="typeahead-item" data-i="${i}">${r.name}</button>`).join('');
+      openDD();
+    }
+
+    function fetchSuggest(q){
+      const url = "{% url 'lupon_mem:staff_suggest' %}?q=" + encodeURIComponent(q);
+      fetch(url, {headers:{'X-Requested-With':'fetch'}})
+        .then(r=>r.json())
+        .then(j=>{ items = j.results || []; render(items); })
+        .catch(()=> closeDD());
+    }
+
+    function choose(i){
+      const row = items[i]; if(!row) return;
+      input.value = row.name; // write chosen name into the real 'pangkat_member_name' field
+      closeDD();
+    }
+
+    input.addEventListener('input', ()=>{
+      const q = input.value.trim();
+      if(q.length < 2){ closeDD(); return; }
+      clearTimeout(timer);
+      timer = setTimeout(()=>fetchSuggest(q), 180);
+    });
+
+    dd.addEventListener('click', (e)=>{
+      const btn = e.target.closest('.typeahead-item'); if(!btn) return;
+      choose(parseInt(btn.getAttribute('data-i'),10));
+    });
+
+    document.addEventListener('click', (e)=>{
+      if(!dd.contains(e.target) && e.target !== input){ closeDD(); }
+    });
+  })();
+  {% endif %}
+
+  /* ---------- KP-13: Typeahead for Subpoena To & Witness (uses person_suggest) ---------- */
+  (function(){
+    function enhanceTypeahead(code){
+      const wrap = document.querySelector(`[data-code="${code}"]`);
+      const input = document.querySelector(
+        `[data-code="${code}"] input, [data-code="${code}"] textarea, input[data-code="${code}"], textarea[data-code="${code}"]`
+      );
+      if(!wrap || !input) return;
+
+      wrap.classList.add('typeahead-wrap');
+
+      const dd = document.createElement('div');
+      dd.className = 'typeahead-dropdown';
+      wrap.appendChild(dd);
+
+      let timer=null, items=[], idx=-1;
+      function openDD(){ dd.style.display='block'; }
+      function closeDD(){ dd.style.display='none'; dd.innerHTML=''; idx=-1; items=[]; }
+      function render(list){
+        if(!list.length){ dd.innerHTML = '<div class="typeahead-empty">No matches</div>'; openDD(); return; }
+        dd.innerHTML = list.map((r,i)=>`<button type="button" class="typeahead-item" data-i="${i}">${r.name}</button>`).join('');
+        openDD();
+      }
+      function fetchSuggest(q){
+        const url = "{% url 'lupon_mem:person_suggest' %}?q=" + encodeURIComponent(q);
+        fetch(url, {headers:{'X-Requested-With':'fetch'}})
+          .then(r=>r.json())
+          .then(j=>{ items = j.results || []; render(items); })
+          .catch(()=> closeDD());
+      }
+      function choose(i){
+        const row = items[i]; if(!row) return;
+        input.value = row.name;
+        closeDD();
+      }
+      input.addEventListener('input', ()=>{
+        const q = input.value.trim();
+        if(q.length < 2){ closeDD(); return; }
+        clearTimeout(timer);
+        timer = setTimeout(()=>fetchSuggest(q), 180);
+      });
+      dd.addEventListener('click', (e)=>{
+        const btn = e.target.closest('.typeahead-item'); if(!btn) return;
+        choose(parseInt(btn.getAttribute('data-i'),10));
+      });
+      document.addEventListener('click', (e)=>{
+        if(!dd.contains(e.target) && e.target !== input){ closeDD(); }
+      });
+    }
+    enhanceTypeahead('subpoena_to');
+    enhanceTypeahead('subpoena_witness');
+  })();
+
+  /* ---------- KP-15: Pangkat Members (member, member_two) typeahead using staff_suggest ---------- */
+  (function(){
+    function enhanceStaff(code){
+      const wrap = document.querySelector(`[data-code="${code}"]`);
+      const input = document.querySelector(
+        `[data-code="${code}"] input, [data-code="${code}"] textarea, input[data-code="${code}"], textarea[data-code="${code}"]`
+      );
+      if(!wrap || !input) return;
+
+      wrap.classList.add('typeahead-wrap');
+
+      const dd = document.createElement('div');
+      dd.className = 'typeahead-dropdown';
+      wrap.appendChild(dd);
+
+      let timer=null, items=[];
+      function openDD(){ dd.style.display='block'; }
+      function closeDD(){ dd.style.display='none'; dd.innerHTML=''; items=[]; }
+
+      function render(list){
+        if(!list.length){ dd.innerHTML = '<div class="typeahead-empty">No matches</div>'; openDD(); return; }
+        dd.innerHTML = list.map((r,i)=>`<button type="button" class="typeahead-item" data-i="${i}">${r.name}</button>`).join('');
+        openDD();
+      }
+
+      function fetchSuggest(q){
+        const url = "{% url 'lupon_mem:staff_suggest' %}?q=" + encodeURIComponent(q);
+        fetch(url, {headers:{'X-Requested-With':'fetch'}})
+          .then(r=>r.json())
+          .then(j=>{ items = j.results || []; render(items); })
+          .catch(()=> closeDD());
+      }
+
+      function choose(i){
+        const row = items[i]; if(!row) return;
+        input.value = row.name;
+        closeDD();
+      }
+
+      input.addEventListener('input', ()=>{
+        const q = input.value.trim();
+        if(q.length < 2){ closeDD(); return; }
+        clearTimeout(timer);
+        timer = setTimeout(()=>fetchSuggest(q), 180);
+      });
+
+      dd.addEventListener('click', (e)=>{
+        const btn = e.target.closest('.typeahead-item'); if(!btn) return;
+        choose(parseInt(btn.getAttribute('data-i'),10));
+      });
+
+      document.addEventListener('click', (e)=>{
+        if(!dd.contains(e.target) && e.target !== input){ closeDD(); }
+      });
+    }
+
+    // Enable staff search on both Pangkat member fields
+    enhanceStaff('member');
+    enhanceStaff('member_two');
+  })();
+  
 </script>
 </body>
 </html>

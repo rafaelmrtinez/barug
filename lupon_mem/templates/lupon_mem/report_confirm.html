@@ -10,6 +10,12 @@
   .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
   .mini-badge{ display:inline-block; padding:.28rem .6rem; border-radius:.5rem;
                background:#fff; border:1px solid rgba(0,0,0,.08); font-size:.78rem; }
+  /* subtle visual cue when read-only */
+  .ro .form-control[readonly],
+  .ro .form-select:disabled{
+    background-color:#f8f9fa;
+    pointer-events:none;
+  }
 </style>
 {% endblock %}
 
@@ -33,7 +39,10 @@
       <div class="card-body">
         <h6 class="mb-3">Parties</h6>
         {% for p in parties %}
-          <span class="mini-badge">{{ p.2 }}: #{{ p.0 }} {{ p.1 }}</span>
+          {# p.2 likely role; p.1 is full name. Expose as data-* for JS #}
+          <span class="mini-badge"
+                data-role="{{ p.2|upper }}"
+                data-name="{{ p.1 }}">{{ p.2 }}: #{{ p.0 }} {{ p.1 }}</span>
         {% empty %}
           <div class="text-muted">No parties linked.</div>
         {% endfor %}
@@ -42,32 +51,63 @@
 
     <form method="post" class="needs-validation" novalidate>
       {% csrf_token %}
-      <div class="card shadow-sm mb-3"><div class="card-body">
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label">Case Name</label>
-            <input class="form-control" name="case_name" required value="People vs.">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Complaint Title</label>
-            <select class="form-select" name="complaint_title_id">
-              {% for id,name in complaint_titles %}<option value="{{ id }}">{{ name }}</option>{% endfor %}
-            </select>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Case Nature</label>
-            <select class="form-select" name="case_nature_id">
-              {% for id,name in case_natures %}<option value="{{ id }}">{{ name }}</option>{% endfor %}
-            </select>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Settlement Status</label>
-            <select class="form-select" name="settlement_status_id">
-              {% for id,name in settlement_statuses %}<option value="{{ id }}">{{ name }}</option>{% endfor %}
-            </select>
+      <div class="card shadow-sm mb-3 {% if user_role|upper == 'BARANGAY TREASURER' %}ro{% endif %}">
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Case Name</label>
+                <input class="form-control"
+                    name="case_name"
+                    required
+                    value="{{ initial_case_name|default:'People vs.' }}"
+                    {% if user_role|upper == 'BARANGAY TREASURER' %}readonly{% endif %}>
+
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label">Complaint Title</label>
+              <select class="form-select"
+                      name="complaint_title_id"
+                      {% if user_role|upper == 'BARANGAY TREASURER' %}disabled data-mirror="complaint_title_id"{% endif %}>
+                {% for id,name in complaint_titles %}
+                  <option value="{{ id }}">{{ name }}</option>
+                {% endfor %}
+              </select>
+              {% if user_role|upper == 'BARANGAY TREASURER' %}
+                <input type="hidden" name="complaint_title_id" id="mirror_complaint_title_id">
+              {% endif %}
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label">Case Nature</label>
+              <select class="form-select"
+                      name="case_nature_id"
+                      {% if user_role|upper == 'BARANGAY TREASURER' %}disabled data-mirror="case_nature_id"{% endif %}>
+                {% for id,name in case_natures %}
+                  <option value="{{ id }}">{{ name }}</option>
+                {% endfor %}
+              </select>
+              {% if user_role|upper == 'BARANGAY TREASURER' %}
+                <input type="hidden" name="case_nature_id" id="mirror_case_nature_id">
+              {% endif %}
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label">Settlement Status</label>
+              <select class="form-select"
+                      name="settlement_status_id"
+                      {% if user_role|upper == 'BARANGAY TREASURER' %}disabled data-mirror="settlement_status_id"{% endif %}>
+                {% for id,name in settlement_statuses %}
+                  <option value="{{ id }}">{{ name }}</option>
+                {% endfor %}
+              </select>
+              {% if user_role|upper == 'BARANGAY TREASURER' %}
+                <input type="hidden" name="settlement_status_id" id="mirror_settlement_status_id">
+              {% endif %}
+            </div>
           </div>
         </div>
-      </div></div>
+      </div>
 
       <div class="card shadow-sm mb-3"><div class="card-body">
         <div class="form-check form-switch mb-2">
@@ -103,4 +143,84 @@
     </form>
   </div>
 </div>
+
+{% if user_role|upper == 'BARANGAY TREASURER' %}
+<script>
+  (function(){
+    // Mirror disabled <select> values into hidden inputs so they still submit
+    function syncMirror(sel){
+      var name = sel.getAttribute('data-mirror');
+      if(!name) return;
+      var hid = document.getElementById('mirror_'+name);
+      if(hid) hid.value = sel.value || '';
+    }
+    document.addEventListener('DOMContentLoaded', function(){
+      var selects = document.querySelectorAll('select[data-mirror]');
+      selects.forEach(function(sel){
+        syncMirror(sel);
+        sel.addEventListener('change', function(){ syncMirror(sel); });
+      });
+      var form = document.querySelector('form.needs-validation');
+      if(form){
+        form.addEventListener('submit', function(){
+          selects.forEach(syncMirror);
+        });
+      }
+    });
+  })();
+</script>
+{% endif %}
+
+<script>
+  // Auto-fill Case Name: "<ComplainantLast> vs. <RespondentLast>"
+  document.addEventListener('DOMContentLoaded', function(){
+    var caseInput = document.querySelector('input[name="case_name"]');
+    if(!caseInput) return;
+
+    // Collect first COMPLAINANT and first RESPONDENT from the "Parties" badges
+    var badges = document.querySelectorAll('.mini-badge[data-role][data-name]');
+    var compName = null, respName = null;
+    badges.forEach(function(b){
+      var role = (b.getAttribute('data-role') || '').trim().toUpperCase();
+      var name = (b.getAttribute('data-name') || '').trim();
+      if(!compName && role.indexOf('COMPLAINANT') !== -1) compName = name;
+      if(!respName && role.indexOf('RESPONDENT')  !== -1) respName = name;
+    });
+
+    function extractLastName(fullName){
+      if(!fullName) return '';
+      // Basic tokenization
+      var tokens = fullName.trim().split(/\s+/);
+      if(tokens.length === 1) return tokens[0];
+
+      // Heuristic for common PH multi-word surname prefixes
+      // Normalize lower for matching but keep original casing
+      var lower = tokens.map(function(t){ return t.toLowerCase(); });
+
+      // Try 3-word tails (e.g., "de los santos")
+      if(lower.length >= 3){
+        var tail3 = lower.slice(-3).join(' ');
+        if(['de los santos','de la cruz'].indexOf(tail3) !== -1){
+          return tokens.slice(-3).join(' ');
+        }
+      }
+      // Try 2-word tails (e.g., "del rosario","dela cruz","delos reyes","de jesus")
+      if(lower.length >= 2){
+        var tail2 = lower.slice(-2).join(' ');
+        if(['del rosario','dela cruz','delos reyes','de jesus','de leon','de guzman','de la'].indexOf(tail2) !== -1){
+          return tokens.slice(-2).join(' ');
+        }
+      }
+      // Fallback: last token
+      return tokens[tokens.length - 1];
+    }
+
+    var cLast = extractLastName(compName);
+    var rLast = extractLastName(respName);
+
+    if(cLast && rLast){
+      caseInput.value = cLast + ' vs. ' + rLast;
+    }
+  });
+</script>
 {% endblock %}

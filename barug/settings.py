@@ -64,7 +64,7 @@ else:
     DEBUG = True
 ALLOWED_HOSTS = ['*']
 
-
+CORS_ALLOW_ALL_ORIGINS = True
 # Application definition
 
 INSTALLED_APPS = [
@@ -91,6 +91,7 @@ INSTALLED_APPS = [
     "midwife",
     "payments",
     "notifications",
+    "corsheaders"
 ]
 
 MIDDLEWARE = [
@@ -105,6 +106,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "authentication.middleware.NoCacheMiddleware",
     "authentication.middleware.AttachProfileMiddleware",  # <— add
+    "corsheaders.middleware.CorsMiddleware"
 ]
 
 ROOT_URLCONF = "barug.urls"
