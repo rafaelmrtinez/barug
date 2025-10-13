@@ -2573,7 +2573,7 @@ def business_information_review(
                 #         bname = (business.get("b_name") or "your business").strip()
                 #         msg = (
                 #             f"BARUG: Business Registration received for '{bname}'.\n"
-                #             f"Ref: {business_id}.\n"
+                #             f"Ref: {business_id: 06d}.\n"
                 #             f"Sign in to the mobile app to request the necessary business documents."
                 #         )
                 #         # fail_silently so we don't break the user flow
@@ -2739,6 +2739,37 @@ def business_information(
         else business_info.execute_by_business_id(b_id)  # see helper below
     )
 
+    def _compose_owner_full_name(data: dict) -> str | None:
+        last   = (data.get("last_name") or "").strip()
+        first  = (data.get("first_name") or "").strip()
+        middle = (data.get("middle_name") or "").strip()
+        suffix = (data.get("suffix") or "").strip()
+
+        parts = []
+        if last:
+            parts.append(last.upper())                   # LAST
+        if first:
+            parts.append((", " if parts else "") + first.title())  # , First
+        if middle:
+            parts.append(" " + middle[:1].upper() + ".")           #  M.
+        if suffix:
+            parts.append(" " + suffix.upper())                     #  JR / III, etc.
+        return "".join(parts) or None
+    
+    def _compose_full_address_from_owner(data: dict) -> str | None:
+        street      = (data.get("street") or "").strip()
+        sitio_purok = (data.get("sitio_purok") or "").strip()
+        barangay    = (data.get("barangay") or "").strip()
+        city        = (data.get("city") or "").strip()
+
+        # Order strictly: STREET, PUROK/SITIO, BARANGAY, CITY
+        parts = [p for p in [street, sitio_purok, barangay, city] if p]
+        return ", ".join(parts) if parts else None
+
+    owner = dict(dto.owner or {})
+    owner["owner_full_name"] = _compose_owner_full_name(owner)
+    owner["full_address"]    = _compose_full_address_from_owner(owner)
+
     operating_days = (dto.business.get("operating_days") or "").strip()  # e.g., "Mon, Tue, Wed"
     days = [d.strip() for d in operating_days.split(",")] if operating_days else []
     operating_days_start_name = days[0] if days else None
@@ -2750,9 +2781,8 @@ def business_information(
         {
             "page_path": f"{user_role} / Business Records / Business Details : {b_id}",
             "page_title": f"Business Details : {b_id}",
-            "owner": dto.owner,
+            "owner": owner,
             "business": dto.business,
-            "owner_files": (dto.owner_id or {}).get("files") or [],
             "business_files": (dto.business_proof or {}).get("files") or [],
             "operating_days_start_name": operating_days_start_name,
             "operating_days_end_name": operating_days_end_name,
