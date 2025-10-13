@@ -62,9 +62,21 @@
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-start flex-wrap">
         <div class="pe-2">
-          <div class="hint">Report <span class="badge-soft">#{{ report.0 }}</span></div>
+          <div class="hint" style="margin-bottom: 10;"><span class="badge-soft">BLOTTER REPORT #{{ report.0 }}</span></div>
           <h5 class="mb-1">{{ report.1 }}</h5>
           <div class="text-muted">Filed: {{ report.3 }}</div>
+
+          <!-- Date Filed -->
+          <div class="mt-2">
+            <span class="text-muted me-1">{% bs_icon 'calendar-event' %}</span>
+            <span><strong>Date Filed:</strong> {{ report.3 }}</span>
+          </div>
+
+          <!-- Incident address -->
+          <div class="mt-2">
+            <span class="text-muted me-1">{% bs_icon 'geo-alt' %}</span>
+            <span><strong>Incident Address:</strong> {{ report.5 }}</span>
+          </div>
         </div>
         <div class="mt-2 mt-md-0">
           {% with status=report.4|upper %}
@@ -75,7 +87,12 @@
           {% endwith %}
         </div>
       </div>
-      <p class="mb-0 mt-2">{{ report.2 }}</p>
+
+      <!-- Subject Details -->
+      <div class="mt-2">
+        <span class="text-muted me-1">{% bs_icon 'card-text' %}</span>
+        <span><strong>Subject Details:</strong> {{ report.2 }}</span>
+      </div>
     </div>
   </div>
 
@@ -85,14 +102,34 @@
       <div class="d-flex align-items-center gap-2 mb-2">
         {% bs_icon 'people' %} <strong>Parties</strong>
       </div>
-      <div id="partyList">
-        {% for p in parties %}
-          <span class="party-chip" data-role="{{ p.2 }}" data-name="{{ p.1|escape }}">
-            <small class="text-muted">{{ p.2 }}:</small> #{{ p.0 }} {{ p.1 }}
-          </span>
-        {% empty %}
-          <div class="text-muted">No parties linked.</div>
-        {% endfor %}
+
+      <!-- Split complainant vs respondents -->
+      <div class="row g-2">
+        <div class="col-md-6">
+          <div class="mb-1 small text-muted">{% bs_icon 'person' %} Complainant(s)</div>
+          <div id="complainantList">
+            {% for p in parties %}
+              {% if p.2|upper == 'COMPLAINANT' %}
+                <span class="party-chip" data-role="{{ p.2 }}" data-name="{{ p.1|escape }}">
+                  #{{ p.0 }} {{ p.1 }}
+                </span>
+              {% endif %}
+            {% endfor %}
+            {% if not parties|length or not parties|dictsort:"2" %}{% endif %}
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-1 small text-muted">{% bs_icon 'people' %} Respondent(s)</div>
+          <div id="respondentList">
+            {% for p in parties %}
+              {% if p.2|upper == 'RESPONDENT' %}
+                <span class="party-chip" data-role="{{ p.2 }}" data-name="{{ p.1|escape }}">
+                  #{{ p.0 }} {{ p.1 }}
+                </span>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -109,7 +146,7 @@
 
         <div class="col-md-4">
           <label class="form-label">Complaint Title</label>
-          <select class="form-select" name="complaint_title_id">
+          <select class="form-select" id="complaintTitleSelect" name="complaint_title_id">
             {% for id,name in complaint_titles %}
               <option value="{{ id }}">{{ name }}</option>
             {% endfor %}
@@ -118,7 +155,7 @@
 
         <div class="col-md-4">
           <label class="form-label">Case Nature</label>
-          <select class="form-select" name="case_nature_id">
+          <select class="form-select" id="caseNatureSelect" name="case_nature_id">
             {% for id,name in case_natures %}
               <option value="{{ id }}">{{ name }}</option>
             {% endfor %}
@@ -127,7 +164,7 @@
 
         <div class="col-md-4">
           <label class="form-label">Settlement Status</label>
-          <select class="form-select" name="settlement_status_id">
+          <select class="form-select" id="settlementStatusSelect" name="settlement_status_id" disabled>
             {% for id,name in settlement_statuses %}
               <option value="{{ id }}" {% if name|upper == "PENDING" %}selected{% endif %}>{{ name }}</option>
             {% endfor %}
@@ -168,6 +205,11 @@
 <!-- Hidden forms (submitted by modal confirm buttons) -->
 <form id="approveForm" method="post" action="{% url 'lupon_mem:report_approve' report.0 %}" class="d-none">
   {% csrf_token %}
+  <!-- we copy values into these right before submit -->
+  <input type="hidden" name="case_name" id="approveCaseName">
+  <input type="hidden" name="complaint_title_id" id="approveComplaintTitleId">
+  <input type="hidden" name="case_nature_id" id="approveCaseNatureId">
+  <input type="hidden" name="settlement_status_id" id="approveSettlementStatusId">
 </form>
 <form id="declineForm" method="post" action="{% url 'lupon_mem:report_decline' report.0 %}" class="d-none">
   {% csrf_token %}
@@ -185,7 +227,7 @@
       <div class="modal-body">
         <p class="mb-2">Do you really want to <strong>approve</strong> this blotter report?</p>
         <ul class="mb-0 ps-3">
-          <li>The case will be created using the auto-generated case name.</li>
+          <li>The case will be created using the case name shown above.</li>
           <li>Parties and selected attributes will be linked to the new case.</li>
         </ul>
       </div>
@@ -229,18 +271,17 @@
     return parts[parts.length - 1].replace(/[.,]+$/, '');
   }
   function buildCaseName(){
-    const chips = Array.from(document.querySelectorAll('#partyList .party-chip'));
-    const complLasts = chips
-      .filter(x => (x.dataset.role || '').toUpperCase() === 'COMPLAINANT')
+    const compl = Array.from(document.querySelectorAll('#complainantList .party-chip'))
       .map(x => lastToken(x.dataset.name));
-    const respLasts = chips
-      .filter(x => (x.dataset.role || '').toUpperCase() === 'RESPONDENT')
+    const resp  = Array.from(document.querySelectorAll('#respondentList .party-chip'))
       .map(x => lastToken(x.dataset.name));
-    const left = complLasts.length ? complLasts.join(', ') : 'Complainant';
-    const right = respLasts.length ? respLasts.join(', ') : 'Respondent(s)';
+
+    const left  = compl.length ? compl.join(', ') : 'Complainant';
+    const right = resp.length  ? resp.join(', ')  : 'Respondent(s)';
     const el = document.getElementById('caseName');
     if (el) el.value = `${left} vs ${right}`;
   }
+
   if (document.readyState === 'loading'){
     document.addEventListener('DOMContentLoaded', buildCaseName);
   } else {
@@ -254,9 +295,24 @@
   if (approveBtn){
     approveBtn.addEventListener('click', function(e){
       e.preventDefault();
+      // copy visible values into hidden approve form inputs
+      document.getElementById('approveCaseName').value =
+        (document.getElementById('caseName').value || '').trim();
+
+      document.getElementById('approveComplaintTitleId').value =
+        document.getElementById('complaintTitleSelect').value;
+
+      document.getElementById('approveCaseNatureId').value =
+        document.getElementById('caseNatureSelect').value;
+
+      // settlement is disabled in UI; still copy its default/selected value for completeness
+      document.getElementById('approveSettlementStatusId').value =
+        document.getElementById('settlementStatusSelect').value;
+
       document.getElementById('approveForm').submit();
     });
   }
+
   if (declineBtn){
     declineBtn.addEventListener('click', function(e){
       e.preventDefault();

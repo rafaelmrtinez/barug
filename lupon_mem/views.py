@@ -263,7 +263,7 @@ def case_settlement_update(request: HttpRequest, case_id: int):
 
     return redirect("lupon_mem:case_detail", case_id=case_id)
 
-    
+
 # --- choose form (DB-backed; cached) ---
 @session_login_required
 @role_required(*LUPON_ROLES)
@@ -1550,22 +1550,88 @@ def report_new(request: HttpRequest):
     auth = request.session.get("auth") or {}
     staff_id = auth.get("staff_id")
 
+    # helpers
+    def _toi(x):
+        try:
+            return int(x) if x not in (None, "",) else None
+        except (TypeError, ValueError):
+            return None
+
+    def _tof(x):
+        try:
+            return float(x) if x not in (None, "",) else None
+        except (TypeError, ValueError):
+            return None
+
     complainant_id = _toi(request.POST.get("complainant_id"))
     respondent_ids = [_toi(x) for x in (request.POST.get("respondent_ids") or "").split(",")]
     respondent_ids = [x for x in respondent_ids if x]
 
+    # address fields coming from the map picker
+    incident_address_id = _toi(request.POST.get("incident_address_id"))
+
+    lat = _tof(request.POST.get("incident_lat"))
+    lng = _tof(request.POST.get("incident_lng"))
+
+    map_street    = (request.POST.get("map_street") or "").strip() or None
+    map_purok     = (request.POST.get("map_purok") or "").strip() or None  # e.g. "KANIPAAN (S01)" OR "KANIPAAN"
+    map_barangay  = (request.POST.get("map_barangay") or "").strip() or None
+    map_city      = (request.POST.get("map_city") or "").strip() or None
+
+    # If no explicit address_id was provided, try to create one from the map fields
+    if not incident_address_id and (lat is not None and lng is not None):
+        with connection.cursor() as cur:
+            # Resolve purok_sitio_id from a name like "KANIPAAN (S01)" or just "KANIPAAN"
+            purok_name_for_lookup = None
+            if map_purok:
+                # pull out the part before " (" if present
+                purok_name_for_lookup = map_purok.split(" (", 1)[0].strip()
+
+            v_purok_sitio_id = None
+            if purok_name_for_lookup:
+                cur.execute(
+                    """
+                    SELECT ps.purok_sitio_id
+                      FROM purok_sitio ps
+                     WHERE upper(trim(ps.purok_sitio_name)) = upper(trim(%s))
+                     LIMIT 1
+                    """,
+                    [purok_name_for_lookup],
+                )
+                row = cur.fetchone()
+                if row:
+                    v_purok_sitio_id = row[0]
+
+            # Uppercase like your PL/pgSQL does
+            up = lambda s: s.upper() if isinstance(s, str) else s
+            up_street   = up(map_street)
+            up_brgy     = up(map_barangay)
+            up_city     = up(map_city)
+
+            # Insert the address (allow some fields to be NULL if not available)
+            cur.execute(
+                """
+                INSERT INTO addresss (latitude, longitude, street, barangay, city, purok_sitio_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING address_id
+                """,
+                [lat, lng, up_street, up_brgy, up_city, v_purok_sitio_id],
+            )
+            incident_address_id = cur.fetchone()[0]
+
+    # Now create the blotter report using the (possibly newly created) address_id
     with connection.cursor() as cur:
         cur.execute(
             """
-          SELECT create_blotter_report(%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb)
-        """,
+            SELECT create_blotter_report(%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb)
+            """,
             [
                 staff_id,
                 request.POST.get("incident_subject") or None,
                 request.POST.get("incident_desc") or None,
                 request.POST.get("incident_date") or None,
                 request.POST.get("incident_time") or None,
-                _toi(request.POST.get("incident_address_id")),
+                incident_address_id,  # <— now filled if we created one
                 complainant_id,
                 respondent_ids if respondent_ids else None,
                 None,  # evidence jsonb
@@ -1584,6 +1650,7 @@ def _toi(x):
         return int(x) if x not in (None, "", "0") else None
     except Exception:
         return None
+
 
 @session_login_required
 @role_required(*LUPON_ROLES, "barangay treasurer")
@@ -1656,7 +1723,7 @@ def report_confirm(request: HttpRequest, report_id: int):
             row_r = cur.fetchone()
             r_last = (row_r and (row_r[0] or "").strip()) or ""
 
-            initial_case_name = f"{c_last} vs. {r_last}" if (c_last and r_last) else "People vs."
+            initial_case_name = f"{c_last} vs {r_last}" if (c_last and r_last) else "People vs"
 
         ctx = {
             "rpt": rpt,
@@ -1678,11 +1745,44 @@ def report_confirm(request: HttpRequest, report_id: int):
         messages.error(request, "Session expired. Please login again.")
         return redirect("lupon_mem:report_confirm", report_id=report_id)
 
+    def _default_case_name(cur) -> str:
+        # compute a basic default if the client didn't send case_name
+        cur.execute(
+            """
+            SELECT coalesce(c_last,''), coalesce(r_last,'')
+            FROM (
+              SELECT
+                (SELECT p.last_name
+                   FROM complainant_report cr
+                   JOIN person p ON p.person_id = cr.person_id
+                  WHERE cr.blotter_report_id=%s
+                  ORDER BY p.last_name, p.first_name
+                  LIMIT 1) AS c_last,
+                (SELECT p.last_name
+                   FROM respondent_report rr
+                   JOIN person p ON p.person_id = rr.person_id
+                  WHERE rr.blotter_report_id=%s
+                  ORDER BY p.last_name, p.first_name
+                  LIMIT 1) AS r_last
+            ) s
+            """,
+            [report_id, report_id],
+        )
+        row = cur.fetchone()
+        c_last = (row and (row[0] or "").strip()) or ""
+        r_last = (row and (row[1] or "").strip()) or ""
+        return f"{c_last} vs {r_last}" if (c_last and r_last) else "People vs"
+
     # Pull fields
-    case_name = (request.POST.get("case_name") or "").strip() or "Untitled Case"
+    case_name = (request.POST.get("case_name") or "").strip()
     complaint_title_id = _toi(request.POST.get("complaint_title_id"))
     case_nature_id = _toi(request.POST.get("case_nature_id"))
     settlement_status_id = _toi(request.POST.get("settlement_status_id"))
+
+    # fill case_name if blank
+    if not case_name:
+        with connection.cursor() as cur:
+            case_name = _default_case_name(cur)
 
     with_payment = (request.POST.get("with_payment") == "on")
     payment_receipt = (request.POST.get("payment_receipt") or "").strip() or None
@@ -1694,7 +1794,6 @@ def report_confirm(request: HttpRequest, report_id: int):
     payment_status = (request.POST.get("payment_status") or "PAID").strip().upper()
     paid_by_person_id = _toi(request.POST.get("paid_by_person_id"))
 
-    # Basic validation to avoid falling through without return
     if not complaint_title_id or not case_nature_id or not settlement_status_id:
         messages.error(request, "Please select Complaint Title, Case Nature, and Settlement Status.")
         return redirect("lupon_mem:report_confirm", report_id=report_id)
@@ -1703,7 +1802,6 @@ def report_confirm(request: HttpRequest, report_id: int):
         messages.error(request, "Enter an OR / Receipt No. to record the payment.")
         return redirect("lupon_mem:report_confirm", report_id=report_id)
 
-    # Call DB function safely
     try:
         with connection.cursor() as cur:
             cur.execute(
@@ -1733,15 +1831,15 @@ def report_confirm(request: HttpRequest, report_id: int):
                 return redirect("lupon_mem:report_confirm", report_id=report_id)
             case_id = int(row[0])
     except DatabaseError as e:
-        # Ensure we still return a response
         messages.error(request, f"Failed to create case: {e}")
         return redirect("lupon_mem:report_confirm", report_id=report_id)
-    except Exception as e:
+    except Exception:
         messages.error(request, "Unexpected error while creating case.")
         return redirect("lupon_mem:report_confirm", report_id=report_id)
 
     messages.success(request, f"Case #{case_id} created.")
     return redirect("lupon_mem:case_detail", case_id=case_id)
+
 
 
 @session_login_required
@@ -2301,9 +2399,26 @@ def report_review(request: HttpRequest, report_id: int):
                    COALESCE(br.incident_subject,'(no subject)') AS subj,
                    COALESCE(br.incident_desc,'') AS descr,
                    to_char(br.date_time_reported,'YYYY-MM-DD HH24:MI') AS reported_at,
-                   COALESCE(ps.payment_status_name, '—') AS pay_status
+                   COALESCE(ps.payment_status_name, '—') AS pay_status,
+                   /* ---- appended: incident address text ---- */
+                   COALESCE(
+                     NULLIF(
+                       trim(
+                         concat_ws(', ',
+                           NULLIF(a.street, ''),
+                           NULLIF(pks.purok_sitio_name, ''),
+                           NULLIF(a.barangay, ''),
+                           NULLIF(a.city, '')
+                         )
+                       ), ''
+                     ), '—'
+                   ) AS incident_address,
+                   a.latitude,
+                   a.longitude
             FROM blotter_report br
             LEFT JOIN payment_status ps ON ps.payment_status_id = br.payment_status_id
+            LEFT JOIN addresss a        ON a.address_id = br.incident_address_id
+            LEFT JOIN purok_sitio pks   ON pks.purok_sitio_id = a.purok_sitio_id
             WHERE br.blotter_report_id=%s
         """, [report_id])
         rpt = cur.fetchone()
@@ -2324,7 +2439,6 @@ def report_review(request: HttpRequest, report_id: int):
         """, [report_id, report_id])
         parties = cur.fetchall()
 
-        # Lookups for the "case details" section (review page mirrors pay page, minus payment card)
         cur.execute("SELECT complaint_title_id, complaint_title_name FROM complaint_title ORDER BY 2")
         complaint_titles = cur.fetchall()
         cur.execute("SELECT case_nature_id, case_name FROM case_nature ORDER BY 2")
@@ -2344,8 +2458,6 @@ def report_review(request: HttpRequest, report_id: int):
     }
     return render(request, "lupon_mem/report_review.html", ctx)
 
-
-# ------------------------------
 
 # APPROVE (Lupon -> set UNPAID via DB func)
 # ------------------------------

@@ -382,3 +382,4 @@ class KP16Handler:
         self._log_fill_map(out)
 
         return out
+    

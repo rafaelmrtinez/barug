@@ -1725,17 +1725,6 @@ def business_details(request: HttpRequest) -> HttpResponse:
         messages.error(request, "Missing staff context. Please log in again.")
         return redirect("login")
 
-    # bucket from settings (required)
-    BUCKET = getattr(settings, "SUPABASE_BUCKET", None)
-    if not BUCKET:
-        messages.error(request, "Storage bucket is not configured. Set SUPABASE_BUCKET in settings.")
-        return redirect("clerk:business_owner_resident")
-
-    draft = _get_draft(request)
-    owner_person_id = draft.get("owner_person_id")
-    if not owner_person_id:
-        messages.warning(request, "Please choose a resident owner first.")
-        return redirect("clerk:business_owner_resident")
 
     form = BusinessDetails(request.POST or None, request.FILES or None)
 

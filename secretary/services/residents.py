@@ -67,6 +67,6 @@ def build_address_line(r: Dict) -> str:
     street = (s.get("street_name") or "").strip()
     purok = ((s.get("purok_sitio") or {}).get("purok_sitio_name") or "").strip()
     brgy  = ((s.get("barangay") or {}).get("barangay_name") or "").strip()
-    city  = ((s.get("city") or {}).get("city_name") or "").strip()
+    city  = ((s.get("city") or {})  .get("city_name") or "").strip()
     parts = [p for p in [street, purok, brgy, city] if p]
     return ", ".join(parts) if parts else "—"

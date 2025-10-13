@@ -62,8 +62,8 @@ if isProduction != None and isProduction == "True":
     ALLOWED_HOSTS = ["barug-development.onrender.com"]
 else:
     DEBUG = True
-ALLOWED_HOSTS = ['*']
 
+ALLOWED_HOSTS = ['*']
 CORS_ALLOW_ALL_ORIGINS = True
 # Application definition
 
@@ -135,6 +135,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "authentication.context_processors.auth_context",
+                "lupon_mem.context_processors.lupon_badge_counts",
             ],
         },
     },
