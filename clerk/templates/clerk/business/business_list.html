@@ -9,6 +9,41 @@
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
 <link rel="stylesheet" href="{% static 'css/paginator.css' %}">
 <link rel="stylesheet" href="{% static 'css/filters.css' %}">
+
+<style>
+  .btn-outline-brand{ color:#6d2932; border-color:#6d2932; background:#fff; }
+  .btn-outline-brand:hover{ background:#6d2932; color:#fff; }
+
+  .table thead th{
+    font-size:.80rem;
+    text-transform:uppercase;   /* keep headers uppercase */
+    letter-spacing:.02em;
+    vertical-align:middle;
+    white-space:nowrap;
+    text-align:left;
+  }
+
+  .table tbody td{
+    font-size:.80rem;           /* slightly smaller body text */
+    vertical-align:middle;
+    text-align:left;
+    font-weight:600;            /* normalize weight */
+  }
+
+  .cat-badge{
+    display:inline-block;
+    font-size:.74rem;
+    padding:.28rem .52rem;
+    line-height:1;
+    border-radius:999px;
+    background:#f3eaeb;
+    color:#6d2932;
+    border:1px solid rgba(109,41,50,.18);
+    text-align:center;
+    font-weight:600;            /* ensure not bold */
+  }
+</style>
+
 {% endblock %}
 
 {% block content %}
@@ -29,16 +64,22 @@
         <input type="hidden" name="ownership_type" value="{{ request.GET.ownership_type|default:'' }}">
         <input type="hidden" name="status" value="{{ request.GET.status|default:'' }}">
 
-        <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
-                type="button"
-                data-bs-toggle="offcanvas"
-                data-bs-target="#filterPanel"
-                aria-controls="filterPanel">
-          {% bs_icon 'sliders' extra_classes='me-2' %} Filters
-          <!-- {% if request.GET.b_type or request.GET.ownership_type or request.GET.status %}
-            <span class="badge rounded-pill text-bg-light ms-2">•</span>
-          {% endif %} -->
-        </button>
+        {# --- Filters button with badge count (b_category, ownership_type, status) --- #}
+        {% with bcat=request.GET.b_category|yesno:"1,0" own=request.GET.ownership_type|yesno:"1,0" stat=request.GET.status|yesno:"1,0" %}
+          {% with fc=0|add:bcat|add:own|add:stat %}
+            <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
+                    type="button"
+                    data-bs-toggle="offcanvas"
+                    data-bs-target="#filterPanel"
+                    aria-controls="filterPanel">
+              {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+              {% if fc %}
+                <span class="badge rounded-pill text-bg-light ms-2">{{ fc }}</span>
+              {% endif %}
+            </button>
+          {% endwith %}
+        {% endwith %}
+
 
         <a class="btn btn-outline-brand ms-2" href="{% url 'clerk:business_owner' %}">
           {% bs_icon 'plus-lg' extra_classes='me-2' %} Add Business
