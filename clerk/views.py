@@ -2544,6 +2544,13 @@ def business_information_review(
                     except Exception:
                         pass
 
+            lat_post = _to_float_or_none(request.POST.get("latitude"))
+            lng_post = _to_float_or_none(request.POST.get("longitude"))
+            if lat_post is not None:
+                business["latitude"] = lat_post
+            if lng_post is not None:
+                business["longitude"] = lng_post
+
             cmd = RegisterBusinessProfileCmd(
                 owner=owner,
                 business=business,
@@ -2787,4 +2794,19 @@ def business_information(
             "operating_days_start_name": operating_days_start_name,
             "operating_days_end_name": operating_days_end_name,
         },
+    )
+
+def business_map_list(request):
+    user_role = _auth_role_name(request)
+
+    form = BusinessFilters()
+
+    return render(
+        request,
+        "business/business_map_list.html",
+        {
+            'page_path': f"{user_role} / Business Map",
+            'page_title': "Business Map",
+            'form': form,
+        }
     )

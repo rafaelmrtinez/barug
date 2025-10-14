@@ -4,7 +4,6 @@
 {% load choiceextras %}
 
 {% block css %}
-<link rel="stylesheet" href="{% static 'css/form.css' %}">
 <link rel="stylesheet" href="{% static 'css/table.css' %}">
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
 <link rel="stylesheet" href="{% static 'css/paginator.css' %}">
@@ -162,42 +161,44 @@
   {% endif %}
 
   {# ─── Offcanvas Filters (dynamic from form choices) ─── #}
-  <div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
-       aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150px;">
+    <div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
+        aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150px;">
     <div class="offcanvas-header">
-      <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
-      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
 
     <div class="offcanvas-body">
-      <form method="get" id="filterForm">
-        <div>
-          <label class="form-label">Business Category</label>
-          {{ form.b_category }}
+        <form method="get" id="filterForm">
+        <div class="mb-3">
+            <label class="form-label">Business Category</label>
+            {{ form.b_category }}
         </div>
 
-        <div>
-          <label class="form-label">Ownership Type</label>
-          {{ form.ownership_type }}
+        <div class="mb-3">
+            <label class="form-label">Ownership Type</label>
+            {{ form.ownership_type }}
         </div>
 
-        <div>
-          <label class="form-label">Status</label>
-          {{ form.status }}
+        <div class="mb-3">
+            <label class="form-label">Status</label>
+            {{ form.status }}
         </div>
 
         {# keep search term when applying filters #}
         <input type="hidden" name="search" value="{{ request.GET.search|default:'' }}"/>
 
+        <!-- Footer pinned to bottom, right-aligned -->
         <div class="offcanvas-footer">
-          <div class="d-flex justify-content-between">
-            <a class="btn btn-outline-brand" href="?search={{ request.GET.search|urlencode }}">Clear</a>
+            <div class="actions">
+            <a class="btn btn-outline-brand"
+                href="?search={{ request.GET.search|urlencode }}">Clear</a>
             <button type="submit" class="btn btn-brand">Apply Filters</button>
-          </div>
+            </div>
         </div>
-      </form>
+        </form>
     </div>
-  </div>
+    </div>
 
 </div>
 

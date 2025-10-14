@@ -45,6 +45,7 @@ urlpatterns = [
     path("business/business_information_review/", views.business_information_review, name="business_information_review"),
     path("business_list/", views.business_list, name="business_list"),
     path("business_information/<int:b_id>/", views.business_information, name="business_information"),
+    path("business/business_map/", views.business_map_list, name="business_map_list"),
 
     # OCR
     path('upload-id/', web_views.upload_valid_id_files, name='upload_id_files'),

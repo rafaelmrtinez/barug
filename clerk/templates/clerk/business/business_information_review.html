@@ -131,6 +131,9 @@
               <p class="fw-semibold mb-1 text-uppercase">{{ biz_disp.address_display|upper }}</p>
             </div>
 
+            <input type="hidden" name="latitude"  value="{{ business.latitude }}">
+            <input type="hidden" name="longitude" value="{{ business.longitude }}">
+
             <div class="col-12">
               <small class="text-muted">Description</small>
               <p class="fw-semibold mb-0 text-uppercase">{{ biz_disp.b_desc|upper }}</p>

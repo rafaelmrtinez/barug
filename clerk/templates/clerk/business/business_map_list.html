@@ -1,0 +1,247 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+{% load choiceextras %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/filters.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<link rel="stylesheet" href="{% static 'css/business_map.css' %}">
+
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"/>
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="{% static 'js/business_map.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap" style="margin-top: 40px;">
+
+  <!-- MAP -->
+  <div style="position:relative">
+    <div id="purokMap"></div>
+    <div class="legend">
+      <h4>Purok / Sitio</h4>
+      <div class="item"><span class="swatch" style="background:#7B1E22"></span> KANIPAAN</div>
+      <div class="item"><span class="swatch" style="background:#D4AF37"></span> PAMPANGO</div>
+      <div class="item"><span class="swatch" style="background:#4f46e5"></span> LUTAW-LUTAW</div>
+      <div class="item"><span class="swatch" style="background:#16a34a"></span> MAUCO</div>
+    </div>
+  </div>
+
+  <!-- SEARCH & FILTERS (static demo) -->
+  <div class="filters-card">
+    {# ─── Toolbar: search + filters + add ─── #}
+    <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+    {% csrf_token %}
+    <div class="searchbox">
+        {% bs_icon 'search' extra_classes='bi' %}
+        {{ form.search }}
+    </div>
+
+    {# preserve selected filters when searching #}
+    <input type="hidden" name="b_type" value="{{ request.GET.b_type|default:'' }}">
+    <input type="hidden" name="ownership_type" value="{{ request.GET.ownership_type|default:'' }}">
+    <input type="hidden" name="status" value="{{ request.GET.status|default:'' }}">
+
+    {# --- Filters button with badge count (b_category, ownership_type, status) --- #}
+    {% with bcat=request.GET.b_category|yesno:"1,0" own=request.GET.ownership_type|yesno:"1,0" stat=request.GET.status|yesno:"1,0" %}
+        {% with fc=0|add:bcat|add:own|add:stat %}
+        <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
+                type="button"
+                data-bs-toggle="offcanvas"
+                data-bs-target="#filterPanel"
+                aria-controls="filterPanel">
+            {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+            {% if fc %}
+            <span class="badge rounded-pill text-bg-light ms-2">{{ fc }}</span>
+            {% endif %}
+        </button>
+        {% endwith %}
+    {% endwith %}
+    </form>
+
+    {# ─── Active filter chips (show selected labels) ─── #}
+    <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
+    {% if request.GET.b_category or request.GET.ownership_type or request.GET.status %}
+        <span class="text-muted me-1">Active:</span>
+
+        {# Business Category chip #}
+        {% if request.GET.b_category %}
+        {% with label=form.b_category|choice_label:request.GET.b_category %}
+            <a class="filter-chip"
+            href="?search={{ request.GET.search|urlencode }}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}">
+            {{ label }}
+            <span class="x" aria-hidden="true">×</span>
+            </a>
+        {% endwith %}
+        {% endif %}
+
+        {# Ownership Type chip #}
+        {% if request.GET.ownership_type %}
+        {% with label=form.ownership_type|choice_label:request.GET.ownership_type %}
+            <a class="filter-chip"
+            href="?search={{ request.GET.search|urlencode }}{% if request.GET.b_category %}&b_category={{ request.GET.b_category|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}">
+            {{ label }}
+            <span class="x" aria-hidden="true">×</span>
+            </a>
+        {% endwith %}
+        {% endif %}
+
+        {# Status chip #}
+        {% if request.GET.status %}
+        {% with label=form.status|choice_label:request.GET.status %}
+            <a class="filter-chip"
+            href="?search={{ request.GET.search|urlencode }}{% if request.GET.b_category %}&b_category={{ request.GET.b_category|urlencode }}{% endif %}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}">
+            {{ label }}
+            <span class="x" aria-hidden="true">×</span>
+            </a>
+        {% endwith %}
+        {% endif %}
+
+        <a class="btn btn-sm btn-outline-brand ms-1" href="?search={{ request.GET.search|urlencode }}">
+        {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
+        </a>
+    {% else %}
+        <span class="text-muted small">No active filters.</span>
+    {% endif %}
+    </div>
+  </div>
+
+  <!-- RESULTS (static demo) -->
+  <div class="results-wrap">
+    <div class="results-header">
+      <div class="results-count">3 results</div>
+    </div>
+
+    <div class="vstack gap-3">
+      <!-- Biz 1 -->
+      <div class="biz-card">
+        <div class="biz-grid">
+          <div>
+            <p class="biz-title">Aling Nena Sari-Sari Store <span class="text-muted">#1001</span></p>
+            <div class="biz-sub">Purok Kanipaan, Sto. Niño · Sto. Niño</div>
+          </div>
+
+          <div class="biz-meta">
+            <span class="badge badge-status">ACTIVE</span>
+            <span><span class="meta-label">Category:</span> <span class="meta-val">Sari-Sari Store</span></span>
+            <span><span class="meta-label">Type:</span> <span class="meta-val">Trading</span></span>
+            <span><span class="meta-label">Ownership:</span> <span class="meta-val">Sole Proprietorship</span></span>
+            <span><span class="meta-label">Owner:</span> <span class="meta-val">JUAN DELA CRUZ</span></span>
+            <span><span class="meta-label">Hours:</span> <span class="meta-val">8:00 AM – 9:00 PM</span></span>
+            <span><span class="meta-label">Days:</span> <span class="meta-val">Mon–Sun</span></span>
+          </div>
+
+          <div class="card-actions">
+            <button type="button" class="btn btn-outline-brand js-locate"
+              data-lat="10.29530" data-lng="123.90220">
+              {% bs_icon 'geo-alt' %} Locate on map
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Biz 2 -->
+      <div class="biz-card">
+        <div class="biz-grid">
+          <div>
+            <p class="biz-title">Mauco Car Wash <span class="text-muted">#1002</span></p>
+            <div class="biz-sub">Mauco Road, Sto. Niño · Sto. Niño</div>
+          </div>
+
+          <div class="biz-meta">
+            <span class="badge badge-status">ACTIVE</span>
+            <span><span class="meta-label">Category:</span> <span class="meta-val">Services</span></span>
+            <span><span class="meta-label">Type:</span> <span class="meta-val">Services</span></span>
+            <span><span class="meta-label">Ownership:</span> <span class="meta-val">Partnership</span></span>
+            <span><span class="meta-label">Owner:</span> <span class="meta-val">MARIA SANTOS</span></span>
+            <span><span class="meta-label">Hours:</span> <span class="meta-val">9:00 AM – 6:00 PM</span></span>
+            <span><span class="meta-label">Days:</span> <span class="meta-val">Tue–Sun</span></span>
+          </div>
+
+          <div class="card-actions">
+            <button type="button" class="btn btn-outline-brand js-locate"
+              data-lat="10.29470" data-lng="123.90310">
+              {% bs_icon 'geo-alt' %} Locate on map
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Biz 3 -->
+      <div class="biz-card">
+        <div class="biz-grid">
+          <div>
+            <p class="biz-title">Pampango Bakehouse <span class="text-muted">#1003</span></p>
+            <div class="biz-sub">Purok Pampango, Sto. Niño · Sto. Niño</div>
+          </div>
+
+          <div class="biz-meta">
+            <span class="badge badge-status">INACTIVE</span>
+            <span><span class="meta-label">Category:</span> <span class="meta-val">Food & Beverage</span></span>
+            <span><span class="meta-label">Type:</span> <span class="meta-val">Manufacturing</span></span>
+            <span><span class="meta-label">Ownership:</span> <span class="meta-val">Corporation</span></span>
+            <span><span class="meta-label">Owner:</span> <span class="meta-val">ROBERTO LIM</span></span>
+            <span><span class="meta-label">Hours:</span> <span class="meta-val">10:00 AM – 10:00 PM</span></span>
+            <span><span class="meta-label">Days:</span> <span class="meta-val">Mon–Sun</span></span>
+          </div>
+
+          <div class="card-actions">
+            <button type="button" class="btn btn-outline-brand js-locate"
+              data-lat="10.29620" data-lng="123.90160">
+              {% bs_icon 'geo-alt' %} Locate on map
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  {% if page_obj.has_other_pages %}
+    <div class="page-pagination">
+      {% include 'paginator.html' %}
+    </div>
+  {% endif %}
+
+  {# ─── Offcanvas Filters (dynamic from form choices) ─── #}
+    <div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
+        aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150px;">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+
+    <div class="offcanvas-body">
+        <form method="get" id="filterForm">
+        <div class="mb-3">
+            <label class="form-label">Business Category</label>
+            {{ form.b_category }}
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Ownership Type</label>
+            {{ form.ownership_type }}
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Status</label>
+            {{ form.status }}
+        </div>
+
+        {# keep search term when applying filters #}
+        <input type="hidden" name="search" value="{{ request.GET.search|default:'' }}"/>
+
+        <!-- Footer pinned to bottom, right-aligned -->
+        <div class="offcanvas-footer">
+            <div class="actions">
+            <a class="btn btn-outline-brand"
+                href="?search={{ request.GET.search|urlencode }}">Clear</a>
+            <button type="submit" class="btn btn-brand">Apply Filters</button>
+            </div>
+        </div>
+        </form>
+    </div>
+    </div>
+
+</div>
+{% endblock %}

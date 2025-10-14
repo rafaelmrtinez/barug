@@ -167,7 +167,12 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD"),
         "HOST": os.getenv("DB_HOST"),
         "PORT": os.getenv("DB_PORT"),
-        "OPTIONS": {"sslmode": "require"},  # <-- add this for Supabase
+        "OPTIONS": {
+            "sslmode": "require",
+            "connect_timeout": 10,
+            "options": "-c statement_timeout=5000"
+        }, 
+        "CONN_MAX_AGE": 120,
     }
 }
 
