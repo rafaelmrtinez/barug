@@ -2592,7 +2592,7 @@ def business_information_review(
                 request.session.pop("bizreg_owner", None)
                 request.session.pop("bizreg_business", None)
                 messages.success(request, f'Business #{business_id} created for owner #{owner_person_id}.')
-                return redirect("clerk:business_list")
+                return redirect("clerk:business_information", b_id=business_id)
             except Exception as e:
                 print("[business_information_review] Failed to register business:", e, flush=True)
                 traceback.print_exc()
@@ -2782,12 +2782,14 @@ def business_information(
     operating_days_start_name = days[0] if days else None
     operating_days_end_name = days[-1] if days else None
 
+    formatted_id = f"{int(b_id):06d}"
+
     return render(
         request,
         "business/business_information.html",
         {
-            "page_path": f"{user_role} / Business Records / Business Details : {b_id}",
-            "page_title": f"Business Details : {b_id}",
+            "page_path": f"{user_role} / Business Records / Business Details : {formatted_id}",
+            "page_title": f"Business Details : {formatted_id}",
             "owner": owner,
             "business": dto.business,
             "business_files": (dto.business_proof or {}).get("files") or [],
@@ -2796,10 +2798,37 @@ def business_information(
         },
     )
 
-def business_map_list(request):
+@session_login_required
+@role_required(CLERK_ROLE)
+@csrf_protect
+@nocache
+@inject
+def business_map_list(
+    request: HttpRequest,
+    business_service: IBusinessService = Provide[AppContainer.business_service],
+) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+    
     user_role = _auth_role_name(request)
+    form = BusinessFilters(request.GET or None)
 
-    form = BusinessFilters()
+    search = request.GET.get("search")
+    b_category = _to_int_or_none(request.GET.get("b_category"))
+    ownership_type = _to_int_or_none(request.GET.get("ownership_type"))
+    status = _to_int_or_none(request.GET.get("status"))
+
+    rows = business_service.execute(
+        search=search,
+        b_category=b_category,
+        ownership_type=ownership_type,
+        status=status,
+    )
+
+    paginator = Paginator(rows, 5)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    if (search or b_category is not None or ownership_type is not None or status is not None) and not form.is_valid():
+        form = BusinessFilters()
 
     return render(
         request,
@@ -2808,5 +2837,12 @@ def business_map_list(request):
             'page_path': f"{user_role} / Business Map",
             'page_title': "Business Map",
             'form': form,
+            'page_obj' : page_obj,
+            'filters' : {
+                'search' : search,
+                'b_category' : b_category,
+                'ownership_type' :ownership_type,
+                'status' : status,
+            }
         }
     )

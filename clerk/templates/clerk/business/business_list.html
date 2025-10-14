@@ -15,11 +15,32 @@
 
   .table thead th{
     font-size:.80rem;
-    text-transform:uppercase;   /* keep headers uppercase */
+    text-transform:capitalize;   /* keep headers uppercase */
     letter-spacing:.02em;
     vertical-align:middle;
     white-space:nowrap;
     text-align:left;
+  }
+
+  .table .business-id{
+    width:1%;
+    white-space:nowrap;
+  }
+
+  /* Pill-styled, monospace, tabular digits for perfect alignment */
+  .id-pill{
+    display:inline-block;
+    padding:.22rem .55rem;
+    border-radius:999px;
+    background:#f8f1f2;                      /* soft brand-tinted bg */
+    border:1px solid rgba(109,41,50,.18);    /* matches your cat-badge border tone */
+    color:#6d2932;
+    font-weight:700;
+    font-size:.78rem;
+    line-height:1;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", Consolas, "Liberation Mono", monospace;
+    font-variant-numeric: tabular-nums;      /* aligned digits */
+    letter-spacing:.03em;
   }
 
   .table tbody td{
@@ -136,6 +157,7 @@
         <table class="table align-middle">
           <thead>
             <tr>
+              <th scope="col">Business ID</th>
               <th scope="col">Business Name</th>
               <th scope="col">Category</th>
               <th scope="col">Nature</th>

@@ -1,0 +1,27 @@
+{% for r in rows %}
+    <div class="biz-card">
+    <div class="biz-grid">
+        <div>
+        <p class="biz-title">{{ r.business_name|title }} <span class="text-muted">#{{ r.business_id|stringformat:"06d" }}</span></p>
+        <div class="biz-sub">{{ r.business_address|title }}</div>
+        </div>
+
+        <div class="biz-meta">
+        <span class="badge badge-status">{{ r.business_status_name|title }}</span>
+        <span><span class="meta-label">Category:</span> <span class="meta-val">{{ r.business_category_name|title }}</span></span>
+        <span><span class="meta-label">Nature:</span> <span class="meta-val">{{ r.business_nature|title }}</span></span>
+        <span><span class="meta-label">Ownership:</span> <span class="meta-val">{{ r.ownership_type_name|title }}</span></span>
+        <span><span class="meta-label">Owner:</span> <span class="meta-val">{{ r.business_owner_name|title }}</span></span>
+        </div>
+
+        <div class="card-actions">
+        <button type="button" class="btn btn-outline-brand js-locate"
+            data-lat="10.29530" data-lng="123.90220">
+            {% load bootstrap_icons %}{% bs_icon 'geo-alt' %} Locate on map
+        </button>
+        </div>
+    </div>
+    </div>
+    {% empty %}
+    <span class="text-center">No businesses found.</span>
+{% endfor %}

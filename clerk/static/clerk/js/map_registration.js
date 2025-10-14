@@ -81,8 +81,11 @@ document.addEventListener("DOMContentLoaded", function () {
     container: 'map',
     style: 'mapbox://styles/mapbox/streets-v11',
     center: defaultCoordinates,
-    zoom: 15
+    zoom: 15,
+    attributionControl: false 
   });
+
+  map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
 
   const marker = new mapboxgl.Marker({ color: '#800000', draggable: true })
     .setLngLat(defaultCoordinates)
@@ -161,15 +164,15 @@ document.addEventListener("DOMContentLoaded", function () {
     attemptUpdate({ lng: e.lngLat.lng, lat: e.lngLat.lat });
   });
 
-  document.getElementById('style-selector')?.addEventListener('change', function (e) {
-    const style = `mapbox://styles/${e.target.value}`;
-    map.setStyle(style);
-    map.on('style.load', () => {
-      if (!map.getSource('sto-nino-BG')) map.addSource('sto-nino-BG', { type: 'geojson', data: stoNinoBoundary });
-      if (!map.getSource('puroks')) map.addSource('puroks', { type: 'geojson', data: purokFc });
-      addLayers();
-    });
-  });
+  // document.getElementById('style-selector')?.addEventListener('change', function (e) {
+  //   const style = `mapbox://styles/${e.target.value}`;
+  //   map.setStyle(style);
+  //   map.on('style.load', () => {
+  //     if (!map.getSource('sto-nino-BG')) map.addSource('sto-nino-BG', { type: 'geojson', data: stoNinoBoundary });
+  //     if (!map.getSource('puroks')) map.addSource('puroks', { type: 'geojson', data: purokFc });
+  //     addLayers();
+  //   });
+  // });
 
   function setPurokInput(props) {
     const purokInput = document.getElementById('purok_sitio');
