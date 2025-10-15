@@ -62,9 +62,9 @@ if isProduction != None and isProduction == "True":
     ALLOWED_HOSTS = ["barug-development.onrender.com"]
 else:
     DEBUG = True
+
 ALLOWED_HOSTS = ['*']
-
-
+CORS_ALLOW_ALL_ORIGINS = True
 # Application definition
 
 INSTALLED_APPS = [
@@ -91,10 +91,12 @@ INSTALLED_APPS = [
     "midwife",
     "payments",
     "notifications",
+    "corsheaders"
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "django.middleware.gzip.GZipMiddleware",       # <-- add
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -104,6 +106,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "authentication.middleware.NoCacheMiddleware",
     "authentication.middleware.AttachProfileMiddleware",  # <— add
+    "corsheaders.middleware.CorsMiddleware"
 ]
 
 ROOT_URLCONF = "barug.urls"
@@ -133,6 +136,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "authentication.context_processors.auth_context",
                 'django.template.context_processors.media',
+                "lupon_mem.context_processors.lupon_badge_counts",
             ],
         },
     },

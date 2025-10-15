@@ -1,3 +1,4 @@
+{# business_list.html (hardcoded filters) #}
 {% extends 'base.html' %}
 {% load static %}
 {% load bootstrap_icons %}
@@ -67,9 +68,8 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-wrap">
-
-  <div class="container-fluid pt-3 page-main" style="margin-top: 40px;">
+<div class="page-wrap" style="margin-top: 40px;">
+  <div class="container-fluid pt-3 page-main">
     <div class="row">
       {# ─── Toolbar: search + filters + add ─── #}
       <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
@@ -177,6 +177,7 @@
   </div>
 
   {% if page_obj.has_other_pages %}
+    <div class="page-pagination">
     <div class="page-pagination">
       {% include 'paginator.html' %}
     </div>

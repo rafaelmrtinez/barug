@@ -100,12 +100,11 @@
 
   function popupHtml(p) {
     const esc = s => (s || "").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-    const addr = [p.street, p.barangay, p.city].filter(Boolean).join(", ");
+    const addr = [p.street, p.purok, p.barangay, p.city].filter(Boolean).join(", ");
     return `
       <div style="min-width:220px">
         <strong>${esc(p.business_name)}</strong><br/>
         ${esc(addr)}<br/>
-        ${p.purok ? `Purok: ${esc(p.purok)}<br/>` : ""}
         ${p.ownership_type ? `Ownership: ${esc(p.ownership_type)}<br/>` : ""}
         ${p.status ? `Status: ${esc(p.status)}` : ""}
       </div>

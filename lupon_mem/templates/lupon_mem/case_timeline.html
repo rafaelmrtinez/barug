@@ -1,0 +1,69 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Case Timeline — {{ header.case_num }}</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    :root { --c1:#0f172a; --c2:#64748b; --ok:#16a34a; --muted:#94a3b8; --line:#e2e8f0; --badge:#f1f5f9; }
+    * { box-sizing: border-box; }
+    body { margin:0; font:14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color:#0f172a; background:#fff; }
+    .wrap { max-width: 900px; margin: 24px auto; padding: 0 16px 40px; }
+    h1 { font-size: 20px; margin: 0 0 8px; }
+    .sub { color: var(--c2); margin-bottom: 20px; }
+    .header { display:flex; flex-wrap:wrap; gap:12px; align-items:baseline; margin-bottom:16px; }
+    .stat { display:inline-block; background:var(--badge); color:#0f172a; border-radius:999px; padding:4px 10px; font-size:12px; }
+    .timeline { position:relative; margin-top:10px; }
+    .timeline:before { content:""; position:absolute; left:14px; top:0; bottom:0; width:2px; background:var(--line); }
+    .item { position:relative; padding-left:40px; margin:20px 0; }
+    .dot { position:absolute; left:8px; top:6px; height:12px; width:12px; border-radius:50%; background:#0ea5e9; border:2px solid #fff; box-shadow:0 0 0 2px var(--line); }
+    .item.form .dot{ background:#8b5cf6; }
+    .item.report .dot{ background:#f59e0b; }
+    .item.case .dot{ background:#10b981; }
+    .title { font-weight:600; }
+    .subtitle { color:var(--c2); }
+    .meta { color:var(--muted); font-size:12px; margin-top:2px; }
+    .date { font-size:12px; color:var(--c2); }
+    .row { display:flex; justify-content:space-between; gap:12px; align-items:baseline; }
+    .empty { color:var(--muted); padding:16px; border:1px dashed var(--line); border-radius:8px; margin-top:12px; }
+    a.btn { display:inline-block; padding:6px 10px; border-radius:8px; border:1px solid var(--line); text-decoration:none; color:#0f172a; }
+    @media (max-width:600px){ .row{flex-direction:column; align-items:flex-start;} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <h1>Case Timeline — {{ header.case_num }}</h1>
+      <span class="stat">{{ header.type_name }}</span>
+      <span class="stat">{{ header.nature_name }}</span>
+      <a class="btn" href="{% url 'lupon_mem:case_detail' header.case_id %}">Back to Case</a>
+    </div>
+    <p class="sub">{{ header.case_name }}</p>
+
+    {% if events %}
+      <div class="timeline">
+        {% for e in events %}
+          <div class="item {{ e.kind }}">
+            <span class="dot"></span>
+            <div class="row">
+              <div>
+                <div class="title">{{ e.title }}</div>
+                {% if e.subtitle %}<div class="subtitle">{{ e.subtitle }}</div>{% endif %}
+                {% if e.meta.submission_id %}
+                  <div class="meta">Submission #{{ e.meta.submission_id }} • Status: {{ e.meta.status }}</div>
+                {% endif %}
+              </div>
+              <div class="date">
+                {% if e.dt %}{{ e.dt|date:"M d, Y" }} {{ e.dt|date:"h:i A" }}{% else %}—{% endif %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty">No events yet for this case.</div>
+    {% endif %}
+  </div>
+</body>
+</html>

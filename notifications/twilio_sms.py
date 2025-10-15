@@ -3,7 +3,7 @@ import re
 from twilio.rest import Client
 from django.conf import settings
 
-_client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+_client = Client(122, 122)
 
 def to_e164_ph(num: str) -> str | None:
     if not num: return None
