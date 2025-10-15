@@ -38,7 +38,7 @@
     font-weight:700;
     font-size:.78rem;
     line-height:1;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", Consolas, "Liberation Mono", monospace;
+    /* font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", Consolas, "Liberation Mono", monospace; */
     font-variant-numeric: tabular-nums;      /* aligned digits */
     letter-spacing:.03em;
   }
@@ -80,7 +80,7 @@
         </div>
 
         {# preserve selected filters when searching #}
-        <input type="hidden" name="b_type" value="{{ request.GET.b_type|default:'' }}">
+        <input type="hidden" name="b_category" value="{{ request.GET.b_category|default:'' }}">
         <input type="hidden" name="ownership_type" value="{{ request.GET.ownership_type|default:'' }}">
         <input type="hidden" name="status" value="{{ request.GET.status|default:'' }}">
 
@@ -235,10 +235,11 @@
   function currentParams() {
     const params = new URLSearchParams();
     params.set('q', (input?.value || '').trim());
-    const bType = document.querySelector('input[name="b_type"]')?.value || '';
+    params.set('tpl', 'rows');  
+    const bType = document.querySelector('input[name="b_category"]')?.value || '';
     const ownership = document.querySelector('input[name="ownership_type"]')?.value || '';
     const status = document.querySelector('input[name="status"]')?.value || '';
-    if (bType) params.set('b_type', bType);
+    if (bType) params.set('b_category', bType);
     if (ownership) params.set('ownership_type', ownership);
     if (status) params.set('status', status);
     return params.toString();

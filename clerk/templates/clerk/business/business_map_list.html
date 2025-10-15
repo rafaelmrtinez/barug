@@ -19,7 +19,7 @@
 
   <!-- MAP -->
   <div style="position:relative">
-    <div id="purokMap"></div>
+    <div id="purokMap" data-pins-url="{{ pins_url }}"></div>
     <div class="legend">
       <h4>Purok / Sitio</h4>
       <div class="item"><span class="swatch" style="background:#7B1E22"></span> KANIPAAN</div>
@@ -29,140 +29,181 @@
     </div>
   </div>
 
-  <!-- SEARCH & FILTERS (static demo) -->
+  <!-- SEARCH & FILTERS -->
   <div class="filters-card">
-    {# ─── Toolbar: search + filters + add ─── #}
     <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
-    {% csrf_token %}
-    <div class="searchbox">
+      {% csrf_token %}
+      <div class="searchbox">
         {% bs_icon 'search' extra_classes='bi' %}
         {{ form.search }}
-    </div>
+      </div>
 
-    {# preserve selected filters when searching #}
-    <input type="hidden" name="b_type" value="{{ request.GET.b_type|default:'' }}">
-    <input type="hidden" name="ownership_type" value="{{ request.GET.ownership_type|default:'' }}">
-    <input type="hidden" name="status" value="{{ request.GET.status|default:'' }}">
+      {# preserve selected filters when searching #}
+      <input type="hidden" name="b_category" value="{{ request.GET.b_category|default:'' }}">
+      <input type="hidden" name="ownership_type" value="{{ request.GET.ownership_type|default:'' }}">
+      <input type="hidden" name="status" value="{{ request.GET.status|default:'' }}">
 
-    {# --- Filters button with badge count (b_category, ownership_type, status) --- #}
-    {% with bcat=request.GET.b_category|yesno:"1,0" own=request.GET.ownership_type|yesno:"1,0" stat=request.GET.status|yesno:"1,0" %}
+      {% with bcat=request.GET.b_category|yesno:"1,0" own=request.GET.ownership_type|yesno:"1,0" stat=request.GET.status|yesno:"1,0" %}
         {% with fc=0|add:bcat|add:own|add:stat %}
         <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
                 type="button"
                 data-bs-toggle="offcanvas"
                 data-bs-target="#filterPanel"
                 aria-controls="filterPanel">
-            {% bs_icon 'sliders' extra_classes='me-2' %} Filters
-            {% if fc %}
+          {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+          {% if fc %}
             <span class="badge rounded-pill text-bg-light ms-2">{{ fc }}</span>
-            {% endif %}
+          {% endif %}
         </button>
         {% endwith %}
-    {% endwith %}
+      {% endwith %}
     </form>
 
-    {# ─── Active filter chips (show selected labels) ─── #}
+    {# Active filter chips ... (unchanged) #}
     <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
-    {% if request.GET.b_category or request.GET.ownership_type or request.GET.status %}
+      {% if request.GET.b_category or request.GET.ownership_type or request.GET.status %}
         <span class="text-muted me-1">Active:</span>
 
-        {# Business Category chip #}
         {% if request.GET.b_category %}
-        {% with label=form.b_category|choice_label:request.GET.b_category %}
+          {% with label=form.b_category|choice_label:request.GET.b_category %}
             <a class="filter-chip"
-            href="?search={{ request.GET.search|urlencode }}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}">
-            {{ label }}
-            <span class="x" aria-hidden="true">×</span>
+               href="?search={{ request.GET.search|urlencode }}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}">
+              {{ label }} <span class="x" aria-hidden="true">×</span>
             </a>
-        {% endwith %}
+          {% endwith %}
         {% endif %}
 
-        {# Ownership Type chip #}
         {% if request.GET.ownership_type %}
-        {% with label=form.ownership_type|choice_label:request.GET.ownership_type %}
+          {% with label=form.ownership_type|choice_label:request.GET.ownership_type %}
             <a class="filter-chip"
-            href="?search={{ request.GET.search|urlencode }}{% if request.GET.b_category %}&b_category={{ request.GET.b_category|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}">
-            {{ label }}
-            <span class="x" aria-hidden="true">×</span>
+               href="?search={{ request.GET.search|urlencode }}{% if request.GET.b_category %}&b_category={{ request.GET.b_category|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}">
+              {{ label }} <span class="x" aria-hidden="true">×</span>
             </a>
-        {% endwith %}
+          {% endwith %}
         {% endif %}
 
-        {# Status chip #}
         {% if request.GET.status %}
-        {% with label=form.status|choice_label:request.GET.status %}
+          {% with label=form.status|choice_label:request.GET.status %}
             <a class="filter-chip"
-            href="?search={{ request.GET.search|urlencode }}{% if request.GET.b_category %}&b_category={{ request.GET.b_category|urlencode }}{% endif %}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}">
-            {{ label }}
-            <span class="x" aria-hidden="true">×</span>
+               href="?search={{ request.GET.search|urlencode }}{% if request.GET.b_category %}&b_category={{ request.GET.b_category|urlencode }}{% endif %}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}">
+              {{ label }} <span class="x" aria-hidden="true">×</span>
             </a>
-        {% endwith %}
+          {% endwith %}
         {% endif %}
 
         <a class="btn btn-sm btn-outline-brand ms-1" href="?search={{ request.GET.search|urlencode }}">
-        {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
+          {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
         </a>
-    {% else %}
+      {% else %}
         <span class="text-muted small">No active filters.</span>
-    {% endif %}
+      {% endif %}
     </div>
   </div>
 
-  <!-- RESULTS (static demo) -->
+  <!-- RESULTS -->
   <div class="results-wrap">
-    <div class="results-header">
-      <div class="results-count">3 results</div>
+
+    {# IMPORTANT: give the AJAX a real target to replace #}
+    <div id="results-body" class="vstack gap-3">
+      {% include "business/_businesses.html" with cards=page_obj.object_list %}
     </div>
 
-    <div class="vstack gap-3">
-      {% include "business/_businesses.html" with rows=page_obj.object_list %}
-    </div>
+    {% if page_obj.has_other_pages %}
+      <div class="page-pagination">
+        {% include 'paginator.html' %}
+      </div>
+    {% endif %}
 
-  {% if page_obj.has_other_pages %}
-    <div class="page-pagination">
-      {% include 'paginator.html' %}
-    </div>
-  {% endif %}
-
-  {# ─── Offcanvas Filters (dynamic from form choices) ─── #}
+    {# Offcanvas filters (unchanged) #}
     <div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
-        aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150px;">
-    <div class="offcanvas-header">
+         aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150px;">
+      <div class="offcanvas-header">
         <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-    </div>
+      </div>
 
-    <div class="offcanvas-body">
+      <div class="offcanvas-body">
         <form method="get" id="filterForm">
-        <div class="mb-3">
+          <div class="mb-3">
             <label class="form-label">Business Category</label>
             {{ form.b_category }}
-        </div>
+          </div>
 
-        <div class="mb-3">
+          <div class="mb-3">
             <label class="form-label">Ownership Type</label>
             {{ form.ownership_type }}
-        </div>
+          </div>
 
-        <div class="mb-3">
+          <div class="mb-3">
             <label class="form-label">Status</label>
             {{ form.status }}
-        </div>
+          </div>
 
-        {# keep search term when applying filters #}
-        <input type="hidden" name="search" value="{{ request.GET.search|default:'' }}"/>
+          <input type="hidden" name="search" value="{{ request.GET.search|default:'' }}"/>
 
-        <!-- Footer pinned to bottom, right-aligned -->
-        <div class="offcanvas-footer">
+          <div class="offcanvas-footer">
             <div class="actions">
-            <a class="btn btn-outline-brand"
-                href="?search={{ request.GET.search|urlencode }}">Clear</a>
-            <button type="submit" class="btn btn-brand">Apply Filters</button>
+              <a class="btn btn-outline-brand" href="?search={{ request.GET.search|urlencode }}">Clear</a>
+              <button type="submit" class="btn btn-brand">Apply Filters</button>
             </div>
-        </div>
+          </div>
         </form>
+      </div>
     </div>
-    </div>
+  </div>
 
 </div>
+
+<script>
+  window.__PINS_URL__ = "{{ pins_url }}";
+</script>
+
+<script>
+(function () {
+  const input = document.getElementById('search');   // id from your Django form
+  const container = document.getElementById('results-body');
+  const endpoint = "{% url 'clerk:ajax_business_search' %}";
+
+  function currentParams() {
+    const params = new URLSearchParams();
+    params.set('q', (input?.value || '').trim());
+    params.set('tpl', 'cards');  
+
+    // read current hidden filter values
+    const bCategory = document.querySelector('input[name="b_category"]')?.value || '';
+    const ownership = document.querySelector('input[name="ownership_type"]')?.value || '';
+    const status = document.querySelector('input[name="status"]')?.value || '';
+
+    if (bCategory) params.set('b_category', bCategory);
+    if (ownership) params.set('ownership_type', ownership);
+    if (status) params.set('status', status);
+    return params.toString();
+  }
+
+  let t = null;
+  function debounce(fn, delay) {
+    return function (...args) {
+      clearTimeout(t);
+      t = setTimeout(() => fn.apply(this, args), delay);
+    }
+  }
+
+  async function fetchRows() {
+    try {
+      const url = endpoint + "?" + currentParams();
+      const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+      if (!res.ok) throw new Error("Network error");
+      const html = await res.text();
+      container.innerHTML = html;
+    } catch (err) {
+      container.innerHTML = `<div class="text-center text-danger py-3">Failed to load results</div>`;
+      console.error(err);
+    }
+  }
+
+  if (input && container) {
+    input.addEventListener('input', debounce(fetchRows, 300));
+  }
+})();
+</script>
 {% endblock %}

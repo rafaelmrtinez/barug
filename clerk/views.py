@@ -21,6 +21,7 @@ from datetime import datetime, date, time
 
 from decimal import Decimal
 from django.forms import Form
+from django.urls import reverse
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.contrib import messages
@@ -95,6 +96,7 @@ from src.app.contracts.business_service_contract import (
     IBusinessInfoService,
     INonResidentOwnerService,
 )
+from src.domain.contracts.business_repository_contract import IBusinessRepository
 from src.app.transfer_objects.commands.business_cmd import (
     RegisterBusinessProfileCmd
 )
@@ -2690,6 +2692,12 @@ def business_list(
         }
     })
 
+AJAX_BUSINESS_PARTIALS = {
+    # key      -> template path
+    "cards": "business/_businesses.html",         # your map list cards
+    "rows":  "business/_business_list.html",      # table rows for list page
+}
+
 @inject
 def ajax_business_search(
     request: HttpRequest,
@@ -2701,29 +2709,32 @@ def ajax_business_search(
     # only allow XHR (optional, but nice)
     if request.headers.get("x-requested-with") != "XMLHttpRequest":
         return HttpResponseBadRequest("XHR required")
+    
+    tpl_key = (request.GET.get("tpl") or "cards").strip().lower()
+    template_name = AJAX_BUSINESS_PARTIALS.get(tpl_key)
+    if not template_name:
+        return HttpResponseBadRequest("Unknown partial")
 
     q = request.GET.get("q", "") or None
     b_category = request.GET.get("b_category")
     ownership_type = request.GET.get("ownership_type")
     status = request.GET.get("status")
 
-    def to_int_or_none(v):
-        try:
-            return int(v) if v not in (None, "",) else None
-        except ValueError:
-            return None
+    # def to_int_or_none(v):
+    #     try:
+    #         return int(v) if v not in (None, "",) else None
+    #     except ValueError:
+    #         return None
 
     rows = business_service.execute(
         search=q,
-        b_category=to_int_or_none(b_category),
-        ownership_type=to_int_or_none(ownership_type),
-        status=to_int_or_none(status),
-    )
+        b_category=_to_int_or_none(b_category),
+        ownership_type=_to_int_or_none(ownership_type),
+        status=_to_int_or_none(status),
+    )[:50]
 
-    # If you want to cap results for live list:
-    rows = rows[:50]
-
-    html = render_to_string("business/_business_list.html", {"rows": rows}, request=request)
+    context = {"rows": rows} if tpl_key == "rows" else {"cards": rows}
+    html = render_to_string(template_name, context, request=request)
     return HttpResponse(html)
 
 @session_login_required
@@ -2843,6 +2854,23 @@ def business_map_list(
                 'b_category' : b_category,
                 'ownership_type' :ownership_type,
                 'status' : status,
-            }
+            },
+            "pins_url": reverse("clerk:api_business_pins"),
         }
     )
+
+@inject
+def api_business_pins(
+    request: HttpRequest,
+    business_repo: IBusinessRepository = Provide[AppContainer.infra.business],
+):
+    if request.method != "GET":
+        return HttpResponseBadRequest("GET only")
+
+    pins = business_repo.fetch_business_pins(
+        search=(request.GET.get("search") or None),
+        b_category=_to_int_or_none(request.GET.get("b_category")),
+        ownership_type=_to_int_or_none(request.GET.get("ownership_type")),
+        status=_to_int_or_none(request.GET.get("status")),
+    )
+    return JsonResponse(pins, safe=False)

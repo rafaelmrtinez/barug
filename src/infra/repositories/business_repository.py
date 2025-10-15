@@ -11,6 +11,7 @@ from src.app.transfer_objects.dto.business_dto import (
     ResidentOwnerDTO,
     NonResidentOwnerDTO,
     OwnerBusinessDTO,
+    BusinessInfoDTO,
 )
 from src.domain.contracts.business_repository_contract import (
     IBusinessRepository,
@@ -343,6 +344,83 @@ class BusinessRepository(IBusinessRepository):
             if not row:
                 raise RuntimeError("Stored procedure returned no rows.")
             return int(row[0]), int(row[1])
+
+    def fetch_business_pins(
+        self,
+        *,
+        search: Optional[str] = None,
+        b_category: Optional[int] = None,
+        ownership_type: Optional[int] = None,
+        status: Optional[int] = None,
+    ) -> list[dict]:
+        """
+        Returns pins with optional filters. Filters are bound via a CTE to avoid
+        repeating placeholders and to keep the WHERE tidy.
+        """
+        try:
+            sql = """
+                WITH params AS (
+                SELECT
+                    %s::int  AS p_status,
+                    %s::int  AS p_category,
+                    %s::int  AS p_ownership,
+                    %s::text AS p_search
+                )
+                SELECT
+                b.business_id,
+                b.business_name,
+                b.business_nature,
+                bc.purpose_label          AS business_category,
+                bs.business_status_name   AS status,
+                ot.ownership_type_name    AS ownership_type,
+                a.latitude::float8        AS lat,
+                a.longitude::float8       AS lng,
+                a.street,
+                a.barangay,
+                a.city,
+                a.purok_sitio_id,
+                ps.purok_sitio_name       AS purok
+                FROM public.business AS b
+                JOIN public.addresss AS a
+                ON a.address_id = b.address_id
+                LEFT JOIN public.document_purpose AS bc
+                ON bc.document_purpose_id = b.business_category_id
+                LEFT JOIN public.business_status   AS bs
+                ON bs.business_status_id   = b.business_status_id
+                LEFT JOIN public.ownership_type    AS ot
+                ON ot.ownership_type_id    = b.ownership_type_id
+                LEFT JOIN public.purok_sitio       AS ps
+                ON ps.purok_sitio_id       = a.purok_sitio_id
+                CROSS JOIN params p
+                WHERE a.latitude  IS NOT NULL
+                AND a.longitude IS NOT NULL
+                AND b.business_status_id   = COALESCE(p.p_status,   b.business_status_id)
+                AND b.business_category_id = COALESCE(p.p_category, b.business_category_id)
+                AND b.ownership_type_id    = COALESCE(p.p_ownership, b.ownership_type_id)
+                AND (
+                    COALESCE(p.p_search,'') = '' OR
+                    b.business_name ILIKE '%%' || p.p_search || '%%' OR
+                    COALESCE(b.business_nature,'') ILIKE '%%' || p.p_search || '%%' OR
+                    COALESCE(a.street,'')          ILIKE '%%' || p.p_search || '%%'
+                )
+                ORDER BY b.business_name;
+            """
+
+            # Only 4 params, matching the CTE order:
+            params = [
+                status,          # %s::int  -> p_status
+                b_category,      # %s::int  -> p_category
+                ownership_type,  # %s::int  -> p_ownership
+                (search or None) # %s::text -> p_search
+            ]
+
+            return self._ctx.execute_query_to_dict(sql, params) or []
+
+        except Exception as e:
+            # Your exception requires a positional 'code'. Provide one (e.g., "E_DB").
+            # If your class supports kwargs, you could do: QueryExecutionException(str(e), code="E_DB")
+            from src.infra.exceptions.query_exec_exception import QueryExecutionException
+            raise QueryExecutionException(f"fetch_business_pins failed: {e}", "E_DB")
 
 class ResidentOwnerRepository(IResidentOwnerRepository):
     def __init__(self, ctx: IConnectionAdapter):

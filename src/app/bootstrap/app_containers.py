@@ -59,3 +59,6 @@ class AppContainer(containers.DeclarativeContainer):
         owner_business_repo=infra.owner_business_info,
         storage_repo=infra.storage
     )
+
+    business_repository = infra.business
+    # resident_owner_repository = infra.resident_owner

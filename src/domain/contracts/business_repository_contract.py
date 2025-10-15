@@ -1,13 +1,13 @@
 from abc import ABC, abstractmethod
-from typing import Optional
-from typing import Optional
+from typing import Optional, Dict, Any
 from src.app.transfer_objects.commands.business_cmd import(
     RegisterBusinessProfileCmd
 )
 from src.app.transfer_objects.dto.business_dto import (
     BusinessListDTO,
     ResidentOwnerDTO,
-    NonResidentOwnerDTO
+    NonResidentOwnerDTO,
+    BusinessInfoDTO,
 )
 
 class IBusinessRepository(ABC):
@@ -34,6 +34,17 @@ class IBusinessRepository(ABC):
 
     @abstractmethod
     def register_business(slf, cmd: RegisterBusinessProfileCmd) -> tuple[int,int]:
+        pass
+    
+    @abstractmethod
+    def fetch_business_pins(
+        self,
+        *,
+        search: Optional[str] = None,
+        b_category: Optional[int] = None,
+        ownership_type: Optional[int] = None,
+        status: Optional[int] = None,
+    ) -> list[Dict[str, Any]]:
         pass
 
 class IResidentOwnerRepository(ABC):
