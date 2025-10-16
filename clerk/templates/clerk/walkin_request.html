@@ -111,7 +111,7 @@
 {% block content %}
 <div class="container py-3" margin>
 
-  <form id="walkinForm" method="post" action="{% url 'clerk:walkin_create' %}" autocomplete="off">
+  <form id="walkinForm" method="post" action="{% url 'clerk:walkin_create' %}" autocomplete="off" style="margin-top: 40px;">
     {% csrf_token %}
 
     <div id="formAlert" class="alert alert-danger d-hidden" role="alert"></div>

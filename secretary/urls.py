@@ -15,4 +15,16 @@ urlpatterns = [
     path("staff_list/staff_details/<str:staff_id>/", views.staff_dets , name="staff_details"),
     path("residents/", views.residents_list, name="residents_list"),
     path("residents/<int:person_id>/", views.resident_profile, name="resident_profile"),
+
+    # RESIDENT
+    path("resident/resident_list/", views.resident_list , name="resident_list"),
+    path("resident/resident_map/", views.resident_map_list , name="resident_map"),
+
+    # HOUSEHOLD 
+    path("household/household_list/", views.household_list , name="household_list"),
+    path("household/household_map/", views.household_map_list , name="household_map"),
+
+    # BUSINESS
+    path("business/business_list/", views.business_list , name="business_list"),
+    path("business/business_map/", views.business_map_list , name="business_map"),
 ]
