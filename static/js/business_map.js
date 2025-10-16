@@ -153,7 +153,7 @@
   // Spread a group around the original point using Turf.destination
   function spreadGroup(baseLng, baseLat, n) {
     // ~8 meters from center; tweak if you want bigger ring for large n
-    const R = 5; // meters
+    const R = 3; // meters
     const coords = [];
     // Distribute bearings evenly; randomize start to avoid identical layout feeling
     const start = Math.random() * 360;

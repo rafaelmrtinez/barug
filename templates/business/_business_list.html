@@ -20,7 +20,7 @@
   </td>
   <td class="text-end">
     <div class="d-inline-flex gap-1">
-      <a class="btn btn-outline-brand btn-sm" href="{% url 'clerk:business_information' b_id=r.business_id %}">
+      <a class="btn btn-outline-brand btn-sm" href="{% url url_name b_id=r.business_id %}">
         <i class="bi bi-building"></i>
         <span>View</span>
       </a>
@@ -29,6 +29,6 @@
 </tr>
 {% empty %}
 <tr>
-  <td colspan="8" class="text-center py-4 text-muted">No businesses found.</td>
+  <td colspan="9" class="text-center py-4 text-muted">No businesses found.</td>
 </tr>
 {% endfor %}

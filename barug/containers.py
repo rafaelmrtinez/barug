@@ -15,5 +15,7 @@ app = AppContainer(infra=infra)
 
 app.wire(modules=[
     "bhw.views",
-    "clerk.views"
+    "captain.views",
+    "clerk.views",
+    "secretary.views",
 ])
