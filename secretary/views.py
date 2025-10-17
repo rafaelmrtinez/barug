@@ -386,7 +386,6 @@ def household_map_list(request):
 # BUSINESS
 # -------------------------------
 
-
 def _to_int_or_none(val) -> Optional[int]:
     try:
         if val in (None, "", "None"):
@@ -448,6 +447,9 @@ AJAX_BUSINESS_PARTIALS = {
     "rows":  "business/_business_list.html",      # table rows for list page
 }
 
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@require_GET
 @inject
 def ajax_business_search(
     request: HttpRequest,
@@ -483,7 +485,11 @@ def ajax_business_search(
         status=_to_int_or_none(status),
     )[:50]
 
-    context = {"rows": rows} if tpl_key == "rows" else {"cards": rows}
+    base_ctx = {
+        "url_name": "secretary:business_information",
+    }
+
+    context = {**base_ctx, ("rows" if tpl_key == "rows" else "cards"): rows}
     html = render_to_string(template_name, context, request=request)
     return HttpResponse(html)
 
@@ -605,11 +611,15 @@ def business_map_list(
                 'ownership_type' :ownership_type,
                 'status' : status,
             },
-            "pins_url": reverse("captain:api_business_pins"),
+            "pins_url": reverse("secretary:api_business_pins"),
             'search_url': 'secretary:ajax_business_search',
         }
     )
 
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@csrf_protect
+@nocache
 @inject
 def api_business_pins(
     request: HttpRequest,

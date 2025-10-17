@@ -102,7 +102,7 @@
 
 
         <a class="btn btn-outline-brand ms-2" href="{% url 'clerk:business_owner' %}">
-          {% bs_icon 'plus-lg' extra_classes='me-2' %} Add Business
+          {% bs_icon 'plus-lg' extra_classes='me-2' %} Register Business
         </a>
       </form>
 
@@ -264,7 +264,7 @@
       tbody.innerHTML = html;
     } catch (err) {
       // optional: show a small error row
-      tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-3">Failed to load results</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" class="text-center py-3">Failed to load results</td></tr>`;
       console.error(err);
     }
   }

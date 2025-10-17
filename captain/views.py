@@ -12,6 +12,7 @@ from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, HttpRes
 from django.template.loader import render_to_string
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.http import require_GET
 from dependency_injector.wiring import inject, Provide
 
 from authentication.guards import session_login_required, role_required
@@ -219,6 +220,9 @@ AJAX_BUSINESS_PARTIALS = {
     "rows":  "business/_business_list.html",      # table rows for list page
 }
 
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@require_GET
 @inject
 def ajax_business_search(
     request: HttpRequest,
@@ -254,7 +258,11 @@ def ajax_business_search(
         status=_to_int_or_none(status),
     )[:50]
 
-    context = {"rows": rows} if tpl_key == "rows" else {"cards": rows}
+    base_ctx = {
+        "url_name": "captain:business_information",
+    }
+
+    context = {**base_ctx, ("rows" if tpl_key == "rows" else "cards"): rows}
     html = render_to_string(template_name, context, request=request)
     return HttpResponse(html)
 
@@ -377,10 +385,14 @@ def business_map_list(
                 'status' : status,
             },
             "pins_url": reverse("captain:api_business_pins"),
-            'search_url': 'secretary:ajax_business_search',
+            'search_url': 'captain:ajax_business_search',
         }
     )
 
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@csrf_protect
+@nocache
 @inject
 def api_business_pins(
     request: HttpRequest,

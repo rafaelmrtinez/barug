@@ -2000,21 +2000,7 @@ def build_business_display(biz: dict, maps: Dict[str, Dict[int, str]]) -> Dict[s
         "opt_end": biz.get("opt_end"),
         "proof_name": biz.get("proof_name") or "—",
     }
-
-@session_login_required
-@role_required(CLERK_ROLE)
-@nocache
-def business_owner(request: HttpRequest):
-    user_role = _auth_role_name(request)
-    return render(
-        request,
-        "business/business_owner.html",
-        {
-            "page_path": f"{user_role} / Business Records / Add Business / Business Owner",
-            "page_title": "Business Owner",
-        },
-    )
-    
+ 
 def _normalize_owner_rows(rows):
     """
     Normalize DTOs/objects into dicts the template & AJAX both expect.
@@ -2132,6 +2118,42 @@ def _owner_payload_common_from_dict(src: Any) -> Dict[str, Any]:
     }
     return payload
 
+def _save_temp_upload(upload, subdir: str) -> dict:
+    """
+    Save an uploaded file to default_storage under tmp/<subdir>/<uuid>_<name>.
+    Returns a dict with storage 'path' plus metadata for later preview/upload.
+    """
+    if not upload:
+        return {}
+
+    # Build a storage-relative path like: "tmp/bizproof/uuid_name.jpg"
+    fname = f"{uuid.uuid4().hex}_{upload.name}"
+    storage_path = "/".join(["tmp", subdir.strip("/"), fname])
+
+    # Write into whatever backend default_storage is configured to use
+    default_storage.save(storage_path, ContentFile(upload.read()))
+
+    return {
+        "path": storage_path,                      # <-- use this everywhere
+        "name": upload.name,
+        "ctype": getattr(upload, "content_type", None),
+        "size": getattr(upload, "size", None),
+    }
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+def business_owner(request: HttpRequest):
+    user_role = _auth_role_name(request)
+    return render(
+        request,
+        "business/business_owner.html",
+        {
+            "page_path": f"{user_role} / Business Records / Add Business / Business Owner",
+            "page_title": "Business Owner",
+        },
+    )
+
 @session_login_required
 @role_required(CLERK_ROLE)
 @csrf_protect
@@ -2197,6 +2219,8 @@ def business_owner_resident(
         },
     )
 
+@session_login_required
+@role_required(CLERK_ROLE)
 @require_GET
 @inject
 def ajax_owner_search(
@@ -2219,28 +2243,6 @@ def ajax_owner_search(
 
     payload = _normalize_owner_rows(rows)
     return JsonResponse({"results": payload})
-
-def _save_temp_upload(upload, subdir: str) -> dict:
-    """
-    Save an uploaded file to default_storage under tmp/<subdir>/<uuid>_<name>.
-    Returns a dict with storage 'path' plus metadata for later preview/upload.
-    """
-    if not upload:
-        return {}
-
-    # Build a storage-relative path like: "tmp/bizproof/uuid_name.jpg"
-    fname = f"{uuid.uuid4().hex}_{upload.name}"
-    storage_path = "/".join(["tmp", subdir.strip("/"), fname])
-
-    # Write into whatever backend default_storage is configured to use
-    default_storage.save(storage_path, ContentFile(upload.read()))
-
-    return {
-        "path": storage_path,                      # <-- use this everywhere
-        "name": upload.name,
-        "ctype": getattr(upload, "content_type", None),
-        "size": getattr(upload, "size", None),
-    }
 
 @session_login_required
 @role_required(CLERK_ROLE)
@@ -2385,6 +2387,8 @@ def business_owner_nonresident(
         },
     )
 
+@session_login_required
+@role_required(CLERK_ROLE)
 @require_GET
 @inject
 def ajax_nonresident_owner_search(
@@ -2689,7 +2693,9 @@ def business_list(
             'b_category' : b_category,
             'ownership_type' :ownership_type,
             'status' : status,
-        }
+        },
+        'url_name' : 'clerk:business_information',
+        'search_url': 'clerk:ajax_business_search',
     })
 
 AJAX_BUSINESS_PARTIALS = {
@@ -2698,6 +2704,9 @@ AJAX_BUSINESS_PARTIALS = {
     "rows":  "business/_business_list.html",      # table rows for list page
 }
 
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_GET
 @inject
 def ajax_business_search(
     request: HttpRequest,
@@ -2733,7 +2742,11 @@ def ajax_business_search(
         status=_to_int_or_none(status),
     )[:50]
 
-    context = {"rows": rows} if tpl_key == "rows" else {"cards": rows}
+    base_ctx = {
+        "url_name": "clerk:business_information",
+    }
+
+    context = {**base_ctx, ("rows" if tpl_key == "rows" else "cards"): rows}
     html = render_to_string(template_name, context, request=request)
     return HttpResponse(html)
 
@@ -2856,9 +2869,13 @@ def business_map_list(
                 'status' : status,
             },
             "pins_url": reverse("clerk:api_business_pins"),
+            'search_url': 'clerk:ajax_business_search',
         }
     )
 
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
 @inject
 def api_business_pins(
     request: HttpRequest,
