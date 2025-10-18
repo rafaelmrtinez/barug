@@ -44,7 +44,7 @@
 
         // Build endpoint url safely (trailing slash included)
         const buildBasicsUrl = (personId) =>
-            `/child_health/ajax/child-basic-info/${encodeURIComponent(personId)}/`;
+            `/child-health/ajax/child-basic-info/${encodeURIComponent(personId)}/`;
 
         // Assign fetched basics into correct form fields
         const assignParentBasics = (role, details) => {

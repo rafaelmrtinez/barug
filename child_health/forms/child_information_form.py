@@ -6,15 +6,16 @@ from maternal.forms.maternal_identification_form import add_bootstrap_classes
 
 class ChildInformationForm(forms.Form):
     # make fields non fillable
+    child_id = forms.IntegerField(widget=forms.HiddenInput())
     family_no = forms.CharField(
         label="Family No.", required=False, disabled=True)
     ufc_no = forms.CharField(label="UFC No.", required=False, disabled=True)
     name = forms.CharField(label="Name", required=True, disabled=True)
     sex = forms.ChoiceField(
-        label="Sex", choices=SEX_CHOICES, required=True, disabled=True)
+        label="Sex", choices=SEX_CHOICES, required=False, disabled=True)
     birth_order = forms.IntegerField(
         label="Birth Order", required=False, min_value=1, disabled=True)
-    date_of_birth = forms.DateField(label="Date of Birth", required=True, widget=forms.DateInput(
+    date_of_birth = forms.DateField(label="Date of Birth", required=False, widget=forms.DateInput(
         attrs={'type': 'date'}), disabled=True)
     place_of_delivery = forms.ChoiceField(
         label="Place of Delivery",
@@ -74,27 +75,22 @@ class ChildInformationForm(forms.Form):
                 for barangay health workers, Family No, UFC No., Name, Sex, Birth Order, Date of Birth, Place of Delivery
                 Mother Name, Age, Mother, and Address is required
             """
-            self.fields['family_no'].required = True
-            self.fields['ufc_no'].required = True
             self.fields['name'].required = True
-            self.fields['sex'].required = True
             self.fields['birth_order'].required = True
-            self.fields['date_of_birth'].required = True
             self.fields['place_of_delivery'].required = True
-            self.fields['mother'].required = True
-            self.fields['mother_age'].required = True
-            self.fields['address'].required = True
             
             # readonyl fields
-            self.fields['family_no'].widget.attrs['readonly'] = True
-            self.fields['ufc_no'].widget.attrs['readonly'] = True
-            self.fields['sex'].widget.attrs['readonly'] = True
-            self.fields['date_of_birth'].widget.attrs['readonly'] = True
-            self.fields['address'].widget.attrs['readonly'] = True
-            self.fields['mother_age'].widget.attrs['readonly'] = True
-            self.fields['mother_occupation'].widget.attrs['readonly'] = True
-            self.fields['father_age'].widget.attrs['readonly'] = True
-            self.fields['father_occupation'].widget.attrs['readonly'] = True
+            self.fields['family_no'].disabled = True
+            self.fields['ufc_no'].disabled = True
+            self.fields['sex'].disabled = True
+            self.fields['date_of_birth'].disabled = True
+            self.fields['address'].disabled = True
+            self.fields['mother_age'].disabled = True
+            self.fields['mother_occupation'].disabled = True
+            self.fields['father_age'].disabled = True
+            self.fields['father_occupation'].disabled = True
+            self.fields["mother"].disabled = True
+            self.fields["father"].disabled = True
             
             self.fields['family_no'].error_messages = {'required': 'Family No. is required.'}
             self.fields['ufc_no'].error_messages = {'required': 'UFC No. is required.'}

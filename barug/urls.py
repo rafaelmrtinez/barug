@@ -35,5 +35,5 @@ urlpatterns = [
     path("resident/", include("resident.urls", namespace="resident")),
     path("metrics/", include("metrics.urls", namespace="metrics")),
     path("maternal/", include("maternal.urls", namespace="maternal")),
-    path("child_health/", include("child_health.urls", namespace="child_health")),
+    path("child-health/", include("child_health.urls", namespace="child_health")),
 ]

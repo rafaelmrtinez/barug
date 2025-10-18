@@ -1,115 +1,134 @@
 // static/child_health/js/fetchChildBasics.js
 (() => {
-    document.addEventListener('DOMContentLoaded', () => {
-        const $ = (id) => document.getElementById(id);
+  document.addEventListener('DOMContentLoaded', () => {
+    const $ = (id) => document.getElementById(id);
 
-        // Hidden & visible inputs tied to the child
-        const childHidden = $('child_person_id');
-        const childNameInput = $('id_name');
+    // Child (hidden + visible)
+    const childHidden    = $('child_person_id');
+    const childNameInput = $('id_name');
 
-        // Target fields to populate
-        const fldFamilyNo = $('id_family_no');
-        const fldUfcNo = $('id_ufc_no');
-        const fldSex = $('id_sex');            // <select> (disabled is ok to set)
-        const fldDob = $('id_date_of_birth');  // <input type="date">
+    // Basics
+    const fldFamilyNo    = $('id_family_no');
+    const fldUfcNo       = $('id_ufc_no');
+    const fldSex         = $('id_sex');            // <select>
+    const fldDob         = $('id_date_of_birth');  // <input type="date">
 
-        // Helpers
-        const debounce = (fn, ms = 250) => {
-            let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-        };
+    // Parents (visible + hidden)
+    const fldMotherName  = $('id_mother');
+    const fldFatherName  = $('id_father');
+    const hidMotherId    = $('mother_person_id');
+    const hidFatherId    = $('father_person_id');
 
-        const setIfPresent = (el, val) => {
-            if (!el) return;
-            const v = (val === null || val === undefined) ? '' : String(val);
-            el.value = v;
-            // Trigger events so any validators/listeners react
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-        };
+    // Parent details (age + occupation)
+    const fldMotherAge   = $('id_mother_age');
+    const fldMotherOcc   = $('id_mother_occupation');
+    const fldFatherAge   = $('id_father_age');
+    const fldFatherOcc   = $('id_father_occupation');
 
-        const setSelectByValueOrText = (selectEl, wanted) => {
-            if (!selectEl) return;
-            const target = (wanted ?? '').toString().trim();
-            if (!target) { selectEl.value = ''; return; }
+    // Helpers
+    const debounce = (fn, ms = 250) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
-            // 1) Try by value match
-            const byValue = Array.from(selectEl.options).find(o => (o.value || '').toString() === target);
-            if (byValue) {
-                selectEl.value = byValue.value;
-                selectEl.dispatchEvent(new Event('change', { bubbles: true }));
-                return;
-            }
+    const setValue = (el, val, { silent = false } = {}) => {
+      if (!el) return;
+      const v = (val === null || val === undefined) ? '' : String(val);
+      el.value = v;
+      if (!silent) {
+        el.dispatchEvent(new Event('input',  { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    };
 
-            // 2) Try by text (case-insensitive)
-            const targetLower = target.toLowerCase();
-            const byText = Array.from(selectEl.options).find(o => (o.text || '').toLowerCase() === targetLower);
-            if (byText) {
-                selectEl.value = byText.value;
-                selectEl.dispatchEvent(new Event('change', { bubbles: true }));
-                return;
-            }
+    const setSelectByValueOrText = (selectEl, wanted) => {
+      if (!selectEl) return;
+      const target = (wanted ?? '').toString().trim();
+      if (!target) { selectEl.value = ''; return; }
 
-            // 3) Fallback: leave as is, but log
-            console.warn('[CHR] Sex option not found for:', target);
-        };
+      // by value
+      const byValue = Array.from(selectEl.options).find(o => (o.value || '').toString() === target);
+      if (byValue) { selectEl.value = byValue.value; selectEl.dispatchEvent(new Event('change', { bubbles: true })); return; }
 
-        const buildUrl = (personId) =>
-            `/child_health/ajax/person-basic/${encodeURIComponent(personId)}/`;
+      // by text (case-insensitive)
+      const tl = target.toLowerCase();
+      const byText = Array.from(selectEl.options).find(o => (o.text || '').toLowerCase() === tl);
+      if (byText) { selectEl.value = byText.value; selectEl.dispatchEvent(new Event('change', { bubbles: true })); return; }
 
-        const assignChildBasics = (details) => {
-            if (!details) return;
+      console.warn('[CHR] Sex option not found for:', target);
+    };
 
-            // family_num and ufc_num may be null -> set empty string
-            setIfPresent(fldFamilyNo, details.family_num ?? '');
-            setIfPresent(fldUfcNo, details.ufc_num ?? '');
+    const toISODate = (d) => {
+      if (!d) return '';
+      if (typeof d === 'string') return d; // already yyyy-mm-dd
+      try {
+        const dt = new Date(d);
+        if (!isNaN(dt)) return dt.toISOString().slice(0, 10);
+      } catch {}
+      return '';
+    };
 
-            // sex might be value or label; attempt both
-            setSelectByValueOrText(fldSex, details.sex ?? '');
+    const buildUrl = (personId) => `/child-health/ajax/person-basic/${encodeURIComponent(personId)}/`;
 
-            // date_of_birth is ISO yyyy-mm-dd (works directly for type="date")
-            setIfPresent(fldDob, details.date_of_birth ?? '');
-        };
+    const assignFromDetails = (details) => {
+      if (!details) return;
 
-        const fetchChildBasics = async () => {
-            const personId = childHidden?.value?.trim();
-            if (!personId) return;
+      // Basics
+      setValue(fldFamilyNo, details.family_num ?? '');
+      setValue(fldUfcNo,    details.ufc_num ?? '');
+      setSelectByValueOrText(fldSex, details.sex ?? '');
+      setValue(fldDob, toISODate(details.date_of_birth));
 
-            try {
-                const res = await fetch(buildUrl(personId), { method: 'GET' });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                console.log('[CHR] CHILD basics:', data);
+      // Parent IDs + names (silent to avoid triggering other scripts)
+      setValue(hidMotherId,  details.mother_id ?? '',        { silent: true });
+      setValue(hidFatherId,  details.father_id ?? '',        { silent: true });
+      setValue(fldMotherName, details.mother_full_name ?? '', { silent: true });
+      setValue(fldFatherName, details.father_full_name ?? '', { silent: true });
 
-                const info = (data && data.ok && Array.isArray(data.details) && data.details.length)
-                    ? data.details[0]
-                    : null;
+      // Parent occupations
+      setValue(fldMotherOcc, details.mother_occupation ?? '');
+      setValue(fldFatherOcc, details.father_occupation ?? '');
 
-                assignChildBasics(info);
-            } catch (err) {
-                console.error('[CHR] Failed to load CHILD basics:', err);
-            }
-        };
+      // Parent ages (numbers → strings)
+      setValue(fldMotherAge, (details.mother_age_years ?? '') === '' ? '' : details.mother_age_years);
+      setValue(fldFatherAge, (details.father_age_years ?? '') === '' ? '' : details.father_age_years);
+    };
 
-        const fetchChildBasicsDebounced = debounce(fetchChildBasics, 300);
+    const fetchChildBasics = async () => {
+      const personId = childHidden?.value?.trim();
+      if (!personId) return;
 
-        // Listen directly on hidden id (covers autocomplete updates)
-        if (childHidden) {
-            childHidden.addEventListener('change', fetchChildBasicsDebounced);
-            childHidden.addEventListener('input', fetchChildBasicsDebounced);
-        }
+      try {
+        const res = await fetch(buildUrl(personId), { method: 'GET' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        console.log('[CHR] CHILD basics:', data);
 
-        // Also listen on visible name field (extra safety)
-        if (childNameInput) {
-            childNameInput.addEventListener('change', fetchChildBasicsDebounced);
-            childNameInput.addEventListener('blur', fetchChildBasicsDebounced);
-            childNameInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') fetchChildBasicsDebounced();
-            });
-        }
+        const info = (data && data.ok && Array.isArray(data.details) && data.details.length)
+          ? data.details[0]
+          : null;
 
-        // Dev helper
-        window.__chrDebug = Object.assign(window.__chrDebug || {}, {
-            fetchChildBasics,
-        });
-    });
+        assignFromDetails(info);
+      } catch (err) {
+        console.error('[CHR] Failed to load CHILD basics:', err);
+      }
+    };
+
+    const fetchChildBasicsDebounced = debounce(fetchChildBasics, 300);
+
+    // Listen to the hidden person_id (set by your autocomplete)
+    if (childHidden) {
+      childHidden.addEventListener('change', fetchChildBasicsDebounced);
+      childHidden.addEventListener('input',  fetchChildBasicsDebounced);
+    }
+
+    // Also listen on visible name field (safety)
+    if (childNameInput) {
+      childNameInput.addEventListener('change', fetchChildBasicsDebounced);
+      childNameInput.addEventListener('blur',   fetchChildBasicsDebounced);
+      childNameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') fetchChildBasicsDebounced();
+      });
+    }
+
+    // Dev helper
+    window.__chrDebug = Object.assign(window.__chrDebug || {}, { fetchChildBasics });
+  });
 })();

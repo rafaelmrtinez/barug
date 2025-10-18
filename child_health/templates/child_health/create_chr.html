@@ -12,7 +12,7 @@
 
 <link rel="stylesheet" href="{% static 'child_health/css/chr-theme.css' %}">
 
-<h1 class="mb-3">Child Health Record</h1>
+<h1 class="mb-3">Create Child Health Record</h1>
 
 <form method="post" action="{% url 'child_health:create_child_health_record' %}" id="child-information-form" novalidate>
 {% csrf_token %}
@@ -87,14 +87,17 @@
 <input type="hidden" id="mother_person_id" name="mother_id">
 <input type="hidden" id="father_person_id" name="father_id">
 
-<div class="d-flex justify-content-end mt-4 section-action">
-    <button type="submit" class="btn btn-brand me-2" id="save-btn" >
-        <i class="bi bi-save"></i> Save
-    </button>
-    <a href="#" class="btn btn-outline-brand">
-        <i class="bi bi-x-circle"></i> Cancel
-    </a>
+<!-- Actions -->
+<div class="section-action d-grid gap-2 d-sm-flex justify-content-end mt-4">
+  <button type="submit" class="btn btn-brand px-4" id="save-btn">
+    <i class="bi bi-save me-1"></i> Save
+  </button>
+
+  <a href="#" class="btn btn-outline-brand px-4">
+    <i class="bi bi-x-circle me-1"></i> Cancel
+  </a>
 </div>
+
 
 
 </form>
@@ -104,7 +107,7 @@
 {{ block.super }}
 <script defer src="{% static 'child_health/js/sectionActions.js' %}"></script>
 <script defer src="{% static 'child_health/js/findPerson.js' %}"></script>
-<script defer src="{% static 'child_health/js/fetchParentBasics.js' %}"></script>
+{% comment %} <script defer src="{% static 'child_health/js/fetchParentBasics.js' %}"></script> {% endcomment %}
 <script defer src="{% static 'child_health/js/fetchChildBasics.js' %}"></script>
 {% endblock %}
 {% endblock %}

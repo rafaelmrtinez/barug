@@ -7,6 +7,7 @@ from django.views.decorators.http import require_http_methods
 
 from authentication.guards import role_required, session_login_required
 from authentication.utils import nocache
+from child_health.exception.child_health_record_exception import ChildHealthRecordExcetion
 from child_health.forms.child_bf_form import ChildBreastFeedingForm
 from child_health.forms.child_birth_supplemention import BirthAndSupplentationForm
 from child_health.forms.child_immunization_form import ChildImmunizationForm
@@ -69,38 +70,74 @@ def find_person_http(request: HttpRequest) -> JsonResponse:
 @role_required(*ACCESS)
 @nocache
 def create_child_health_record(request: HttpRequest) -> HttpResponse:
-    
-    if request.method == "POST":
-        child_information_form = ChildInformationForm(
-        chr_repo=CHILD_HEALTH_REPOSITORY,
-        child_id=None,
-        role=request.session.get("auth").get("role_name"),
-        data=request.POST
-    )
-        if not child_information_form.is_valid():
-            messages.warning(request, "Only father and occupation are optional.")
-            return render(
-                request,
-                "child_health/create_chr.html",
-                {
-                    "form": child_information_form,
-                },
+    try:
+        if request.method == "POST":
+            child_information_form = ChildInformationForm(
+            chr_repo=CHILD_HEALTH_REPOSITORY,
+            child_id=None,
+            role=request.session.get("auth").get("role_name"),
+            data=request.POST
             )
-        
-        return redirect('child_health:create_child_health_record')
+            if not child_information_form.is_valid():
+                messages.warning(request, "Only father and occupation are optional.")
+                return render(
+                    request,
+                    "child_health/create_chr.html",
+                    {
+                        "form": child_information_form,
+                    },
+                )
+            res = CHILD_HEALTH_REPOSITORY.insert_chr_record(
+                p_staff_id=request.session.get("auth").get("staff_id"),
+                p_person_id=child_information_form.cleaned_data.get("child_id"),
+                p_birth_order=child_information_form.cleaned_data.get("birth_order").__str__(),
+                p_delivery_place_type_id=int(child_information_form.cleaned_data.get("place_of_delivery")),
+            )
+            if not res or not isinstance(res, tuple):
+                messages.error(request, "Failed to create child health record.")
+                return render(
+                    request,
+                    "child_health/create_chr.html",
+                    {
+                        "form": child_information_form,
+                    },
+                )
+            messages.success(request, "Child Health Record created successfully.")
+            return redirect('child_health:create_child_health_record')
+        child_information_form = ChildInformationForm(
+            chr_repo=CHILD_HEALTH_REPOSITORY,
+            child_id=None,
+            role=request.session.get("auth").get("role_name"),
+        )
+        return render(
+            request,
+            "child_health/create_chr.html",
+            {
+                "form": child_information_form,
+            },
+        )
+    except ChildHealthRecordExcetion as chre:
+        logger.error("ChildHealthRecordExcetion: %s", chre.message)
+        messages.warning(request, f"Warning: {chre.message}")
+        return render(
+            request,
+            "child_health/create_chr.html",
+            {
+                "form": child_information_form,
+            },
+        )
+    except Exception as e:
+        logger.exception("create_child_health_record failed: %s", e)
+        messages.error(request, "An error occurred while creating the child health record.")
+        return render(
+            request,
+            "child_health/create_chr.html",
+            {
+                "form": child_information_form,
+            },
+        )
     
-    child_information_form = ChildInformationForm(
-        chr_repo=CHILD_HEALTH_REPOSITORY,
-        child_id=None,
-        role=request.session.get("auth").get("role_name"),
-    )
-    return render(
-        request,
-        "child_health/create_chr.html",
-        {
-            "form": child_information_form,
-        },
-    )
+    
 
 @session_login_required
 @role_required(*ACCESS)

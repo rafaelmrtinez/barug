@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="{% static 'css/table.css' %}">
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
 <link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<link rel="stylesheet" href="{% static 'child_health/css/chr-theme.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -15,12 +16,25 @@
         <div class="row">
             <div>
 
-                <!-- Search Bar -->
-                <form class="toolbar d-flex align-items-center flex-wrap mt-5" method="get">
+                <!-- Toolbar: search + create button on the same row (vertically aligned) -->
+                <div class="toolbar d-flex align-items-stretch flex-wrap mt-4 gap-2 mb-2">
+                <form class="flex-grow-1 mb-0" method="get">
                     <div class="searchbox w-100">
-                        <input type="text" class="form-control" name="q" placeholder="Search by name or family #" value="{{ request.GET.q }}">
+                    <input type="text" class="form-control" name="q"
+                            placeholder="Search by name or family #"
+                            value="{{ request.GET.q }}">
                     </div>
                 </form>
+
+                {% if request.session.auth.role_name == "barangay health worker" %}
+                    <button type="button"
+                            class="btn btn-brand d-flex align-items-center justify-content-center px-3"
+                            aria-label="Create Child Health Record"
+                            onclick="window.location.href='{% url 'child_health:create_child_health_record' %}'">
+                    {% bs_icon 'plus-lg' extra_classes='me-1' %} New Child Health Record
+                    </button>
+                {% endif %}
+                </div>
 
                 <!-- Data Table -->
                 <table class="table align-middle">

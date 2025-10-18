@@ -70,7 +70,7 @@
                 if (controller) controller.abort();
                 controller = new AbortController();
                 try {
-                    const res = await fetch(`/child_health/ajax/find-person/?q=${encodeURIComponent(query)}`, {
+                    const res = await fetch(`/child-health/ajax/find-person/?q=${encodeURIComponent(query)}`, {
                         signal: controller.signal
                     });
                     if (!res.ok) throw new Error(`HTTP ${res.status}`);
