@@ -22,12 +22,3 @@ class ObstetricHistoryForm(forms.Form):
         super().__init__(*args, **kwargs)
         add_bootstrap_classes(self)
         self._maternal_repository = maternal_repository
-        
-        obsetric_data = self._maternal_repository.fetch_obstetric_history_by_mhr_id(mhr_id)
-        if obsetric_data:
-            self.fields['children_born_alive'].initial = obsetric_data.get('num_children_born_alive', 0)
-            self.fields['living_children'].initial = obsetric_data.get('num_children_living', 0)
-            self.fields['abortions'].initial = obsetric_data.get('num_abortion', 0)
-            self.fields['stillbirths'].initial = obsetric_data.get('num_stillbirth_or_fetal_death', 0)
-            self.fields['history_large_babies'].initial = obsetric_data.get('num_large_babies', 0)
-            self.fields['diabetes_history'].initial = obsetric_data.get('has_diabetes', False)

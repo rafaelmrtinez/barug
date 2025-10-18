@@ -40,51 +40,18 @@ class MaternalIdentificationForm(forms.Form):
     person_id = forms.IntegerField(required=False, widget=forms.HiddenInput())
     husband_id = forms.IntegerField(required=False, widget=forms.HiddenInput())
 
-    ALLOWED_ROLES = { "bhw", "Barangay Health Worker", "barangay health worker", "BHW", "BARANGAY HEALTH WORKER" }
+    W_PLUS_R_PRIVILEGE = { "bhw", "Barangay Health Worker", "barangay health worker", "BHW", "BARANGAY HEALTH WORKER" }
 
-    def __init__(self, role, maternal_repository: MaternalHealthRecordRepository, maternal_id: int | None, *args, **kwargs):
+    def __init__(self, path: str | None, role: str | None, maternal_repository: MaternalHealthRecordRepository, maternal_id: int | None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         add_bootstrap_classes(self)
         self._maternal_repository = maternal_repository
-        self.field_by_role_policy(role, maternal_id)
-    
-    def field_by_role_policy(self, role, maternal_id: int | None):
-        if role in self.ALLOWED_ROLES:
-            """ Make certain fields readonly for BHW role
-            - Family Number
-            - Date of Birth
-            - Age
-            - Age group
-            - Address
-            - Occupation
-            - BMI and BMI category
-            """
-            readonly_fields = [
-                'family_no',
-                'date_of_birth',
-                'age',
-                'age_group',
-                'address',
-                'occupation',
-                'bmi',
-                'bmi_category',
-            ]
-            for field_name in readonly_fields:
-                field = self.fields.get(field_name)
-                if field:
-                    field.disabled = True
-        else:
+        
+        if role in self.W_PLUS_R_PRIVILEGE and "health-record-form" in path:
             for field in self.fields.values():
                 field.disabled = True
-                
-            if maternal_id is not None:
-                
-                data = self._maternal_repository.fetch_all_mhr_form_basic_info_by_mhr_id(maternal_id)
-                if data:
-                    self.fields['family_no'].initial = data.get('family_number')
-                    self.fields['name'].initial = data.get('full_name')
-                    self.fields['date_of_birth'].initial = data.get('date_of_birth')
-                    self.fields['age'].initial = data.get('age')
-                    self.fields['address'].initial = data.get('address')
-                    self.fields['husband_name'].initial = data.get('husband_full_name') or 'N/A'
-                    self.fields['occupation'].initial = data.get('occupation') or 'N/A'
+        
+        if role not in self.W_PLUS_R_PRIVILEGE:
+            # Disable all fields for non-BHW roles
+            for field in self.fields.values():
+                field.disabled = True

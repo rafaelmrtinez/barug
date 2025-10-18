@@ -30,18 +30,3 @@ class RiskCodeForm(forms.Form):
         add_bootstrap_classes(self)
         self._mhr_repo = mhr_repo
         self._mhr_id = mhr_id
-        self.fields['assessed_by'].disabled = True
-        risk_data = mhr_repo.fetch_risk_codes_by_mhr_id(int(mhr_id))
-        print(f"Risk data in form init: {risk_data}")
-        if risk_data:
-            if risk_data[0].get('category') == 'OBSTETRIC RISKS':
-                self.fields['risk_obstetric_history'].initial = True
-            if risk_data[0].get('category') == 'MEDICAL CONDITIONS':
-                self.fields['risk_medical_comorbidities'].initial = True
-
-        
-        print(f"Assisted by in form init: {assisted_by}")            
-        if assisted_by:
-            # disable
-            self.fields['assessed_by'].initial = assisted_by
-        

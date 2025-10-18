@@ -16,9 +16,7 @@ class PreviousPregnancyForm(forms.Form):
     def __init__(self, *args, mhr_repository=None, maternal_id=None, **kwargs):
         super().__init__(*args, **kwargs)
         add_bootstrap_classes(self)
-        # optionally keep them if you’ll need inside the form later
-        self._mhr_repository = mhr_repository
-        self._maternal_id = maternal_id
+
 
 PreviousPregnancyFormSet = formset_factory(
     PreviousPregnancyForm,
