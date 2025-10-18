@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap mt-4">
+    <div class="container-fluid pt-3 page-main">
+        <div class="row">
+            <div>
+
+                <!-- Search Bar -->
+                <form class="toolbar d-flex align-items-center flex-wrap mt-5" method="get">
+                    <div class="searchbox w-100">
+                        <input type="text" class="form-control" name="q" placeholder="Search by name or family #" value="{{ request.GET.q }}">
+                    </div>
+                </form>
+
+                <!-- Data Table -->
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Family #</th>
+                            <th>Child Name</th>
+                            <th>Mother</th>
+                            <th>Father</th>
+                            <th>Date Added</th>
+                            {% if request.session.auth.role_name == "midwife" %}
+                            <th>Action</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if page_obj.object_list %}
+                            {% for record in page_obj.object_list %}
+                                <tr>
+                                    <td>{{ record.family_num }}</td>
+                                    <td>{{ record.child }}</td>
+                                    <td>{{ record.mother }}</td>
+                                    <td>{{ record.father }}</td>
+                                    <td>{{ record.date_added|date:"Y-m-d H:i" }}</td>
+                                    {% if request.session.auth.role_name == "midwife" %}
+                                    <td>
+                                        <a href="{% url 'child_health:child_health_entry' record.child_id %}" class="btn btn-outline-brand btn-sm">
+                                            {% bs_icon 'folder2-open' extra_classes='me-1' %}Open
+                                        </a>
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">No records found.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+
+                <!-- Pagination -->
+                {% if page_obj.has_other_pages %}
+                <div class="page-pagination">
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination justify-content-center">
+                            {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled"><a class="page-link">Previous</a></li>
+                            {% endif %}
+
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if num == page_obj.number %}
+                                    <li class="page-item active"><a class="page-link">{{ num }}</a></li>
+                                {% else %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled"><a class="page-link">Next</a></li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

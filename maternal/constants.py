@@ -45,11 +45,12 @@ SYMPTOM_CHOICES = [
 SEX_CHOICES = [('M', 'Male'), ('F', 'Female')]
 
 PLACE_OF_DELIVERY_CHOICES = [
-    ('hospital', 'Hospital (Public/Private)'),
-    ('home', 'Home'),
-    ('private_clinic', 'Private Clinic'),
-    ('lying_in', 'Lying-In Clinic'),
-    ('hc', 'Health Center'),
+    ('1', 'HOSPITAL (GOVERNMENT)'),
+    ('2', 'HOSPITAL (PRIVATE)'),
+    ('3', 'HOME'),
+    ('4', 'PRIVATE CLINIC'),
+    ('5', 'LYING-IN CLINIC'),
+    ('6', 'HEALTH CENTER'),
 ]
 
 PLACE_OF_DELIVERY_MAP = {

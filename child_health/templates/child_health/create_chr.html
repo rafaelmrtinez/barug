@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'child_health/css/chr-theme.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container py-4 mt-5">
+
+{% include "messages.html" %}
+
+<link rel="stylesheet" href="{% static 'child_health/css/chr-theme.css' %}">
+
+<h1 class="mb-3">Child Health Record</h1>
+
+<form method="post" action="{% url 'child_health:create_child_health_record' %}" id="child-information-form" novalidate>
+{% csrf_token %}
+
+<!-- Identification (read-only) -->
+<div class="card mb-3 card-brand">
+    <div class="card-header">Identification</div>
+    <div class="card-body" id="identification">
+        <div class="row g-3">
+            <div class="col-md-2">
+                {{ form.family_no.label_tag }}
+                {{ form.family_no }}
+            </div>
+            <div class="col-md-2">
+                {{ form.ufc_no.label_tag }}
+                {{ form.ufc_no }}
+            </div>
+            <div class="col-md-4">
+                {{ form.name.label_tag }}
+                {{ form.name }}
+            </div>
+            <div class="col-md-2">
+                {{ form.sex.label_tag }}
+                {{ form.sex }}
+            </div>
+            <div class="col-md-2">
+                {{ form.birth_order.label_tag }}
+                {{ form.birth_order }}
+            </div>
+            <div class="col-md-3">
+                {{ form.date_of_birth.label_tag }}
+                {{ form.date_of_birth }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Place of Delivery -->
+<div class="card mb-3 card-brand">
+    <div class="card-header">Place of Delivery</div>
+    <div class="card-body" id="place-of-delivery">
+        <div class="row g-2">
+            <div class="col-md-12">
+                {{ form.place_of_delivery.label_tag }}
+                {{ form.place_of_delivery }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Parent Information -->
+<div class="card mb-3 card-brand">
+    <div class="card-header">Parent Information</div>
+    <div class="card-body" id="parent-info">
+        <div class="row g-3">
+            <div class="col-md-3">{{ form.mother.label_tag }} {{ form.mother }}</div>
+            <div class="col-md-2">{{ form.mother_age.label_tag }} {{ form.mother_age }}</div>
+            <div class="col-md-3">{{ form.mother_occupation.label_tag }} {{ form.mother_occupation }}</div>
+
+            <div class="col-md-3">{{ form.father.label_tag }} {{ form.father }}</div>
+            <div class="col-md-2">{{ form.father_age.label_tag }} {{ form.father_age }}</div>
+            <div class="col-md-2">{{ form.father_occupation.label_tag }} {{ form.father_occupation }}</div>
+        </div>
+
+        <div class="row g-3 mt-2">
+            <div class="col-md-12">{{ form.address.label_tag }} {{ form.address }}</div>
+        </div>
+    </div>
+</div>
+    <!-- Correct hidden ID holders -->
+<input type="hidden" id="child_person_id"  name="child_id">
+<input type="hidden" id="mother_person_id" name="mother_id">
+<input type="hidden" id="father_person_id" name="father_id">
+
+<div class="d-flex justify-content-end mt-4 section-action">
+    <button type="submit" class="btn btn-brand me-2" id="save-btn" >
+        <i class="bi bi-save"></i> Save
+    </button>
+    <a href="#" class="btn btn-outline-brand">
+        <i class="bi bi-x-circle"></i> Cancel
+    </a>
+</div>
+
+
+</form>
+
+</div>
+{% block script %}
+{{ block.super }}
+<script defer src="{% static 'child_health/js/sectionActions.js' %}"></script>
+<script defer src="{% static 'child_health/js/findPerson.js' %}"></script>
+<script defer src="{% static 'child_health/js/fetchParentBasics.js' %}"></script>
+<script defer src="{% static 'child_health/js/fetchChildBasics.js' %}"></script>
+{% endblock %}
+{% endblock %}

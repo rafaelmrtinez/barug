@@ -1,0 +1,351 @@
+from src.infra.database.connection_adapter import ConnectionAdapter
+
+
+class ChildHealthRecordRepository:
+    def __init__(self, ctx: ConnectionAdapter):
+        self.ctx = ctx
+        
+    def fetch_person_and_house_basic_details_by_id(self, person_id: int) -> dict | None:
+        sql="""-- Fetch family number, UFC number, sex/gender, and DOB by person_id
+            SELECT
+            f.family_num,
+            f.ufc_num,
+            s.sex_name      AS sex,
+            p.birthdate     AS date_of_birth
+            FROM person AS p
+            LEFT JOIN sex AS s
+            ON s.sex_id = p.sex_id
+            LEFT JOIN family_unit AS f
+            ON f.family_head_id = p.person_id
+            WHERE p.person_id = %s;  -- supply person_id here
+        """
+        params = [person_id]
+        result = self.ctx.execute_query_to_dict(sql, params)
+        if not result:
+            return None
+        return result
+        
+    def find_person_basic_details_by_id(self, person_id: int) -> dict | None:
+        sql="""-- Fetch age (computed) and occupation for a given person_id
+            SELECT
+            p.person_id,
+            -- Return NULL if birthdate is NULL or in the future; else compute exact years
+            CASE
+                WHEN p.birthdate IS NULL OR p.birthdate > CURRENT_DATE
+                THEN NULL
+                ELSE EXTRACT(YEAR FROM age(CURRENT_DATE, p.birthdate))::int
+            END AS age_years,
+            p.occupation
+            FROM public."person" AS p
+            WHERE p.person_id = %s;  -- supply person_id here
+        """
+        params = [person_id]
+        result = self.ctx.execute_query_to_dict(sql, params)
+        if not result:
+            return None
+        return result
+        
+    def match_person_by_key(self, key: str):
+        key = (key or "").strip()
+        if len(key) < 2:
+            return []
+
+        like = f"%{key}%"
+        sql = """
+        SELECT
+        p.person_id,
+        TRIM(
+            REGEXP_REPLACE(
+            CONCAT_WS(' ',
+                COALESCE(p.first_name, ''),
+                NULLIF(LEFT(COALESCE(p.middle_name, ''), 1) || '.', '.'),
+                COALESCE(p.last_name, ''),
+                COALESCE(p.suffix, '')
+            ),
+            '\s+',
+            ' ',
+            'g'
+            )
+        ) AS full_name,
+        -- Build a clean full address: "Street, Purok/Sitio, Brgy {barangay}, {city}"
+        CONCAT_WS(', ',
+            NULLIF(a.street, ''),
+            NULLIF(ps.purok_sitio_name, ''),
+            CASE WHEN COALESCE(a.barangay, '') <> '' THEN 'Brgy ' || a.barangay ELSE NULL END,
+            NULLIF(a.city, '')
+        ) AS address
+        FROM public.person AS p
+        LEFT JOIN public.addresss AS a
+        ON a.address_id = p.address_id
+        LEFT JOIN public.purok_sitio AS ps
+        ON ps.purok_sitio_id = a.purok_sitio_id
+        WHERE
+            p.first_name ILIKE %s
+        OR p.middle_name ILIKE %s
+        OR p.last_name  ILIKE %s
+        OR (p.first_name || ' ' || p.last_name) ILIKE %s
+        OR (p.last_name  || ', ' || p.first_name) ILIKE %s
+        ORDER BY COALESCE(p.last_name, '') ASC, COALESCE(p.first_name, '') ASC
+        LIMIT 25;
+        """
+        params = (like, like, like, like, like)
+        result = self.ctx.execute_query_to_dict(sql, params)
+
+        if not result:
+            return []
+
+        return result
+        
+    def fetch_child_monitoring_logs(self, child_record_id: int) -> list[dict]:
+        sql = """
+        SELECT
+        cml.child_monitoring_id,
+        cml.check_date::date AS check_date,
+        cml.age,
+        cml.weight,
+        cml.temperature,
+        cml.height,
+        cml.findings,
+        cml.notes,
+        cml.visit_id
+        FROM public.child_monitoring_log cml
+        WHERE cml.child_record_id = %s
+        ORDER BY cml.check_date DESC NULLS LAST, cml.child_monitoring_id DESC;
+        """
+        return self.ctx.execute_query_to_dict(sql, [child_record_id]) or []
+
+        
+    def fetch_child_screening_package(self, child_record_id: int) -> dict | None:
+        sql = """
+        WITH latest_screen AS (
+            SELECT DISTINCT ON (csa.child_record_id)
+                csa.child_record_id,
+                csa.screening_id,
+                csa.date_assessed::date               AS date_assessed,
+                csa.birth_weight,
+                csa.anemic_seen_date::date            AS anemic_2_59_seen_date,
+                csa.anemic_given_iron_date::date      AS anemic_2_59_given_iron_date,
+                csa.iron_seen_2_6_mos_date::date      AS seen_2_6_mos_date,
+                csa.iron_given_2_6_mos_date::date     AS given_2_6_mos_date
+            FROM public.child_screening_assessment csa
+            WHERE csa.child_record_id = %s
+            ORDER BY csa.child_record_id, csa.date_assessed DESC NULLS LAST, csa.screening_id DESC
+        ),
+        iron AS (
+            SELECT
+                cis.child_record_id,
+                MIN(cis.date_started)::date   AS iron_date_started,
+                MAX(cis.date_completed)::date AS iron_date_completed
+            FROM public.child_iron_supplement_record cis
+            WHERE cis.child_record_id = %s
+            GROUP BY cis.child_record_id
+        ),
+        vit AS (
+            SELECT
+                vag.child_record_id,
+                MIN(CASE WHEN vag.vit_stage_id = 1 THEN vag.date_given::date END) AS vit_a_given_1,
+                MIN(CASE WHEN vag.vit_stage_id = 2 THEN vag.date_given::date END) AS vit_a_given_2,
+                MIN(CASE WHEN vag.vit_stage_id = 3 THEN vag.date_given::date END) AS vit_a_given_3
+            FROM public.vitamin_a_given vag
+            WHERE vag.child_record_id = %s
+            GROUP BY vag.child_record_id
+        )
+        SELECT
+            COALESCE(ls.child_record_id, i.child_record_id, v.child_record_id) AS child_record_id,
+            ls.date_assessed,
+            ls.birth_weight,
+            ls.anemic_2_59_seen_date,
+            ls.anemic_2_59_given_iron_date,
+            ls.seen_2_6_mos_date,
+            ls.given_2_6_mos_date,
+            i.iron_date_started,
+            i.iron_date_completed,
+            v.vit_a_given_1,
+            v.vit_a_given_2,
+            v.vit_a_given_3
+        FROM latest_screen ls
+        FULL OUTER JOIN iron i ON i.child_record_id = ls.child_record_id
+        FULL OUTER JOIN vit  v ON v.child_record_id  = COALESCE(ls.child_record_id, i.child_record_id)
+        LIMIT 1;
+        """
+        rows = self.ctx.execute_query_to_dict(sql, [child_record_id, child_record_id, child_record_id])
+        return rows[0] if rows else None
+
+    
+    def fetch_all_child_immunizations_by_chr_id(self, id: int) -> dict | None:
+        sql="""WITH rows AS (
+            SELECT
+                it.immunization_type_name  AS type_name,
+                sg.immunization_stage_name AS stage_name,
+                ci.date_given::date        AS date_given
+            FROM public.child_immunization           AS ci
+            JOIN public.immunization_type            AS it ON it.immunization_type_id = ci.immunization_type_id
+            JOIN public.immunization_stage_given     AS sg ON sg.immunization_stage_given_id = ci.immunization_stage_given_id
+            WHERE ci.child_record_id = %s
+            )
+            SELECT type_name, stage_name, MAX(date_given) AS date_given
+            FROM rows
+            GROUP BY type_name, stage_name"""
+        params = [id]
+        result = self.ctx.execute_query_to_dict(sql, params)
+        if not result:
+            return None
+        return result
+    
+    def fetch_child_record_id_by_person_id(self, id: int) -> int | None:
+        sql="""SELECT child_record_id FROM child_health_record WHERE person_id = %s;"""
+        params = [id]
+        result = self.ctx.execute_query_to_dict(sql, params)
+        if not result:
+            return None
+        return result[0]['child_record_id']
+
+    def fetch_all_feeding_check_dates_by_person_id(self, id: int) -> list[dict]:
+        sql="""WITH target AS (
+            SELECT chr.child_record_id
+            FROM public.child_health_record AS chr
+            WHERE chr.person_id = %s
+            ORDER BY chr.created_at DESC, chr.child_record_id DESC
+            LIMIT 1
+            )
+            SELECT
+            cbc.bbf_check_id,
+            cbc.check_date,
+            cbc.visit_id,
+            cv.visit_no,
+            cv.visit_date::date AS visit_date
+            FROM public.child_breastfeeding_check AS cbc
+            JOIN target t
+            ON t.child_record_id = cbc.child_record_id
+            LEFT JOIN public.child_visit AS cv
+            ON cv.visit_id = cbc.visit_id
+            ORDER BY
+            cbc.check_date ASC,
+            cv.visit_date ASC NULLS LAST,
+            cbc.bbf_check_id ASC
+            LIMIT 5;"""
+        params = [id]
+        return self.ctx.execute_query_to_dict(sql, params)
+        
+    def fetch_all_feeding_type(self) -> list[dict]:
+        sql = """SELECT feeding_type_id, feeding_type_name FROM public.feeding_type;"""
+        return self.ctx.execute_query_to_dict(sql, [])
+        
+    def fetch_child_newborn_screening_by_person_id(self, id: int) -> dict | None:
+        sql="""WITH target AS (
+            -- Resolve the most recent child record for this person
+            SELECT chr.child_record_id
+            FROM public.child_health_record AS chr
+            WHERE chr.person_id = %s
+            ORDER BY chr.created_at DESC, chr.child_record_id DESC
+            LIMIT 1
+            ),
+            feeding_visits AS (
+            -- Only visits that actually have a feeding entry
+            SELECT
+                cv.child_record_id,
+                cv.visit_id,
+                cv.visit_no,
+                cv.visit_date::date                             AS visit_date,
+                cv.created_at                                   AS visit_created_at,
+                ftns.feeding_type_id,
+                ftns.referred_newborn_screening_date::date     AS referred_nbs_date
+            FROM public.child_visit AS cv
+            JOIN public.feeding_type_nwbrn_scrnng AS ftns
+                ON ftns.visit_id = cv.visit_id
+            JOIN target t
+                ON t.child_record_id = cv.child_record_id
+            ),
+            latest AS (
+            -- Pick the single most recent feeding entry for this child
+            SELECT DISTINCT ON (fv.child_record_id)
+                    fv.child_record_id,
+                    fv.visit_id,
+                    fv.visit_no,
+                    fv.visit_date,
+                    fv.visit_created_at,
+                    fv.feeding_type_id,
+                    fv.referred_nbs_date
+            FROM feeding_visits fv
+            ORDER BY
+                fv.child_record_id,
+                fv.visit_date DESC NULLS LAST,
+                fv.visit_created_at DESC NULLS LAST,
+                fv.visit_id DESC
+            )
+            SELECT
+            l.child_record_id,
+            l.visit_id,
+            l.visit_no,
+            l.visit_date,
+            l.referred_nbs_date,
+            l.feeding_type_id,
+            ft.feeding_type_name
+            FROM latest l
+            LEFT JOIN public.feeding_type ft
+            ON ft.feeding_type_id = l.feeding_type_id;"""
+        params = [id]
+        result = self.ctx.execute_query_to_dict(sql, params)
+        if not result:
+            return None
+        return result[0]
+
+    def fetch_child_basic_information_by_person_id(self, id: int) -> dict | None:
+        raw = """
+            SELECT 
+            family_unit.family_num,
+            family_unit.ufc_num,
+            CONCAT(CHILD.first_name, ' ', COALESCE(CHILD.middle_name, ''), ' ', CHILD.last_name, ' ', COALESCE(CHILD.suffix, '')) AS CHILD,
+            SEX.sex_name,
+            CHR.birth_order,
+            CHILD.birthdate AS DATE_OF_BIRTH,
+            delivery_place_type.delivery_place_type_name AS PLACE_OF_DELIVERY,
+            CONCAT(MOTHER.first_name, ' ', COALESCE(MOTHER.middle_name, ''), ' ', MOTHER.last_name, ' ', COALESCE(MOTHER.suffix, '')) AS MOTHER_NAME,
+            COALESCE(MOTHER.occupation, 'N/A') AS MOTHER_OCCUPATION,
+            MOTHER.age AS MOTHER_AGE,
+            CONCAT(FATHER.first_name, ' ', COALESCE(FATHER.middle_name, ''), ' ', FATHER.last_name, ' ', COALESCE(FATHER.suffix, '')) AS FATHER_NAME,
+            COALESCE(FATHER.occupation, 'N/A') AS FATHER_OCCUPATION,
+            FATHER.age AS FATHER_AGE,
+            CONCAT(
+                household_info.house_number, ', ', purok_sitio.purok_sitio_name, ', ',
+                addresss.street, ', ', addresss.barangay, ', ', addresss.city, ', 6000'
+            ) AS ADDRESS
+            FROM child_health_record AS CHR
+            INNER JOIN person AS CHILD ON CHILD.person_id = CHR.person_id
+            LEFT JOIN person AS MOTHER ON MOTHER.person_id = CHR.mother_id
+            LEFT JOIN person AS FATHER ON FATHER.person_id = CHR.father_id
+            INNER JOIN family_unit ON family_unit.family_id = CHR.family_id
+            INNER JOIN addresss ON addresss.address_id = CHILD.address_id
+            INNER JOIN purok_sitio ON purok_sitio.purok_sitio_id = addresss.purok_sitio_id
+            INNER JOIN household_info ON household_info.household_id = family_unit.household_id
+            INNER JOIN sex ON sex.sex_id = CHILD.sex_id
+            INNER JOIN delivery_place_type ON delivery_place_type.delivery_place_type_id = CHR.delivery_place_type_id
+            WHERE CHILD.person_id = %s;
+        """
+        params = [id]
+        result = self.ctx.execute_query_to_dict(raw, params)
+        
+        if not result:
+            return None
+        return result[0]
+
+    def fetch_all_basic_records(self):
+        raw = """
+            SELECT 
+            CHILD.person_id AS CHILD_ID,
+            family_unit.family_num,
+            CONCAT(CHILD.first_name, ' ', COALESCE(CHILD.middle_name, ''), ' ', CHILD.last_name, ' ', COALESCE(CHILD.suffix, '')) AS CHILD,
+            CONCAT(MOTHER.first_name, ' ', COALESCE(MOTHER.middle_name, ''), ' ', MOTHER.last_name, ' ', COALESCE(MOTHER.suffix, '')) AS MOTHER,
+            CONCAT(FATHER.first_name, ' ', COALESCE(FATHER.middle_name, ''), ' ', FATHER.last_name, ' ', COALESCE(FATHER.suffix, '')) AS FATHER,
+            CHR.created_at AS DATE_ADDED
+            FROM child_health_record AS CHR
+            INNER JOIN person AS CHILD
+            ON CHILD.person_id = CHR.person_id
+            INNER JOIN person AS MOTHER
+            ON MOTHER.person_id = CHR.person_id
+            INNER JOIN person AS FATHER
+            ON FATHER.person_id = CHR.person_id
+            INNER JOIN family_unit
+            ON family_unit.family_id = CHR.family_id
+        """
+        return self.ctx.execute_query_to_dict(raw, [])

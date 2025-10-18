@@ -1,0 +1,33 @@
+.person-dd{
+  position:absolute;
+  top:100%;
+  left:0;
+  right:0;
+  z-index: 20;
+  background:#fff;
+  border:1px solid #dee2e6;
+  border-radius:.375rem;
+  box-shadow:0 .5rem 1rem rgba(0,0,0,.05);
+  margin-top:.25rem;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.person-dd-list{
+  list-style:none;
+  padding:0;
+  margin:0;
+}
+
+.person-dd-item{
+  padding:.5rem .75rem;
+  cursor:pointer;
+}
+.person-dd-item:hover,
+.person-dd-item:focus{
+  background: var(--brand-100, #f8f9fa);
+  outline: none;
+}
+
+.pdd-name{ font-weight: 600; }
+.pdd-addr{ font-size:.875rem; color:#6c757d; }

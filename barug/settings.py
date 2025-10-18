@@ -55,6 +55,7 @@ ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
     "maternal.apps.MaternalConfig",
+    "child_health.apps.ChildHealthConfig",
     "metrics.apps.MetricsConfig",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -110,6 +111,7 @@ TEMPLATES = [
             BASE_DIR / "treasurer/templates/treasurer",
             BASE_DIR / "midwife/templates/midwife",
             BASE_DIR / "maternal/templates/maternal",
+            BASE_DIR / "child_health/templates/child_health",
         ],
         "APP_DIRS": True,
         "OPTIONS": {
@@ -340,6 +342,7 @@ STATICFILES_DIRS = [
     # os.path.join(BASE_DIR, "clerk/static/clerk"),
     os.path.join(BASE_DIR, "midwife/static/midwife"),
     os.path.join(BASE_DIR, "maternal/static/maternal"),
+    os.path.join(BASE_DIR, "child_health/static/child_health"),
 ]
 
 # STATICFILES_DIRS = [
