@@ -1,0 +1,416 @@
+{% extends "base.html" %} 
+{% load static %}
+{% block content %}
+
+<div class="container py-4 mt-5">
+<h1 class="mb-3">Maternal Health Record</h1>
+<form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="card mb-3">
+    <div class="card-header">Identification</div>
+    <div class="card-body row g-3">
+        <div class="col-md-3">
+        {{ identification_form.family_no.label_tag }} {{ identification_form.family_no }}
+        </div>
+        <div class="col-md-6">{{ identification_form.name.label_tag }} {{ identification_form.name }}</div>
+        <div class="col-md-3">
+        {{ identification_form.date_of_birth.label_tag }} {{ identification_form.date_of_birth }}
+        </div>
+        <div class="col-md-2">{{ identification_form.age.label_tag }} {{ identification_form.age }}</div>
+        <div class="col-md-2">
+        {{ identification_form.age_group.label_tag }} {{ identification_form.age_group }}
+        </div>
+        <div class="col-md-8">
+        {{ identification_form.address.label_tag }} {{ identification_form.address }}
+        </div>
+        <div class="col-md-4">
+        {{ identification_form.husband_name.label_tag }} {{ identification_form.husband_name }}
+        </div>
+        <div class="col-md-4">
+        {{ identification_form.occupation.label_tag }} {{ identification_form.occupation }}
+        </div>
+        <div class="col-md-2">
+        {{ identification_form.weight_kg.label_tag }} {{ identification_form.weight_kg }}
+        </div>
+        <div class="col-md-2">
+        {{ identification_form.height_cm.label_tag }} {{ identification_form.height_cm }}
+        </div>
+        <div class="col-md-2">{{ identification_form.bmi.label_tag }} {{ identification_form.bmi }}</div>
+        <div class="col-md-2">
+        {{ identification_form.bmi_category.label_tag }} {{ identification_form.bmi_category }}
+        </div>
+    </div>
+    </div>
+
+    <div class="card mb-3">
+    <div class="card-header">Obstetric</div>
+        <div class="card-body row g-3">
+            <div class="col-md-3">
+            {{ obstetric_form.children_born_alive.label_tag }} {{ obstetric_form.children_born_alive }}
+            </div>
+            <div class="col-md-3">
+            {{ obstetric_form.living_children.label_tag }} {{ obstetric_form.living_children }}
+            </div>
+            <div class="col-md-3">
+            {{ obstetric_form.abortions.label_tag }} {{ obstetric_form.abortions }}
+            </div>
+            <div class="col-md-3">
+            {{ obstetric_form.stillbirths.label_tag }} {{ obstetric_form.stillbirths }}
+            </div>
+            <div class="col-md-6 form-check mt-2 ms-2">
+            {{ obstetric_form.history_large_babies.label_tag }} {{ obstetric_form.history_large_babies }}
+            </div>
+            <div class="col-md-6 form-check mt-2 ms-2">
+            {{ obstetric_form.diabetes_history }} {{ obstetric_form.diabetes_history.label_tag }}
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+    <div class="card-header">Medical History</div>
+        <div class="card-body row g-3">
+            <div class="col-md-4">
+            {{ medical_history_form.previous_illness.label_tag }} {{ medical_history_form.previous_illness }}
+            </div>
+            <div class="col-md-4">
+            {{ medical_history_form.previous_hospitalization.label_tag }} {{ medical_history_form.previous_hospitalization }}
+            </div>
+            <div class="col-md-4">
+            {{ medical_history_form.previous_preg_complications.label_tag }} {{ medical_history_form.previous_preg_complications }}
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+    <div class="card-header">Previous Pregnancies</div>
+    <div class="card-body table-responsive">
+        {{ formset.management_form }}
+        <table class="table table-sm align-middle">
+        <thead>
+            <tr>
+            <th>Date of delivery</th>
+            <th>Outcome</th>
+            <th>Type</th>
+            <th>Baby’s wt (kg)</th>
+            <th>Gender</th>
+            <th>Ballard</th>
+            <th>Apgar</th>
+            <th>Delete</th>
+            </tr>
+        </thead>
+        <tbody id="pregnancy-table-body">
+            {% for f in formset %}
+            <tr>
+            <td>{{ f.delivery_date }}</td>
+            <td>{{ f.outcome }}</td>
+            <td>{{ f.delivery_type }}</td>
+            <td>{{ f.baby_weight_kg }}</td>
+            <td>{{ f.gender }}</td>
+            <td>{{ f.ballard_score }}</td>
+            <td>{{ f.apgar_score }}</td>
+            <td>
+                <button type="button" class="btn btn-sm btn-danger remove-row">Remove</button>
+            </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        </table>
+
+        <div class="text-end mt-2">
+        <button type="button" id="add-previous-pregnancy" class="btn btn-sm btn-primary">
+            Add Previous Pregnancy
+        </button>
+        </div>
+    </div>
+    </div>
+
+    <!-- Hidden empty form template -->
+    <table style="display: none;">
+    <tbody id="empty-form-template">
+        <tr>
+        <td>{{ formset.empty_form.delivery_date }}</td>
+        <td>{{ formset.empty_form.outcome }}</td>
+        <td>{{ formset.empty_form.delivery_type }}</td>
+        <td>{{ formset.empty_form.baby_weight_kg }}</td>
+        <td>{{ formset.empty_form.gender }}</td>
+        <td>{{ formset.empty_form.ballard_score }}</td>
+        <td>{{ formset.empty_form.apgar_score }}</td>
+        <td>
+            <button type="button" class="btn btn-sm btn-danger remove-row">Remove</button>
+        </td>
+        </tr>
+    </tbody>
+    </table>
+
+
+
+    <div class="card mb-3">
+    <div class="card-header">Tetanus Toxoid (dates given)</div>
+    <div class="card-body row g-3">
+        <div class="col-md-2">
+        {{ tt_form.tt1_date.label_tag }} {{ tt_form.tt1_date }}
+        </div>
+        <div class="col-md-2">
+        {{ tt_form.tt2_date.label_tag }} {{ tt_form.tt2_date }}
+        </div>
+        <div class="col-md-2">
+        {{ tt_form.tt3_date.label_tag }} {{ tt_form.tt3_date }}
+        </div>
+        <div class="col-md-2">
+        {{ tt_form.tt4_date.label_tag }} {{ tt_form.tt4_date }}
+        </div>
+        <div class="col-md-2">
+        {{ tt_form.tt5_date.label_tag }} {{ tt_form.tt5_date }}
+        </div>
+        <div class="col-md-2">
+        {{ tt_form.fim_date.label_tag }} {{ tt_form.fim_date }}
+        </div>
+    </div>
+    </div>
+
+    <div class="card mb-3">
+    <div class="card-header">Present Pregnancy</div>
+    <div class="card-body row g-3">
+        <div class="col-md-2">
+        {{ present_pregnancy_form.gravida.label_tag }} {{ present_pregnancy_form.gravida }}
+        </div>
+        <div class="col-md-2">{{ present_pregnancy_form.para.label_tag }} {{ present_pregnancy_form.para }}</div>
+        <div class="col-md-2">
+        {{ present_pregnancy_form.fullterm.label_tag }} {{ present_pregnancy_form.fullterm }}
+        </div>
+        <div class="col-md-2">
+        {{ present_pregnancy_form.preterm.label_tag }} {{ present_pregnancy_form.preterm }}
+        </div>
+        <div class="col-md-2">{{ present_pregnancy_form.lmp.label_tag }} {{ present_pregnancy_form.lmp }}</div>
+        <div class="col-md-2">{{ present_pregnancy_form.edc.label_tag }} {{ present_pregnancy_form.edc }}</div>
+    </div>
+    </div>
+
+    <div class="card mb-3">
+    <div class="card-header">Laboratory Results</div>
+    <div class="card-body">
+    <div class="row g-3">
+        <!-- Header row -->
+        <div class="row align-items-center mb-2 mt-3">
+        <div class="col-md-8">
+            <div class="d-flex align-items-center gap-2">
+            <span class="fw-semibold text-uppercase small text-muted">Results</span>
+            <span class="flex-grow-1 border-bottom" style="opacity:.35;"></span>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="d-flex align-items-center gap-2">
+            <span class="fw-semibold text-uppercase small text-muted">Date Conducted</span>
+            <span class="flex-grow-1 border-bottom" style="opacity:.35;"></span>
+            </div>
+        </div>
+        </div>
+        <!-- Urinalysis -->
+        <div class="col-md-8">
+        {{ lab_form.urinalysis.label_tag }} {{ lab_form.urinalysis }}
+        </div>
+        <div class="col-md-4">
+        {{ lab_form.urinalysis_date.label_tag }} {{ lab_form.urinalysis_date }}
+        </div>
+
+        <!-- CBC -->
+        <div class="col-md-8">
+        {{ lab_form.cbc.label_tag }} {{ lab_form.cbc }}
+        </div>
+        <div class="col-md-4">
+        {{ lab_form.cbc_date.label_tag }} {{ lab_form.cbc_date }}
+        </div>
+
+        <!-- SGOT/SGPT -->
+        <div class="col-md-8">
+        {{ lab_form.sgot_sgpt.label_tag }} {{ lab_form.sgot_sgpt }}
+        </div>
+        <div class="col-md-4">
+        {{ lab_form.sgot_sgpt_date.label_tag }} {{ lab_form.sgot_sgpt_date }}
+        </div>
+
+        <!-- Creatinine serum -->
+        <div class="col-md-8">
+        {{ lab_form.creatinine_serum.label_tag }} {{ lab_form.creatinine_serum }}
+        </div>
+        <div class="col-md-4">
+        {{ lab_form.creatinine_serum_date.label_tag }} {{ lab_form.creatinine_serum_date }}
+        </div>
+
+        <!-- BUA / BUN -->
+        <div class="col-md-8">
+        {{ lab_form.bua_bun.label_tag }} {{ lab_form.bua_bun }}
+        </div>
+        <div class="col-md-4">
+        {{ lab_form.bua_bun_date.label_tag }} {{ lab_form.bua_bun_date }}
+        </div>
+
+        <!-- Syphilis -->
+        <div class="col-md-8">
+        {{ lab_form.syphilis.label_tag }} {{ lab_form.syphilis }}
+        </div>
+        <div class="col-md-4">
+        {{ lab_form.syphilis_date.label_tag }} {{ lab_form.syphilis_date }}
+        </div>
+
+        <!-- HIV -->
+        <div class="col-md-8">
+        {{ lab_form.hiv_test.label_tag }} {{ lab_form.hiv_test }}
+        </div>
+        <div class="col-md-4">
+        {{ lab_form.hiv_test_date.label_tag }} {{ lab_form.hiv_test_date }}
+        </div>
+
+        <!-- HEPA B -->
+        <div class="col-md-8">
+        {{ lab_form.hepa_b.label_tag }} {{ lab_form.hepa_b }}
+        </div>
+        <div class="col-md-4">
+        {{ lab_form.hepa_b_date.label_tag }} {{ lab_form.hepa_b_date }}
+        </div>
+
+        <!-- Blood typing -->
+        <div class="col-md-8">
+        {{ lab_form.blood_typing.label_tag }} {{ lab_form.blood_typing }}
+        </div>
+        <div class="col-md-4">
+        {{ lab_form.blood_typing_date.label_tag }} {{ lab_form.blood_typing_date }}
+        </div>
+
+        <!-- OGCT (50g) -->
+        <div class="col-md-8">
+        {{ lab_form.ogct_50g.label_tag }} {{ lab_form.ogct_50g }}
+        </div>
+        <div class="col-md-4">
+        {{ lab_form.ogct_50g_date.label_tag }} {{ lab_form.ogct_50g_date }}
+        </div>
+    </div>
+    </div>
+    </div>
+
+    <div class="card mb-3">
+    <div class="card-header">Checklist</div>
+    <div class="card-body">
+        <div class="row">
+        <div class="col-12">
+            {% for checkbox in check_list_form.symptoms %}
+            <div class="form-check form-check-inline mb-2">
+            {{ checkbox.tag }}
+            <label class="form-check-label"
+                >{{ checkbox.choice_label }}</label
+            >
+            </div>
+            {% endfor %}
+        </div>
+        <div class="col-12 mt-2">
+            <div class="form-check">
+            {{ check_list_form.preeclampsia_flag }} {{ check_list_form.preeclampsia_flag.label_tag }}
+            </div>
+        </div>
+        </div>
+    </div>
+    </div>
+
+    <div class="card mb-3">
+    <div class="card-header">Plans</div>
+    <div class="card-body row g-3">
+        <div class="col-md-6">
+        {{ plan_form.plan_place_of_delivery.label_tag }} {{ plan_form.plan_place_of_delivery }}
+        </div>
+        <div class="col-md-6 form-check mt-2">
+        {{ plan_form.plan_newborn_screening }} {{ plan_form.plan_newborn_screening.label_tag }}
+        </div>
+    </div>
+    </div>
+
+    <div class="card mb-3">
+    <div class="card-header">Micronutrients</div>
+    <div class="card-body row g-3">
+        <div class="col-md-6">
+        {{ micro_nutrients_form.iron_folic_start.label_tag }} {{ micro_nutrients_form.iron_folic_start }}
+        </div>
+        <div class="col-md-6 form-check mt-2">
+        {{ micro_nutrients_form.iron_folic_end }} {{ micro_nutrients_form.iron_folic_end.label_tag }}
+        </div>
+        <div class="col-md-4">
+        {{ micro_nutrients_form.deworming_date.label_tag }} {{ micro_nutrients_form.deworming_date }}
+        </div>
+        <div class="col-md-4">
+        {{ micro_nutrients_form.deworming_date.label_tag }} {{ micro_nutrients_form.deworming_date }}
+        </div>
+    </div>
+    </div>
+
+    <div class="card mb-3">
+    <div class="card-header">Risk Codes</div>
+    <div class="card-body row">
+        <div class="col-md-6">
+        <div class="fw-semibold text-muted small mb-2">
+            {{ risk_code_form.risk_obstetric_history.label_tag }} {{ risk_code_form.risk_obstetric_history }}
+        </div>
+        <div class="form-check">{{ risk_code_form.risk_prev_cs }} {{ risk_code_form.risk_prev_cs.label_tag }}</div>
+        <div class="form-check">{{ risk_code_form.risk_three_miscarriages }} {{ risk_code_form.risk_three_miscarriages.label_tag }}</div>
+        <div class="form-check">{{ risk_code_form.risk_pph }} {{ risk_code_form.risk_pph.label_tag }}</div>
+        </div>
+        <div class="col-md-6">
+        <div class="fw-semibold text-muted small mb-2">
+            {{ risk_code_form.risk_medical_comorbidities.label_tag }} {{ risk_code_form.risk_medical_comorbidities }}
+        </div>
+        <div class="form-check">{{ risk_code_form.risk_tb }} {{ risk_code_form.risk_tb.label_tag }}</div>
+        <div class="form-check">{{ risk_code_form.risk_heart_disease }} {{ risk_code_form.risk_heart_disease.label_tag }}</div>
+        <div class="form-check">{{ risk_code_form.risk_diabetes }} {{ risk_code_form.risk_diabetes.label_tag }}</div>
+        <div class="form-check">{{ risk_code_form.risk_asthma }} {{ risk_code_form.risk_asthma.label_tag }}</div>
+        <div class="form-check">{{ risk_code_form.risk_goiter }} {{ risk_code_form.risk_goiter.label_tag }}</div>
+        </div>
+    </div>
+    </div>
+
+
+    <div class="card mb-4">
+    <div class="card-body row g-3">
+        <div class="col-md-6">
+        {{ risk_code_form.assessed_by.label_tag }} {{ risk_code_form.assessed_by }}
+        </div>
+        <div class="col-md-6 text-end">
+        <button class="btn btn-primary">Submit</button>
+        </div>
+    </div>
+    </div>
+</form>
+</div>
+
+{% block js %}
+{{ block.super }}
+<script>
+(() => {
+    document.addEventListener("DOMContentLoaded", function() {
+        if (window.ppFormsetBound) return;
+        window.ppFormsetBound = true;
+
+        const addBtn = document.getElementById("add-previous-pregnancy");
+        const totalForms = document.querySelector("#id_pp-TOTAL_FORMS");
+        const tableBody = document.getElementById("pregnancy-table-body");
+        const emptyForm = document.querySelector("#empty-form-template").innerHTML;
+
+        // Add new row
+        addBtn.addEventListener("click", function() {
+            const formCount = parseInt(totalForms.value);
+            const newFormHtml = emptyForm.replaceAll("__prefix__", formCount);
+            tableBody.insertAdjacentHTML("beforeend", newFormHtml);
+            totalForms.value = formCount + 1;
+        });
+
+        // Delegate remove action
+        tableBody.addEventListener("click", function(e) {
+            if (e.target.classList.contains("remove-row")) {
+            e.target.closest("tr").remove();
+            totalForms.value = tableBody.querySelectorAll("tr").length;
+            }
+        });
+        });
+})();
+</script>
+
+{% endblock %}
+{% endblock %}

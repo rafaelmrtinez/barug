@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<style>
+:root{ --brand-700:#6d2932; --brand-800:#561c24; }
+.btn-brand{ color:#fff;background:var(--brand-700);border-color:var(--brand-700); }
+.btn-brand:hover{ background:var(--brand-800);border-color:var(--brand-800); }
+.toolbar{ background:#fff;border:1px solid var(--bs-border-color);border-radius:1rem;padding:.75rem;gap:.5rem; }
+.searchbox{ position:relative;flex:1; }
+.searchbox .bi{ position:absolute;left:.8rem;top:50%;transform:translateY(-50%);opacity:.6;color:var(--brand-700); }
+.searchbox input{ padding-left:2.35rem!important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3">
+<h1 class="h4 mb-3">Maternal Health Records</h1>
+
+<!-- Simple Search -->
+<form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+    <div class="searchbox">
+    {% bs_icon 'search' extra_classes='bi' %}
+    <input type="text" class="form-control" name="q" placeholder="Search name / family # / address" value="{{ q }}">
+    </div>
+    <button class="btn btn-brand d-flex align-items-center" type="submit">
+    {% bs_icon 'search' extra_classes='me-2' %}Search
+    </button>
+</form>
+
+<!-- Data Table -->
+<table class="table align-middle">
+    <thead>
+    <tr>
+        <th>Name</th>
+        <th>Family #</th>
+        <th>Address</th>
+        <th>Date</th>
+        <th class="text-end">Open</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% if page_obj.object_list %}
+        {% for r in page_obj.object_list %}
+        <tr>
+            <td>{{ r.full_name }}</td>
+            <td>{{ r.family_num|default:"—" }}</td>
+            <td>{{ r.full_address|default:"—" }}</td>
+            <td>{{ r.updated_date|date:"M d, Y" }}</td>
+            <td class="text-end">
+            {% if r.maternal_record_id %}
+                <a class="btn btn-outline-secondary btn-sm"
+                href="{% url 'maternal:maternal_record_detail' r.person_id r.maternal_record_id %}"
+                data-maternal-record-id="{{ r.maternal_record_id }}">
+                {% bs_icon 'folder2-open' extra_classes='me-1' %} Open
+                </a>
+            {% else %}
+                <span class="text-muted small">—</span>
+            {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    {% else %}
+        <tr><td colspan="5" class="text-center text-muted py-4">No records.</td></tr>
+    {% endif %}
+    </tbody>
+</table>
+
+{% if page_obj.has_other_pages %}
+    <div class="page-pagination">
+    {% include 'paginator.html' with page_obj=page_obj %}
+    </div>
+{% endif %}
+</div>
+{% endblock %}

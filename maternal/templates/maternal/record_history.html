@@ -1,0 +1,377 @@
+{# templates/midwife/record_detail.html #} 
+{% extends "base.html" %} 
+{% load static %} 
+{% load bootstrap_icons %} 
+{% block css %}
+<style>
+  :root {
+    --brand-900: #2c0e16;
+    --brand-800: #44141e;
+    --brand-700: #6d2932;
+    --brand-600: #8b3a45;
+    --brand-050: #fbf6f6;
+    --brand-100: #f7eef0;
+    --ink: #1f2937;
+    --muted: #6b7280;
+    --ring: rgba(109, 41, 50, 0.35);
+  }
+  body {
+    background: #faf9fb;
+    color: var(--ink);
+  }
+
+  /* Page */
+  .container-xxl {
+    max-width: 1320px;
+  }
+  .hero {
+    background: linear-gradient(90deg, var(--brand-900), var(--brand-700));
+    color: #fff;
+    border-radius: 20px;
+    padding: 1rem 1.25rem;
+  }
+  .hero .name {
+    font-weight: 700;
+    font-size: 1.35rem;
+  }
+  .hero .meta {
+    opacity: 0.85;
+  }
+  .hero .pill {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.8rem;
+  }
+  .hero .btn-hero {
+    background: #fff;
+    color: var(--brand-800);
+    border: none;
+  }
+  .card {
+    border: 1px solid rgba(68, 20, 30, 0.25);
+    border-radius: 18px;
+    background: #fff;
+  }
+  .card-title {
+    color: var(--brand-700);
+    font-weight: 700;
+  }
+  .muted {
+    color: var(--muted);
+  }
+  .kpi {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.92rem;
+  }
+  .kpi span:last-child {
+    font-weight: 600;
+  }
+
+  .visit-table thead th {
+    color: #6b7280;
+    font-weight: 600;
+  }
+  .visit-table td,
+  .visit-table th {
+    vertical-align: middle;
+  }
+
+  /* Modal sizing & polish */
+  .modal {
+    z-index: 1200;
+  }
+  .modal-backdrop {
+    z-index: 1190;
+  }
+  .modal.mhr .modal-header {
+    background: linear-gradient(90deg, var(--brand-800), var(--brand-700));
+    color: #fff;
+    border-top-left-radius: 18px;
+    border-top-right-radius: 18px;
+  }
+  .modal.mhr .modal-content {
+    border-radius: 18px;
+    border: 1px solid var(--brand-800);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  }
+  .modal.mhr .modal-title {
+    font-weight: 700;
+  }
+  .modal.mhr .badge-tri {
+    background: var(--brand-100);
+    color: var(--brand-800);
+    font-weight: 600;
+    border: 1px solid rgba(109, 41, 50, 0.25);
+  }
+  .modal.mhr .sticky-footer {
+    position: sticky;
+    bottom: -1px;
+    background: #fff;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-bottom-left-radius: 18px;
+    border-bottom-right-radius: 18px;
+  }
+
+  /* Expand room for forms */
+  .modal.mhr .modal-dialog.modal-xxl {
+    max-width: 1320px;
+  }
+  @media (max-width: 992px) {
+    .modal.mhr .modal-dialog {
+      margin: 0;
+    }
+  }
+
+  .side-summary {
+    background: var(--brand-050);
+    border-left: 1px dashed rgba(68, 20, 30, 0.25);
+    padding-left: 1rem;
+  }
+  .summary-row {
+    display: flex;
+    align-items: start;
+    gap: 0.6rem;
+    margin-bottom: 0.5rem;
+  }
+  .summary-row .icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: #fff;
+    border: 1px solid #eee;
+    color: var(--brand-700);
+  }
+
+  .kbd {
+    font-variant: all-small-caps;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    color: #555;
+  }
+  .form-control:focus,
+  .form-select:focus {
+    border-color: var(--brand-600);
+    box-shadow: 0 0 0 0.25rem var(--ring);
+  }
+
+  .collection-card .input-group > .form-control,
+  .collection-card .input-group > .form-select {
+    min-width: 0;
+  }
+  .collection-table td {
+    vertical-align: middle;
+  }
+  .collection-table .col-val {
+    white-space: nowrap;
+  }
+  .table-min td,
+  .table-min th {
+    padding: 0.45rem 0.6rem;
+    font-size: 0.95rem;
+  }
+
+  .section-title {
+    font-weight: 700;
+    color: var(--brand-700);
+    margin-bottom: 0.25rem;
+  }
+  .section-sub {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 0.75rem;
+  }
+
+  /* Pills */
+  .btn-check + .btn.btn-sm {
+    border-radius: 999px;
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="page-wrap">
+  <div class="container-xxl py-4 mt-5">
+    <!-- Hero -->
+    <div class="hero mb-4">
+      <div class="d-flex flex-wrap align-items-center gap-3">
+        <div class="flex-grow-1">
+          <div class="name" id="record_pname">
+            {{ person_name|default:"-" }}
+          </div>
+          <div class="meta small">
+            Maternal Health Record Number:
+            <strong id="mhr_number">{{ mhr_number|default:"-" }}</strong> ·
+            Family Number:
+            <strong id="family_no">{{ family_no|default:"-" }}</strong> ·
+            Last Menstrual Period:
+            <strong id="lmp">{{ lmp|date:"Y-m-d"|default:"-" }}</strong> ·
+            Estimated Due Date:
+            <strong id="edd">{{ edd|date:"Y-m-d"|default:"-" }}</strong>
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 ms-auto">
+          <span class="pill">Person is {{ person_status|default:"-" }}</span>
+          {% if request.session.auth.role_name != "midwife" %}
+          <button
+            class="btn btn-hero"
+            type="button"
+            onclick="location.href='{% url 'bhw:create_maternal_record'  %}'"
+          >
+            <i class="bi bi-file-plus me-1">
+            </i>
+                Add Maternal Health Record
+          </button>
+          {% else %}
+          <button
+            class="btn btn-hero"
+            type="button"
+            onclick="location.href='{% url 'maternal:maternal_health_record_view' person_id %}'"
+          >
+            <i class="bi bi-file-plus me-1">
+            </i>
+                Add ANC Visit
+          </button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <!-- MAIN -->
+      <div class="col-lg-8">
+        <div class="card p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">All Maternal Records</h5>
+            <small class="text-muted">Total: {{ all_records|length|default:0 }}</small>
+          </div>
+
+          <div class="table-responsive mt-2">
+            <table class="table table-sm visit-table align-middle">
+              <thead>
+                <tr>
+                  <th>MHR #</th>
+                  <th>Start Date</th>
+                  <th>LMP</th>
+                  <th>EDD</th>
+                  <th class="text-end">Open</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% if all_records %}
+                  {% for r in all_records %}
+                    <tr class="{% if r.maternal_record_id == mhr_number %}table-active{% endif %}">
+                      <td>{{ r.maternal_record_id }}</td>
+                      <td>{{ r.start_date|date:"Y-m-d"|default:"-" }}</td>
+                      <td>{{ r.lmp|date:"Y-m-d"|default:"-" }}</td>
+                      <td>{{ r.edd|date:"Y-m-d"|default:"-" }}</td>
+                      <td class="text-end">
+                        <a class="btn btn-outline-secondary btn-sm"
+                          href="{% url 'maternal:maternal_health_record_form' r.maternal_record_id %}">
+                          <i class="bi bi-folder2-open me-1"></i> Open
+                        </a>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                {% else %}
+                  <tr>
+                    <td colspan="5" class="text-center text-muted py-4">No records.</td>
+                  </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+
+
+      <!-- SIDE -->
+      <div class="col-lg-4">
+        <div class="card p-3 mb-3">
+          <h6 class="card-title mb-2">Episode Plan</h6>
+          <div class="small">
+            <div class="kpi">
+              <span>Delivery Plan</span
+              ><span id="ep_delivery_plan"
+                >{{ delivery_plan|default:"NSVD — District Hospital" }}</span
+              >
+            </div>
+            <div class="kpi">
+              <span>Newborn Screening</span
+              ><span id="ep_nbs_plan">{{ nbs_plan|default:"Planned" }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card p-3 mb-3">
+          <h6 class="card-title mb-2">Anthropometrics</h6>
+          <div class="small">
+            <div class="kpi">
+              <span>Height</span
+              ><span id="h-val">{{ height_cm|default:"154" }} cm</span>
+            </div>
+            <div class="kpi">
+              <span>Weight</span
+              ><span id="w-val">{{ weight_kg|default:"54" }} kg</span>
+            </div>
+            {% comment %}
+            <div class="kpi"><span>BMI</span><span id="bmi-val">—</span></div>
+            {% endcomment %}
+            <div class="kpi">
+              <span>BMI Status</span
+              ><span id="an_bmi_stat">{{ bmi_status|default:"Normal" }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card p-3">
+          <h6 class="card-title mb-2">Last Visit Snapshot</h6>
+          <div class="small">
+            <div class="kpi">
+              <span>Date</span
+              ><span id="lv_date"
+                >{{ last_visit_date|default:"2025-06-10" }}</span
+              >
+            </div>
+            {% comment %}
+            <div class="kpi">
+              <span>GA</span><span>{{ last_ga|default:"8 wks (1st)" }}</span>
+            </div>
+            {% endcomment %} {% comment %}
+            <div class="kpi">
+              <span>BP</span><span>{{ last_bp|default:"110/70" }}</span>
+            </div>
+            {% endcomment %} {% comment %}
+            <div class="kpi">
+              <span>FHR</span><span>{{ last_fhr|default:"—" }}</span>
+            </div>
+            {% endcomment %}
+            <div class="kpi">
+              <span>Trimester</span><span id="lv_trimester">1st</span>
+            </div>
+            <div class="kpi">
+              <span>Weight</span><span id="lv_weight">45.5 KG</span>
+            </div>
+            <div class="kpi">
+              <span>Danger</span><span>{{ last_danger|default:"None" }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% block scripts %}
+<script defer src="{% static 'midwife/js/anc.js' %}"></script>
+<script defer src="{% static 'midwife/js/fetchMaternalRecord.js' %}"></script>
+{% endblock %}
+{% endblock %}
