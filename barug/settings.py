@@ -91,7 +91,8 @@ INSTALLED_APPS = [
     "midwife",
     "payments",
     "notifications",
-    "corsheaders"
+    "corsheaders",
+    "common",
 ]
 
 MIDDLEWARE = [

@@ -10,11 +10,20 @@ from src.app.contracts.business_service_contract import (
     IResidentOwnerService,
     IBusinessRegistrationService,
 )
+from src.domain.contracts.household_repository_contract import (
+    IHouseholdRepository
+)
 from src.app.services.business_service import (
     BusinessService,
     ResidentOwnerService,
     BusinessRegistrationService,
     OwnerBusinessInfoService
+)
+from src.app.contracts.household_service_contract import (
+    IHouseholdService
+)
+from src.app.services.household_service import (
+    HouseholdService
 )
 
 
@@ -62,3 +71,10 @@ class AppContainer(containers.DeclarativeContainer):
 
     business_repository = infra.business
     # resident_owner_repository = infra.resident_owner
+
+    household_service: providers.Provider[IHouseholdService] = providers.Factory(
+        HouseholdService,
+        household_repository=infra.household_list
+    )
+
+    household_repository: providers.Provider[IHouseholdRepository] = infra.household_list

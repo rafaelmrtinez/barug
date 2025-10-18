@@ -8,9 +8,6 @@ from django.conf import settings
 from dataclasses import replace
 from authentication.supabase_client import supabase
 from src.infra.exceptions.query_exec_exception import QueryExecutionException
-# from src.app.transfer_objects.dto.business_dto import BusinessListDTO
-# from src.app.contracts.business_service_contract import IBusinessService
-# from src.domain.contracts.business_repository_contract import IBusinessRepository
 
 from src.app.transfer_objects.commands.business_cmd import (
     RegisterBusinessProfileCmd,
@@ -45,9 +42,9 @@ class BusinessService(IBusinessService):
     def execute(
         self,
         search: Optional[str] = None,
-        b_category: Optional[str] = None,
-        ownership_type: Optional[str] = None,
-        status: Optional[str] = None,
+        b_category: Optional[int] = None,
+        ownership_type: Optional[int] = None,
+        status: Optional[int] = None,
     ) -> list[BusinessListDTO]:
         if search:
             return self._business_repo.search_business(search)

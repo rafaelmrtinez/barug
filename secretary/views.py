@@ -30,6 +30,7 @@ from src.domain.contracts.business_repository_contract import IBusinessRepositor
 from .forms import (
     StaffFilters,
     BusinessFilters,
+    HouseholdFilters
 )
 
 from secretary.models import Secretary
@@ -349,7 +350,7 @@ def resident_map_list(request):
 # -------------------------------
 
 def household_list(request):
-    form = StaffFilters()
+    form = HouseholdFilters()
     list = []
     paginator = Paginator(list, 10)
     page_number = request.GET.get('page')
@@ -439,6 +440,7 @@ def business_list(
         },
         'url_name' : 'secretary:business_information',
         'search_url': 'secretary:ajax_business_search',
+        'is_clerk': (user_role == 'Barangay Clerk'),
     })
 
 AJAX_BUSINESS_PARTIALS = {

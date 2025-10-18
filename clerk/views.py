@@ -2696,6 +2696,7 @@ def business_list(
         },
         'url_name' : 'clerk:business_information',
         'search_url': 'clerk:ajax_business_search',
+        'is_clerk': (user_role == CLERK_ROLE),
     })
 
 AJAX_BUSINESS_PARTIALS = {

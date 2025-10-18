@@ -101,9 +101,11 @@
         {% endwith %}
 
 
-        <a class="btn btn-outline-brand ms-2" href="{% url 'clerk:business_owner' %}">
-          {% bs_icon 'plus-lg' extra_classes='me-2' %} Register Business
-        </a>
+        {% if is_clerk %}
+          <a class="btn btn-outline-brand ms-2" href="{% url 'clerk:business_owner' %}">
+            {% bs_icon 'plus-lg' extra_classes='me-2' %} Register Business
+          </a>
+        {% endif %}
       </form>
 
       {# ─── Active filter chips (show selected labels) ─── #}

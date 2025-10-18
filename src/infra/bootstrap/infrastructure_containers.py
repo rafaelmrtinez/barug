@@ -8,12 +8,18 @@ from authentication.supabase_client import supabase
 
 from src.domain.contracts.business_repository_contract import (
     IBusinessRepository,
-    IResidentOwnerRepository
+    IResidentOwnerRepository,
 )
 from src.infra.repositories.business_repository import (
     BusinessRepository,
     ResidentOwnerRepository,
     OwnerBusinessInformationRepository
+)
+from src.domain.contracts.household_repository_contract import (
+    IHouseholdRepository,
+)
+from src.infra.repositories.household_repository import (
+    HouseholdRepository,
 )
 
 
@@ -56,4 +62,9 @@ class InfraContainer(containers.DeclarativeContainer):
     storage = providers.Factory(
         SupabaseStorage,
         _supabase=supabase_client
+    )
+
+    household_list: providers.Provider[IHouseholdRepository] = providers.Factory(
+        HouseholdRepository,
+        ctx=context
     )

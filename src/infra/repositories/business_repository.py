@@ -3,6 +3,8 @@ from django.db import connection
 from datetime import date, time, datetime
 from decimal import Decimal
 from pprint import pformat
+from src.infra.contracts.connection_adapter import IConnectionAdapter
+from src.infra.exceptions.query_exec_exception import QueryExecutionException
 from src.app.transfer_objects.commands.business_cmd import (
     RegisterBusinessProfileCmd
 )
@@ -18,8 +20,6 @@ from src.domain.contracts.business_repository_contract import (
     IResidentOwnerRepository,
     INonResidentOwnerRepository,
 )
-from src.infra.contracts.connection_adapter import IConnectionAdapter
-from src.infra.exceptions.query_exec_exception import QueryExecutionException
 
 try:
     from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
@@ -419,7 +419,6 @@ class BusinessRepository(IBusinessRepository):
         except Exception as e:
             # Your exception requires a positional 'code'. Provide one (e.g., "E_DB").
             # If your class supports kwargs, you could do: QueryExecutionException(str(e), code="E_DB")
-            from src.infra.exceptions.query_exec_exception import QueryExecutionException
             raise QueryExecutionException(f"fetch_business_pins failed: {e}", "E_DB")
 
 class ResidentOwnerRepository(IResidentOwnerRepository):

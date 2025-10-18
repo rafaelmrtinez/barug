@@ -16,9 +16,9 @@ class IBusinessService(ABC):
     @abstractmethod
     def execute(self, 
         search:Optional[str], 
-        b_category: Optional[str] , 
-        ownership_type:Optional[str], 
-        status:Optional[str]
+        b_category: Optional[int] , 
+        ownership_type:Optional[int], 
+        status:Optional[int]
     ) -> Tuple[List[Dict[str, Any]], Dict[str, List[tuple[str, str]]], Optional[str]]:
         """
         Returns:
