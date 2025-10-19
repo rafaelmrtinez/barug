@@ -25,7 +25,15 @@ from src.app.contracts.business_service_contract import (
     IBusinessService,
     IBusinessInfoService,
 )
-from src.domain.contracts.business_repository_contract import IBusinessRepository
+from src.domain.contracts.business_repository_contract import (
+    IBusinessRepository
+)
+from src.app.contracts.household_service_contract import (
+    IHouseholdService,
+)
+from src.domain.contracts.household_repository_contract import (
+    IHouseholdRepository,
+)
 
 from .forms import (
     StaffFilters,
@@ -61,6 +69,14 @@ user_role_template = user_role.lower().replace(' ', '_')
 
 def _auth_role_name(request: HttpRequest) -> str:
     return (((request.session.get("auth") or {}).get("role_name")) or "Staff").title()
+
+def _to_int_or_none(val) -> Optional[int]:
+    try:
+        if val in (None, "", "None"):
+            return None
+        return int(val)
+    except Exception:
+        return None
 
 @session_login_required
 @role_required(SECRETARY_ROLE)
@@ -348,52 +364,160 @@ def resident_map_list(request):
 # -------------------------------
 # HOUSEHOLD
 # -------------------------------
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@csrf_protect
+@nocache
+@inject
+def household_list(
+    request: HttpRequest,
+    household_service: IHouseholdService = Provide[AppContainer.household_service],
+) -> HttpResponseRedirect | HttpResponseRedirect | HttpResponse:
+    
+    user_role = _auth_role_name(request)
+    form = HouseholdFilters(request.GET or None)
 
-def household_list(request):
-    form = HouseholdFilters()
-    list = []
-    paginator = Paginator(list, 10)
-    page_number = request.GET.get('page')
+    search = request.GET.get("search")
+    house_type = _to_int_or_none(request.GET.get("house_type"))
+    house_ownership = _to_int_or_none(request.GET.get("house_ownership"))
+
+    rows = household_service.execute(
+        search=search,
+        house_type=house_type,
+        ownership_type=house_ownership,
+    )
+
+    paginator = Paginator(rows,10)
+    page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
+
+    if (search or house_type is not None or house_ownership is not None) and not form.is_valid():
+        form = HouseholdFilters()
 
     return render(request, "household/household_list.html", {
-        'user_fullname' : user_fullname,
-        'user_role': user_role,
         'page_path': f'{user_role} / Household List',
         'page_title': 'Household List',
-        'user_role_template': user_role_template,
         'page_obj': page_obj,
         'form': form,
+        'filters' : {
+            'search' : search,
+            'house_type' : house_type,
+            'house_ownership':  house_ownership,
+        },
+        "search_url": "secretary:ajax_household_search",
     })
 
-def household_map_list(request):
-    form = StaffFilters()
-    list = []
-    paginator = Paginator(list, 10)
-    page_number = request.GET.get('page')
+@session_login_required
+@role_required(SECRETARY_ROLE)   # change if needed
+@nocache
+@inject
+def ajax_household_search(
+    request: HttpRequest,
+    household_service: IHouseholdService = Provide[AppContainer.household_service],
+) -> HttpResponse:
+    """
+    Returns partial HTML for live search.
+    Accepts:
+      q -> search
+      house_type, house_ownership
+      tpl -> 'cards' (default) or 'rows'
+    """
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR only")
+
+    tpl_key = (request.GET.get("tpl") or "cards").strip().lower()
+    if tpl_key == "rows":
+        template_name = "household/_household_list.html"   # table rows partial
+        ctx_key = "rows"
+    elif tpl_key == "cards":
+        template_name = "household/_households.html"       # cards partial (map list)
+        ctx_key = "cards"
+    else:
+        return HttpResponseBadRequest("Unknown partial")
+
+    q = request.GET.get("q")
+    house_type = _to_int_or_none(request.GET.get("house_type"))
+    house_ownership = _to_int_or_none(request.GET.get("house_ownership"))
+
+    rows = household_service.execute(
+        search=q,
+        house_type=house_type,
+        ownership_type=house_ownership,
+    )[:50]
+
+    html = render_to_string(
+        template_name,
+        {ctx_key: rows},
+        request=request,
+    )
+    return HttpResponse(html)
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@csrf_protect
+@nocache
+@inject
+def household_map_list(
+    request: HttpRequest,
+    household_service: IHouseholdService = Provide[AppContainer.household_service],
+) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+    
+    user_role = _auth_role_name(request)
+    form = HouseholdFilters(request.GET or None)
+
+    search = request.GET.get("search")
+    house_type = _to_int_or_none(request.GET.get("house_type"))
+    house_ownership = _to_int_or_none(request.GET.get("house_ownership"))
+
+    rows = household_service.execute(
+        search=search,
+        house_type=house_type,
+        ownership_type=house_ownership,
+    )
+
+    paginator = Paginator(rows,10)
+    page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
+    if (search or house_type is not None or house_ownership is not None) and not form.is_valid():
+        form = HouseholdFilters()
+
     return render(request, "household/household_map_list.html", {
-        'user_fullname' : user_fullname,
-        'user_role': user_role,
         'page_path': f'{user_role} / Household Map',
         'page_title': 'Household Map',
-        'user_role_template': user_role_template,
         'page_obj': page_obj,
         'form': form,
+        'filters' : {
+            'search' : search,
+            'house_type' : house_type,
+            'house_ownership':  house_ownership,
+        },
+        "pins_url": reverse("secretary:api_household_pins"),
+        'search_url': 'secretary:ajax_household_search',
     })
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@csrf_protect
+@nocache
+@inject
+def api_household_pins(
+    request: HttpRequest,
+    household_repo: IHouseholdRepository = Provide[AppContainer.household_repository],
+):
+    if request.method != "GET":
+        return HttpResponseBadRequest("GET only")
+
+    pins = household_repo.fetch_household_pins(
+        search=(request.GET.get("search") or None),
+        house_type=_to_int_or_none(request.GET.get("house_type")),
+        ownership_type=_to_int_or_none(request.GET.get("house_ownership")),
+    )
+    return JsonResponse(pins, safe=False)
 
 # -------------------------------
 # BUSINESS
 # -------------------------------
-
-def _to_int_or_none(val) -> Optional[int]:
-    try:
-        if val in (None, "", "None"):
-            return None
-        return int(val)
-    except Exception:
-        return None
 
 @session_login_required
 @role_required(SECRETARY_ROLE)
