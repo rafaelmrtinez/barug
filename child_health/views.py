@@ -1,3 +1,4 @@
+import json
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.core.paginator import Paginator
@@ -8,6 +9,7 @@ from django.db import transaction
 
 from authentication.guards import role_required, session_login_required
 from authentication.utils import nocache
+from barug.utility.custom_date_time_util import DateAndTimeUtility
 from barug.utility.messages_util import MessageUtility
 from child_health.exception.child_health_record_exception import ChildHealthRecordException
 from child_health.forms.bf_feeding_type import BreastFeedingTypeForm
@@ -30,6 +32,162 @@ CONNECTION = ConnectionAdapter()
 CHILD_HEALTH_REPOSITORY: ChildHealthRecordRepository = ChildHealthRecordRepository(CONNECTION)
 
 # Create your views here.
+
+def child_immunization_http(request: HttpRequest) -> HttpResponse:
+    # parse json data
+    try:
+        data = json.loads(request.body)
+        staff = request.session.get("auth").get("staff_id")
+        response = CHILD_HEALTH_REPOSITORY.insert_child_immunizations(
+            p_child_record_id=data.get("child_health_record_id"),
+            p_assessed_by_id=staff,
+            p_immunization_type_id=data.get("immunization_type_id"),
+            p_immunization_stage_given_id=data.get("immunization_stage_given_id"),
+            p_date_given=DateAndTimeUtility.get_current_date()
+        )
+        
+        if not response:
+            messages.error(request, "Failed to save immunization data.")
+            return JsonResponse({"message": "Failed to save immunization data"}, status=500)
+
+        messages.success(request, "Immunization data saved successfully.")
+        return JsonResponse({"message": response}, status=200)
+    except ChildHealthRecordException as chre:
+        logger.warning("ChildHealthRecordException in child_new_born_screening_http: %s", chre.message)
+        messages.warning(request, f"Warning: {chre.message}")
+        return JsonResponse({"message": chre.message}, status=400)
+    except Exception as e:
+        logger.exception("child_new_born_screening_http failed: %s", e)
+        messages.error(request, "Failed to submit Newborn Screening Data. Please try again.")
+        return JsonResponse({"ok": False, "error": "Internal Server Error"}, status=500)    
+
+@session_login_required
+@role_required(*ACCESS)
+@nocache
+@require_http_methods(["GET", "POST"])
+def child_health_entry(request: HttpRequest, child_health_record_id: int) -> HttpResponse:
+    try:
+        child_information_form = ChildInformationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, role=None)
+        bf_form = ChildBreastFeedingForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
+        immunizations = ChildImmunizationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
+        birth_and_supplementation = BirthAndSupplentationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
+        visit_form = ChildVisitForm()
+        new_born_screening = NewbornScreeningForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
+        visit_log = CHILD_HEALTH_REPOSITORY.fetch_child_monitoring_logs(child_health_record_id)
+        bf_type = BreastFeedingTypeForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
+        
+        staff_id = request.session.get("auth").get("staff_id")
+        
+        logger.info("STAFF ID in child_health_entry: %s", staff_id)
+        logger.info("FORM TYPE in POST data: %s", request.POST.get("form_type"))
+        
+        if request.method == "GET":
+            return render(
+                request,
+                "child_health/chr_entry.html",
+                {
+                    "form": birth_and_supplementation,
+                    "new_born_screening": new_born_screening,
+                    "child_information_form": child_information_form,
+                    "visit_form": visit_form,
+                    "child_health_record_id": child_health_record_id,
+                    "bf_form": bf_form,
+                    "immunizations": immunizations,
+                    "visit_log": visit_log,
+                    "bf_type": bf_type,
+                },
+            )
+        
+        form_type = request.POST.get("form_type")
+        
+        if form_type == "newborn_screening_form":
+            screening_data = NewbornScreeningForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, data=request.POST)
+            if screening_data.is_valid():
+                is_success = CHILD_HEALTH_REPOSITORY.insert_new_born_screening_date(
+                    p_child_record_id=child_health_record_id, 
+                    p_assessed_by_id=staff_id, 
+                    p_referred_nbs_date=screening_data.cleaned_data.get("referred_for_newborn_screening"))
+                
+                if is_success and isinstance(is_success, tuple):
+                    messages.success(request, "Newborn Screening data saved successfully.")
+                    return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
+            else:
+                MessageUtility.push_form_errors_as_messages(request, screening_data)
+                return render(
+                    request,
+                    "child_health/chr_entry.html",
+                    {
+                        "form": birth_and_supplementation,
+                        "new_born_screening": screening_data,
+                        "child_information_form": child_information_form,
+                        "visit_form": visit_form,
+                        "child_health_record_id": child_health_record_id,
+                        "bf_form": bf_form,
+                        "immunizations": immunizations,
+                        "visit_log": visit_log,
+                        "bf_type": bf_type,
+                    },
+                )
+        elif form_type == "bf_feeding_form":
+            bf_data = ChildBreastFeedingForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, data=request.POST)
+            
+            if bf_data.is_valid():
+                is_success = CHILD_HEALTH_REPOSITORY.insert_bf_check(
+                    p_child_record_id=child_health_record_id,
+                    p_assessed_by_id=staff_id,
+                    p_feeding_type_id=bf_data.cleaned_data.get("type_of_feeding"),
+                    p_check_date=bf_data.cleaned_data.get("exclusive_bf_check_last")
+                )
+                print(f"DEBUG: is_success value {is_success}")
+                if is_success and isinstance(is_success, tuple):
+                    messages.success(request, "Breast Feeding Type saved successfully.")
+
+                    return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
+            else:
+                MessageUtility.push_form_errors_as_messages(request, bf_data)
+                return render(
+                    request,
+                    "child_health/chr_entry.html",
+                    {
+                        "form": birth_and_supplementation,
+                        "new_born_screening": new_born_screening,
+                        "child_information_form": child_information_form,
+                        "visit_form": visit_form,
+                        "child_health_record_id": child_health_record_id,
+                        "bf_form": bf_form,
+                        "immunizations": immunizations,
+                        "visit_log": visit_log,
+                        "bf_type": bf_data,
+                    },
+                )
+            
+        else:
+            messages.error(request, "Invalid form submission.")
+            return render(
+                request,
+                "child_health/chr_entry.html",
+                {
+                    "form": birth_and_supplementation,
+                    "new_born_screening": new_born_screening,
+                    "child_information_form": child_information_form,
+                    "visit_form": visit_form,
+                    "child_health_record_id": child_health_record_id,
+                    "bf_form": bf_form,
+                    "immunizations": immunizations,
+                    "visit_log": visit_log,
+                    "bf_type": bf_type,
+                },
+            )
+    except ChildHealthRecordException as chre:
+        logger.warning("ChildHealthRecordException in child_health_entry: %s", chre.message)
+        messages.warning(request, f"Warning: {chre.message}")
+        return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
+    except Exception as e:
+        logger.exception("child_health_entry failed: %s", e)
+        messages.error(request, "An unexpected error occurred. Please try again later.")
+        return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
+        
+        
 
 def fetch_person_and_house_basic_details_http(request: HttpRequest, person_id: int) -> JsonResponse:
     try:
@@ -157,187 +315,3 @@ def child_record_list_view(request: HttpRequest) -> HttpRequest:
             "page_obj": page_obj,
         },
     )
-
-
-@session_login_required
-@role_required(*ACCESS)
-@nocache
-def child_health_entry(request: HttpRequest, child_health_record_id: int) -> HttpResponse:
-    # this is not a child id or person id.
-    # TODO: will be fixising this later
-    child_information_form = bf_form = immunizations = birth_and_supplementation = visit_form = new_born_screening = visit_log = bf_type = None
-    staff = request.session.get("auth").get("staff_id")
-    logger.info("Accessing child_health_entry for child_health_record_id: %s by staff_id: %s", child_health_record_id, staff)
-    try:
-        child_information_form = ChildInformationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, role=None)
-        bf_form = ChildBreastFeedingForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
-        immunizations = ChildImmunizationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
-        birth_and_supplementation = BirthAndSupplentationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
-        visit_form = ChildVisitForm()
-        new_born_screening = NewbornScreeningForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
-        visit_log = CHILD_HEALTH_REPOSITORY.fetch_child_monitoring_logs(child_health_record_id)
-        bf_type = BreastFeedingTypeForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
-        
-        if request.method == "GET":
-            return render(
-            request,
-            "child_health/chr_entry.html",
-            {
-                "form": birth_and_supplementation,
-                "new_born_screening": new_born_screening,
-                "child_information_form": child_information_form,
-                "visit_form": visit_form,
-                "child_health_record_id": child_health_record_id,
-                "bf_form": bf_form,
-                "immunizations": immunizations,
-                "visit_log": visit_log,
-                "bf_type": bf_type,
-            },
-        )
-            
-        form_type = request.POST.get("form_type")
-        logger.info("Processing form submission of type: %s", form_type)
-        
-        if form_type == "bf_type_form":
-            newborn_screening_form = BreastFeedingTypeForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, data=request.POST)
-            if newborn_screening_form.is_valid():
-                messages.success(request, "Newborn Screening form submitted successfully.")
-                return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
-            else:
-                MessageUtility.push_form_errors_as_messages(request, newborn_screening_form)
-                return render(
-                    request,
-                    "child_health/chr_entry.html",
-                    {
-                        "form": birth_and_supplementation,
-                        "child_information_form": child_information_form,
-                        "visit_form": visit_form,
-                        "child_health_record_id": child_health_record_id,
-                        "bf_form": bf_form,
-                        "immunizations": immunizations,
-                        "visit_log": visit_log,
-                        "bf_type": newborn_screening_form,
-                    },
-                )
-        elif form_type == "bf_feeding_form":
-            
-            bf_feeding_form = ChildBreastFeedingForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, data=request.POST)
-        
-            if bf_feeding_form.is_valid():
-                res = CHILD_HEALTH_REPOSITORY.insert_bf_check(
-                    p_child_record_id=child_health_record_id,
-                    p_assessed_by_id=request.session.get("auth").get("staff_id"),
-                    p_feeding_type_id=int(bf_feeding_form.cleaned_data.get("type_of_feeding")),
-                    p_check_date=bf_feeding_form.cleaned_data.get("exclusive_bf_check_last")   
-                )
-                messages.success(request, "Breast Feeding form submitted successfully.")
-                return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
-            else:
-                MessageUtility.push_form_errors_as_messages(request, bf_feeding_form)
-                return render(
-                    request,
-                    "child_health/chr_entry.html",
-                    {
-                        "form": birth_and_supplementation,
-                        "child_information_form": child_information_form,
-                        "new_born_screening": new_born_screening,
-                        "visit_form": visit_form,
-                        "child_health_record_id": child_health_record_id,
-                        "bf_form": bf_feeding_form,
-                        "immunizations": immunizations,
-                        "visit_log": visit_log,
-                        "bf_type": bf_type,
-                    },
-                )
-        elif form_type == "child_immunization_form":
-            form = ChildImmunizationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, data=request.POST)
-            if form.is_valid():
-                cleaned = form.cleaned_data
-                print("CHILD IMMUNIZATION FORM CLEANED DATA:", cleaned)
-                return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
-                
-            MessageUtility.push_form_errors_as_messages(request, form)
-            return render(
-                request,
-                "child_health/chr_entry.html",
-                {
-                    "form": birth_and_supplementation,
-                    "child_information_form": child_information_form,
-                    "new_born_screening": new_born_screening,
-                    "visit_form": visit_form,
-                    "child_health_record_id": child_health_record_id,
-                    "bf_form": bf_form,
-                    "immunizations": form,
-                    "visit_log": visit_log,
-                    "bf_type": bf_type,
-                },
-            )
-    except ChildHealthRecordException as chre:
-        logger.error("child_health_entry raised ChildHealthRecordException: %s", getattr(chre, "message", str(chre)))
-        messages.warning(request, f"Warning: {getattr(chre, 'message', 'A validation error occurred.')}")
-        if child_information_form is None:
-            child_information_form = ChildInformationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, role=None)
-        if bf_form is None:
-            bf_form = ChildBreastFeedingForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
-        if immunizations is None:
-            immunizations = ChildImmunizationForm(chr_repo=CHILD_HEALTH_REPOSITORY, chr_id=child_health_record_id)
-        if birth_and_supplementation is None:
-            birth_and_supplementation = BirthAndSupplentationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
-        if visit_form is None:
-            visit_form = ChildVisitForm()
-        if new_born_screening is None:
-            new_born_screening = NewbornScreeningForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
-        if visit_log is None:
-            visit_log = CHILD_HEALTH_REPOSITORY.fetch_child_monitoring_logs(chr_id)
-        if bf_type is None:
-            bf_type = BreastFeedingTypeForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
-        return render(
-            request,
-            "child_health/chr_entry.html",
-            {
-                "form": birth_and_supplementation,
-                "new_born_screening": new_born_screening,
-                "child_information_form": child_information_form,
-                "visit_form": visit_form,
-                "child_health_record_id": child_health_record_id,
-                "bf_form": bf_form,
-                "immunizations": immunizations,
-                "visit_log": visit_log,
-                "bf_type": bf_type,
-            },
-        )
-    except Exception as e:
-        logger.exception("child_health_entry encountered an unexpected error: %s", e)
-        messages.error(request, "An unexpected error occurred. Please try again.")
-        if child_information_form is None:
-            child_information_form = ChildInformationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, role=None)
-        if bf_form is None:
-            bf_form = ChildBreastFeedingForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
-        if immunizations is None:
-            immunizations = ChildImmunizationForm(chr_repo=CHILD_HEALTH_REPOSITORY, chr_id=child_health_record_id)
-        if birth_and_supplementation is None:
-            birth_and_supplementation = BirthAndSupplentationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
-        if visit_form is None:
-            visit_form = ChildVisitForm()
-        if new_born_screening is None:
-            new_born_screening = NewbornScreeningForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
-        if visit_log is None:
-            visit_log = []
-        if bf_type is None:
-            bf_type = BreastFeedingTypeForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
-        return render(
-            request,
-            "child_health/chr_entry.html",
-            {
-                "form": birth_and_supplementation,
-                "new_born_screening": new_born_screening,
-                "child_information_form": child_information_form,
-                "visit_form": visit_form,
-                "child_health_record_id": child_health_record_id,
-                "bf_form": bf_form,
-                "immunizations": immunizations,
-                "visit_log": visit_log,
-                "bf_type": bf_type,
-            },
-            status=500,
-        )

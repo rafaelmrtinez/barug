@@ -24,39 +24,19 @@ class NewbornScreeningForm(forms.Form):
         error_messages={'required': 'Please provide the date referred for newborn screening.'}
     )
     
-    type_of_feeding = forms.ChoiceField(
-        label="Type of Feeding", 
-        required=True, 
-        choices=[],
-        error_messages={'required': 'Please select a type of feeding.'})
+    form_type = forms.CharField(widget=forms.HiddenInput(), initial="newborn_screening_form")
     
+
     def clean(self):
         cleaned_data = super().clean()
-        
         return cleaned_data
 
     def __init__(self, chr_repo: ChildHealthRecordRepository, child_health_record_id: int, *args, **kwargs):
         super().__init__(*args, **kwargs)
         add_bootstrap_classes(self)
-        
-        """ 
-            Expected Data:
-            Newborn Screening Data: {
-                'child_record_id': 5, 
-                'visit_id': 43, 
-                'visit_no': 2, 
-                'visit_date': None, 
-                'referred_nbs_date': datetime.date(2025, 10, 14), 
-                'feeding_type_id': 1, 
-                'feeding_type_name': 'EXCLUSIVE BREASTFEEDING'
-                }
-        """
-        newborn_screening_data = chr_repo.fetch_child_newborn_screening_by_person_id(child_health_record_id)
-        print("Newborn Screening Data:", newborn_screening_data)
-        feeding_types = chr_repo.fetch_all_feeding_type()
-        
-        self.fields['type_of_feeding'].choices = [('', 'Select Feeding Type')] + [(ft['feeding_type_id'], ft['feeding_type_name']) for ft in feeding_types]
-        
-        if newborn_screening_data:
-            self.fields['referred_for_newborn_screening'].initial = newborn_screening_data.get('referred_nbs_date')
-            self.fields['type_of_feeding'].initial = newborn_screening_data.get('feeding_type_id')
+        self._repo = chr_repo
+        self._chr_id = child_health_record_id
+        self._screening_date = self._repo.fetch_new_born_screening_date_by_chr_id(self._chr_id)
+        if self._screening_date and isinstance(self._screening_date, list):
+            self.fields['referred_for_newborn_screening'].initial = self._screening_date[0]['referred_newborn_screening_date']
+            self.fields['referred_for_newborn_screening'].widget.attrs['readonly'] = True

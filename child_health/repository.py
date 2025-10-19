@@ -12,6 +12,37 @@ class ChildHealthRecordRepository:
         self.ctx = ctx
         logger.info("ChildHealthRecordRepository initialized")
         
+    def fetch_new_born_screening_date_by_chr_id(self, chr_id: int) -> dict | None:
+        sql="""SELECT
+            s.referred_newborn_screening_date
+            FROM
+            feeding_type_nwbrn_scrnng s
+            JOIN child_visit v ON v.visit_id = s.visit_id
+            WHERE
+            v.child_record_id = %s
+            ORDER BY feeding_type_nwbrn_scrnng_id DESC
+            LIMIT 1;
+        """
+        params = [chr_id]
+        result = self.ctx.execute_query_to_dict(sql, params)
+        if not result:
+            return None
+        return result
+        
+    def insert_new_born_screening_date(self, p_child_record_id, p_assessed_by_id, p_referred_nbs_date):
+        sql="""SELECT * FROM add_referred_newborn_screening_date(%s, %s, %s);"""
+        params = [p_child_record_id, p_assessed_by_id, p_referred_nbs_date]
+        try:
+            result = self.ctx.execute_query(sql, params)
+            if not result:
+                return None
+            return result
+        except QueryExecutionException as e:
+            logger.error(f"Error inserting new born screening date: {e}")
+            if ChildHealthRecordException.is_child_health_record_exception(e.code):
+                raise ChildHealthRecordException(e.message) from e
+            raise e
+
     def fetch_immunization_dates_matrix_by_chr_id(self, chr_id: int) -> dict | None:
         print(f"Fetching immunization dates matrix for chr_id: {chr_id}")
         sql="""-- Repository SQL: pivot immunization dates per type for a child record

@@ -16,7 +16,7 @@
     <!-- Identification (NO header button) -->
     <div class="card mb-3 card-brand">
     <div class="card-header">Identification</div>
-
+    <input type="hidden" name="child_information_form" id="child_health_record_id" value="{{ child_health_record_id }}">
     <div class="card-body" id="identification">
         <div class="row g-3">
         <div class="col-md-2">
@@ -87,7 +87,8 @@
             <button type="button" class="btn btn-sm btn-outline-brand section-action" data-section="#nbs">Edit</button>
         </div>
         <div class="card-body" id="nbs">
-            <form method="post">
+            <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
+                {{ new_born_screening.form_type }}
                 {% csrf_token %}
                 <div class="row g-3 align-items-end">
                     <div class="col-md-4">
@@ -175,7 +176,7 @@
             <tbody>
                 <!-- BCG -->
                 <tr>
-                <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
+                <form method="post" id="bcgImmunizationForm">
                     {% csrf_token %}
                     <td>BCG</td>
                     <td>{{ immunizations.bcg_24hr }}</td>
@@ -185,13 +186,12 @@
                     <td>
                     <button type="submit" class="btn btn-brand btn-sm w-100">Save</button>
                     </td>
-                    {{ immunizations.form_type }}
                 </form>
                 </tr>
 
                 <!-- Hep. BV -->
                 <tr>
-                <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
+                <form method="post" id="hepbvImmunizationForm" novalidate>
                     {% csrf_token %}
                     <td>Hep. BV</td>
                     <td>{{ immunizations.hepbv_24hr }}</td>
@@ -201,13 +201,12 @@
                     <td>
                     <button type="submit" class="btn btn-brand btn-sm w-100">Save</button>
                     </td>
-                    {{ immunizations.form_type }}
                 </form>
                 </tr>
 
                 <!-- PCV -->
                 <tr>
-                <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
+                <form method="post" id="pcvImmunizationForm" novalidate>
                     {% csrf_token %}
                     <td>PCV</td>
                     <td>{{ immunizations.pcv_24hr }}</td>
@@ -217,13 +216,12 @@
                     <td>
                     <button type="submit" class="btn btn-brand btn-sm w-100">Save</button>
                     </td>
-                    {{ immunizations.form_type }}
                 </form>
                 </tr>
 
                 <!-- OPV -->
                 <tr>
-                <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
+                <form method="post" id="opvImmunizationForm" novalidate>
                     {% csrf_token %}
                     <td>OPV</td>
                     <td>{{ immunizations.opv_24hr }}</td>
@@ -233,13 +231,12 @@
                     <td>
                     <button type="submit" class="btn btn-brand btn-sm w-100">Save</button>
                     </td>
-                    {{ immunizations.form_type }}
                 </form>
                 </tr>
 
                 <!-- AMV -->
                 <tr>
-                <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
+                <form method="post" id="amvImmunizationForm" novalidate>
                     {% csrf_token %}
                     <td>AMV</td>
                     <td>{{ immunizations.amv_24hr }}</td>
@@ -249,13 +246,12 @@
                     <td>
                     <button type="submit" class="btn btn-brand btn-sm w-100">Save</button>
                     </td>
-                    {{ immunizations.form_type }}
                 </form>
                 </tr>
 
                 <!-- Pentavalent -->
                 <tr>
-                <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
+                <form method="post" id="pentavalentImmunizationForm" novalidate>
                     {% csrf_token %}
                     <td>Pentavalent</td>
                     <td>{{ immunizations.pentavalent_24hr }}</td>
@@ -265,7 +261,6 @@
                     <td>
                     <button type="submit" class="btn btn-brand btn-sm w-100">Save</button>
                     </td>
-                    {{ immunizations.form_type }}
                 </form>
                 </tr>
             </tbody>
@@ -385,9 +380,9 @@
 
 {% block script %}
 <script defer src="{% static 'child_health/js/sectionActions.js' %}"></script>
-<script defer src="{% static 'child_health/js/child_health_entry/insertBF.js' %}"></script>
-<script defer src="{% static 'child_health/js/child_health_entry/selectors.js' %}"></script>
-<script defer src="{% static 'child_health/js/child_health_entry/weightCalculator.js' %}"></script>
-{% comment %} <script defer src="{% static 'child_health/js/immunizationSequence.js' %}"></script> {% endcomment %}
+<script defer src="{% static 'child_health/js/insertBF.js' %}"></script>
+<script defer src="{% static 'child_health/js/selector.js' %}"></script>
+<script defer src="{% static 'child_health/js/weightCalculator.js' %}"></script>
+<script defer src="{% static 'child_health/js/immunizationRequest.js' %}"></script>
 {% endblock %}
 {% endblock %}

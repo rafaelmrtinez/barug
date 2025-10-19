@@ -67,6 +67,10 @@ class ChildBreastFeedingForm(forms.Form):
         self._populate_bf_checks_from_details(self.child_details)         # oldest -> newest
         self._populate_type_of_feeding_from_details(self.child_details)   # latest visit
         self._apply_succession_lock()
+        
+        for i in range(5):
+            if self.fields[f"exclusive_bf_check_{i+1}"].initial:
+                self.fields[f"exclusive_bf_check_{i+1}"].widget.attrs['readonly'] = True
 
     # -------------------- clean / validation --------------------
 
@@ -88,13 +92,15 @@ class ChildBreastFeedingForm(forms.Form):
 
         # C) Latest provided date client posted (5..1)
         last = None
+        count = 5 # just for clarity
         for i in range(5, 0, -1):
             val = cleaned.get(f"exclusive_bf_check_{i}")
             if val:
                 last = val
                 break
+            count-=1
+            
         cleaned["exclusive_bf_check_last"] = last
-
         return cleaned
 
     # -------------------- helpers: UI & data --------------------
