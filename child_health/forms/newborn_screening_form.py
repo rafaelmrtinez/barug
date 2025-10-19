@@ -5,6 +5,17 @@ from maternal.forms.maternal_identification_form import add_bootstrap_classes
 
 
 class NewbornScreeningForm(forms.Form):
+    
+    """
+        IMPORTANT NOTE:
+    
+            This has already been merged into BreastFeedingTypeForm.
+        Keeping this here for reference in case we need to revert.
+        
+        Date: October 19, 2025    
+    
+    """
+    
     referred_for_newborn_screening = forms.DateField(
         label="Date referred for newborn screening",
         required=True,
@@ -18,8 +29,13 @@ class NewbornScreeningForm(forms.Form):
         required=True, 
         choices=[],
         error_messages={'required': 'Please select a type of feeding.'})
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        
+        return cleaned_data
 
-    def __init__(self, chr_repo: ChildHealthRecordRepository, child_id: int, *args, **kwargs):
+    def __init__(self, chr_repo: ChildHealthRecordRepository, child_health_record_id: int, *args, **kwargs):
         super().__init__(*args, **kwargs)
         add_bootstrap_classes(self)
         
@@ -35,7 +51,7 @@ class NewbornScreeningForm(forms.Form):
                 'feeding_type_name': 'EXCLUSIVE BREASTFEEDING'
                 }
         """
-        newborn_screening_data = chr_repo.fetch_child_newborn_screening_by_person_id(child_id)
+        newborn_screening_data = chr_repo.fetch_child_newborn_screening_by_person_id(child_health_record_id)
         print("Newborn Screening Data:", newborn_screening_data)
         feeding_types = chr_repo.fetch_all_feeding_type()
         

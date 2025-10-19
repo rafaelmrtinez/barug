@@ -6,7 +6,7 @@ from maternal.forms.maternal_identification_form import add_bootstrap_classes
 
 class ChildInformationForm(forms.Form):
     # make fields non fillable
-    child_id = forms.IntegerField(widget=forms.HiddenInput())
+    child_health_record_id = forms.IntegerField(widget=forms.HiddenInput())
     family_no = forms.CharField(
         label="Family No.", required=False, disabled=True)
     ufc_no = forms.CharField(label="UFC No.", required=False, disabled=True)
@@ -36,35 +36,31 @@ class ChildInformationForm(forms.Form):
         label="Father Occupation", required=False, disabled=True)
     address = forms.CharField(label="Complete Address with landmarks", required=False, widget=forms.Textarea(attrs={'rows': 2}), disabled=True)
 
-    def __init__(self, chr_repo: ChildHealthRecordRepository | None, child_id: int | None, role: str | None, *args, **kwargs):
+    def __init__(self, chr_repo: ChildHealthRecordRepository | None, child_health_record_id: int | None, role: str | None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         add_bootstrap_classes(self)
         self._chr_repo = chr_repo
-        self._child_id = child_id
-        """ 
-            Expected result:
-            
-            Child Data: {
-                'family_num': '456', 
-                'ufc_num': '654', 
-                'child': 'TEST TEST MAMA ', 
-                'sex_name': 'FEMALE', 
-                'birth_order': '1', '
-                date_of_birth': datetime.date(2025, 9, 1), 
-                'place_of_delivery': 'PRIVATE CLINIC', 
-                'mother_name': 'RAPHAEL HIZON BELLOSILLO ', 
-                'mother_occupation': 'Tao', 
-                'mother_age': Decimal('16.83'), 
-                'father_name': 'ADRIANNE MABANAG VILLARTA JR.', 
-                'father_occupation': 'N/A', 
-                'father_age': Decimal('22.00'), 
-                'address': '321, KANIPAAN, LEGASPI STREET, SEÑOR SANTO NIÑO, CEBU CITY, 6000'
-            }
-
-            Display if exist, otherwise N/A
-        """
+        self._child_health_record_id = child_health_record_id
         self.__display_child_data()
         self.__health_worker_policy(role)
+        self.display_info_if_exist()
+
+    def display_info_if_exist(self):
+        fetch_data = self._chr_repo.fetch_child_health_record_info_by_chr_id(self._child_health_record_id)
+        if fetch_data and isinstance(fetch_data, list) and len(fetch_data) > 0:
+            self.fields['name'].initial = fetch_data[0].get('child_full_name', 'N/A')
+            self.fields['ufc_no'].initial = fetch_data[0].get('ufc_num', 'N/A')
+            self.fields['family_no'].initial = fetch_data[0].get('family_num', 'N/A')
+            self.fields['date_of_birth'].initial = fetch_data[0].get('date_of_birth', 'N/A')
+            self.fields['place_of_delivery'].initial = fetch_data[0].get('place_of_delivery', 'N/A')
+            self.fields['mother'].initial = fetch_data[0].get('mother_full_name', 'N/A')
+            self.fields['father'].initial = fetch_data[0].get('father_full_name', 'N/A')
+            self.fields['mother_age'].initial = fetch_data[0].get('mothers_age', 'N/A')
+            self.fields['father_age'].initial = fetch_data[0].get('fathers_age', 'N/A')
+            self.fields['address'].initial = fetch_data[0].get('child_complete_address', 'N/A')
+            self.fields['birth_order'].initial = fetch_data[0].get('birth_order', 'N/A')
+            self.fields['mother_occupation'].initial = fetch_data[0].get('mother_occupation', 'N/A')
+            self.fields['father_occupation'].initial = fetch_data[0].get('fathers_occupation', 'N/A')
 
     def __health_worker_policy(self, role):
         if role == "barangay health worker":
@@ -104,7 +100,7 @@ class ChildInformationForm(forms.Form):
             self.fields['address'].error_messages = {'required': 'Address is required.'}
 
     def __display_child_data(self):
-        child_data = self._chr_repo.fetch_child_basic_information_by_person_id(self._child_id)
+        child_data = self._chr_repo.fetch_child_basic_information_by_person_id(self._child_health_record_id)
         
         if child_data:
             self.fields['family_no'].initial = child_data.get('family_num', 'N/A')

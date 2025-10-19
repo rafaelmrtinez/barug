@@ -4,7 +4,7 @@ from child_health import views
 app_name = 'child_health'
 
 urlpatterns = [
-    path('child_health_entry/<int:child_id>/', views.child_health_entry, name='child_health_entry'),
+    path('health-entry/<int:child_health_record_id>/', views.child_health_entry, name='child_health_entry'),
     path('records/', views.child_record_list_view, name='child_record_list'),
     path('create_child_health_record/', views.create_child_health_record, name='create_child_health_record'),
     path('ajax/find-person/', views.find_person_http, name='ajax_find_person'),

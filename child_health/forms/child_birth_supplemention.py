@@ -35,11 +35,10 @@ class BirthAndSupplentationForm(forms.Form):
     vit_a_2 = forms.BooleanField(label="Vit. A Given 2", required=False)
     vit_a_3 = forms.BooleanField(label="Vit. A Given 3", required=False)
     
-    def __init__(self, chr_repo: ChildHealthRecordRepository, child_id, *args, **kwargs):
+    def __init__(self, chr_repo: ChildHealthRecordRepository, child_health_record_id, *args, **kwargs):
         super().__init__(*args, **kwargs)
         add_bootstrap_classes(self)
-        chr_id = chr_repo.fetch_child_record_id_by_person_id(child_id)
-        latest_screening_data = chr_repo.fetch_child_screening_package(chr_id)
+        latest_screening_data = chr_repo.fetch_child_screening_package(child_health_record_id)
         print("Latest Screening Data:", latest_screening_data)
         if latest_screening_data:
             """ Assign data accordingly

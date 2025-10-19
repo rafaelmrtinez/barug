@@ -55,13 +55,13 @@
                             {% for record in page_obj.object_list %}
                                 <tr>
                                     <td>{{ record.family_num }}</td>
-                                    <td>{{ record.child }}</td>
-                                    <td>{{ record.mother }}</td>
-                                    <td>{{ record.father }}</td>
-                                    <td>{{ record.date_added|date:"Y-m-d H:i" }}</td>
+                                    <td>{{ record.child_full_name }}</td>
+                                    <td>{{ record.mother_full_name }}</td>
+                                    <td>{{ record.father_full_name }}</td>
+                                    <td>{{ record.record_created_at|date:"Y-m-d H:i" }}</td>
                                     {% if request.session.auth.role_name == "midwife" %}
                                     <td>
-                                        <a href="{% url 'child_health:child_health_entry' record.child_id %}" class="btn btn-outline-brand btn-sm">
+                                        <a href="{% url 'child_health:child_health_entry' record.child_record_id %}" class="btn btn-outline-brand btn-sm">
                                             {% bs_icon 'folder2-open' extra_classes='me-1' %}Open
                                         </a>
                                     </td>
