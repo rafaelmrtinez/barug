@@ -1,459 +1,92 @@
 (() => {
+    const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+    const recordId = document.getElementById("child_health_record_id").value;
 
-    document.getElementById("pentavalentImmunizationForm").addEventListener("submit", function (event) {
-        event.preventDefault();
+    const getImmunizationStage = (prefix) => {
+        const third = document.getElementById(`id_${prefix}_3rd`)?.checked;
+        const second = document.getElementById(`id_${prefix}_2nd`)?.checked;
+        const first = document.getElementById(`id_${prefix}_1st`)?.checked;
 
-        const twentyFourHtInput = document.getElementById("id_pentavalent_24hr").checked;
+        if (third) return 4;
+        if (second) return 3;
+        if (first) return 2;
+        return null;
+    };
 
-        if (twentyFourHtInput) {
-            return;
-        }
+    const postImmunizationData = async (payload, immunizationName) => {
+        try {
+            const response = await fetch("/child-health/child-immunization/request/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
 
-        const firstDoseInput = document.getElementById("id_pentavalent_1st").checked;
-        const secondDoseInput = document.getElementById("id_pentavalent_2nd").checked;
-        const thirdDoseInput = document.getElementById("id_pentavalent_3rd").checked;
-        const recordId = document.getElementById("child_health_record_id").value;
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+            const data = await response.json();
 
-        const immunizationType = 6;
-        let immunizationStage = null;
-        
-        const dataArray = [
-            { field: "pentavalent_24hr", value: twentyFourHtInput },
-            { field: "pentavalent_1st", value: firstDoseInput },
-            { field: "pentavalent_2nd", value: secondDoseInput },
-            { field: "pentavalent_3rd", value: thirdDoseInput }
-        ]
-
-        for (const item of dataArray.reverse()) {
-            if(item.value) {
-                if (item.field == "pentavalent_3rd") {
-                    immunizationStage = 4;
-                    break;
-                } else if (item.field == "pentavalent_2nd") {
-                    immunizationStage = 3;
-                    break;
-                } else if (item.field == "pentavalent_1st") {
-                    immunizationStage = 2;
-                    break;
-                } else {
-                    confirm("No immunization stage selected for Pentavalent.");
-                    return;
-                }
+            if (!response.ok) {
+                confirm(`${immunizationName} Submission Failed: ${data.message}`);
+                return;
             }
-        }
 
-        console.log("Submitting Pentavalent Immunization Data:", {
-            pentavalent_24hr: twentyFourHtInput,
-            pentavalent_1st: firstDoseInput,
-            pentavalent_2nd: secondDoseInput,
-            pentavalent_3rd: thirdDoseInput,
-            child_health_record_id: recordId,
-            immunization_type: immunizationType,
-            immunization_stage_given_id: immunizationStage,
+            if (!data.message) {
+                alert(`Failed to submit ${immunizationName} data. Please try again.`);
+                return;
+            }
+
+            alert(`${immunizationName} Data submitted successfully!`);
+        } catch (error) {
+            console.error(`Error submitting ${immunizationName}:`, error);
+            alert(`Failed to submit ${immunizationName}. Please try again.`);
+        }
+    };
+
+    const submitImmunization = ({ formId, prefix, typeId, immunizationName, stageOverride = null }) => {
+        document.getElementById(formId).addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const dose24hr = document.getElementById(`id_${prefix}_24hr`)?.checked;
+            if (dose24hr && !stageOverride) return;
+
+            const immunizationStage = stageOverride ?? getImmunizationStage(prefix);
+
+            if (!immunizationStage) {
+                confirm(`No immunization stage selected for ${immunizationName}.`);
+                return;
+            }
+
+            console.log(`Submitting ${immunizationName} Data:`, {
+                [`${prefix}_24hr`]: dose24hr,
+                child_health_record_id: recordId,
+                immunization_type_id: typeId,
+                immunization_stage_given_id: immunizationStage
+            });
+
+            await postImmunizationData({
+                [`${prefix}_24hr`]: dose24hr,
+                child_health_record_id: recordId,
+                immunization_type_id: typeId,
+                immunization_stage_given_id: immunizationStage
+            }, immunizationName);
         });
+    };
 
-        const sendPayload = async () => {
-            try {
-                const response = await fetch("/child-health/child-immunization/request/", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRFToken": csrfToken
-                    },
-                    body: JSON.stringify({
-                        pentavalent_24hr: twentyFourHtInput,
-                        child_health_record_id: recordId,
-                        immunization_type_id: immunizationType,
-                        immunization_stage_given_id: immunizationStage
-                    })
-                });
+    const immunizations = [
+        { formId: "bcgImmunizationForm", prefix: "bcg", typeId: 1, name: "BCG", stageOverride: 1 },
+        { formId: "hepbvImmunizationForm", prefix: "hepbv", typeId: 2, name: "Hepatitis BV", stageOverride: 1 },
+        { formId: "pcvImmunizationForm", prefix: "pcv", typeId: 3, name: "PCV" },
+        { formId: "opvImmunizationForm", prefix: "opv", typeId: 4, name: "OPV" },
+        { formId: "amvImmunizationForm", prefix: "amv", typeId: 5, name: "AMV" },
+        { formId: "pentavalentImmunizationForm", prefix: "pentavalent", typeId: 6, name: "Pentavalent" }
+    ];
 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    confirm(`Pentavalent Immunization Submission: ${errorData.message}`);
-                    window.location.href = window.location.href;
-                    return;
-                }
-                const responseData = await response.json();
-                if (!responseData.message) {
-                    console.error("Unexpected response format:");
-                    alert("Failed to submit Pentavalent Immunization Data. Please try again.");
-                    return;
-                }
-                alert("Pentavalent Immunization Data submitted successfully!");
-            } catch (error) {
-                console.error("Error submitting Pentavalent Immunization Data:", error);
-                alert("Failed to submit Pentavalent Immunization Data. Please try again.");
-            }
-        }
-        sendPayload();
-    });
-
-    document.getElementById("amvImmunizationForm").addEventListener("submit", function (event) {
-        event.preventDefault();
-        
-        const twentyFourHtInput = document.getElementById("id_amv_24hr").checked;
-        if (twentyFourHtInput) {
-            return;
-        }
-
-        const firstDoseInput = document.getElementById("id_amv_1st").checked;
-        const secondDoseInput = document.getElementById("id_amv_2nd").checked;
-        const thirdDoseInput = document.getElementById("id_amv_3rd").checked;
-        const recordId = document.getElementById("child_health_record_id").value;
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-
-        const immunizationType = 5;
-        let immunizationStage = null;
-
-        const dataArray = [
-            { field: "amv_24hr", value: twentyFourHtInput },
-            { field: "amv_1st", value: firstDoseInput },
-            { field: "amv_2nd", value: secondDoseInput },
-            { field: "amv_3rd", value: thirdDoseInput }
-        ]
-
-        for (const item of dataArray.reverse()) {
-            if(item.value) {
-                if (item.field == "amv_3rd") {
-                    immunizationStage = 4;
-                    break;
-                } else if (item.field == "amv_2nd") {
-                    immunizationStage = 3;
-                    break;
-                } else if (item.field == "amv_1st") {
-                    immunizationStage = 2;
-                    break;
-                } else {
-                    confirm("No immunization stage selected for AMV.");
-                    return;
-                }
-            }
-        }
-
-        console.log("Submitting AMV Immunization Data:", {
-            amv_24hr: twentyFourHtInput,
-            amv_1st: firstDoseInput,
-            amv_2nd: secondDoseInput,
-            amv_3rd: thirdDoseInput,
-            child_health_record_id: recordId,
-            immunization_type: immunizationType,
-            immunization_stage_given_id: immunizationStage,
-        });
-
-        const sendPayload = async () => {
-            try {
-                const response = await fetch("/child-health/child-immunization/request/", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRFToken": csrfToken
-                    },
-                    body: JSON.stringify({
-                        amv_24hr: twentyFourHtInput,
-                        child_health_record_id: recordId,
-                        immunization_type_id: immunizationType,
-                        immunization_stage_given_id: immunizationStage
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    confirm(`AMV Immunization Submission: ${errorData.message}`);
-                    window.location.href = window.location.href;
-                    return;
-                }
-                const responseData = await response.json();
-                if (!responseData.message) {
-                    console.error("Unexpected response format:");
-                    alert("Failed to submit AMV Immunization Data. Please try again.");
-                    return;
-                }
-                alert("AMV Immunization Data submitted successfully!");
-            } catch (error) {
-                console.error("Error submitting AMV Immunization Data:", error);
-                alert("Failed to submit AMV Immunization Data. Please try again.");
-            }
-        }
-        sendPayload();
-    });
-
-    document.getElementById("opvImmunizationForm").addEventListener("submit", function (event) {
-        event.preventDefault();
-
-        const twentyFourHtInput = document.getElementById("id_opv_24hr").checked;
-
-        if (twentyFourHtInput) {
-            return;
-        }
-
-        const firstDoseInput = document.getElementById("id_opv_1st").checked;
-        const secondDoseInput = document.getElementById("id_opv_2nd").checked;
-        const thirdDoseInput = document.getElementById("id_opv_3rd").checked;
-        const recordId = document.getElementById("child_health_record_id").value;
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-
-        const immunizationType = 4;
-        let immunizationStage = null;
-
-        const dataArray = [
-            { field: "opv_24hr", value: twentyFourHtInput },
-            { field: "opv_1st", value: firstDoseInput },
-            { field: "opv_2nd", value: secondDoseInput },
-            { field: "opv_3rd", value: thirdDoseInput }
-        ]
-
-        for (const item of dataArray.reverse()) {
-            if(item.value) {
-                if (item.field == "opv_3rd") {
-                    immunizationStage = 4;
-                    break;
-                } else if (item.field == "opv_2nd") {
-                    immunizationStage = 3;
-                    break;
-                } else if (item.field == "opv_1st") {
-                    immunizationStage = 2;
-                    break;
-                } else {
-                    confirm("No immunization stage selected for OPV.");
-                    return;
-                }
-            }
-        }
-
-        console.log("Submitting OPV Immunization Data:", {
-            opv_24hr: twentyFourHtInput,
-            opv_1st: firstDoseInput,
-            opv_2nd: secondDoseInput,
-            opv_3rd: thirdDoseInput,
-            child_health_record_id: recordId,
-            immunization_type: immunizationType,
-            immunization_stage_given_id: immunizationStage,
-        });
-
-        const sendPayload = async () => {
-            try {
-                const response = await fetch("/child-health/child-immunization/request/", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRFToken": csrfToken
-                    },
-                    body: JSON.stringify({
-                        opv_24hr: twentyFourHtInput,
-                        child_health_record_id: recordId,
-                        immunization_type_id: immunizationType,
-                        immunization_stage_given_id: immunizationStage
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    confirm(`OPV Immunization Submission: ${errorData.message}`);
-                    window.location.href = window.location.href;
-                    return;
-                }
-                const responseData = await response.json();
-                if (!responseData.message) {
-                    console.error("Unexpected response format:");
-                    alert("Failed to submit OPV Immunization Data. Please try again.");
-                    return;
-                }
-                alert("OPV Immunization Data submitted successfully!");
-            } catch (error) {
-                console.error("Error submitting OPV Immunization Data:", error);
-                alert("Failed to submit OPV Immunization Data. Please try again.");
-            }
-        }
-        sendPayload();
-    });
-
-    document.getElementById("pcvImmunizationForm").addEventListener("submit", function (event) {
-        event.preventDefault();
-
-        const twentyFourHtInput = document.getElementById("id_pcv_24hr").checked;
-
-        if (twentyFourHtInput) {
-            return;
-        }
-
-        const firstDoseInput = document.getElementById("id_pcv_1st").checked;
-        const secondDoseInput = document.getElementById("id_pcv_2nd").checked;
-        const thirdDoseInput = document.getElementById("id_pcv_3rd").checked;
-        const recordId = document.getElementById("child_health_record_id").value;
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-
-        const immunizationType = 3;
-        let immunizationStage = null;
-
-        const dataArray = [
-            { field: "pcv_24hr", value: twentyFourHtInput },
-            { field: "pcv_1st", value: firstDoseInput },
-            { field: "pcv_2nd", value: secondDoseInput },
-            { field: "pcv_3rd", value: thirdDoseInput }
-        ]
-
-        for (const item of dataArray.reverse()) {
-            if(item.value) {
-                if (item.field == "pcv_3rd") {
-                    immunizationStage = 4;
-                    break;
-                } else if (item.field == "pcv_2nd") {
-                    immunizationStage = 3;
-                    break;
-                } else if (item.field == "pcv_1st") {
-                    immunizationStage = 2;
-                    break;
-                } else {
-                    confirm("No immunization stage selected for PCV.");
-                    return;
-                }
-            }
-        }
-
-        console.log("Submitting PCV Immunization Data:", {
-            pcv_24hr: twentyFourHtInput,
-            pcv_1st: firstDoseInput,
-            pcv_2nd: secondDoseInput,
-            pcv_3rd: thirdDoseInput,
-            child_health_record_id: recordId,
-            immunization_type: immunizationType,
-            immunization_stage_given_id: immunizationStage,
-        });
-
-        const sendPayload = async () => {
-            try {
-                const response = await fetch("/child-health/child-immunization/request/", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRFToken": csrfToken
-                    },
-                    body: JSON.stringify({
-                        hepbv_24hr: twentyFourHtInput,
-                        child_health_record_id: recordId,
-                        immunization_type_id: immunizationType,
-                        immunization_stage_given_id: immunizationStage
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    confirm(`PCV Immunization Submission: ${errorData.message}`);
-                    window.location.href = window.location.href;
-                    return;
-                }
-                const responseData = await response.json();
-                if (!responseData.message) {
-                    console.error("Unexpected response format:");
-                    alert("Failed to submit PCV Immunization Data. Please try again.");
-                    return;
-                }
-                alert("PCV Immunization Data submitted successfully!");
-            } catch (error) {
-                console.error("Error submitting PCV Immunization Data:", error);
-                alert("Failed to submit PCV Immunization Data. Please try again.");
-            }
-        }
-        sendPayload();
-
-    });
-
-    document.getElementById("hepbvImmunizationForm").addEventListener("submit", function (event) {
-        event.preventDefault();
-        const twentyFourHtInput = document.getElementById("id_hepbv_24hr").checked;
-        const recordId = document.getElementById("child_health_record_id").value;
-        const immunizationType = 2;
-        const immunizationStage = 1;
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        console.log("Submitting Hep. BV Immunization Data:", {
-            hepbv_24hr: twentyFourHtInput,
-            child_health_record_id: recordId,
-            immunization_type: immunizationType,
-            immunization_stage_given_id: immunizationStage,
-        });
-        const sendPayload = async () => {
-            try {
-                const response = await fetch("/child-health/child-immunization/request/", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRFToken": csrfToken
-                    },
-                    body: JSON.stringify({
-                        child_health_record_id: recordId,
-                        immunization_type_id: immunizationType,
-                        immunization_stage_given_id: immunizationStage
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    confirm(`HEP BV Immunization Submission: ${errorData.message}`);
-                    window.location.href = window.location.href;
-                    return;
-                }
-                const responseData = await response.json();
-                if (!responseData.message) {
-                    console.error("Unexpected response format:");
-                    alert("Failed to submit Hep. BV Immunization Data. Please try again.");
-                    return;
-                }
-                alert("Hep. BV Immunization Data submitted successfully!");
-            } catch (error) {
-                console.error("Error submitting Hep. BV Immunization Data:", error);
-                alert("Failed to submit Hep. BV Immunization Data. Please try again.");
-            }
-        }
-        sendPayload();
-    });
-
-    document.getElementById("bcgImmunizationForm").addEventListener("submit", function (event) {
-        event.preventDefault();
-        const twentyFourHtInput = document.getElementById("id_bcg_24hr").checked;
-        const recordId = document.getElementById("child_health_record_id").value;
-        const immunizationType = 1;
-        const immunizationStage = 1;
-        const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        console.log("Submitting BCG Immunization Data:", {
-            child_health_record_id: recordId,
-            immunization_type: immunizationType,
-            immunization_stage_given_id: immunizationStage,
-        });
-        const sendPayload = async () => {
-            try {
-                const response = await fetch("/child-health/child-immunization/request/", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRFToken": csrfToken
-                    },
-                    body: JSON.stringify({
-                        child_health_record_id: recordId,
-                        immunization_type_id: immunizationType,
-                        immunization_stage_given_id: immunizationStage
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    confirm(`BCG Immunization Submission: ${errorData.message}`);
-                    window.location.href = window.location.href;
-                    return;
-                }
-                const responseData = await response.json();
-                if (!responseData.message) {
-                    console.error("Unexpected response format:");
-                    alert("Failed to submit BCG Immunization Data. Please try again.");
-                    return;
-                }
-                alert("BCG Immunization Data submitted successfully!");
-            } catch (error) {
-                console.error("Error submitting BCG Immunization Data:", error);
-                alert("Failed to submit BCG Immunization Data. Please try again.");
-            }
-        }
-        sendPayload();
-    });
+    immunizations.forEach(im => submitImmunization({
+        formId: im.formId,
+        prefix: im.prefix,
+        typeId: im.typeId,
+        immunizationName: im.name,
+        stageOverride: im.stageOverride
+    }));
 })();

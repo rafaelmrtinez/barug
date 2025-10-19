@@ -4,8 +4,7 @@ from django.shortcuts import redirect, render
 from django.core.paginator import Paginator
 from django.contrib import messages
 from django.views.decorators.http import require_http_methods
-from django.db import transaction
-
+from django.views.decorators.csrf import csrf_protect
 
 from authentication.guards import role_required, session_login_required
 from authentication.utils import nocache
@@ -21,9 +20,14 @@ from child_health.forms.child_visit_form import ChildVisitForm
 from child_health.forms.newborn_screening_form import NewbornScreeningForm
 from child_health.repository import ChildHealthRecordRepository
 from child_health.utilities.immunizations_util import ImmunizationUtility
+from src.app.services.child_health_services import ChildHealthService
+from src.app.transfer_objects.request.child_health_version_two.immunization_request import ImmunizationRequestVersion2
+from src.domain.exceptions.child_health_domain_exception import ChildHealthDomainException
 from src.infra.database.connection_adapter import ConnectionAdapter
 
 import logging
+
+from src.infra.repositories.child_health_repository import ChildHealthRepository
 
 logger = logging.getLogger(__name__)
 
@@ -33,32 +37,41 @@ CHILD_HEALTH_REPOSITORY: ChildHealthRecordRepository = ChildHealthRecordReposito
 
 # Create your views here.
 
+@session_login_required
+@role_required(*ACCESS)
+@nocache
+@require_http_methods(["POST"])
+@csrf_protect
 def child_immunization_http(request: HttpRequest) -> HttpResponse:
     # parse json data
     try:
         data = json.loads(request.body)
         staff = request.session.get("auth").get("staff_id")
-        response = CHILD_HEALTH_REPOSITORY.insert_child_immunizations(
+        immunization_data = ImmunizationRequestVersion2(
             p_child_record_id=data.get("child_health_record_id"),
             p_assessed_by_id=staff,
             p_immunization_type_id=data.get("immunization_type_id"),
             p_immunization_stage_given_id=data.get("immunization_stage_given_id"),
             p_date_given=DateAndTimeUtility.get_current_date()
         )
-        
+        service = ChildHealthService(ChildHealthRepository(ctx=CONNECTION))
+        response = service.execute_insert_child_immunization(immunization=immunization_data)
         if not response:
-            messages.error(request, "Failed to save immunization data.")
+            # messages.error(request, "Failed to save immunization data.")
             return JsonResponse({"message": "Failed to save immunization data"}, status=500)
-
-        messages.success(request, "Immunization data saved successfully.")
+        # messages.success(request, "Immunization data saved successfully.")
         return JsonResponse({"message": response}, status=200)
-    except ChildHealthRecordException as chre:
+    except (ChildHealthRecordException, ChildHealthDomainException) as chre:
         logger.warning("ChildHealthRecordException in child_new_born_screening_http: %s", chre.message)
-        messages.warning(request, f"Warning: {chre.message}")
+        # messages.warning(request, f"Warning: {chre.message}")
         return JsonResponse({"message": chre.message}, status=400)
+    except ValueError as ve:
+        logger.warning("ValueError in child_new_born_screening_http: %s", str(ve))
+        # messages.warning(request, f"Warning: {str(ve)}")
+        return JsonResponse({"message": str(ve)}, status=400)
     except Exception as e:
         logger.exception("child_new_born_screening_http failed: %s", e)
-        messages.error(request, "Failed to submit Newborn Screening Data. Please try again.")
+        # messages.error(request, "Failed to submit Newborn Screening Data. Please try again.")
         return JsonResponse({"ok": False, "error": "Internal Server Error"}, status=500)    
 
 @session_login_required
@@ -130,15 +143,15 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                 )
         elif form_type == "bf_feeding_form":
             bf_data = ChildBreastFeedingForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, data=request.POST)
-            
             if bf_data.is_valid():
+                
+                print("BREASTFEEDING FORM DATA:", bf_data.cleaned_data)
                 is_success = CHILD_HEALTH_REPOSITORY.insert_bf_check(
                     p_child_record_id=child_health_record_id,
                     p_assessed_by_id=staff_id,
                     p_feeding_type_id=bf_data.cleaned_data.get("type_of_feeding"),
                     p_check_date=bf_data.cleaned_data.get("exclusive_bf_check_last")
                 )
-                print(f"DEBUG: is_success value {is_success}")
                 if is_success and isinstance(is_success, tuple):
                     messages.success(request, "Breast Feeding Type saved successfully.")
 
