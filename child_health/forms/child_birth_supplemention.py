@@ -27,8 +27,8 @@ class BirthAndSupplentationForm(forms.Form):
         label="If low birth weight", required=False)
     birth_wt_seen = forms.CharField(label="2-6 mos. Seen", required=False, widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}))
     birth_wt_given_iron = forms.CharField(label="2-6 mos. Given iron", required=False, widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}))
-    
-    form_type = forms.CharField(widget=forms.HiddenInput(), initial='birth_and_supplementation_form')
+
+    form_type = forms.CharField(widget=forms.HiddenInput(attrs={'id': 'id_form_type_bs'}), initial='birth_and_supplementation_form')
 
     def __init__(self, chr_repo: ChildHealthRecordRepository, child_health_record_id, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -54,16 +54,12 @@ class BirthAndSupplentationForm(forms.Form):
                     
                 If data is None in DB, assign False to BooleanFields to avoid 'None' display.
             """
-            print("Latest Screening Data:", latest_screening_data)
-            # self.fields['child_record_id'].initial = latest_screening_data['child_record_id']
             self.fields['data_assessed'].initial = latest_screening_data['date_assessed'] or ''
             self.fields['birth_weight'].initial = latest_screening_data['birth_weight'] or ''
             self.fields['anemia_2_59_seen'].initial = latest_screening_data['anemic_2_59_seen_date'] or ''
             self.fields['anemia_2_59_given_iron'].initial = latest_screening_data['anemic_2_59_given_iron_date'] or ''
             self.fields['birth_wt_seen'].initial = latest_screening_data['seen_2_6_mos_date'] or ''
             self.fields['birth_wt_given_iron'].initial = latest_screening_data['given_2_6_mos_date'] or ''
-        
-        print("TT Status Mother Data:", tt_status_mother)
         if tt_status_mother:
             if isinstance(tt_status_mother, list) and len(tt_status_mother) > 0:
                 if tt_status_mother[0].get('tt_type_name') and tt_status_mother[0].get('tt_type_id'):

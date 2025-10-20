@@ -7,7 +7,7 @@ class IronIntakeForm(forms.Form):
     date_iron_started = forms.CharField(
         label="Date iron started", required=False, widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}))
     date_iron_completed = forms.CharField(label="Completed", required=False, widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}))
-    form_type = forms.CharField(widget=forms.HiddenInput(), initial="iron_intake_form")
+    form_type = forms.CharField(widget=forms.HiddenInput(attrs={'id': 'id_form_type_iron'}), initial="iron_intake_form")
     
     def __init__(self, chr_repo: ChildHealthRecordRepository, child_health_record_id, *args, **kwargs):
         super().__init__(*args, **kwargs)

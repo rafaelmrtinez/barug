@@ -28,7 +28,7 @@ class ChildBreastFeedingForm(forms.Form):
         )
     del i
 
-    form_type = forms.CharField(initial="bf_feeding_form", widget=forms.HiddenInput())
+    form_type = forms.CharField(initial="bf_feeding_form", widget=forms.HiddenInput(attrs={'id': 'id_form_type_bf'}))
 
     # -------------------- INIT --------------------
 

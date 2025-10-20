@@ -23,9 +23,8 @@ class NewbornScreeningForm(forms.Form):
             attrs={"type": "date", "class": "form-control"}),
         error_messages={'required': 'Please provide the date referred for newborn screening.'}
     )
-    
-    form_type = forms.CharField(widget=forms.HiddenInput(), initial="newborn_screening_form")
-    
+
+    form_type = forms.CharField(widget=forms.HiddenInput(attrs={'id': 'id_form_type_nbs'}), initial="newborn_screening_form")
 
     def clean(self):
         cleaned_data = super().clean()
@@ -37,7 +36,6 @@ class NewbornScreeningForm(forms.Form):
         self._repo = chr_repo
         self._chr_id = child_health_record_id
         self._screening_date = self._repo.fetch_new_born_screening_date_by_chr_id(self._chr_id)
-        print(f"Newborn Screening Date Data: {self._screening_date}")
         if self._screening_date and isinstance(self._screening_date, list):
             if self._screening_date[0].get('referred_newborn_screening_date'):
                 self.fields['referred_for_newborn_screening'].initial = self._screening_date[0]['referred_newborn_screening_date']

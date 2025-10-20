@@ -43,16 +43,6 @@
             }
         }
 
-        console.log("Submitting Pentavalent Immunization Data:", {
-            pentavalent_24hr: twentyFourHtInput,
-            pentavalent_1st: firstDoseInput,
-            pentavalent_2nd: secondDoseInput,
-            pentavalent_3rd: thirdDoseInput,
-            child_health_record_id: recordId,
-            immunization_type: immunizationType,
-            immunization_stage_given_id: immunizationStage,
-        });
-
         const sendPayload = async () => {
             try {
                 const response = await fetch("/child-health/child-immunization/request/", {
@@ -131,16 +121,6 @@
                 }
             }
         }
-
-        console.log("Submitting AMV Immunization Data:", {
-            amv_24hr: twentyFourHtInput,
-            amv_1st: firstDoseInput,
-            amv_2nd: secondDoseInput,
-            amv_3rd: thirdDoseInput,
-            child_health_record_id: recordId,
-            immunization_type: immunizationType,
-            immunization_stage_given_id: immunizationStage,
-        });
 
         const sendPayload = async () => {
             try {
@@ -222,16 +202,6 @@
             }
         }
 
-        console.log("Submitting OPV Immunization Data:", {
-            opv_24hr: twentyFourHtInput,
-            opv_1st: firstDoseInput,
-            opv_2nd: secondDoseInput,
-            opv_3rd: thirdDoseInput,
-            child_health_record_id: recordId,
-            immunization_type: immunizationType,
-            immunization_stage_given_id: immunizationStage,
-        });
-
         const sendPayload = async () => {
             try {
                 const response = await fetch("/child-health/child-immunization/request/", {
@@ -312,16 +282,6 @@
             }
         }
 
-        console.log("Submitting PCV Immunization Data:", {
-            pcv_24hr: twentyFourHtInput,
-            pcv_1st: firstDoseInput,
-            pcv_2nd: secondDoseInput,
-            pcv_3rd: thirdDoseInput,
-            child_health_record_id: recordId,
-            immunization_type: immunizationType,
-            immunization_stage_given_id: immunizationStage,
-        });
-
         const sendPayload = async () => {
             try {
                 const response = await fetch("/child-health/child-immunization/request/", {
@@ -367,12 +327,6 @@
         const immunizationType = 2;
         const immunizationStage = 1;
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        console.log("Submitting Hep. BV Immunization Data:", {
-            hepbv_24hr: twentyFourHtInput,
-            child_health_record_id: recordId,
-            immunization_type: immunizationType,
-            immunization_stage_given_id: immunizationStage,
-        });
         const sendPayload = async () => {
             try {
                 const response = await fetch("/child-health/child-immunization/request/", {
@@ -416,11 +370,6 @@
         const immunizationType = 1;
         const immunizationStage = 1;
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
-        console.log("Submitting BCG Immunization Data:", {
-            child_health_record_id: recordId,
-            immunization_type: immunizationType,
-            immunization_stage_given_id: immunizationStage,
-        });
         const sendPayload = async () => {
             try {
                 const response = await fetch("/child-health/child-immunization/request/", {

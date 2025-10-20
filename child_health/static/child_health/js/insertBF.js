@@ -49,8 +49,6 @@
         // const bfCheckDate_10 = document.getElementById("id_exclusive_bf_check_10").value;
         const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
 
-        console.log(validEntries);
-
         const sendData = async () => {
             try {
                 const response = await fetch(`/midwife/bf-submission/${childId}/`, {
@@ -75,7 +73,6 @@
                 }
 
                 const result = await response.json();
-                console.log("Success: ", result);
             } catch (error) {
                 console.error("Error submitting data: ", error);
                 alert("An error occurred while submitting data.");

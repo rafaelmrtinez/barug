@@ -35,7 +35,7 @@ class ChildVisitForm(forms.Form):
         error_messages={'required': 'Please provide the findings.'}
     )
     notes = forms.CharField(label="Notes", required=False, max_length=1000)
-    form_type = forms.CharField(widget=forms.HiddenInput(), initial='child_visit_form')
+    form_type = forms.CharField(widget=forms.HiddenInput(attrs={'id': 'id_form_type_cv'}), initial='child_visit_form')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

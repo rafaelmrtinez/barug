@@ -195,7 +195,6 @@ class ChildHealthRecordRepository:
             raise e
 
     def fetch_immunization_dates_matrix_by_chr_id(self, chr_id: int) -> dict | None:
-        print(f"Fetching immunization dates matrix for chr_id: {chr_id}")
         sql="""-- Repository SQL: pivot immunization dates per type for a child record
             -- params: $1 = child_record_id
             WITH src AS (
@@ -545,7 +544,6 @@ class ChildHealthRecordRepository:
         result = self.ctx.execute_query_to_dict(sql, params)
         if not result:
             return None
-        print("Person and House Basic Details:", result)
         return result
 
     def find_person_basic_details_by_id(self, person_id: int) -> dict | None:

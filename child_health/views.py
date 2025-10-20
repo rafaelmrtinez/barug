@@ -1,3 +1,4 @@
+from datetime import datetime
 import json
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
@@ -46,36 +47,85 @@ CHILD_HEALTH_REPOSITORY: ChildHealthRecordRepository = ChildHealthRecordReposito
 @require_http_methods(["POST"])
 @csrf_protect
 def child_immunization_http(request: HttpRequest) -> HttpResponse:
-    # parse json data
     try:
-        data = json.loads(request.body)
-        staff = request.session.get("auth").get("staff_id")
+        data = json.loads(request.body or "{}")
+        staff_id = request.session.get("auth").get("staff_id")
+        child_record_id = data.get("child_health_record_id")
+        immunization_type_id = data.get("immunization_type_id")
+        immunization_stage_given_id = data.get("immunization_stage_given_id")
+        date_given_str = data.get("date_given")
+        if not all([child_record_id, immunization_type_id, immunization_stage_given_id]):
+            return JsonResponse({
+                "message": "Missing required immunization fields."
+            }, status=400)
+        if date_given_str:
+            try:
+                date_given = datetime.strptime(date_given_str, "%Y-%m-%d").date()
+            except ValueError:
+                return JsonResponse({
+                    "message": f"Invalid date format: {date_given_str}. Expected YYYY-MM-DD."
+                }, status=400)
+        else:
+            date_given = DateAndTimeUtility.get_current_date()
         immunization_data = ImmunizationRequestVersion2(
-            p_child_record_id=data.get("child_health_record_id"),
-            p_assessed_by_id=staff,
-            p_immunization_type_id=data.get("immunization_type_id"),
-            p_immunization_stage_given_id=data.get("immunization_stage_given_id"),
-            p_date_given=DateAndTimeUtility.get_current_date()
+            p_child_record_id=child_record_id,
+            p_assessed_by_id=staff_id,
+            p_immunization_type_id=immunization_type_id,
+            p_immunization_stage_given_id=immunization_stage_given_id,
+            p_date_given=date_given
         )
         service = ChildHealthService(ChildHealthRepository(ctx=CONNECTION))
         response = service.execute_insert_child_immunization(immunization=immunization_data)
         if not response:
-            # messages.error(request, "Failed to save immunization data.")
-            return JsonResponse({"message": "Failed to save immunization data"}, status=500)
-        # messages.success(request, "Immunization data saved successfully.")
+            return JsonResponse({"message": "Failed to save immunization data."}, status=500)
         return JsonResponse({"message": response}, status=200)
     except (ChildHealthRecordException, ChildHealthDomainException) as chre:
-        logger.warning("ChildHealthRecordException in child_new_born_screening_http: %s", chre.message)
-        # messages.warning(request, f"Warning: {chre.message}")
+        logger.warning("ChildHealth exception in child_immunization_http: %s", chre.message)
         return JsonResponse({"message": chre.message}, status=400)
-    except ValueError as ve:
-        logger.warning("ValueError in child_new_born_screening_http: %s", str(ve))
-        # messages.warning(request, f"Warning: {str(ve)}")
-        return JsonResponse({"message": str(ve)}, status=400)
+    except json.JSONDecodeError:
+        logger.warning("Invalid JSON body in child_immunization_http.")
+        return JsonResponse({"message": "Invalid JSON data."}, status=400)
     except Exception as e:
-        logger.exception("child_new_born_screening_http failed: %s", e)
-        # messages.error(request, "Failed to submit Newborn Screening Data. Please try again.")
-        return JsonResponse({"ok": False, "error": "Internal Server Error"}, status=500)    
+        logger.exception("child_immunization_http failed: %s", e)
+        return JsonResponse({"ok": False, "error": "Internal Server Error"}, status=500)
+
+
+# @session_login_required
+# @role_required(*ACCESS)
+# @nocache
+# @require_http_methods(["POST"])
+# @csrf_protect
+# def child_immunization_http(request: HttpRequest) -> HttpResponse:
+#     # parse json data
+#     try:
+#         data = json.loads(request.body)
+#         staff = request.session.get("auth").get("staff_id")
+#         immunization_data = ImmunizationRequestVersion2(
+#             p_child_record_id=data.get("child_health_record_id"),
+#             p_assessed_by_id=staff,
+#             p_immunization_type_id=data.get("immunization_type_id"),
+#             p_immunization_stage_given_id=data.get("immunization_stage_given_id"),
+#             p_date_given=DateAndTimeUtility.get_current_date()
+#         )
+#         service = ChildHealthService(ChildHealthRepository(ctx=CONNECTION))
+#         response = service.execute_insert_child_immunization(immunization=immunization_data)
+#         if not response:
+#             # messages.error(request, "Failed to save immunization data.")
+#             return JsonResponse({"message": "Failed to save immunization data"}, status=500)
+#         # messages.success(request, "Immunization data saved successfully.")
+#         return JsonResponse({"message": response}, status=200)
+#     except (ChildHealthRecordException, ChildHealthDomainException) as chre:
+#         logger.warning("ChildHealthRecordException in child_new_born_screening_http: %s", chre.message)
+#         # messages.warning(request, f"Warning: {chre.message}")
+#         return JsonResponse({"message": chre.message}, status=400)
+#     except ValueError as ve:
+#         logger.warning("ValueError in child_new_born_screening_http: %s", str(ve))
+#         # messages.warning(request, f"Warning: {str(ve)}")
+#         return JsonResponse({"message": str(ve)}, status=400)
+#     except Exception as e:
+#         logger.exception("child_new_born_screening_http failed: %s", e)
+#         # messages.error(request, "Failed to submit Newborn Screening Data. Please try again.")
+#         return JsonResponse({"ok": False, "error": "Internal Server Error"}, status=500)    
 
 @session_login_required
 @role_required(*ACCESS)
@@ -92,12 +142,7 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
         visit_form = ChildVisitForm()
         new_born_screening = NewbornScreeningForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
         visit_log = CHILD_HEALTH_REPOSITORY.fetch_child_monitoring_logs(child_health_record_id)
-        
         staff_id = request.session.get("auth").get("staff_id")
-        
-        logger.info("STAFF ID in child_health_entry: %s", staff_id)
-        logger.info("FORM TYPE in POST data: %s", request.POST.get("form_type"))
-        
         if request.method == "GET":
             return render(
                 request,
@@ -115,9 +160,7 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                     "iron_intake_form": iron_intake_form
                 },
             )
-        
         form_type = request.POST.get("form_type")
-        
         if form_type == "newborn_screening_form":
             screening_data = NewbornScreeningForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, data=request.POST)
             if screening_data.is_valid():
@@ -125,7 +168,6 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                     p_child_record_id=child_health_record_id, 
                     p_assessed_by_id=staff_id, 
                     p_referred_nbs_date=screening_data.cleaned_data.get("referred_for_newborn_screening"))
-                
                 if is_success and isinstance(is_success, tuple):
                     messages.success(request, "Newborn Screening data saved successfully.")
                     return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
@@ -150,8 +192,6 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
         elif form_type == "bf_feeding_form":
             bf_data = ChildBreastFeedingForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, data=request.POST)
             if bf_data.is_valid():
-                
-                print("BREASTFEEDING FORM DATA:", bf_data.cleaned_data)
                 is_success = CHILD_HEALTH_REPOSITORY.insert_bf_check(
                     p_child_record_id=child_health_record_id,
                     p_assessed_by_id=staff_id,
@@ -160,7 +200,6 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                 )
                 if is_success and isinstance(is_success, tuple):
                     messages.success(request, "Breast Feeding Type saved successfully.")
-
                     return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
             else:
                 MessageUtility.push_form_errors_as_messages(request, bf_data)
@@ -183,15 +222,11 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                 )
         elif form_type == "child_visit_form":
             visit_data = ChildVisitForm(data=request.POST)
-            
             if visit_data.is_valid():
                 visit_data.cleaned_data.pop("form_type", None)
                 log = ChildMonitoringLog(**visit_data.cleaned_data)
-
                 res = CHILD_HEALTH_REPOSITORY.insert_child_monitoring_log(log=log, chr_id=child_health_record_id, staff_id=staff_id)
-                
                 logger.info("Insert Child Monitoring Log Result: %s", res)
-
                 messages.success(request, "Child Monitoring Log saved successfully.")
                 return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
             else:
@@ -216,7 +251,6 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
             birth_and_supplementation = BirthAndSupplentationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, data=request.POST)
             if birth_and_supplementation.is_valid():
                 birth_and_supplementation.cleaned_data.pop("form_type", None)
-                print("BIRTH AND SUPPLEMENTATION CLEANED DATA:", birth_and_supplementation.cleaned_data)                
                 result = CHILD_HEALTH_REPOSITORY.insert_child_screening(
                     chr_id=child_health_record_id,
                     assessed_by_id=staff_id,
@@ -270,7 +304,6 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
         elif form_type == "iron_intake_form":
             iron_intake_data = IronIntakeForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, data=request.POST)
             if iron_intake_data.is_valid():
-                print("IRON INTAKE FORM DATA:", iron_intake_data.cleaned_data)
                 response = CHILD_HEALTH_REPOSITORY.upsert_iron_supplement_completion_by_chr_id(
                     chr_id=child_health_record_id,
                     assessed_by_id=staff_id,
@@ -302,14 +335,12 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
         elif form_type == "vitamin_form":
             vitamin_form = VitaminForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, data=request.POST)
             if vitamin_form.is_valid():
-                print("VITAMIN FORM DATA:", vitamin_form.cleaned_data)
                 response = CHILD_HEALTH_REPOSITORY.upsert_vitamin_a_stage_by_chr_id(
                     p_child_record_id=child_health_record_id,
                     staff_id=staff_id,
                     stage_id=vitamin_form.cleaned_data.get("vit_a_stage"),
                     date_given=DateAndTimeUtility.get_current_date(),
                 )
-                print(f"VITAMIN FORM RESPONSE: {response}")
                 if response and isinstance(response, tuple):
                     messages.success(request, "Vitamin A data saved successfully.")
                 return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)

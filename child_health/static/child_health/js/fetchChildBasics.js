@@ -99,7 +99,6 @@
         const res = await fetch(buildUrl(personId), { method: 'GET' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        console.log('[CHR] CHILD basics:', data);
 
         const info = (data && data.ok && Array.isArray(data.details) && data.details.length)
           ? data.details[0]

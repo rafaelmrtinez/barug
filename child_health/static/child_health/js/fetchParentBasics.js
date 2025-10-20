@@ -69,7 +69,6 @@
                 const res = await fetch(url, { method: 'GET' });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
-                console.log(`[CHR] ${role.toUpperCase()} basics:`, data);
 
                 // Expecting: { ok: true, details: [{...}] }
                 const info =
