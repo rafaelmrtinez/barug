@@ -17,10 +17,13 @@ from child_health.forms.child_birth_supplemention import BirthAndSupplentationFo
 from child_health.forms.child_immunization_form import ChildImmunizationForm
 from child_health.forms.child_information_form import ChildInformationForm
 from child_health.forms.child_visit_form import ChildVisitForm
+from child_health.forms.iron_intake_form import IronIntakeForm
 from child_health.forms.newborn_screening_form import NewbornScreeningForm
+from child_health.forms.vitamin_form import VitaminForm
 from child_health.repository import ChildHealthRecordRepository
 from child_health.utilities.immunizations_util import ImmunizationUtility
 from src.app.services.child_health_services import ChildHealthService
+from src.app.transfer_objects.request.child_health_version_two.child_monitoring_log import ChildMonitoringLog
 from src.app.transfer_objects.request.child_health_version_two.immunization_request import ImmunizationRequestVersion2
 from src.domain.exceptions.child_health_domain_exception import ChildHealthDomainException
 from src.infra.database.connection_adapter import ConnectionAdapter
@@ -84,10 +87,11 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
         bf_form = ChildBreastFeedingForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
         immunizations = ChildImmunizationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
         birth_and_supplementation = BirthAndSupplentationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
+        vitamin_form = VitaminForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
+        iron_intake_form = IronIntakeForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
         visit_form = ChildVisitForm()
         new_born_screening = NewbornScreeningForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
         visit_log = CHILD_HEALTH_REPOSITORY.fetch_child_monitoring_logs(child_health_record_id)
-        bf_type = BreastFeedingTypeForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
         
         staff_id = request.session.get("auth").get("staff_id")
         
@@ -107,7 +111,8 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                     "bf_form": bf_form,
                     "immunizations": immunizations,
                     "visit_log": visit_log,
-                    "bf_type": bf_type,
+                    "vitamin_form": vitamin_form,
+                    "iron_intake_form": iron_intake_form
                 },
             )
         
@@ -138,7 +143,8 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                         "bf_form": bf_form,
                         "immunizations": immunizations,
                         "visit_log": visit_log,
-                        "bf_type": bf_type,
+                        "vitamin_form": vitamin_form,
+                        "iron_intake_form": iron_intake_form
                     },
                 )
         elif form_type == "bf_feeding_form":
@@ -171,9 +177,96 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                         "immunizations": immunizations,
                         "visit_log": visit_log,
                         "bf_type": bf_data,
+                        "vitamin_form": vitamin_form,
+                        "iron_intake_form": iron_intake_form,
                     },
                 )
+        elif form_type == "child_visit_form":
+            visit_data = ChildVisitForm(data=request.POST)
             
+            if visit_data.is_valid():
+                visit_data.cleaned_data.pop("form_type", None)
+                log = ChildMonitoringLog(**visit_data.cleaned_data)
+
+                res = CHILD_HEALTH_REPOSITORY.insert_child_monitoring_log(log=log, chr_id=child_health_record_id, staff_id=staff_id)
+                
+                logger.info("Insert Child Monitoring Log Result: %s", res)
+
+                messages.success(request, "Child Monitoring Log saved successfully.")
+                return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
+            else:
+                messages.warning(request, "Please correct the errors below.")
+                return render(
+                    request,
+                    "child_health/chr_entry.html",
+                    {
+                        "form": birth_and_supplementation,
+                        "new_born_screening": new_born_screening,
+                        "child_information_form": child_information_form,
+                        "visit_form": visit_data,
+                        "child_health_record_id": child_health_record_id,
+                        "bf_form": bf_form,
+                        "immunizations": immunizations,
+                        "visit_log": visit_log,
+                        "vitamin_form": vitamin_form,
+                        "iron_intake_form": iron_intake_form,
+                    },
+                )
+        elif form_type == "birth_and_supplementation_form":
+            birth_and_supplementation = BirthAndSupplentationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, data=request.POST)
+            if birth_and_supplementation.is_valid():
+                birth_and_supplementation.cleaned_data.pop("form_type", None)
+                print("BIRTH AND SUPPLEMENTATION CLEANED DATA:", birth_and_supplementation.cleaned_data)                
+                result = CHILD_HEALTH_REPOSITORY.insert_child_screening(
+                    chr_id=child_health_record_id,
+                    assessed_by_id=staff_id,
+                    date_assessed=birth_and_supplementation.cleaned_data.get("data_assessed"),
+                    anemic_seen=birth_and_supplementation.cleaned_data.get("anemia_2_59_seen"),
+                    anemic_given_iron=birth_and_supplementation.cleaned_data.get("anemia_2_59_given_iron"),
+                    birth_weight=birth_and_supplementation.cleaned_data.get("birth_weight"),
+                    is_low_birth_weight=birth_and_supplementation.cleaned_data.get("low_birth_weight"),
+                    seen_2_6_mos=birth_and_supplementation.cleaned_data.get("birth_wt_seen"),
+                    given_2_6_mos=birth_and_supplementation.cleaned_data.get("birth_wt_given_iron"),
+                )
+                logger.info("Insert Child Screening Result: %s", result)
+                if not result:
+                    messages.error(request, "Failed to save Birth and Supplementation data.")
+                    return render(
+                        request,
+                        "child_health/chr_entry.html",
+                        {
+                            "form": birth_and_supplementation,
+                            "new_born_screening": new_born_screening,
+                            "child_information_form": child_information_form,
+                            "visit_form": visit_form,
+                            "child_health_record_id": child_health_record_id,
+                            "bf_form": bf_form,
+                            "immunizations": immunizations,
+                            "visit_log": visit_log,
+                            "vitamin_form": vitamin_form,
+                            "iron_intake_form": iron_intake_form,
+                        },
+                    )
+                messages.success(request, "Birth and Supplementation saved successfully.")
+                return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
+            else:
+                messages.warning(request, "Please correct the errors below.")
+                return render(
+                    request,
+                    "child_health/chr_entry.html",
+                    {
+                        "form": birth_and_supplementation,
+                        "new_born_screening": new_born_screening,
+                        "child_information_form": child_information_form,
+                        "visit_form": visit_form,
+                        "child_health_record_id": child_health_record_id,
+                        "bf_form": bf_form,
+                        "immunizations": immunizations,
+                        "visit_log": visit_log,
+                        "vitamin_form": vitamin_form,
+                        "iron_intake_form": iron_intake_form,
+                    },
+                )
         else:
             messages.error(request, "Invalid form submission.")
             return render(
@@ -188,17 +281,48 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                     "bf_form": bf_form,
                     "immunizations": immunizations,
                     "visit_log": visit_log,
-                    "bf_type": bf_type,
+                    "vitamin_form": vitamin_form,
+                    "iron_intake_form": iron_intake_form,
                 },
             )
     except ChildHealthRecordException as chre:
         logger.warning("ChildHealthRecordException in child_health_entry: %s", chre.message)
         messages.warning(request, f"Warning: {chre.message}")
-        return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
+        return render(
+            request,
+            "child_health/chr_entry.html",
+            {
+                "form": birth_and_supplementation,
+                "new_born_screening": new_born_screening,
+                "child_information_form": child_information_form,
+                "visit_form": visit_form,
+                "child_health_record_id": child_health_record_id,
+                "bf_form": bf_form,
+                "immunizations": immunizations,
+                "visit_log": visit_log,
+                "vitamin_form": vitamin_form,
+                "iron_intake_form": iron_intake_form,
+            },
+        )
     except Exception as e:
         logger.exception("child_health_entry failed: %s", e)
         messages.error(request, "An unexpected error occurred. Please try again later.")
-        return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
+        return render(
+            request,
+            "child_health/chr_entry.html",
+            {
+                "form": birth_and_supplementation,
+                "new_born_screening": new_born_screening,
+                "child_information_form": child_information_form,
+                "visit_form": visit_form,
+                "child_health_record_id": child_health_record_id,
+                "bf_form": bf_form,
+                "immunizations": immunizations,
+                "visit_log": visit_log,
+                "vitamin_form": vitamin_form,
+                "iron_intake_form": iron_intake_form,
+            },
+        )
         
         
 

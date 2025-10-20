@@ -17,9 +17,9 @@ class BreastFeedingTypeForm(forms.Form):
         add_bootstrap_classes(self)
         newborn_screening_data = chr_repo.fetch_child_newborn_screening_by_person_id(child_health_record_id)
         self.display_type_of_feeding_selections(chr_repo)
-
         if newborn_screening_data:
             self.fields['type_of_feeding'].initial = newborn_screening_data.get('feeding_type_id')
+            self.fields['type_of_feeding'].widget.attrs['readonly'] = True
             
     def display_type_of_feeding_selections(self, chr_repo):
         feeding_types = chr_repo.fetch_all_feeding_type()

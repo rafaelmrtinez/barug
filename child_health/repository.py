@@ -1,4 +1,5 @@
 from child_health.exception.child_health_record_exception import ChildHealthRecordException
+from src.app.transfer_objects.request.child_health_version_two.child_monitoring_log import ChildMonitoringLog
 from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.exceptions.query_exec_exception import QueryExecutionException
 
@@ -11,22 +12,112 @@ class ChildHealthRecordRepository:
     def __init__(self, ctx: ConnectionAdapter):
         self.ctx = ctx
         logger.info("ChildHealthRecordRepository initialized")
-        
-    def fetch_new_born_screening_date_by_chr_id(self, chr_id: int) -> dict | None:
-        sql="""SELECT
-            s.referred_newborn_screening_date
-            FROM
-            feeding_type_nwbrn_scrnng s
-            JOIN child_visit v ON v.visit_id = s.visit_id
-            WHERE
-            v.child_record_id = %s
-            ORDER BY feeding_type_nwbrn_scrnng_id DESC
-            LIMIT 1;
+    
+    def fetch_mother_tt_type(self, chr_id: int) -> dict | None:
+        sql = """SELECT
+            tt.tt_type_id,
+            tt.tt_type_name,
+            tvr.date_given
+        FROM child_health_record chr
+        JOIN maternal_health_record mhr
+            ON mhr.person_id = chr.mother_id
+        JOIN tt_vaccine_record tvr
+            ON tvr.maternal_record_id = mhr.maternal_record_id
+        JOIN tt_type tt
+            ON tt.tt_type_id = tvr.tt_type_id
+        WHERE chr.child_record_id = %s
+        ORDER BY tvr.date_given DESC
+        LIMIT 1;
         """
         params = [chr_id]
         result = self.ctx.execute_query_to_dict(sql, params)
         if not result:
             return None
+        return result
+    
+    def insert_child_screening(
+        self, chr_id, assessed_by_id, date_assessed, 
+        anemic_seen, anemic_given_iron, birth_weight,
+        is_low_birth_weight, seen_2_6_mos, given_2_6_mos,):
+        
+        sql = """SELECT * FROM add_child_screening(
+                %s::INTEGER,
+                %s::INTEGER,
+                %s::DATE,
+                %s::DATE,
+                %s::DATE,
+                %s::NUMERIC,
+                %s::BOOLEAN,
+                %s::DATE,
+                %s::DATE
+            )
+            """
+        params = [
+            chr_id,
+            assessed_by_id,
+            date_assessed,
+            anemic_seen,
+            anemic_given_iron,
+            birth_weight,
+            is_low_birth_weight,
+            seen_2_6_mos,
+            given_2_6_mos
+        ]
+        try:
+            result = self.ctx.execute_query(sql, params)
+            if not result:
+                return None
+            return result
+        except QueryExecutionException as e:
+            logger.error(f"Error inserting child screening: {e}")
+            if ChildHealthRecordException.is_child_health_record_exception(e.code):
+                raise ChildHealthRecordException(e.message) from e
+            raise e
+
+    def insert_child_monitoring_log(self, log: ChildMonitoringLog, chr_id: int, staff_id: int):
+        sql = """SELECT * FROM add_monitoring_log_unique_date(
+                %s::INTEGER,
+                %s::INTEGER,
+                %s::DATE,
+                %s::INTEGER,
+                %s::NUMERIC,
+                %s::NUMERIC,
+                %s::NUMERIC,
+                %s::TEXT,
+                %s::TEXT
+            )
+            """
+        params = [
+            chr_id,
+            staff_id,
+            log.date,
+            log.age,
+            log.weight,
+            log.temp,
+            log.height,
+            log.findings,
+            log.notes
+        ]
+        try:
+            result = self.ctx.execute_query(sql, params)
+            if not result:
+                return None
+            return result
+        except QueryExecutionException as e:
+            logger.error(f"Error inserting child monitoring log: {e}")
+            if ChildHealthRecordException.is_child_health_record_exception(e.code):
+                raise ChildHealthRecordException(e.message) from e
+            raise e
+        
+    def fetch_new_born_screening_date_by_chr_id(self, chr_id: int) -> dict | None:
+        sql="""SELECT visit_id FROM child_visit WHERE child_record_id = %s ORDER BY visit_id ASC LIMIT 1;"""
+        params = [chr_id]
+        result = self.ctx.execute_query_to_dict(sql, params)
+        if not result and isinstance(result, list):
+            return None
+        sql="""SELECT referred_newborn_screening_date FROM feeding_type_nwbrn_scrnng WHERE visit_id = %s;"""
+        params = [result[0]['visit_id']]
+        result = self.ctx.execute_query_to_dict(sql, params)
         return result
         
     def insert_new_born_screening_date(self, p_child_record_id, p_assessed_by_id, p_referred_nbs_date):
@@ -192,7 +283,7 @@ class ChildHealthRecordRepository:
             raise e
 
     def fetch_child_health_record_info_by_chr_id(self, chr_id: int) -> dict | None:
-        sql = """/* Input: %s = child_record_id */
+        sql = """
             SELECT
             c.child_record_id,
 
@@ -255,7 +346,7 @@ class ChildHealthRecordRepository:
             LEFT JOIN person               AS pf ON pf.person_id = c.father_id
             LEFT JOIN addresss             AS a  ON a.address_id = pc.address_id
             LEFT JOIN purok_sitio          AS ps ON ps.purok_sitio_id = a.purok_sitio_id
-            WHERE c.child_record_id = 10;   -- supply the specific child_record_id"""
+            WHERE c.child_record_id = %s;   -- supply the specific child_record_id"""
 
         params = [chr_id]
         result = self.ctx.execute_query_to_dict(sql, params)
