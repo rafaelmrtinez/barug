@@ -1,5 +1,6 @@
 from datetime import datetime
 import json
+from pprint import pprint
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.core.paginator import Paginator
@@ -133,7 +134,8 @@ def child_immunization_http(request: HttpRequest) -> HttpResponse:
 @require_http_methods(["GET", "POST"])
 def child_health_entry(request: HttpRequest, child_health_record_id: int) -> HttpResponse:
     try:
-        child_information_form = ChildInformationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, role=None)
+        role = request.session.get("auth").get("role_name").lower()
+        child_information_form = ChildInformationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, role=role)
         bf_form = ChildBreastFeedingForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
         immunizations = ChildImmunizationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
         birth_and_supplementation = BirthAndSupplentationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
@@ -473,7 +475,7 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
             data=request.POST
             )
             if not child_information_form.is_valid():
-                messages.warning(request, "Only father and occupation are optional.")
+                MessageUtility.push_form_errors_as_messages(request, child_information_form)
                 return render(
                     request,
                     "child_health/create_chr.html",
@@ -483,7 +485,7 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
                 )
             res = CHILD_HEALTH_REPOSITORY.insert_chr_record(
                 p_staff_id=request.session.get("auth").get("staff_id"),
-                p_person_id=child_information_form.cleaned_data.get("child_health_record_id"),
+                p_person_id=request.POST.get("child_id"),
                 p_birth_order=child_information_form.cleaned_data.get("birth_order").__str__(),
                 p_delivery_place_type_id=int(child_information_form.cleaned_data.get("place_of_delivery")),
             )
