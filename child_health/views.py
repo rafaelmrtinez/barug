@@ -267,6 +267,70 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                         "iron_intake_form": iron_intake_form,
                     },
                 )
+        elif form_type == "iron_intake_form":
+            iron_intake_data = IronIntakeForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, data=request.POST)
+            if iron_intake_data.is_valid():
+                print("IRON INTAKE FORM DATA:", iron_intake_data.cleaned_data)
+                response = CHILD_HEALTH_REPOSITORY.upsert_iron_supplement_completion_by_chr_id(
+                    chr_id=child_health_record_id,
+                    assessed_by_id=staff_id,
+                    date_started=iron_intake_data.cleaned_data.get("date_iron_started"),
+                    date_completed=iron_intake_data.cleaned_data.get("date_iron_completed")
+                )
+                if response and isinstance(response, tuple):
+                    messages.success(request, "Iron Intake data saved successfully.")
+                messages.success(request, "Iron Intake data saved successfully.")
+                return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
+            else:
+                MessageUtility.push_form_errors_as_messages(request, iron_intake_data)
+                return render(
+                    request,
+                    "child_health/chr_entry.html",
+                    {
+                        "form": birth_and_supplementation,
+                        "new_born_screening": new_born_screening,
+                        "child_information_form": child_information_form,
+                        "visit_form": visit_form,
+                        "child_health_record_id": child_health_record_id,
+                        "bf_form": bf_form,
+                        "immunizations": immunizations,
+                        "visit_log": visit_log,
+                        "vitamin_form": vitamin_form,
+                        "iron_intake_form": iron_intake_data,
+                    },
+                )
+        elif form_type == "vitamin_form":
+            vitamin_form = VitaminForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, data=request.POST)
+            if vitamin_form.is_valid():
+                print("VITAMIN FORM DATA:", vitamin_form.cleaned_data)
+                response = CHILD_HEALTH_REPOSITORY.upsert_vitamin_a_stage_by_chr_id(
+                    p_child_record_id=child_health_record_id,
+                    staff_id=staff_id,
+                    stage_id=vitamin_form.cleaned_data.get("vit_a_stage"),
+                    date_given=DateAndTimeUtility.get_current_date(),
+                )
+                print(f"VITAMIN FORM RESPONSE: {response}")
+                if response and isinstance(response, tuple):
+                    messages.success(request, "Vitamin A data saved successfully.")
+                return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
+            else:
+                MessageUtility.push_form_errors_as_messages(request, vitamin_form)
+                return render(
+                    request,
+                    "child_health/chr_entry.html",
+                    {
+                        "form": birth_and_supplementation,
+                        "new_born_screening": new_born_screening,
+                        "child_information_form": child_information_form,
+                        "visit_form": visit_form,
+                        "child_health_record_id": child_health_record_id,
+                        "bf_form": bf_form,
+                        "immunizations": immunizations,
+                        "visit_log": visit_log,
+                        "vitamin_form": vitamin_form,
+                        "iron_intake_form": iron_intake_form,
+                    },
+                )
         else:
             messages.error(request, "Invalid form submission.")
             return render(

@@ -1,3 +1,4 @@
+from datetime import date
 from child_health.exception.child_health_record_exception import ChildHealthRecordException
 from src.app.transfer_objects.request.child_health_version_two.child_monitoring_log import ChildMonitoringLog
 from src.infra.database.connection_adapter import ConnectionAdapter
@@ -12,7 +13,66 @@ class ChildHealthRecordRepository:
     def __init__(self, ctx: ConnectionAdapter):
         self.ctx = ctx
         logger.info("ChildHealthRecordRepository initialized")
-    
+        
+    def fetch_vitamin_by_chr_id(self, chr_id: int):
+        sql=""" SELECT vit_stage_id
+            FROM vitamin_a_given
+            WHERE child_record_id = %s
+            ORDER BY vit_stage_id"""
+        params = [chr_id]
+        result = self.ctx.execute_query_to_dict(sql, params)
+        if not result:
+            return None
+        return result
+        
+    def upsert_vitamin_a_stage_by_chr_id(
+        self, p_child_record_id: int, staff_id: int,
+        stage_id: int, date_given: date 
+    ):
+        sql="""SELECT * FROM upsert_vitamin_a_stage(%s, %s, %s, %s);"""
+        params = [p_child_record_id, staff_id, stage_id, date_given]
+        try:
+            result = self.ctx.execute_query(sql, params)
+            if not result:
+                return None
+            return result
+        except QueryExecutionException as e:
+            logger.error(f"Error upserting vitamin A stage: {e}")
+            if ChildHealthRecordException.is_child_health_record_exception(e.code):
+                raise ChildHealthRecordException(e.message) from e
+            raise e
+
+    def fetch_iron_supplement_completion_by_chr_id(self, chr_id: int):
+        sql="""SELECT
+                cisr.date_started,
+                cisr.date_completed
+            FROM child_iron_supplement_record cisr
+            WHERE cisr.child_record_id = %s
+            ORDER BY cisr.date_started DESC
+            LIMIT 1;"""
+        params = [chr_id]
+        result = self.ctx.execute_query_to_dict(sql, params)
+        if not result:
+            return None
+        return result
+
+    def upsert_iron_supplement_completion_by_chr_id(
+        self, chr_id: int, assessed_by_id: int,
+        date_started: date, date_completed: date
+    ):
+        sql="""SELECT * FROM upsert_child_iron_supplement(%s, %s, %s, %s)"""
+        params = [chr_id, assessed_by_id, date_started, date_completed]
+        try:
+            result = self.ctx.execute_query(sql, params)
+            if not result:
+                return None
+            return result
+        except QueryExecutionException as e:
+            logger.error(f"Error upserting iron supplement completion: {e}")
+            if ChildHealthRecordException.is_child_health_record_exception(e.code):
+                raise ChildHealthRecordException(e.message) from e
+            raise e
+
     def fetch_mother_tt_type(self, chr_id: int) -> dict | None:
         sql = """SELECT
             tt.tt_type_id,

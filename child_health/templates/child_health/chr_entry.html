@@ -331,8 +331,10 @@
                     <div class="col-md-3">{{ iron_intake_form.date_iron_started.label_tag }} {{ iron_intake_form.date_iron_started }}</div>
                     <div class="col-md-3">{{ iron_intake_form.date_iron_completed.label_tag }} {{ iron_intake_form.date_iron_completed }}</div>
                     <div class="d-flex justify-content-end gap-2 mt-3">
+                        {{ iron_intake_form.form_type }}
                         <button type="submit" class="btn btn-brand btn-sm flex-fill" style="max-width:150px;">Update
-                            Entry</button>
+                            Entry
+                        </button>
                     </div>
                 </div>
             </form>
@@ -353,6 +355,7 @@
                     <div class="col-md-3">{{ vitamin_form.vit_a_1 }} {{ vitamin_form.vit_a_1.label_tag }}</div>
                     <div class="col-md-3">{{ vitamin_form.vit_a_2 }} {{ vitamin_form.vit_a_2.label_tag }}</div>
                     <div class="col-md-3">{{ vitamin_form.vit_a_3 }} {{ vitamin_form.vit_a_3.label_tag }}</div>
+                    {{ vitamin_form.form_type }}
                     <div class="d-flex justify-content-end gap-2 mt-3">
                         <button type="submit" class="btn btn-brand btn-sm flex-fill" style="max-width:150px;">Update
                             Entry</button>
