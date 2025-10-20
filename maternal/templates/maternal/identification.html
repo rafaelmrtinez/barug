@@ -1,0 +1,74 @@
+{% extends "base.html" %} 
+{% load static %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/btn_outline.css' %}">
+<div class="container py-4 mt-5">
+<h1 class="mb-3">Maternal Health Record</h1>
+<form method="post" novalidate>
+    {% csrf_token %}
+    <div class="card mb-3">
+    <div class="card-header">Identification</div>
+
+    {{ identification_form.person_id }}
+    {{ identification_form.husband_id }}
+
+    <div class="card-body row g-3">
+        <div class="col-md-3">
+        {{ identification_form.family_no.label_tag }} {{ identification_form.family_no }}
+        </div>
+        <div class="col-md-6">
+        {{ identification_form.name.label_tag }} {{ identification_form.name }}
+        </div>
+        <div class="col-md-3">
+        {{ identification_form.date_of_birth.label_tag }} {{ identification_form.date_of_birth }}
+        </div>
+        <div class="col-md-2">
+        {{ identification_form.age.label_tag }} {{ identification_form.age }}
+        </div>
+        <div class="col-md-2">
+        {{ identification_form.age_group.label_tag }} {{ identification_form.age_group }}
+        </div>
+        <div class="col-md-8">
+        {{ identification_form.address.label_tag }} {{ identification_form.address }}
+        </div>
+        <div class="col-md-4">
+        {{ identification_form.husband_name.label_tag }} {{ identification_form.husband_name }}
+        <input type="hidden" id="id_husband_person_id" name="husband_person_id">
+        </div>
+        <div class="col-md-4">
+        {{ identification_form.occupation.label_tag }} {{ identification_form.occupation }}
+        </div>
+        <div class="col-md-2">
+        {{ identification_form.weight_kg.label_tag }} {{ identification_form.weight_kg }}
+        </div>
+        <div class="col-md-2">
+        {{ identification_form.height_cm.label_tag }} {{ identification_form.height_cm }}
+        </div>
+        <div class="col-md-2">
+        {{ identification_form.bmi.label_tag }} {{ identification_form.bmi }}
+        </div>
+        <div class="col-md-2">
+        {{ identification_form.bmi_category.label_tag }} {{ identification_form.bmi_category }}
+        </div>
+
+        {# --- RESULTS CONTAINER (server returns ready-made HTML) --- #}
+        <div class="col-12">
+        <div id="resident-results" class="mt-2"></div>
+        </div>
+    </div>
+
+    {# New footer with right-aligned buttons #}
+    <div class="card-footer d-flex justify-content-end gap-2">
+        <button type="reset"  class="btn btn-accent-outline">Clear</button>
+        <button type="submit" class="btn btn-accent">Submit</button>
+    </div>
+
+    </div>
+</form>
+</div>
+{% endblock %}
+
+{% block js %}
+<script src="{% static 'bhw/js/findPerson.js' %}"></script>
+<script src="{% static 'bhw/js/maternalBasicInfo.js' %}"></script>
+{% endblock %}

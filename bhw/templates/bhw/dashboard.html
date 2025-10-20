@@ -127,11 +127,8 @@
             <div class="text-muted small mt-1">{{ today|default:"" }}</div>
           </div>
           <div class="d-flex flex-wrap gap-2">
-            <a href="{% url 'clerk:identity_verification' %}" class="btn btn-outline-brand">
-              {% bs_icon 'shield-check' %}<span class="ms-1">Verify IDs</span>
-            </a>
-            <a href="" class="btn btn-brand">
-              {% bs_icon 'file-earmark-text' %}<span class="ms-1">Doc Requests</span>
+            <a href="{% url 'child_health:child_record_list' %}" class="btn btn-outline-brand">
+              {% bs_icon 'shield-check' %}<span class="ms-1">Add Child Health Record</span>
             </a>
             <a href="{% url 'clerk:business_owner_resident' %}" class="btn btn-brand-subtle">
               {% bs_icon 'buildings' %}<span class="ms-1">New Business</span>
