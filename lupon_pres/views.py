@@ -11,7 +11,32 @@ user_role = 'Barangay Lupon President'
 
 user_role_template = user_role.lower().replace(' ', '_')
 
-# Create your views here.
+# Create your views here.# keep this one name and remove the others
+# keep this one name and remove the others
+def has_any_mediation_attendance(case_id: int, submission_id: int | None = None) -> bool:
+    try:
+        with connection.cursor() as cur:
+            cur.execute("""
+                SELECT 1 FROM hearing_attendance
+                WHERE blotter_case_id=%s AND (%s IS NULL OR submission_id=%s)
+                LIMIT 1
+            """, [case_id, submission_id, submission_id])
+            if cur.fetchone(): return True
+    except Exception:
+        pass
+    try:
+        with connection.cursor() as cur:
+            cur.execute("""
+                SELECT 1 FROM kp_mediation_attendance
+                WHERE blotter_case_id=%s AND (%s IS NULL OR submission_id=%s)
+                LIMIT 1
+            """, [case_id, submission_id, submission_id])
+            return cur.fetchone() is not None
+    except Exception:
+        return False
+
+
+
 def staff_selection(request):
     return render(request, "members/staff_selection.html", {
         'user_fullname': user_fullname,

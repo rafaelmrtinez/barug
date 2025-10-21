@@ -2,10 +2,13 @@
 from __future__ import annotations
 from typing import Dict, Set, Any
 from datetime import date as _date, datetime as _dt, time as _time
+import json
+import logging
 
 from .. import form_shared as FS
 from django.db import connection  # DB lookups (PB name, case data)
 
+logger = logging.getLogger(__name__)
 
 # Exact AcroForm field names in kp_form_no_8_notice_of_hearing.pdf
 _KP8_FIELDS = [
@@ -24,7 +27,7 @@ _KP8_FIELDS = [
 # Accepted sources to fill targets (read from either field label or code)
 _KP8_SOURCES: Dict[str, Set[str]] = {
     "recipient":         {"recipient"},
-    "recipient_2":       {"appearance_time", "hearing_time", "hearing time"}, # the time
+    "recipient_2":       {"recipient_2"},
     "complainants":      {"complainants", "complainant(s)"},
     "complainants_2":    {"complainants_2", "complainants", "complainant(s)"},
     # Use the Hearing* fields from the form as inputs for the “appearance_*” PDF fields
@@ -168,6 +171,24 @@ class KP8Handler:
         # fallback: return as-is
         return s
 
+    @staticmethod
+    def _to_12h(val: Any) -> str:
+        """
+        Return time like '9:30 PM' (12-hour, no leading zero on hour).
+        Accepts str, datetime.time, datetime.datetime; empty string on failure.
+        """
+        s24 = KP8Handler._fmt_hm(val)  # normalize to 'HH:MM' first
+        if not s24:
+            return ""
+        try:
+            hh, mm = s24.split(":")
+            t = _time(hour=int(hh) % 24, minute=int(mm) % 60)
+            # %I keeps leading zero; strip it for '9:30 PM' instead of '09:30 PM'
+            return t.strftime("%I:%M %p").lstrip("0")
+        except Exception:
+            return ""
+
+
     def _fetch_punong_barangay_from_db(self) -> str:
         try:
             with connection.cursor() as cur:
@@ -253,15 +274,15 @@ class KP8Handler:
                 # IMPORTANT: KP-8 top line expects ONLY the last digit beside the printed "202_"
                 out["appearance_year"]  = str(d.year)[-1]
 
-
         # --- Normalize/override appearance_time from Hearing Time (if provided)
         # Still inside build_name_value_map(), after computing hearing time
         ht_raw = _find_any({"hearing_time", "hearing time"}) or out.get("appearance_time") or ""
         if ht_raw:
-            norm = self._fmt_hm(ht_raw)  # -> 'HH:MM'
-            out["appearance_time"] = norm
-            # Mirror to a common alias some templates use
-            out["appearance_oclock"] = norm
+            out["appearance_time"]  = self._to_12h(ht_raw)  # -> '9:30 PM'
+            out["appearance_oclock"] = out["appearance_time"]
+            out["recipient_2"] = out.get("appearance_time", "")
+            out["appearance_oclock"] = out["appearance_time"]
+
 
         # Mirror complainants to line 2 if blank
         if not (out.get("complainants_2") or "").strip() and (out.get("complainants") or "").strip():
@@ -280,8 +301,8 @@ class KP8Handler:
 
         # --- CURRENT date for “Notified this … day of …, …”
         today = _date.today()
-        out["date_notified"]  = today.strftime("%B")   # Month name
-        out["month_notified"] = f"{today.day:02d}"     # Day (number with leading zero)
+        out["date_notified"]  = f"{today.day:02d}"   # Day (number with leading zero)
+        out["month_notified"]  = today.strftime("%B")   # Month name
         out["year_notified"]  = str(today.year)        # Year
 
         # --- “This __ day of ____, ____” (we fill DAY → MONTH → YEAR)
@@ -332,9 +353,10 @@ class KP8Handler:
                 made_day, made_month, made_year = f"{today.day:02d}", today.strftime("%B"), str(today.year)
 
         # Assign in natural order for the PDF wording:
-        out["date_created"]  = made_day
-        out["month_created"] = made_month
-        out["year_created"]  = made_year
+        now = _dt.now()
+        out["date_created"]  = f"{now.day:02d}"      # DAY (01..31)
+        out["month_created"] = now.strftime("%B")    # MONTH NAME (e.g., October)
+        out["year_created"]  = str(now.year)         # YEAR (e.g., 2025)
 
         # Also allow normalizing if user pasted an ISO date into appearance_date
         # self._normalize_triplet(out, "appearance_date", "appearance_month", "appearance_year")
@@ -344,13 +366,14 @@ class KP8Handler:
         # 2) case.time_filed
         # 3) case.incident_time
         if (out.get("appearance_time") or "").strip():
-            out["appearance_time"] = self._fmt_hm(out["appearance_time"])
+            out["appearance_time"] = self._to_12h(out["appearance_time"])
         else:
             out["appearance_time"] = (
-                self._fmt_hm(time_filed) or
-                self._fmt_hm(incident_time) or
+                self._to_12h(time_filed) or
+                self._to_12h(incident_time) or
                 ""
             )
+
 
         # --- Barangay Captain / Punong Barangay
         if not (out.get("brgy_capt") or "").strip():
@@ -362,5 +385,13 @@ class KP8Handler:
                 out[k] = FS.sanitize_text(v)
         for k in _KP8_FIELDS:
             out.setdefault(k, "")
+
+        # ---- PRINT what will be filled into the PDF (ordered) ----
+        ordered = {k: out.get(k, "") for k in _KP8_FIELDS}
+        print("[KP8] fill map (ordered):\n", json.dumps(ordered, ensure_ascii=False, indent=2))
+        try:
+            logger.info("KP8 fill map (ordered):\n%s", json.dumps(ordered, ensure_ascii=False, indent=2))
+        except Exception:
+            pass
 
         return out

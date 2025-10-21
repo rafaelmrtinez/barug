@@ -9,6 +9,7 @@ import logging
 from django.db import connection
 from .. import form_shared as FS
 from zoneinfo import ZoneInfo  # PH time
+from .util import get_captain_name, get_secretary_name  # util helpers
 
 logger = logging.getLogger(__name__)
 
@@ -18,13 +19,13 @@ _KP11_FIELDS = [
     "repondents",          # (typo in PDF) — we will still fill this
     "brgy_case_num",
     "purpose",
-    "date_today",
+    "date_today",          # ← will be "October 20, 2025"
     "recepient",           # (typo in PDF) — we will still fill this
     "brgy_capt",
     "rcvd_date",           # day (1..31)
     "rcvd_month",          # month name (January..December)
     "pangkat_member_name",
-    "rcvd_month_2",        # in practice: YEAR (per user’s PDF)
+    "rcvd_month_2",        # we use this for YEAR (e.g., 2025)
 ]
 
 # Accept both label text and field_code from the builder (robust to common variants)
@@ -43,7 +44,7 @@ _KP11_SOURCES: Dict[str, Set[str]] = {
     # Today
     "date_today": {"date_today", "current_date", "this_date", "date", "date_created"},
     # Recipient (PDF typo: recepient)
-    "recepient": {"recepient", "recipient", "addr_to", "addressed to"},
+    "recepient": {"pangkat_member_name", "pangkat member name", "pangkat_member"},
     # Barangay Captain
     "brgy_capt": {"brgy_capt", "punong barangay", "barangay captain", "chairman", "brgy capt"},
     # Received day/month (explicit if the form supplies them)
@@ -61,13 +62,13 @@ class KP11Handler:
 
     Behavior:
       • Pull values from saved answers by label or field_code.
-      • Default date_today = today (YYYY-MM-DD, Asia/Manila) if blank.
+      • date_today is rendered as "Month DD, YYYY" (e.g., "October 20, 2025").
       • If rcvd_date / rcvd_month are blank, derive them from date_today:
             rcvd_date  = day number (1..31)
             rcvd_month = month name (January..December)
-      • rcvd_month_2 = YEAR (e.g., "2025") — per your PDF usage.
-      • Keep builder/prefill-resolved party names, case no., purpose, captain, recipient, etc.
-      • Print & log (INFO) the final ordered map that’s filled into the PDF.
+        And rcvd_month_2 = YEAR (e.g., "2025") for your PDF.
+      • Auto-fill Barangay Captain if blank using staff table.
+      • Print/log the final ordered map.
     """
 
     @staticmethod
@@ -75,7 +76,7 @@ class KP11Handler:
         if not s:
             return None
         txt = s.strip()
-        for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"):
+        for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y", "%B %d, %Y"):
             try:
                 return _dt.strptime(txt, fmt).date()
             except Exception:
@@ -83,15 +84,15 @@ class KP11Handler:
         return None
 
     @staticmethod
+    def _to_long_date(d: _date) -> str:
+        # Cross-platform "October 20, 2025" (no %-d, no leading zero issues)
+        return f"{d.strftime('%B')} {d.day}, {d.year}"
+
+    @staticmethod
     def _log_fill_map(out: Dict[str, str]) -> None:
-        """
-        Log/print the final field → value map in the exact order of _KP11_FIELDS.
-        """
         try:
             ordered = {k: out.get(k, "") for k in _KP11_FIELDS}
-            # always visible in runserver console
             print("[KP11] fill map (ordered):\n", json.dumps(ordered, ensure_ascii=False, indent=2))
-            # also log (shows if logger level is INFO)
             logger.info("KP11 fill map (ordered):\n%s", json.dumps(ordered, ensure_ascii=False, indent=2))
         except Exception as e:
             logger.warning("KP11 logging failed: %s", e)
@@ -143,22 +144,29 @@ class KP11Handler:
             out[target] = _find_any(sources)
 
         # --- Defaults / derivations ---
-        # Ensure date_today using Asia/Manila
         now_ph = _dt.now(ZoneInfo("Asia/Manila"))
         today = now_ph.date()
-        if not (out.get("date_today") or "").strip():
-            out["date_today"] = today.isoformat()
 
-        # Derive rcvd_date / rcvd_month / rcvd_month_2(YEAR) from date_today if blank
-        dt = self._try_parse_date(out.get("date_today", "")) or today
+        # Parse incoming date_today (may be blank or ISO). Always render as "Month DD, YYYY".
+        parsed = self._try_parse_date(out.get("date_today", "")) or today
+        out["date_today"] = self._to_long_date(parsed)
+
+        # Derive rcvd_date / rcvd_month / rcvd_month_2(YEAR) from parsed date if blank
         if not (out.get("rcvd_date") or "").strip():
-            out["rcvd_date"] = str(dt.day)
+            out["rcvd_date"] = str(parsed.day)
         if not (out.get("rcvd_month") or "").strip():
-            out["rcvd_month"] = dt.strftime("%B")
-
-        # IMPORTANT: your layout wants YEAR in rcvd_month_2
+            out["rcvd_month"] = parsed.strftime("%B")
         if not (out.get("rcvd_month_2") or "").strip():
-            out["rcvd_month_2"] = str(dt.year)
+            out["rcvd_month_2"] = str(parsed.year)
+
+        # --- Auto-fill officials if missing ---
+        if not (out.get("brgy_capt") or "").strip():
+            out["brgy_capt"] = get_captain_name(default=out.get("brgy_capt", "")) or out.get("brgy_capt", "")
+
+        # (KP-11 usually doesn't print the Secretary, but util is available)
+        # Example if you add a field later:
+        # if not (out.get("brgy_sec") or "").strip():
+        #     out["brgy_sec"] = get_secretary_name()
 
         # Final sanitize & ensure all fields exist
         for k, v in list(out.items()):

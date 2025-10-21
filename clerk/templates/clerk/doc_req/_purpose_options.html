@@ -1,5 +1,6 @@
 {% for p in purposes %}
   <option value="{{ p.document_purpose_id }}"
+          data-bcat="{{ p.business_category_id }}"
           data-amount="{{ p.current_amount }}"
           data-exempt-ftj="{{ p.exempt_ftj|yesno:'1,0' }}"
           data-exempt-senior="{{ p.exempt_senior|yesno:'1,0' }}"

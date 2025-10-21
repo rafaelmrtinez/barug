@@ -1,137 +1,448 @@
-{# templates/lupon_mem/report_pay.html #}
 {% extends 'base.html' %}
-{% load static bootstrap_icons %}
+{% load static %}
+{% load bootstrap_icons %}
 
 {% block css %}
-<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
 <style>
-  :root{ --brand-700:#6d2932; --brand-800:#561c24; }
-  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
-  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
-  .mini-badge{ display:inline-block; padding:.28rem .6rem; border-radius:.5rem;
-               background:#fff; border:1px solid rgba(0,0,0,.08); font-size:.78rem; }
-  .ro .form-control[readonly],
-  .ro .form-select:disabled{ background-color:#f8f9fa; pointer-events:none; }
+  :root{
+    --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932;
+    --brand-100:#f3eaeb; --brand-050:#fbf6f6; --ring: rgba(109,41,50,.18);
+    --accent:#D4AF37; --ink:#212529; --muted:#6c757d; --card:#ffffff;
+  }
+  body{ background:linear-gradient(160deg, var(--brand-050), #fff 30%) }
+  .title{ color:var(--brand-800); font-weight:800; letter-spacing:.2px }
+  .subtle{ color:var(--muted); }
+  .cardx{
+    background:var(--card);
+    border:1px solid rgba(109,41,50,.12);
+    border-radius:16px;
+    box-shadow:0 10px 30px rgba(0,0,0,.05);
+  }
+  .header-card{ border-left:4px solid var(--accent); }
+  .label{ font-weight:600; color:#222; font-size:.92rem; margin-bottom:.25rem; }
+  .form-control, .form-select{
+    border:1px solid rgba(109,41,50,.18)!important;
+    border-radius:12px!important;
+    padding:.6rem .75rem!important;
+  }
+  .form-control:focus, .form-select:focus{ box-shadow:0 0 0 .2rem var(--ring)!important; border-color:var(--brand-700)!important; }
+  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); border-radius:12px; }
+  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); }
+  .btn-soft{ background:var(--brand-100); color:var(--brand-800); border:1px solid rgba(109,41,50,.2); border-radius:12px; }
+  .pill{
+    display:inline-flex; align-items:center; gap:.4rem; padding:.25rem .55rem; border-radius:999px;
+    background:var(--brand-100); border:1px solid rgba(109,41,50,.15); color:var(--brand-800); font-weight:600; font-size:.85rem;
+  }
+  .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+  .kbd{
+    display:inline-flex; align-items:center; justify-content:center; min-width:1.25rem;
+    padding:.1rem .35rem; border:1px solid #d0d5dd; border-bottom-width:2px; border-radius:6px;
+    font-size:.75rem; background:#fff; color:#444
+  }
+  .divider{ height:1px; background:rgba(0,0,0,.06); margin:1rem 0 }
+  .ghost{ opacity:.6 }
+  .req{ color:#cc0000; font-weight:700; margin-left:.25rem }
+  .grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:14px }
+  @media (max-width: 991px){ .grid-2{ grid-template-columns:1fr } }
+
+  /* Inline person search UI */
+  .results-viewport{ max-height:280px; overflow:auto; border:1px solid rgba(0,0,0,.08); border-radius:10px; }
+  .result-item{ cursor:pointer; }
+  .result-item:hover{ background:#f3efe9; }
+  .chip{ display:inline-flex; align-items:center; gap:.35rem; padding:.25rem .5rem; border-radius:999px;
+         border:1px solid var(--bs-border-color); background:#fff; margin:.15rem .25rem 0 0; font-size:.875rem; }
+  .chip .rm{ border:none; background:transparent; padding:0; line-height:1; cursor:pointer; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="page-wrap" style="margin-top: 40;">
-  <div class="container-fluid pt-3 page-main">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h4 class="mb-0">{{ page_title }}</h4>
-      <a href="{% url 'lupon_mem:report_list' %}" class="btn btn-outline-brand">
-        {% bs_icon 'arrow-left' extra_classes='me-1' %} Back
-      </a>
+<div class="container-fluid px-4 py-4">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <div>
+      <h2 class="title m-0">Confirm Payment & Open Case</h2>
+      <div class="subtle">Review the report, record payment (optional), and open a blotter case.</div>
     </div>
+    <div><span class="pill"><i class="bi bi-receipt-cutoff"></i> Treasurer Flow</span></div>
+  </div>
 
-    <!-- Report header (exact details) -->
-    <div class="card shadow-sm mb-3">
-      <div class="card-body">
-        <h6 class="mb-2">Report #{{ report.0 }} — {{ report.1 }}</h6>
-        <p class="mb-1"><strong>Date/Time:</strong> {{ report.2 }}</p>
-        <p class="mb-0"><strong>Description:</strong> {{ report.3 }}</p>
-      </div>
-    </div>
-
-    <!-- Parties (read-only chips) -->
-    <div class="card shadow-sm mb-3">
-      <div class="card-body">
-        <h6 class="mb-3">Parties</h6>
-        {% for p in parties %}
-          <span class="mini-badge" data-role="{{ p.2|upper }}" data-name="{{ p.1 }}">
-            {{ p.2 }}: #{{ p.0 }} {{ p.1 }}
-          </span>
-        {% empty %}
-          <div class="text-muted">No parties linked.</div>
-        {% endfor %}
-      </div>
-    </div>
-
-    <form method="post" class="needs-validation" novalidate>
-      {% csrf_token %}
-
-      <!-- Case details (READ-ONLY UI; hidden mirrors submit real values) -->
-      <div class="card shadow-sm mb-3 ro">
-        <div class="card-body">
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label">Case Name</label>
-              <input class="form-control" value="{{ case_name }}" readonly>
-              <input type="hidden" name="case_name" value="{{ case_name }}">
-            </div>
-
-            <div class="col-md-3">
-              <label class="form-label">Complaint Title</label>
-              <input class="form-control" value="{{ complaint_title_name }}" readonly>
-              <input type="hidden" name="complaint_title_id" value="{{ complaint_title_id }}">
-            </div>
-
-            <div class="col-md-3">
-              <label class="form-label">Case Nature</label>
-              <input class="form-control" value="{{ case_nature_name }}" readonly>
-              <input type="hidden" name="case_nature_id" value="{{ case_nature_id }}">
-            </div>
-
-            <div class="col-md-3">
-              <label class="form-label">Settlement Status</label>
-              <input class="form-control" value="{{ settlement_status_name }}" readonly>
-              <input type="hidden" name="settlement_status_id" value="{{ settlement_status_id }}">
-            </div>
+  <!-- Report Header -->
+  <div class="cardx header-card p-3 mb-3">
+    <div class="d-flex align-items-start justify-content-between gap-3">
+      <div>
+        <div class="label">Report</div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="fw-bold" style="font-size:1.05rem">
+            #{{ report.0|default:"—" }} • {{ report.1|default:"(no subject)" }}
           </div>
+          {% if report.2 %}
+          <div class="text-muted">
+            <i class="bi bi-calendar-event"></i>
+            {{ report.2 }}
+          </div>
+          {% endif %}
         </div>
+        {% if report.3 %}
+          <div class="text-muted mt-1">{{ report.3 }}</div>
+        {% endif %}
       </div>
+      <div class="text-end">
+        <div class="text-muted small">Keyboard: <span class="kbd">Tab</span> to move • <span class="kbd">Enter</span> to submit</div>
+      </div>
+    </div>
+  </div>
 
-      <!-- Payment section (ONLY editable part) -->
-      <div class="card shadow-sm mb-3">
-        <div class="card-body">
-          <div class="form-check form-switch mb-2">
-            <input class="form-check-input" type="checkbox" id="with_payment" name="with_payment">
-            <label class="form-check-label" for="with_payment">Record payment now</label>
+  <form method="post" class="mb-5" id="payForm" novalidate
+        data-report-id="{{ report.0|default:'0' }}">
+    {% csrf_token %}
+
+    <div class="row g-3">
+      <!-- Left: Case details -->
+      <div class="col-lg-7">
+        <div class="cardx p-3">
+          <div class="mb-3">
+            <div class="label">Case Name<span class="req">*</span></div>
+            <input type="text" class="form-control" name="case_name" id="case_name"
+                   placeholder="e.g., Dela Cruz vs Santos"
+                   value="{{ initial_case_name|default:case_name|default:'' }}" required>
+            <div class="form-text">Tip: Use “Complainant Lastname vs Respondent Lastname”.</div>
           </div>
 
-          <div class="row g-3 pay-fields">
-            <div class="col-md-3">
-              <label class="form-label">OR / Receipt No.</label>
-              <input class="form-control" name="payment_receipt" value="{{ default_or }}" disabled>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Amount</label>
-              <input class="form-control" name="payment_amount" value="{{ default_amount }}" disabled>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Payment Status</label>
-              <select class="form-select" name="payment_status" disabled>
-                {% for s in payment_statuses %}
-                  <option {% if s|upper == "PAID" %}selected{% endif %}>{{ s }}</option>
+          <div class="grid-2">
+            <div>
+              <div class="label">Complaint Title<span class="req">*</span></div>
+              <select name="complaint_title_id" id="complaint_title_id" class="form-select" required>
+                <option value="">— Select —</option>
+                {% for id,name in complaint_titles %}
+                  <option value="{{ id }}" {% if id == complaint_title_id %}selected{% endif %}>{{ name }}</option>
                 {% endfor %}
               </select>
             </div>
-            <div class="col-md-3">
-              <label class="form-label">Paid By (Person ID)</label>
-              <input class="form-control" name="paid_by_person_id" placeholder="e.g., 1001" disabled>
+            <div>
+              <div class="label">Case Nature<span class="req">*</span></div>
+              <select name="case_nature_id" id="case_nature_id" class="form-select" required>
+                <option value="">— Select —</option>
+                {% for id,name in case_natures %}
+                  <option value="{{ id }}" {% if id == case_nature_id %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+              </select>
             </div>
           </div>
+
+          <div class="mt-3">
+            <div class="label">Initial Settlement Status<span class="req">*</span></div>
+            <select name="settlement_status_id" id="settlement_status_id" class="form-select" required>
+              <option value="">— Select —</option>
+              {% for id,name in settlement_statuses %}
+                <option value="{{ id }}" {% if id == settlement_status_id %}selected{% endif %}>{{ name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          {% if parties %}
+          <div class="divider"></div>
+          <div>
+            <div class="label mb-1">Parties</div>
+            <div class="small text-muted">
+              {% for p in parties %}
+                <div><span class="badge bg-light text-dark border me-2">{{ p.2 }}</span><span>{{ p.1 }}</span></div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
         </div>
       </div>
 
-      <div class="d-flex justify-content-end">
-        <button class="btn btn-brand">
-          {% bs_icon 'check2' extra_classes='me-2' %} Confirm & Create Case
-        </button>
+      <!-- Right: Payment -->
+      <div class="col-lg-5">
+        <div class="cardx p-3">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="label m-0">Payment</div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="with_payment" name="with_payment">
+              <label class="form-check-label" for="with_payment">Record payment</label>
+            </div>
+          </div>
+
+          <div id="payFields" class="mt-3" aria-disabled="true">
+            <div class="mb-2">
+              <div class="label">Official Receipt No.</div>
+              <input type="text" class="form-control" name="payment_receipt" id="payment_receipt"
+                     placeholder="For automatic OR please leave blank or OR-2025-xxxxx" disabled>
+            </div>
+
+            <div class="grid-2">
+              <div>
+                <div class="label">Amount</div>
+                <input type="text" class="form-control mono" name="payment_amount" id="payment_amount"
+                       placeholder="0.00" inputmode="decimal"
+                       value="{{ default_amount|default:'0.00' }}" disabled>
+              </div>
+              <div>
+                <div class="label">Status</div>
+                <select name="payment_status" id="payment_status" class="form-select" disabled>
+                  {% for s in payment_statuses %}
+                    <option value="{{ s }}" {% if s == 'PAID' %}selected{% endif %}>{{ s }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+
+            <!-- INLINE TYPEAHEAD -->
+            <div class="mt-2">
+              <div class="label">Paid by</div>
+
+              <!-- what user types -->
+              <input type="text" class="form-control" id="paid_by_search" placeholder="Start typing name…">
+              <!-- selected person id to submit -->
+              <input type="hidden" name="paid_by_person_id" id="paid_by_person_id" value="">
+
+              <!-- dropdown results -->
+              <div id="payerDropdown" class="results-viewport mt-2" style="display:none;"></div>
+
+              <!-- selection preview -->
+              <div id="payerDisplay" class="form-control bg-body-tertiary mt-2" style="min-height:38px; display:flex; align-items:center;">
+                <span class="text-muted">No payer selected</span>
+              </div>
+
+              <div id="payerHelp" class="small subtle mt-1">Type at least 2 letters to search residents.</div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-brand btn-lg">
+              <i class="bi bi-check2-circle"></i> Create Case
+            </button>
+            <a href="{% url 'lupon_mem:report_list' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left"></i> Back to Reports
+            </a>
+          </div>
+        </div>
       </div>
-    </form>
-  </div>
+    </div>
+  </form>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
-  document.addEventListener('DOMContentLoaded', function(){
-    const tgl = document.getElementById('with_payment');
-    const container = document.querySelector('.pay-fields');
-    const inputs = container ? container.querySelectorAll('input,select,textarea') : [];
-    function sync(){ const on = tgl.checked; inputs.forEach(el => { el.disabled = !on; }); }
-    if (tgl){ tgl.addEventListener('change', sync); sync(); }
+(function(){
+  const $ = (sel, root=document)=> root.querySelector(sel);
+
+  const form = $('#payForm');
+  const withPay = $('#with_payment');
+  const payFields = $('#payFields');
+
+  const receipt = $('#payment_receipt');
+  const amount = $('#payment_amount');
+  const statusSel = $('#payment_status');
+
+  // Inline typeahead elems
+  const paidById   = $('#paid_by_person_id');
+  const payerInput = $('#paid_by_search');
+  const payerDrop  = $('#payerDropdown');
+  const payerDisp  = $('#payerDisplay');
+  const payerHelp  = $('#payerHelp');
+
+  const caseName = $('#case_name');
+  const ctSel = $('#complaint_title_id');
+  const cnSel = $('#case_nature_id');
+  const ssSel = $('#settlement_status_id');
+
+  const rptId = Number(form?.dataset?.reportId || '0');
+
+  function setPaymentEnabled(enabled){
+    payFields.setAttribute('aria-disabled', String(!enabled));
+    [receipt, amount, statusSel, payerInput]
+      .forEach(el=>{ if (el) el.disabled = !enabled; });
+    payFields.classList.toggle('ghost', !enabled);
+    if (!enabled){ hideDrop(); }
+  }
+
+  withPay.addEventListener('change', ()=>{
+    setPaymentEnabled(withPay.checked);
+    if(withPay.checked && !receipt.value.trim()){
+    }
   });
+
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function genOR(){
+    const d = new Date();
+    return `OR-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}-${String(rptId||0).padStart(5,'0')}`;
+  }
+
+  amount.addEventListener('blur', ()=>{
+    const v = amount.value.replace(/[^0-9.]/g,'');
+    if(!v) { amount.value = ''; return; }
+    const num = Number(v);
+    if(!isNaN(num)) amount.value = num.toFixed(2);
+  });
+
+  // ==== Typeahead logic (mirrors report_new) ====
+  let debounceTimer=null;
+  let pendingController=null;
+
+  function cancelPending(){
+    if (pendingController){ try{ pendingController.abort(); }catch(e){} }
+    pendingController = null;
+  }
+
+  function showDrop(){ payerDrop.style.display = 'block'; }
+  function hideDrop(){ payerDrop.style.display = 'none'; payerDrop.innerHTML = ''; }
+
+  function setDropMsg(msg, muted){
+    payerDrop.innerHTML = `<div class="list-group-item ${muted?'text-muted':''}">${escapeHtml(msg)}</div>`;
+    showDrop();
+  }
+
+  payerInput.addEventListener('input', function(){
+    const q = this.value.trim();
+    if (q.length === 0){ hideDrop(); paidById.value=''; resetDisplay(); return; }
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(()=> doSearch(q), 220);
+  });
+
+  payerInput.addEventListener('focus', ()=>{
+    if (payerDrop.innerHTML) showDrop();
+  });
+
+  document.addEventListener('click', (e)=>{
+    if (!payerDrop.contains(e.target) && e.target !== payerInput) hideDrop();
+  });
+
+  async function doSearch(q){
+    if (q.length < 2){ setDropMsg('Type at least 2 letters…', true); return; }
+    setDropMsg('Searching…', true);
+
+    cancelPending();
+    pendingController = new AbortController();
+
+    try{
+      const url = `{% url 'lupon_mem:person_suggest' %}?q=` + encodeURIComponent(q);
+      const res = await fetch(url, {
+        headers:{ 'Accept':'application/json', 'X-Requested-With':'XMLHttpRequest' },
+        credentials:'same-origin',
+        signal: pendingController.signal
+      });
+
+      if (!res.ok){
+        const txt = await res.text();
+        console.error('person_suggest failed:', res.status, txt);
+        setDropMsg(`Search failed (${res.status}).`, false);
+        return;
+      }
+
+      const data = await res.json().catch(e=>{
+        console.error('JSON parse error', e);
+        setDropMsg('Invalid response.', false);
+        return null;
+      });
+      if (!data) return;
+
+      const arr = Array.isArray(data.results) ? data.results : [];
+      if (!arr.length){ setDropMsg('No matches', true); return; }
+
+      payerDrop.innerHTML = '';
+      const frag = document.createDocumentFragment();
+      arr.forEach(item=>{
+        const btn = document.createElement('button');
+        btn.type='button';
+        btn.className='list-group-item list-group-item-action d-flex justify-content-between align-items-center result-item';
+        btn.innerHTML = `<span>${escapeHtml(item.name || '(no name)')}</span>
+                         <span class="badge text-bg-light border">ID ${item.id}</span>`;
+        btn.addEventListener('click', ()=> choosePayer(item.id, item.name));
+        frag.appendChild(btn);
+      });
+      payerDrop.appendChild(frag);
+      showDrop();
+
+    }catch(e){
+      if (e.name === 'AbortError') return;
+      console.error(e);
+      setDropMsg('Search error — see console.', false);
+    }
+  }
+
+  function choosePayer(id, name){
+    paidById.value = id;
+    payerInput.value = name;
+    hideDrop();
+    payerDisp.innerHTML =
+      `<span class="chip">
+         ${escapeHtml(name)} <small class="text-muted">(#${id})</small>
+         <button type="button" class="rm" title="Remove payer" aria-label="Remove payer">
+           <i class="bi bi-x-lg"></i>
+         </button>
+       </span>`;
+    payerDisp.querySelector('.rm').addEventListener('click', ()=>{
+      paidById.value = '';
+      payerInput.value = '';
+      resetDisplay();
+      payerInput.focus();
+    });
+    payerHelp.textContent = 'Payer selected from registry.';
+  }
+
+  function resetDisplay(){
+    payerDisp.innerHTML = `<span class="text-muted">No payer selected</span>`;
+    payerHelp.textContent = 'Type at least 2 letters to search residents.';
+  }
+
+  function escapeHtml(s){
+    return String(s ?? '')
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;')
+      .replaceAll("'","&#39;");
+  }
+  // ==============================================
+
+  // Submit guard
+  form.addEventListener('submit', (e)=>{
+    if(!caseName.value.trim() || !ctSel.value || !cnSel.value || !ssSel.value){
+      e.preventDefault();
+      flash('Please complete required case fields.');
+      [caseName, ctSel, cnSel, ssSel].forEach(el=>{
+        if(!el.value || (el === caseName && !el.value.trim())) el.classList.add('is-invalid'); else el.classList.remove('is-invalid');
+      });
+      return;
+    }
+    if(withPay.checked){
+      if(!receipt.value.trim()){ receipt.value = genOR(); }
+      if(!statusSel.value){ statusSel.value = 'PAID'; }
+      if(!amount.value.trim()){ amount.value = '0.00'; }
+      // If you want to require a payer, uncomment:
+      // if(!paidById.value.trim()){ e.preventDefault(); flash('Select a payer from the registry.'); return; }
+    }
+  });
+
+  function flash(text){
+    const el = document.createElement('div');
+    el.textContent = text;
+    el.style.position = 'fixed';
+    el.style.bottom = '16px';
+    el.style.right = '16px';
+    el.style.background = '#111';
+    el.style.color = '#fff';
+    el.style.padding = '.5rem .75rem';
+    el.style.borderRadius = '10px';
+    el.style.opacity = '0';
+    el.style.transition = 'opacity .2s, transform .2s';
+    el.style.transform = 'translateY(6px)';
+    el.style.zIndex = '9999';
+    document.body.appendChild(el);
+    requestAnimationFrame(()=>{
+      el.style.opacity = '1'; el.style.transform = 'translateY(0)';
+      setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateY(6px)'; setTimeout(()=>el.remove(),200)}, 900);
+    });
+  }
+
+  // init
+  setPaymentEnabled(false);
+})();
 </script>
 {% endblock %}

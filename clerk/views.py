@@ -32,6 +32,8 @@ from django.utils.html import escape
 from django.utils import timezone
 from django.conf import settings
 from django.views.decorators.http import require_POST
+from django.template.loader import render_to_string
+from django.http import JsonResponse
 
 from postgrest.exceptions import APIError
 from django.views.decorators.http import require_GET
@@ -343,6 +345,40 @@ def _lookup_person_contact(person_id: Optional[int]) -> Tuple[Optional[str], Opt
 # ────────────────────────────────────────────────────────────
 _DOC_TYPES_ALL_CACHE: List[str] = []
 
+def _fetch_purposes_by_request_type(req_doc_type_id: int) -> List[Dict[str, Any]]:
+    q = (
+        supabase.table("document_purpose")
+        .select(
+            "document_purpose_id, request_document_type_id, purpose_code, purpose_label, "
+            "default_details, default_offense_no, business_category_id, "  # ← NEW
+            "fee_item:fee_item_id(fee_item_id, current_amount, "
+            "exempt_ftj, exempt_senior, exempt_pwd, exempt_indigent, exempt_student)"
+        )
+        .eq("request_document_type_id", req_doc_type_id)
+        .order("purpose_label")
+    ).execute()
+
+    rows = q.data or []
+    out = []
+    for r in rows:
+        fi = r.get("fee_item") or {}
+        out.append({
+            "document_purpose_id": r["document_purpose_id"],
+            "purpose_label": r.get("purpose_label"),
+            "purpose_code": r.get("purpose_code"),
+            "business_category_id": r.get("business_category_id"),  # ← NEW
+            "default_offense_no": r.get("default_offense_no"),
+            "default_details": r.get("default_details") or {},
+            "fee_item_id": fi.get("fee_item_id"),
+            "current_amount": fi.get("current_amount") or 0,
+            "exempt_ftj": bool(fi.get("exempt_ftj")),
+            "exempt_senior": bool(fi.get("exempt_senior")),
+            "exempt_pwd": bool(fi.get("exempt_pwd")),
+            "exempt_indigent": bool(fi.get("exempt_indigent")),
+            "exempt_student": bool(fi.get("exempt_student")),
+        })
+    return out
+    
 def _fetch_doc_types_all() -> List[str]:
     """Get the full list of document type names for the filter panel."""
     global _DOC_TYPES_ALL_CACHE
@@ -1087,7 +1123,6 @@ def dashboard(request: HttpRequest):
 
 @session_login_required
 @role_required(CLERK_ROLE)
-@role_required(CLERK_ROLE)
 @nocache
 def review_approve(request: HttpRequest):
     """List of ID verification requests."""
@@ -1148,7 +1183,6 @@ def review_approve(request: HttpRequest):
 
 @session_login_required
 @role_required(CLERK_ROLE)
-@role_required(CLERK_ROLE)
 @nocache
 def person_submission_dets(request: HttpRequest, req_id: int):
     """Details of a single person's submitted verification + latest status."""
@@ -1199,8 +1233,43 @@ def person_submission_dets(request: HttpRequest, req_id: int):
 # ────────────────────────────────────────────────────────────
 # SECTION: AJAX helpers (search and purposes)
 # ────────────────────────────────────────────────────────────
-from django.template.loader import render_to_string
-from django.http import JsonResponse
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+def ajax_owner_businesses(request: HttpRequest) -> HttpResponse:
+    """
+    Return <option> list of the selected owner's businesses.
+    Used when Document Type is 'Barangay Business Clearance'.
+    """
+    try:
+        owner_person_id = int(request.GET.get("owner_person_id") or 0)
+    except Exception:
+        owner_person_id = 0
+
+    if not owner_person_id:
+        # Keep it simple so the select shows a clear message
+        html = '<option value="">— select resident first —</option>'
+        return HttpResponse(html)
+
+    try:
+        resp = (
+            supabase.table("business")
+            .select(
+                "business_id, business_name, business_category_id, "
+                "address:address_id(street, barangay, city)"
+            )
+            .eq("business_owner_id", owner_person_id)
+            .order("business_name")
+            .execute()
+        )
+        rows = resp.data or []
+    except Exception as e:
+        rows = []
+        logger.warning("ajax_owner_businesses failed: %s", e)
+
+    html = render_to_string("clerk/doc_req/_business_options.html", {"businesses": rows})
+    return HttpResponse(html)
+
 
 @session_login_required
 @role_required(CLERK_ROLE)

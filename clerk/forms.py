@@ -120,6 +120,7 @@ BUSINESS_STATUS_CHOICES = [
     (4, "REVOKED"),
     (5, "CLOSED"),
     (6, "EXPIRED"),
+    (7, "PENDING"),
 ]
 
 OPERATING_DAY_CHOICES = [
@@ -595,19 +596,6 @@ class BusinessDetails(forms.Form):
             'inputmode' : 'decimal',
         }),
         label= 'Total Gross Sales of Previous Year',
-        required= True,
-        min_value=Decimal('0.00'),
-        decimal_places=2,
-        max_digits=14,
-    )
-    inc_est = forms.DecimalField(
-        widget=forms.NumberInput(attrs={
-            'id' : 'inc_est',
-            'class' : 'form-control',
-            'placeholder' : 'Monthly Gross Income Estimate',
-            'inputmode' : 'decimal',
-        }),
-        label= 'Monthly Gross Income Estimate',
         required= True,
         min_value=Decimal('0.00'),
         decimal_places=2,

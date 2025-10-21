@@ -1,7 +1,7 @@
 # kp10.py
 from __future__ import annotations
-from typing import Dict, Set
-from datetime import date as _date, datetime as _dt
+from typing import Dict, Set, Optional
+from datetime import date as _date, datetime as _dt, time as _time
 
 import json
 import logging
@@ -17,14 +17,14 @@ _KP10_FIELDS = [
     "addr_to",
     "complainants",
     "respondents",
-    "appear_to",          # will hold DAY (1..31)
-    "appearance_date",    # will hold MONTH NAME (January..December)
-    "current_year",       # will hold YYYY
-    "appearance_time",
-    "date_today",         # must be MONTH NAME (e.g., "October")
-    "day_of",
-    "date_notified",      # must be MONTH NAME (e.g., "October")
-    "notified_day_of",
+    "appear_to",          # DAY (1..31) of the hearing
+    "appearance_date",    # MONTH NAME of the hearing
+    "current_year",       # YYYY of the hearing
+    "appearance_time",    # 12h with AM/PM
+    "date_today",         # MONTH NAME (current date)
+    "day_of",             # DAY (current date)
+    "date_notified",      # MONTH NAME (default: current)
+    "notified_day_of",    # DAY (default: current)
     "complainants_2",
     "respondents_2",
     "current_year_2",
@@ -54,22 +54,24 @@ _KP10_SOURCES: Dict[str, Set[str]] = {
     "notified_day_of": {"notified_day_of"},
 }
 
+
 class KP10Handler:
     """
     KP-10: NOTICE FOR CONSTITUTION OF PANGKAT
 
-    New behavior for the single picked date:
+    Single picked hearing date provides:
       • appear_to          = DAY (e.g., 13)
       • appearance_date    = MONTH NAME (e.g., January)
       • current_year       = 4-digit YEAR (e.g., 2026)
 
-    We look for the date value from either:
-      • field_code 'appearance_date' (your “Hearing Details” date input)
-      • OR (fallback) a value saved under label 'hearing details' / 'hearing date'.
+    “This ___ day of ___” (date_today + day_of) must always reflect the **current date**
+    in Asia/Manila, not the picked hearing date.
+
+    appearance_time is normalized to **12-hour AM/PM**.
     """
 
     @staticmethod
-    def _try_parse_date(s: str):
+    def _try_parse_date(s: str) -> Optional[_date]:
         if not s:
             return None
         txt = s.strip()
@@ -81,6 +83,35 @@ class KP10Handler:
         return None
 
     @staticmethod
+    def _try_parse_time(s: str) -> Optional[_time]:
+        """
+        Accepts common time formats, returns a time object if possible.
+        """
+        if not s:
+            return None
+        txt = s.strip().upper().replace(".", "")
+        # Try 24h first
+        for fmt in ("%H:%M:%S", "%H:%M"):
+            try:
+                return _dt.strptime(txt, fmt).time()
+            except Exception:
+                pass
+        # Then 12h variants
+        for fmt in ("%I:%M %p", "%I:%M%p", "%I %p"):
+            try:
+                return _dt.strptime(txt, fmt).time()
+            except Exception:
+                pass
+        return None
+
+    @staticmethod
+    def _format_12h(t: _time) -> str:
+        """
+        Formats to 'HH:MM AM/PM' (no leading space). Ensures 12-hour clock with AM/PM.
+        """
+        return _dt.combine(_dt.today(), t).strftime("%I:%M %p").lstrip("0")
+
+    @staticmethod
     def _log_fill_map(out: Dict[str, str]) -> None:
         """
         Log the final field → value map in the exact order of _KP10_FIELDS.
@@ -88,9 +119,7 @@ class KP10Handler:
         """
         try:
             ordered = {k: out.get(k, "") for k in _KP10_FIELDS}
-            # always visible in runserver console
             print("[KP10] fill map (ordered):\n", json.dumps(ordered, ensure_ascii=False, indent=2))
-            # also log (shows if logger level is INFO)
             logger.info("KP10 fill map (ordered):\n%s", json.dumps(ordered, ensure_ascii=False, indent=2))
         except Exception as e:
             logger.warning("KP10 logging failed: %s", e)
@@ -138,9 +167,7 @@ class KP10Handler:
         for target, sources in _KP10_SOURCES.items():
             out[target] = _find_any(sources)
 
-        # ------- Derive from the single picked date -------
-        # Primary source is the field with code 'appearance_date' (Hearing Details),
-        # but accept label fallbacks too.
+        # ------- Derive from the single picked hearing date (for appear_to / appearance_date / current_year) -------
         picked_date_txt = (
             by_code.get("appearance_date")
             or by_label.get("hearing details")
@@ -150,13 +177,11 @@ class KP10Handler:
         d = self._try_parse_date(picked_date_txt)
 
         if d:
-            # appear_to = DAY number
+            # appear_to = DAY number of hearing
             out["appear_to"] = str(d.day)
-
-            # appearance_date = MONTH NAME
+            # appearance_date = MONTH NAME of hearing
             out["appearance_date"] = d.strftime("%B")
-
-            # current_year = 4-digit year
+            # current_year = 4-digit hearing year
             out["current_year"] = str(d.year)
 
         # Mirrors for alternates
@@ -169,41 +194,35 @@ class KP10Handler:
         now_ph = _dt.now(ZoneInfo("Asia/Manila"))
         today = now_ph.date()
 
-        # --- date_today → MONTH NAME (normalize if it came as a date) ---
-        raw_dt_today = (out.get("date_today") or "").strip()
-        if raw_dt_today:
-            parsed_today = self._try_parse_date(raw_dt_today)
-            if parsed_today:
-                out["date_today"] = parsed_today.strftime("%B")
-            else:
-                # if already a month name, keep as-is
-                out["date_today"] = raw_dt_today
-        else:
-            out["date_today"] = today.strftime("%B")
-
-        # --- years (keep your mirrors) ---
+        # === “This ___ day of ___” must be TODAY (current date) ===
+        # month
+        out["date_today"] = today.strftime("%B")
+        # day
+        out["day_of"] = str(today.day)
+        # fallback years
         for ykey in ("current_year", "current_year_2", "current_year_3"):
             if not (out.get(ykey) or "").strip():
                 out[ykey] = str(today.year)
 
-        # --- day_of (from picked date d; else from date_today/today) ---
-        if d:
-            out["day_of"] = str(d.day)
-        else:
-            if not (out.get("day_of") or "").strip():
-                # date_today is just a month name, so parsing won't produce a full date; fallback to today's day
-                td = self._try_parse_date(out.get("date_today", ""))
-                out["day_of"] = str(td.day) if td else str(today.day)
-
-        # --- date_notified → MONTH NAME and notified_day_of → DAY ---
+        # --- date_notified / notified_day_of: if not provided or unparseable, default to TODAY ---
         raw_notified = (out.get("date_notified") or "").strip()
         nd = self._try_parse_date(raw_notified)
         if nd:
-            out["notified_day_of"] = str(nd.day)      # e.g., "11"
-            out["date_notified"] = nd.strftime("%B")  # e.g., "October"
-        elif raw_notified:
-            # if already a month name, keep as-is; otherwise leave untouched
-            out["date_notified"] = raw_notified
+            out["notified_day_of"] = str(nd.day)
+            out["date_notified"] = nd.strftime("%B")
+        else:
+            # default to today if missing or not a date/month
+            if not raw_notified:
+                out["date_notified"] = today.strftime("%B")
+            if not (out.get("notified_day_of") or "").strip():
+                out["notified_day_of"] = str(today.day)
+
+        # --- appearance_time: normalize to 12h with AM/PM (fallback to now) ---
+        raw_time = (out.get("appearance_time") or "").strip()
+        parsed_time = self._try_parse_time(raw_time)
+        if not parsed_time:
+            parsed_time = now_ph.time().replace(second=0, microsecond=0)
+        out["appearance_time"] = self._format_12h(parsed_time)
 
         # Final sanitize & ensure all fields exist
         for k, v in list(out.items()):
