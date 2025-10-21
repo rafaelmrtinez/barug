@@ -1,0 +1,392 @@
+{% extends "base.html" %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<link rel="stylesheet" href="{% static 'css/filters.css' %}">
+<style>
+  :root{
+    --brand-900:#3a1217;
+    --brand-800:#561c24;
+    --brand-700:#6d2932; /* primary */
+    --brand-600:#7a323b;
+    --brand-100:#f3eaeb; /* soft bg */
+    --brand-050:#fbf6f6; /* very soft bg */
+    --accent:#D4AF37;
+    --ink:#0f172a;
+    --muted:#6b7280;
+    --line:#e5e7eb;
+    --ring:rgba(109,41,50,.18);
+  }
+  /* Status pills (legend + table) */
+  .status-pill{
+    display:inline-flex; align-items:center; gap:.35rem;
+    border-radius:999px; padding:.22rem .6rem;
+    font-weight:600; font-size:.82rem; border:1px solid transparent;
+    cursor:pointer; /* so it feels clickable */
+  }
+  .st-draft{ background:#fff; border-color:#d1d5db; color:#374151; }
+  .st-review{ background:#fff; border-color:#fde68a; color:#92400e; }
+  .st-forpay{ background:#fff; border-color:#fca5a5; color:#991b1b; }
+  .st-paid{ background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
+  .st-print{ background:#eff6ff; border-color:#bfdbfe; color:#1e40af; }
+  .st-done{ background:#f0fdf4; border-color:#bbf7d0; color:#166534; }
+
+  .owner{ color:#374151; }
+  .small-muted{ color:var(--muted); font-size:.82rem; }
+
+  /* === Stepper (used inside Flow Modal) === */
+  .stepper{ border:1px solid var(--line); border-radius:16px; padding:1rem; background:#fff; }
+  .step{ display:flex; gap:.75rem; align-items:flex-start; padding:.5rem 0; }
+  .step .dot{ width:1.25rem; height:1.25rem; border-radius:50%; border:2px solid var(--brand-700); display:flex; align-items:center; justify-content:center; color:#fff; background:#fff; flex:0 0 1.25rem; }
+  .step.done .dot{ background:var(--brand-700); }
+  .step .label{ font-weight:600; }
+  .step .sub{ font-size:.85rem; color:var(--muted); margin-top:.15rem; }
+
+  /* Remove default button look for status triggers */
+  .status-trigger{
+    background:none; border:0; padding:0;
+  }
+</style>
+{% endblock css %}
+
+{% block content %}
+<div class="container-fluid py-3" style="margin-top: 40px;">
+
+  {# Toolbar with same search + filters.css styling #}
+  <form class="toolbar d-flex align-items-center flex-wrap mb-3" onsubmit="event.preventDefault();">
+    <div class="searchbox">
+      {% bs_icon 'search' extra_classes='bi' %}
+      <input id="search" name="search" class="form-control" placeholder="Search business / owner / permit / phone">
+    </div>
+
+    <input type="hidden" name="year" id="hYear">
+    <input type="hidden" name="category" id="hCategory">
+    <input type="hidden" name="status" id="hStatus">
+
+    <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
+            type="button"
+            data-bs-toggle="offcanvas"
+            data-bs-target="#filterPanel"
+            aria-controls="filterPanel">
+      {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+      <span class="badge rounded-pill text-bg-light ms-2" id="filterCount" style="display:none;">0</span>
+    </button>
+
+    {# Keep Register button commented as in your original #}
+    <!-- <a class="btn btn-outline-brand ms-2" href="{% url 'clerk:business_owner' %}">
+      {% bs_icon 'plus-lg' extra_classes='me-2' %} Register Business
+    </a> -->
+  </form>
+
+  {# Active chips #}
+  <div class="filters-bar d-flex flex-wrap align-items-center mb-3" id="activeChips">
+    <span class="text-muted small">No active filters.</span>
+  </div>
+
+  <div class="row g-3">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0" id="renewalTable">
+        <thead>
+          <tr>
+            <th style="width:28%;">Business</th>
+            <th style="width:18%;">Owner</th>
+            <th style="width:14%;">Expiry</th>
+            <th style="width:12%;">Last OR</th>
+            <th style="width:14%;">Status</th>
+            <th style="width:14%;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="renewal-row" data-renewal="1" data-business="Sto. Niño Bakery" data-owner="Juan Dela Cruz" data-expiry="Dec 31, 2025" data-permit="2025-0001" data-phone="+63 912 345 6789" data-status="DRAFT" data-year="2025" data-category="F&B">
+            <td data-label="Business">
+              <div class="fw-semibold">Sto. Niño Bakery</div>
+              <div class="small-muted">Permit # 2025-0001 · F&amp;B</div>
+            </td>
+            <td data-label="Owner">
+              <div class="owner">Juan Dela Cruz</div>
+              <div class="small-muted">+63 912 345 6789</div>
+            </td>
+            <td data-label="Expiry">Dec 31, 2025</td>
+            <td data-label="Last OR"><span class="small-muted">—</span></td>
+
+            {# Turn the STATUS PILL into a modal trigger (no JS) #}
+            <td data-label="Status">
+              <button type="button" class="status-trigger"
+                      data-bs-toggle="modal" data-bs-target="#flowModal"
+                      aria-label="Open renewal flow">
+                <span class="status-pill st-draft">
+                  {% bs_icon 'pencil-square' %} Draft
+                </span>
+              </button>
+            </td>
+
+            <td data-label="Actions">
+              <div class="table-actions">
+                <a href="#" class="btn btn-sm btn-outline-brand">
+                  {% bs_icon 'box-arrow-in-right' extra_classes='me-1' %} Open
+                </a>
+                {# Flow button removed per request #}
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Offcanvas Filters ===== -->
+<div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
+     aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150px;">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <form id="filterForm" onsubmit="event.preventDefault(); applyFilters();">
+      <div class="mb-3">
+        <label class="form-label">Year</label>
+        <select class="form-select" id="fYear">
+          <option value="">Any</option>
+          <option value="2026">2026</option>
+          <option value="2025" selected>2025</option>
+          <option value="2024">2024</option>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Category</label>
+        <select class="form-select" id="fCategory">
+          <option value="">Any</option>
+          <option value="F&B">F&amp;B</option>
+          <option value="Retail">Retail</option>
+          <option value="Services">Services</option>
+          <option value="Trading">Trading</option>
+          <option value="Manufacturing">Manufacturing</option>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Status</label>
+        <select class="form-select" id="fStatus">
+          <option value="">Any</option>
+          <option value="DRAFT">Draft</option>
+          <option value="FOR_TREASURER_REVIEW">For Treasurer Review</option>
+          <option value="FOR_PAYMENT">For Payment</option>
+          <option value="PAID">Paid</option>
+          <option value="FOR_PRINTING">For Printing</option>
+          <option value="COMPLETED">Completed</option>
+        </select>
+      </div>
+
+      <div class="offcanvas-footer">
+        <div class="actions">
+          <button class="btn btn-outline-brand" type="button" onclick="clearFilters()">Clear</button>
+          <button type="submit" class="btn btn-brand">Apply Filters</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===== Modals (existing) ===== -->
+<div class="modal fade" id="startRenewalModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content" onsubmit="event.preventDefault(); alert('Simulate: Start renewal');">
+      <div class="modal-header">
+        <h5 class="modal-title">{% bs_icon 'plus-circle' extra_classes='me-2 text-danger' %} Start Renewal</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Business</label>
+          <select class="form-select" required>
+            <option value="">Select…</option>
+            <option>Sto. Niño Bakery — Juan Dela Cruz</option>
+            <option>Pampango Hardware — Maria Santos</option>
+            <option>Kanipaan Eatery — Jose Rizal</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Renewal Year</label>
+          <input type="number" class="form-control" value="2025" required>
+        </div>
+        <div class="small-muted">A new renewal entry will be created in DRAFT.</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-brand" type="submit">Create Renewal</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="uploadDocsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <form class="modal-content">
+      <input type="hidden" id="docsRenewalId">
+      <div class="modal-header">
+        <h5 class="modal-title">{% bs_icon 'paperclip' extra_classes='me-2 text-danger' %} Upload Requirements</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Valid ID (Front)</label>
+            <input type="file" class="form-control" accept="image/*,application/pdf">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Valid ID (Back)</label>
+            <input type="file" class="form-control" accept="image/*,application/pdf">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Business Proof (DTI/SEC/Mayor’s)</label>
+            <input type="file" class="form-control" multiple accept="image/*,application/pdf">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Notes (optional)</label>
+            <textarea class="form-control" rows="3" placeholder="Any remarks…"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Close</button>
+        <button class="btn btn-brand" type="submit">Upload</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content">
+      <input type="hidden" id="payRenewalId">
+      <div class="modal-header">
+        <h5 class="modal-title">{% bs_icon 'credit-card' extra_classes='me-2 text-danger' %} Record Payment</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">OR Number</label>
+          <input type="text" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Amount</label>
+          <div class="input-group">
+            <span class="input-group-text">₱</span>
+            <input type="number" class="form-control" step="0.01" min="0" required>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Date</label>
+          <input type="date" class="form-control" value="2025-10-20" required>
+        </div>
+        <div class="small-muted">Status will move to PAID.</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-brand" type="submit">Save Payment</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="printModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">{% bs_icon 'printer' extra_classes='me-2 text-danger' %} Print Clearance</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">Generate and print the Business Clearance for this renewal.</p>
+        <div class="alert alert-warning py-2 px-3">
+          {% bs_icon 'exclamation-triangle' extra_classes='me-1' %} Ensure payment is marked PAID.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <a id="printLink" class="btn btn-brand" target="_blank" href="#">Open PDF</a>
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Flow Modal (Stepper) — STATIC CONTENT, NO JS) ===== -->
+<div class="modal fade" id="flowModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-md">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          {% bs_icon 'info-circle' extra_classes='text-danger me-2' %}
+          Sto. Niño Bakery
+          <small class="text-muted ms-2">Draft</small>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="stepper">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <strong>Renewal Flow</strong>
+            <span class="small-muted">Static demo</span>
+          </div>
+
+          <div class="step done" data-step="1">
+            <div class="dot">{% bs_icon 'check' %}</div>
+            <div>
+              <div class="label">1. Start Renewal</div>
+              <div class="sub">Create a renewal for current year.</div>
+            </div>
+          </div>
+
+          <div class="step done" data-step="2">
+            <div class="dot">{% bs_icon 'check' %}</div>
+            <div>
+              <div class="label">2. Upload Requirements</div>
+              <div class="sub">Valid ID, Business Proofs, etc.</div>
+            </div>
+          </div>
+
+          <div class="step" data-step="3">
+            <div class="dot"></div>
+            <div>
+              <div class="label">3. Treasurer Review</div>
+              <div class="sub">Treasurer checks completeness and fees.</div>
+            </div>
+          </div>
+
+          <div class="step" data-step="4">
+            <div class="dot"></div>
+            <div>
+              <div class="label">4. Payment</div>
+              <div class="sub">Issue OR and confirm amount.</div>
+            </div>
+          </div>
+
+          <div class="step" data-step="5">
+            <div class="dot"></div>
+            <div>
+              <div class="label">5. Print & Release</div>
+              <div class="sub">Print clearance and mark as completed.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-3 small-muted">
+          <div><strong>Owner:</strong> Juan Dela Cruz</div>
+          <div><strong>Expiry:</strong> Dec 31, 2025</div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

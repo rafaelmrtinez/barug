@@ -2892,3 +2892,11 @@ def api_business_pins(
         status=_to_int_or_none(request.GET.get("status")),
     )
     return JsonResponse(pins, safe=False)
+
+def renewal_list(request):
+    user_role = _auth_role_name(request)
+
+    return render(request, "business/renewal_list.html", {
+        'page_path': f'{user_role} / Resident List',
+        'page_title': 'Resident List',
+    })
