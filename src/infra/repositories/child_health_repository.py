@@ -31,16 +31,16 @@ class ChildHealthRepository:
                 raise ChildHealthRecordException(e.message) from e
             raise e
 
-    def fetch_immunization_stages_by_chr_id_and_visit_id(self, chr_id: int, visit_id: int) -> list[dict]:
+    def fetch_immunization_stages_by_chr_id_and_visit_id(self, chr_id: int) -> list[dict]:
         raw = """SELECT immunization_type.immunization_type_id, immunization_type.immunization_type_name, immunization_stage_given.immunization_stage_given_id, immunization_stage_given.immunization_stage_name 
             FROM child_immunization 
             INNER JOIN immunization_type
             ON immunization_type.immunization_type_id = child_immunization.immunization_type_id
             INNER JOIN immunization_stage_given
             ON immunization_stage_given.immunization_stage_given_id = child_immunization.immunization_stage_given_id
-            WHERE child_record_id = %s AND visit_id = %s ORDER BY immunization_stage_given.immunization_stage_given_id ASC;"""
+            WHERE child_record_id = %s ORDER BY immunization_stage_given.immunization_stage_given_id ASC;"""
 
-        params = [chr_id, visit_id]
+        params = [chr_id]
         return self._ctx.execute_query_to_dict(raw, params)
 
     def fetch_recent_visit_id_by_chr_id(self, chr_id: int) -> int:

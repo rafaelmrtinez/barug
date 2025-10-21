@@ -257,12 +257,12 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                     chr_id=child_health_record_id,
                     assessed_by_id=staff_id,
                     date_assessed=birth_and_supplementation.cleaned_data.get("data_assessed"),
-                    anemic_seen=birth_and_supplementation.cleaned_data.get("anemia_2_59_seen"),
-                    anemic_given_iron=birth_and_supplementation.cleaned_data.get("anemia_2_59_given_iron"),
+                    anemic_seen=birth_and_supplementation.cleaned_data.get("anemia_2_59_seen") or None,
+                    anemic_given_iron=birth_and_supplementation.cleaned_data.get("anemia_2_59_given_iron") or None,
                     birth_weight=birth_and_supplementation.cleaned_data.get("birth_weight"),
                     is_low_birth_weight=birth_and_supplementation.cleaned_data.get("low_birth_weight"),
-                    seen_2_6_mos=birth_and_supplementation.cleaned_data.get("birth_wt_seen"),
-                    given_2_6_mos=birth_and_supplementation.cleaned_data.get("birth_wt_given_iron"),
+                    seen_2_6_mos=birth_and_supplementation.cleaned_data.get("birth_wt_seen") or None,
+                    given_2_6_mos=birth_and_supplementation.cleaned_data.get("birth_wt_given_iron") or None,
                 )
                 logger.info("Insert Child Screening Result: %s", result)
                 if not result:
