@@ -24,6 +24,12 @@
   .form-name{ font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #pageLoadingSmall{ position:fixed; inset:0; display:none; align-items:center; justify-content:center;
                      background:rgba(255,255,255,.65); backdrop-filter:blur(2px); z-index:2000; }
+
+  /* ——— Badge pills: improved contrast ——— */
+  .hint-badge{ font-size:.72rem; font-weight:600; border:1px solid transparent; }
+  .hint-badge.kp9{  background:#dff1ff; border-color:#83c5ff; color:#073b6f; }       /* New Summons */
+  .hint-badge.kp18{ background:#ffe3e3; border-color:#ff9a9a; color:#7a1111; }      /* No-show (Complainant) */
+  .hint-badge.kp19{ background:#fff1cc; border-color:#ffd24d; color:#5a4300; }      /* No-show (Respondent) */
 </style>
 {% endblock %}
 
@@ -35,6 +41,13 @@
       {% bs_icon 'arrow-left' extra_classes='me-2' %} Back to Case
     </a>
   </div>
+
+  {# Optional gate message from the server explaining why these forms are allowed now #}
+  {% if gate_msg %}
+    <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+      {% bs_icon 'info-circle' extra_classes='me-2' %} {{ gate_msg }}
+    </div>
+  {% endif %}
 
   <form class="toolbar d-flex align-items-center flex-wrap mb-3" onsubmit="return false;">
     <div class="searchbox">
@@ -52,6 +65,17 @@
         <div class="form-meta">
           <span class="form-code">{% bs_icon 'file-earmark-text' %} {{ code }}</span>
           <div class="form-name" title="{{ name }}">{{ name }}</div>
+          {# Lightweight contextual badges so users know why these show up #}
+          {% if code|upper == 'MED-ATT-2025' %}
+            <span class="badge rounded-pill hint-badge kp9 ms-1">{% bs_icon 'envelope' %} Med Attendance</span>
+          {% endif %}
+          {% if code|upper == 'KP-9' %}
+            <span class="badge rounded-pill hint-badge kp9 ms-1">{% bs_icon 'envelope' %} New Summons</span>
+          {% elif code|upper == 'KP-18' %}
+            <span class="badge rounded-pill hint-badge kp18 ms-1">{% bs_icon 'person-exclamation' %} No-show (Complainant)</span>
+          {% elif code|upper == 'KP-19' %}
+            <span class="badge rounded-pill hint-badge kp19 ms-1">{% bs_icon 'person-exclamation' %} No-show (Respondent)</span>
+          {% endif %}
         </div>
         <div class="form-action">
           <a class="btn btn-brand btn-sm d-flex align-items-center use-form"
@@ -72,8 +96,8 @@
 
 <script>
 (function(){
-  const input = document.getElementById('formSearch');
-  const list  = document.getElementById('formList');
+  const input   = document.getElementById('formSearch');
+  const list    = document.getElementById('formList');
   const overlay = document.getElementById('pageLoadingSmall');
 
   function filter() {

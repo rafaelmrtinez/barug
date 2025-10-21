@@ -10,6 +10,7 @@ import re
 from django.db import connection
 from zoneinfo import ZoneInfo  # PH time
 from .. import form_shared as FS
+from .util import get_lupon_chair_name  # Pangkat Chairman (Lupon Chair/President)
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +27,12 @@ _KP18_FIELDS = [
     "notice_month",
     "notice_year",
     "notice_time",
-    "hearing_schedule",
-    "hearing_schedule_year",
+    "hearing_schedule",         # "Month DD" (e.g., "October 20")
+    "hearing_schedule_year",    # "YYYY" (e.g., "2025")
     "this_date",
     "this_month",
     "this_year",
-    "chairman",
+    "chairman",                 # Pangkat Chairman
     "date_notified",
     "month_notified",
     "year_notified",
@@ -69,7 +70,7 @@ _KP18_SOURCES: Dict[str, Set[str]] = {
     "notice_year":  {"notice_year", "appearance_year", "hearing_year", "schedule_year", "current_year"},
     "notice_time":  {"notice_time", "appearance_time", "hearing_time", "schedule_time"},
 
-    # Hearing schedule “header” month/year (often duplicated on the form)
+    # Hearing schedule header (duplicate on some forms)
     "hearing_schedule":       {"hearing_schedule", "appearance_month", "hearing_month", "schedule_month"},
     "hearing_schedule_year":  {"hearing_schedule_year", "appearance_year", "hearing_year", "schedule_year", "current_year"},
 
@@ -83,8 +84,8 @@ _KP18_SOURCES: Dict[str, Set[str]] = {
     "month_notified": {"month_notified", "served_month", "service_month"},
     "year_notified":  {"year_notified", "served_year", "service_year"},
 
-    # Chairman / PB
-    "chairman": {"chairman", "punong barangay", "barangay captain", "brgy_capt", "brgy captain"},
+    # Chairman / PB (we will override to Pangkat Chair automatically if blank)
+    "chairman": {},
 }
 
 class KP18Handler:
@@ -93,16 +94,19 @@ class KP18Handler:
 
     Behavior:
       • Pull values by label/field_code.
-      • Look up date/time filed from blotter_case using brgy_case_number; fallback via submission’s linked case.
-      • Format date_filed -> "Month DD, YYYY"; time_filed -> 12-hr "h:mm am/pm".
+      • Pull case date/time filed from blotter_case; fallback via submission’s linked case.
+      • Format: date_filed -> "Month DD, YYYY"; time_filed -> 12-hr "h:mm am/pm".
       • Notice/Hearing scheduling:
-          - If a full date is provided for notice/appearance, split into day/month/year.
-          - If only parts are given, use them; else default to TODAY (PH).
-          - notice_time prefers appearance/hearing time; fallback to case time_filed.
-          - hearing_schedule/hearing_schedule_year mirror the final notice month/year if missing.
+          - Parse/compose notice date parts; default to TODAY (PH).
+          - notice_time prefers provided time; else fallback to case time_filed.
+          - hearing_schedule/hearing_schedule_year use the LATEST hearing date from
+            fn_case_mediation_hearings(case_id):
+                hearing_schedule       = "Month DD"
+                hearing_schedule_year  = "YYYY"
+            Fallback: mirror from final notice date.
+      • Auto-fill "chairman" with Pangkat Chairman (Lupon Chair/President) like KP-13.
       • Mirror missing secondary party lines.
-      • this_date/this_month/this_year default to TODAY (PH).
-      • date_notified/month_notified/year_notified default to TODAY (PH) when missing.
+      • "this_*" and notified date trios default to TODAY (PH).
       • Sanitize & ensure all fields exist; log final ordered map.
     """
 
@@ -198,11 +202,11 @@ class KP18Handler:
         return row[0], row[1]
 
     @staticmethod
-    def _load_case_datetime_from_submission(submission_id: int) -> Tuple[Optional[_date], Optional[_time], Optional[str]]:
+    def _load_case_datetime_from_submission(submission_id: int) -> Tuple[Optional[_date], Optional[_time], Optional[str], Optional[int]]:
         with connection.cursor() as cur:
             cur.execute(
                 """
-                SELECT bc.date_filed, bc.time_filed, bc.blotter_case_num
+                SELECT bc.date_filed, bc.time_filed, bc.blotter_case_num, bc.blotter_case_id
                   FROM blotter_kp_submission s
                   JOIN blotter_case bc ON bc.blotter_case_id = s.blotter_case_id
                  WHERE s.submission_id = %s
@@ -211,8 +215,36 @@ class KP18Handler:
             )
             row = cur.fetchone()
         if not row:
-            return None, None, None
-        return row[0], row[1], row[2]
+            return None, None, None, None
+        return row[0], row[1], row[2], row[3]
+
+    @staticmethod
+    def _latest_hearing_date_for_case(case_id: int) -> Optional[_date]:
+        """
+        Get newest hearing_date from fn_case_mediation_hearings(case_id).
+        """
+        if not case_id:
+            return None
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                SELECT hearing_date
+                  FROM fn_case_mediation_hearings(%s)
+                 WHERE COALESCE(NULLIF(TRIM(hearing_date), ''), NULL) IS NOT NULL
+                 ORDER BY (hearing_date)::date DESC, notice_created_at DESC
+                 LIMIT 1
+                """,
+                [case_id],
+            )
+            row = cur.fetchone()
+        if not row:
+            return None
+        txt = str(row[0]).strip()
+        try:
+            return _dt.strptime(txt, "%Y-%m-%d").date()
+        except Exception:
+            pass
+        return KP18Handler._try_parse_date(txt)
 
     @staticmethod
     def _log_fill_map(out: Dict[str, str]) -> None:
@@ -282,7 +314,7 @@ class KP18Handler:
         # ---- Case date/time filed via case number, then submission fallback ----
         case_num = (out.get("brgy_case_number") or "").strip()
         date_by_num, time_by_num = self._load_case_datetime_by_case_num(case_num) if case_num else (None, None)
-        date_by_sub, time_by_sub, case_num_from_sub = self._load_case_datetime_from_submission(submission_id)
+        date_by_sub, time_by_sub, case_num_from_sub, case_id = self._load_case_datetime_from_submission(submission_id)
 
         # If brgy_case_number is blank, fill from submission-derived case number
         if (not case_num) and case_num_from_sub:
@@ -309,11 +341,9 @@ class KP18Handler:
         out["time_filed"] = self._fmt_time_12h(t_obj) if t_obj else ""
 
         # -------- NOTICE / HEARING schedule --------
-        # Try to parse a full date from any of the notice/appearance fields
-        # Priority: notice_date (if full), else compose from parts; else today.
         ph_today = _dt.now(ZoneInfo("Asia/Manila")).date()
 
-        # Attempt full-date parse from whatever is in notice_date first
+        # Attempt full-date parse from notice_date first
         nd_txt = (out.get("notice_date") or "").strip()
         nd = self._try_parse_date(nd_txt)
 
@@ -329,9 +359,8 @@ class KP18Handler:
                 except Exception:
                     nd = None
 
-        # If still missing, try appearance/hearing fallbacks in the mapping (already seeded into notice_* by sources)
+        # If still missing, try composing from month/year or fallback to today
         if not nd:
-            # If month/year present but no day, use today's day
             m_txt = (out.get("notice_month") or "").strip()
             y_txt = (out.get("notice_year") or "").strip()
             m_num = self._month_name_to_number(m_txt)
@@ -340,8 +369,6 @@ class KP18Handler:
                     nd = _date(int(y_txt), m_num, int((nd_txt or "").isdigit() and nd_txt or ph_today.day))
                 except Exception:
                     nd = None
-
-        # Final fallback: today
         if not nd:
             nd = ph_today
 
@@ -357,17 +384,19 @@ class KP18Handler:
             nt = t_obj
         out["notice_time"] = self._fmt_time_12h(nt) if nt else ""
 
-        # hearing_schedule header month/year — mirror from final notice month/year if missing
-        if not (out.get("hearing_schedule") or "").strip():
-            out["hearing_schedule"] = out.get("notice_month", nd.strftime("%B"))
-        if not (out.get("hearing_schedule_year") or "").strip():
-            out["hearing_schedule_year"] = out.get("notice_year", str(nd.year))
+        # ---- Hearing schedule header: USE LATEST HEARING DATE VIA FUNCTION ----
+        latest_hearing: Optional[_date] = self._latest_hearing_date_for_case(case_id) if case_id else None
+        if latest_hearing:
+            out["hearing_schedule"] = f"{latest_hearing.strftime('%B')} {latest_hearing.day}"
+            out["hearing_schedule_year"] = str(latest_hearing.year)
+        else:
+            out["hearing_schedule"] = f"{nd.strftime('%B')} {nd.day}"
+            out["hearing_schedule_year"] = str(nd.year)
 
         # -------- “THIS” date trio (entered) defaults to today --------
         if not (out.get("this_date") or "").strip():
             out["this_date"] = str(ph_today.day)
         else:
-            # If it came as a full date, reduce to the day number
             maybe = self._try_parse_date(out["this_date"])
             if maybe:
                 out["this_date"] = str(maybe.day)
@@ -391,6 +420,10 @@ class KP18Handler:
 
         if not (out.get("year_notified") or "").strip():
             out["year_notified"] = str(ph_today.year)
+
+        # -------- Pangkat Chairman (auto-fill like KP-13) --------
+        if not (out.get("chairman") or "").strip():
+            out["chairman"] = get_lupon_chair_name(default=out.get("chairman", ""))
 
         # ---- Final sanitize & ensure all fields exist ----
         for k, v in list(out.items()):

@@ -155,8 +155,8 @@
             <hr class="my-3">
 
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="is_on_behalf" name="is_on_behalf">
-              <label class="form-check-label" for="is_on_behalf">File on behalf of another resident</label>
+              <input class="form-check-input" type="checkbox" id="is_on_behalf" name="is_on_behalf" hidden>
+              <label class="form-check-label" for="is_on_behalf" hidden>File on behalf of another resident</label>
             </div>
 
             <div id="onBehalfRow" class="row g-3 mt-1 d-hidden">
@@ -164,11 +164,7 @@
                 <label class="form-label">On-behalf Person ID</label>
                 <input class="form-control" name="on_behalf_of_person_id" inputmode="numeric" pattern="[0-9]*" placeholder="Person ID">
               </div>
-              <div class="col-md-6" id="businessCol">
-                <label class="form-label">Business ID (optional)</label>
-                <input class="form-control" name="business_id" inputmode="numeric" pattern="[0-9]*" placeholder="Business ID">
-                <div class="help">Provide only for Business Clearance.</div>
-              </div>
+              <!-- Business input moved to its own section below -->
             </div>
           </div>
         </section>
@@ -196,15 +192,25 @@
               </div>
             </div>
 
+            <!-- Business (owner) — only for Barangay Business Clearance -->
+            <div class="row g-3 mt-1 d-hidden" id="businessRow">
+              <div class="col-12">
+                <label class="form-label label-req" for="businessSelect">Business (owner)</label>
+                <select class="form-select" id="businessSelect">
+                  <option value="">— select resident first —</option>
+                </select>
+                <div class="help">This list shows businesses owned by the selected resident.</div>
+                <!-- Hidden field the server expects -->
+                <input type="hidden" name="business_id" id="business_id">
+              </div>
+            </div>
+
             <div class="row g-3 mt-1">
               <div class="col-6 col-md-2">
-                <label class="form-label label-req" for="qtyInput">Qty</label>
-                <input id="qtyInput" class="form-control" type="number" min="1" value="1" name="line_quantity[]" required>
+                <input id="qtyInput" class="form-control" type="number" min="1" value="1" name="line_quantity[]" required hidden>
               </div>
               <div class="col-6 col-md-3" id="offenseWrap">
-                <label class="form-label" for="offenseInput">Offense No</label>
-                <input id="offenseInput" class="form-control" type="number" min="1" max="3" name="line_offense_no[]" placeholder="auto">
-                <div class="help">Shown for clearance-type documents.</div>
+                <input id="offenseInput" class="form-control" type="number" min="1" max="3" name="line_offense_no[]" placeholder="auto" hidden>
               </div>
             </div>
           </div>
@@ -236,7 +242,7 @@
             <ul class="summary-list">
               <li><span class="summary-key">Requester</span><span id="sumRequester" class="summary-val">—</span></li>
               <li><span class="summary-key">On-behalf</span><span id="sumBehalf" class="summary-val">—</span></li>
-              <li><span class="summary-key">Business ID</span><span id="sumBiz" class="summary-val">—</span></li>
+              <li><span class="summary-key">Business</span><span id="sumBiz" class="summary-val">—</span></li>
               <li><span class="summary-key">Document</span><span id="sumDoc" class="summary-val">—</span></li>
               <li><span class="summary-key">Purpose</span><span id="sumPurpose" class="summary-val">—</span></li>
               <li><span class="summary-key">Qty</span><span id="sumQty" class="summary-val">1</span></li>
@@ -273,7 +279,11 @@
 
   const isOnBehalf      = document.getElementById('is_on_behalf');
   const onBehalfRow     = document.getElementById('onBehalfRow');
-  const businessCol     = document.getElementById('businessCol');
+
+  // Business UI
+  const businessRow     = document.getElementById('businessRow');
+  const bizSel          = document.getElementById('businessSelect');
+  const bizHidden       = document.getElementById('business_id');
 
   const submitBtn       = document.getElementById('submitBtn');
   const btnLabel        = submitBtn.querySelector('.btn-label');
@@ -288,8 +298,10 @@
   const sumQty       = document.getElementById('sumQty');
   const sumOffense   = document.getElementById('sumOffense');
 
-  const URL_SEARCH  = "{% url 'clerk:ajax_resident_search' %}";
-  const URL_PURPOSE = "{% url 'clerk:ajax_purpose_options' %}";
+  // ------- Endpoints (make sure ajax_owner_businesses exists in urls.py) -------
+  const URL_SEARCH     = "{% url 'clerk:ajax_resident_search' %}";
+  const URL_PURPOSE    = "{% url 'clerk:ajax_purpose_options' %}";
+  const URL_BIZ_BY_OWN = "{% url 'clerk:ajax_owner_businesses' %}";
 
   // ------- Helpers -------
   let t = null;
@@ -306,17 +318,39 @@
   const isBusinessDoc   = (text) => (text||'').toLowerCase().includes('business');
   const isClearanceDoc  = (text) => (text||'').toLowerCase().includes('clearance');
 
+  // ------- PURPOSE INDEX (by document_purpose_id) -------
+  // We will match: business.business_category_id == document_purpose_id
+  let PURPOSE_INDEX = [];
+
+  function indexPurposes() {
+    PURPOSE_INDEX = [];
+    for (let i = 0; i < purSel.options.length; i++) {
+      const o = purSel.options[i];
+      if (!o.value) continue; // skip placeholder
+      const pidInt = /^\d+$/.test(o.value) ? parseInt(o.value, 10) : null; // document_purpose_id
+      PURPOSE_INDEX.push({
+        idx: i,
+        value: o.value,       // original value (string)
+        purposeIdInt: pidInt, // parsed int of document_purpose_id
+        text: o.text
+      });
+    }
+    console.log('[BBC] PURPOSE_INDEX (by document_purpose_id) built:');
+    console.table(PURPOSE_INDEX);
+  }
+
   const updateSummary = () => {
     sumRequester.textContent = residentLabel.textContent.trim() || '—';
     sumDoc.textContent       = docSel.options[docSel.selectedIndex]?.text || '—';
     sumPurpose.textContent   = purSel.options[purSel.selectedIndex]?.text || '—';
     sumQty.textContent       = qtyInput.value || '1';
-    sumOffense.textContent   = offenseInput.value || 'auto';
+    if (sumOffense) sumOffense.textContent = offenseInput.value || 'auto';
 
     const ob = onBehalfRow.querySelector('[name="on_behalf_of_person_id"]');
-    const biz = onBehalfRow.querySelector('[name="business_id"]');
     sumBehalf.textContent = (isOnBehalf.checked && ob?.value) ? ob.value : (isOnBehalf.checked ? '—' : 'n/a');
-    sumBiz.textContent    = (isOnBehalf.checked && !businessCol.classList.contains('d-hidden') && biz?.value) ? biz.value : (isOnBehalf.checked ? '—' : 'n/a');
+
+    const opt = bizSel.options[bizSel.selectedIndex];
+    sumBiz.textContent = (!businessRow.classList.contains('d-hidden') && opt && opt.value) ? (opt.text || `ID ${opt.value}`) : (businessRow.classList.contains('d-hidden') ? 'n/a' : '—');
   };
 
   // ------- Resident search -------
@@ -355,6 +389,13 @@
     panel.classList.add('d-none');
     document.getElementById('changeResidentBtn').classList.remove('d-hidden');
 
+    // If current doc is Business Clearance, fetch businesses for this owner
+    const selectedText = docSel.options[docSel.selectedIndex]?.text || '';
+    if (isBusinessDoc(selectedText)){
+      businessRow.classList.remove('d-hidden');
+      if (id) loadOwnerBusinesses(id);
+    }
+
     clearAlert();
   });
 
@@ -378,17 +419,97 @@
       const html = await resp.text();
       purSel.innerHTML = html || '<option value="">No purposes found</option>';
       purSel.disabled = false;
-    }catch{
+      indexPurposes(); // rebuild index after loading
+    }catch(e){
+      console.error('[BBC] loadPurposes failed:', e);
       purSel.innerHTML = '<option value="">Failed to load purposes</option>';
     }finally{
       updateSummary();
+      if (!businessRow.classList.contains('d-hidden') && bizSel.value){
+        autoPickPurposeByCategory(); // attempt auto-pick if business already chosen
+      }
     }
   }
 
+  // ------- Load owner businesses -------
+  async function loadOwnerBusinesses(ownerId){
+    bizSel.innerHTML = '<option value="">Loading…</option>';
+    try{
+      const resp = await fetch(`${URL_BIZ_BY_OWN}?owner_person_id=${encodeURIComponent(ownerId)}`, { headers: { "X-Requested-With":"fetch" }});
+      const html = await resp.text();
+      bizSel.innerHTML = html || '<option value="">— no businesses found —</option>';
+
+      // Debug: dump loaded businesses
+      const bizDump = [];
+      for (let i=0; i<bizSel.options.length; i++){
+        const o = bizSel.options[i];
+        if (!o.value) continue;
+        bizDump.push({ idx:i, id:o.value, text:o.text, business_category_id:o.getAttribute('data-bcat') });
+      }
+      console.log('[BBC] Loaded businesses for owner:', ownerId);
+      console.table(bizDump);
+    }catch(e){
+      console.error('[BBC] loadOwnerBusinesses failed:', e);
+      bizSel.innerHTML = '<option value="">Failed to load businesses</option>';
+    }finally{
+      bizHidden.value = '';
+      sumBiz.textContent = '—';
+    }
+  }
+
+  // ------- Auto-pick Purpose by equality: business_category_id == document_purpose_id -------
+  function autoPickPurposeByCategory(){
+    const opt = bizSel.options[bizSel.selectedIndex];
+    if (!opt || !opt.value) {
+      console.log('[BBC] No business selected; skip auto-pick.');
+      return;
+    }
+
+    // The <option> for a business must have data-bcat="{{ b.business_category_id }}"
+    const rawBcat = (opt.getAttribute('data-bcat') || '').trim();
+    const bcatInt = /^\d+$/.test(rawBcat) ? parseInt(rawBcat, 10) : null;
+
+    console.log('[BBC] Selected business for matching:', {
+      business_id: opt.value, name: opt.text, business_category_id_raw: rawBcat, business_category_id: bcatInt
+    });
+
+    if (bcatInt === null) {
+      console.warn('[BBC] business_category_id is not numeric; cannot match to document_purpose_id.');
+      return;
+    }
+
+    // Match: business_category_id == document_purpose_id
+    const match = PURPOSE_INDEX.find(p => p.purposeIdInt === bcatInt);
+
+    if (match){
+      purSel.selectedIndex = match.idx;
+      console.log('[BBC] Purpose auto-picked (doc_purpose_id == business_category_id):', match);
+    } else {
+      console.warn('[BBC] No Purpose where document_purpose_id == business_category_id:', bcatInt);
+    }
+
+    sumPurpose.textContent = purSel.options[purSel.selectedIndex]?.text || '—';
+  }
+
+  // ------- Toggle UI that depends on doc type -------
   function updateDocDependentToggles(){
     const selectedText = docSel.options[docSel.selectedIndex]?.text || '';
+
     offenseWrap.classList.toggle('d-hidden', !isClearanceDoc(selectedText));
-    businessCol.classList.toggle('d-hidden', !isBusinessDoc(selectedText));
+
+    const isBiz = isBusinessDoc(selectedText);
+    businessRow.classList.toggle('d-hidden', !isBiz);
+
+    // If becoming visible and a resident is already chosen, fetch businesses
+    const ownerId = document.getElementById('requested_by_person_id').value;
+    if (isBiz && ownerId){
+      loadOwnerBusinesses(ownerId);
+    }else if(!isBiz){
+      bizSel.innerHTML = '<option value="">— select resident first —</option>';
+      bizHidden.value = '';
+      sumBiz.textContent = '—';
+    }
+
     updateSummary();
   }
 
@@ -405,16 +526,24 @@
     onBehalfRow.classList.toggle('d-hidden', !isOnBehalf.checked);
     if (!isOnBehalf.checked){
       const ob = onBehalfRow.querySelector('[name="on_behalf_of_person_id"]');
-      const biz = onBehalfRow.querySelector('[name="business_id"]');
       if (ob) ob.value = '';
-      if (biz) biz.value = '';
     }
     updateSummary();
   });
   onBehalfRow.addEventListener('input', updateSummary);
 
+  // business change → set hidden + summary + auto-pick purpose
+  bizSel.addEventListener('change', () => {
+    const opt = bizSel.options[bizSel.selectedIndex];
+    const val = opt?.value || '';
+    bizHidden.value = val;
+    sumBiz.textContent = opt?.text || '—';
+    autoPickPurposeByCategory();
+  });
+
   // init
   updateDocDependentToggles();
+  indexPurposes();   // build once if options already present
   updateSummary();
 
   // ------- Validation & submit -------
@@ -431,6 +560,12 @@
 
     if (!qtyInput.value || Number(qtyInput.value) < 1){ errors.push('Quantity must be at least 1.'); qtyInput.classList.add('is-invalid'); }
     else{ qtyInput.classList.remove('is-invalid'); }
+
+    // If Business Clearance, require a selected business
+    const selectedText = docSel.options[docSel.selectedIndex]?.text || '';
+    if (isBusinessDoc(selectedText) && !bizHidden.value){
+      errors.push('Please choose a business for Barangay Business Clearance.');
+    }
 
     if (errors.length){
       e.preventDefault();

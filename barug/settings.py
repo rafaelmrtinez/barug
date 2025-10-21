@@ -44,6 +44,8 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
 DEFAULT_FROM_NAME  = os.getenv("DEFAULT_FROM_NAME", "Barangay Sto. Niño")
 
+# settings.py
+LUPON_AUTOGEN_MEDX = False  # turn OFF auto creation of MED1/2/3-SETTLED
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -161,6 +163,9 @@ SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET")
 SUPABASE_ID_UPLOADS_BUCKET = os.getenv("SUPABASE_ID_UPLOADS_BUCKET", "id-uploads")
 SUPABASE_OCR_TEST_BUCKET = os.getenv("SUPABASE_OCR_TEST_BUCKET", "ocr-testing")
 
+MEDIA_ROOT = BASE_DIR / "media"        
+MEDIA_URL  = "/media/"
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -172,7 +177,7 @@ DATABASES = {
         # "OPTIONS": {"sslmode": "require"},  # <-- add this for Supabase
         "OPTIONS": {
             "sslmode": "require",
-            "connect_timeout": 5,     # fail fast instead of hanging
+            "connect_timeout": 20,     # fail fast instead of hanging
             "options": "-c statement_timeout=5000"  # 5s cap per statement (protects slow queries)
         },  # <-- add this for Supabase
         "CONN_MAX_AGE": 120,

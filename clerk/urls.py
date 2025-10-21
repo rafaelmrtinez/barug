@@ -23,6 +23,7 @@ urlpatterns = [
     path("walkin/create/", views.walkin_create, name="walkin_create"),
 
     # Search Helpers
+    path("ajax/owner-businesses/", views.ajax_owner_businesses, name="ajax_owner_businesses"),
     path("ajax/resident-search/", views.ajax_resident_search, name="ajax_resident_search"),
     path("ajax/purpose-options/", views.ajax_purpose_options, name="ajax_purpose_options"),
 

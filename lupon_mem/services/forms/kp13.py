@@ -1,14 +1,14 @@
 # lupon_mem/services/forms/kp13.py
 from __future__ import annotations
-from typing import Dict, Set
+from typing import Dict, Set, Optional
 from datetime import datetime as _dt, date as _date
-
 import json
 import logging
 
 from django.db import connection
 from zoneinfo import ZoneInfo  # PH time
 from .. import form_shared as FS
+from .util import get_lupon_chair_name  # Pangkat Chairman (Lupon Chair/President)
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +23,11 @@ _KP13_FIELDS = [
     "appearance_date",     # day (1..31)
     "appearance_month",    # month name (January..December)
     "appearance_year",     # 4-digit year
-    "appearance_time",     # hh:mm (as entered)
+    "appearance_time",     # h:MM AM/PM
     "date_entered",        # day (1..31)
     "month_entered",       # month name
     "year_entered",        # 4-digit year
-    "chairman",            # Punong Barangay / Chairman
+    "chairman",            # Pangkat Chairman (Lupon Chair)
 ]
 
 # Accept both label text and field_code from the builder (robust to common variants)
@@ -42,38 +42,36 @@ _KP13_SOURCES: Dict[str, Set[str]] = {
     },
     # Purpose (a.k.a. “For”)
     "purpose": {"purpose", "for"},
-    # Subpoena specific
+    # Subpoena specifics
     "subpoena_to": {"subpoena_to", "addr_to", "recipient", "addressed to"},
     "subpoena_witness": {"subpoena_witness", "witness", "witness_name", "witnesses"},
-    # Appearance schedule (we’ll derive split fields below)
+    # Appearance schedule (split fields below if needed)
     "appearance_date": {"appearance_date", "hearing_date", "schedule_date", "appearance_day", "day_of"},
     "appearance_month": {"appearance_month", "hearing_month", "schedule_month"},
     "appearance_year": {"appearance_year", "hearing_year", "schedule_year", "current_year"},
     "appearance_time": {"appearance_time", "hearing_time", "schedule_time"},
-    # Entered date (we’ll default to today if blank)
+    # Entered date (default to today if blank)
     "date_entered": {"date_entered", "date_today", "current_date", "this_date", "date_created"},
     "month_entered": {"month_entered", "current_month", "month_today", "month_created"},
     "year_entered": {"year_entered", "current_year", "year_created"},
-    # Chairman (Punong Barangay)
-    "chairman": {"chairman", "punong barangay", "barangay captain", "brgy_capt", "brgy captain"},
+    # Chairman — we prefer Pangkat/Lupon Chair; allow common variants
+    "chairman": {
+        "pangkat chairman", "lupon chair", "lupon chairman",
+        "punong barangay", "brgy_capt"
+    },
 }
 
 class KP13Handler:
     """
     KP-13: SUBPOENA LETTER
 
-    Behavior:
-      • Pull values from saved answers by label or field_code.
-      • Derive the split appearance_date/month/year from any provided date-like source:
-            - If appearance_date is an ISO-like date (YYYY-MM-DD), split into D/M/Y.
-            - If only month/year provided, keep as-is and leave what’s missing blank.
-      • Default entered date (date_entered/month_entered/year_entered) to TODAY (Asia/Manila), if blank.
-      • Sanitize/normalize all strings and ensure all target PDF fields exist.
-      • Print & log (INFO) the final ordered map that’s filled into the PDF.
+    Changes:
+      • Chairman line now uses Pangkat Chairman (Lupon Chair/President).
+      • appearance_time is coerced to 12-hour 'h:MM AM/PM' (Windows-safe).
     """
 
     @staticmethod
-    def _try_parse_date(s: str) -> _date | None:
+    def _try_parse_date(s: str) -> Optional[_date]:
         if not s:
             return None
         txt = s.strip()
@@ -85,21 +83,60 @@ class KP13Handler:
         return None
 
     @staticmethod
+    def _to_12h(tstr: str, now_dt: _dt) -> str:
+        """
+        Windows-safe 'h:MM AM/PM' formatter.
+        Accepts 'HH:MM', 'HH:MM:SS', 'h:MM AM/PM', or digits 'HHMM'.
+        Falls back to now_dt.
+        """
+        def _fmt12(h: int, m: int) -> str:
+            ampm = "AM" if h < 12 else "PM"
+            hh = h % 12
+            if hh == 0:
+                hh = 12
+            return f"{hh}:{m:02d} {ampm}"
+
+        if not tstr or not tstr.strip():
+            return _fmt12(now_dt.hour, now_dt.minute)
+
+        s = tstr.strip()
+
+        # Already AM/PM?
+        for fmt in ("%I:%M %p",):
+            try:
+                dt = _dt.strptime(s, fmt)
+                return _fmt12(dt.hour, dt.minute)
+            except Exception:
+                pass
+
+        # 24h formats
+        for fmt in ("%H:%M:%S", "%H:%M"):
+            try:
+                dt = _dt.strptime(s, fmt)
+                return _fmt12(dt.hour, dt.minute)
+            except Exception:
+                continue
+
+        # Plain digits 'HHMM'
+        if s.isdigit() and len(s) == 4:
+            h, m = int(s[:2]), int(s[2:])
+            if 0 <= h < 24 and 0 <= m < 60:
+                return _fmt12(h, m)
+
+        # Fallback
+        return _fmt12(now_dt.hour, now_dt.minute)
+
+    @staticmethod
     def _log_fill_map(out: Dict[str, str]) -> None:
-        """
-        Log/print the final field → value map in the exact order of _KP13_FIELDS.
-        """
         try:
             ordered = {k: out.get(k, "") for k in _KP13_FIELDS}
-            # always visible in runserver console
             print("[KP13] fill map (ordered):\n", json.dumps(ordered, ensure_ascii=False, indent=2))
-            # also log (shows if logger level is INFO)
             logger.info("KP13 fill map (ordered):\n%s", json.dumps(ordered, ensure_ascii=False, indent=2))
         except Exception as e:
             logger.warning("KP13 logging failed: %s", e)
 
     def build_name_value_map(self, form_id: int, submission_id: int) -> dict:
-        # Load saved answers for this submission (field_id -> raw string)
+        # Load saved answers
         answers_by_id = FS.load_answers(submission_id)
 
         # Discover labels + codes present on this KP-13 form
@@ -139,35 +176,25 @@ class KP13Handler:
                     return FS.normalize(by_code[kk])
             return ""
 
-        # Seed direct mappings (raw pulls)
+        # Seed direct mappings
         out: Dict[str, str] = {}
         for target, sources in _KP13_SOURCES.items():
             out[target] = _find_any(sources)
 
         # --- Derive/normalize appearance split (day/month/year) ---
-        # If appearance_date looks like a full date, split it. Otherwise,
-        # keep what’s given and fill blanks if there are alternatives.
-        # Priority order:
-        #   1) Parse out['appearance_date'] if it’s a full date string
-        #   2) Else, try any of date_entered/current_date (not ideal, but a fallback)
         appearance_day   = (out.get("appearance_date") or "").strip()
         appearance_month = (out.get("appearance_month") or "").strip()
         appearance_year  = (out.get("appearance_year") or "").strip()
 
-        # Try strict parse from a date-like string in any of those
         parsed = None
         if appearance_day:
             parsed = self._try_parse_date(appearance_day)
-        if not parsed and out.get("date_entered"):
-            parsed = self._try_parse_date(out.get("date_entered", ""))
 
         if parsed:
-            # Use parsed date to set/override the trio
             appearance_day   = str(parsed.day)
             appearance_month = parsed.strftime("%B")
             appearance_year  = str(parsed.year)
 
-        # Ensure trio is set back
         if appearance_day:
             out["appearance_date"] = appearance_day
         if appearance_month:
@@ -182,7 +209,6 @@ class KP13Handler:
         if not (out.get("date_entered") or "").strip():
             out["date_entered"] = str(today.day)
         else:
-            # If a full date slipped here, normalize to just day number
             maybe = self._try_parse_date(out["date_entered"])
             if maybe:
                 out["date_entered"] = str(maybe.day)
@@ -193,6 +219,13 @@ class KP13Handler:
         if not (out.get("year_entered") or "").strip():
             out["year_entered"] = str(today.year)
 
+        # --- Time → 12h AM/PM (Windows-safe) ---
+        out["appearance_time"] = self._to_12h(out.get("appearance_time", ""), now_ph)
+
+        # --- Chairman → Pangkat Chairman (Lupon Chair/President) ---
+        if not (out.get("chairman") or "").strip():
+            out["chairman"] = get_lupon_chair_name(default=out.get("chairman", ""))
+
         # --- Final sanitize & ensure all fields exist ---
         for k, v in list(out.items()):
             if isinstance(v, str):
@@ -200,7 +233,6 @@ class KP13Handler:
         for k in _KP13_FIELDS:
             out.setdefault(k, "")
 
-        # ---- Log what's being filled into the PDF (ordered) ----
+        # Log final map
         self._log_fill_map(out)
-
         return out

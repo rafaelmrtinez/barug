@@ -8,6 +8,12 @@
   :root{
     --brand:#7B1E22; --brand-700:#6a1a1e; --accent:#D4AF37;
     --ink:#212529; --muted:#6c757d; --card:#ffffff; --bg:#faf9f8; --ring:rgba(123,30,34,.25);
+
+    --pill-ok-bg:#e7f6ec; --pill-ok-bd:#c7ebd3; --pill-ok-fg:#0f5132;
+    --pill-warn-bg:#fff7e6; --pill-warn-bd:#ffe0a6; --pill-warn-fg:#8a6d1d;
+    --pill-neutral-bg:#f0f0f0; --pill-neutral-bd:#c9c9c9; --pill-neutral-fg:#555;
+    --pill-danger-bg:#fde2e1; --pill-danger-bd:#f5c2c7; --pill-danger-fg:#842029;
+    --pill-info-bg:#e9f0ff; --pill-info-bd:#d6e2ff; --pill-info-fg:#244b9a;
   }
   html,body{ background:var(--bg); }
   .page-wrap{ max-width:1120px; margin:0 auto; padding:1.25rem; }
@@ -38,6 +44,14 @@
   .btn-link-compact:hover{ border-color:var(--brand); color:var(--brand); }
 
   .hint{ color:var(--muted); font-size:.9rem; }
+
+  /* Soft pills for statuses */
+  .pill{ display:inline-flex; align-items:center; gap:.4rem; padding:.35rem .6rem; border-radius:999px; font-weight:700; font-size:.85rem; border:1px solid transparent; }
+  .pill-paid{ background:var(--pill-ok-bg); color:var(--pill-ok-fg); border-color:var(--pill-ok-bd); }
+  .pill-unpaid{ background:var(--pill-neutral-bg); color:var(--pill-neutral-fg); border-color:var(--pill-neutral-bd); }
+  .pill-declined{ background:var(--pill-danger-bg); color:var(--pill-danger-fg); border-color:var(--pill-danger-bd); }
+  .pill-partial{ background:var(--pill-warn-bg); color:var(--pill-warn-fg); border-color:var(--pill-warn-bd); }
+  .pill-reviewed{ background:var(--pill-info-bg); color:var(--pill-info-fg); border-color:var(--pill-info-bd); }
 </style>
 {% endblock %}
 
@@ -78,12 +92,21 @@
             <span><strong>Incident Address:</strong> {{ report.5 }}</span>
           </div>
         </div>
+
+        <!-- Payment badge (includes DECLINED) -->
         <div class="mt-2 mt-md-0">
           {% with status=report.4|upper %}
-            {% if status == 'PAID' %}<span class="badge text-bg-success px-3 py-2">PAID</span>
-            {% elif status == 'UNPAID' %}<span class="badge text-bg-secondary px-3 py-2">UNPAID</span>
-            {% elif status == 'PARTIALLY PAID' %}<span class="badge text-bg-warning px-3 py-2">PARTIALLY PAID</span>
-            {% else %}<span class="badge text-bg-light text-muted px-3 py-2">—</span>{% endif %}
+            {% if status == 'PAID' %}
+              <span class="pill pill-paid">{% bs_icon 'check-circle' %} PAID</span>
+            {% elif status == 'UNPAID' %}
+              <span class="pill pill-unpaid">{% bs_icon 'cash-coin' %} UNPAID</span>
+            {% elif status == 'DECLINED' %}
+              <span class="pill pill-declined">{% bs_icon 'x-octagon' %} DECLINED</span>
+            {% elif status == 'PARTIALLY PAID' %}
+              <span class="pill pill-partial">{% bs_icon 'pie-chart' %} PARTIALLY PAID</span>
+            {% else %}
+              <span class="badge text-bg-light text-muted px-3 py-2">—</span>
+            {% endif %}
           {% endwith %}
         </div>
       </div>
@@ -103,31 +126,21 @@
         {% bs_icon 'people' %} <strong>Parties</strong>
       </div>
 
-      <!-- Split complainant vs respondents -->
       <div class="row g-2">
         <div class="col-md-6">
           <div class="mb-1 small text-muted">{% bs_icon 'person' %} Complainant(s)</div>
           <div id="complainantList">
-            {% for p in parties %}
-              {% if p.2|upper == 'COMPLAINANT' %}
-                <span class="party-chip" data-role="{{ p.2 }}" data-name="{{ p.1|escape }}">
-                  #{{ p.0 }} {{ p.1 }}
-                </span>
-              {% endif %}
-            {% endfor %}
-            {% if not parties|length or not parties|dictsort:"2" %}{% endif %}
+            {% for p in parties %}{% if p.2|upper == 'COMPLAINANT' %}
+              <span class="party-chip" data-role="{{ p.2 }}" data-name="{{ p.1|escape }}">#{{ p.0 }} {{ p.1 }}</span>
+            {% endif %}{% endfor %}
           </div>
         </div>
         <div class="col-md-6">
           <div class="mb-1 small text-muted">{% bs_icon 'people' %} Respondent(s)</div>
           <div id="respondentList">
-            {% for p in parties %}
-              {% if p.2|upper == 'RESPONDENT' %}
-                <span class="party-chip" data-role="{{ p.2 }}" data-name="{{ p.1|escape }}">
-                  #{{ p.0 }} {{ p.1 }}
-                </span>
-              {% endif %}
-            {% endfor %}
+            {% for p in parties %}{% if p.2|upper == 'RESPONDENT' %}
+              <span class="party-chip" data-role="{{ p.2 }}" data-name="{{ p.1|escape }}">#{{ p.0 }} {{ p.1 }}</span>
+            {% endif %}{% endfor %}
           </div>
         </div>
       </div>
@@ -147,18 +160,14 @@
         <div class="col-md-4">
           <label class="form-label">Complaint Title</label>
           <select class="form-select" id="complaintTitleSelect" name="complaint_title_id">
-            {% for id,name in complaint_titles %}
-              <option value="{{ id }}">{{ name }}</option>
-            {% endfor %}
+            {% for id,name in complaint_titles %}<option value="{{ id }}">{{ name }}</option>{% endfor %}
           </select>
         </div>
 
         <div class="col-md-4">
           <label class="form-label">Case Nature</label>
           <select class="form-select" id="caseNatureSelect" name="case_nature_id">
-            {% for id,name in case_natures %}
-              <option value="{{ id }}">{{ name }}</option>
-            {% endfor %}
+            {% for id,name in case_natures %}<option value="{{ id }}">{{ name }}</option>{% endfor %}
           </select>
         </div>
 
@@ -174,23 +183,45 @@
     </div>
   </div>
 
-  {% if user_role|upper in LUPON_ROLES_LIST %}
+  {# Reviewed state vs action buttons #}
+  {% if is_reviewed %}
     <div class="card shadow-sm mb-3">
-      <div class="card-body d-flex flex-wrap gap-2">
-        <!-- Open approve modal -->
-        <button type="button" class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#approveModal">
-          {% bs_icon 'check2' extra_classes='me-2' %} Approve Blotter Report
-        </button>
-
-        <!-- Open decline modal -->
-        <button type="button" class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#declineModal">
-          {% bs_icon 'x-circle' extra_classes='me-2' %} Decline
-        </button>
+      <div class="card-body d-flex flex-wrap align-items-center justify-content-between">
+        <div>
+          <span class="pill pill-reviewed">{% bs_icon 'check2' %} REVIEWED</span>
+          {% if review_action %}
+            <span class="ms-2 badge rounded-pill bg-light text-dark">{{ review_action }}</span>
+          {% endif %}
+          {% if reviewed_by %}
+            <span class="hint ms-2">by <strong>{{ reviewed_by }}</strong>{% if reviewed_at %} on {{ reviewed_at }}{% endif %}</span>
+          {% else %}
+            <span class="hint ms-2">This report has been reviewed.</span>
+          {% endif %}
+          {% if review_remarks %}
+            <div class="mt-1 small text-muted">Remarks: {{ review_remarks }}</div>
+          {% endif %}
+        </div>
+        <a class="btn btn-outline-brand" href="{% url 'lupon_mem:report_list' %}">
+          {% bs_icon 'arrow-left' extra_classes='me-1' %} Back to Reports
+        </a>
       </div>
     </div>
+  {% else %}
+    {% if user_role|upper in LUPON_ROLES_LIST %}
+      <div class="card shadow-sm mb-3">
+        <div class="card-body d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#approveModal">
+            {% bs_icon 'check2' extra_classes='me-2' %} Approve Blotter Report
+          </button>
+          <button type="button" class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#declineModal">
+            {% bs_icon 'x-circle' extra_classes='me-2' %} Decline
+          </button>
+        </div>
+      </div>
+    {% endif %}
   {% endif %}
 
-  {% if user_role|lower == 'barangay treasurer' %}
+  {% if user_role|lower == 'barangay treasurer' and not is_reviewed %}
     <div class="card shadow-sm">
       <div class="card-body d-flex justify-content-between align-items-center">
         <div class="hint"><i>Payment required to open a case.</i></div>
@@ -205,7 +236,6 @@
 <!-- Hidden forms (submitted by modal confirm buttons) -->
 <form id="approveForm" method="post" action="{% url 'lupon_mem:report_approve' report.0 %}" class="d-none">
   {% csrf_token %}
-  <!-- we copy values into these right before submit -->
   <input type="hidden" name="case_name" id="approveCaseName">
   <input type="hidden" name="complaint_title_id" id="approveComplaintTitleId">
   <input type="hidden" name="case_nature_id" id="approveCaseNatureId">
@@ -240,7 +270,7 @@
 </div>
 
 <!-- Decline Modal -->
-<div class="modal fade" id="declineModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal fade" id="declineModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false" style="margin-top: 150;">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
@@ -260,10 +290,10 @@
   </div>
 </div>
 
-<!-- Inline script so it always runs even if base.html has no 'scripts' block -->
+<!-- Inline script so it always runs -->
 <script>
 (function(){
-  // ---- Build Case Name: "<Complainant Lastname> vs <Respondent Lastname[, Lastname...]>"
+  // Build Case Name from last names: "Complainant vs Respondent"
   function lastToken(full){
     const s = String(full || '').trim();
     if(!s) return '';
@@ -271,48 +301,28 @@
     return parts[parts.length - 1].replace(/[.,]+$/, '');
   }
   function buildCaseName(){
-    const compl = Array.from(document.querySelectorAll('#complainantList .party-chip'))
-      .map(x => lastToken(x.dataset.name));
-    const resp  = Array.from(document.querySelectorAll('#respondentList .party-chip'))
-      .map(x => lastToken(x.dataset.name));
-
+    const compl = Array.from(document.querySelectorAll('#complainantList .party-chip')).map(x => lastToken(x.dataset.name));
+    const resp  = Array.from(document.querySelectorAll('#respondentList .party-chip')).map(x => lastToken(x.dataset.name));
     const left  = compl.length ? compl.join(', ') : 'Complainant';
     const right = resp.length  ? resp.join(', ')  : 'Respondent(s)';
-    const el = document.getElementById('caseName');
-    if (el) el.value = `${left} vs ${right}`;
+    const el = document.getElementById('caseName'); if (el) el.value = `${left} vs ${right}`;
   }
+  if (document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', buildCaseName); } else { buildCaseName(); }
 
-  if (document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', buildCaseName);
-  } else {
-    buildCaseName();
-  }
-
-  // ---- Approve / Decline actions via modals
+  // Approve / Decline submit
   const approveBtn = document.getElementById('approveConfirmBtn');
   const declineBtn = document.getElementById('declineConfirmBtn');
 
   if (approveBtn){
     approveBtn.addEventListener('click', function(e){
       e.preventDefault();
-      // copy visible values into hidden approve form inputs
-      document.getElementById('approveCaseName').value =
-        (document.getElementById('caseName').value || '').trim();
-
-      document.getElementById('approveComplaintTitleId').value =
-        document.getElementById('complaintTitleSelect').value;
-
-      document.getElementById('approveCaseNatureId').value =
-        document.getElementById('caseNatureSelect').value;
-
-      // settlement is disabled in UI; still copy its default/selected value for completeness
-      document.getElementById('approveSettlementStatusId').value =
-        document.getElementById('settlementStatusSelect').value;
-
+      document.getElementById('approveCaseName').value = (document.getElementById('caseName').value || '').trim();
+      document.getElementById('approveComplaintTitleId').value = document.getElementById('complaintTitleSelect').value;
+      document.getElementById('approveCaseNatureId').value = document.getElementById('caseNatureSelect').value;
+      document.getElementById('approveSettlementStatusId').value = document.getElementById('settlementStatusSelect').value;
       document.getElementById('approveForm').submit();
     });
   }
-
   if (declineBtn){
     declineBtn.addEventListener('click', function(e){
       e.preventDefault();

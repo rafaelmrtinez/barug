@@ -3,9 +3,11 @@ from __future__ import annotations
 from typing import Dict, Set, Optional, Tuple
 from datetime import datetime as _dt, date as _date, time as _time
 import json, logging, re
+
 from django.db import connection
 from zoneinfo import ZoneInfo
 from .. import form_shared as FS
+from .util import get_lupon_chair_name  # Pangkat Chairman (Lupon Chair/President)
 
 logger = logging.getLogger(__name__)
 
@@ -22,26 +24,27 @@ _KP19_FIELDS = [
 ]
 
 _KP19_SOURCES: Dict[str, Set[str]] = {
-    "complainants": {"complainants","complainant(s)"},
-    "complainants_two": {"complainants_two","complainants 2"},
-    "respondents": {"respondents","respondent(s)"},
-    "repondents_two": {"repondents_two","respondents_two","respondents 2"},
-    "respondents_three": {"respondents_three","respondents 3"},
-    "brgy_case_number": {"brgy_case_number","brgy_case_num","case number","case_no","blotter_case_num"},
+    "complainants": {"complainants","complainant(s)","party-complainants","parties_complainants"},
+    "complainants_two": {"complainants_two","complainants 2","complainant_two","complainant 2","party-complainants-2"},
+    "respondents": {"respondents","respondent(s)","party-respondents","parties_respondents"},
+    "repondents_two": {"repondents_two","respondents_two","respondents 2","respondent_two","respondent 2","party-respondents-2"},
+    "respondents_three": {"respondents_three","respondents 3","respondent_three","respondent 3"},
+    "brgy_case_number": {"brgy_case_number","brgy_case_num","case number","case_no","case_num","blotter_case_num"},
     "purpose": {"purpose","for","case_purpose"},
 
     # case filed (answers may exist; DB is source of truth)
-    "date_filed": {"date_filed","filed_date","date_of_filing","date_created","date today"},
+    "date_filed": {"date_filed","filed_date","date_of_filing","date_created","date today","date_today"},
     "time_filed": {"time_filed","filed_time","time_of_filing","time_created"},
 
     # appearance/schedule pieces
-    "appearance_date": {"appearance_date","day_of","appearance_day"},
-    "appearance_month":{"appearance_month","appearance_mo","hearing_month","month_of_hearing"},
-    "appearance_year": {"appearance_year","current_year","hearing_year"},
-    "appearance_time": {"appearance_time","hearing_time"},
+    "appearance_date": {"appearance_date","hearing_date","schedule_date","day_of","appearance_day"},
+    "appearance_month":{"appearance_month","appearance_mo","hearing_month","month_of_hearing","schedule_month"},
+    "appearance_year": {"appearance_year","current_year","hearing_year","schedule_year"},
+    "appearance_time": {"appearance_time","hearing_time","schedule_time"},
 
-    "date_month_scheduled": {"date_month_scheduled","appearance_month","hearing_month"},
-    "year_scheduled": {"year_scheduled","appearance_year","current_year","hearing_year"},
+    # header schedule (we’ll overwrite from latest hearing)
+    "date_month_scheduled": {"date_month_scheduled","appearance_month","hearing_month","schedule_month"},
+    "year_scheduled": {"year_scheduled","appearance_year","current_year","hearing_year","schedule_year"},
 
     # “this” (entry) date
     "this_date": {"this_date","date_entered","current_date","date_today"},
@@ -49,13 +52,15 @@ _KP19_SOURCES: Dict[str, Set[str]] = {
     "this_year": {"this_year","year_entered","current_year","year_today"},
 
     # Notified date trio
-    "date_notified": {"date_notified","served_date"},
-    "month_notified":{"month_notified","served_month"},
-    "year_notified": {"year_notified","served_year"},
+    "date_notified": {"date_notified","served_date","service_date"},
+    "month_notified":{"month_notified","served_month","service_month"},
+    "year_notified": {"year_notified","served_year","service_year"},
 
-    "chairman": {"chairman","punong barangay","barangay captain","brgy_capt","brgy captain"},
+    # Chairman
+    "chairman": {},
 }
 
+# ---------- helpers ----------
 def _try_parse_date(s:str)->Optional[_date]:
     if not s: return None
     for fmt in ("%Y-%m-%d","%m/%d/%Y","%d/%m/%Y","%B %d, %Y","%b %d, %Y","%d %B %Y","%d %b %Y"):
@@ -71,6 +76,7 @@ def _month_to_num(m:str)->Optional[int]:
     return None
 
 def _fmt_full(d:_date)->str: return d.strftime("%B %d, %Y")
+
 def _fmt12(t:Optional[_time])->str:
     if not t: return ""
     s = t.strftime("%I:%M %p").lstrip("0").lower()
@@ -94,6 +100,7 @@ def _parse_time(s:str)->Optional[_time]:
         except: pass
     return None
 
+# ---------- DB lookups ----------
 def _case_dt_by_case_num(case_num:str)->Tuple[Optional[_date],Optional[_time]]:
     if not case_num: return None,None
     with connection.cursor() as cur:
@@ -101,25 +108,45 @@ def _case_dt_by_case_num(case_num:str)->Tuple[Optional[_date],Optional[_time]]:
         row = cur.fetchone()
     return (row[0],row[1]) if row else (None,None)
 
-def _case_dt_by_submission(submission_id:int)->Tuple[Optional[_date],Optional[_time],Optional[str]]:
+def _case_dt_by_submission(submission_id:int)->Tuple[Optional[_date],Optional[_time],Optional[str],Optional[int]]:
     with connection.cursor() as cur:
         cur.execute("""
-          SELECT bc.date_filed, bc.time_filed, bc.blotter_case_num
+          SELECT bc.date_filed, bc.time_filed, bc.blotter_case_num, bc.blotter_case_id
             FROM blotter_kp_submission s
             JOIN blotter_case bc ON bc.blotter_case_id = s.blotter_case_id
            WHERE s.submission_id=%s
         """,[submission_id])
         row = cur.fetchone()
-    return (row[0],row[1],row[2]) if row else (None,None,None)
+    return (row[0],row[1],row[2],row[3]) if row else (None,None,None,None)
 
+def _latest_hearing_date_for_case(case_id:int)->Optional[_date]:
+    if not case_id: return None
+    with connection.cursor() as cur:
+        cur.execute("""
+            SELECT hearing_date
+              FROM fn_case_mediation_hearings(%s)
+             WHERE COALESCE(NULLIF(TRIM(hearing_date), ''), NULL) IS NOT NULL
+             ORDER BY (hearing_date)::date DESC, notice_created_at DESC
+             LIMIT 1
+        """,[case_id])
+        row = cur.fetchone()
+    if not row: return None
+    txt = str(row[0]).strip()
+    try:
+        return _dt.strptime(txt, "%Y-%m-%d").date()
+    except:
+        return _try_parse_date(txt)
+
+# ---------- handler ----------
 class KP19Handler:
-    def _log(self,out:Dict[str,str])->None:
+    @staticmethod
+    def _log_fill_map(out:Dict[str,str])->None:
         try:
             ordered={k:out.get(k,"") for k in _KP19_FIELDS}
-            print("[KP19] fill map (ordered):\n",json.dumps(ordered,ensure_ascii=False,indent=2))
-            logger.info("KP19 fill map (ordered):\n%s",json.dumps(ordered,ensure_ascii=False,indent=2))
+            print("[KP19] fill map (ordered):\n", json.dumps(ordered, ensure_ascii=False, indent=2))
+            logger.info("KP19 fill map (ordered):\n%s", json.dumps(ordered, ensure_ascii=False, indent=2))
         except Exception as e:
-            logger.warning("KP19 logging failed: %s",e)
+            logger.warning("KP19 logging failed: %s", e)
 
     def build_name_value_map(self, form_id:int, submission_id:int)->dict:
         answers = FS.load_answers(submission_id)
@@ -161,10 +188,10 @@ class KP19Handler:
         if not (out.get("respondents_three") or "").strip():
             out["respondents_three"] = out.get("respondents","")
 
-        # case date/time via case number or submission
+        # case date/time via case number or submission (also grab case_id)
         case_num = (out.get("brgy_case_number") or "").strip()
         d_by_num,t_by_num = _case_dt_by_case_num(case_num) if case_num else (None,None)
-        d_by_sub,t_by_sub,case_num_from_sub = _case_dt_by_submission(submission_id)
+        d_by_sub,t_by_sub,case_num_from_sub,case_id = _case_dt_by_submission(submission_id)
         if not case_num and case_num_from_sub:
             out["brgy_case_number"] = str(case_num_from_sub)
 
@@ -190,7 +217,6 @@ class KP19Handler:
                 try: ad_obj = _date(int(ay_txt),m,int(ad_txt))
                 except: ad_obj = None
         if not ad_obj:
-            # if only month/year exist, use today.day
             m_num = _month_to_num(am_txt)
             if m_num and ay_txt.isdigit():
                 try: ad_obj = _date(int(ay_txt), m_num, ph_today.day)
@@ -201,11 +227,15 @@ class KP19Handler:
         out["appearance_month"] = ad_obj.strftime("%B")
         out["appearance_year"]  = str(ad_obj.year)
 
-        # date_month_scheduled/year_scheduled → mirror final month/year
-        if not (out.get("date_month_scheduled") or "").strip():
-            out["date_month_scheduled"] = out["appearance_month"]
-        if not (out.get("year_scheduled") or "").strip():
-            out["year_scheduled"] = out["appearance_year"]
+        # date_month_scheduled/year_scheduled → USE LATEST HEARING DATE
+        latest = _latest_hearing_date_for_case(case_id) if case_id else None
+        if latest:
+            out["date_month_scheduled"] = f"{latest.strftime('%B')} {latest.day}"   # Month DD
+            out["year_scheduled"] = str(latest.year)                                # YYYY
+        else:
+            # fallback mirrors final appearance date
+            out["date_month_scheduled"] = f"{ad_obj.strftime('%B')} {ad_obj.day}"
+            out["year_scheduled"] = str(ad_obj.year)
 
         # appearance_time: keep given; else fallback to case time
         at = _parse_time(out.get("appearance_time",""))
@@ -234,10 +264,15 @@ class KP19Handler:
         if not (out.get("year_notified") or "").strip():
             out["year_notified"] = str(ph_today.year)
 
-        # sanitize + ensure fields
+        # Pangkat Chairman (auto-fill like KP-13/KP-18)
+        if not (out.get("chairman") or "").strip():
+            out["chairman"] = get_lupon_chair_name(default=out.get("chairman",""))
+
+        # sanitize + ensure fields exist
         for k,v in list(out.items()):
             if isinstance(v,str): out[k]=FS.sanitize_text(v)
         for k in _KP19_FIELDS: out.setdefault(k,"")
 
-        self._log(out)
+        # KP-18–style final ordered log of exactly what goes into the PDF
+        self._log_fill_map(out)
         return out
