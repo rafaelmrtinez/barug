@@ -14,7 +14,6 @@ class IronIntakeForm(forms.Form):
         add_bootstrap_classes(self)
         self._ch_repo = chr_repo
         intake_dates = self._ch_repo.fetch_iron_supplement_completion_by_chr_id(child_health_record_id)
-        print(f'Intake dates: {intake_dates}')
         if intake_dates and isinstance(intake_dates, list):
             if intake_dates[0].__len__() > 0:
                 if intake_dates[0]['date_started']:

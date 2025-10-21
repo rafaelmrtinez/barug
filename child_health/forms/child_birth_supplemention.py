@@ -4,7 +4,6 @@ from maternal.forms.maternal_identification_form import add_bootstrap_classes
 
 class BirthAndSupplentationForm(forms.Form):
     # Immunization fields: these map to a table, so use per field for each dose.
-    # child_record_id = forms.IntegerField(widget=forms.HiddenInput())
     # child_protected_at_birth = forms.CharField(label="Child protected at birth", required=False)
     data_assessed = forms.CharField(
         label="Date assessed", 
@@ -33,34 +32,46 @@ class BirthAndSupplentationForm(forms.Form):
     def __init__(self, chr_repo: ChildHealthRecordRepository, child_health_record_id, *args, **kwargs):
         super().__init__(*args, **kwargs)
         add_bootstrap_classes(self)
+
+        # --- Step 1: Fetch Data ---
         latest_screening_data = chr_repo.fetch_child_screening_package(child_health_record_id)
         tt_status_mother = chr_repo.fetch_mother_tt_type(child_health_record_id)
+
+        # --- Step 2: Validate and Normalize Data ---
+        def safe_date(value):
+            """Return None instead of empty string."""
+            return value or None
+
         if latest_screening_data:
-            """ Assign data accordingly
-            
-                Result: Latest Screening Data: {
-                    'child_record_id': 7, 
-                    'date_assessed': datetime.date(2025, 2, 10), 
-                    'birth_weight': Decimal('3.20'), 
-                    'anemic_2_59_seen_date': None, 
-                    'anemic_2_59_given_iron_date': None, 
-                    'seen_2_6_mos_date': None, 
-                    'given_2_6_mos_date': None, 
-                    'iron_date_started': datetime.date(2025, 3, 1), 
-                    'iron_date_completed': datetime.date(2025, 4, 1), 
-                    'vit_a_given_1': None, 
-                    'vit_a_given_2': None, 
-                    'vit_a_given_3': None}
-                    
-                If data is None in DB, assign False to BooleanFields to avoid 'None' display.
-            """
-            self.fields['data_assessed'].initial = latest_screening_data['date_assessed'] or ''
-            self.fields['birth_weight'].initial = latest_screening_data['birth_weight'] or ''
-            self.fields['anemia_2_59_seen'].initial = latest_screening_data['anemic_2_59_seen_date'] or ''
-            self.fields['anemia_2_59_given_iron'].initial = latest_screening_data['anemic_2_59_given_iron_date'] or ''
-            self.fields['birth_wt_seen'].initial = latest_screening_data['seen_2_6_mos_date'] or ''
-            self.fields['birth_wt_given_iron'].initial = latest_screening_data['given_2_6_mos_date'] or ''
-        if tt_status_mother:
-            if isinstance(tt_status_mother, list) and len(tt_status_mother) > 0:
-                if tt_status_mother[0].get('tt_type_name') and tt_status_mother[0].get('tt_type_id'):
-                    self.fields['tt_status_mother'].initial = tt_status_mother[0].get('tt_type_name', '')
+            # Clean values first
+            cleaned_data = {
+                'date_assessed': safe_date(latest_screening_data.get('date_assessed')),
+                'birth_weight': latest_screening_data.get('birth_weight') or '',
+                'anemic_2_59_seen_date': safe_date(latest_screening_data.get('anemic_2_59_seen_date')),
+                'seen_2_6_mos_date': safe_date(latest_screening_data.get('seen_2_6_mos_date')),
+                'given_2_6_mos_date': safe_date(latest_screening_data.get('given_2_6_mos_date')),
+                'anemic_2_59_given_iron_date': safe_date(latest_screening_data.get('anemic_2_59_given_iron_date')),
+            }
+
+            # --- Step 3: Initialize Fields ---
+            self.fields['data_assessed'].initial = cleaned_data['date_assessed']
+            self.fields['birth_weight'].initial = cleaned_data['birth_weight']
+            self.fields['anemia_2_59_seen'].initial = cleaned_data['anemic_2_59_seen_date']
+            self.fields['birth_wt_seen'].initial = cleaned_data['seen_2_6_mos_date']
+            self.fields['birth_wt_given_iron'].initial = cleaned_data['given_2_6_mos_date']
+            self.fields['anemia_2_59_given_iron'].initial = cleaned_data['anemic_2_59_given_iron_date']
+
+            # --- Step 4: Apply Field Restrictions ---
+            if not cleaned_data['anemic_2_59_seen_date']:
+                self.fields['anemia_2_59_given_iron'].widget.attrs['readonly'] = True
+
+            if not cleaned_data['seen_2_6_mos_date']:
+                self.fields['birth_wt_given_iron'].widget.attrs['readonly'] = True
+
+        # --- Step 5: Initialize TT Status ---
+        if tt_status_mother and isinstance(tt_status_mother, list) and tt_status_mother:
+            first_tt = tt_status_mother[0]
+            tt_name = first_tt.get('tt_type_name')
+            tt_id = first_tt.get('tt_type_id')
+            if tt_name and tt_id:
+                self.fields['tt_status_mother'].initial = tt_name
