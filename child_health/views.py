@@ -135,7 +135,6 @@ def child_immunization_http(request: HttpRequest) -> HttpResponse:
 def child_health_entry(request: HttpRequest, child_health_record_id: int) -> HttpResponse:
     try:
         role = request.session.get("auth").get("role_name").lower()
-        print(f"User Role: {role}")
         child_information_form = ChildInformationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, role=role)
         bf_form = ChildBreastFeedingForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
         immunizations = ChildImmunizationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)

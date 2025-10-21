@@ -18,15 +18,16 @@ class ChildHealthService:
         - Inserts immunization record
         """
         # --- 1️⃣ Verify latest visit existence ---
-        child_visit_id = self._ch_repo.fetch_recent_visit_id_by_chr_id(immunization.p_child_record_id)
-        if not child_visit_id:
-            raise ValueError("No recent visit found for the given Child Health Record.")
+        # child_visit_id = self._ch_repo.fetch_recent_visit_id_by_chr_id(immunization.p_child_record_id)
+        # if not child_visit_id:
+        #     raise ValueError("No recent visit found for the given Child Health Record.")
 
         # --- 2️⃣ Get all immunizations for this child and visit ---
         all_immunizations = self._ch_repo.fetch_immunization_stages_by_chr_id_and_visit_id(
             chr_id=immunization.p_child_record_id,
-            visit_id=child_visit_id
         )
+        
+        print(f"All Immunizations for CHR ID {immunization.p_child_record_id}: {all_immunizations}")
 
         # --- 3️⃣ Bypass validation for 24hr vaccines (BCG, Hep BV) ---
         if immunization.p_immunization_type_id in [1, 2]:
