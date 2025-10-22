@@ -6,6 +6,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+from maternal.exceptions.maternal_exceptions import MaternalHealthRecordException
+import logging
+
+logger = logging.getLogger(__name__)
 
 class MaternalHealthRecordRepository:
 
@@ -480,6 +484,12 @@ class MaternalHealthRecordRepository:
             ORDER BY a.start_date DESC, a.maternal_record_id DESC;
             """
         return self.ctx.execute_query_to_dict(sql, (person_id,)) or []
+    
+    def fetch_maternal_health_record_id_by_person_id(self, id: int):
+        sql="""SELECT maternal_record_id FROM maternal_health_record WHERE person_id = %s;"""
+        params = (id,)
+        rows = self.ctx.execute_query_to_dict(sql, params)
+        return rows[0] if rows else None
 
     def fetch_maternal_health_record_id_by_person_id(self, id: int):
         sql = """SELECT maternal_record_id FROM maternal_health_record WHERE person_id = %s;"""
