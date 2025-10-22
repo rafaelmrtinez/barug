@@ -23,11 +23,11 @@ class ChildVisitForm(forms.Form):
         error_messages={'required': 'Please provide the weight.', 'min_value': 'Weight must be positive.'}
     )
     temp = forms.DecimalField(
-        label="Temp. (°C)", required=True, min_value=Decimal('30.0'), max_value=Decimal('45.0'), max_digits=4, decimal_places=1,
+        label="Temp. (°C)", required=True, min_value=Decimal('0.1'), max_value=Decimal('45.0'), max_digits=4, decimal_places=1,
         error_messages={'required': 'Please provide the temperature.', 'min_value': 'Temperature too low.', 'max_value': 'Temperature too high.'}
     )
     height = forms.DecimalField(
-        label="Height (cm)", required=True, min_value=Decimal('30.0'), max_digits=5, decimal_places=2,
+        label="Height (cm)", required=True, min_value=Decimal('0.1'), max_digits=5, decimal_places=2,
         error_messages={'required': 'Please provide the height.', 'min_value': 'Height must be positive.'}
     )
     findings = forms.CharField(
