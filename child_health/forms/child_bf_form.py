@@ -11,7 +11,7 @@ class ChildBreastFeedingForm(forms.Form):
 
     type_of_feeding = forms.ChoiceField(
         label="Type of Feeding",
-        required=True,
+        required=False,
         choices=[],
         error_messages={'required': 'Please select a type of feeding.'},
     )
@@ -56,6 +56,27 @@ class ChildBreastFeedingForm(forms.Form):
         self._validate_no_future_dates(cleaned)
         self._validate_visit_sequence(cleaned)
         cleaned["exclusive_bf_check_last"] = self._get_latest_visit_date(cleaned)
+
+        if not cleaned.get("type_of_feeding") and not cleaned.get("exclusive_bf_check_1"):
+            self.add_error(
+                "type_of_feeding",
+                "Feeding type and Visit 1 date are required for first visit."
+            )
+        
+        if cleaned.get("type_of_feeding") and not cleaned.get("exclusive_bf_check_1"):
+            self.add_error(
+                "type_of_feeding",
+                "Please provide at least Visit 1 date when selecting a feeding type."
+            )
+        
+        if not cleaned.get("type_of_feeding") and cleaned.get("exclusive_bf_check_1"):
+            self.add_error(
+                "type_of_feeding",
+                "Please select a feeding type when providing Visit dates."
+            )
+            
+        
+    
         return cleaned
 
     # -------------------- HELPER METHODS --------------------

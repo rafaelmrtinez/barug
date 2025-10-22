@@ -75,3 +75,20 @@ class BirthAndSupplentationForm(forms.Form):
             tt_id = first_tt.get('tt_type_id')
             if tt_name and tt_id:
                 self.fields['tt_status_mother'].initial = tt_name
+                
+    def clean(self):
+        cleaned_data = super().clean()
+        self.__assessment_policy(cleaned_data)
+        self.__iron_and_anemic_policy(cleaned_data)
+        return cleaned_data
+
+    def __iron_and_anemic_policy(self, cleaned_data):
+        if not cleaned_data.get('anemia_2_59_seen') and cleaned_data.get('anemia_2_59_given_iron'):
+            self.add_error('anemia_2_59_given_iron', 'Cannot provide iron if the child has not been seen for anemia.')
+            
+        if not cleaned_data.get('birth_wt_seen') and cleaned_data.get('birth_wt_given_iron'):
+            self.add_error('birth_wt_given_iron', 'Cannot provide iron if the child has not been seen for birth weight follow-up.')
+
+    def __assessment_policy(self, cleaned_data):
+        if not cleaned_data.get('data_assessed'):
+            self.add_error('data_assessed', 'Please provide the date assessed.')
