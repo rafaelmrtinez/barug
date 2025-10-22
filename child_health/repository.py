@@ -472,74 +472,83 @@ class ChildHealthRecordRepository:
     def fetch_person_and_house_basic_details_by_id(self, person_id: int) -> dict | None:
         sql = """/* Input: :person_id (the child’s person_id) */
             WITH base AS (
-            SELECT p.person_id,
+                SELECT 
+                    p.person_id,
                     p.birthdate,
                     p.sex_id,
                     f.family_num,
                     f.ufc_num
-            FROM person p
-            LEFT JOIN family_unit f
-                    ON f.family_head_id = p.person_id
-            WHERE p.person_id = %s
+                FROM person p
+                /* Get their active family membership */
+                LEFT JOIN house_member hm 
+                    ON hm.person_id = p.person_id
+                    AND hm.is_active = TRUE
+
+                /* Then get the family info */
+                LEFT JOIN family_unit f 
+                    ON f.family_id = hm.family_id
+
+                WHERE p.person_id = %s
             )
             SELECT
-            b.family_num,
-            b.ufc_num,
-            s.sex_name                                 AS sex,
-            b.birthdate                                 AS date_of_birth,
+                b.family_num,
+                b.ufc_num,
+                s.sex_name                                 AS sex,
+                b.birthdate                                AS date_of_birth,
 
-            /* Mother */
-            mom.person_id                               AS mother_id,
-            (mom.first_name
-                || ' ' || COALESCE(SUBSTRING(mom.middle_name FROM 1 FOR 1) || '. ', '')
-                || mom.last_name)                        AS mother_full_name,
-            mom.occupation                              AS mother_occupation,
-            CASE WHEN mom.birthdate IS NOT NULL
-                THEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, mom.birthdate))::int
-                ELSE NULL
-            END                                         AS mother_age_years,
+                /* Mother */
+                mom.person_id                              AS mother_id,
+                (mom.first_name
+                    || ' ' || COALESCE(SUBSTRING(mom.middle_name FROM 1 FOR 1) || '. ', '')
+                    || mom.last_name)                      AS mother_full_name,
+                mom.occupation                             AS mother_occupation,
+                CASE WHEN mom.birthdate IS NOT NULL
+                    THEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, mom.birthdate))::int
+                    ELSE NULL
+                END                                        AS mother_age_years,
 
-            /* Father */
-            dad.person_id                               AS father_id,
-            (dad.first_name
-                || ' ' || COALESCE(SUBSTRING(dad.middle_name FROM 1 FOR 1) || '. ', '')
-                || dad.last_name)                        AS father_full_name,
-            dad.occupation                              AS father_occupation,
-            CASE WHEN dad.birthdate IS NOT NULL
-                THEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, dad.birthdate))::int
-                ELSE NULL
-            END                                         AS father_age_years
+                /* Father */
+                dad.person_id                              AS father_id,
+                (dad.first_name
+                    || ' ' || COALESCE(SUBSTRING(dad.middle_name FROM 1 FOR 1) || '. ', '')
+                    || dad.last_name)                      AS father_full_name,
+                dad.occupation                             AS father_occupation,
+                CASE WHEN dad.birthdate IS NOT NULL
+                    THEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, dad.birthdate))::int
+                    ELSE NULL
+                END                                        AS father_age_years
 
             FROM base b
             LEFT JOIN sex s ON s.sex_id = b.sex_id
 
             /* Mother: prefer active link, else most recent historical; relationship_id = 4 */
             LEFT JOIN LATERAL (
-            SELECT p2.*
-            FROM person_kinship pk
-            JOIN person p2 ON p2.person_id = pk.dst_person_id
-            WHERE pk.src_person_id  = b.person_id
-                AND pk.relationship_id = 4
-            ORDER BY
-                (pk.is_active IS TRUE AND pk.end_date IS NULL) DESC,  -- prefer active
-                COALESCE(pk.start_date, pk.added_at) DESC,
-                pk.kinship_id DESC
-            LIMIT 1
+                SELECT p2.*
+                FROM person_kinship pk
+                JOIN person p2 ON p2.person_id = pk.dst_person_id
+                WHERE pk.src_person_id  = b.person_id
+                    AND pk.relationship_id = 4
+                ORDER BY
+                    (pk.is_active IS TRUE AND pk.end_date IS NULL) DESC,  -- prefer active
+                    COALESCE(pk.start_date, pk.added_at) DESC,
+                    pk.kinship_id DESC
+                LIMIT 1
             ) mom ON TRUE
 
             /* Father: prefer active link, else most recent historical; relationship_id = 5 */
             LEFT JOIN LATERAL (
-            SELECT p3.*
-            FROM person_kinship pk
-            JOIN person p3 ON p3.person_id = pk.dst_person_id
-            WHERE pk.src_person_id  = b.person_id
-                AND pk.relationship_id = 5
-            ORDER BY
-                (pk.is_active IS TRUE AND pk.end_date IS NULL) DESC,  -- prefer active
-                COALESCE(pk.start_date, pk.added_at) DESC,
-                pk.kinship_id DESC
-            LIMIT 1
+                SELECT p3.*
+                FROM person_kinship pk
+                JOIN person p3 ON p3.person_id = pk.dst_person_id
+                WHERE pk.src_person_id  = b.person_id
+                    AND pk.relationship_id = 5
+                ORDER BY
+                    (pk.is_active IS TRUE AND pk.end_date IS NULL) DESC,  -- prefer active
+                    COALESCE(pk.start_date, pk.added_at) DESC,
+                    pk.kinship_id DESC
+                LIMIT 1
             ) dad ON TRUE;
+
         """
         params = [person_id]
         result = self.ctx.execute_query_to_dict(sql, params)

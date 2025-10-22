@@ -208,14 +208,10 @@
             {{ person_name|default:"-" }}
           </div>
           <div class="meta small">
-            Maternal Health Record Number:
-            <strong id="mhr_number">{{ mhr_number|default:"-" }}</strong> ·
+            Total Maternal Records:
+            <strong id="total_mhr">{{ basic_info.total_maternal_records|default:"-" }}</strong>
             Family Number:
-            <strong id="family_no">{{ family_no|default:"-" }}</strong> ·
-            Last Menstrual Period:
-            <strong id="lmp">{{ lmp|date:"Y-m-d"|default:"-" }}</strong> ·
-            Estimated Due Date:
-            <strong id="edd">{{ edd|date:"Y-m-d"|default:"-" }}</strong>
+            <strong id="family_no">{{ basic_info.family_number|default:"-" }}</strong> ·
           </div>
         </div>
         <div class="d-flex align-items-center gap-2 ms-auto">
@@ -260,8 +256,7 @@
                 <tr>
                   <th>MHR #</th>
                   <th>Start Date</th>
-                  <th>LMP</th>
-                  <th>EDD</th>
+                  <th>Maternal Record Status</th>
                   <th class="text-end">Open</th>
                 </tr>
               </thead>
@@ -271,8 +266,7 @@
                     <tr class="{% if r.maternal_record_id == mhr_number %}table-active{% endif %}">
                       <td>{{ r.maternal_record_id }}</td>
                       <td>{{ r.start_date|date:"Y-m-d"|default:"-" }}</td>
-                      <td>{{ r.lmp|date:"Y-m-d"|default:"-" }}</td>
-                      <td>{{ r.edd|date:"Y-m-d"|default:"-" }}</td>
+                      <td>{{ r.status_name|default:"N/A" }}</td>
                       <td class="text-end">
                         <a class="btn btn-outline-secondary btn-sm"
                           href="{% url 'maternal:maternal_health_record_form' r.maternal_record_id %}">

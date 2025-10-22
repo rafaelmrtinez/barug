@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 
 # Create your views here.
 ACCESS = ("MIDWIFE", "Midwife", "midwife", "Barangay Health Worker", "bhw", "Super Admin")
+BHW_ACCESS = ("Barangay Health Worker", "bhw")
+MIDWIFE_ACCESS = ("MIDWIFE", "Midwife", "midwife")
 ADAPTER = ConnectionAdapter()
 REPOSITORY = MaternalHealthRecordRepository(ADAPTER)
 
@@ -42,7 +44,7 @@ def find_mother_basic_info(request: HttpRequest, person_id: int) -> JsonResponse
     return JsonResponse(basic_info)
 
 @session_login_required
-@role_required(*ACCESS)
+@role_required(*BHW_ACCESS)
 @nocache
 @csrf_required
 def create_new_maternal_entry(request: HttpRequest) -> HttpResponse:
@@ -59,7 +61,6 @@ def create_new_maternal_entry(request: HttpRequest) -> HttpResponse:
             if maternal_identification_form.is_valid():
                 # Process the valid form data
                 data = maternal_identification_form.cleaned_data
-                print(f"Valid Maternal Identification Data: {data}")
                 res = REPOSITORY.insert_maternal_health_record(
                     staff_id=staff_id,
                     person_id=data.get("person_id"),
@@ -211,17 +212,16 @@ def maternal_health_record_form(request, record_id : int):
 @nocache
 @csrf_required
 def record_detail(request: HttpRequest, person_id: int) -> HttpResponse:
-    repo = MaternalHealthRecordRepository(ConnectionAdapter())
-    maternal_health_record_id = repo.fetch_maternal_health_record_id_by_person_id(person_id)['maternal_record_id']
-    record = repo.fetch_latest_maternal_record_by_person_and_maternal_id(person_id, maternal_record_id=maternal_health_record_id) or {}
-    all_records = repo.fetch_all_maternal_records_for_person(person_id)
-    print(f"All Records: {all_records}")
+    maternal_health_record_id = REPOSITORY.fetch_maternal_health_record_id_by_person_id(person_id)['maternal_record_id']
+    record = REPOSITORY.fetch_latest_maternal_record_by_person_and_maternal_id(person_id, maternal_record_id=maternal_health_record_id) or {}
+    all_records = REPOSITORY.fetch_all_maternal_records_for_person(person_id)
+    basic_info = REPOSITORY.fetch_mhr_count_and_fam_id_by_person_id(person_id)
+    # print maternal health record id, record, all records
+    print(f"Basic Info: {all_records}")
     return render(
         request,
         "maternal/record_history.html",
         {
-            "page_path": "Midwife / Record Details",
-            "page_title": "Record Details",
             "record_id": maternal_health_record_id,
             "person_id": person_id,
 
@@ -235,11 +235,12 @@ def record_detail(request: HttpRequest, person_id: int) -> HttpResponse:
 
             # history table (now includes latest)
             "all_records": all_records,
+            "basic_info": basic_info,
         },
     )
 
 @session_login_required
-@role_required(*ACCESS, "Super Admin")
+@role_required(*ACCESS)
 @nocache
 @csrf_required
 def records(request: HttpRequest) -> HttpResponse:
@@ -257,6 +258,7 @@ def records(request: HttpRequest) -> HttpResponse:
             or q_lower in (r.get("family_num","").lower())
             or q_lower in (r.get("full_address","").lower())
         ]
+        
 
     page_obj = Paginator(rows, 10).get_page(request.GET.get("page"))
 

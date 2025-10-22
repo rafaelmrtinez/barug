@@ -6,15 +6,17 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class MaternalHealthRecordRepository:
-    
+
     def __init__(self, ctx: ConnectionAdapter):
         self.ctx = ctx
-    
+
     def insert_maternal_health_record(self, staff_id, person_id, husband_id, weight, height, bmi_status_id, is_transferred):
-        sql="""SELECT * FROM create_maternal_health_record_bhw(%s::INTEGER, %s::INTEGER, %s::INTEGER, %s::DECIMAL, %s::DECIMAL, %s::INTEGER, %s::BOOLEAN);"""
-        params = (staff_id, person_id, husband_id, weight, height, bmi_status_id, is_transferred)
-        
+        sql = """SELECT * FROM create_maternal_health_record_bhw(%s::INTEGER, %s::INTEGER, %s::INTEGER, %s::DECIMAL, %s::DECIMAL, %s::INTEGER, %s::BOOLEAN);"""
+        params = (staff_id, person_id, husband_id, weight,
+                  height, bmi_status_id, is_transferred)
+
         try:
             rows = self.ctx.execute_query(sql, params)
             return rows[0] if rows else None
@@ -24,9 +26,10 @@ class MaternalHealthRecordRepository:
                 raise MaternalHealthRecordException(e.message) from e
             raise e
         except Exception as e:
-            logger.error(f"Unexpected error inserting maternal health record: {e}")
+            logger.error(
+                f"Unexpected error inserting maternal health record: {e}")
             raise e
-    
+
     def fetch_mother_basic_info_by_person_id(self, id: int):
         sql = """
             SELECT 
@@ -53,7 +56,6 @@ class MaternalHealthRecordRepository:
         params = (id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows[0] if rows else None
-
 
     def fetch_risk_codes_by_mhr_id(self, maternal_record_id: int):
         sql = """
@@ -84,9 +86,8 @@ class MaternalHealthRecordRepository:
         params = ('obstetric%', 'medical%', int(maternal_record_id))
         return self.ctx.execute_query_to_dict(sql, params)
 
-    
     def fetch_single_micro_nutrients_by_mhr_id(self, maternal_record_id: int):
-        sql="""SELECT DISTINCT ON (m.maternal_record_id)
+        sql = """SELECT DISTINCT ON (m.maternal_record_id)
                 m.maternal_record_id,
                 m.iron_start_date   AS iron_folic_start,
                 m.iron_end_date     AS iron_folic_end,
@@ -102,9 +103,9 @@ class MaternalHealthRecordRepository:
         params = (maternal_record_id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows[0] if rows else None
-    
+
     def fetch_multiple_micro_nutrients_by_mhr_id(self, maternal_record_id: int):
-        sql="""SELECT
+        sql = """SELECT
             m.micronutrients_id,
             m.maternal_record_id,
             m.anc_visit_id,
@@ -124,9 +125,9 @@ class MaternalHealthRecordRepository:
         params = (maternal_record_id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows
-        
+
     def fetch_delivery_plan_by_mhr_id(self, maternal_record_id: int):
-        sql="""SELECT DISTINCT ON (mav.maternal_record_id)
+        sql = """SELECT DISTINCT ON (mav.maternal_record_id)
             mav.maternal_record_id,
             pab.place_of_delivery_plan,          -- text
             pab.new_born_screening_plan          -- boolean
@@ -144,7 +145,7 @@ class MaternalHealthRecordRepository:
         return rows
 
     def fetch_maternal_checklist_by_mhr_id(self, maternal_record_id: int):
-        sql="""WITH latest_visit AS (
+        sql = """WITH latest_visit AS (
             SELECT v.anc_visit_id, v.visit_no, v.visit_date
             FROM public.maternal_anc_visit v
             WHERE v.maternal_record_id = %s
@@ -257,7 +258,7 @@ class MaternalHealthRecordRepository:
         return rows or None
 
     def fetch_latest_present_pregnancy_by_mhr_id(self, maternal_record_id: int):
-        sql="""WITH latest_visit AS (
+        sql = """WITH latest_visit AS (
             SELECT DISTINCT ON (v.maternal_record_id)
                     v.anc_visit_id,
                     v.maternal_record_id,
@@ -289,9 +290,9 @@ class MaternalHealthRecordRepository:
         params = (maternal_record_id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows[0] if rows else None
-        
+
     def fetch_maternal_tt_by_mhr_id(self, maternal_record_id: int):
-        sql="""-- $1 := maternal_record_id
+        sql = """-- $1 := maternal_record_id
             WITH tt_type_map AS (
             -- If you have a tt_type lookup, replace this with a SELECT from that table.
             SELECT 1 AS tt_type_id, 1 AS dose_order, 'TT1' AS dose_label UNION ALL
@@ -331,7 +332,7 @@ class MaternalHealthRecordRepository:
         params = (maternal_record_id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows
-        
+
     def fetch_person_id_by_maternal_record_id(self, maternal_record_id: int):
         sql = """SELECT person_id
             FROM public.maternal_health_record
@@ -340,7 +341,7 @@ class MaternalHealthRecordRepository:
         params = (maternal_record_id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows[0]['person_id'] if rows else None
-        
+
     def fetch_all_previous_pregnancies_by_person_id(self, person_id: int):
         sql = """SELECT
             m.maternal_record_id,
@@ -388,7 +389,7 @@ class MaternalHealthRecordRepository:
         params = (maternal_record_id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows[0] if rows else None
-        
+
     def fetch_all_mhr_form_basic_info_by_mhr_id(self, maternal_record_id: int):
         sql = """SELECT
             fu.family_num                                             AS family_number,
@@ -446,43 +447,66 @@ class MaternalHealthRecordRepository:
         params = (maternal_record_id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows[0] if rows else None
-        
+
     def fetch_all_maternal_records_for_person(self, person_id: int):
         sql = """
             WITH all_mhr AS (
-            SELECT
-                m.maternal_record_id,
-                m.person_id,
-                m.created_at::date AS start_date
-            FROM public.maternal_health_record m
-            WHERE m.person_id = %s
+                SELECT
+                    m.maternal_record_id,
+                    m.person_id,
+                    m.created_at::date AS start_date,
+                    m.record_status_id
+                FROM public.maternal_health_record m
+                WHERE m.person_id = %s
             ),
             latest_visit AS (
-            SELECT DISTINCT ON (v.maternal_record_id)
-                    v.maternal_record_id, v.anc_visit_id, v.visit_date
-            FROM public.maternal_anc_visit v
-            JOIN all_mhr a ON a.maternal_record_id = v.maternal_record_id
-            ORDER BY v.maternal_record_id, v.visit_date DESC, v.anc_visit_id DESC
+                SELECT DISTINCT ON (v.maternal_record_id)
+                    v.maternal_record_id, 
+                    v.anc_visit_id, 
+                    v.visit_date
+                FROM public.maternal_anc_visit v
+                JOIN all_mhr a ON a.maternal_record_id = v.maternal_record_id
+                ORDER BY v.maternal_record_id, v.visit_date DESC, v.anc_visit_id DESC
             )
             SELECT
-            a.maternal_record_id,
-            a.start_date,
-            pps.lmp,
-            pps.edc AS edd
+                a.maternal_record_id,
+                a.start_date,
+                rs.record_status_name AS status_name
             FROM all_mhr a
-            LEFT JOIN latest_visit lv ON lv.maternal_record_id = a.maternal_record_id
-            LEFT JOIN public.present_pregnancy_status pps ON pps.anc_visit_id = lv.anc_visit_id
+            LEFT JOIN latest_visit lv 
+                ON lv.maternal_record_id = a.maternal_record_id
+            LEFT JOIN public.record_status rs
+                ON rs.record_status_id = a.record_status_id
             ORDER BY a.start_date DESC, a.maternal_record_id DESC;
             """
         return self.ctx.execute_query_to_dict(sql, (person_id,)) or []
-    
+
     def fetch_maternal_health_record_id_by_person_id(self, id: int):
-        sql="""SELECT maternal_record_id FROM maternal_health_record WHERE person_id = %s;"""
+        sql = """SELECT maternal_record_id FROM maternal_health_record WHERE person_id = %s;"""
+        params = (id,)
+        rows = self.ctx.execute_query_to_dict(sql, params)
+        return rows[0] if rows else None
+
+    def fetch_mhr_count_and_fam_id_by_person_id(self, id: int):
+        sql = """SELECT 
+                    COUNT(mhr.maternal_record_id) AS total_maternal_records,
+                    fu.family_num AS family_number
+                FROM public.maternal_health_record AS mhr
+                LEFT JOIN public.family_unit AS fu
+                    ON fu.family_id = mhr.family_id
+                WHERE mhr.person_id = %s
+                GROUP BY fu.family_num
+                LIMIT 1;
+                """
         params = (id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows[0] if rows else None
 
     def fetch_latest_maternal_record_by_person_and_maternal_id(self, person_id: int, maternal_record_id: int):
+        """ 
+            Mark as deprecated 
+        """
+        logger.warning("THIS WILL BE DEPRECATED SOON.")
         sql = """WITH target AS (
             SELECT m.maternal_record_id, m.person_id
             FROM public.maternal_health_record m
@@ -516,27 +540,26 @@ class MaternalHealthRecordRepository:
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows[0] if rows else None
 
-    def fetch_all_most_recent_records(self):
+    def fetch_all_most_recent_records(self) -> list[dict] | None:
         sql = """WITH latest AS (
-            SELECT DISTINCT ON (m.person_id)
-                    m.person_id,
-                    m.maternal_record_id,
-                    m.created_at AS updated_at
-            FROM public.maternal_health_record AS m
-            ORDER BY m.person_id, m.created_at DESC, m.maternal_record_id DESC
-            )
-            SELECT
+            SELECT DISTINCT ON (person_id)
+                maternal_record_id,
+                person_id,
+                created_at
+            FROM public.maternal_health_record
+            ORDER BY person_id, created_at DESC, maternal_record_id DESC
+        )
+        SELECT
             p.person_id,
-            l.maternal_record_id,  -- ← include the latest maternal record id
             TRIM(
                 REGEXP_REPLACE(
-                CONCAT_WS(' ',
-                    COALESCE(p.first_name, ''),
-                    NULLIF(LEFT(COALESCE(p.middle_name, ''), 1) || '.', '.'),
-                    COALESCE(p.last_name, ''),
-                    COALESCE(p.suffix, '')
-                ),
-                '\s+',' ','g'
+                    CONCAT_WS(' ',
+                        COALESCE(p.first_name, ''),
+                        NULLIF(LEFT(COALESCE(p.middle_name, ''), 1) || '.', '.'),
+                        COALESCE(p.last_name, ''),
+                        COALESCE(p.suffix, '')
+                    ),
+                    '\s+', ' ', 'g'
                 )
             ) AS full_name,
             fu.family_num,
@@ -546,18 +569,22 @@ class MaternalHealthRecordRepository:
                 CASE WHEN COALESCE(a.barangay, '') <> '' THEN 'Brgy ' || a.barangay ELSE NULL END,
                 NULLIF(a.city, '')
             ) AS full_address,
-            l.updated_at::date AS updated_date
-            FROM latest AS l
-            JOIN public.person AS p
+            l.created_at::date AS record_date
+        FROM latest AS l
+        JOIN public.person AS p
             ON p.person_id = l.person_id
-            LEFT JOIN public.family_unit AS fu
-            ON fu.family_head_id = p.person_id
-            LEFT JOIN public.addresss AS a
+        LEFT JOIN public.family_unit AS fu
+            ON fu.family_id = (
+                SELECT family_id
+                FROM public.maternal_health_record m2
+                WHERE m2.maternal_record_id = l.maternal_record_id
+            )
+        LEFT JOIN public.addresss AS a
             ON a.address_id = p.address_id
-            LEFT JOIN public.purok_sitio AS ps
+        LEFT JOIN public.purok_sitio AS ps
             ON ps.purok_sitio_id = a.purok_sitio_id
-            ORDER BY full_name;
+        ORDER BY record_date ASC, p.person_id ASC;
         """
         rows = self.ctx.execute_query_to_dict(sql)
-        
+
         return rows if rows else None

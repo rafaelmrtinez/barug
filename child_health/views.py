@@ -170,9 +170,27 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                     p_child_record_id=child_health_record_id, 
                     p_assessed_by_id=staff_id, 
                     p_referred_nbs_date=screening_data.cleaned_data.get("referred_for_newborn_screening"))
-                if is_success and isinstance(is_success, tuple):
+                if is_success:
                     messages.success(request, "Newborn Screening data saved successfully.")
                     return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
+                else:
+                    messages.error(request, "Failed to save Newborn Screening data.")
+                    return render(
+                        request,
+                        "child_health/chr_entry.html",
+                        {
+                            "form": birth_and_supplementation,
+                            "new_born_screening": screening_data,
+                            "child_information_form": child_information_form,
+                            "visit_form": visit_form,
+                            "child_health_record_id": child_health_record_id,
+                            "bf_form": bf_form,
+                            "immunizations": immunizations,
+                            "visit_log": visit_log,
+                            "vitamin_form": vitamin_form,
+                            "iron_intake_form": iron_intake_form
+                        },
+                    )
             else:
                 MessageUtility.push_form_errors_as_messages(request, screening_data)
                 return render(
@@ -200,7 +218,7 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                     p_feeding_type_id=bf_data.cleaned_data.get("type_of_feeding"),
                     p_check_date=bf_data.cleaned_data.get("exclusive_bf_check_last")
                 )
-                if is_success and isinstance(is_success, tuple):
+                if is_success:
                     messages.success(request, "Breast Feeding Type saved successfully.")
                     return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
             else:
@@ -256,15 +274,14 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                 result = CHILD_HEALTH_REPOSITORY.insert_child_screening(
                     chr_id=child_health_record_id,
                     assessed_by_id=staff_id,
-                    date_assessed=birth_and_supplementation.cleaned_data.get("data_assessed"),
+                    date_assessed=birth_and_supplementation.cleaned_data.get("data_assessed") or None,
                     anemic_seen=birth_and_supplementation.cleaned_data.get("anemia_2_59_seen") or None,
                     anemic_given_iron=birth_and_supplementation.cleaned_data.get("anemia_2_59_given_iron") or None,
-                    birth_weight=birth_and_supplementation.cleaned_data.get("birth_weight"),
-                    is_low_birth_weight=birth_and_supplementation.cleaned_data.get("low_birth_weight"),
+                    birth_weight=birth_and_supplementation.cleaned_data.get("birth_weight") or None,
+                    is_low_birth_weight=birth_and_supplementation.cleaned_data.get("low_birth_weight") or None,
                     seen_2_6_mos=birth_and_supplementation.cleaned_data.get("birth_wt_seen") or None,
                     given_2_6_mos=birth_and_supplementation.cleaned_data.get("birth_wt_given_iron") or None,
                 )
-                logger.info("Insert Child Screening Result: %s", result)
                 if not result:
                     messages.error(request, "Failed to save Birth and Supplementation data.")
                     return render(
@@ -286,7 +303,7 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                 messages.success(request, "Birth and Supplementation saved successfully.")
                 return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
             else:
-                messages.warning(request, "Please correct the errors below.")
+                MessageUtility.push_form_errors_as_messages(request, birth_and_supplementation)
                 return render(
                     request,
                     "child_health/chr_entry.html",
@@ -310,7 +327,7 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                     chr_id=child_health_record_id,
                     assessed_by_id=staff_id,
                     date_started=iron_intake_data.cleaned_data.get("date_iron_started"),
-                    date_completed=iron_intake_data.cleaned_data.get("date_iron_completed")
+                    date_completed=iron_intake_data.cleaned_data.get("date_iron_completed") or None
                 )
                 if response and isinstance(response, tuple):
                     messages.success(request, "Iron Intake data saved successfully.")
