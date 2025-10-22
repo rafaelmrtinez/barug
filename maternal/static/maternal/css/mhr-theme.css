@@ -6,12 +6,14 @@
   --brand-100:#f8eef0;
 }
 
+/* Card headers with brand gradient */
 .card-brand .card-header{
   background: linear-gradient(90deg, var(--brand-800), var(--brand-700));
   color:#fff;
   font-weight:600;
 }
 
+/* Solid brand button */
 .btn-brand{
   --bs-btn-bg: var(--brand-700);
   --bs-btn-border-color: var(--brand-700);
@@ -23,6 +25,7 @@
   --bs-btn-hover-color:#fff;
 }
 
+/* Outline brand button */
 .btn-outline-brand{
   --bs-btn-color: var(--brand-700);
   --bs-btn-border-color: var(--brand-700);
@@ -31,16 +34,38 @@
   --bs-btn-hover-color:#fff;
 }
 
+/* Form controls */
 .form-check-input:checked{
   background-color: var(--brand-700);
   border-color: var(--brand-700);
 }
-.form-control:focus, .form-select:focus{
+.form-control:focus,
+.form-select:focus{
   border-color: var(--brand-600);
   box-shadow: 0 0 0 .2rem rgba(109,41,50,.25);
 }
 
+/* Tables */
 .table thead th{
   color:#6b7280;
   font-weight:600;
+}
+
+/* Optional: subtle card body background for contrast */
+.card-brand .card-body{
+  background: #fff;
+}
+
+/* Optional: section action buttons alignment */
+.section-action{
+  display: inline-flex;
+  align-items: center;
+  gap:.35rem;
+}
+
+/* Optional: badges in this scheme */
+.badge-accent{
+  background: var(--brand-100);
+  color: var(--brand-700);
+  border: 1px solid var(--brand-700);
 }

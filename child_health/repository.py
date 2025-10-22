@@ -13,9 +13,9 @@ class ChildHealthRecordRepository:
     def __init__(self, ctx: ConnectionAdapter):
         self.ctx = ctx
         logger.info("ChildHealthRecordRepository initialized")
-        
+
     def fetch_vitamin_by_chr_id(self, chr_id: int):
-        sql=""" SELECT vit_stage_id
+        sql = """ SELECT vit_stage_id
             FROM vitamin_a_given
             WHERE child_record_id = %s
             ORDER BY vit_stage_id"""
@@ -24,12 +24,12 @@ class ChildHealthRecordRepository:
         if not result:
             return None
         return result
-        
+
     def upsert_vitamin_a_stage_by_chr_id(
         self, p_child_record_id: int, staff_id: int,
-        stage_id: int, date_given: date 
+        stage_id: int, date_given: date
     ):
-        sql="""SELECT * FROM upsert_vitamin_a_stage(%s, %s, %s, %s);"""
+        sql = """SELECT * FROM upsert_vitamin_a_stage(%s, %s, %s, %s);"""
         params = [p_child_record_id, staff_id, stage_id, date_given]
         try:
             result = self.ctx.execute_query(sql, params)
@@ -43,7 +43,7 @@ class ChildHealthRecordRepository:
             raise e
 
     def fetch_iron_supplement_completion_by_chr_id(self, chr_id: int):
-        sql="""SELECT
+        sql = """SELECT
                 cisr.date_started,
                 cisr.date_completed
             FROM child_iron_supplement_record cisr
@@ -60,7 +60,7 @@ class ChildHealthRecordRepository:
         self, chr_id: int, assessed_by_id: int,
         date_started: date, date_completed: date
     ):
-        sql="""SELECT * FROM upsert_child_iron_supplement(%s, %s, %s, %s)"""
+        sql = """SELECT * FROM upsert_child_iron_supplement(%s, %s, %s, %s)"""
         params = [chr_id, assessed_by_id, date_started, date_completed]
         try:
             result = self.ctx.execute_query(sql, params)
@@ -94,12 +94,12 @@ class ChildHealthRecordRepository:
         if not result:
             return None
         return result
-    
+
     def insert_child_screening(
-        self, chr_id, assessed_by_id, date_assessed, 
-        anemic_seen, anemic_given_iron, birth_weight,
-        is_low_birth_weight, seen_2_6_mos, given_2_6_mos,):
-        
+            self, chr_id, assessed_by_id, date_assessed,
+            anemic_seen, anemic_given_iron, birth_weight,
+            is_low_birth_weight, seen_2_6_mos, given_2_6_mos,):
+
         sql = """SELECT * FROM add_child_screening(
                 %s::INTEGER,
                 %s::INTEGER,
@@ -168,20 +168,20 @@ class ChildHealthRecordRepository:
             if ChildHealthRecordException.is_child_health_record_exception(e.code):
                 raise ChildHealthRecordException(e.message) from e
             raise e
-        
+
     def fetch_new_born_screening_date_by_chr_id(self, chr_id: int) -> dict | None:
-        sql="""SELECT visit_id FROM child_visit WHERE child_record_id = %s ORDER BY visit_id ASC LIMIT 1;"""
+        sql = """SELECT visit_id FROM child_visit WHERE child_record_id = %s ORDER BY visit_id ASC LIMIT 1;"""
         params = [chr_id]
         result = self.ctx.execute_query_to_dict(sql, params)
         if not result and isinstance(result, list):
             return None
-        sql="""SELECT referred_newborn_screening_date FROM feeding_type_nwbrn_scrnng WHERE visit_id = %s;"""
+        sql = """SELECT referred_newborn_screening_date FROM feeding_type_nwbrn_scrnng WHERE visit_id = %s;"""
         params = [result[0]['visit_id']]
         result = self.ctx.execute_query_to_dict(sql, params)
         return result
-        
+
     def insert_new_born_screening_date(self, p_child_record_id, p_assessed_by_id, p_referred_nbs_date):
-        sql="""SELECT * FROM add_referred_newborn_screening_date(%s, %s, %s);"""
+        sql = """SELECT * FROM add_referred_newborn_screening_date(%s, %s, %s);"""
         params = [p_child_record_id, p_assessed_by_id, p_referred_nbs_date]
         try:
             result = self.ctx.execute_query(sql, params)
@@ -195,7 +195,7 @@ class ChildHealthRecordRepository:
             raise e
 
     def fetch_immunization_dates_matrix_by_chr_id(self, chr_id: int) -> dict | None:
-        sql="""-- Repository SQL: pivot immunization dates per type for a child record
+        sql = """-- Repository SQL: pivot immunization dates per type for a child record
             -- params: $1 = child_record_id
             WITH src AS (
             SELECT
@@ -242,9 +242,9 @@ class ChildHealthRecordRepository:
             if ChildHealthRecordException.is_child_health_record_exception(e.code):
                 raise ChildHealthRecordException(e.message) from e
             raise e
-        
+
     def fetch_child_details_bf_display_by_chr_id(self, chr_id: int) -> dict | None:
-        sql="""WITH checks AS (
+        sql = """WITH checks AS (
             SELECT
                 cbc.bbf_check_id,
                 cbc.check_date,
@@ -452,8 +452,9 @@ class ChildHealthRecordRepository:
     def insert_chr_record(self, p_staff_id, p_person_id, p_birth_order, p_delivery_place_type_id):
         try:
             sql = """SELECT * FROM create_child_health_record(%s, %s, %s, %s);"""
-            params = [p_staff_id, p_person_id,
-                      p_birth_order, p_delivery_place_type_id]
+            params = [
+                p_staff_id, p_person_id,
+                p_birth_order, p_delivery_place_type_id]
             result = self.ctx.execute_query(sql, params)
             if not result:
                 return None

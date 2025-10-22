@@ -220,7 +220,7 @@
         </div>
         <div class="d-flex align-items-center gap-2 ms-auto">
           <span class="pill">Person is {{ person_status|default:"-" }}</span>
-          {% if request.session.auth.role_name != "midwife" %}
+          {% if request.session.auth.role_name == "barangay health worker" %}
           <button
             class="btn btn-hero"
             type="button"
@@ -230,8 +230,8 @@
             </i>
                 Add Maternal Health Record
           </button>
-          {% else %}
-          <button
+          {% elif request.session.auth.role_name == "midwife" %}
+          {% comment %} <button
             class="btn btn-hero"
             type="button"
             onclick="location.href='{% url 'maternal:maternal_health_record_view' person_id %}'"
@@ -239,7 +239,7 @@
             <i class="bi bi-file-plus me-1">
             </i>
                 Add ANC Visit
-          </button>
+          </button> {% endcomment %}
           {% endif %}
         </div>
       </div>

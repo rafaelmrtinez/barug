@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'maternal/css/mhr-theme.css' %}?v=2">
+
+{% block content %}
+<div class="container py-4 mt-5">
+    <h1 class="mb-3">Create Maternal Health Record</h1>
+    <!-- Identification -->
+    <form method="post" class="card mb-3 card-brand" id="form-identification" action="">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="identification">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Identification</span>
+        </div>
+        <div id="identification" class="card-body row g-3">
+            <div class="col-md-3">{{ identification_form.family_no.label_tag }} {{ identification_form.family_no }}
+            </div>
+            <div class="col-md-6">{{ identification_form.name.label_tag }} {{ identification_form.name }}</div>
+            <div class="col-md-3">{{ identification_form.date_of_birth.label_tag }} {{ identification_form.date_of_birth }}</div>
+            <div class="col-md-2">{{ identification_form.age.label_tag }} {{ identification_form.age }}</div>
+            <div class="col-md-2">{{ identification_form.age_group.label_tag }} {{ identification_form.age_group }}
+            </div>
+            <div class="col-md-8">{{ identification_form.address.label_tag }} {{ identification_form.address }}</div>
+            <div class="col-md-4">{{ identification_form.husband_name.label_tag }} {{ identification_form.husband_name }}</div>
+            <div class="col-md-4">{{ identification_form.occupation.label_tag }} {{ identification_form.occupation }}
+            </div>
+            <div class="col-md-2">{{ identification_form.weight_kg.label_tag }} {{ identification_form.weight_kg }}
+            </div>
+            <div class="col-md-2">{{ identification_form.height_cm.label_tag }} {{ identification_form.height_cm }}
+            </div>
+            <div class="col-md-2">{{ identification_form.bmi.label_tag }} {{ identification_form.bmi }}</div>
+            <div class="col-md-2">{{ identification_form.bmi_category.label_tag }} {{ identification_form.bmi_category }}</div>
+        </div>
+        <div class="card-footer text-end">
+            <button type="submit" class="btn btn-brand">Save Identification</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block js %}
+{{ block.super }}
+<script src="{% static 'maternal/js/smoothScroll.js' %}"></script>
+<script src="{% static 'maternal/js/mhrTable.js' %}"></script>
+<script src="{% static 'maternal/js/imagePreview.js' %}"></script>
+{% endblock %}
