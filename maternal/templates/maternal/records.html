@@ -52,7 +52,7 @@
             <td class="text-end">
             {% if r.maternal_record_id %}
                 <a class="btn btn-outline-secondary btn-sm"
-                href="{% url 'maternal:maternal_record_detail' r.person_id r.maternal_record_id %}"
+                href="{% url 'maternal:maternal_record_detail' r.person_id %}"
                 data-maternal-record-id="{{ r.maternal_record_id }}">
                 {% bs_icon 'folder2-open' extra_classes='me-1' %} Open
                 </a>

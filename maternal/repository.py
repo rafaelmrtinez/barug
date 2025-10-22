@@ -1,11 +1,60 @@
 from src.infra.database.connection_adapter import ConnectionAdapter
+from src.infra.exceptions.query_exec_exception import QueryExecutionException
 
+from maternal.exceptions.maternal_exceptions import MaternalHealthRecordException
+import logging
+
+logger = logging.getLogger(__name__)
 
 class MaternalHealthRecordRepository:
     
     def __init__(self, ctx: ConnectionAdapter):
         self.ctx = ctx
+    
+    def insert_maternal_health_record(self, staff_id, person_id, husband_id, weight, height, bmi_status_id, is_transferred):
+        sql="""SELECT * FROM create_maternal_health_record_bhw(%s::INTEGER, %s::INTEGER, %s::INTEGER, %s::DECIMAL, %s::DECIMAL, %s::INTEGER, %s::BOOLEAN);"""
+        params = (staff_id, person_id, husband_id, weight, height, bmi_status_id, is_transferred)
         
+        try:
+            rows = self.ctx.execute_query(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException as e:
+            logger.error(f"Error inserting child health record: {e.message}")
+            if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
+                raise MaternalHealthRecordException(e.message) from e
+            raise e
+        except Exception as e:
+            logger.error(f"Unexpected error inserting maternal health record: {e}")
+            raise e
+    
+    def fetch_mother_basic_info_by_person_id(self, id: int):
+        sql = """
+            SELECT 
+                f.family_num AS family_number,
+                p.birthdate AS date_of_birth,
+                p.age,
+                pk.dst_person_id AS spouse_id,
+                CONCAT(s.first_name, ' ', s.last_name) AS spouse_name,
+                s.occupation AS spouse_occupation
+            FROM person p
+            LEFT JOIN house_member hm ON hm.person_id = p.person_id
+            LEFT JOIN family_unit f ON f.family_id = hm.family_id
+            LEFT JOIN person_kinship pk 
+                ON pk.src_person_id = p.person_id
+            LEFT JOIN relationship r 
+                ON r.relationship_id = pk.relationship_id
+                AND LOWER(r.relationship_name) = 'spouse'
+            LEFT JOIN person s 
+                ON s.person_id = pk.dst_person_id
+            WHERE p.person_id = %s
+            ORDER BY pk.added_at DESC
+            LIMIT 1;
+        """
+        params = (id,)
+        rows = self.ctx.execute_query_to_dict(sql, params)
+        return rows[0] if rows else None
+
+
     def fetch_risk_codes_by_mhr_id(self, maternal_record_id: int):
         sql = """
         WITH cat_map AS (
@@ -426,6 +475,12 @@ class MaternalHealthRecordRepository:
             ORDER BY a.start_date DESC, a.maternal_record_id DESC;
             """
         return self.ctx.execute_query_to_dict(sql, (person_id,)) or []
+    
+    def fetch_maternal_health_record_id_by_person_id(self, id: int):
+        sql="""SELECT maternal_record_id FROM maternal_health_record WHERE person_id = %s;"""
+        params = (id,)
+        rows = self.ctx.execute_query_to_dict(sql, params)
+        return rows[0] if rows else None
 
     def fetch_latest_maternal_record_by_person_and_maternal_id(self, person_id: int, maternal_record_id: int):
         sql = """WITH target AS (

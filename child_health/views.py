@@ -456,7 +456,6 @@ def find_person_http(request: HttpRequest) -> JsonResponse:
     try:
         rows = CHILD_HEALTH_REPOSITORY.match_person_by_key(q)  # [{'person_id':..., 'full_name':..., 'address':...}, ...]
         results = [{"id": r["person_id"], "name": r["full_name"], "address": r.get("address") or ""} for r in rows]
-        logger.info("FIND PERSON RESULTS: %s", results)
         return JsonResponse({"ok": True, "count": len(results), "results": results})
     except Exception as e:
         logger.exception("find_person failed: %s", e)

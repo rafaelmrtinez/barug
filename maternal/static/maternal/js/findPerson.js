@@ -1,7 +1,6 @@
-// static/bhw/js/findPersonClient.min.js
+// static/bhw/js/findPersonClient.min.js  (edited)
 (() => {
   // ---------- CONFIG: attach to multiple fields ----------
-  // CHANGED: re-usable attach function so we can wire both Name and Husband's name
   const attachPersonAutocomplete = ({ inputId, hiddenId, addressId }) => {
     const nameInput    = document.getElementById(inputId);
     const personIdInput = hiddenId ? document.getElementById(hiddenId) : null;
@@ -32,7 +31,7 @@
         .person-dd li {
           padding: 6px 10px;
           cursor: pointer;
-          white-space: normal; /* allow name + address on separate lines */
+          white-space: normal;
         }
         .person-dd li:hover, .person-dd li:focus { background: #f7f7f7; }
         .person-dd .muted { color: #6c757d; font-size: .825rem; padding: 8px 10px; }
@@ -86,7 +85,7 @@
       if (activeController) activeController.abort();
       activeController = new AbortController();
       try {
-        const res = await fetch(`/midwife/find-person/?q=${encodeURIComponent(q)}`, { signal: activeController.signal });
+        const res = await fetch(`/child-health/ajax/find-person/?q=${encodeURIComponent(q)}`, { signal: activeController.signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const normalized = (data.results || []).map(r => ({
@@ -108,13 +107,13 @@
     // typing: clear stale id, then search
     const onInput = debounce((e) => {
       const q = (e.target.value || '').trim();
-      if (personIdInput) personIdInput.value = '';         // CHANGED: clear hidden id when typing
+      if (personIdInput) personIdInput.value = '';         // clear hidden id when typing
       if (q.length < 2) { hide(); return; }
       sizeDropdown(); showLoading(); search(q);
     }, 250);
     nameInput.addEventListener('input', onInput);
 
-    // click select
+    // click select — <<-- REDUNDANT name change dispatch REMOVED HERE
     dd.addEventListener('click', (e) => {
       const li = e.target.closest('li[data-name]');
       if (!li) return;
@@ -122,10 +121,10 @@
       if (addressInput)   { addressInput.value   = li.dataset.address || ''; addressInput.dispatchEvent(new Event('change')); }
       if (personIdInput)  { personIdInput.value  = li.dataset.id || '';      personIdInput.dispatchEvent(new Event('change')); }
       hide();
-      nameInput.dispatchEvent(new Event('change'));
+      // removed: nameInput.dispatchEvent(new Event('change'));
     });
 
-    // keyboard select
+    // keyboard select — <<-- REDUNDANT name change dispatch REMOVED HERE
     dd.addEventListener('keydown', (e) => {
       if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('li[data-name]')) {
         e.preventDefault();
@@ -135,7 +134,7 @@
         if (personIdInput)  { personIdInput.value  = li.dataset.id || '';      personIdInput.dispatchEvent(new Event('change')); }
         hide();
         nameInput.focus();
-        nameInput.dispatchEvent(new Event('change'));
+        // removed: nameInput.dispatchEvent(new Event('change'));
       }
     });
 
@@ -150,17 +149,14 @@
   };
 
   // ---------- WIRE FIELDS ----------
-  // CHANGED: Name (existing behavior) — fills name + address + person_id
   attachPersonAutocomplete({
     inputId:   'id_name',
-    hiddenId:  'id_person_id',   // your HiddenInput for the selected person
-    addressId: 'id_address'      // optional address field to populate
+    hiddenId:  'id_person_id',
+    addressId: 'id_address'
   });
 
-  // CHANGED: Husband's name — searchable, sets its own hidden husband_person_id
   attachPersonAutocomplete({
-    inputId:  'id_husband_name',       // Django's auto id for Husband’s name
-    hiddenId: 'id_husband_person_id',  // new hidden input you’ll add in HTML
-    // no addressId here (unless you also want to populate a separate husband address)
+    inputId:  'id_husband_name',
+    hiddenId: 'id_husband_person_id',
   });
 })();
