@@ -14,11 +14,13 @@ from src.app.transfer_objects.dto.business_dto import (
     NonResidentOwnerDTO,
     OwnerBusinessDTO,
     BusinessInfoDTO,
+    RenewalListDTO,
 )
 from src.domain.contracts.business_repository_contract import (
     IBusinessRepository,
     IResidentOwnerRepository,
     INonResidentOwnerRepository,
+    IBusinessRenewalRepository,
 )
 
 try:
@@ -539,3 +541,166 @@ class OwnerBusinessInformationRepository:
             return rows[0] if rows else {}
         except Exception as e:
             raise QueryExecutionException(f"get_owner_information failed: {e}") from e
+        
+class BusinessRenewalRepository(IBusinessRenewalRepository):
+    def __init__(self, ctx:IConnectionAdapter):
+        self._ctx = ctx
+    
+    def fetch_business_renewal_list(self) -> List[RenewalListDTO]:
+        try:
+            sql = """
+            WITH base AS (
+                SELECT 
+                    b_1.business_id,
+                    b_1.business_name,
+                    bs.business_status_name AS business_state,
+                    -- owner full name
+                    trim(concat_ws(
+                        ' ',
+                        COALESCE(p.first_name, ''),
+                        COALESCE(p.middle_name, ''),
+                        COALESCE(p.last_name, ''),
+                        COALESCE(p.suffix, '')
+                    )) AS owner_full_name
+                FROM business b_1
+                JOIN business_status bs 
+                ON bs.business_status_id = b_1.business_status_id
+                LEFT JOIN person p
+                ON p.person_id = b_1.business_owner_id
+            ), latest AS (
+                SELECT 
+                    bb.business_id,
+                    vl.effective_status,
+                    vl.valid_from,
+                    vl.expires_on,
+                    vl.extension_until
+                FROM base bb
+                LEFT JOIN LATERAL (
+                    SELECT 
+                        vl_1.business_id,
+                        vl_1.business_name,
+                        vl_1.business_state,
+                        vl_1.brgy_clearance_status_rec_id,
+                        vl_1.period_type,
+                        vl_1.period_year,
+                        vl_1.period_quarter,
+                        vl_1.valid_from,
+                        vl_1.expires_on,
+                        vl_1.extension_until,
+                        vl_1.paid_on,
+                        vl_1.or_number,
+                        vl_1.offense_no,
+                        vl_1.surcharge_pct,
+                        vl_1.surcharge_amount,
+                        vl_1.clearance_status_id,
+                        vl_1.clearance_status_name,
+                        vl_1.effective_status,
+                        vl_1.days_overdue
+                    FROM v_business_clearance_latest vl_1
+                WHERE vl_1.business_id = bb.business_id
+                LIMIT 1
+                ) vl ON true
+            ), fallback AS (
+                SELECT 
+                    bb.business_id,
+                    ceo.has AS has_from_requests,
+                    ceo.issued_on AS req_issued_on,
+                    ceo.valid_until AS req_valid_until
+                FROM base bb
+                LEFT JOIN LATERAL check_business_clearance_effective_on(
+                    p_business_id => bb.business_id
+                ) ceo(has, reference_request_id, request_code, issued_on, valid_until, basis_year) ON true
+            ), open_reqs AS (
+                SELECT 
+                    bb.business_id,
+                    COUNT(DISTINCT h.doc_request_id) FILTER (
+                        WHERE rs.request_status_name::text <> ALL (ARRAY[
+                            'REJECTED'::varchar,
+                            'CANCELLED'::varchar,
+                            'ACCOMPLISHED'::varchar,
+                            'RELEASED'::varchar
+                        ]::text[])
+                    ) AS open_req_count,
+                    MAX(h.created_at) FILTER (
+                        WHERE rs.request_status_name::text <> ALL (ARRAY[
+                            'REJECTED'::varchar,
+                            'CANCELLED'::varchar,
+                            'ACCOMPLISHED'::varchar,
+                            'RELEASED'::varchar
+                        ]::text[])
+                    ) AS last_open_req_at,
+                    MAX(h.doc_request_id) FILTER (
+                        WHERE rs.request_status_name::text <> ALL (ARRAY[
+                            'REJECTED'::varchar,
+                            'CANCELLED'::varchar,
+                            'ACCOMPLISHED'::varchar,
+                            'RELEASED'::varchar
+                        ]::text[])
+                    ) AS last_open_doc_request_id
+                FROM base bb
+                LEFT JOIN doc_request_hdr h ON true
+                LEFT JOIN doc_request_line l_1 
+                ON l_1.doc_request_id = h.doc_request_id
+                LEFT JOIN fee_item fi 
+                ON fi.fee_item_id = l_1.fee_item_id
+                LEFT JOIN request_document_type rdt 
+                ON rdt.request_document_type_id = fi.request_document_type_id
+                LEFT JOIN request_status rs 
+                ON rs.request_status_id = h.request_status_id
+            WHERE rdt.request_document_type_name::text = 'BARANGAY BUSINESS CLEARANCE'::text
+                AND COALESCE(
+                        h.business_id,
+                        CASE
+                            WHEN (l_1.details ->> 'business_id') ~ '^[0-9]+$' THEN (l_1.details ->> 'business_id')::int
+                            ELSE NULL::int
+                        END
+                    ) = bb.business_id
+            GROUP BY bb.business_id
+            )
+            SELECT 
+                b.business_id,
+                b.business_name,
+                b.owner_full_name AS owner_fullname,
+                -- keep the same VALID/EXPIRED filter basis
+                COALESCE(
+                    l.effective_status,
+                    CASE WHEN f.has_from_requests THEN 'VALID' ELSE 'NONE' END
+                ) AS clearance_state,  -- retained if you still display it elsewhere
+                -- NEW: use renewal activity instead of active clearance
+                COALESCE(orq.open_req_count, 0) > 0 AS has_active_renewal_request,
+                COALESCE(orq.open_req_count, 0)     AS open_renewal_request_count,
+                l.valid_from,
+                l.expires_on,
+                l.extension_until AS extension
+            FROM base b
+            LEFT JOIN latest    l   ON l.business_id = b.business_id
+            LEFT JOIN fallback  f   ON f.business_id = b.business_id
+            LEFT JOIN open_reqs orq ON orq.business_id = b.business_id
+            WHERE COALESCE(
+                    l.effective_status,
+                    CASE WHEN f.has_from_requests THEN 'VALID' ELSE 'NONE' END
+                ) IN ('VALID','EXPIRED')
+            ORDER BY b.business_name;
+            """
+            rows = self._ctx.execute_query_to_dict(sql, [])
+            return [RenewalListDTO(**row) for row in rows]
+        except Exception as e:
+            raise QueryExecutionException(f"fetch_business_renewal_list failed: {e}", "E_DB") from e
+       
+    def search_business_renewal(self, search: str) -> list[RenewalListDTO]:
+        try:
+            sql = " "
+            rows = self._ctx.execute_query_to_dict(sql, [search])
+
+            return self._map(rows)
+        except Exception as e:
+            raise QueryExecutionException(f"fetch_business_renewal_list failed: {e}", "E_DB") from e
+        
+    def sort_clearance_sate(self, b_category_id: int) -> list[RenewalListDTO]:
+        try:
+            sql = " "
+            rows = self._ctx.execute_query_to_dict(sql, [b_category_id])
+
+            return self._map(rows)
+        except Exception as e:
+            raise QueryExecutionException(f"sort_clearance_sate failed: {e}") from e

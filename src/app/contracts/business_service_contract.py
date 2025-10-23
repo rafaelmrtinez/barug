@@ -82,4 +82,11 @@ class IBusinessMapService(ABC):
       status:Optional[str]
     ) -> Tuple[List[Dict[str, Any]], Dict[str, List[tuple[str, str]]], Optional[str]]:
         pass
-    
+
+class IBusinessRenewalService(ABC):
+    @abstractmethod
+    def execute(self, 
+        search:Optional[str], 
+        clearance_state: Optional[int] , 
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, List[tuple[str, str]]], Optional[str]]:
+        pass

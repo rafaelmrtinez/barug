@@ -9,11 +9,13 @@ from authentication.supabase_client import supabase
 from src.domain.contracts.business_repository_contract import (
     IBusinessRepository,
     IResidentOwnerRepository,
+    IBusinessRenewalRepository,
 )
 from src.infra.repositories.business_repository import (
     BusinessRepository,
     ResidentOwnerRepository,
-    OwnerBusinessInformationRepository
+    OwnerBusinessInformationRepository,
+    BusinessRenewalRepository,
 )
 from src.domain.contracts.household_repository_contract import (
     IHouseholdRepository,
@@ -66,5 +68,10 @@ class InfraContainer(containers.DeclarativeContainer):
 
     household_list: providers.Provider[IHouseholdRepository] = providers.Factory(
         HouseholdRepository,
+        ctx=context
+    )
+
+    business_renewal:providers.Factory[IBusinessRenewalRepository] = providers.Factory(
+        BusinessRenewalRepository,
         ctx=context
     )

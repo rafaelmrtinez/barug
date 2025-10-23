@@ -212,6 +212,26 @@ class BusinessFilters(forms.Form):
         required= False,
     )
 
+class RenewalFilters(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search',
+        }),
+        label= 'Search',
+        required= False,
+    )
+    clearance_state = forms.ChoiceField(
+        choices= BUSINESS_CATEGORY_CHOICES,
+        widget=forms.Select(attrs={
+            'id' : 'clearance_state',
+            'class' : 'form-select',
+        }),
+        label= 'Clearance State',
+        required= False,
+    )
+
 class SearchBusinessOwner(forms.Form):
     search = forms.CharField(
         widget=forms.TextInput(attrs={

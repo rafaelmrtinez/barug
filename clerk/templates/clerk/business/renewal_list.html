@@ -1,6 +1,8 @@
+{# renewal_list.html — updated to mirror Business List filter behavior #}
 {% extends "base.html" %}
 {% load static %}
 {% load bootstrap_icons %}
+{% load choiceextras %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'css/table.css' %}">
@@ -21,12 +23,13 @@
     --line:#e5e7eb;
     --ring:rgba(109,41,50,.18);
   }
+
   /* Status pills (legend + table) */
   .status-pill{
     display:inline-flex; align-items:center; gap:.35rem;
     border-radius:999px; padding:.22rem .6rem;
     font-weight:600; font-size:.82rem; border:1px solid transparent;
-    cursor:pointer; /* so it feels clickable */
+    cursor:default;
   }
   .st-draft{ background:#fff; border-color:#d1d5db; color:#374151; }
   .st-review{ background:#fff; border-color:#fde68a; color:#92400e; }
@@ -38,355 +41,216 @@
   .owner{ color:#374151; }
   .small-muted{ color:var(--muted); font-size:.82rem; }
 
-  /* === Stepper (used inside Flow Modal) === */
-  .stepper{ border:1px solid var(--line); border-radius:16px; padding:1rem; background:#fff; }
-  .step{ display:flex; gap:.75rem; align-items:flex-start; padding:.5rem 0; }
-  .step .dot{ width:1.25rem; height:1.25rem; border-radius:50%; border:2px solid var(--brand-700); display:flex; align-items:center; justify-content:center; color:#fff; background:#fff; flex:0 0 1.25rem; }
-  .step.done .dot{ background:var(--brand-700); }
-  .step .label{ font-weight:600; }
-  .step .sub{ font-size:.85rem; color:var(--muted); margin-top:.15rem; }
+  /* Keep filters.css look/feel consistent */
+  .btn-outline-brand{ color:#6d2932; border-color:#6d2932; background:#fff; }
+  .btn-outline-brand:hover{ background:#6d2932; color:#fff; }
 
-  /* Remove default button look for status triggers */
-  .status-trigger{
-    background:none; border:0; padding:0;
+  /* ─── YES/NO radio styling (sidebar) ─── */
+  .radio-yn{ display:flex; flex-direction:column; gap:.5rem; }
+  .radio-yn .yn{
+    display:flex; align-items:center; gap:.5rem; cursor:pointer; user-select:none;
+    font-weight:600; color:#111827;
   }
+  .radio-yn .yn input{
+    position:absolute; opacity:0; width:0; height:0; /* keep accessible */
+  }
+  .radio-yn .yn .dot{
+    width:18px; height:18px; border-radius:50%;
+    border:2px solid var(--muted);
+    display:inline-grid; place-items:center;
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .radio-yn .yn .dot::after{
+    content:""; width:8px; height:8px; border-radius:50%;
+    background:transparent; transition:background-color .15s ease;
+  }
+  .radio-yn .yn input:checked + .dot{ border-color:var(--brand-700); }
+  .radio-yn .yn input:checked + .dot::after{ background:var(--brand-700); }
+  .radio-yn .yn input:focus-visible + .dot{ box-shadow:0 0 0 3px var(--ring); }
+
+  .validity-pill{
+    display:inline-flex; align-items:center; gap:.4rem;
+    padding:.2rem .6rem; border-radius:999px;
+    font-weight:600; font-size:.9rem; border:1px solid var(--line);
+    background:var(--brand-050); color:var(--ink);
+  }
+  .validity-pill .range{ font-variant-numeric:tabular-nums; letter-spacing:.2px; }
+  .validity-pill.valid { background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
+  .validity-pill.expired{ background:#fef2f2; border-color:#fecaca; color:#991b1b; }
+  .validity-pill.none{ background:#f9fafb; border-style:dashed; color:#6b7280; }
 </style>
 {% endblock css %}
 
 {% block content %}
 <div class="container-fluid py-3" style="margin-top: 40px;">
 
-  {# Toolbar with same search + filters.css styling #}
-  <form class="toolbar d-flex align-items-center flex-wrap mb-3" onsubmit="event.preventDefault();">
+  {# ─── Toolbar: search + filters (mirrors Business List) ─── #}
+  <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+    {# Search box from RenewalFilters.search #}
     <div class="searchbox">
       {% bs_icon 'search' extra_classes='bi' %}
-      <input id="search" name="search" class="form-control" placeholder="Search business / owner / permit / phone">
+      {{ form.search }}
     </div>
 
-    <input type="hidden" name="year" id="hYear">
-    <input type="hidden" name="category" id="hCategory">
-    <input type="hidden" name="status" id="hStatus">
+    {# preserve selected filters when searching #}
+    <input type="hidden" name="clearance_state" value="{{ request.GET.clearance_state|default:'' }}">
+    <input type="hidden" name="active_renewal" value="{{ request.GET.active_renewal|default:'' }}">
 
-    <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
-            type="button"
-            data-bs-toggle="offcanvas"
-            data-bs-target="#filterPanel"
-            aria-controls="filterPanel">
-      {% bs_icon 'sliders' extra_classes='me-2' %} Filters
-      <span class="badge rounded-pill text-bg-light ms-2" id="filterCount" style="display:none;">0</span>
-    </button>
-
-    {# Keep Register button commented as in your original #}
-    <!-- <a class="btn btn-outline-brand ms-2" href="{% url 'clerk:business_owner' %}">
-      {% bs_icon 'plus-lg' extra_classes='me-2' %} Register Business
-    </a> -->
+    {# Filters button with badge count #}
+    {% with cs=request.GET.clearance_state|yesno:"1,0" ar=request.GET.active_renewal|yesno:"1,0" %}
+      {% with fc=0|add:cs|add:ar %}
+        <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
+                type="button"
+                data-bs-toggle="offcanvas"
+                data-bs-target="#filterPanel"
+                aria-controls="filterPanel">
+          {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+          {% if fc %}
+            <span class="badge rounded-pill text-bg-light ms-2">{{ fc }}</span>
+          {% endif %}
+        </button>
+      {% endwith %}
+    {% endwith %}
   </form>
 
-  {# Active chips #}
-  <div class="filters-bar d-flex flex-wrap align-items-center mb-3" id="activeChips">
-    <span class="text-muted small">No active filters.</span>
+  {# ─── Active filter chips (same pattern as Business List) ─── #}
+  <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
+    {% if request.GET.clearance_state or request.GET.active_renewal %}
+      <span class="text-muted me-1">Active:</span>
+
+      {# Clearance State chip #}
+      {% if request.GET.clearance_state %}
+        {% with label=form.clearance_state|choice_label:request.GET.clearance_state %}
+          <a class="filter-chip"
+             href="?search={{ request.GET.search|urlencode }}{% if request.GET.active_renewal %}&active_renewal={{ request.GET.active_renewal|urlencode }}{% endif %}">
+            {{ label }}
+            <span class="x" aria-hidden="true">×</span>
+          </a>
+        {% endwith %}
+      {% endif %}
+
+      {# Active Renewal chip (YES/NO) #}
+      {% if request.GET.active_renewal %}
+        {% with label=form.active_renewal|choice_label:request.GET.active_renewal %}
+          <a class="filter-chip"
+             href="?search={{ request.GET.search|urlencode }}{% if request.GET.clearance_state %}&clearance_state={{ request.GET.clearance_state|urlencode }}{% endif %}">
+            {{ label }}
+            <span class="x" aria-hidden="true">×</span>
+          </a>
+        {% endwith %}
+      {% endif %}
+
+      <a class="btn btn-sm btn-outline-brand ms-1" href="?search={{ request.GET.search|urlencode }}">
+        {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
+      </a>
+    {% else %}
+      <span class="text-muted small">No active filters.</span>
+    {% endif %}
   </div>
 
+  {# ─── Table ─── #}
   <div class="row g-3">
     <div class="table-responsive">
       <table class="table align-middle mb-0" id="renewalTable">
         <thead>
           <tr>
-            <th style="width:28%;">Business</th>
-            <th style="width:18%;">Owner</th>
-            <th style="width:14%;">Expiry</th>
-            <th style="width:12%;">Last OR</th>
-            <th style="width:14%;">Status</th>
-            <th style="width:14%;">Actions</th>
+            <th>Business</th>
+            <th>Clearance State</th>
+            <th>Has Active Renewal Request</th>
+            <th>Validity Date</th>
+            <th>Extension</th>
+            <th>Actions</th>
           </tr>
         </thead>
-        <tbody>
-          <tr class="renewal-row" data-renewal="1" data-business="Sto. Niño Bakery" data-owner="Juan Dela Cruz" data-expiry="Dec 31, 2025" data-permit="2025-0001" data-phone="+63 912 345 6789" data-status="DRAFT" data-year="2025" data-category="F&B">
-            <td data-label="Business">
-              <div class="fw-semibold">Sto. Niño Bakery</div>
-              <div class="small-muted">Permit # 2025-0001 · F&amp;B</div>
-            </td>
-            <td data-label="Owner">
-              <div class="owner">Juan Dela Cruz</div>
-              <div class="small-muted">+63 912 345 6789</div>
-            </td>
-            <td data-label="Expiry">Dec 31, 2025</td>
-            <td data-label="Last OR"><span class="small-muted">—</span></td>
-
-            {# Turn the STATUS PILL into a modal trigger (no JS) #}
-            <td data-label="Status">
-              <button type="button" class="status-trigger"
-                      data-bs-toggle="modal" data-bs-target="#flowModal"
-                      aria-label="Open renewal flow">
-                <span class="status-pill st-draft">
-                  {% bs_icon 'pencil-square' %} Draft
-                </span>
-              </button>
-            </td>
-
-            <td data-label="Actions">
-              <div class="table-actions">
-                <a href="#" class="btn btn-sm btn-outline-brand">
-                  {% bs_icon 'box-arrow-in-right' extra_classes='me-1' %} Open
-                </a>
-                {# Flow button removed per request #}
-              </div>
-            </td>
-          </tr>
+        <tbody id="results-body">
+          {# server renders initial rows here; ajax replaces just this tbody #}
+          {% include "business/_renewal_rows.html" with rows=page_obj.object_list %}
         </tbody>
       </table>
     </div>
   </div>
-</div>
 
-<!-- ===== Offcanvas Filters ===== -->
-<div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
-     aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150px;">
-  <div class="offcanvas-header">
-    <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
-    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-  </div>
-  <div class="offcanvas-body">
-    <form id="filterForm" onsubmit="event.preventDefault(); applyFilters();">
-      <div class="mb-3">
-        <label class="form-label">Year</label>
-        <select class="form-select" id="fYear">
-          <option value="">Any</option>
-          <option value="2026">2026</option>
-          <option value="2025" selected>2025</option>
-          <option value="2024">2024</option>
-        </select>
-      </div>
+  {# ─── Offcanvas Filters (driven by RenewalFilters fields) ─── #}
+  <div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
+       aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150px;">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
 
-      <div class="mb-3">
-        <label class="form-label">Category</label>
-        <select class="form-select" id="fCategory">
-          <option value="">Any</option>
-          <option value="F&B">F&amp;B</option>
-          <option value="Retail">Retail</option>
-          <option value="Services">Services</option>
-          <option value="Trading">Trading</option>
-          <option value="Manufacturing">Manufacturing</option>
-        </select>
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Status</label>
-        <select class="form-select" id="fStatus">
-          <option value="">Any</option>
-          <option value="DRAFT">Draft</option>
-          <option value="FOR_TREASURER_REVIEW">For Treasurer Review</option>
-          <option value="FOR_PAYMENT">For Payment</option>
-          <option value="PAID">Paid</option>
-          <option value="FOR_PRINTING">For Printing</option>
-          <option value="COMPLETED">Completed</option>
-        </select>
-      </div>
-
-      <div class="offcanvas-footer">
-        <div class="actions">
-          <button class="btn btn-outline-brand" type="button" onclick="clearFilters()">Clear</button>
-          <button type="submit" class="btn btn-brand">Apply Filters</button>
-        </div>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- ===== Modals (existing) ===== -->
-<div class="modal fade" id="startRenewalModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <form class="modal-content" onsubmit="event.preventDefault(); alert('Simulate: Start renewal');">
-      <div class="modal-header">
-        <h5 class="modal-title">{% bs_icon 'plus-circle' extra_classes='me-2 text-danger' %} Start Renewal</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
+    <div class="offcanvas-body">
+      <form method="get" id="filterForm">
         <div class="mb-3">
-          <label class="form-label">Business</label>
-          <select class="form-select" required>
-            <option value="">Select…</option>
-            <option>Sto. Niño Bakery — Juan Dela Cruz</option>
-            <option>Pampango Hardware — Maria Santos</option>
-            <option>Kanipaan Eatery — Jose Rizal</option>
-          </select>
+          <label class="form-label">Clearance State</label>
+          {{ form.clearance_state }}
         </div>
-        <div class="mb-3">
-          <label class="form-label">Renewal Year</label>
-          <input type="number" class="form-control" value="2025" required>
-        </div>
-        <div class="small-muted">A new renewal entry will be created in DRAFT.</div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
-        <button class="btn btn-brand" type="submit">Create Renewal</button>
-      </div>
-    </form>
-  </div>
-</div>
 
-<div class="modal fade" id="uploadDocsModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <form class="modal-content">
-      <input type="hidden" id="docsRenewalId">
-      <div class="modal-header">
-        <h5 class="modal-title">{% bs_icon 'paperclip' extra_classes='me-2 text-danger' %} Upload Requirements</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label">Valid ID (Front)</label>
-            <input type="file" class="form-control" accept="image/*,application/pdf">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Valid ID (Back)</label>
-            <input type="file" class="form-control" accept="image/*,application/pdf">
-          </div>
-          <div class="col-12">
-            <label class="form-label">Business Proof (DTI/SEC/Mayor’s)</label>
-            <input type="file" class="form-control" multiple accept="image/*,application/pdf">
-          </div>
-          <div class="col-12">
-            <label class="form-label">Notes (optional)</label>
-            <textarea class="form-control" rows="3" placeholder="Any remarks…"></textarea>
+        {# Keep current search term while applying filters #}
+        <input type="hidden" name="search" value="{{ request.GET.search|default:'' }}"/>
+
+        <div class="offcanvas-footer">
+          <div class="actions">
+            <a class="btn btn-outline-brand"
+               href="?search={{ request.GET.search|urlencode }}">Clear</a>
+            <button type="submit" class="btn btn-brand">Apply Filters</button>
           </div>
         </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Close</button>
-        <button class="btn btn-brand" type="submit">Upload</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <form class="modal-content">
-      <input type="hidden" id="payRenewalId">
-      <div class="modal-header">
-        <h5 class="modal-title">{% bs_icon 'credit-card' extra_classes='me-2 text-danger' %} Record Payment</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-3">
-          <label class="form-label">OR Number</label>
-          <input type="text" class="form-control" required>
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Amount</label>
-          <div class="input-group">
-            <span class="input-group-text">₱</span>
-            <input type="number" class="form-control" step="0.01" min="0" required>
-          </div>
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Date</label>
-          <input type="date" class="form-control" value="2025-10-20" required>
-        </div>
-        <div class="small-muted">Status will move to PAID.</div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
-        <button class="btn btn-brand" type="submit">Save Payment</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<div class="modal fade" id="printModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">{% bs_icon 'printer' extra_classes='me-2 text-danger' %} Print Clearance</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <p class="mb-2">Generate and print the Business Clearance for this renewal.</p>
-        <div class="alert alert-warning py-2 px-3">
-          {% bs_icon 'exclamation-triangle' extra_classes='me-1' %} Ensure payment is marked PAID.
-        </div>
-      </div>
-      <div class="modal-footer">
-        <a id="printLink" class="btn btn-brand" target="_blank" href="#">Open PDF</a>
-        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-      </div>
+      </form>
     </div>
   </div>
+
 </div>
 
-<!-- ===== Flow Modal (Stepper) — STATIC CONTENT, NO JS) ===== -->
-<div class="modal fade" id="flowModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-md">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">
-          {% bs_icon 'info-circle' extra_classes='text-danger me-2' %}
-          Sto. Niño Bakery
-          <small class="text-muted ms-2">Draft</small>
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
+{# ─── AJAX live search: mirrors Business List implementation ─── #}
+<script>
+(function () {
+  // elements
+  const input  = document.getElementById('search');      // default Django id for form field "search"
+  const tbody  = document.getElementById('results-body');
+  const endpoint = "{% url search_url %}";               // provide in context like in business list
 
-      <div class="modal-body">
-        <div class="stepper">
-          <div class="d-flex align-items-center justify-content-between mb-2">
-            <strong>Renewal Flow</strong>
-            <span class="small-muted">Static demo</span>
-          </div>
+  // read current filter values from the page (match your hidden inputs)
+  function currentParams() {
+    const params = new URLSearchParams();
+    params.set('q', (input?.value || '').trim()); // backend expects 'q' like business list
+    params.set('tpl', 'rows');                    // ask server to render only rows partial
 
-          <div class="step done" data-step="1">
-            <div class="dot">{% bs_icon 'check' %}</div>
-            <div>
-              <div class="label">1. Start Renewal</div>
-              <div class="sub">Create a renewal for current year.</div>
-            </div>
-          </div>
+    const state = document.querySelector('input[name="clearance_state"]')?.value || '';
+    const active = document.querySelector('input[name="active_renewal"]')?.value || '';
 
-          <div class="step done" data-step="2">
-            <div class="dot">{% bs_icon 'check' %}</div>
-            <div>
-              <div class="label">2. Upload Requirements</div>
-              <div class="sub">Valid ID, Business Proofs, etc.</div>
-            </div>
-          </div>
+    if (state)  params.set('clearance_state', state);
+    if (active) params.set('active_renewal', active);
 
-          <div class="step" data-step="3">
-            <div class="dot"></div>
-            <div>
-              <div class="label">3. Treasurer Review</div>
-              <div class="sub">Treasurer checks completeness and fees.</div>
-            </div>
-          </div>
+    return params.toString();
+  }
 
-          <div class="step" data-step="4">
-            <div class="dot"></div>
-            <div>
-              <div class="label">4. Payment</div>
-              <div class="sub">Issue OR and confirm amount.</div>
-            </div>
-          </div>
+  // simple debounce
+  let t = null;
+  function debounce(fn, delay) {
+    return function (...args) {
+      clearTimeout(t);
+      t = setTimeout(() => fn.apply(this, args), delay);
+    }
+  }
 
-          <div class="step" data-step="5">
-            <div class="dot"></div>
-            <div>
-              <div class="label">5. Print & Release</div>
-              <div class="sub">Print clearance and mark as completed.</div>
-            </div>
-          </div>
-        </div>
+  async function fetchRows() {
+    try {
+      const url = endpoint + "?" + currentParams();
+      const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+      if (!res.ok) throw new Error("Network error");
+      const html = await res.text();
+      tbody.innerHTML = html;
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3">Failed to load results</td></tr>`;
+      console.error(err);
+    }
+  }
 
-        <div class="mt-3 small-muted">
-          <div><strong>Owner:</strong> Juan Dela Cruz</div>
-          <div><strong>Expiry:</strong> Dec 31, 2025</div>
-        </div>
-      </div>
+  if (input && tbody) {
+    // live as the user types (300ms)
+    input.addEventListener('input', debounce(fetchRows, 300));
+  }
+})();
+</script>
 
-      <div class="modal-footer">
-        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
 {% endblock content %}

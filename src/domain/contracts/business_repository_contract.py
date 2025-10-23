@@ -8,6 +8,7 @@ from src.app.transfer_objects.dto.business_dto import (
     ResidentOwnerDTO,
     NonResidentOwnerDTO,
     BusinessInfoDTO,
+    RenewalListDTO,
 )
 
 class IBusinessRepository(ABC):
@@ -75,4 +76,17 @@ class INonResidentOwnerRepository(ABC):
     @abstractmethod
     def insert_owner_details(self) -> NonResidentOwnerDTO:
         """Call SQL register_owner_only(...) then select and return full DTO."""
+        pass
+
+class IBusinessRenewalRepository(ABC):
+    @abstractmethod
+    def fetch_business_renewal_list(self) -> list[RenewalListDTO]:
+        pass
+
+    @abstractmethod
+    def search_business_renewal(self, search: str) -> list[RenewalListDTO]:
+        pass
+
+    @abstractmethod
+    def sort_clearance_sate(self, b_type: int) -> list[RenewalListDTO]:
         pass

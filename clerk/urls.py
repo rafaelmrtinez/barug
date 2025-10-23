@@ -55,6 +55,7 @@ urlpatterns = [
     path("valid-id/test/", web_views.upload_valid_id_test_page, name="valid_id_test"),
 
     path("ajax/business_search/", views.ajax_business_search, name="ajax_business_search"),
+    path("ajax/business_renewal_search/", views.ajax_business_search, name="ajax_renewal_search"),
     path("ajax/resident_owner_search/", views.ajax_owner_search, name="ajax_owner_search"),
     path("ajax/nonresident_owner_search/", views.ajax_nonresident_owner_search, name="ajax_nonresident_owner_search"),
     path("api/business/pins", views.api_business_pins, name="api_business_pins"),

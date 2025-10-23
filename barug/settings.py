@@ -176,7 +176,7 @@ DATABASES = {
         "PORT": os.getenv("DB_PORT"),
         "OPTIONS": {
             "sslmode": "require",
-            "connect_timeout": 10,
+            "connect_timeout": 20,
             "options": "-c statement_timeout=5000"
         }, 
         "CONN_MAX_AGE": 120,

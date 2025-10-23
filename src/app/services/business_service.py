@@ -15,17 +15,20 @@ from src.app.transfer_objects.commands.business_cmd import (
 from src.app.transfer_objects.dto.business_dto import (
     BusinessListDTO,
     ResidentOwnerDTO,
-    OwnerBusinessDTO
+    OwnerBusinessDTO,
+    RenewalListDTO,
 )
 from src.app.contracts.business_service_contract import (
     IBusinessService,
     IResidentOwnerService,
     IBusinessRegistrationService,
     IBusinessInfoService,
+    IBusinessRenewalService,
 )
 from src.domain.contracts.business_repository_contract import (
     IBusinessRepository,
     IResidentOwnerRepository,
+    IBusinessRenewalRepository,
 )
 from src.infra.repositories.business_repository import (
     OwnerBusinessInformationRepository,
@@ -297,3 +300,22 @@ class OwnerBusinessInfoService(IBusinessInfoService):
             # If your DB function uses a different field name, adjust here
             raise QueryExecutionException("Owner (person_id) not found for this business.")
         return self.execute(person_id=int(person_id), business_id=business_id)
+
+class BusinessRenewalService(IBusinessRenewalService):
+    def __init__(
+        self,
+        business_renewal_repo: IBusinessRenewalRepository,
+    ):
+        self._business_renewal_repo = business_renewal_repo
+
+    def execute(
+        self, 
+        search: Optional[str] = None, 
+        clearance_state: Optional[int] = None,
+    ) -> list[RenewalListDTO]:
+        if search:
+            return self._business_renewal_repo.search_business_renewal(search)
+        if clearance_state is not None:
+            return self._business_renewal_repo.sort_clearance_sate(clearance_state)
+
+        return self._business_renewal_repo.fetch_business_renewal_list()

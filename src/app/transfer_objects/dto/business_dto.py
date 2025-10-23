@@ -106,3 +106,15 @@ class OwnerBusinessDTO:
     business: dict[str, Any]
     # owner_id: dict[str, Any]
     business_proof: dict[str, Any]
+
+@dataclass(frozen=True)
+class RenewalListDTO:
+    business_id: int
+    business_name: str
+    owner_fullname: str
+    clearance_state: str
+    has_active_renewal_request: bool
+    open_renewal_request_count: int
+    valid_from: Optional[str]
+    expires_on: Optional[str]
+    extension: Optional[str]

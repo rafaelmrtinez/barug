@@ -44,7 +44,7 @@ from authentication.supabase_client import supabase
 from django.views.decorators.http import require_POST
 from .forms import (
     SearchVerificationRequest, SearchBusinessOwner, SelectOwnerForm , BusinessOwnerInfo,
-    BusinessDetails, BusinessFilters, RequestedDocsFilters, SelectOwnerForm
+    BusinessDetails, BusinessFilters, RequestedDocsFilters, SelectOwnerForm, RenewalFilters
 )
 
 # ---- email helper (uses your custom Gmail SMTP backend) ----
@@ -97,6 +97,7 @@ from src.app.contracts.business_service_contract import (
     IBusinessRegistrationService,
     IBusinessInfoService,
     INonResidentOwnerService,
+    IBusinessRenewalService,
 )
 from src.domain.contracts.business_repository_contract import IBusinessRepository
 from src.app.transfer_objects.commands.business_cmd import (
@@ -2799,12 +2800,6 @@ def ajax_business_search(
     ownership_type = request.GET.get("ownership_type")
     status = request.GET.get("status")
 
-    # def to_int_or_none(v):
-    #     try:
-    #         return int(v) if v not in (None, "",) else None
-    #     except ValueError:
-    #         return None
-
     rows = business_service.execute(
         search=q,
         b_category=_to_int_or_none(b_category),
@@ -2962,10 +2957,73 @@ def api_business_pins(
     )
     return JsonResponse(pins, safe=False)
 
-def renewal_list(request):
+@session_login_required
+@role_required(CLERK_ROLE)
+@csrf_protect
+@nocache
+@inject
+def renewal_list(
+    request: HttpRequest,
+    business_renewal_repo: IBusinessRenewalService = Provide[AppContainer.business_renewal_service],
+) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+    
     user_role = _auth_role_name(request)
+
+    form = RenewalFilters(request.GET or None)
+
+    search = request.GET.get("search")
+    clearance_state = request.GET.get("clearance_state")
+
+    rows = business_renewal_repo.execute(
+        search=search,
+        clearance_state=clearance_state
+    )
+
+    paginator = Paginator(rows, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    if (search or clearance_state is not None) and not form.is_valid():
+        form = RenewalFilters()
 
     return render(request, "business/renewal_list.html", {
         'page_path': f'{user_role} / Resident List',
         'page_title': 'Resident List',
+        'form' : form,
+        'page_obj' : page_obj,
+        'filters' : {
+            'search' : search,
+            'clearance_state' : clearance_state,
+        },
+        'url_name' : 'clerk:business_information',
+        'search_url' : 'clerk:ajax_renewal_search',
     })
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_GET
+@inject
+def ajax_renewal_search(
+    request:HttpRequest,
+    business_renewal_repo: IBusinessRenewalService = Provide[AppContainer.business_renewal_service],
+) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseBadRequest("GET only")
+    
+    if request.headers.get("x-requested-with") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR required")
+
+    q = request.GET.get("q", "") or None
+    clearance_state = request.GET.get("clearance_state")
+
+    rows = business_renewal_repo.execute(
+        search=q,
+        clearance_state=_to_int_or_none(clearance_state)
+    )[:50]
+
+    html = render_to_string(
+        "business/_renewal_rows.html",
+        {"rows": rows},
+        request=request,
+    )
+    return HttpResponse(html, content_type="text/html; charset=utf-8")
