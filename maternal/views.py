@@ -1,5 +1,5 @@
 from django.http import HttpRequest, HttpResponse, JsonResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.core.paginator import Paginator
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_protect as csrf_required
@@ -117,17 +117,13 @@ def create_new_maternal_entry(request: HttpRequest) -> HttpResponse:
 @nocache
 @csrf_required
 def maternal_health_record_form(request, record_id : int):
-    role = request.session.get("auth", {}).get("role_name")
-    assistant = request.session.get("auth", {}).get("first_name") + " " + request.session.get("auth", {}).get("last_name")
-    if request.method == "POST":
-        risk_code_form = RiskCodeForm(request.POST)
-        formset = PreviousPregnancyFormSet(request.POST, prefix="pp")
-        if risk_code_form.is_valid() and formset.is_valid():
-            # Save or process
-            pass
-    else:
+    try:
+        role = request.session.get("auth", {}).get("role_name")
+        assistant = request.session.get("auth", {}).get("first_name") + " " + request.session.get("auth", {}).get("last_name")
+        staff_id = request.session.get("auth", {}).get("staff_id")
+        
         maternal_identification_form = MaternalIdentificationForm(
-            role=role, maternal_repository=REPOSITORY, maternal_id=record_id)
+                role=role, maternal_repository=REPOSITORY, maternal_id=record_id)
         obstetric_form = ObstetricHistoryForm(
             maternal_repository=REPOSITORY,
             mhr_id=record_id
@@ -136,7 +132,7 @@ def maternal_health_record_form(request, record_id : int):
             maternal_repository=REPOSITORY,
             mhr_id=record_id
         )
-        person_id = REPOSITORY.fetch_person_id_by_maternal_record_id(record_id)
+        person_id = REPOSITORY.fetch_person_id_by_maternal_record_id(maternal_record_id=record_id) or None
         # Fetch rows once, then map to form initial
         rows = REPOSITORY.fetch_all_previous_pregnancies_by_person_id(person_id)
         # Map repo fields -> form field names (adjust keys to your repo output)
@@ -193,19 +189,208 @@ def maternal_health_record_form(request, record_id : int):
                 "maternal_id": record_id,
             },
         )
-    return render(request, "maternal/health_record_form.html", {
-        "risk_code_form": risk_code_form,
-        "formset": formset,
-        "identification_form": maternal_identification_form,
-        "obstetric_form": obstetric_form,
-        "medical_history_form": medical_history_form,
-        "tt_form": tt_form,
-        "present_pregnancy_form": presemt_pregnancy_form,
-        "lab_form": lab_form,
-        "check_list_form": check_list_form,
-        "plan_form": plan_form,
-        "micro_nutrients_form": micro_nutrients_form,
-    })
+        logger.info(f"FORM TYPE RECEIVED: {request.POST.get('form_type', None)}")
+        
+        if request.method == "POST":
+            form_type = request.POST.get("form_type", None) or None
+            if form_type:
+                if form_type == "obstetric_history_form":
+                    obstetric_form = ObstetricHistoryForm(
+                        maternal_repository=REPOSITORY,
+                        mhr_id=record_id,
+                        data=request.POST
+                    )
+                    if obstetric_form.is_valid():
+                        
+                        res = REPOSITORY.insert_obstetric_history(
+                            mhr_id=record_id,
+                            added_by_id=staff_id,
+                            num_children_born_alive=obstetric_form.cleaned_data.get("children_born_alive"),
+                            num_children_living=obstetric_form.cleaned_data.get("living_children"),
+                            num_of_abortions=obstetric_form.cleaned_data.get("abortions"),
+                            num_stillbirth=obstetric_form.cleaned_data.get("stillbirths"),
+                            num_large_babies=obstetric_form.cleaned_data.get("history_large_babies"),
+                            has_diabetes=obstetric_form.cleaned_data.get("diabetes_history"),
+                        )
+                        
+                        if not res:
+                            messages.error(request, "Failed to save Obstetric History.")
+                            return render(request, "maternal/health_record_form.html", {
+                                "risk_code_form": risk_code_form,
+                                "formset": formset,
+                                "identification_form": maternal_identification_form,
+                                "obstetric_form": obstetric_form,
+                                "medical_history_form": medical_history_form,
+                                "tt_form": tt_form,
+                                "present_pregnancy_form": presemt_pregnancy_form,
+                                "lab_form": lab_form,
+                                "check_list_form": check_list_form,
+                                "plan_form": plan_form,
+                                "micro_nutrients_form": micro_nutrients_form,
+                            })
+                        
+                        messages.success(request, "Obstetric History saved successfully.")
+                        return redirect('maternal:maternal_health_record_form', record_id=record_id)
+                    else:
+                        MessageUtility.push_form_errors_as_messages(request, obstetric_form)
+                        return render(request, "maternal/health_record_form.html", {
+                            "risk_code_form": risk_code_form,
+                            "formset": formset,
+                            "identification_form": maternal_identification_form,
+                            "obstetric_form": obstetric_form,
+                            "medical_history_form": medical_history_form,
+                            "tt_form": tt_form,
+                            "present_pregnancy_form": presemt_pregnancy_form,
+                            "lab_form": lab_form,
+                            "check_list_form": check_list_form,
+                            "plan_form": plan_form,
+                            "micro_nutrients_form": micro_nutrients_form,
+                        })
+                elif form_type == "medical_history_form":
+                    medical_history_form = MedicalHistoryForm(
+                        maternal_repository=REPOSITORY,
+                        mhr_id=record_id,
+                        data=request.POST
+                    )
+                    if medical_history_form.is_valid():
+                        
+                        res = REPOSITORY.insert_medical_history(
+                            mhr_id=record_id,
+                            staff_id=staff_id,
+                            previous_illness=medical_history_form.cleaned_data.get("previous_illness"),
+                            previous_hostpitalzation=medical_history_form.cleaned_data.get("previous_hospitalization"),
+                            previous_complication=medical_history_form.cleaned_data.get("previous_preg_complications"),
+                        )
+                        
+                        if not res:
+                            messages.error(request, "Failed to save Medical History.")
+                            return render(request, "maternal/health_record_form.html", {
+                                "risk_code_form": risk_code_form,
+                                "formset": formset,
+                                "identification_form": maternal_identification_form,
+                                "obstetric_form": obstetric_form,
+                                "medical_history_form": medical_history_form,
+                                "tt_form": tt_form,
+                                "present_pregnancy_form": presemt_pregnancy_form,
+                                "lab_form": lab_form,
+                                "check_list_form": check_list_form,
+                                "plan_form": plan_form,
+                                "micro_nutrients_form": micro_nutrients_form,
+                            })
+                        
+                        messages.success(request, "Medical History saved successfully.")
+                        return redirect('maternal:maternal_health_record_form', record_id=record_id)
+                    else:
+                        MessageUtility.push_form_errors_as_messages(request, medical_history_form)
+                        return render(request, "maternal/health_record_form.html", {
+                            "risk_code_form": risk_code_form,
+                            "formset": formset,
+                            "identification_form": maternal_identification_form,
+                            "obstetric_form": obstetric_form,
+                            "medical_history_form": medical_history_form,
+                            "tt_form": tt_form,
+                            "present_pregnancy_form": presemt_pregnancy_form,
+                            "lab_form": lab_form,
+                            "check_list_form": check_list_form,
+                            "plan_form": plan_form,
+                            "micro_nutrients_form": micro_nutrients_form,
+                        })
+                elif form_type == "tetanus_toxoid":
+                    tt_form = TetanusToxoidForm(
+                        mhr_repo=REPOSITORY,
+                        mhr_id=record_id,
+                        data=request.POST
+                    )
+                    if tt_form.is_valid():
+                        res = REPOSITORY.insert_maternal_tt_record(
+                            mhr_id=record_id,
+                            staff_id=staff_id,
+                            tt_type_id=tt_form.cleaned_data.get("tt_id"),
+                            date_given=tt_form.cleaned_data.get("last_entry"),
+                        )
+                        if not res:
+                            messages.error(request, "Failed to save Tetanus Toxoid data.")
+                            return render(request, "maternal/health_record_form.html", {
+                                "risk_code_form": risk_code_form,
+                                "formset": formset,
+                                "identification_form": maternal_identification_form,
+                                "obstetric_form": obstetric_form,
+                                "medical_history_form": medical_history_form,
+                                "tt_form": tt_form,
+                                "present_pregnancy_form": presemt_pregnancy_form,
+                                "lab_form": lab_form,
+                                "check_list_form": check_list_form,
+                                "plan_form": plan_form,
+                                "micro_nutrients_form": micro_nutrients_form,
+                            })
+                        
+                        messages.success(request, "Tetanus Toxoid data saved successfully.")
+                        return redirect('maternal:maternal_health_record_form', record_id=record_id)
+                    else:
+                        MessageUtility.push_form_errors_as_messages(request, tt_form)
+                        return render(request, "maternal/health_record_form.html", {
+                            "risk_code_form": risk_code_form,
+                            "formset": formset,
+                            "identification_form": maternal_identification_form,
+                            "obstetric_form": obstetric_form,
+                            "medical_history_form": medical_history_form,
+                            "tt_form": tt_form,
+                            "present_pregnancy_form": presemt_pregnancy_form,
+                            "lab_form": lab_form,
+                            "check_list_form": check_list_form,
+                            "plan_form": plan_form,
+                            "micro_nutrients_form": micro_nutrients_form,
+                        })
+            else:
+                messages.warning(request, "No form type specified.")
+                return render(request, "maternal/health_record_form.html", {
+                    "risk_code_form": risk_code_form,
+                    "formset": formset,
+                    "identification_form": maternal_identification_form,
+                    "obstetric_form": obstetric_form,
+                    "medical_history_form": medical_history_form,
+                    "tt_form": tt_form,
+                    "present_pregnancy_form": presemt_pregnancy_form,
+                    "lab_form": lab_form,
+                    "check_list_form": check_list_form,
+                    "plan_form": plan_form,
+                    "micro_nutrients_form": micro_nutrients_form,
+                })
+        
+            
+        return render(request, "maternal/health_record_form.html", {
+            "risk_code_form": risk_code_form,
+            "formset": formset,
+            "identification_form": maternal_identification_form,
+            "obstetric_form": obstetric_form,
+            "medical_history_form": medical_history_form,
+            "tt_form": tt_form,
+            "present_pregnancy_form": presemt_pregnancy_form,
+            "lab_form": lab_form,
+            "check_list_form": check_list_form,
+            "plan_form": plan_form,
+            "micro_nutrients_form": micro_nutrients_form,
+        })
+    except MaternalHealthRecordException as e:
+        logger.warning(f"Error in maternal health record form: {str(e)}")
+        messages.warning(request, e.message)
+        return render(request, "maternal/health_record_form.html", {
+            "risk_code_form": risk_code_form,
+            "formset": formset,
+            "identification_form": maternal_identification_form,
+            "obstetric_form": obstetric_form,
+            "medical_history_form": medical_history_form,
+            "tt_form": tt_form,
+            "present_pregnancy_form": presemt_pregnancy_form,
+            "lab_form": lab_form,
+            "check_list_form": check_list_form,
+            "plan_form": plan_form,
+            "micro_nutrients_form": micro_nutrients_form,
+        })
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        messages.error(request, f"Something went wrong. Please try again later.")
+        return redirect('maternal:maternal_health_record_form', record_id=record_id)
 
 @session_login_required
 @role_required(*ACCESS)

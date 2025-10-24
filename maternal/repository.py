@@ -6,20 +6,114 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from maternal.exceptions.maternal_exceptions import MaternalHealthRecordException
-import logging
 
 logger = logging.getLogger(__name__)
+
 
 class MaternalHealthRecordRepository:
 
     def __init__(self, ctx: ConnectionAdapter):
         self.ctx = ctx
+        
+    def fetch_maternal_tt_by_mhr_id(self, id: int):
+        sql="""SELECT tt_type.tt_type_id,  tt_type.tt_type_name FROM tt_vaccine_record 
+            INNER JOIN tt_type
+            ON tt_type.tt_type_id = tt_vaccine_record.tt_type_id
+            WHERE maternal_record_id = %s;"""
+        params = (id,)
+        rows = self.ctx.execute_query_to_dict(sql, params)
+        return rows
+        
+    def insert_maternal_tt_record(self, mhr_id, staff_id, tt_type_id, date_given):
+        sql="""SELECT * FROM add_maternal_tt_record(%s::INTEGER, %s::INTEGER, %s::INTEGER, %s::DATE);"""
+        params = (
+            mhr_id, staff_id, tt_type_id, date_given
+        )
+        try:
+            rows = self.ctx.execute_query(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException as e:
+            logger.error(f"Error inserting maternal TT record: {e.message}")
+            if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
+                raise MaternalHealthRecordException(e.message) from e
+            raise e
+        
+    def fetch_medical_history_by_mhr_id(self, maternal_record_id: int):
+        sql = """
+            SELECT
+                mh.previous_illness,
+                mh.previous_hospitalization,
+                mh.previous_preg_complication
+            FROM
+                medical_history AS mh
+            WHERE
+                mh.maternal_record_id = %s
+            ORDER BY
+                mh.medical_history_id DESC
+            LIMIT 1;
+        """
+        params = (maternal_record_id,)
+        rows = self.ctx.execute_query_to_dict(sql, params)
+        return rows[0] if rows else None
+
+        
+    def insert_medical_history(
+        self, mhr_id, staff_id, previous_illness, 
+        previous_hostpitalzation, previous_complication):
+        sql="""SELECT * FROM insert_medical_history(%s::INTEGER, %s::INTEGER, %s::TEXT, %s::TEXT, %s::TEXT);"""
+        params = (
+            mhr_id, staff_id, previous_illness, previous_hostpitalzation, previous_complication
+        )
+        try:
+            rows = self.ctx.execute_query(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException as e:
+            logger.error(f"Error inserting medical history: {e.message}")
+            if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
+                raise MaternalHealthRecordException(e.message) from e
+            raise e
+
+    def fetch_obstetric_history_by_mhr_id(self, maternal_record_id: int):
+        sql = """
+            SELECT
+                oh.num_children_born_alive,
+                oh.num_children_living,
+                oh.num_abortion,
+                oh.num_stillbirth,
+                oh.num_large_babies,
+                oh.has_diabetes
+            FROM
+                obstetric_history AS oh
+            WHERE
+                oh.maternal_record_id = %s;
+        """
+        params = (maternal_record_id,)
+        rows = self.ctx.execute_query_to_dict(sql, params)
+        return rows[0] if rows else None
+        
+    def insert_obstetric_history(
+        self, mhr_id: int, added_by_id: int, num_children_born_alive: int, 
+        num_children_living: int, num_of_abortions: int, num_stillbirth: int, num_large_babies: int, 
+        has_diabetes: bool):
+        sql="""SELECT * FROM insert_obstetric_history(%s::INTEGER, %s::INTEGER, %s::INTEGER, %s::INTEGER, %s::INTEGER, %s::INTEGER, %s::INTEGER, %s::BOOLEAN);"""
+        params = (
+            mhr_id, added_by_id, num_children_born_alive, num_children_living,
+            num_of_abortions, num_stillbirth, num_large_babies, has_diabetes
+        )
+        try:
+            rows = self.ctx.execute_query(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException as e:
+            logger.error(f"Error inserting obstetric history: {e.message}")
+            if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
+                raise MaternalHealthRecordException(e.message) from e
+            raise e
 
     def insert_maternal_health_record(self, staff_id, person_id, husband_id, weight, height, bmi_status_id, is_transferred):
         sql = """SELECT * FROM create_maternal_health_record_bhw(%s::INTEGER, %s::INTEGER, %s::INTEGER, %s::DECIMAL, %s::DECIMAL, %s::INTEGER, %s::BOOLEAN);"""
-        params = (staff_id, person_id, husband_id, weight,
-                  height, bmi_status_id, is_transferred)
+        params = (
+            staff_id, person_id, husband_id, weight,
+            height, bmi_status_id, is_transferred)
 
         try:
             rows = self.ctx.execute_query(sql, params)
@@ -107,6 +201,15 @@ class MaternalHealthRecordRepository:
         params = (maternal_record_id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows[0] if rows else None
+    
+    def fetch_person_id_by_maternal_record_id(self, maternal_record_id: int):
+        sql = """SELECT person_id
+            FROM public.maternal_health_record
+            WHERE maternal_record_id = %s
+            LIMIT 1;"""
+        params = (maternal_record_id,)
+        rows = self.ctx.execute_query_to_dict(sql, params)
+        return rows[0]['person_id'] if rows else None
 
     def fetch_multiple_micro_nutrients_by_mhr_id(self, maternal_record_id: int):
         sql = """SELECT
@@ -296,55 +399,20 @@ class MaternalHealthRecordRepository:
         return rows[0] if rows else None
 
     def fetch_maternal_tt_by_mhr_id(self, maternal_record_id: int):
-        sql = """-- $1 := maternal_record_id
-            WITH tt_type_map AS (
-            -- If you have a tt_type lookup, replace this with a SELECT from that table.
-            SELECT 1 AS tt_type_id, 1 AS dose_order, 'TT1' AS dose_label UNION ALL
-            SELECT 2, 2, 'TT2' UNION ALL
-            SELECT 3, 3, 'TT3' UNION ALL
-            SELECT 4, 4, 'TT4' UNION ALL
-            SELECT 5, 5, 'TT5'
-            ),
-            per_type AS (
-            -- keep earliest date per type for this maternal record
+        sql = """
             SELECT
-                r.maternal_record_id,
-                r.tt_type_id,
-                MIN(r.date_given)::date AS date_given
-            FROM public.tt_vaccine_record r
+                r.tt_id,
+                t.tt_type_name,
+                r.date_given::date AS date_given
+            FROM public.tt_vaccine_record AS r
+            JOIN public.tt_type AS t
+                ON t.tt_type_id = r.tt_type_id
             WHERE r.maternal_record_id = %s
-            GROUP BY r.maternal_record_id, r.tt_type_id
-            ),
-            ordered AS (
-            SELECT
-                p.maternal_record_id,
-                m.dose_order,
-                m.dose_label,
-                p.date_given
-            FROM per_type p
-            JOIN tt_type_map m
-                ON m.tt_type_id = p.tt_type_id
-            )
-            SELECT
-            maternal_record_id,
-            dose_label,                     -- 'TT1'...'TT5'
-            date_given,                     -- date given for that dose
-            LEAST(ROW_NUMBER() OVER (ORDER BY dose_order), 6) AS fim_level,   -- 1..6
-            CONCAT('FIM-', LEAST(ROW_NUMBER() OVER (ORDER BY dose_order), 6)) AS fim_label
-            FROM ordered
-            ORDER BY dose_order;"""
+            ORDER BY r.date_given NULLS LAST, r.tt_id DESC;
+        """
         params = (maternal_record_id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
-        return rows
-
-    def fetch_person_id_by_maternal_record_id(self, maternal_record_id: int):
-        sql = """SELECT person_id
-            FROM public.maternal_health_record
-            WHERE maternal_record_id = %s
-            LIMIT 1;"""
-        params = (maternal_record_id,)
-        rows = self.ctx.execute_query_to_dict(sql, params)
-        return rows[0]['person_id'] if rows else None
+        return rows or []
 
     def fetch_all_previous_pregnancies_by_person_id(self, person_id: int):
         sql = """SELECT
@@ -395,62 +463,40 @@ class MaternalHealthRecordRepository:
         return rows[0] if rows else None
 
     def fetch_all_mhr_form_basic_info_by_mhr_id(self, maternal_record_id: int):
-        sql = """SELECT
-            fu.family_num                                             AS family_number,
-            /* Mother's full name: First M. Last Suffix */
-            TRIM(
-                REGEXP_REPLACE(
-                CONCAT_WS(' ',
-                    COALESCE(pm.first_name, ''),
-                    NULLIF(LEFT(COALESCE(pm.middle_name, ''), 1) || '.', '.'),
-                    COALESCE(pm.last_name, ''),
-                    COALESCE(pm.suffix, '')
-                ),
-                '\s+', ' ', 'g'
-                )
-            )                                                         AS full_name,
-            pm.birthdate::date                                        AS date_of_birth,
-            /* Age: prefer stored pm.age; else compute whole years from birthdate */
-            COALESCE(
-                pm.age,
-                EXTRACT(YEAR FROM age(current_date, pm.birthdate))::int
-            )                                                         AS age,
-            /* Complete address: "Street, Purok/Sitio, Brgy X, City" */
-            CONCAT_WS(', ',
-                NULLIF(a.street, ''),
-                NULLIF(ps.purok_sitio_name, ''),
-                CASE WHEN COALESCE(a.barangay, '') <> '' THEN 'Brgy ' || a.barangay ELSE NULL END,
-                NULLIF(a.city, '')
-            )                                                         AS address,
-            /* Husband's full name (if set on the MHR) */
-            TRIM(
-                REGEXP_REPLACE(
-                CONCAT_WS(' ',
-                    COALESCE(ph.first_name, ''),
-                    NULLIF(LEFT(COALESCE(ph.middle_name, ''), 1) || '.', '.'),
-                    COALESCE(ph.last_name, ''),
-                    COALESCE(ph.suffix, '')
-                ),
-                '\s+', ' ', 'g'
-                )
-            )                                                         AS husband_full_name,
-            pm.occupation                                             AS occupation
-            FROM public.maternal_health_record AS m
-            JOIN public.person AS pm
-            ON pm.person_id = m.person_id               -- mother
-            LEFT JOIN public.person AS ph
-            ON ph.person_id = m.husband_id              -- husband (optional)
-            LEFT JOIN public.family_unit AS fu
-            ON fu.family_head_id = pm.person_id         -- assumes mother is family head
-            LEFT JOIN public.addresss AS a
-            ON a.address_id = pm.address_id
-            LEFT JOIN public.purok_sitio AS ps
-            ON ps.purok_sitio_id = a.purok_sitio_id
-            WHERE m.maternal_record_id = %s
-            LIMIT 1;"""
+        sql = """
+            SELECT
+                mhr.maternal_record_id,
+                fu.family_num AS family_number,
+                CONCAT(mother.first_name, ' ',
+                    COALESCE(mother.middle_name, ''), ' ',
+                    mother.last_name) AS mother_full_name,
+                mother.birthdate AS mother_birthdate,
+                DATE_PART('year', AGE(CURRENT_DATE, mother.birthdate)) AS mother_age,
+                CONCAT(addr.street, ', ', addr.barangay, ', ', addr.city) AS mother_address,
+                CONCAT(husband.first_name, ' ',
+                    COALESCE(husband.middle_name, ''), ' ',
+                    husband.last_name) AS husband_full_name,
+                mother.occupation AS mother_occupation,
+                mhr.weight AS mother_weight,
+                mhr.height AS mother_height,
+                ROUND(mhr.weight / POWER(mhr.height / 100, 2), 2) AS mother_bmi,
+                bs.bmi_status_name AS bmi_status
+            FROM
+                maternal_health_record mhr
+                INNER JOIN person AS mother ON mhr.person_id = mother.person_id
+                INNER JOIN person AS husband ON mhr.husband_id = husband.person_id
+                INNER JOIN family_unit AS fu ON mhr.family_id = fu.family_id
+                INNER JOIN addresss AS addr ON mother.address_id = addr.address_id
+                INNER JOIN bmi_status AS bs ON mhr.bmi_status_id = bs.bmi_status_id
+            WHERE
+                mhr.maternal_record_id = %s
+            ORDER BY
+                fu.family_num;
+        """
         params = (maternal_record_id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows[0] if rows else None
+
 
     def fetch_all_maternal_records_for_person(self, person_id: int):
         sql = """
@@ -484,9 +530,9 @@ class MaternalHealthRecordRepository:
             ORDER BY a.start_date DESC, a.maternal_record_id DESC;
             """
         return self.ctx.execute_query_to_dict(sql, (person_id,)) or []
-    
+
     def fetch_maternal_health_record_id_by_person_id(self, id: int):
-        sql="""SELECT maternal_record_id FROM maternal_health_record WHERE person_id = %s;"""
+        sql = """SELECT maternal_record_id FROM maternal_health_record WHERE person_id = %s;"""
         params = (id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows[0] if rows else None

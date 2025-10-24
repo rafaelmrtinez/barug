@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block css %}
-<link rel="stylesheet" href="{% static 'maternal/css/mhr_form.css' %}">
+<link rel="stylesheet" href="{% static 'css/mhr-theme.css' %}">
 <link rel="stylesheet" href="{% static 'maternal/css/image-preview.css' %}">
 {% endblock %}
 
@@ -10,61 +10,63 @@
 <div class="container py-4 mt-5">
     <h1 class="mb-3">Maternal Health Record</h1>
 
+    {% include 'messages.html' %}
+
+    {# ───────────────── Identification ───────────────── #}
+
     <!-- Identification -->
     <form method="post" class="card mb-3 card-brand" id="form-identification" action="">
         {% csrf_token %}
         <input type="hidden" name="section" value="identification">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <span>Identification</span>
+        <div class="card mb-3 card-brand">
+            <div class="card-header">Identification</div>
+            <div class="card-body">
+                <div id="identification" class="row g-3">
+                    <div class="col-md-3">{{ identification_form.family_no.label_tag }} {{ identification_form.family_no }}
+                    </div>
+                    <div class="col-md-6">{{ identification_form.name.label_tag }} {{ identification_form.name }}</div>
+                    <div class="col-md-3">{{ identification_form.date_of_birth.label_tag }} {{ identification_form.date_of_birth }}</div>
+                    <div class="col-md-2">{{ identification_form.age.label_tag }} {{ identification_form.age }}</div>
+                    <div class="col-md-2">{{ identification_form.age_group.label_tag }} {{ identification_form.age_group }}
+                    </div>
+                    <div class="col-md-8">{{ identification_form.address.label_tag }} {{ identification_form.address }}</div>
+                    <div class="col-md-4">{{ identification_form.husband_name.label_tag }} {{ identification_form.husband_name }}</div>
+                    <div class="col-md-4">{{ identification_form.occupation.label_tag }} {{ identification_form.occupation }}
+                    </div>
+                    <div class="col-md-2">{{ identification_form.weight_kg.label_tag }} {{ identification_form.weight_kg }}
+                    </div>
+                    <div class="col-md-2">{{ identification_form.height_cm.label_tag }} {{ identification_form.height_cm }}
+                    </div>
+                    <div class="col-md-2">{{ identification_form.bmi.label_tag }} {{ identification_form.bmi }}</div>
+                    <div class="col-md-2">{{ identification_form.bmi_category.label_tag }} {{ identification_form.bmi_category }}</div>
+                </div>
+            </div>
             {% if request.session.auth.role_name == "barangay health worker" %}
-            <button type="button" class="btn btn-sm btn-brand section-action"
-                data-section="#identification">Edit
-            </button>
+            <div class="card-footer text-end">
+                <button type="submit" class="btn btn-brand">Save Identification</button>
+            </div>
             {% endif %}
         </div>
-        <div id="identification" class="card-body row g-3">
-            <div class="col-md-3">{{ identification_form.family_no.label_tag }} {{ identification_form.family_no }}
-            </div>
-            <div class="col-md-6">{{ identification_form.name.label_tag }} {{ identification_form.name }}</div>
-            <div class="col-md-3">{{ identification_form.date_of_birth.label_tag }} {{ identification_form.date_of_birth }}</div>
-            <div class="col-md-2">{{ identification_form.age.label_tag }} {{ identification_form.age }}</div>
-            <div class="col-md-2">{{ identification_form.age_group.label_tag }} {{ identification_form.age_group }}
-            </div>
-            <div class="col-md-8">{{ identification_form.address.label_tag }} {{ identification_form.address }}</div>
-            <div class="col-md-4">{{ identification_form.husband_name.label_tag }} {{ identification_form.husband_name }}</div>
-            <div class="col-md-4">{{ identification_form.occupation.label_tag }} {{ identification_form.occupation }}
-            </div>
-            <div class="col-md-2">{{ identification_form.weight_kg.label_tag }} {{ identification_form.weight_kg }}
-            </div>
-            <div class="col-md-2">{{ identification_form.height_cm.label_tag }} {{ identification_form.height_cm }}
-            </div>
-            <div class="col-md-2">{{ identification_form.bmi.label_tag }} {{ identification_form.bmi }}</div>
-            <div class="col-md-2">{{ identification_form.bmi_category.label_tag }} {{ identification_form.bmi_category }}</div>
-        </div>
-        {% if request.session.auth.role_name == "barangay health worker" %}
-        <div class="card-footer text-end">
-            <button type="submit" class="btn btn-brand">Save Identification</button>
-        </div>
-        {% endif %}
     </form>
 
     {% if request.session.auth.role_name == "midwife" %}
         <!-- Obstetric -->
         <form method="post" class="card mb-3 card-brand" id="form-obstetric" action="">
             {% csrf_token %}
-            <input type="hidden" name="section" value="obstetric">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Obstetric</span>
-                <button type="button" class="btn btn-sm btn-brand section-action" data-section="#obstetric">Edit</button>
-            </div>
-            <div id="obstetric" class="card-body row g-3">
-                <div class="col-md-3">{{ obstetric_form.children_born_alive.label_tag }} {{ obstetric_form.children_born_alive }}</div>
-                <div class="col-md-3">{{ obstetric_form.living_children.label_tag }} {{ obstetric_form.living_children }}
+            {{ obstetric_form.form_type }}
+            <div class="card mb-3 card-brand">
+                <span class="card-header">Obstetric</span>
+                <div class="card-body">
+                    <div id="obstetric" class="row g-3">
+                        <div class="col-md-3">{{ obstetric_form.children_born_alive.label_tag }} {{ obstetric_form.children_born_alive }}</div>
+                        <div class="col-md-3">{{ obstetric_form.living_children.label_tag }} {{ obstetric_form.living_children }}
+                        </div>
+                        <div class="col-md-3">{{ obstetric_form.abortions.label_tag }} {{ obstetric_form.abortions }}</div>
+                        <div class="col-md-3">{{ obstetric_form.stillbirths.label_tag }} {{ obstetric_form.stillbirths }}</div>
+                        <div class="col-md-6 form-check mt-2 ms-2">{{ obstetric_form.history_large_babies.label_tag }} {{ obstetric_form.history_large_babies }}</div>
+                        <div class="col-md-6 form-check mt-2 ms-2">{{ obstetric_form.diabetes_history }} {{ obstetric_form.diabetes_history.label_tag }}</div>
+                    </div>
                 </div>
-                <div class="col-md-3">{{ obstetric_form.abortions.label_tag }} {{ obstetric_form.abortions }}</div>
-                <div class="col-md-3">{{ obstetric_form.stillbirths.label_tag }} {{ obstetric_form.stillbirths }}</div>
-                <div class="col-md-6 form-check mt-2 ms-2">{{ obstetric_form.history_large_babies.label_tag }} {{ obstetric_form.history_large_babies }}</div>
-                <div class="col-md-6 form-check mt-2 ms-2">{{ obstetric_form.diabetes_history }} {{ obstetric_form.diabetes_history.label_tag }}</div>
             </div>
             <div class="card-footer text-end">
                 <button type="submit" class="btn btn-brand">Save Obstetric</button>
@@ -74,15 +76,16 @@
         <!-- Medical History -->
         <form method="post" class="card mb-3 card-brand" id="form-medhist" action="">
             {% csrf_token %}
-            <input type="hidden" name="section" value="medical_history">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Medical History</span>
-                <button type="button" class="btn btn-sm btn-brand section-action" data-section="#medhist">Edit</button>
-            </div>
-            <div id="medhist" class="card-body row g-3">
-                <div class="col-md-4">{{ medical_history_form.previous_illness.label_tag }} {{ medical_history_form.previous_illness }}</div>
-                <div class="col-md-4">{{ medical_history_form.previous_hospitalization.label_tag }} {{ medical_history_form.previous_hospitalization }}</div>
-                <div class="col-md-4">{{ medical_history_form.previous_preg_complications.label_tag }} {{ medical_history_form.previous_preg_complications }}</div>
+            {{ medical_history_form.form_type }}
+            <div class="card mb-3 card-brand">
+                <span class="card-header">Medical History</span>
+                <div class="card-body">
+                    <div id="medhist" class="row g-3">
+                        <div class="col-md-4">{{ medical_history_form.previous_illness.label_tag }} {{ medical_history_form.previous_illness }}</div>
+                        <div class="col-md-4">{{ medical_history_form.previous_hospitalization.label_tag }} {{ medical_history_form.previous_hospitalization }}</div>
+                        <div class="col-md-4">{{ medical_history_form.previous_preg_complications.label_tag }} {{ medical_history_form.previous_preg_complications }}</div>
+                    </div>
+                </div>
             </div>
             <div class="card-footer text-end">
                 <button type="submit" class="btn btn-brand">Save Medical History</button>
@@ -156,18 +159,19 @@
         <!-- Tetanus Toxoid -->
         <form method="post" class="card mb-3 card-brand" id="form-tt" action="">
             {% csrf_token %}
-            <input type="hidden" name="section" value="tetanus_toxoid">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Tetanus Toxoid (dates given)</span>
-                <button type="button" class="btn btn-sm btn-brand section-action" data-section="#tt">Edit</button>
-            </div>
-            <div id="tt" class="card-body row g-3">
-                <div class="col-md-2">{{ tt_form.tt1_date.label_tag }} {{ tt_form.tt1_date }}</div>
-                <div class="col-md-2">{{ tt_form.tt2_date.label_tag }} {{ tt_form.tt2_date }}</div>
-                <div class="col-md-2">{{ tt_form.tt3_date.label_tag }} {{ tt_form.tt3_date }}</div>
-                <div class="col-md-2">{{ tt_form.tt4_date.label_tag }} {{ tt_form.tt4_date }}</div>
-                <div class="col-md-2">{{ tt_form.tt5_date.label_tag }} {{ tt_form.tt5_date }}</div>
-                <div class="col-md-2">{{ tt_form.fim_date.label_tag }} {{ tt_form.fim_date }}</div>
+            {{ tt_form.form_type }}
+            <div class="card card-brand mb-3">
+                <span class="card-header">Tetanus Toxoid (dates given)</span>
+                <div class="card-body">
+                    <div id="tt" class="row g-3">
+                        <div class="col-md-2">{{ tt_form.tt1_date.label_tag }} {{ tt_form.tt1_date }}</div>
+                        <div class="col-md-2">{{ tt_form.tt2_date.label_tag }} {{ tt_form.tt2_date }}</div>
+                        <div class="col-md-2">{{ tt_form.tt3_date.label_tag }} {{ tt_form.tt3_date }}</div>
+                        <div class="col-md-2">{{ tt_form.tt4_date.label_tag }} {{ tt_form.tt4_date }}</div>
+                        <div class="col-md-2">{{ tt_form.tt5_date.label_tag }} {{ tt_form.tt5_date }}</div>
+                        <div class="col-md-2">{{ tt_form.fim_date.label_tag }} {{ tt_form.fim_date }}</div>
+                    </div>
+                </div>
             </div>
             <div class="card-footer text-end">
                 <button type="submit" class="btn btn-brand">Save Tetanus Toxoid</button>
@@ -178,20 +182,21 @@
         <form method="post" class="card mb-3 card-brand" id="form-present" action="">
             {% csrf_token %}
             <input type="hidden" name="section" value="present_pregnancy">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Present Pregnancy</span>
-                <button type="button" class="btn btn-sm btn-brand section-action" data-section="#present">Edit</button>
-            </div>
-            <div id="present" class="card-body row g-3">
-                <div class="col-md-2">{{ present_pregnancy_form.gravida.label_tag }} {{ present_pregnancy_form.gravida }}
+            <div class="card card-brand mb-3">
+                <span class="card-header">Present Pregnancy</span>
+                <div class="card-body">
+                    <div id="present" class="row g-3">
+                        <div class="col-md-2">{{ present_pregnancy_form.gravida.label_tag }} {{ present_pregnancy_form.gravida }}
+                        </div>
+                        <div class="col-md-2">{{ present_pregnancy_form.para.label_tag }} {{ present_pregnancy_form.para }}</div>
+                        <div class="col-md-2">{{ present_pregnancy_form.fullterm.label_tag }} {{ present_pregnancy_form.fullterm }}
+                        </div>
+                        <div class="col-md-2">{{ present_pregnancy_form.preterm.label_tag }} {{ present_pregnancy_form.preterm }}
+                        </div>
+                        <div class="col-md-2">{{ present_pregnancy_form.lmp.label_tag }} {{ present_pregnancy_form.lmp }}</div>
+                        <div class="col-md-2">{{ present_pregnancy_form.edc.label_tag }} {{ present_pregnancy_form.edc }}</div>
+                    </div>
                 </div>
-                <div class="col-md-2">{{ present_pregnancy_form.para.label_tag }} {{ present_pregnancy_form.para }}</div>
-                <div class="col-md-2">{{ present_pregnancy_form.fullterm.label_tag }} {{ present_pregnancy_form.fullterm }}
-                </div>
-                <div class="col-md-2">{{ present_pregnancy_form.preterm.label_tag }} {{ present_pregnancy_form.preterm }}
-                </div>
-                <div class="col-md-2">{{ present_pregnancy_form.lmp.label_tag }} {{ present_pregnancy_form.lmp }}</div>
-                <div class="col-md-2">{{ present_pregnancy_form.edc.label_tag }} {{ present_pregnancy_form.edc }}</div>
             </div>
             <div class="card-footer text-end">
                 <button type="submit" class="btn btn-brand">Save Present Pregnancy</button>
@@ -435,13 +440,14 @@
         <form method="post" class="card mb-3 card-brand" id="form-plans" action="">
             {% csrf_token %}
             <input type="hidden" name="section" value="plans">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Plans</span>
-                <button type="button" class="btn btn-sm btn-brand section-action" data-section="#plans">Edit</button>
-            </div>
-            <div id="plans" class="card-body row g-3">
-                <div class="col-md-6">{{ plan_form.plan_place_of_delivery.label_tag }} {{ plan_form.plan_place_of_delivery }}</div>
-                <div class="col-md-6 form-check mt-2">{{ plan_form.plan_newborn_screening }} {{ plan_form.plan_newborn_screening.label_tag }}</div>
+            <div class="card card-brand mb-3">
+                <span class="card-header">Plans</span>
+                <div class="card-body">
+                    <div id="plans" class="row g-3">
+                        <div class="col-md-6">{{ plan_form.plan_place_of_delivery.label_tag }} {{ plan_form.plan_place_of_delivery }}</div>
+                        <div class="col-md-6 form-check mt-2">{{ plan_form.plan_newborn_screening }} {{ plan_form.plan_newborn_screening.label_tag }}</div>
+                    </div>
+                </div>
             </div>
             <div class="card-footer text-end">
                 <button type="submit" class="btn btn-brand">Save Plans</button>
@@ -452,15 +458,16 @@
         <form method="post" class="card mb-4 card-brand" id="form-micros" action="">
             {% csrf_token %}
             <input type="hidden" name="section" value="micronutrients">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Micronutrients</span>
-                <button type="button" class="btn btn-sm btn-brand section-action" data-section="#micros">Edit</button>
-            </div>
-            <div id="micros" class="card-body row g-3">
-                <div class="col-md-6">{{ micro_nutrients_form.iron_folic_start.label_tag }} {{ micro_nutrients_form.iron_folic_start }}</div>
-                <div class="col-md-6 form-check mt-2">{{ micro_nutrients_form.iron_folic_end }} {{ micro_nutrients_form.iron_folic_end.label_tag }}</div>
-                <div class="col-md-4">{{ micro_nutrients_form.deworming_date.label_tag }} {{ micro_nutrients_form.deworming_date }}</div>
-                <div class="col-md-4">{{ micro_nutrients_form.deworming_date.label_tag }} {{ micro_nutrients_form.deworming_date }}</div>
+            <div class="card card-brand mb-3">
+                <span class="card-header">Micronutrients</span>
+                <div class="card-body">
+                    <div id="micros" class="row g-3">
+                        <div class="col-md-6">{{ micro_nutrients_form.iron_folic_start.label_tag }} {{ micro_nutrients_form.iron_folic_start }}</div>
+                        <div class="col-md-6 form-check mt-2"> {{ micro_nutrients_form.iron_folic_end.label_tag }} {{ micro_nutrients_form.iron_folic_end }}</div>
+                        <div class="col-md-4">{{ micro_nutrients_form.deworming_date.label_tag }} {{ micro_nutrients_form.deworming_date }}</div>
+                        <div class="col-md-4">{{ micro_nutrients_form.deworming_date.label_tag }} {{ micro_nutrients_form.deworming_date }}</div>
+                    </div>
+                </div>
             </div>
             <div class="card-footer d-flex justify-content-between align-items-center">
                 <div class="text-muted small">Tip: Micronutrients are per maternal record (not per visit).</div>
@@ -472,36 +479,36 @@
         <form method="post" class="card mb-3 card-brand" id="form-prenatal-followup" action="">
         {% csrf_token %}
         <input type="hidden" name="section" value="prenatal_followup">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <span>Prenatal Follow-Up</span>
-            <button type="button" class="btn btn-sm btn-brand section-action" data-section="#prenatal-followup-fields">Edit</button>
-        </div>
-
-        <div id="prenatal-followup-fields" class="card-body row g-3">
-            {# One new-entry row (inputs only) — bind to your view as needed #}
-            <div class="col-md-2">
-            {{ prenatal_followup_entry_form.date.label_tag }}
-            {{ prenatal_followup_entry_form.date }}
-            </div>
-            <div class="col-md-2">
-            {{ prenatal_followup_entry_form.aog.label_tag }}
-            {{ prenatal_followup_entry_form.aog }}
-            </div>
-            <div class="col-md-2">
-            {{ prenatal_followup_entry_form.wt_kg.label_tag }}
-            {{ prenatal_followup_entry_form.wt_kg }}
-            </div>
-            <div class="col-md-2">
-            {{ prenatal_followup_entry_form.bp.label_tag }}
-            {{ prenatal_followup_entry_form.bp }}
-            </div>
-            <div class="col-md-4">
-            {{ prenatal_followup_entry_form.findings.label_tag }}
-            {{ prenatal_followup_entry_form.findings }}
-            </div>
-            <div class="col-12">
-            {{ prenatal_followup_entry_form.notes.label_tag }}
-            {{ prenatal_followup_entry_form.notes }}
+        <div class="card card-brand mb-3">
+            <span class="card-header">Prenatal Follow-Up</span>
+            <div class="card-body">
+                <div id="prenatal-followup-fields" class="row g-3">
+                    {# One new-entry row (inputs only) — bind to your view as needed #}
+                    <div class="col-md-2">
+                    {{ prenatal_followup_entry_form.date.label_tag }}
+                    {{ prenatal_followup_entry_form.date }}
+                    </div>
+                    <div class="col-md-2">
+                    {{ prenatal_followup_entry_form.aog.label_tag }}
+                    {{ prenatal_followup_entry_form.aog }}
+                    </div>
+                    <div class="col-md-2">
+                    {{ prenatal_followup_entry_form.wt_kg.label_tag }}
+                    {{ prenatal_followup_entry_form.wt_kg }}
+                    </div>
+                    <div class="col-md-2">
+                    {{ prenatal_followup_entry_form.bp.label_tag }}
+                    {{ prenatal_followup_entry_form.bp }}
+                    </div>
+                    <div class="col-md-4">
+                    {{ prenatal_followup_entry_form.findings.label_tag }}
+                    {{ prenatal_followup_entry_form.findings }}
+                    </div>
+                    <div class="col-12">
+                    {{ prenatal_followup_entry_form.notes.label_tag }}
+                    {{ prenatal_followup_entry_form.notes }}
+                    </div>
+                </div>
             </div>
         </div>
 
