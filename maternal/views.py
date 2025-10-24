@@ -17,6 +17,7 @@ from maternal.forms.micro_nutrients_form import MicroNutrientsForm
 from maternal.forms.obstetric_history_form import ObstetricHistoryForm
 from maternal.forms.plans_form import PlanForm
 from maternal.forms.pre_natal_follow_up_base_formset import PrenatalFollowUpFormSet
+from maternal.forms.pre_natal_follow_up_form import PrenatalFollowUpEntryForm
 from maternal.forms.present_pregnancy_form import PresentPregnancyForm
 from maternal.forms.previous_pregnancy_form import PreviousPregnancyFormSet
 from maternal.forms.tetanus_toxoid_form import TetanusToxoidForm
@@ -32,8 +33,22 @@ logger = logging.getLogger(__name__)
 ACCESS = ("MIDWIFE", "Midwife", "midwife", "Barangay Health Worker", "bhw", "Super Admin")
 BHW_ACCESS = ("Barangay Health Worker", "bhw")
 MIDWIFE_ACCESS = ("MIDWIFE", "Midwife", "midwife")
-ADAPTER = ConnectionAdapter()
-REPOSITORY = MaternalHealthRecordRepository(ADAPTER)
+
+class _LazyRepository:
+    """Proxy: instantiate ConnectionAdapter + repository on first use."""
+    def __init__(self):
+        self._repo = None
+
+    def _ensure(self):
+        if self._repo is None:
+            adapter = ConnectionAdapter()
+            self._repo = MaternalHealthRecordRepository(adapter)
+
+    def __getattr__(self, name):
+        self._ensure()
+        return getattr(self._repo, name)
+
+REPOSITORY: MaternalHealthRecordRepository = _LazyRepository()
 
 @session_login_required
 @role_required(*ACCESS)
@@ -189,6 +204,12 @@ def maternal_health_record_form(request, record_id : int):
                 "maternal_id": record_id,
             },
         )
+        # single blank form for entering a new prenatal followup
+        pf_entry_form = PrenatalFollowUpEntryForm(
+            mhr_repository=REPOSITORY,
+            maternal_id=record_id,
+            prefix="pf_entry"  # keep prefixes distinct from the formset (if used)
+        )
         logger.info(f"FORM TYPE RECEIVED: {request.POST.get('form_type', None)}")
         
         if request.method == "POST":
@@ -227,6 +248,8 @@ def maternal_health_record_form(request, record_id : int):
                                 "check_list_form": check_list_form,
                                 "plan_form": plan_form,
                                 "micro_nutrients_form": micro_nutrients_form,
+                                "prenatal_followup_entry_form": pf_entry_form,
+                                "prenatal_followup_formset": pf_formset,
                             })
                         
                         messages.success(request, "Obstetric History saved successfully.")
@@ -245,6 +268,8 @@ def maternal_health_record_form(request, record_id : int):
                             "check_list_form": check_list_form,
                             "plan_form": plan_form,
                             "micro_nutrients_form": micro_nutrients_form,
+                            "prenatal_followup_entry_form": pf_entry_form,
+                            "prenatal_followup_formset": pf_formset,
                         })
                 elif form_type == "medical_history_form":
                     medical_history_form = MedicalHistoryForm(
@@ -276,6 +301,8 @@ def maternal_health_record_form(request, record_id : int):
                                 "check_list_form": check_list_form,
                                 "plan_form": plan_form,
                                 "micro_nutrients_form": micro_nutrients_form,
+                                "prenatal_followup_entry_form": pf_entry_form,
+                                "prenatal_followup_formset": pf_formset,
                             })
                         
                         messages.success(request, "Medical History saved successfully.")
@@ -294,6 +321,8 @@ def maternal_health_record_form(request, record_id : int):
                             "check_list_form": check_list_form,
                             "plan_form": plan_form,
                             "micro_nutrients_form": micro_nutrients_form,
+                            "prenatal_followup_entry_form": pf_entry_form,
+                            "prenatal_followup_formset": pf_formset,
                         })
                 elif form_type == "tetanus_toxoid":
                     tt_form = TetanusToxoidForm(
@@ -322,6 +351,8 @@ def maternal_health_record_form(request, record_id : int):
                                 "check_list_form": check_list_form,
                                 "plan_form": plan_form,
                                 "micro_nutrients_form": micro_nutrients_form,
+                                "prenatal_followup_entry_form": pf_entry_form,
+                                "prenatal_followup_formset": pf_formset,
                             })
                         
                         messages.success(request, "Tetanus Toxoid data saved successfully.")
@@ -340,6 +371,158 @@ def maternal_health_record_form(request, record_id : int):
                             "check_list_form": check_list_form,
                             "plan_form": plan_form,
                             "micro_nutrients_form": micro_nutrients_form,
+                            "prenatal_followup_entry_form": pf_entry_form,
+                            "prenatal_followup_formset": pf_formset,
+                        })
+                elif form_type == "check_list_form":
+                    check_list_form = CheckListForm(
+                        mhr_repo=REPOSITORY,
+                        mhr_id=record_id,
+                        data=request.POST
+                    )
+                    if check_list_form.is_valid():
+                        res = REPOSITORY.insert_checklist_items(
+                            mhr_id=record_id,
+                            staff_id=staff_id,
+                            checklist_items=check_list_form.cleaned_data.get("symptoms"),
+                        )
+                        if not res:
+                            messages.error(request, "Failed to save Checklist data.")
+                            return render(request, "maternal/health_record_form.html", {
+                                "risk_code_form": risk_code_form,
+                                "formset": formset,
+                                "identification_form": maternal_identification_form,
+                                "obstetric_form": obstetric_form,
+                                "medical_history_form": medical_history_form,
+                                "tt_form": tt_form,
+                                "present_pregnancy_form": presemt_pregnancy_form,
+                                "lab_form": lab_form,
+                                "check_list_form": check_list_form,
+                                "plan_form": plan_form,
+                                "micro_nutrients_form": micro_nutrients_form,
+                                "prenatal_followup_entry_form": pf_entry_form,
+                                "prenatal_followup_formset": pf_formset,
+                            })
+                        
+                        messages.success(request, "Checklist data saved successfully.")
+                        return redirect('maternal:maternal_health_record_form', record_id=record_id)
+                    else:
+                        MessageUtility.push_form_errors_as_messages(request, check_list_form)
+                        return render(request, "maternal/health_record_form.html", {
+                            "risk_code_form": risk_code_form,
+                            "formset": formset,
+                            "identification_form": maternal_identification_form,
+                            "obstetric_form": obstetric_form,
+                            "medical_history_form": medical_history_form,
+                            "tt_form": tt_form,
+                            "present_pregnancy_form": presemt_pregnancy_form,
+                            "lab_form": lab_form,
+                            "check_list_form": check_list_form,
+                            "plan_form": plan_form,
+                            "micro_nutrients_form": micro_nutrients_form,
+                            "prenatal_followup_entry_form": pf_entry_form,
+                            "prenatal_followup_formset": pf_formset,
+                        })
+                elif form_type == "plan_form":
+                    plan_form = PlanForm(
+                        mhr_repo=REPOSITORY,
+                        mhr_id=record_id,
+                        data=request.POST
+                    )
+                    if plan_form.is_valid():
+                        res = REPOSITORY.insert_plan_and_baseline(
+                            mhr_id=record_id,
+                            staff_id=staff_id,
+                            nbs_plan=plan_form.cleaned_data.get("plan_newborn_screening"),
+                            delivery_plan=plan_form.cleaned_data.get("plan_place_of_delivery"),
+                        )
+                        if not res:
+                            messages.error(request, "Failed to save Plan data.")
+                            return render(request, "maternal/health_record_form.html", {
+                                "risk_code_form": risk_code_form,
+                                "formset": formset,
+                                "identification_form": maternal_identification_form,
+                                "obstetric_form": obstetric_form,
+                                "medical_history_form": medical_history_form,
+                                "tt_form": tt_form,
+                                "present_pregnancy_form": presemt_pregnancy_form,
+                                "lab_form": lab_form,
+                                "check_list_form": check_list_form,
+                                "plan_form": plan_form,
+                                "micro_nutrients_form": micro_nutrients_form,
+                                "prenatal_followup_entry_form": pf_entry_form,
+                                "prenatal_followup_formset": pf_formset,
+                            })
+                        
+                        messages.success(request, "Plan data saved successfully.")
+                        return redirect('maternal:maternal_health_record_form', record_id=record_id)
+                    else:
+                        MessageUtility.push_form_errors_as_messages(request, plan_form)
+                        return render(request, "maternal/health_record_form.html", {
+                            "risk_code_form": risk_code_form,
+                            "formset": formset,
+                            "identification_form": maternal_identification_form,
+                            "obstetric_form": obstetric_form,
+                            "medical_history_form": medical_history_form,
+                            "tt_form": tt_form,
+                            "present_pregnancy_form": presemt_pregnancy_form,
+                            "lab_form": lab_form,
+                            "check_list_form": check_list_form,
+                            "plan_form": plan_form,
+                            "micro_nutrients_form": micro_nutrients_form,
+                            "prenatal_followup_entry_form": pf_entry_form,
+                            "prenatal_followup_formset": pf_formset,
+                        })
+                elif form_type == "micro_nutrients_form":
+                    micro_nutrients_form = MicroNutrientsForm(
+                        mhr_repo=REPOSITORY,
+                        mhr_id=record_id,
+                        data=request.POST
+                    )
+                    if micro_nutrients_form.is_valid():
+                        res = REPOSITORY.insert_micronutrients(
+                            mhr_id=record_id,
+                            staff_id=staff_id,
+                            iron_started=micro_nutrients_form.cleaned_data.get("iron_folic_start") or None,
+                            iron_completed=micro_nutrients_form.cleaned_data.get("iron_folic_end") or None,
+                            deworming_started=micro_nutrients_form.cleaned_data.get("deworming_date") or None,
+                        )
+                        if not res:
+                            messages.error(request, "Failed to save Micro Nutrients data.")
+                            return render(request, "maternal/health_record_form.html", {
+                                "risk_code_form": risk_code_form,
+                                "formset": formset,
+                                "identification_form": maternal_identification_form,
+                                "obstetric_form": obstetric_form,
+                                "medical_history_form": medical_history_form,
+                                "tt_form": tt_form,
+                                "present_pregnancy_form": presemt_pregnancy_form,
+                                "lab_form": lab_form,
+                                "check_list_form": check_list_form,
+                                "plan_form": plan_form,
+                                "micro_nutrients_form": micro_nutrients_form,
+                                "prenatal_followup_entry_form": pf_entry_form,
+                                "prenatal_followup_formset": pf_formset,
+                            })
+                        
+                        messages.success(request, "Micro Nutrients data saved successfully.")
+                        return redirect('maternal:maternal_health_record_form', record_id=record_id)
+                    else:
+                        MessageUtility.push_form_errors_as_messages(request, micro_nutrients_form)
+                        return render(request, "maternal/health_record_form.html", {
+                            "risk_code_form": risk_code_form,
+                            "formset": formset,
+                            "identification_form": maternal_identification_form,
+                            "obstetric_form": obstetric_form,
+                            "medical_history_form": medical_history_form,
+                            "tt_form": tt_form,
+                            "present_pregnancy_form": presemt_pregnancy_form,
+                            "lab_form": lab_form,
+                            "check_list_form": check_list_form,
+                            "plan_form": plan_form,
+                            "micro_nutrients_form": micro_nutrients_form,
+                            "prenatal_followup_entry_form": pf_entry_form,
+                            "prenatal_followup_formset": pf_formset,
                         })
             else:
                 messages.warning(request, "No form type specified.")
@@ -355,9 +538,9 @@ def maternal_health_record_form(request, record_id : int):
                     "check_list_form": check_list_form,
                     "plan_form": plan_form,
                     "micro_nutrients_form": micro_nutrients_form,
+                    "prenatal_followup_entry_form": pf_entry_form,
+                    "prenatal_followup_formset": pf_formset,
                 })
-        
-            
         return render(request, "maternal/health_record_form.html", {
             "risk_code_form": risk_code_form,
             "formset": formset,
@@ -370,6 +553,8 @@ def maternal_health_record_form(request, record_id : int):
             "check_list_form": check_list_form,
             "plan_form": plan_form,
             "micro_nutrients_form": micro_nutrients_form,
+            "prenatal_followup_entry_form": pf_entry_form,
+            "prenatal_followup_formset": pf_formset,
         })
     except MaternalHealthRecordException as e:
         logger.warning(f"Error in maternal health record form: {str(e)}")
@@ -386,6 +571,8 @@ def maternal_health_record_form(request, record_id : int):
             "check_list_form": check_list_form,
             "plan_form": plan_form,
             "micro_nutrients_form": micro_nutrients_form,
+            "prenatal_followup_entry_form": pf_entry_form,
+            "prenatal_followup_formset": pf_formset,
         })
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")

@@ -28,18 +28,13 @@ GENDER_CHOICES = (
 )
 
 SYMPTOM_CHOICES = [
-    ("increased_bp", "Increased BP"),
-    ("epigastric_pain", "Epigastric pain"),
-    ("nausea_vomiting", "Nausea/Vomiting"),
-    ("blurred_vision", "Blurring of vision"),
-    ("edema", "Edema"),
-    ("severe_headache", "Severe headache"),
-    ("abnormal_discharge", "Abnormal vaginal discharges"),
-    ("vaginal_bleeding", "Vaginal bleeding"),
-    ("chills_fever", "Chills & fever"),
-    ("diff_breathing", "Difficulty in breathing"),
-    ("varicosities", "Varicosities"),
-    ("abdominal_pain", "Abdominal pain"),
+    (1, "Preeclampsia"),
+    (2, "Abnormal vaginal discharges"),
+    (3, "Vaginal bleeding"),
+    (4, "Chills & fever"),
+    (5, "Difficulty in breathing"),
+    (6, "Varicosities"),
+    (7, "Abdominal pain"),
 ]
 
 SEX_CHOICES = [('M', 'Male'), ('F', 'Female')]

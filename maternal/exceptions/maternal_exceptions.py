@@ -2,6 +2,7 @@ class MaternalHealthRecordException(Exception):
     """Base exception for maternal module."""
 
     ERROR_CODES = {
+        # general / existing codes
         "P6010",
         "P6057",
         "P6059",
@@ -29,6 +30,16 @@ class MaternalHealthRecordException(Exception):
         "P6194",
         "P6195",
         "P6196",
+        # codes from maternal checklist function
+        "P6201",
+        "P6202",
+        "P6203",
+        "P6204",
+        "P6205",
+        # codes from micronutrients function (added)
+        "P6181",  # Iron end date cannot be in the future.
+        "P6182",  # Deworming date cannot be in the future.
+        "P6183",  # Iron end date cannot be before start date.
     }
 
     def __init__(self, message):

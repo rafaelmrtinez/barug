@@ -409,7 +409,7 @@
         <!-- Checklist -->
         <form method="post" class="card mb-3 card-brand" id="form-checklist" action="">
             {% csrf_token %}
-            <input type="hidden" name="section" value="checklist">
+            {{ check_list_form.form_type }}
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span>Checklist</span>
                 <button type="button" class="btn btn-sm btn-brand section-action" data-section="#checklist">Edit</button>
@@ -439,7 +439,7 @@
         <!-- Plans -->
         <form method="post" class="card mb-3 card-brand" id="form-plans" action="">
             {% csrf_token %}
-            <input type="hidden" name="section" value="plans">
+            {{ plan_form.form_type }}
             <div class="card card-brand mb-3">
                 <span class="card-header">Plans</span>
                 <div class="card-body">
@@ -457,6 +457,7 @@
         <!-- Micronutrients -->
         <form method="post" class="card mb-4 card-brand" id="form-micros" action="">
             {% csrf_token %}
+            {{ micro_nutrients_form.form_type }}
             <input type="hidden" name="section" value="micronutrients">
             <div class="card card-brand mb-3">
                 <span class="card-header">Micronutrients</span>

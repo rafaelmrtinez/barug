@@ -100,8 +100,6 @@ class TetanusToxoidForm(forms.Form):
         self.last_recorded_tt_number = self._last_tt_number
         self.last_recorded_tt_record_id = self._last_tt_record_id
 
-        print(f"existing data: {self._existing_data}")  
-        
     def clean(self):
         cleaned_data = super().clean()
         

@@ -9,6 +9,7 @@ class PlanForm(forms.Form):
     plan_place_of_delivery = forms.CharField(required=False)
     plan_newborn_screening = forms.BooleanField(
         required=False, label="Plan for newborn screening")
+    form_type = forms.CharField(widget=forms.HiddenInput(attrs={'id': 'plan_form'}), initial='plan_form')
     
     def __init__(self, mhr_repo: MaternalHealthRecordRepository, mhr_id: int, *args, **kwargs):
         super().__init__(*args, **kwargs)

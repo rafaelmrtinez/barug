@@ -1,3 +1,5 @@
+from psycopg2.extras import Json
+
 from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.exceptions.query_exec_exception import QueryExecutionException
 
@@ -14,18 +16,128 @@ class MaternalHealthRecordRepository:
 
     def __init__(self, ctx: ConnectionAdapter):
         self.ctx = ctx
-        
+
+    def fetch_micronutrients_by_mhr_id(self, maternal_record_id: int):
+        """
+        Return the most recent micronutrients row for a maternal record (if any).
+        Fields returned:
+          - iron_start_date
+          - iron_end_date
+          - deworming_date (alias for deworming_given_date)
+        """
+        sql = """
+            SELECT
+                m.iron_start_date   AS iron_start_date,
+                m.iron_end_date     AS iron_end_date,
+                m.deworming_given_date AS deworming_date
+            FROM public.micronutrients AS m
+            WHERE m.maternal_record_id = %s
+            ORDER BY m.micronutrients_id DESC
+            LIMIT 1;
+        """
+        params = (maternal_record_id,)
+        rows = self.ctx.execute_query_to_dict(sql, params)
+        return rows[0] if rows else None
+
+    def insert_micronutrients(self, mhr_id, staff_id, iron_started, iron_completed, deworming_started):
+        sql = """SELECT * FROM insert_micronutrients(%s::INTEGER, %s::INTEGER, %s::DATE, %s::DATE, %s::DATE);"""
+        params = (
+            mhr_id, staff_id, iron_started, iron_completed, deworming_started
+        )
+        try:
+            rows = self.ctx.execute_query(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException as e:
+            logger.error(f"Error inserting micronutrients: {e.message}")
+            if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
+                raise MaternalHealthRecordException(e.message) from e
+            raise e
+
+    def insert_plan_and_baseline(self, mhr_id, staff_id, nbs_plan, delivery_plan):
+        sql = """SELECT * FROM insert_plan_and_baseline(%s::INTEGER, %s::INTEGER, %s::BOOLEAN, %s::TEXT);"""
+        params = (
+            mhr_id, staff_id, nbs_plan, delivery_plan
+        )
+        try:
+            rows = self.ctx.execute_query(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException as e:
+            logger.error(f"Error inserting plan and baseline: {e.message}")
+            if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
+                raise MaternalHealthRecordException(e.message) from e
+            raise e
+
+    def fetch_checklist_items(self):
+        """Return all checklist items as list of dicts: [{'checklist_item_id': int, 'checklist_name': str}, ...]"""
+        sql = """
+            SELECT checklist_item_id, checklist_name
+            FROM public.checklist_item
+            ORDER BY checklist_item_id;
+        """
+        try:
+            rows = self.ctx.execute_query_to_dict(sql, ())
+            return rows or []
+        except QueryExecutionException as e:
+            logger.error("Error fetching checklist items: %s",
+                         getattr(e, "message", e))
+            raise
+
+    def fetch_maternal_checklist_by_mhr_id(self, maternal_record_id: int):
+        """Return checklist_item_id ints for a given maternal_record_id."""
+        sql = """
+            SELECT checklist_item_id
+            FROM public.maternal_checklist
+            WHERE maternal_record_id = %s
+            ORDER BY maternal_checklist_id;
+        """
+        try:
+            rows = self.ctx.execute_query_to_dict(sql, (maternal_record_id,))
+            return [r.get("checklist_item_id") for r in (rows or [])]
+        except QueryExecutionException as e:
+            logger.error("Error fetching maternal checklist for mhr %s: %s",
+                         maternal_record_id, getattr(e, "message", e))
+            raise
+
+    def insert_checklist_items(self, mhr_id, staff_id, checklist_items):
+        sql = """SELECT * FROM add_maternal_checklist_items_json(%s::INTEGER, %s::INTEGER, %s::JSONB);"""
+
+        # normalize input: accept either a flat list or a list-of-lists (common from form cleaning)
+        items = checklist_items
+        if isinstance(checklist_items, list) and len(checklist_items) == 1 and isinstance(checklist_items[0], list):
+            items = checklist_items[0]
+
+        # convert to integers and validate
+        try:
+            items_int = [int(x) for x in items]
+        except (TypeError, ValueError):
+            raise ValueError("checklist_items must be convertible to integers")
+
+        if not items_int:
+            raise ValueError("checklist_items must be a non-empty list of ids")
+
+        params = (mhr_id, staff_id, Json(items_int))
+        logger.debug("Insert checklist params: %s", params)
+        try:
+            rows = self.ctx.execute_query(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException as e:
+            logger.error(
+                f"Error inserting maternal checklist items: {e.message}")
+            if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
+                raise MaternalHealthRecordException(e.message) from e
+            raise e
+
     def fetch_maternal_tt_by_mhr_id(self, id: int):
-        sql="""SELECT tt_type.tt_type_id,  tt_type.tt_type_name FROM tt_vaccine_record 
+        sql = """SELECT tt_type.tt_type_id,  tt_type.tt_type_name FROM tt_vaccine_record 
             INNER JOIN tt_type
             ON tt_type.tt_type_id = tt_vaccine_record.tt_type_id
             WHERE maternal_record_id = %s;"""
         params = (id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows
-        
+
     def insert_maternal_tt_record(self, mhr_id, staff_id, tt_type_id, date_given):
-        sql="""SELECT * FROM add_maternal_tt_record(%s::INTEGER, %s::INTEGER, %s::INTEGER, %s::DATE);"""
+        sql = """SELECT * FROM add_maternal_tt_record(%s::INTEGER, %s::INTEGER, %s::INTEGER, %s::DATE);"""
         params = (
             mhr_id, staff_id, tt_type_id, date_given
         )
@@ -37,7 +149,7 @@ class MaternalHealthRecordRepository:
             if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
                 raise MaternalHealthRecordException(e.message) from e
             raise e
-        
+
     def fetch_medical_history_by_mhr_id(self, maternal_record_id: int):
         sql = """
             SELECT
@@ -56,11 +168,10 @@ class MaternalHealthRecordRepository:
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows[0] if rows else None
 
-        
     def insert_medical_history(
-        self, mhr_id, staff_id, previous_illness, 
-        previous_hostpitalzation, previous_complication):
-        sql="""SELECT * FROM insert_medical_history(%s::INTEGER, %s::INTEGER, %s::TEXT, %s::TEXT, %s::TEXT);"""
+            self, mhr_id, staff_id, previous_illness,
+            previous_hostpitalzation, previous_complication):
+        sql = """SELECT * FROM insert_medical_history(%s::INTEGER, %s::INTEGER, %s::TEXT, %s::TEXT, %s::TEXT);"""
         params = (
             mhr_id, staff_id, previous_illness, previous_hostpitalzation, previous_complication
         )
@@ -90,12 +201,12 @@ class MaternalHealthRecordRepository:
         params = (maternal_record_id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows[0] if rows else None
-        
+
     def insert_obstetric_history(
-        self, mhr_id: int, added_by_id: int, num_children_born_alive: int, 
-        num_children_living: int, num_of_abortions: int, num_stillbirth: int, num_large_babies: int, 
-        has_diabetes: bool):
-        sql="""SELECT * FROM insert_obstetric_history(%s::INTEGER, %s::INTEGER, %s::INTEGER, %s::INTEGER, %s::INTEGER, %s::INTEGER, %s::INTEGER, %s::BOOLEAN);"""
+            self, mhr_id: int, added_by_id: int, num_children_born_alive: int,
+            num_children_living: int, num_of_abortions: int, num_stillbirth: int, num_large_babies: int,
+            has_diabetes: bool):
+        sql = """SELECT * FROM insert_obstetric_history(%s::INTEGER, %s::INTEGER, %s::INTEGER, %s::INTEGER, %s::INTEGER, %s::INTEGER, %s::INTEGER, %s::BOOLEAN);"""
         params = (
             mhr_id, added_by_id, num_children_born_alive, num_children_living,
             num_of_abortions, num_stillbirth, num_large_babies, has_diabetes
@@ -201,7 +312,7 @@ class MaternalHealthRecordRepository:
         params = (maternal_record_id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows[0] if rows else None
-    
+
     def fetch_person_id_by_maternal_record_id(self, maternal_record_id: int):
         sql = """SELECT person_id
             FROM public.maternal_health_record
@@ -496,7 +607,6 @@ class MaternalHealthRecordRepository:
         params = (maternal_record_id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows[0] if rows else None
-
 
     def fetch_all_maternal_records_for_person(self, person_id: int):
         sql = """
