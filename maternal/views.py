@@ -19,7 +19,7 @@ from maternal.forms.plans_form import PlanForm
 from maternal.forms.pre_natal_follow_up_base_formset import PrenatalFollowUpFormSet
 from maternal.forms.pre_natal_follow_up_form import PrenatalFollowUpEntryForm
 from maternal.forms.present_pregnancy_form import PresentPregnancyForm
-from maternal.forms.previous_pregnancy_form import PreviousPregnancyFormSet
+from maternal.forms.previous_pregnancy_form import PreviousPregnancyForm, PreviousPregnancyFormSet
 from maternal.forms.tetanus_toxoid_form import TetanusToxoidForm
 from maternal.repository import MaternalHealthRecordRepository
 from midwife.services import fetch_maternal_registry
@@ -151,12 +151,13 @@ def maternal_health_record_form(request, record_id : int):
         # Fetch rows once, then map to form initial
         rows = REPOSITORY.fetch_all_previous_pregnancies_by_person_id(person_id)
         # Map repo fields -> form field names (adjust keys to your repo output)
+        print(f"Rows fetched for previous pregnancies: {rows}")
         initial = [{
             "delivery_date":  r.get("date_of_delivery"),
-            "outcome":        r.get("outcome_type"),
-            "delivery_type":  r.get("delivery_type_id"),  # if your choices expect an ID
+            "outcome":   r.get("outcome_type"),
+            "delivery_type":  r.get('delivery_type'),  # if your choices expect an ID
             "baby_weight_kg": r.get("baby_weight_kg"),
-            "gender":         r.get("baby_sex"),          # align with GENDER_CHOICES values
+            "gender":         r.get("gender"),          # align with GENDER_CHOICES values
             "ballard_score":  r.get("ballard"),
             "apgar_score":    r.get("apgar"),
         } for r in (rows or [])]
@@ -165,6 +166,8 @@ def maternal_health_record_form(request, record_id : int):
             prefix="pp",
             form_kwargs={"mhr_repository": REPOSITORY, "maternal_id": record_id},  # <-- pass to each form
         )
+        # single-entry form for adding a previous pregnancy (user adds one-by-one)
+        pp_entry_form = PreviousPregnancyForm(mhr_repository=REPOSITORY, maternal_id=record_id)
         tt_form = TetanusToxoidForm(
             mhr_repo=REPOSITORY,
             mhr_id=record_id
@@ -268,6 +271,7 @@ def maternal_health_record_form(request, record_id : int):
                             "check_list_form": check_list_form,
                             "plan_form": plan_form,
                             "micro_nutrients_form": micro_nutrients_form,
+                            "previous_pregnancy_entry_form": pp_entry_form,
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
                         })
@@ -321,6 +325,7 @@ def maternal_health_record_form(request, record_id : int):
                             "check_list_form": check_list_form,
                             "plan_form": plan_form,
                             "micro_nutrients_form": micro_nutrients_form,
+                            "previous_pregnancy_entry_form": pp_entry_form,
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
                         })
@@ -371,6 +376,7 @@ def maternal_health_record_form(request, record_id : int):
                             "check_list_form": check_list_form,
                             "plan_form": plan_form,
                             "micro_nutrients_form": micro_nutrients_form,
+                            "previous_pregnancy_entry_form": pp_entry_form,
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
                         })
@@ -420,6 +426,7 @@ def maternal_health_record_form(request, record_id : int):
                             "check_list_form": check_list_form,
                             "plan_form": plan_form,
                             "micro_nutrients_form": micro_nutrients_form,
+                            "previous_pregnancy_entry_form": pp_entry_form,
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
                         })
@@ -470,6 +477,7 @@ def maternal_health_record_form(request, record_id : int):
                             "check_list_form": check_list_form,
                             "plan_form": plan_form,
                             "micro_nutrients_form": micro_nutrients_form,
+                            "previous_pregnancy_entry_form": pp_entry_form,
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
                         })
@@ -524,6 +532,67 @@ def maternal_health_record_form(request, record_id : int):
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
                         })
+                elif form_type == 'previous_pregnancy_form':
+                    
+                    formset = PreviousPregnancyForm(
+                        data=request.POST,
+                        mhr_repository=REPOSITORY,
+                        maternal_id=record_id
+                    )
+                    
+                    if formset.is_valid():
+                        print(f"Cleaned Data: {formset.cleaned_data}")
+                        res = REPOSITORY.insert_previous_pregnancy_info(
+                            mhr_id=record_id,
+                            staff_id=staff_id,
+                            date_of_delivery=formset.cleaned_data.get("delivery_date"),
+                            outcome=formset.cleaned_data.get("outcome"),
+                            baby_weight_kg=formset.cleaned_data.get("baby_weight_kg"),
+                            ballard_score=formset.cleaned_data.get("ballard_score"),
+                            apgar_score=formset.cleaned_data.get("apgar_score"),
+                            delivery_type_id=formset.cleaned_data.get("delivery_type_id"),
+                            sex=formset.cleaned_data.get("gender_id")
+                        )
+                        if not res:
+                            messages.error(request, "Failed to save Previous Pregnancies data.")
+                            return render(request, "maternal/health_record_form.html", {
+                                "risk_code_form": risk_code_form,
+                                "formset": formset,
+                                "identification_form": maternal_identification_form,
+                                "obstetric_form": obstetric_form,
+                                "medical_history_form": medical_history_form,
+                                "tt_form": tt_form,
+                                "present_pregnancy_form": presemt_pregnancy_form,
+                                "lab_form": lab_form,
+                                "check_list_form": check_list_form,
+                                "plan_form": plan_form,
+                                "micro_nutrients_form": micro_nutrients_form,
+                                "previous_pregnancy_entry_form": pp_entry_form,
+                                "prenatal_followup_entry_form": pf_entry_form,
+                                "prenatal_followup_formset": pf_formset,
+                            })
+                        
+                        messages.success(request, "Previous Pregnancies data saved successfully.")
+                        return redirect('maternal:maternal_health_record_form', record_id=record_id)
+                    
+                    else:
+                        MessageUtility.push_form_errors_as_messages(request, formset)
+                        return render(request, "maternal/health_record_form.html", {
+                            "risk_code_form": risk_code_form,
+                            "formset": formset,
+                            "identification_form": maternal_identification_form,
+                            "obstetric_form": obstetric_form,
+                            "medical_history_form": medical_history_form,
+                            "tt_form": tt_form,
+                            "present_pregnancy_form": presemt_pregnancy_form,
+                            "lab_form": lab_form,
+                            "check_list_form": check_list_form,
+                            "plan_form": plan_form,
+                            "micro_nutrients_form": micro_nutrients_form,
+                            "previous_pregnancy_entry_form": pp_entry_form,
+                            "prenatal_followup_entry_form": pf_entry_form,
+                            "prenatal_followup_formset": pf_formset,
+                        })
             else:
                 messages.warning(request, "No form type specified.")
                 return render(request, "maternal/health_record_form.html", {
@@ -538,6 +607,7 @@ def maternal_health_record_form(request, record_id : int):
                     "check_list_form": check_list_form,
                     "plan_form": plan_form,
                     "micro_nutrients_form": micro_nutrients_form,
+                    "previous_pregnancy_entry_form": pp_entry_form,
                     "prenatal_followup_entry_form": pf_entry_form,
                     "prenatal_followup_formset": pf_formset,
                 })
@@ -553,6 +623,7 @@ def maternal_health_record_form(request, record_id : int):
             "check_list_form": check_list_form,
             "plan_form": plan_form,
             "micro_nutrients_form": micro_nutrients_form,
+            "previous_pregnancy_entry_form": pp_entry_form,
             "prenatal_followup_entry_form": pf_entry_form,
             "prenatal_followup_formset": pf_formset,
         })
@@ -571,6 +642,7 @@ def maternal_health_record_form(request, record_id : int):
             "check_list_form": check_list_form,
             "plan_form": plan_form,
             "micro_nutrients_form": micro_nutrients_form,
+            "previous_pregnancy_entry_form": pp_entry_form,
             "prenatal_followup_entry_form": pf_entry_form,
             "prenatal_followup_formset": pf_formset,
         })

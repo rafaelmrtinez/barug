@@ -92,20 +92,85 @@
             </div>
         </form>
 
-        <!-- Previous Pregnancies -->
-        <form method="post" class="card mb-3 card-brand" id="form-prev-preg" action="">
+        <!-- Previous Pregnancies - separated input (single entry) and read-only table -->
+        <!-- Single-entry form: user adds one previous pregnancy at a time -->
+        <form method="post" class="card mb-3 card-brand" id="form-prev-preg-entry" action="">
             {% csrf_token %}
-            <input type="hidden" name="section" value="previous_pregnancies">
+            {{ previous_pregnancy_entry_form.form_type }}
             <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Previous Pregnancies</span>
-                <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-brand section-action"
-                        data-section="#prev-preg">Edit</button>
-                    <button type="button" id="add-previous-pregnancy" class="btn btn-sm btn-brand">Add Row</button>
+                <span>Previous Pregnancy (Add one)</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">{{ previous_pregnancy_entry_form.delivery_date.label }}</label>
+                        {{ previous_pregnancy_entry_form.delivery_date }}
+                        {% if previous_pregnancy_entry_form.delivery_date.errors %}
+                            <div class="text-danger small">{{ previous_pregnancy_entry_form.delivery_date.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label">{{ previous_pregnancy_entry_form.outcome.label }}</label>
+                        {{ previous_pregnancy_entry_form.outcome }}
+                        {% if previous_pregnancy_entry_form.outcome.errors %}
+                            <div class="text-danger small">{{ previous_pregnancy_entry_form.outcome.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label">{{ previous_pregnancy_entry_form.delivery_type.label }}</label>
+                        {{ previous_pregnancy_entry_form.delivery_type }}
+                        {% if previous_pregnancy_entry_form.delivery_type.errors %}
+                            <div class="text-danger small">{{ previous_pregnancy_entry_form.delivery_type.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label">{{ previous_pregnancy_entry_form.baby_weight_kg.label }}</label>
+                        {{ previous_pregnancy_entry_form.baby_weight_kg }}
+                        {% if previous_pregnancy_entry_form.baby_weight_kg.errors %}
+                            <div class="text-danger small">{{ previous_pregnancy_entry_form.baby_weight_kg.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-1">
+                        <label class="form-label">{{ previous_pregnancy_entry_form.gender.label }}</label>
+                        {{ previous_pregnancy_entry_form.gender }}
+                        {% if previous_pregnancy_entry_form.gender.errors %}
+                            <div class="text-danger small">{{ previous_pregnancy_entry_form.gender.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-1">
+                        <label class="form-label">{{ previous_pregnancy_entry_form.ballard_score.label }}</label>
+                        {{ previous_pregnancy_entry_form.ballard_score }}
+                        {% if previous_pregnancy_entry_form.ballard_score.errors %}
+                            <div class="text-danger small">{{ previous_pregnancy_entry_form.ballard_score.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-1">
+                        <label class="form-label">{{ previous_pregnancy_entry_form.apgar_score.label }}</label>
+                        {{ previous_pregnancy_entry_form.apgar_score }}
+                        {% if previous_pregnancy_entry_form.apgar_score.errors %}
+                            <div class="text-danger small">{{ previous_pregnancy_entry_form.apgar_score.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
-            <div id="prev-preg" class="card-body table-responsive">
-                {{ formset.management_form }}
+            <div class="card-footer text-end">
+                <button type="submit" class="btn btn-brand">Add Previous Pregnancy</button>
+            </div>
+        </form>
+
+        <!-- Read-only table of existing previous pregnancies -->
+        <div class="card mb-3 card-brand">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Previous Pregnancies</span>
+                <div class="small text-white">Read-only</div>
+            </div>
+            <div class="card-body table-responsive">
                 <table class="table table-sm align-middle">
                     <thead>
                         <tr>
@@ -116,45 +181,30 @@
                             <th>Gender</th>
                             <th>Ballard</th>
                             <th>Apgar</th>
-                            <th>Delete</th>
                         </tr>
                     </thead>
-                    <tbody id="pregnancy-table-body">
-                        {% for f in formset %}
-                        <tr>
-                            <td>{{ f.delivery_date }}</td>
-                            <td>{{ f.outcome }}</td>
-                            <td>{{ f.delivery_type }}</td>
-                            <td>{{ f.baby_weight_kg }}</td>
-                            <td>{{ f.gender }}</td>
-                            <td>{{ f.ballard_score }}</td>
-                            <td>{{ f.apgar_score }}</td>
-                            <td><button type="button" class="btn btn-sm btn-danger remove-row">Remove</button></td>
-                        </tr>
-                        {% endfor %}
+                    <tbody>
+                        {% if formset and formset.forms %}
+                            {% for f in formset %}
+                                <tr>
+                                    <td>{{ f.delivery_date.value|default:"—" }}</td>
+                                    <td>{{ f.outcome.value|default:"—" }}</td>
+                                    <td>{{ f.delivery_type.value|default:"—" }}</td>
+                                    <td>{{ f.baby_weight_kg.value|default:"—" }}</td>
+                                    <td>{{ f.gender.value|default:"—" }}</td>
+                                    <td>{{ f.ballard_score.value|default:"—" }}</td>
+                                    <td>{{ f.apgar_score.value|default:"—" }}</td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center text-muted">No previous pregnancies recorded.</td>
+                            </tr>
+                        {% endif %}
                     </tbody>
                 </table>
             </div>
-            <div class="card-footer text-end">
-                <button type="submit" class="btn btn-brand">Save Previous Pregnancies</button>
-            </div>
-        </form>
-
-        <!-- Hidden empty form template (stays outside) -->
-        <table style="display:none;">
-            <tbody id="empty-form-template">
-                <tr>
-                    <td>{{ formset.empty_form.delivery_date }}</td>
-                    <td>{{ formset.empty_form.outcome }}</td>
-                    <td>{{ formset.empty_form.delivery_type }}</td>
-                    <td>{{ formset.empty_form.baby_weight_kg }}</td>
-                    <td>{{ formset.empty_form.gender }}</td>
-                    <td>{{ formset.empty_form.ballard_score }}</td>
-                    <td>{{ formset.empty_form.apgar_score }}</td>
-                    <td><button type="button" class="btn btn-sm btn-danger remove-row">Remove</button></td>
-                </tr>
-            </tbody>
-        </table>
+        </div>
 
         <!-- Tetanus Toxoid -->
         <form method="post" class="card mb-3 card-brand" id="form-tt" action="">
