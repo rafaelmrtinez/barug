@@ -13,6 +13,11 @@ class MaternalHealthRecordException(Exception):
         "P6162",
         "P6163",
         "P6164",
+        # codes from previous_pregnancy_info function (added)
+        "P6172",  # Delivery type not found.
+        "P6173",  # Sex not found.
+        "P6174",  # APGAR score must be between 0 and 10.
+        "P6175",  # Delivery date cannot be in the future.
         "P6176",
         "P6177",
         "P6178",

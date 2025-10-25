@@ -562,7 +562,6 @@ def maternal_health_record_form(request, record_id : int):
                         
                         messages.success(request, "Previous Pregnancies data saved successfully.")
                         return redirect('maternal:maternal_health_record_form', record_id=record_id)
-                    
                     else:
                         MessageUtility.push_form_errors_as_messages(request, formset)
                         return render(request, "maternal/health_record_form.html", {

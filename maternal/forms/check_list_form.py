@@ -36,8 +36,6 @@ class CheckListForm(forms.Form):
                 self.fields["symptoms"].choices = choices
 
             existing = self.mhr_repo.fetch_maternal_checklist_by_mhr_id(self.mhr_id) or []
-            
-            print(f'Existing checklist items for mhr_id {self.mhr_id}: {existing}')
 
             # existing is list of rows -> extract the checklist_item_id values and set as strings
             existing_ids = []
