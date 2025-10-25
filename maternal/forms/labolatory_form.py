@@ -1,6 +1,9 @@
 # maternal/forms/laboratory_form.py
 from decimal import Decimal
+from typing import Any, Dict, List
+
 from django import forms
+from django.core.exceptions import ValidationError
 from django.forms.widgets import ClearableFileInput
 
 from maternal.forms.maternal_identification_form import add_bootstrap_classes
@@ -36,17 +39,197 @@ class LaboratoryForm(forms.Form):
     # --- Attachments (multi-image per test) ---
     img_widget = MultiImageInput(attrs={"multiple": True, "accept": "image/*"})
 
-    urinalysis_images       = forms.ImageField(required=False, widget=img_widget, label="Attachments")
-    cbc_images              = forms.ImageField(required=False, widget=img_widget, label="Attachments")
-    sgot_sgpt_images        = forms.ImageField(required=False, widget=img_widget, label="Attachments")
-    creatinine_serum_images = forms.ImageField(required=False, widget=img_widget, label="Attachments")
-    bua_bun_images          = forms.ImageField(required=False, widget=img_widget, label="Attachments")
-    syphilis_images         = forms.ImageField(required=False, widget=img_widget, label="Attachments")
-    hiv_test_images         = forms.ImageField(required=False, widget=img_widget, label="Attachments")
-    hepa_b_images           = forms.ImageField(required=False, widget=img_widget, label="Attachments")
-    blood_typing_images     = forms.ImageField(required=False, widget=img_widget, label="Attachments")
-    ogct_50g_images         = forms.ImageField(required=False, widget=img_widget, label="Attachments")
+    # Render multi-file inputs but avoid FileField/ImageField validation here.
+    # The view will read actual files from request.FILES (attached to the form as
+    # `form._raw_files`) and our helpers will process them.
+    urinalysis_images       = forms.CharField(required=False, widget=img_widget, label="Attachments")
+    cbc_images              = forms.CharField(required=False, widget=img_widget, label="Attachments")
+    sgot_sgpt_images        = forms.CharField(required=False, widget=img_widget, label="Attachments")
+    creatinine_serum_images = forms.CharField(required=False, widget=img_widget, label="Attachments")
+    bua_bun_images          = forms.CharField(required=False, widget=img_widget, label="Attachments")
+    syphilis_images         = forms.CharField(required=False, widget=img_widget, label="Attachments")
+    hiv_test_images         = forms.CharField(required=False, widget=img_widget, label="Attachments")
+    hepa_b_images           = forms.CharField(required=False, widget=img_widget, label="Attachments")
+    blood_typing_images     = forms.CharField(required=False, widget=img_widget, label="Attachments")
+    ogct_50g_images         = forms.CharField(required=False, widget=img_widget, label="Attachments")
+    
+    form_type = forms.CharField(widget=forms.HiddenInput(attrs={'id': 'laboratory_form'}), initial="laboratory_form")
 
     def __init__(self, mhr_repo: MaternalHealthRecordRepository, mhr_id: int, *args, **kwargs):
         super().__init__(*args, **kwargs)
         add_bootstrap_classes(self)
+        # repository and id are stored for possible future use
+        self._mhr_repo = mhr_repo
+        self._mhr_id = mhr_id
+
+    # -- Small, focused helpers so the pairing behaviour can be plugged/removed --
+    def _test_keys(self) -> List[str]:
+        """Return the base keys for all laboratory tests handled by this form."""
+        return [
+            'urinalysis', 'cbc', 'sgot_sgpt', 'creatinine_serum', 'bua_bun',
+            'syphilis', 'hiv_test', 'hepa_b', 'blood_typing', 'ogct_50g'
+        ]
+
+    def _images_for_key(self, cleaned_data: Dict[str, Any], key: str) -> List[Any]:
+        """Return a list of image objects (or filenames) for a given test key.
+
+        This supports multiple possible sources:
+        - files in `self.files` (typical Django request.FILES, supports getlist)
+        - values already present in cleaned_data (e.g., lists of filenames)
+        """
+        images_key = f"{key}_images"
+        imgs: List[Any] = []
+
+        files_container = getattr(self, 'files', None)
+        if files_container:
+            # MultiValueDict from request.FILES supports getlist
+            getlist = getattr(files_container, 'getlist', None)
+            if callable(getlist):
+                imgs = [i for i in list(files_container.getlist(images_key)) if i]
+                if imgs:
+                    return imgs
+            # fallback - single entry
+            single = files_container.get(images_key)
+            if single:
+                return [single]
+
+        # fallback to cleaned_data value (tests in some callers provide image lists there)
+        v = cleaned_data.get(images_key)
+        if not v:
+            return []
+        if isinstance(v, (list, tuple)):
+            return [i for i in list(v) if i]
+        return [v] if v else []
+
+    def _pair_single_test(self, cleaned_data: Dict[str, Any], key: str) -> Dict[str, Any]:
+        """Pair a single test's description, date and images into a dict.
+
+        Rules implemented:
+        - If the test has a value or has images present, a corresponding date is required.
+        - If no description/value is present, fall back to 'N/A'.
+        - If no images are present that's allowed (images list will be empty).
+        - Raises ValidationError when a required date is missing.
+        """
+        desc = cleaned_data.get(key)
+        date_key = f"{key}_date"
+        date_val = cleaned_data.get(date_key)
+        images = self._images_for_key(cleaned_data, key)
+
+        # normalize description
+        if desc in (None, ''):
+            desc_val = 'N/A'
+        else:
+            desc_val = desc
+
+        # If the test has a value (not N/A) or has attachments, date is required
+        has_meaningful_value = desc not in (None, '') or bool(images) or bool(date_val)
+        if has_meaningful_value and not date_val:
+            raise ValidationError({date_key: f'Date is required for {key}.'})
+
+        # If everything is empty (no desc/date/images) return None to skip
+        if not has_meaningful_value:
+            return None
+
+        return {
+            'test_type': key,
+            'date': date_val,
+            'description': desc_val,
+            'images': images,
+        }
+
+    def _pair_all_tests(self, cleaned_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Iterate all known tests and return a list of paired records.
+
+        The output is a list of dicts with keys: test_type, date, description, images.
+        Tests that have no data at all are skipped.
+        """
+        pairs: List[Dict[str, Any]] = []
+        for k in self._test_keys():
+            paired = self._pair_single_test(cleaned_data, k)
+            if paired:
+                pairs.append(paired)
+        return pairs
+    def clean(self):
+        """Validate and pair lab tests -> stores result on `self.paired_tests`.
+
+        The pairing logic is implemented inline here to keep all validation
+        and normalization in one place. Behavior is unchanged from the
+        previous helper-based implementation:
+        - For each known test: gather description, date and images.
+        - If a test has a value (non-empty description) or attachments,
+          a date is required.
+        - If description is empty, it falls back to 'N/A'.
+        - Images may be absent; images are read from an attached files
+          container (prefer `self._raw_files`, fallback to `self.files`).
+        - The resulting list of paired tests is stored on
+          `cleaned_data['paired_tests']` and `self.paired_tests`.
+        """
+        cleaned_data = super().clean()
+
+        # list of test keys handled by the form
+        test_keys = [
+            'urinalysis', 'cbc', 'sgot_sgpt', 'creatinine_serum', 'bua_bun',
+            'syphilis', 'hiv_test', 'hepa_b', 'blood_typing', 'ogct_50g'
+        ]
+
+        # helper to fetch images for a given key from available file containers
+        def images_for_key(key: str) -> List[Any]:
+            images_key = f"{key}_images"
+            imgs: List[Any] = []
+
+            # prefer the raw files attached by the view (lab_form._raw_files)
+            files_container = getattr(self, '_raw_files', None) or getattr(self, 'files', None)
+            if files_container:
+                getlist = getattr(files_container, 'getlist', None)
+                if callable(getlist):
+                    imgs = [i for i in list(files_container.getlist(images_key)) if i]
+                    if imgs:
+                        return imgs
+                single = files_container.get(images_key)
+                if single:
+                    return [single]
+
+            # fallback to any value present in cleaned_data
+            v = cleaned_data.get(images_key)
+            if not v:
+                return []
+            if isinstance(v, (list, tuple)):
+                return [i for i in list(v) if i]
+            return [v] if v else []
+
+        pairs: List[Dict[str, Any]] = []
+
+        for key in test_keys:
+            desc = cleaned_data.get(key)
+            date_key = f"{key}_date"
+            date_val = cleaned_data.get(date_key)
+            images = images_for_key(key)
+
+            # normalize description
+            if desc in (None, ''):
+                desc_val = 'N/A'
+            else:
+                desc_val = desc
+
+            # Determine if this test has any meaningful data
+            has_meaningful_value = desc not in (None, '') or bool(images) or bool(date_val)
+            if has_meaningful_value and not date_val:
+                # attach the error to the date field so it displays near the input
+                raise ValidationError({date_key: f'Date is required for {key}.'})
+
+            if not has_meaningful_value:
+                # skip empty tests
+                continue
+
+            pairs.append({
+                'test_type': key,
+                'date': date_val,
+                'description': desc_val,
+                'images': images,
+            })
+
+        # expose result for later processing; keep original cleaned_data unchanged
+        cleaned_data['paired_tests'] = pairs
+        self.paired_tests = pairs
+
+        return cleaned_data

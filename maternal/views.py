@@ -637,6 +637,93 @@ def maternal_health_record_form(request, record_id : int):
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
                         })
+                elif form_type == 'laboratory_form':
+                    # Instantiate form with POST only and attach raw files to avoid
+                    # Django's single-file field validators interfering with multi-file inputs.
+                    lab_form = LaboratoryForm(
+                        mhr_repo=REPOSITORY,
+                        mhr_id=record_id,
+                        data=request.POST,
+                    )
+                    # attach request.FILES for our helpers to read using getlist()
+                    lab_form._raw_files = request.FILES
+                    if lab_form.is_valid():
+                        paired = lab_form.cleaned_data.get('paired_tests') or []
+                        serializable_pairs = []
+                        for p in paired:
+                            imgs = p.get('images') or []
+                            names = [getattr(f, 'name', None) or str(f) for f in imgs]
+                            # coerce potentially non-serializable types (Decimal)
+                            desc = p.get('description')
+                            if isinstance(desc, (bytes, bytearray)):
+                                desc = desc.decode('utf-8', errors='ignore')
+                            try:
+                                # import here to avoid top-level if not needed
+                                from decimal import Decimal as _Decimal
+                                if isinstance(desc, _Decimal):
+                                    try:
+                                        desc = float(desc)
+                                    except Exception:
+                                        desc = str(desc)
+                            except Exception:
+                                # ignore introspection errors and fallback to str()
+                                pass
+
+                            serializable_pairs.append({
+                                'test_type': p.get('test_type'),
+                                'date': p.get('date').isoformat() if p.get('date') else None,
+                                'description': desc,
+                                'images': names,
+                            })
+                        try:
+                            res = REPOSITORY.insert_maternal_lab_results(
+                                mhr_id=record_id,
+                                staff_id=staff_id,
+                                lab_results=serializable_pairs or None,
+                            )
+                        except Exception:
+                            # Log full traceback for debugging the root cause (e.g., JSON serialization)
+                            logger.exception('Error inserting maternal lab results')
+                            raise
+                        if not res:
+                            messages.error(request, "Failed to save Laboratory data.")
+                            return render(request, "maternal/health_record_form.html", {
+                                "risk_code_form": risk_code_form,
+                                "formset": formset,
+                                "identification_form": maternal_identification_form,
+                                "obstetric_form": obstetric_form,
+                                "medical_history_form": medical_history_form,
+                                "tt_form": tt_form,
+                                "present_pregnancy_form": presemt_pregnancy_form,
+                                "lab_form": lab_form,
+                                "check_list_form": check_list_form,
+                                "plan_form": plan_form,
+                                "micro_nutrients_form": micro_nutrients_form,
+                                "previous_pregnancy_entry_form": pp_entry_form,
+                                "prenatal_followup_entry_form": pf_entry_form,
+                                "prenatal_followup_formset": pf_formset,
+                            })
+                        
+                        messages.success(request, "Laboratory data saved successfully.")
+                        return redirect('maternal:maternal_health_record_form', record_id=record_id)
+                    else:
+                        MessageUtility.push_form_errors_as_messages(request, lab_form)
+                        return render(request, "maternal/health_record_form.html", {
+                            "risk_code_form": risk_code_form,
+                            "formset": formset,
+                            "identification_form": maternal_identification_form,
+                            "obstetric_form": obstetric_form,
+                            "medical_history_form": medical_history_form,
+                            "tt_form": tt_form,
+                            "present_pregnancy_form": presemt_pregnancy_form,
+                            "lab_form": lab_form,
+                            "check_list_form": check_list_form,
+                            "plan_form": plan_form,
+                            "micro_nutrients_form": micro_nutrients_form,
+                            "previous_pregnancy_entry_form": pp_entry_form,
+                            "prenatal_followup_entry_form": pf_entry_form,
+                            "prenatal_followup_formset": pf_formset,
+                        })
             else:
                 messages.warning(request, "No form type specified.")
                 return render(request, "maternal/health_record_form.html", {

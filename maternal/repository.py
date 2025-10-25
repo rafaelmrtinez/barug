@@ -17,6 +17,19 @@ class MaternalHealthRecordRepository:
     def __init__(self, ctx: ConnectionAdapter):
         self.ctx = ctx
         
+    def insert_maternal_lab_results(self, mhr_id, staff_id, lab_results):
+        sql="""SELECT * FROM add_maternal_lab_results_json(%s::INTEGER, %s::INTEGER, %s::JSONB);"""
+        params = (mhr_id, staff_id, Json(lab_results))
+        print(f'INSERT LAB RESULTS PARAMS: {params}')
+        try:
+            rows = self.ctx.execute_query(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException as e:
+            logger.error(f"Error inserting maternal lab results: {e.message}")
+            if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
+                raise MaternalHealthRecordException(e.message) from e
+            raise e
+
     def insert_present_pregnancy_status(self, mhr_id, staff_id, gravida, para, is_fullterm, is_preterm, lmp, edc):
         sql = """SELECT * FROM insert_present_pregnancy_status(%s::INTEGER, %s::INTEGER, %s::INTEGER, %s::INTEGER, %s::BOOLEAN, %s::BOOLEAN, %s::DATE, %s::DATE);"""
         params = (
@@ -374,6 +387,26 @@ class MaternalHealthRecordRepository:
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows
 
+    def fetch_nbs_data_by_mhr_id(self, maternal_record_id: int):
+        """
+        Return the most recent new_born_screening_plan and place_of_delivery_plan
+        for a given maternal_record_id from the plan_and_baseline table.
+
+        Returns a dict like:
+            { 'new_born_screening_plan': bool, 'place_of_delivery_plan': str }
+        or None if no row exists.
+        """
+        sql = """
+                SELECT new_born_screening_plan, place_of_delivery_plan
+                FROM public.plan_and_baseline
+                WHERE maternal_record_id = %s
+                ORDER BY plan_and_baseline_id DESC
+                LIMIT 1;
+        """
+        params = (maternal_record_id,)
+        rows = self.ctx.execute_query_to_dict(sql, params)
+        return rows[0] if rows else None
+
     def fetch_delivery_plan_by_mhr_id(self, maternal_record_id: int):
         sql = """SELECT DISTINCT ON (mav.maternal_record_id)
             mav.maternal_record_id,
@@ -388,31 +421,6 @@ class MaternalHealthRecordRepository:
                 mav.visit_date DESC NULLS LAST,
                 pab.plan_and_baseline_id DESC;
             """
-        params = (maternal_record_id,)
-        rows = self.ctx.execute_query_to_dict(sql, params)
-        return rows
-
-    def fetch_maternal_checklist_by_mhr_id(self, maternal_record_id: int):
-        sql = """WITH latest_visit AS (
-            SELECT v.anc_visit_id, v.visit_no, v.visit_date
-            FROM public.maternal_anc_visit v
-            WHERE v.maternal_record_id = %s
-            ORDER BY v.visit_date DESC, v.anc_visit_id DESC
-            LIMIT 1
-            )
-            SELECT
-            lv.anc_visit_id,
-            lv.visit_no,
-            lv.visit_date::date AS visit_date,
-            mc.maternal_checklist_id,
-            mc.checklist_item_id,
-            ci.checklist_name
-            FROM latest_visit lv
-            LEFT JOIN public.maternal_checklist mc
-            ON mc.anc_visit_id = lv.anc_visit_id
-            LEFT JOIN public.checklist_item ci
-            ON ci.checklist_item_id = mc.checklist_item_id
-            ORDER BY ci.checklist_name NULLS LAST;"""
         params = (maternal_record_id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows
