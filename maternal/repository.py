@@ -17,6 +17,20 @@ class MaternalHealthRecordRepository:
     def __init__(self, ctx: ConnectionAdapter):
         self.ctx = ctx
         
+    def insert_present_pregnancy_status(self, mhr_id, staff_id, gravida, para, is_fullterm, is_preterm, lmp, edc):
+        sql = """SELECT * FROM insert_present_pregnancy_status(%s::INTEGER, %s::INTEGER, %s::INTEGER, %s::INTEGER, %s::BOOLEAN, %s::BOOLEAN, %s::DATE, %s::DATE);"""
+        params = (
+            mhr_id, staff_id, gravida, para, is_fullterm, is_preterm, lmp, edc
+        )
+        try:
+            rows = self.ctx.execute_query(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException as e:
+            logger.error(f"Error inserting present pregnancy status: {e.message}")
+            if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
+                raise MaternalHealthRecordException(e.message) from e
+            raise e
+        
     def insert_previous_pregnancy_info(self, mhr_id, staff_id, date_of_delivery, outcome, baby_weight_kg, ballard_score, apgar_score, delivery_type_id, sex):
         # Note: keep SQL parameter order in sync with the DB function signature.
         sql = """SELECT * FROM insert_previous_pregnancy_info(%s::INTEGER, %s::INTEGER, %s::DATE, %s::TEXT, %s::NUMERIC, %s::INTEGER, %s::INTEGER, %s::INTEGER, %s::INTEGER);"""

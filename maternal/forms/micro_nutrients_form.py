@@ -21,8 +21,6 @@ class MicroNutrientsForm(forms.Form):
         self._mhr_repo = mhr_repo
         self._micronutrients_data = self._mhr_repo.fetch_micronutrients_by_mhr_id(mhr_id)
         
-        print(f"DEBUG: Fetched micronutrients data for MHR ID {mhr_id}: {self._micronutrients_data}")
-
         # populate form fields only if values are present (not None)
         if self._micronutrients_data:
             iron_start = self._micronutrients_data.get("iron_start_date")

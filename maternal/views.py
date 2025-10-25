@@ -6,6 +6,7 @@ from django.views.decorators.csrf import csrf_protect as csrf_required
 
 from authentication.guards import role_required, session_login_required
 from authentication.utils import nocache
+from barug.utility.lazy_repository import LazyRepositoryProxy
 from barug.utility.messages_util import MessageUtility
 from maternal.exceptions.maternal_exceptions import MaternalHealthRecordException
 from maternal.forms.check_list_form import CheckListForm
@@ -34,21 +35,10 @@ ACCESS = ("MIDWIFE", "Midwife", "midwife", "Barangay Health Worker", "bhw", "Sup
 BHW_ACCESS = ("Barangay Health Worker", "bhw")
 MIDWIFE_ACCESS = ("MIDWIFE", "Midwife", "midwife")
 
-class _LazyRepository:
-    """Proxy: instantiate ConnectionAdapter + repository on first use."""
-    def __init__(self):
-        self._repo = None
 
-    def _ensure(self):
-        if self._repo is None:
-            adapter = ConnectionAdapter()
-            self._repo = MaternalHealthRecordRepository(adapter)
-
-    def __getattr__(self, name):
-        self._ensure()
-        return getattr(self._repo, name)
-
-REPOSITORY: MaternalHealthRecordRepository = _LazyRepository()
+REPOSITORY: MaternalHealthRecordRepository = LazyRepositoryProxy(
+    repo_factory=lambda: MaternalHealthRecordRepository(
+        ConnectionAdapter()))
 
 @session_login_required
 @role_required(*ACCESS)
@@ -151,7 +141,6 @@ def maternal_health_record_form(request, record_id : int):
         # Fetch rows once, then map to form initial
         rows = REPOSITORY.fetch_all_previous_pregnancies_by_person_id(person_id)
         # Map repo fields -> form field names (adjust keys to your repo output)
-        print(f"Rows fetched for previous pregnancies: {rows}")
         initial = [{
             "delivery_date":  r.get("date_of_delivery"),
             "outcome":   r.get("outcome_type"),
@@ -541,7 +530,6 @@ def maternal_health_record_form(request, record_id : int):
                     )
                     
                     if formset.is_valid():
-                        print(f"Cleaned Data: {formset.cleaned_data}")
                         res = REPOSITORY.insert_previous_pregnancy_info(
                             mhr_id=record_id,
                             staff_id=staff_id,
@@ -660,8 +648,6 @@ def record_detail(request: HttpRequest, person_id: int) -> HttpResponse:
     record = REPOSITORY.fetch_latest_maternal_record_by_person_and_maternal_id(person_id, maternal_record_id=maternal_health_record_id) or {}
     all_records = REPOSITORY.fetch_all_maternal_records_for_person(person_id)
     basic_info = REPOSITORY.fetch_mhr_count_and_fam_id_by_person_id(person_id)
-    # print maternal health record id, record, all records
-    print(f"Basic Info: {all_records}")
     return render(
         request,
         "maternal/record_history.html",
