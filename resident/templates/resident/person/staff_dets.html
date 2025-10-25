@@ -1,5 +1,4 @@
 {% extends 'base.html' %}
-
 {% load static %}
 {% load bootstrap_icons %}
 
@@ -13,78 +12,78 @@
   <div class="row justify-content-center">
     <div class="col-12">
       <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
-        <h4><strong>Raphael H. Bellosillo</strong></h4>
-        <span class="badge" style="background-color: var(--bs-danger-text-emphasis);">RESIDENT</span>
+        <h4><strong>{{ heading_full_name|default:"" }}</strong></h4>
+        {% if role %}
+          <span class="badge bg-primary">{{ role }}</span>
+        {% endif %}
       </div>
 
       <div class="divider"></div>
 
+      <h4><strong>{{ profile.full_name|default:"—" }}</strong></h4>
+
       <div class="row g-4">
-            <!-- Personal Information -->
-            <div class="col-md-6">
-            <div class="section-title mb-2">Personal Information</div>
-            <div class="kv">
-                <div class="kv-item"><span class="kv-key">Last Name</span><span class="kv-val">Bellosillo</span></div>
-                <div class="kv-item"><span class="kv-key">First Name</span><span class="kv-val">Raphael</span></div>
-                <div class="kv-item"><span class="kv-key">Middle Name</span><span class="kv-val">Hernandez</span></div>
-                <div class="kv-item"><span class="kv-key">Suffix</span><span class="kv-val">Jr.</span></div>
-                <div class="kv-item"><span class="kv-key">Sex</span><span class="kv-val">Male</span></div>
-                <div class="kv-item"><span class="kv-key">Date of Birth</span><span class="kv-val">March 14, 1995</span></div>
-                <div class="kv-item"><span class="kv-key">Civil Status</span><span class="kv-val">Single</span></div>
-                <div class="kv-item"><span class="kv-key">Nationality</span><span class="kv-val">Filipino</span></div>
-                <div class="kv-item"><span class="kv-key">Religion</span><span class="kv-val">Roman Catholic</span></div>
-                <div class="kv-item"><span class="kv-key">Home Address</span><span class="kv-val">Purok 3, Sitio San Roque, Brgy Sto. Niño</span></div>
-                <div class="kv-item"><span class="kv-key">Email Address</span><span class="kv-val">raphael.bellosillo@email.com</span></div>
-                <div class="kv-item"><span class="kv-key">Mobile Number</span><span class="kv-val">+63 912 345 6789</span></div>
-            </div>
-            </div>
+        <!-- Personal Information -->
+        <div class="col-md-6">
+          <div class="section-title mb-2">Personal Information</div>
+          <div class="kv">
+            <div class="kv-item"><span class="kv-key">Last Name</span><span class="kv-val">{{ profile.last_name|default:"—" }}</span></div>
+            <div class="kv-item"><span class="kv-key">First Name</span><span class="kv-val">{{ profile.first_name|default:"—" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Middle Name</span><span class="kv-val">{{ profile.middle_name|default:"—" }}</span></div> 
+            <div class="kv-item"><span class="kv-key">Suffix</span><span class="kv-val">{{ profile.suffix|default:"—" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Sex</span><span class="kv-val">{{ profile.sex|default:"—" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Date of Birth</span><span class="kv-val">{{ profile.date_of_birth|date:"F d, Y"|default:"—" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Civil Status</span><span class="kv-val">{{ profile.civil_status|default:"—" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Nationality</span><span class="kv-val">{{ profile.nationality|default:"—" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Religion</span><span class="kv-val">{{ profile.religion|default:"—" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Home Address</span><span class="kv-val">{{ profile.home_address|default:"—" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Email Address</span><span class="kv-val">{{ profile.email_address|default:"—" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Mobile Number</span><span class="kv-val">{{ profile.mobile_number|default:"—" }}</span></div>
+          </div>
+        </div>
 
-            <div class="col-md-6">
-                <div class="section-title mb-2">Staff Information</div>
-                <div class="kv">
-                    <div class="kv-item"><span class="kv-key">Role</span><span class="kv-val">Undergraduate Studies</span></div>
-                    <!-- if bhw -->
-                    <div class="kv-item"><span class="kv-key">Assigned Purok / Sitio</span><span class="kv-val">Employed</span></div>
-                    <!-- if lupon member -->
-                    <div class="kv-item"><span class="kv-key">Schedule</span><span class="kv-val">Software Developer</span></div>
-                    <!-- PLEASE INCLUDE THE OTHER INFORMATION THAT IS NEEDED TO BE SHOW FOR A BARANGAY STAFF (EXAMPLE: RELEVANT STATUS FOR A BARANGAY STAFF) -->
-                </div>
+        <!-- Staff Information -->
+        <div class="col-md-6">
+          <div class="section-title mb-2">Staff Information</div>
+          <div class="kv">
+            <div class="kv-item"><span class="kv-key">Role</span><span class="kv-val">{{ profile.role|default:"—" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Assigned Purok / Sitio</span><span class="kv-val">{{ profile.assigned_purok|default:"—" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Schedule</span><span class="kv-val">{{ profile.schedule|default:"—" }}</span></div>
+          </div>
 
-                <div class="section-title mb-2 pt-4">Supporting Documents</div>
-                <div class="kv">
-                    <div class="kv-item"><span class="kv-key">ID Type</span><span class="kv-val">15 years</span></div>
-                    <div class="doc-carousel carousel slide" id="docCarousel" data-bs-ride="false" aria-label="Supporting documents">
-                        <div class="carousel-inner">
-                        <div class="carousel-item active">
-                            <div class="img-wrap">
-                            <img src="{% static 'images/login-logo.png' %}" class="doc-img" alt="Front of ID">
-                            </div>
-                            <small class="text-muted d-block text-center mt-2">Front of ID</small>
-                        </div>
-                        <div class="carousel-item">
-                            <div class="img-wrap">
-                            <img src="{% static 'images/login-logo.png' %}" class="doc-img" alt="Back of ID">
-                            </div>
-                            <small class="text-muted d-block text-center mt-2">Back of ID</small>
-                        </div>
-                        <div class="carousel-item">
-                            <div class="img-wrap">
-                            <img src="{% static 'images/brgy-sto-nino.png' %}" class="doc-img" alt="Selfie holding the ID">
-                            </div>
-                            <small class="text-muted d-block text-center mt-2">Selfie w/ ID</small>
-                        </div>
-                        </div>
+          <div class="section-title mb-2 pt-4">Supporting Documents</div>
+          <div class="kv">
+            <div class="kv-item"><span class="kv-key">ID Type</span><span class="kv-val">{{ profile.id_type_name|default:"—" }}</span></div>
 
-                        <!-- Controls placed OUTSIDE the image bounds -->
-                        <button class="carousel-control-prev doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="prev" aria-label="Previous">
-                        <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
-                        </button>
-                        <button class="carousel-control-next doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="next" aria-label="Next">
-                        <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
-                        </button>
+            <div class="doc-carousel carousel slide" id="docCarousel" data-bs-ride="false" aria-label="Supporting documents">
+              <div class="carousel-inner">
+                {% for s in doc_slides %}
+                  <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                    <div class="img-wrap">
+                      <img src="{{ s.src }}" class="doc-img" alt="{{ s.label }}">
                     </div>
-                </div>
+                    <small class="text-muted d-block text-center mt-2">{{ s.label }}</small>
+                  </div>
+                {% endfor %}
+              </div>
+              <button class="carousel-control-prev doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="prev" aria-label="Previous">
+                <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
+              </button>
+              <button class="carousel-control-next doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="next" aria-label="Next">
+                <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
+              </button>
             </div>
+
+            <div class="kv-item mt-3">
+              <span class="kv-key">Proof of Employment</span>
+              <span class="kv-val">
+                {% if profile.proof_of_employment_path %}
+                  <a href="{{ profile.proof_of_employment_path }}" target="_blank" rel="noopener">Open</a>
+                {% else %}—{% endif %}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="divider"></div>
