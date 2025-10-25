@@ -40,6 +40,18 @@ class MaternalHealthRecordException(Exception):
         "P6181",  # Iron end date cannot be in the future.
         "P6182",  # Deworming date cannot be in the future.
         "P6183",  # Iron end date cannot be before start date.
+        # codes from present_pregnancy_status function (added)
+        "P6265",  # Gravida cannot be negative.
+        "P6266",  # Para cannot be negative.
+        "P6267",  # Para cannot exceed Gravida.
+        "P6268",  # LMP date cannot be in the future.
+        "P6269",  # EDD cannot be before LMP.
+        "P6270",  # Full-term and preterm cannot both be TRUE.
+        # codes from present_pregnancy_status overlay/checks
+        "P6271",  # Para cannot exceed Gravida (after overlay).
+        "P6272",  # EDD cannot be before LMP (after overlay).
+        "P6273",  # Full-term and preterm cannot both be TRUE (after overlay).
+        "P6274",  # Only one present pregnancy status allowed per ANC visit.
     }
 
     def __init__(self, message):

@@ -581,6 +581,62 @@ def maternal_health_record_form(request, record_id : int):
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
                         })
+                elif form_type == 'present_pregnancy_form':
+                    presemt_pregnancy_form = PresentPregnancyForm(
+                        mhr_repo=REPOSITORY,
+                        mhr_id=record_id,
+                        data=request.POST
+                    )
+                    if presemt_pregnancy_form.is_valid():
+                        res = REPOSITORY.insert_present_pregnancy_status(
+                            mhr_id=record_id,
+                            staff_id=staff_id,
+                            gravida=presemt_pregnancy_form.cleaned_data.get("gravida"),
+                            para=presemt_pregnancy_form.cleaned_data.get("para"),
+                            is_fullterm=presemt_pregnancy_form.cleaned_data.get("fullterm"),
+                            is_preterm=presemt_pregnancy_form.cleaned_data.get("preterm"),
+                            lmp=presemt_pregnancy_form.cleaned_data.get("lmp"),
+                            edc=presemt_pregnancy_form.cleaned_data.get("edc"),
+                        )
+                        if not res:
+                            messages.error(request, "Failed to save Present Pregnancy data.")
+                            return render(request, "maternal/health_record_form.html", {
+                                "risk_code_form": risk_code_form,
+                                "formset": formset,
+                                "identification_form": maternal_identification_form,
+                                "obstetric_form": obstetric_form,
+                                "medical_history_form": medical_history_form,
+                                "tt_form": tt_form,
+                                "present_pregnancy_form": presemt_pregnancy_form,
+                                "lab_form": lab_form,
+                                "check_list_form": check_list_form,
+                                "plan_form": plan_form,
+                                "micro_nutrients_form": micro_nutrients_form,
+                                "previous_pregnancy_entry_form": pp_entry_form,
+                                "prenatal_followup_entry_form": pf_entry_form,
+                                "prenatal_followup_formset": pf_formset,
+                            })
+                        
+                        messages.success(request, "Present Pregnancy data saved successfully.")
+                        return redirect('maternal:maternal_health_record_form', record_id=record_id)
+                    else:
+                        MessageUtility.push_form_errors_as_messages(request, presemt_pregnancy_form)
+                        return render(request, "maternal/health_record_form.html", {
+                            "risk_code_form": risk_code_form,
+                            "formset": formset,
+                            "identification_form": maternal_identification_form,
+                            "obstetric_form": obstetric_form,
+                            "medical_history_form": medical_history_form,
+                            "tt_form": tt_form,
+                            "present_pregnancy_form": presemt_pregnancy_form,
+                            "lab_form": lab_form,
+                            "check_list_form": check_list_form,
+                            "plan_form": plan_form,
+                            "micro_nutrients_form": micro_nutrients_form,
+                            "previous_pregnancy_entry_form": pp_entry_form,
+                            "prenatal_followup_entry_form": pf_entry_form,
+                            "prenatal_followup_formset": pf_formset,
+                        })
             else:
                 messages.warning(request, "No form type specified.")
                 return render(request, "maternal/health_record_form.html", {

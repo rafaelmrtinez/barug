@@ -87,6 +87,7 @@ class MaternalHealthRecordRepository:
         params = (
             mhr_id, staff_id, nbs_plan, delivery_plan
         )
+        logger.debug("Insert plan and baseline params: %s", params)
         try:
             rows = self.ctx.execute_query(sql, params)
             return rows[0] if rows else None

@@ -231,7 +231,7 @@
         <!-- Present Pregnancy -->
         <form method="post" class="card mb-3 card-brand" id="form-present" action="">
             {% csrf_token %}
-            <input type="hidden" name="section" value="present_pregnancy">
+            {{ present_pregnancy_form.form_type }}
             <div class="card card-brand mb-3">
                 <span class="card-header">Present Pregnancy</span>
                 <div class="card-body">
