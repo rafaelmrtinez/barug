@@ -16,7 +16,31 @@ class MaternalHealthRecordRepository:
 
     def __init__(self, ctx: ConnectionAdapter):
         self.ctx = ctx
-        
+
+    def insert_anc_row_findings(self, mhr_id, staff_id, aog_weeks, aog_days, weight, bp_systolic, bp_diastolic):
+        sql = """SELECT * FROM _get_or_create_today_maternal_visit(%s::INTEGER, %s::INTEGER, %s::INTEGER, %s::INTEGER, %s::NUMERIC, %s::INTEGER, %s::INTEGER);"""
+        params = (mhr_id, staff_id, aog_weeks, aog_days, weight, bp_systolic, bp_diastolic)
+        try:
+            rows = self.ctx.execute_query(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException as e:
+            logger.error(f"Error inserting ANC row findings: {e.message}")
+            if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
+                raise MaternalHealthRecordException(e.message) from e
+            raise e
+
+    def update_maternal_anc_row_findings(self, mhr_id, staff_id, findings, notes):
+        sql = """SELECT * FROM update_maternal_anc_row_findings(%s::INTEGER, %s::INTEGER, %s::TEXT, %s::TEXT);"""
+        params = (mhr_id, staff_id, findings, notes)
+        try:
+            rows = self.ctx.execute_query(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException as e:
+            logger.error(f"Error updating maternal ANC row findings: {e.message}")
+            if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
+                raise MaternalHealthRecordException(e.message) from e
+            raise e
+
     def insert_maternal_lab_results(self, mhr_id, staff_id, lab_results):
         sql="""SELECT * FROM add_maternal_lab_results_json(%s::INTEGER, %s::INTEGER, %s::JSONB);"""
         params = (mhr_id, staff_id, Json(lab_results))
@@ -434,6 +458,39 @@ class MaternalHealthRecordRepository:
                 ON t.lab_test_type_id = r.lab_test_id
             WHERE r.maternal_record_id = %s
             ORDER BY r.date_tested DESC NULLS LAST, r.lab_result_id DESC;
+        """
+        params = (maternal_record_id,)
+        rows = self.ctx.execute_query_to_dict(sql, params)
+        return rows or []
+
+    def fetch_prenatal_information_by_mhr_id(self, maternal_record_id: int):
+        """Fetch prenatal ANC rows for a maternal record.
+
+        Returns a list of dicts with keys:
+            - date (anc_date::date)
+            - aog_days
+            - aog_weeks
+            - weight (weight_kg)
+            - bp_systolic
+            - bp_diastolic
+            - leopolds_findings
+            - notes
+
+        Ordered by anc_date DESC then anc_row_id DESC.
+        """
+        sql = """
+            SELECT
+                anc_date::date AS date,
+                aog_days,
+                aog_weeks,
+                weight_kg AS weight,
+                bp_systolic,
+                bp_diastolic,
+                leopolds_findings,
+                notes
+            FROM public.maternal_anc_row
+            WHERE maternal_record_id = %s
+            ORDER BY anc_date DESC NULLS LAST, anc_row_id DESC;
         """
         params = (maternal_record_id,)
         rows = self.ctx.execute_query_to_dict(sql, params)

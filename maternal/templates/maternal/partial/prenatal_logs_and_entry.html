@@ -1,0 +1,132 @@
+<form id="prenatal-form" method="post" action="{% url 'maternal:bhw_prenatal_form' mhr_id %}" novalidate
+    data-api-endpoint="/maternal/api/form/prenatal/" data-mhr-id="{{ mhr_id }}">
+    {% csrf_token %}
+
+    {% if prenatal_form.non_field_errors %}
+    <div class="alert alert-danger">
+        {% for err in prenatal_form.non_field_errors %}
+        <div>{{ err }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card mb-3 card-brand">
+        <div class="card-header">Prenatal Follow-up Entry</div>
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                {% comment %} <div class="col-md-2">
+                    {{ prenatal_form.date.label_tag }}
+                    {{ prenatal_form.date }}
+                    {% for error in prenatal_form.date.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
+                </div> {% endcomment %}
+
+                <div class="col-md-2">
+                    {{ prenatal_form.aog_days.label_tag }}
+                    {{ prenatal_form.aog_days }}
+                    {% for error in prenatal_form.aog_days.errors %}
+                    {% comment %} <small class="invalid-feedback d-block">{{ error }}</small> {% endcomment %}
+                    {% endfor %}
+                </div>
+
+                <div class="col-md-2">
+                    {{ prenatal_form.aog_weeks.label_tag }}
+                    {{ prenatal_form.aog_weeks }}
+                    {% for error in prenatal_form.aog_weeks.errors %}
+                    {% comment %} <small class="invalid-feedback d-block">{{ error }}</small> {% endcomment %}
+                    {% endfor %}
+                </div>
+
+                <div class="col-md-2">
+                    {{ prenatal_form.wt_kg.label_tag }}
+                    {{ prenatal_form.wt_kg }}
+                    {% for error in prenatal_form.wt_kg.errors %}
+                    {% comment %} <small class="invalid-feedback d-block">{{ error }}</small> {% endcomment %}
+                    {% endfor %}
+                </div>
+
+                <div class="col-md-2">
+                    {{ prenatal_form.bp_systolic.label_tag }}
+                    {{ prenatal_form.bp_systolic }}
+                    {% for error in prenatal_form.bp_systolic.errors %}
+                    {% comment %} <small class="invalid-feedback d-block">{{ error }}</small> {% endcomment %}
+                    {% endfor %}
+                </div>
+
+                <div class="col-md-2">
+                    {{ prenatal_form.bp_diastolic.label_tag }}
+                    {{ prenatal_form.bp_diastolic }}
+                    {% for error in prenatal_form.bp_diastolic.errors %}
+                    {% comment %} <small class="invalid-feedback d-block">{{ error }}</small> {% endcomment %}
+                    {% endfor %}
+                </div>
+
+                <div class="col-md-4">
+                    {{ prenatal_form.findings.label_tag }}
+                    {{ prenatal_form.findings }}
+                    {% for error in prenatal_form.findings.errors %}
+                    {% comment %} <small class="invalid-feedback d-block">{{ error }}</small> {% endcomment %}
+                    {% endfor %}
+                </div>
+
+                <div class="col-md-4">
+                    {{ prenatal_form.notes.label_tag }}
+                    {{ prenatal_form.notes }}
+                    {% for error in prenatal_form.notes.errors %}
+                    {% comment %} <small class="invalid-feedback d-block">{{ error }}</small> {% endcomment %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="card-footer d-flex justify-content-end gap-2 mt-3">
+                <button type="reset" class="btn btn-outline-brand">Clear</button>
+                <button type="submit" class="btn btn-brand">Save</button>
+            </div>
+        </div>
+    </div>
+</form>
+
+<div class="card mb-5 card-brand" id="prenatal-followup-log">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Prenatal Follow-Up Log</span>
+        <span class="small text-white">Read-only</span>
+    </div>
+
+    <div class="card-body table-responsive">
+        <table class="table table-sm align-middle text-center">
+            <thead>
+                <tr>
+                <th style="width:10%">Date</th>
+                <th style="width:10%">AOG Days</th>
+                <th style="width:10%">AOG Weeks</th>
+                <th style="width:10%">WT (kg)</th>
+                <th style="width:10%">BP Systolic</th>
+                <th style="width:10%">BP Diastolic</th>
+                <th style="width:30%">Findings (Leopold’s)</th>
+                <th style="width:30%">Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if prenatal_followup_formset and prenatal_followup_formset.forms %}
+                {% for f in prenatal_followup_formset %}
+                    <tr>
+                    <td>{{ f.date.value|default:"—" }}</td>
+                    <td>{{ f.aog_days.value|default:"—" }}</td>
+                    <td>{{ f.aog_weeks.value|default:"—" }}</td>
+                    <td>{{ f.wt_kg.value|default:"—" }}</td>
+                    <td>{{ f.bp_systolic.value|default:"—" }}</td>
+                    <td>{{ f.bp_diastolic.value|default:"—" }}</td>
+                    <td>{{ f.findings.value|default:"—" }}</td>
+                    <td>{{ f.notes.value|default:"—" }}</td>
+                    </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted">No follow-up entries yet.</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>

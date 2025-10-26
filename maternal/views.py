@@ -1,8 +1,10 @@
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.core.paginator import Paginator
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_protect as csrf_required
+from django.views.decorators.http import require_http_methods
 import json
 
 from authentication.guards import role_required, session_login_required
@@ -10,7 +12,6 @@ from authentication.utils import nocache
 from barug.utility.lazy_repository import LazyRepositoryProxy
 from barug.utility.messages_util import MessageUtility
 from maternal.exceptions.maternal_exceptions import MaternalHealthRecordException
-from maternal.forms.bhw_prenatal_form import HealthWorkerPrenatalFollowUpEntryForm
 from maternal.forms.check_list_form import CheckListForm
 from maternal.forms.labolatory_form import LaboratoryForm
 from maternal.forms.maternal_identification_form import MaternalIdentificationForm
@@ -27,8 +28,7 @@ from maternal.forms.tetanus_toxoid_form import TetanusToxoidForm
 from maternal.repository import MaternalHealthRecordRepository
 from midwife.services import fetch_maternal_registry
 from src.infra.database.connection_adapter import ConnectionAdapter
-from django.conf import settings
-import os
+
 from maternal.supa.supabase_storage_service import SupabaseStorageService
 from maternal.services.laboratory_service import LaboratoryService, ExistingLabResultError
 
@@ -47,18 +47,138 @@ REPOSITORY: MaternalHealthRecordRepository = LazyRepositoryProxy(
         ConnectionAdapter()))
 
 @session_login_required
+@role_required(*ACCESS)
+@nocache
+@csrf_required
+def prenatal_api(request: HttpRequest) -> JsonResponse:
+    """AJAX endpoint to save prenatal follow-up entry.
+
+    Expects JSON payload containing the prenatal form fields and `mhr_id`.
+    Validates the payload with `PrenatalFollowUpEntryForm.is_valid()` before
+    inserting into the repository.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Only POST allowed.'}, status=405)
+
+    # parse JSON body (frontend sends JSON)
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+    except Exception:
+        return JsonResponse({'success': False, 'message': 'Invalid JSON payload.'}, status=400)
+
+    mhr_id = payload.get('mhr_id')
+    if not mhr_id:
+        return JsonResponse({'success': False, 'message': 'Missing maternal record id (mhr_id).'}, status=400)
+
+    staff_id = request.session.get('auth', {}).get('staff_id')
+    staff_role = request.session.get('auth', {}).get('role_name')
+
+    # instantiate form with the same prefix used by the rendered form inputs
+    # the frontend sends names like 'pf_entry-fieldname', so set prefix='pf_entry'
+    prenatal_form = PrenatalFollowUpEntryForm(
+        maternal_id=mhr_id,
+        mhr_repository=REPOSITORY,
+        role=staff_role,
+        prefix='pf_entry',
+        data=payload,
+    )
+
+    if not prenatal_form.is_valid():
+        # return errors for client-side display
+        return JsonResponse({
+            'success': False,
+            'message': 'Validation failed.',
+            'errors': prenatal_form.errors,
+        }, status=400)
+
+    data = prenatal_form.cleaned_data
+
+    # perform repository insert/update depending on role
+    res = None
+    try:
+        if staff_role == 'barangay health worker':
+            res = REPOSITORY.insert_anc_row_findings(
+                mhr_id=mhr_id,
+                staff_id=staff_id,
+                aog_weeks=data.get('aog_weeks'),
+                aog_days=data.get('aog_days'),
+                weight=data.get('wt_kg'),
+                bp_systolic=data.get('bp_systolic'),
+                bp_diastolic=data.get('bp_diastolic'),
+            )
+        else:
+            # midwife path: update findings/notes if repository supports it
+
+            if not data.get('findings') and not data.get('notes'):
+                data['findings'] = 'N/A'
+                data['notes'] = 'N/A'
+
+            if hasattr(REPOSITORY, 'update_maternal_anc_row_findings'):
+                res = REPOSITORY.update_maternal_anc_row_findings(
+                    mhr_id=mhr_id,
+                    staff_id=staff_id,
+                    findings=data.get('findings'),
+                    notes=data.get('notes'),
+                )
+            else:
+                # not implemented on repository yet
+                return JsonResponse({'success': False, 'message': 'Midwife update not implemented.'}, status=501)
+    except MaternalHealthRecordException as e:
+        return JsonResponse({'success': False, 'message': e.message or str(e)}, status=400)
+    except Exception as e:
+        logger.exception('Unexpected error saving prenatal entry')
+        return JsonResponse({'success': False, 'message': 'Unexpected error.'}, status=500)
+
+    if not res:
+        return JsonResponse({'success': False, 'message': 'Failed to save Prenatal Follow-up data.'}, status=500)
+
+    # success: tell the client to reload or redirect
+    redirect_url = reverse('maternal:bhw_prenatal_form', args=[mhr_id]) if staff_role != 'midwife' else reverse('maternal:maternal_health_record_form', args=[mhr_id])
+    return JsonResponse({'success': True, 'message': 'Prenatal Follow-up saved.', 'redirect': redirect_url})
+    
+
+@session_login_required
 @role_required(*BHW_ACCESS)
 @nocache
 @csrf_required
 def health_worker_prenatal_form_view(request: HttpRequest, mhr_id: int) -> HttpResponse:
     # Implementation for the health worker prenatal form view
-    prenatal_form = HealthWorkerPrenatalFollowUpEntryForm(
+    # Wrap the view logic with robust exception handling so unexpected errors
+    # don't surface raw tracebacks to users and we always render a usable form.
+    staff_id = request.session.get("auth", {}).get("staff_id")
+    staff_role = request.session.get("auth", {}).get("role_name")
+    existing_data = REPOSITORY.fetch_prenatal_information_by_mhr_id(mhr_id)
+    initial = [{
+        "date":  r.get("date"),
+        "aog_days": r.get("aog_days"),
+        "aog_weeks": r.get('aog_weeks'),
+        "wt_kg": r.get("weight"),
+        "bp_systolic": r.get("bp_systolic"),
+        "bp_diastolic": r.get("bp_diastolic"),
+        "findings": r.get("leopolds_findings") or 'TBD',
+        "notes": r.get("notes") or 'TBD',
+    } for r in (existing_data or [])]
+    pf_formset = PrenatalFollowUpFormSet(
+        initial=initial,
+        prefix="pf",
+        form_kwargs={
+            "mhr_repository": None,
+            "maternal_id": mhr_id,
+        },
+    )
+    # GET -> show blank form
+    prenatal_form = PrenatalFollowUpEntryForm(
         maternal_id=mhr_id,
-        mhr_repository=REPOSITORY
+        mhr_repository=REPOSITORY,
+        role=staff_role,
     )
     return render(request, "maternal/bhw_prenatal_form.html", {
-        "prenatal_form": prenatal_form
+        "prenatal_form": prenatal_form,
+        "mhr_id": mhr_id,
+        "prenatal_followup_formset": pf_formset,
     })
+
+    
 
 @session_login_required
 @role_required(*ACCESS)
@@ -206,13 +326,27 @@ def maternal_health_record_form(request, record_id : int):
             mhr_id=record_id,
             assisted_by=assistant
         )
+        
+        pre_natal_existing_data = REPOSITORY.fetch_prenatal_information_by_mhr_id(record_id)
+        
+        initial_pre_natal_existing_data = [{
+            "date":  r.get("date"),
+            "aog_days": r.get("aog_days"),
+            "aog_weeks": r.get('aog_weeks'),
+            "wt_kg": r.get("weight"),
+            "bp_systolic": r.get("bp_systolic"),
+            "bp_diastolic": r.get("bp_diastolic"),
+            "findings": r.get("leopolds_findings") or 'TBD',
+            "notes": r.get("notes") or 'TBD',
+        } for r in (pre_natal_existing_data or [])]
+        
         # NEW: Prenatal follow-up formset (DB not ready → no initial yet)
         # keep the same prefix "pf" you used in POST
         pf_formset = PrenatalFollowUpFormSet(
-            initial=[],           # will be populated later from your logs table
+            initial=initial_pre_natal_existing_data,
             prefix="pf",
             form_kwargs={
-                "mhr_repository": None,     # supply repo later
+                "mhr_repository": None,
                 "maternal_id": record_id,
             },
         )
@@ -262,6 +396,7 @@ def maternal_health_record_form(request, record_id : int):
                                 "micro_nutrients_form": micro_nutrients_form,
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
+                                "mhr_id": record_id,
                             })
                         
                         messages.success(request, "Obstetric History saved successfully.")
@@ -283,6 +418,7 @@ def maternal_health_record_form(request, record_id : int):
                             "previous_pregnancy_entry_form": pp_entry_form,
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
+                            "mhr_id": record_id,
                         })
                 elif form_type == "medical_history_form":
                     medical_history_form = MedicalHistoryForm(
@@ -316,6 +452,7 @@ def maternal_health_record_form(request, record_id : int):
                                 "micro_nutrients_form": micro_nutrients_form,
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
+                                "mhr_id": record_id,
                             })
                         
                         messages.success(request, "Medical History saved successfully.")
@@ -337,6 +474,7 @@ def maternal_health_record_form(request, record_id : int):
                             "previous_pregnancy_entry_form": pp_entry_form,
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
+                            "mhr_id": record_id,
                         })
                 elif form_type == "tetanus_toxoid":
                     tt_form = TetanusToxoidForm(
@@ -367,6 +505,7 @@ def maternal_health_record_form(request, record_id : int):
                                 "micro_nutrients_form": micro_nutrients_form,
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
+                                "mhr_id": record_id,
                             })
                         
                         messages.success(request, "Tetanus Toxoid data saved successfully.")
@@ -388,6 +527,7 @@ def maternal_health_record_form(request, record_id : int):
                             "previous_pregnancy_entry_form": pp_entry_form,
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
+                            "mhr_id": record_id,
                         })
                 elif form_type == "check_list_form":
                     check_list_form = CheckListForm(
@@ -417,6 +557,7 @@ def maternal_health_record_form(request, record_id : int):
                                 "micro_nutrients_form": micro_nutrients_form,
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
+                                "mhr_id": record_id,
                             })
                         
                         messages.success(request, "Checklist data saved successfully.")
@@ -438,6 +579,7 @@ def maternal_health_record_form(request, record_id : int):
                             "previous_pregnancy_entry_form": pp_entry_form,
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
+                            "mhr_id": record_id,
                         })
                 elif form_type == "plan_form":
                     plan_form = PlanForm(
@@ -468,6 +610,7 @@ def maternal_health_record_form(request, record_id : int):
                                 "micro_nutrients_form": micro_nutrients_form,
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
+                                "mhr_id": record_id,
                             })
                         
                         messages.success(request, "Plan data saved successfully.")
@@ -489,6 +632,7 @@ def maternal_health_record_form(request, record_id : int):
                             "previous_pregnancy_entry_form": pp_entry_form,
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
+                            "mhr_id": record_id,
                         })
                 elif form_type == "micro_nutrients_form":
                     micro_nutrients_form = MicroNutrientsForm(
@@ -520,6 +664,7 @@ def maternal_health_record_form(request, record_id : int):
                                 "micro_nutrients_form": micro_nutrients_form,
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
+                                "mhr_id": record_id,
                             })
                         
                         messages.success(request, "Micro Nutrients data saved successfully.")
@@ -540,6 +685,7 @@ def maternal_health_record_form(request, record_id : int):
                             "micro_nutrients_form": micro_nutrients_form,
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
+                            "mhr_id": record_id,
                         })
                 elif form_type == 'previous_pregnancy_form':
                     
@@ -578,6 +724,7 @@ def maternal_health_record_form(request, record_id : int):
                                 "previous_pregnancy_entry_form": pp_entry_form,
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
+                                "mhr_id": record_id,
                             })
                         
                         messages.success(request, "Previous Pregnancies data saved successfully.")
@@ -599,6 +746,7 @@ def maternal_health_record_form(request, record_id : int):
                             "previous_pregnancy_entry_form": pp_entry_form,
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
+                            "mhr_id": record_id,
                         })
                 elif form_type == 'present_pregnancy_form':
                     presemt_pregnancy_form = PresentPregnancyForm(
@@ -634,6 +782,7 @@ def maternal_health_record_form(request, record_id : int):
                                 "previous_pregnancy_entry_form": pp_entry_form,
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
+                                "mhr_id": record_id,
                             })
                         
                         messages.success(request, "Present Pregnancy data saved successfully.")
@@ -655,6 +804,7 @@ def maternal_health_record_form(request, record_id : int):
                             "previous_pregnancy_entry_form": pp_entry_form,
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
+                            "mhr_id": record_id,
                         })
                 elif form_type == 'laboratory_form':
                     # Instantiate form with POST only. Keep validation in the view.
@@ -688,6 +838,7 @@ def maternal_health_record_form(request, record_id : int):
                                 "previous_pregnancy_entry_form": pp_entry_form,
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
+                                "mhr_id": record_id,
                             })
 
                         # normalize service return value (support bool or dict)
@@ -713,6 +864,7 @@ def maternal_health_record_form(request, record_id : int):
                                 "previous_pregnancy_entry_form": pp_entry_form,
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
+                                "mhr_id": record_id,
                             })
 
                         messages.success(request, "Laboratory data saved successfully.")
@@ -734,6 +886,7 @@ def maternal_health_record_form(request, record_id : int):
                             "previous_pregnancy_entry_form": pp_entry_form,
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
+                            "mhr_id": record_id,
                         })
             else:
                 messages.warning(request, "No form type specified.")
@@ -752,6 +905,7 @@ def maternal_health_record_form(request, record_id : int):
                     "previous_pregnancy_entry_form": pp_entry_form,
                     "prenatal_followup_entry_form": pf_entry_form,
                     "prenatal_followup_formset": pf_formset,
+                    "mhr_id": record_id,
                 })
         return render(request, "maternal/health_record_form.html", {
             "risk_code_form": risk_code_form,
@@ -768,6 +922,7 @@ def maternal_health_record_form(request, record_id : int):
             "previous_pregnancy_entry_form": pp_entry_form,
             "prenatal_followup_entry_form": pf_entry_form,
             "prenatal_followup_formset": pf_formset,
+            "mhr_id": record_id,
         })
     except MaternalHealthRecordException as e:
         logger.warning(f"Error in maternal health record form: {str(e)}")
@@ -787,6 +942,7 @@ def maternal_health_record_form(request, record_id : int):
             "previous_pregnancy_entry_form": pp_entry_form,
             "prenatal_followup_entry_form": pf_entry_form,
             "prenatal_followup_formset": pf_formset,
+            "mhr_id": record_id,
         })
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")

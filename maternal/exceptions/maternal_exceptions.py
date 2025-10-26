@@ -45,6 +45,14 @@ class MaternalHealthRecordException(Exception):
         "P6275",  # Result image path required / cannot be empty (commented rules)
         "P6276",  # Result image path array entries must be non-empty strings
         "P6277",  # Result image path must be string or array
+        # codes from maternal ANC visit/row insertion function
+        "P6165",  # AOG weeks must be between 0 and 45
+        "P6166",  # AOG days must be between 0 and 6
+        "P6167",  # BP systolic out of valid range
+        "P6168",  # BP diastolic out of valid range
+        "P6169",  # Record status ONGOING not found
+        "P6170",  # Trimester stage lookup not found
+        "P6171",  # ANC record for today's visit already exists
         # codes from maternal checklist function
         "P6201",
         "P6202",

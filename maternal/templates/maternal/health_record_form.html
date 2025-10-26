@@ -610,90 +610,7 @@
             </div>
         </form>
     {% endif %}
-    {# ───────────────── Prenatal Follow-Up (Inputs) ───────────────── #}
-        <form method="post" class="card mb-3 card-brand" id="form-prenatal-followup" action="">
-        {% csrf_token %}
-        <input type="hidden" name="section" value="prenatal_followup">
-        <div class="card card-brand mb-3">
-            <span class="card-header">Prenatal Follow-Up</span>
-            <div class="card-body">
-                <div id="prenatal-followup-fields" class="row g-3">
-                    {# One new-entry row (inputs only) — bind to your view as needed #}
-                    <div class="col-md-2">
-                    {{ prenatal_followup_entry_form.date.label_tag }}
-                    {{ prenatal_followup_entry_form.date }}
-                    </div>
-                    <div class="col-md-2">
-                    {{ prenatal_followup_entry_form.aog.label_tag }}
-                    {{ prenatal_followup_entry_form.aog }}
-                    </div>
-                    <div class="col-md-2">
-                    {{ prenatal_followup_entry_form.wt_kg.label_tag }}
-                    {{ prenatal_followup_entry_form.wt_kg }}
-                    </div>
-                    <div class="col-md-2">
-                    {{ prenatal_followup_entry_form.bp.label_tag }}
-                    {{ prenatal_followup_entry_form.bp }}
-                    </div>
-                    <div class="col-md-4">
-                    {{ prenatal_followup_entry_form.findings.label_tag }}
-                    {{ prenatal_followup_entry_form.findings }}
-                    </div>
-                    <div class="col-12">
-                    {{ prenatal_followup_entry_form.notes.label_tag }}
-                    {{ prenatal_followup_entry_form.notes }}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="card-footer text-end">
-            <button type="submit" class="btn btn-brand">Save Prenatal Follow-Up</button>
-        </div>
-        </form>
-    {# ───────────────── Prenatal Follow-Up Log (Read-only) ───────────────── #}
-    <div class="card mb-5 card-brand" id="prenatal-followup-log">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span>Prenatal Follow-Up Log</span>
-        <span class="small text-white">Read-only</span>
-    </div>
-
-    <div class="card-body table-responsive">
-        {# No editing: we don’t render inputs; we print values from the formset #}
-        <table class="table table-sm align-middle">
-        <thead>
-            <tr>
-            <th style="width:10%">Date</th>
-            <th style="width:10%">AOG</th>
-            <th style="width:10%">WT (kg)</th>
-            <th style="width:10%">BP</th>
-            <th style="width:30%">Findings (Leopold’s)</th>
-            <th style="width:30%">Notes</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% if prenatal_followup_formset and prenatal_followup_formset.forms %}
-            {% for f in prenatal_followup_formset %}
-                <tr>
-                <td>{{ f.date.value|default:"—" }}</td>
-                <td>{{ f.aog.value|default:"—" }}</td>
-                <td>{{ f.wt_kg.value|default:"—" }}</td>
-                <td>{{ f.bp.value|default:"—" }}</td>
-                <td>{{ f.findings.value|default:"—" }}</td>
-                <td>{{ f.notes.value|default:"—" }}</td>
-                </tr>
-            {% endfor %}
-            {% else %}
-            <tr>
-                <td colspan="6" class="text-center text-muted">No follow-up entries yet.</td>
-            </tr>
-            {% endif %}
-        </tbody>
-        </table>
-    </div>
-    </div>
-
-
+    {% include 'maternal/partial/prenatal_logs_and_entry.html' with mhr_id=mhr_id prenatal_form=prenatal_followup_entry_form %}
 </div>
         <!-- Image preview modal (used by imagePreview.js) -->
         <div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true">
@@ -717,4 +634,5 @@
 <script src="{% static 'maternal/js/mhrTable.js' %}"></script>
 <script src="{% static 'maternal/js/imagePreview.js' %}"></script>
 <script src="{% static 'maternal/js/api/save_lab_results.js' %}"></script>
+<script src="{% static 'maternal/js/prenatalApi.js' %}"></script>
 {% endblock %}

@@ -38,9 +38,9 @@
         <th>Family #</th>
         <th>Address</th>
         <th>Date</th>
-        {% if request.session.auth.role_name == "midwife" %}
+        {% comment %} {% if request.session.auth.role_name == "midwife" %} {% endcomment %}
         <th class="text-end">Open</th>
-        {% endif %}
+        {% comment %} {% endif %} {% endcomment %}
     </tr>
     </thead>
     <tbody>
@@ -52,13 +52,13 @@
             <td>{{ r.full_address|default:"—" }}</td>
             <td>{{ r.record_date|date:"M d, Y" }}</td>
             <td class="text-end">
-            {% if request.session.auth.role_name == "midwife" %}
+            {% comment %} {% if request.session.auth.role_name == "midwife" %} {% endcomment %}
                 <a class="btn btn-outline-secondary btn-sm"
                 href="{% url 'maternal:maternal_record_detail' r.person_id %}"
                 data-maternal-record-id="{{ r.maternal_record_id }}">
                 {% bs_icon 'folder2-open' extra_classes='me-1' %} Open
                 </a>
-            {% endif %}
+            {% comment %} {% endif %} {% endcomment %}
             </td>
         </tr>
         {% endfor %}
