@@ -178,7 +178,6 @@ def health_worker_prenatal_form_view(request: HttpRequest, mhr_id: int) -> HttpR
         "prenatal_followup_formset": pf_formset,
     })
 
-    
 
 @session_login_required
 @role_required(*ACCESS)
@@ -258,7 +257,7 @@ def create_new_maternal_entry(request: HttpRequest) -> HttpResponse:
         })
 
 @session_login_required
-@role_required(*ACCESS)
+@role_required(*MIDWIFE_ACCESS)
 @nocache
 @csrf_required
 def maternal_health_record_form(request, record_id : int):
@@ -951,7 +950,7 @@ def maternal_health_record_form(request, record_id : int):
 
 
 @session_login_required
-@role_required(*ACCESS)
+@role_required(*MIDWIFE_ACCESS)
 @nocache
 @csrf_required
 def laboratory_save_api(request, record_id: int) -> JsonResponse:
