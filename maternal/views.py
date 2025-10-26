@@ -10,6 +10,7 @@ from authentication.utils import nocache
 from barug.utility.lazy_repository import LazyRepositoryProxy
 from barug.utility.messages_util import MessageUtility
 from maternal.exceptions.maternal_exceptions import MaternalHealthRecordException
+from maternal.forms.bhw_prenatal_form import HealthWorkerPrenatalFollowUpEntryForm
 from maternal.forms.check_list_form import CheckListForm
 from maternal.forms.labolatory_form import LaboratoryForm
 from maternal.forms.maternal_identification_form import MaternalIdentificationForm
@@ -44,6 +45,20 @@ MIDWIFE_ACCESS = ("MIDWIFE", "Midwife", "midwife")
 REPOSITORY: MaternalHealthRecordRepository = LazyRepositoryProxy(
     repo_factory=lambda: MaternalHealthRecordRepository(
         ConnectionAdapter()))
+
+@session_login_required
+@role_required(*BHW_ACCESS)
+@nocache
+@csrf_required
+def health_worker_prenatal_form_view(request: HttpRequest, mhr_id: int) -> HttpResponse:
+    # Implementation for the health worker prenatal form view
+    prenatal_form = HealthWorkerPrenatalFollowUpEntryForm(
+        maternal_id=mhr_id,
+        mhr_repository=REPOSITORY
+    )
+    return render(request, "maternal/bhw_prenatal_form.html", {
+        "prenatal_form": prenatal_form
+    })
 
 @session_login_required
 @role_required(*ACCESS)
@@ -835,7 +850,7 @@ def laboratory_save_api(request, record_id: int) -> JsonResponse:
     svc = LaboratoryService(REPOSITORY, request.session.get('auth', {}).get('staff_id'), record_id)
     try:
         result = svc.save(paired)
-    except ExistingLabResultError as e:
+    except (ExistingLabResultError, MaternalHealthRecordException) as e:
         # Client attempted to add/upload tests that already exist
         logger.info('Client attempted to add existing lab tests: %s', getattr(e, 'tests', None))
         return JsonResponse({'success': False, 'message': str(e), 'conflicts': getattr(e, 'tests', [])}, status=409)
