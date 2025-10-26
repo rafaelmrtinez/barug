@@ -73,15 +73,15 @@ def prenatal_api(request: HttpRequest) -> JsonResponse:
     staff_id = request.session.get('auth', {}).get('staff_id')
     staff_role = request.session.get('auth', {}).get('role_name')
 
-    # instantiate form with the same prefix used by the rendered form inputs
-    # the frontend sends names like 'pf_entry-fieldname', so set prefix='pf_entry'
-    prenatal_form = PrenatalFollowUpEntryForm(
-        maternal_id=mhr_id,
-        mhr_repository=REPOSITORY,
-        role=staff_role,
-        prefix='pf_entry',
-        data=payload,
-    )
+    # Determine whether payload uses the 'pf_entry-' prefix (the frontend may or may not include it).
+    uses_prefix = any(str(k).startswith('pf_entry-') for k in payload.keys())
+
+    # Instantiate the form with the detected prefix when present; otherwise, instantiate without prefix
+    form_kwargs = dict(maternal_id=mhr_id, mhr_repository=REPOSITORY, role=staff_role, data=payload)
+    if uses_prefix:
+        form_kwargs['prefix'] = 'pf_entry'
+
+    prenatal_form = PrenatalFollowUpEntryForm(**form_kwargs)
 
     if not prenatal_form.is_valid():
         # return errors for client-side display
