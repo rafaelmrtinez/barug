@@ -35,6 +35,16 @@ class MaternalHealthRecordException(Exception):
         "P6194",
         "P6195",
         "P6196",
+        # codes from maternal lab result insertion function
+        "P6197",  # Each array element must be an object with required keys
+        "P6198",  # Date tested missing or in the future
+        "P6199",  # Invalid lab test type
+        "P6207",  # Lab test type id not found
+        "P6208",  # Duplicate lab entry in same request
+        "P6209",  # Duplicate lab entry already exists in DB for that date
+        "P6275",  # Result image path required / cannot be empty (commented rules)
+        "P6276",  # Result image path array entries must be non-empty strings
+        "P6277",  # Result image path must be string or array
         # codes from maternal checklist function
         "P6201",
         "P6202",
