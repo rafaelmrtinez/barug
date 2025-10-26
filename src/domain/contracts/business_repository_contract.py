@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from decimal import Decimal
 from typing import Optional, Dict, Any
 from src.app.transfer_objects.commands.business_cmd import(
     RegisterBusinessProfileCmd
@@ -9,6 +10,7 @@ from src.app.transfer_objects.dto.business_dto import (
     NonResidentOwnerDTO,
     BusinessInfoDTO,
     RenewalListDTO,
+    RenewalQuoteLineDTO,
 )
 
 class IBusinessRepository(ABC):
@@ -89,4 +91,20 @@ class IBusinessRenewalRepository(ABC):
 
     @abstractmethod
     def sort_clearance_sate(self, b_type: int) -> list[RenewalListDTO]:
+        pass
+
+class IBusinessRenewalQuoteRepository(ABC):
+    @abstractmethod
+    def fetch_quote_auto(self, business_id: int, year: int) -> list[RenewalQuoteLineDTO]:
+        """Calls public.get_bc_renewal_quote_auto(..) and maps rows to DTOs."""
+        pass
+
+    @abstractmethod
+    def fetch_grand_total_auto(self, business_id: int, year: int) -> Decimal:
+        """Calls public.get_bc_renewal_grand_total_auto(..)."""
+        pass
+
+    @abstractmethod
+    def fetch_paid_history(self, business_id: int) -> list[Dict[str, Any]]:
+        """Paid rows (annual) for reference; uses business_clearance_status_record."""
         pass

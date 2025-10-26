@@ -98,6 +98,7 @@ from src.app.contracts.business_service_contract import (
     IBusinessInfoService,
     INonResidentOwnerService,
     IBusinessRenewalService,
+    IBusinessRenewalQuoteService,
 )
 from src.domain.contracts.business_repository_contract import IBusinessRepository
 from src.app.transfer_objects.commands.business_cmd import (
@@ -2822,8 +2823,9 @@ def ajax_business_search(
 def business_information(
     request, 
     b_id: int,
-    business_info: IBusinessInfoService = Provide[
-        AppContainer.owner_business_service]) -> HttpResponse:
+    business_info: IBusinessInfoService = Provide[AppContainer.owner_business_service],
+    renewal_quote_svc: IBusinessRenewalQuoteService = Provide[AppContainer.business_renewal_quote_service],
+) -> HttpResponse:
     user_role = _auth_role_name(request)
     
     person_id = request.GET.get("owner")
@@ -2872,6 +2874,9 @@ def business_information(
     operating_days_end_name = days[-1] if days else None
 
     formatted_id = f"{int(b_id):06d}"
+    current_year = date.today().year
+
+    grand_total, quote_rows, paid_rows = renewal_quote_svc.execute(business_id=b_id, year=current_year)
 
     return render(
         request,
@@ -2884,6 +2889,9 @@ def business_information(
             "business_files": (dto.business_proof or {}).get("files") or [],
             "operating_days_start_name": operating_days_start_name,
             "operating_days_end_name": operating_days_end_name,
+            "grand_total": grand_total,
+            "quote_rows": quote_rows,
+            "paid_rows": paid_rows,
         },
     )
 

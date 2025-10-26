@@ -1,6 +1,7 @@
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Optional, Any
-from datetime import date, time
+from datetime import date, time, datetime
 
 @dataclass(frozen=True)
 class BusinessListDTO:
@@ -118,3 +119,18 @@ class RenewalListDTO:
     valid_from: Optional[str]
     expires_on: Optional[str]
     extension: Optional[str]
+
+@dataclass(frozen=True)
+class RenewalQuoteLineDTO:
+    business_id: int
+    item_year: int
+    kind: str                        
+    is_paid: Optional[bool]         
+    paid_on: Optional[datetime]
+    or_number: Optional[str]
+    base_fee: Decimal
+    offense_no: Optional[int]
+    surcharge: Decimal
+    total: Decimal
+    deadline: Optional[date]
+    days_late: Optional[int]

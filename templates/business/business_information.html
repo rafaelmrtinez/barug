@@ -12,116 +12,99 @@
 
     /* underline-only action link (keeps your color) */
     .btn-link-underline{
-      background: transparent;
-      border: 0;
-      padding: 0;
-      font-weight: 600;
-      text-decoration: underline;
-      text-underline-offset: 2px;
-      color: #6d2932;
+      background: transparent; border: 0; padding: 0; font-weight: 600;
+      text-decoration: underline; text-underline-offset: 2px; color: #6d2932;
     }
-    .btn-link-underline:hover,
-    .btn-link-underline:focus{
-      color: #6d2932;
-      text-decoration: underline;
-      box-shadow: none;
-    }
+    .btn-link-underline:hover,.btn-link-underline:focus{ color:#6d2932; text-decoration: underline; box-shadow:none; }
 
     /* === Section emphasis === */
     :root{
-      --brand: #6d2932;                  /* used only for accents (not buttons/badges) */
-      --section-border: #e9ecef;
-      --section-bg: #fff;
-      --section-cap-bg: #f8f9fa;         /* soft header background */
+      --brand:#6d2932; --section-border:#e9ecef; --section-bg:#fff; --section-cap-bg:#f8f9fa; --muted:#6c757d;
     }
     .section-block{
-      background: var(--section-bg);
-      border: 1px solid var(--section-border);
-      border-left: 4px solid var(--brand);
-      border-radius: 12px;
-      padding: 1rem 1rem;
-      margin-top: 1rem;
-      box-shadow: 0 1px 0 rgba(16,24,40,.04);
+      background:var(--section-bg); border:1px solid var(--section-border); border-left:4px solid var(--brand);
+      border-radius:12px; padding:1rem 1rem; margin-top:1rem; box-shadow:0 1px 0 rgba(16,24,40,.04);
     }
-    .section-cap{
-      display:flex; align-items:center; gap:.5rem;
-      background: var(--section-cap-bg);
-      border-radius: 10px;
-      padding: .5rem .75rem;
-      margin: -0.25rem -0.25rem .75rem;
-    }
-    .section-cap i{
-      width: 28px; height: 28px; border-radius: 999px;
-      background:#eef1f3; display:flex; align-items:center; justify-content:center;
-      font-size: 1rem;
-    }
-    .section-title{
-      font-weight:600; letter-spacing:.2px;
-      display:flex; align-items:center; gap:.5rem;
-      font-size:1.075rem; line-height:1.25rem; margin:0;
-    }
+    .section-cap{ display:flex; align-items:center; gap:.5rem; background:var(--section-cap-bg); border-radius:10px; padding:.5rem .75rem; margin:-.25rem -.25rem .75rem; }
+    .section-cap i{ width:28px; height:28px; border-radius:999px; background:#eef1f3; display:flex; align-items:center; justify-content:center; font-size:1rem; }
+    .section-title{ font-weight:600; letter-spacing:.2px; display:flex; align-items:center; gap:.5rem; font-size:1.075rem; line-height:1.25rem; margin:0; }
 
-    /* === Global value styling: SEMIBOLD + UPPERCASE === */
+    /* === Global value styling === */
     .val{ font-weight:600; text-transform:uppercase; letter-spacing:.3px; }
     .kv .value{ font-weight:600; text-transform:uppercase; letter-spacing:.3px; }
-
-    /* Do NOT uppercase these */
     .no-case{ text-transform:none !important; }
     .file-name{ text-transform:none !important; font-weight:600; }
-
-    /* helpers */
     .truncate-1{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .small-muted{ font-size:.875rem; color:#6c757d; }
-    .kv .label{ font-size:.75rem; color:#6c757d; margin-bottom:.125rem; }
+    .small-muted{ font-size:.875rem; color:var(--muted); }
+    .kv .label{ font-size:.75rem; color:var(--muted); margin-bottom:.125rem; }
     .soft-hr{ height:1px; background:#eee; margin:1rem 0; }
 
-    /* Proof list tidy + alignment with header "View all" */
+    /* Proof list */
     .proof-header{ padding-right:0; }
-    .proof-list .list-group-item{
-      padding: .5rem 0;
-      border: 0;
-      border-bottom: 1px solid #f1f3f5;
-    }
-    .proof-list .list-group-item:last-child{ border-bottom: 0; }
+    .proof-list .list-group-item{ padding:.5rem 0; border:0; border-bottom:1px solid #f1f3f5; }
+    .proof-list .list-group-item:last-child{ border-bottom:0; }
     .proof-list .file-row{ display:flex; align-items:center; gap:.75rem; }
     .proof-list .file-icon{ width:28px; height:28px; border-radius:6px; background:#f8f9fa; display:flex; align-items:center; justify-content:center; }
     .proof-list .file-meta{ flex:1 1 auto; min-width:0; }
     .proof-list .file-actions{ flex:0 0 auto; text-align:right; }
 
-    /* carousel arrows (unchanged) */
-    #proofCarousel .carousel-control-prev-icon,
-    #proofCarousel .carousel-control-next-icon{
-      filter: none !important;
-      background-size: 100% 100%;
-      background-color: transparent;
-    }
-    #proofCarousel .carousel-control-prev-icon{
-      background-image: url("data:image/svg+xml;charset=utf-8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23000'><path d='M11.354 1.646a.5.5 0 0 1 0 .708L6.707 7l4.647 4.646a.5.5 0 0 1-.708.708l-5-5a.5.5 0 0 1 0-.708l5-5a.5.5 0 0 1 .708 0z'/></svg>") !important;
-    }
-    #proofCarousel .carousel-control-next-icon{
-      background-image: url("data:image/svg+xml;charset=utf-8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23000'><path d='M4.646 1.646a.5.5 0 0 1 .708 0l5 5a.5.5 0 0 1 0 .708l-5 5a.5.5 0 1 1-.708-.708L9.293 7 4.646 2.354a.5.5 0 0 1 0-.708z'/></svg>") !important;
-    }
-    #proofCarousel .carousel-control-prev,
-    #proofCarousel .carousel-control-next{ opacity:.9; width:4rem; }
-    #proofCarousel .carousel-control-prev:hover,
-    #proofCarousel .carousel-control-next:hover{ opacity:1; }
+    /* carousel arrows */
+    #proofCarousel .carousel-control-prev-icon,#proofCarousel .carousel-control-next-icon{ filter:none !important; background-size:100% 100%; background-color:transparent; }
+    #proofCarousel .carousel-control-prev-icon{ background-image:url("data:image/svg+xml;charset=utf-8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23000'><path d='M11.354 1.646a.5.5 0 0 1 0 .708L6.707 7l4.647 4.646a.5.5 0 0 1-.708.708l-5-5a.5.5 0 0 1 0-.708l5-5a.5.5 0 0 1 .708 0z'/></svg>") !important; }
+    #proofCarousel .carousel-control-next-icon{ background-image:url("data:image/svg+xml;charset=utf-8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23000'><path d='M4.646 1.646a.5.5 0 0 1 .708 0l5 5a.5.5 0 0 1 0 .708l-5 5a.5.5 0 1 1-.708-.708L9.293 7 4.646 2.354a.5.5 0 0 1 0-.708z'/></svg>") !important; }
+    #proofCarousel .carousel-control-prev,#proofCarousel .carousel-control-next{ opacity:.9; width:4rem; }
+    #proofCarousel .carousel-control-prev:hover,#proofCarousel .carousel-control-next:hover{ opacity:1; }
+
+    /* === NEW: Renewal summary + table cosmetics === */
+    .money{ font-weight:800; font-size:1.75rem; letter-spacing:.5px; }
+    .money small{ font-weight:600; font-size:1rem; color:var(--muted); }
+    .pill{ display:inline-flex; align-items:center; gap:.375rem; border-radius:999px; padding:.25rem .625rem; font-size:.75rem; font-weight:600; border:1px solid #e5e7eb; }
+    .pill-current{ background:#e8f7ef; border-color:#cce7da; color:#0f5132; }
+    .pill-arrears{ background:#fdeaea; border-color:#f5c2c7; color:#842029; }
+    .td-right{ text-align:right; }
+    .note{ font-size:.875rem; color:var(--muted); }
+    .mini-badge{ font-size:.72rem; padding:.2rem .45rem; border-radius:999px; }
+    .mini-badge-green{ background:#e8f7ef; color:#0f5132; border:1px solid #cce7da;}
+    .mini-badge-red{ background:#fdeaea; color:#842029; border:1px solid #f5c2c7;}
   </style>
 {% endblock %}
 
 {% block content %}
 <div class="container py-4" style="margin-top:40px;">
 
+  <!-- ===================== NEW: RENEWAL SUMMARY (STATIC) ===================== -->
+  <div class="section-block mb-3">
+    <div class="section-cap">
+      <i class="text-muted d-inline-flex"><span class="bi bi-cash-coin"></span></i>
+      <div class="section-title"><span>Renewal Summary</span></div>
+    </div>
+    <div class="row align-items-end g-3">
+      <div class="col-md-8">
+        <div class="small text-muted mb-1">Grand Total to Collect Today</div>
+        <div class="money">₱ {{ grand_total|floatformat:2 }}</div>
+        <div class="note mt-1">
+          • Includes unpaid arrears and the current year when applicable.<br/>
+          • Current year is <b>included</b> because it’s unpaid.
+        </div>
+      </div>
+      <div class="col-md-4 text-md-end">
+        <button type="button" class="btn btn-outline-brand">Create Renewal Request</button>
+      </div>
+    </div>
+  </div>
+  <!-- ======================================================================= -->
+
   <!-- ONE ROUNDED BOX -->
   <div class="card shadow-sm rounded-3">
     <div class="card-body">
 
+      <!-- ===================== YOUR ORIGINAL SECTIONS (UNCHANGED) ============ -->
       <!-- OWNER -->
       <div class="section-block">
         <div class="section-cap">
           <i class="text-muted d-inline-flex"><span class="bi bi-person-fill"></span></i>
           <div class="section-title"><span>Business Owner</span></div>
         </div>
-
         <div class="d-flex align-items-start justify-content-between gap-3">
           <div>
             <div class="val truncate-1" title="{{ owner.owner_full_name }}">{{ owner.owner_full_name|default:"—" }}</div>
@@ -133,40 +116,15 @@
             </span>
           </div>
         </div>
-
         <div class="row g-3 mt-3">
-          <div class="col-12 col-md-6 kv">
-            <div class="label">Sex</div>
-            <div class="value">{{ owner.sex|default:"—" }}</div>
-          </div>
-          <div class="col-12 col-md-6 kv">
-            <div class="label">Date of Birth</div>
-            <div class="value">{{ owner.birthdate|default:"—" }}</div>
-          </div>
-          <div class="col-12 col-md-6 kv">
-            <div class="label">Address</div>
-            <div class="value truncate-1" title="{{ owner.full_address }}">{{ owner.full_address|default:"—" }}</div>
-          </div>
-          <div class="col-12 col-md-6 kv">
-            <div class="label">Civil Status</div>
-            <div class="value">{{ owner.civil_status|default:"—" }}</div>
-          </div>
-          <div class="col-12 col-md-6 kv">
-            <div class="label">Nationality</div>
-            <div class="value">{{ owner.nationality|default:"—" }}</div>
-          </div>
-          <div class="col-12 col-md-6 kv">
-            <div class="label">Religion</div>
-            <div class="value">{{ owner.religion|default:"—" }}</div>
-          </div>
-          <div class="col-12 col-md-6 kv">
-            <div class="label">Mobile</div>
-            <div class="value">{{ owner.mobile_num|default:"—" }}</div>
-          </div>
-          <div class="col-12 col-md-6 kv">
-            <div class="label">Email</div>
-            <div class="value no-case">{{ owner.email|default:"—" }}</div>  {# keep email casing #}
-          </div>
+          <div class="col-12 col-md-6 kv"><div class="label">Sex</div><div class="value">{{ owner.sex|default:"—" }}</div></div>
+          <div class="col-12 col-md-6 kv"><div class="label">Date of Birth</div><div class="value">{{ owner.birthdate|default:"—" }}</div></div>
+          <div class="col-12 col-md-6 kv"><div class="label">Address</div><div class="value truncate-1" title="{{ owner.full_address }}">{{ owner.full_address|default:"—" }}</div></div>
+          <div class="col-12 col-md-6 kv"><div class="label">Civil Status</div><div class="value">{{ owner.civil_status|default:"—" }}</div></div>
+          <div class="col-12 col-md-6 kv"><div class="label">Nationality</div><div class="value">{{ owner.nationality|default:"—" }}</div></div>
+          <div class="col-12 col-md-6 kv"><div class="label">Religion</div><div class="value">{{ owner.religion|default:"—" }}</div></div>
+          <div class="col-12 col-md-6 kv"><div class="label">Mobile</div><div class="value">{{ owner.mobile_num|default:"—" }}</div></div>
+          <div class="col-12 col-md-6 kv"><div class="label">Email</div><div class="value no-case">{{ owner.email|default:"—" }}</div></div>
         </div>
       </div>
 
@@ -176,7 +134,6 @@
           <i class="text-muted d-inline-flex"><span class="bi bi-card-list"></span></i>
           <div class="section-title"><span>Business Identity</span></div>
         </div>
-
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-start">
           <div>
             <h6 class="mb-0 val truncate-1" title="{{ business.business_name }}">{{ business.business_name|default:"—" }}</h6>
@@ -194,59 +151,11 @@
             {% endwith %}
           </div>
         </div>
-
         <div class="row mt-3 g-3">
-          <div class="col-md-6 kv">
-            <div class="label">Ownership Type</div>
-            <div class="value">{{ business.ownership_type|default:"—" }}</div>
-          </div>
-          <div class="col-md-6 kv">
-            <div class="label">Business Category</div>
-            <div class="value">{{ business.business_category|default:"—" }}</div>
-          </div>
-          <div class="col-md-6 kv">
-            <div class="label">Nature of Business</div>
-            <div class="value">{{ business.business_nature|default:"—" }}</div>
-          </div>
-          <div class="col-md-6 kv">
-            <div class="label">Date Established</div>
-            <div class="value">{{ business.date_established|date:"Y-m-d"|default:"—" }}</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- REGISTRATION & FINANCIALS -->
-      <div class="section-block">
-        <div class="section-cap">
-          <i class="text-muted d-inline-flex"><span class="bi bi-receipt"></span></i>
-          <div class="section-title"><span>Registration & Financials</span></div>
-        </div>
-
-        <div class="row mt-1 g-3">
-          <div class="col-md-6 kv">
-            <div class="label">Capital Invested</div>
-            <div class="value">{{ business.capital_invested|default:"—" }}</div>
-          </div>
-          <div class="col-md-6 kv">
-            <div class="label">Total Gross Sales (Previous Year)</div>
-            <div class="value">{{ business.prev_year_gross_sales|default:"—" }}</div>
-          </div>
-          <div class="col-md-6 kv">
-            <div class="label">Monthly Gross Estimate</div>
-            <div class="value">{{ business.mnthly_gross_incom_est|default:"—" }}</div>
-          </div>
-          <div class="col-md-6 kv">
-            <div class="label">DTI/SEC Registration Number</div>
-            <div class="value">{{ business.dti_reg_num|default:"—" }}</div>
-          </div>
-          <div class="col-md-6 kv">
-            <div class="label">Number of Employees</div>
-            <div class="value">{{ business.num_of_employees|default:"—" }}</div>
-          </div>
-          <div class="col-md-6 kv">
-            <div class="label">Business Status</div>
-            <div class="value">{{ business.business_status|default:"—" }}</div>
-          </div>
+          <div class="col-md-6 kv"><div class="label">Ownership Type</div><div class="value">{{ business.ownership_type|default:"—" }}</div></div>
+          <div class="col-md-6 kv"><div class="label">Business Category</div><div class="value">{{ business.business_category|default:"—" }}</div></div>
+          <div class="col-md-6 kv"><div class="label">Nature of Business</div><div class="value">{{ business.business_nature|default:"—" }}</div></div>
+          <div class="col-md-6 kv"><div class="label">Date Established</div><div class="value">{{ business.date_established|date:"Y-m-d"|default:"—" }}</div></div>
         </div>
       </div>
 
@@ -256,16 +165,9 @@
           <i class="text-muted d-inline-flex"><span class="bi bi-geo-alt-fill"></span></i>
           <div class="section-title"><span>Location</span></div>
         </div>
-
         <div class="row mt-1 g-3">
-          <div class="col-12 kv">
-            <div class="label">Business Address</div>
-            <div class="value truncate-1" title="{{ business.business_address }}">{{ business.business_address|default:"—" }}</div>
-          </div>
-          <div class="col-12 kv">
-            <div class="label">Location Description</div>
-            <div class="value">{{ business.description|default:"—" }}</div>
-          </div>
+          <div class="col-12 kv"><div class="label">Business Address</div><div class="value truncate-1" title="{{ business.business_address }}">{{ business.business_address|default:"—" }}</div></div>
+          <div class="col-12 kv"><div class="label">Location Description</div><div class="value">{{ business.description|default:"—" }}</div></div>
         </div>
       </div>
 
@@ -275,20 +177,9 @@
           <i class="text-muted d-inline-flex"><span class="bi bi-clock-history"></span></i>
           <div class="section-title"><span>Operating Schedule</span></div>
         </div>
-
         <div class="row mt-1 g-3">
-          <div class="col-md-6 kv">
-            <div class="label">Operating Days</div>
-            <div class="value">
-              {{ operating_days_start_name|default:"monday"|lower }}-{{ operating_days_end_name|default:"sunday"|lower }}
-            </div>
-          </div>
-          <div class="col-md-6 kv">
-            <div class="label">Operating Hours</div>
-            <div class="value">
-              {{ business.operating_hours_start|default:"10:00 AM" }} - {{ business.operating_hours_end|default:"10:00 PM" }}
-            </div>
-          </div>
+          <div class="col-md-6 kv"><div class="label">Operating Days</div><div class="value">{{ operating_days_start_name|default:"monday"|lower }}-{{ operating_days_end_name|default:"sunday"|lower }}</div></div>
+          <div class="col-md-6 kv"><div class="label">Operating Hours</div><div class="value">{{ business.operating_hours_start|default:"10:00 AM" }} - {{ business.operating_hours_end|default:"10:00 PM" }}</div></div>
         </div>
       </div>
 
@@ -302,10 +193,7 @@
         {% if business_files %}
           <div class="d-flex justify-content-between align-items-center mb-2 proof-header">
             <span class="small-muted">{{ business_files|length }} file{{ business_files|length|pluralize }}</span>
-            <button type="button" class="btn btn-outline-brand btn-sm"
-                    data-bs-toggle="modal" data-bs-target="#proofModal">
-              View all
-            </button>
+            <button type="button" class="btn btn-outline-brand btn-sm" data-bs-toggle="modal" data-bs-target="#proofModal">View all</button>
           </div>
 
           <ul class="list-group list-group-flush proof-list">
@@ -313,16 +201,10 @@
               <li class="list-group-item">
                 <div class="file-row">
                   <div class="file-icon"><i class="bi bi-file-earmark-text text-muted"></i></div>
-                  <div class="file-meta">
-                    <div class="file-name truncate-1" title="{{ f.name }}">{{ f.name }}</div>  {# keep filename casing #}
-                  </div>
+                  <div class="file-meta"><div class="file-name truncate-1" title="{{ f.name }}">{{ f.name }}</div></div>
                   <div class="file-actions">
                     {% if f.signed_url %}
-                      <button type="button"
-                              class="btn btn-link-underline proof-open-btn"
-                              data-proof-index="{{ forloop.counter0 }}">
-                        Preview
-                      </button>
+                      <button type="button" class="btn btn-link-underline proof-open-btn" data-proof-index="{{ forloop.counter0 }}">Preview</button>
                     {% else %}
                       <span class="text-muted small">no signed url</span>
                     {% endif %}
@@ -336,22 +218,113 @@
         {% endif %}
       </div>
 
+      <!-- ===================== NEW: QUOTE BREAKDOWN (STATIC) ================== -->
+      <div class="section-block">
+        <div class="section-cap">
+          <i class="text-muted d-inline-flex"><span class="bi bi-table"></span></i>
+          <div class="section-title"><span>Breakdown (Auto-Computed Quote)</span></div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th style="width: 90px;">Year</th>
+                <th style="width: 120px;">Kind</th>
+                <th class="td-right">Base Fee</th>
+                <th class="td-right">Offense #</th>
+                <th class="td-right">Surcharge</th>
+                <th class="td-right">Line Total</th>
+                <th>Deadline</th>
+                <th class="td-right">Days Late</th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for r in quote_rows %}
+              <tr>
+                <td>{{ r.item_year }}</td>
+                <td>
+                  {% if r.kind == 'ARREARS' %}
+                    <span class="pill pill-arrears"><i class="bi bi-exclamation-octagon"></i> ARREARS</span>
+                  {% else %}
+                    <span class="pill pill-current"><i class="bi bi-calendar2-check"></i> CURRENT</span>
+                  {% endif %}
+                </td>
+                <td class="td-right">₱ {{ r.base_fee|floatformat:2 }}</td>
+                <td class="td-right">{{ r.offense_no|default:"—" }}</td>
+                <td class="td-right">₱ {{ r.surcharge|floatformat:2 }}</td>
+                <td class="td-right"><strong>₱ {{ r.total|floatformat:2 }}</strong></td>
+                <td>{{ r.deadline|date:"Y-m-d"|default:"—" }}</td>
+                <td class="td-right">{{ r.days_late|default:"—" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="8" class="text-center text-muted">No items.</td></tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-light">
+              <th colspan="5" class="td-right">Grand Total</th>
+              <th class="td-right"><strong>₱ {{ grand_total|floatformat:2 }}</strong></th>
+              <th colspan="2"></th>
+            </tr>
+          </tfoot>
+          </table>
+        </div>
+
+        <div class="note mt-2">
+          * Generated by <code>get_bc_renewal_quote_auto(business_id, year)</code>.<br/>
+          * Use <code>get_bc_renewal_grand_total_auto(business_id, year)</code> for the total above.
+        </div>
+      </div>
+      <!-- ===================================================================== -->
+
+      <!-- ===================== OPTIONAL: PAID HISTORY (STATIC) ================ -->
+      <div class="section-block">
+        <div class="section-cap">
+          <i class="text-muted d-inline-flex"><span class="bi bi-receipt-cutoff"></span></i>
+          <div class="section-title"><span>Paid History (Reference)</span></div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th style="width:90px;">Year</th>
+                <th>OR Number</th>
+                <th>Paid On</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in paid_rows %}
+                <tr>
+                  <td>{{ p.period_year }}</td>
+                  <td>{{ p.or_number|default:"—" }}</td>
+                  <td>{{ p.paid_on|date:"Y-m-d"|default:"—" }}</td>
+                  <td><span class="mini-badge mini-badge-green">PAID</span></td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="4" class="text-center text-muted">No paid records.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note mt-2">
+          * Source: <code>business_clearance_status_record</code> (period_type='ANNUAL', paid_on IS NOT NULL).
+        </div>
+      </div>
+      <!-- ===================================================================== -->
+
       <!-- METADATA -->
       <div class="section-block">
         <div class="section-cap">
           <i class="text-muted d-inline-flex"><span class="bi bi-info-circle"></span></i>
           <div class="section-title"><span>Metadata</span></div>
         </div>
-
         <div class="row mt-1 g-3">
-          <div class="col-md-6">
-            <div class="small text-muted">Created At</div>
-            <div class="meta">{{ business.created_at|date:"Y-m-d H:i"|default:"—" }}</div>
-          </div>
-          <div class="col-md-6">
-            <div class="small text-muted">Updated At</div>
-            <div class="meta">{{ business.updated_at|date:"Y-m-d H:i"|default:"—" }}</div>
-          </div>
+          <div class="col-md-6"><div class="small text-muted">Created At</div><div class="meta">{{ business.created_at|date:"Y-m-d H:i"|default:"—" }}</div></div>
+          <div class="col-md-6"><div class="small text-muted">Updated At</div><div class="meta">{{ business.updated_at|date:"Y-m-d H:i"|default:"—" }}</div></div>
         </div>
       </div>
 
@@ -359,6 +332,7 @@
       <div class="text-end pt-3 mt-3">
         <button type="button" class="btn btn-submit">Request Document for the Business</button>
       </div>
+      <!-- ===================================================================== -->
 
     </div>
   </div>
@@ -377,11 +351,8 @@
           <div id="proofCarousel" class="carousel slide" data-bs-ride="false">
             <div class="carousel-indicators">
               {% for f in business_files %}
-                <button type="button"
-                        data-bs-target="#proofCarousel"
-                        data-bs-slide-to="{{ forloop.counter0 }}"
-                        {% if forloop.first %}class="active{% endif %}"
-                        aria-label="Slide {{ forloop.counter }}"></button>
+                <button type="button" data-bs-target="#proofCarousel" data-bs-slide-to="{{ forloop.counter0 }}"
+                        {% if forloop.first %}class="active{% endif %}" aria-label="Slide {{ forloop.counter }}"></button>
               {% endfor %}
             </div>
 

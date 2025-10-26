@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 from typing import Any, Dict, List, Optional, Tuple
+from decimal import Decimal
 from src.app.transfer_objects.commands.business_cmd import (
   RegisterBusinessProfileCmd
 )
@@ -8,6 +9,7 @@ from src.app.transfer_objects.dto.business_dto import (
   ResidentOwnerDTO,
   NonResidentOwnerDTO,
   OwnerBusinessDTO,
+  RenewalQuoteLineDTO
 )  
 
 # from supabase_auth import Optional
@@ -89,4 +91,15 @@ class IBusinessRenewalService(ABC):
         search:Optional[str], 
         clearance_state: Optional[int] , 
     ) -> Tuple[List[Dict[str, Any]], Dict[str, List[tuple[str, str]]], Optional[str]]:
+        pass
+    
+class IBusinessRenewalQuoteService(ABC):
+    @abstractmethod
+    def execute(self, business_id: int, year: int) -> Tuple[Decimal, List[RenewalQuoteLineDTO], List[Dict[str, Any]]]:
+        """
+        Returns:
+          grand_total      : Decimal
+          quote_rows       : List[RenewalQuoteLineDTO]
+          paid_history_rows: List[{period_year, or_number, paid_on}]
+        """
         pass

@@ -15,12 +15,14 @@ from src.app.transfer_objects.dto.business_dto import (
     OwnerBusinessDTO,
     BusinessInfoDTO,
     RenewalListDTO,
+    RenewalQuoteLineDTO
 )
 from src.domain.contracts.business_repository_contract import (
     IBusinessRepository,
     IResidentOwnerRepository,
     INonResidentOwnerRepository,
     IBusinessRenewalRepository,
+    IBusinessRenewalQuoteRepository,
 )
 
 try:
@@ -704,3 +706,68 @@ class BusinessRenewalRepository(IBusinessRenewalRepository):
             return self._map(rows)
         except Exception as e:
             raise QueryExecutionException(f"sort_clearance_sate failed: {e}") from e
+        
+class BusinessRenewalQuoteRepository(IBusinessRenewalQuoteRepository):
+    def __init__(self, ctx: IConnectionAdapter):
+        self._ctx = ctx
+
+    def _to_dec(self, v) -> Decimal:
+        return Decimal(str(v)) if v is not None else Decimal("0")
+
+    def fetch_grand_total_auto(self, business_id: int, year: int) -> Decimal:
+        try:
+            sql = "SELECT public.get_bc_renewal_grand_total_auto(%s, %s)"
+            rows = self._ctx.execute_query_to_dict(sql, [business_id, year])
+            if not rows:
+                return Decimal("0")
+            # The adapter returns a dict with a single key; use first value
+            first = rows[0]
+            val = list(first.values())[0] if first else 0
+            return self._to_dec(val)
+        except Exception as e:
+            raise QueryExecutionException(f"fetch_grand_total_auto failed: {e}") from e
+
+    def fetch_quote_auto(self, business_id: int, year: int) -> List[RenewalQuoteLineDTO]:
+        try:
+            sql = """
+                SELECT business_id, item_year, kind, is_paid, paid_on, or_number,
+                       base_fee, offense_no, surcharge, total, deadline, days_late
+                FROM public.get_bc_renewal_quote_auto(%s, %s)
+                ORDER BY item_year;
+            """
+            rows = self._ctx.execute_query_to_dict(sql, [business_id, year]) or []
+            out: List[RenewalQuoteLineDTO] = []
+            for r in rows:
+                out.append(
+                    RenewalQuoteLineDTO(
+                        business_id = int(r["business_id"]),
+                        item_year   = int(r["item_year"]),
+                        kind        = str(r["kind"]),
+                        is_paid     = r.get("is_paid"),
+                        paid_on     = r.get("paid_on"),
+                        or_number   = r.get("or_number"),
+                        base_fee    = self._to_dec(r.get("base_fee")),
+                        offense_no  = (int(r["offense_no"]) if r.get("offense_no") is not None else None),
+                        surcharge   = self._to_dec(r.get("surcharge")),
+                        total       = self._to_dec(r.get("total")),
+                        deadline    = r.get("deadline"),
+                        days_late   = (int(r["days_late"]) if r.get("days_late") is not None else None),
+                    )
+                )
+            return out
+        except Exception as e:
+            raise QueryExecutionException(f"fetch_quote_auto failed: {e}") from e
+
+    def fetch_paid_history(self, business_id: int) -> List[Dict[str, Any]]:
+        try:
+            sql = """
+                SELECT period_year, or_number, paid_on
+                FROM public.business_clearance_status_record
+                WHERE business_id = %s
+                  AND period_type = 'ANNUAL'
+                  AND paid_on IS NOT NULL
+                ORDER BY period_year DESC;
+            """
+            return self._ctx.execute_query_to_dict(sql, [business_id]) or []
+        except Exception as e:
+            raise QueryExecutionException(f"fetch_paid_history failed: {e}") from e

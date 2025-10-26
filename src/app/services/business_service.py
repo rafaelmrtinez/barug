@@ -3,6 +3,7 @@ import uuid
 import logging
 logger = logging.getLogger(__name__)
 from typing import Any, Dict, List, Optional, Tuple
+from decimal import Decimal
 from dataclasses import asdict
 from django.conf import settings
 from dataclasses import replace
@@ -17,6 +18,7 @@ from src.app.transfer_objects.dto.business_dto import (
     ResidentOwnerDTO,
     OwnerBusinessDTO,
     RenewalListDTO,
+    RenewalQuoteLineDTO
 )
 from src.app.contracts.business_service_contract import (
     IBusinessService,
@@ -24,11 +26,13 @@ from src.app.contracts.business_service_contract import (
     IBusinessRegistrationService,
     IBusinessInfoService,
     IBusinessRenewalService,
+    IBusinessRenewalQuoteService
 )
 from src.domain.contracts.business_repository_contract import (
     IBusinessRepository,
     IResidentOwnerRepository,
     IBusinessRenewalRepository,
+    IBusinessRenewalQuoteRepository,
 )
 from src.infra.repositories.business_repository import (
     OwnerBusinessInformationRepository,
@@ -319,3 +323,13 @@ class BusinessRenewalService(IBusinessRenewalService):
             return self._business_renewal_repo.sort_clearance_sate(clearance_state)
 
         return self._business_renewal_repo.fetch_business_renewal_list()
+    
+class BusinessRenewalQuoteService(IBusinessRenewalQuoteService):
+    def __init__(self, quote_repo: IBusinessRenewalQuoteRepository):
+        self._quote_repo = quote_repo
+
+    def execute(self, business_id: int, year: int) -> Tuple[Decimal, List[RenewalQuoteLineDTO], List[Dict[str, Any]]]:
+        grand_total = self._quote_repo.fetch_grand_total_auto(business_id, year)
+        quote_rows  = self._quote_repo.fetch_quote_auto(business_id, year)
+        paid_rows   = self._quote_repo.fetch_paid_history(business_id)
+        return (grand_total, quote_rows, paid_rows)

@@ -10,12 +10,14 @@ from src.domain.contracts.business_repository_contract import (
     IBusinessRepository,
     IResidentOwnerRepository,
     IBusinessRenewalRepository,
+    IBusinessRenewalQuoteRepository,
 )
 from src.infra.repositories.business_repository import (
     BusinessRepository,
     ResidentOwnerRepository,
     OwnerBusinessInformationRepository,
     BusinessRenewalRepository,
+    BusinessRenewalQuoteRepository
 )
 from src.domain.contracts.household_repository_contract import (
     IHouseholdRepository,
@@ -73,5 +75,10 @@ class InfraContainer(containers.DeclarativeContainer):
 
     business_renewal:providers.Factory[IBusinessRenewalRepository] = providers.Factory(
         BusinessRenewalRepository,
+        ctx=context
+    )
+
+    business_renewal_quote: providers.Factory[IBusinessRenewalQuoteRepository] = providers.Factory(
+        BusinessRenewalQuoteRepository,
         ctx=context
     )
