@@ -144,14 +144,33 @@ SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET")
 SUPABASE_ID_UPLOADS_BUCKET = os.getenv("SUPABASE_ID_UPLOADS_BUCKET", "id-uploads")
 
+# DB connection tuning (env-driven; safe defaults for local/dev)
+DB_CONN_MAX_AGE = int(os.getenv("DB_CONN_MAX_AGE", "0"))           # 0 = close after each request
+DB_CONNECT_TIMEOUT = int(os.getenv("DB_CONNECT_TIMEOUT", "10"))    # seconds
+DB_SSL_MODE = os.getenv("DB_SSL_MODE", "require")                  # adjust for your environment
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv("DB_NAME"),
-        'USER': os.getenv("DB_USER"),
-        'PASSWORD': os.getenv("DB_PASSWORD"),
-        'HOST': os.getenv("DB_HOST"),
-        'PORT': os.getenv("DB_PORT")
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("DB_NAME"),
+        "USER": os.getenv("DB_USER"),
+        "PASSWORD": os.getenv("DB_PASSWORD"),
+        "HOST": os.getenv("DB_HOST"),
+        "PORT": os.getenv("DB_PORT"),
+        # keep connections short-lived by default to avoid exhausting pooled DB clients
+        "CONN_MAX_AGE": DB_CONN_MAX_AGE,
+        # health checks force Django to verify connection liveness before use
+        "CONN_HEALTH_CHECKS": True,
+        # do not wrap every request in a transaction by default
+        "ATOMIC_REQUESTS": False,
+        "OPTIONS": {
+            # common options for remote/postgres providers (Supabase etc.)
+            "sslmode": DB_SSL_MODE,
+            "connect_timeout": DB_CONNECT_TIMEOUT,
+            # application_name is useful when inspecting pg_stat_activity
+            "application_name": "barug",
+            # add other provider-specific options here if needed
+        },
     }
 }
 

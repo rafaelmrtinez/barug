@@ -11,14 +11,36 @@
             const tile = document.createElement('div');
             tile.className = 'upload-thumb';
             tile.innerHTML = `<img src="${url}" alt="Upload preview">`;
+            // open modal when user clicks a thumbnail
+            tile.style.cursor = 'pointer';
+            tile.addEventListener('click', function () {
+                openPreviewModal(url);
+            });
             galleryEl.appendChild(tile);
         });
+    }
+
+    // Open a Bootstrap modal to preview the image at full size (or as large as modal)
+    function openPreviewModal(url) {
+        try {
+            const modalEl = document.getElementById('imagePreviewModal');
+            const modalImg = document.getElementById('imagePreviewModalImg');
+            if (!modalEl || !modalImg) return;
+            modalImg.src = url;
+            // use Bootstrap's modal API (v5+)
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        } catch (_e) {
+            // fallback: open in new tab/tab-equivalent
+            try { globalThis.open(url, '_blank'); } catch { /* noop */ }
+        }
     }
 
     // Read pre-existing URLs from a data attribute on the input (if present)
     function getExistingUrls(input) {
         try {
-            const raw = input.getAttribute('data-existing');
+            // support either data-existing-images (new) or data-existing (legacy)
+            const raw = input.getAttribute('data-existing-images') || input.getAttribute('data-existing');
             if (!raw) return [];
             const parsed = JSON.parse(raw);
             return Array.isArray(parsed) ? parsed : [];
@@ -60,16 +82,7 @@
                 // If it's currently visible (Bootstrap collapse has 'show' class), update immediately
                 if (galleryEl.classList.contains('show')) {
                     const files = Array.from(this.files || []);
-                    const existing = (function () {
-                        try {
-                            const raw = inputEl.getAttribute('data-existing');
-                            if (!raw) return [];
-                            const parsed = JSON.parse(raw);
-                            return Array.isArray(parsed) ? parsed : [];
-                        } catch {
-                            return [];
-                        }
-                    })();
+                    const existing = getExistingUrls(inputEl);
                     renderThumbs(galleryEl, [...existing, ...files]);
                 }
             });

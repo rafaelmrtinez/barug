@@ -220,12 +220,21 @@
           <button
             class="btn btn-hero"
             type="button"
-            onclick="location.href='{% url 'bhw:create_maternal_record'  %}'"
+            onclick="location.href='{% url 'maternal:create_maternal_entry'  %}'"
           >
             <i class="bi bi-file-plus me-1">
             </i>
                 Add Maternal Health Record
           </button>
+          {% comment %} <button
+            class="btn btn-hero"
+            type="button"
+            onclick="location.href='{% url 'maternal:bhw_prenatal_form' record_id %}'"
+          >
+            <i class="bi bi-file-plus me-1">
+            </i>
+                Add Prenatal Follow-up Entry
+          </button> {% endcomment %}
           {% elif request.session.auth.role_name == "midwife" %}
           {% comment %} <button
             class="btn btn-hero"
@@ -267,12 +276,21 @@
                       <td>{{ r.maternal_record_id }}</td>
                       <td>{{ r.start_date|date:"Y-m-d"|default:"-" }}</td>
                       <td>{{ r.status_name|default:"N/A" }}</td>
+                      {% if request.session.auth.role_name == "midwife" %}
                       <td class="text-end">
                         <a class="btn btn-outline-secondary btn-sm"
                           href="{% url 'maternal:maternal_health_record_form' r.maternal_record_id %}">
                           <i class="bi bi-folder2-open me-1"></i> Open
                         </a>
                       </td>
+                      {% elif request.session.auth.role_name == "barangay health worker" %}
+                      <td class="text-end">
+                        <a class="btn btn-outline-secondary btn-sm"
+                          href="{% url 'maternal:bhw_prenatal_form' r.maternal_record_id %}">
+                          <i class="bi bi-folder2-open me-1"></i> Prenatal Follow-up
+                        </a>
+                      </td>
+                      {% endif %}
                     </tr>
                   {% endfor %}
                 {% else %}

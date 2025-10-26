@@ -12,10 +12,33 @@ class PreviousPregnancyForm(forms.Form):
     ballard_score   = forms.IntegerField(required=False, label="Ballard score")
     apgar_score     = forms.IntegerField(required=False, label="Apgar score")
 
+    form_type = forms.CharField(initial="previous_pregnancy_form", widget=forms.HiddenInput(
+        attrs={'id': 'previous_pregnancy_form'}
+    ))
+    
     # Accept custom kwargs so formset can pass them safely
     def __init__(self, *args, mhr_repository=None, maternal_id=None, **kwargs):
         super().__init__(*args, **kwargs)
         add_bootstrap_classes(self)
+        
+    def clean(self):
+        cleaned_data = super().clean()
+        
+        delivery_type = str(cleaned_data.get('delivery_type')).lower()
+        if delivery_type:
+            if delivery_type == 'nsvd':
+                cleaned_data['delivery_type_id'] = 1
+            elif delivery_type == 'cs':
+                cleaned_data['delivery_type_id'] = 2
+                
+        gender = str(cleaned_data.get('gender')).lower()
+        if gender:
+            if gender == 'female':
+                cleaned_data['gender_id'] = 2
+            elif gender == 'male':
+                cleaned_data['gender_id'] = 1
+        
+        return cleaned_data
 
 
 PreviousPregnancyFormSet = formset_factory(
