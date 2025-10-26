@@ -407,6 +407,38 @@ class MaternalHealthRecordRepository:
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows[0] if rows else None
 
+    def fetch_lab_results_by_mhr_id(self, maternal_record_id: int):
+        """Fetch lab results for a maternal record joined with lab test type name.
+
+        Returns a list of dicts with keys:
+            - lab_result_id
+            - result
+            - date_test (date)
+            - result_img_path (stored JSON/text)
+            - maternal_record_id
+            - lab_test_type_name
+
+        Ordered by date_test DESC, then lab_result_id DESC.
+        """
+        sql = """
+            SELECT
+                r.lab_result_id,
+                r.lab_test_id,
+                r.result,
+                r.date_tested::date AS date_test,
+                r.result_img_path,
+                r.maternal_record_id,
+                t.lab_test_type_name
+            FROM public.lab_result r
+            LEFT JOIN public.lab_test_type t
+                ON t.lab_test_type_id = r.lab_test_id
+            WHERE r.maternal_record_id = %s
+            ORDER BY r.date_tested DESC NULLS LAST, r.lab_result_id DESC;
+        """
+        params = (maternal_record_id,)
+        rows = self.ctx.execute_query_to_dict(sql, params)
+        return rows or []
+
     def fetch_delivery_plan_by_mhr_id(self, maternal_record_id: int):
         sql = """SELECT DISTINCT ON (mav.maternal_record_id)
             mav.maternal_record_id,

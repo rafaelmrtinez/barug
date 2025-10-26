@@ -254,9 +254,7 @@
         </form>
 
         <!-- Laboratory Results -->
-            <form method="post" class="card mb-3 card-brand" id="form-labs" action="" enctype="multipart/form-data">
-            {% csrf_token %}
-            {{ lab_form.form_type }}
+        <div class="card mb-3 card-brand">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span>Laboratory Results</span>
                 <button type="button" class="btn btn-sm btn-brand section-action" data-section="#labs">Edit</button>
@@ -287,172 +285,249 @@
                 </div>
 
                 <!-- Urinalysis -->
-                <div class="col-md-6">{{ lab_form.urinalysis.label_tag }} {{ lab_form.urinalysis }}</div>
-                <div class="col-md-3">{{ lab_form.urinalysis_date.label_tag }} {{ lab_form.urinalysis_date }}</div>
-                <div class="col-md-3">
-                    {{ lab_form.urinalysis_images }}
-                    <div class="form-text">
-                    <a href="#gallery-urinalysis" class="preview-uploads-link"
-                        data-bs-toggle="collapse"
-                        data-input-id="{{ lab_form.urinalysis_images.id_for_label }}"
-                        data-gallery-id="gallery-urinalysis">
-                        Preview uploads
-                    </a>
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.urinalysis.label_tag }} {{ lab_form.urinalysis }}</div>
+                    <div class="col-md-3">{{ lab_form.urinalysis_date.label_tag }} {{ lab_form.urinalysis_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.urinalysis_images }}
+                        <div class="form-text">
+                        <a href="#gallery-urinalysis" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.urinalysis_images.id_for_label }}"
+                            data-gallery-id="gallery-urinalysis">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-urinalysis" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                        </div>
                     </div>
-                    <div id="gallery-urinalysis" class="upload-gallery collapse mt-2"></div>
-                </div>
+                </form>
+                <hr class="my-3" />
 
                 <!-- CBC -->
-                <div class="col-md-6">{{ lab_form.cbc.label_tag }} {{ lab_form.cbc }}</div>
-                <div class="col-md-3">{{ lab_form.cbc_date.label_tag }} {{ lab_form.cbc_date }}</div>
-                <div class="col-md-3">
-                    {{ lab_form.cbc_images }}
-                    <div class="form-text">
-                    <a href="#gallery-cbc" class="preview-uploads-link"
-                        data-bs-toggle="collapse"
-                        data-input-id="{{ lab_form.cbc_images.id_for_label }}"
-                        data-gallery-id="gallery-cbc">
-                        Preview uploads
-                    </a>
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.cbc.label_tag }} {{ lab_form.cbc }}</div>
+                    <div class="col-md-3">{{ lab_form.cbc_date.label_tag }} {{ lab_form.cbc_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.cbc_images }}
+                        <div class="form-text">
+                        <a href="#gallery-cbc" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.cbc_images.id_for_label }}"
+                            data-gallery-id="gallery-cbc">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-cbc" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                        </div>
                     </div>
-                    <div id="gallery-cbc" class="upload-gallery collapse mt-2"></div>
-                </div>
+                </form>
+                <hr class="my-3" />
 
                 <!-- SGOT/SGPT -->
-                <div class="col-md-6">{{ lab_form.sgot_sgpt.label_tag }} {{ lab_form.sgot_sgpt }}</div>
-                <div class="col-md-3">{{ lab_form.sgot_sgpt_date.label_tag }} {{ lab_form.sgot_sgpt_date }}</div>
-                <div class="col-md-3">
-                    {{ lab_form.sgot_sgpt_images }}
-                    <div class="form-text">
-                    <a href="#gallery-sgotsgpt" class="preview-uploads-link"
-                        data-bs-toggle="collapse"
-                        data-input-id="{{ lab_form.sgot_sgpt_images.id_for_label }}"
-                        data-gallery-id="gallery-sgotsgpt">
-                        Preview uploads
-                    </a>
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.sgot_sgpt.label_tag }} {{ lab_form.sgot_sgpt }}</div>
+                    <div class="col-md-3">{{ lab_form.sgot_sgpt_date.label_tag }} {{ lab_form.sgot_sgpt_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.sgot_sgpt_images }}
+                        <div class="form-text">
+                        <a href="#gallery-sgotsgpt" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.sgot_sgpt_images.id_for_label }}"
+                            data-gallery-id="gallery-sgotsgpt">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-sgotsgpt" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                        </div>
                     </div>
-                    <div id="gallery-sgotsgpt" class="upload-gallery collapse mt-2"></div>
-                </div>
+                </form>
+                <hr class="my-3" />
 
                 <!-- Creatinine serum -->
-                <div class="col-md-6">{{ lab_form.creatinine_serum.label_tag }} {{ lab_form.creatinine_serum }}</div>
-                <div class="col-md-3">{{ lab_form.creatinine_serum_date.label_tag }} {{ lab_form.creatinine_serum_date }}</div>
-                <div class="col-md-3">
-                    {{ lab_form.creatinine_serum_images }}
-                    <div class="form-text">
-                    <a href="#gallery-creatinine" class="preview-uploads-link"
-                        data-bs-toggle="collapse"
-                        data-input-id="{{ lab_form.creatinine_serum_images.id_for_label }}"
-                        data-gallery-id="gallery-creatinine">
-                        Preview uploads
-                    </a>
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.creatinine_serum.label_tag }} {{ lab_form.creatinine_serum }}</div>
+                    <div class="col-md-3">{{ lab_form.creatinine_serum_date.label_tag }} {{ lab_form.creatinine_serum_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.creatinine_serum_images }}
+                        <div class="form-text">
+                        <a href="#gallery-creatinine" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.creatinine_serum_images.id_for_label }}"
+                            data-gallery-id="gallery-creatinine">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-creatinine" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                        </div>
                     </div>
-                    <div id="gallery-creatinine" class="upload-gallery collapse mt-2"></div>
-                </div>
+                </form>
+                <hr class="my-3" />
 
                 <!-- BUA / BUN -->
-                <div class="col-md-6">{{ lab_form.bua_bun.label_tag }} {{ lab_form.bua_bun }}</div>
-                <div class="col-md-3">{{ lab_form.bua_bun_date.label_tag }} {{ lab_form.bua_bun_date }}</div>
-                <div class="col-md-3">
-                    {{ lab_form.bua_bun_images }}
-                    <div class="form-text">
-                    <a href="#gallery-buabun" class="preview-uploads-link"
-                        data-bs-toggle="collapse"
-                        data-input-id="{{ lab_form.bua_bun_images.id_for_label }}"
-                        data-gallery-id="gallery-buabun">
-                        Preview uploads
-                    </a>
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.bua_bun.label_tag }} {{ lab_form.bua_bun }}</div>
+                    <div class="col-md-3">{{ lab_form.bua_bun_date.label_tag }} {{ lab_form.bua_bun_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.bua_bun_images }}
+                        <div class="form-text">
+                        <a href="#gallery-buabun" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.bua_bun_images.id_for_label }}"
+                            data-gallery-id="gallery-buabun">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-buabun" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                        </div>
                     </div>
-                    <div id="gallery-buabun" class="upload-gallery collapse mt-2"></div>
-                </div>
+                </form>
+                <hr class="my-3" />
 
                 <!-- Syphilis -->
-                <div class="col-md-6">{{ lab_form.syphilis.label_tag }} {{ lab_form.syphilis }}</div>
-                <div class="col-md-3">{{ lab_form.syphilis_date.label_tag }} {{ lab_form.syphilis_date }}</div>
-                <div class="col-md-3">
-                    {{ lab_form.syphilis_images }}
-                    <div class="form-text">
-                    <a href="#gallery-syphilis" class="preview-uploads-link"
-                        data-bs-toggle="collapse"
-                        data-input-id="{{ lab_form.syphilis_images.id_for_label }}"
-                        data-gallery-id="gallery-syphilis">
-                        Preview uploads
-                    </a>
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.syphilis.label_tag }} {{ lab_form.syphilis }}</div>
+                    <div class="col-md-3">{{ lab_form.syphilis_date.label_tag }} {{ lab_form.syphilis_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.syphilis_images }}
+                        <div class="form-text">
+                        <a href="#gallery-syphilis" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.syphilis_images.id_for_label }}"
+                            data-gallery-id="gallery-syphilis">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-syphilis" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                        </div>
                     </div>
-                    <div id="gallery-syphilis" class="upload-gallery collapse mt-2"></div>
-                </div>
+                </form>
+                <hr class="my-3" />
 
                 <!-- HIV -->
-                <div class="col-md-6">{{ lab_form.hiv_test.label_tag }} {{ lab_form.hiv_test }}</div>
-                <div class="col-md-3">{{ lab_form.hiv_test_date.label_tag }} {{ lab_form.hiv_test_date }}</div>
-                <div class="col-md-3">
-                    {{ lab_form.hiv_test_images }}
-                    <div class="form-text">
-                    <a href="#gallery-hiv" class="preview-uploads-link"
-                        data-bs-toggle="collapse"
-                        data-input-id="{{ lab_form.hiv_test_images.id_for_label }}"
-                        data-gallery-id="gallery-hiv">
-                        Preview uploads
-                    </a>
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.hiv_test.label_tag }} {{ lab_form.hiv_test }}</div>
+                    <div class="col-md-3">{{ lab_form.hiv_test_date.label_tag }} {{ lab_form.hiv_test_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.hiv_test_images }}
+                        <div class="form-text">
+                        <a href="#gallery-hiv" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.hiv_test_images.id_for_label }}"
+                            data-gallery-id="gallery-hiv">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-hiv" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                        </div>
                     </div>
-                    <div id="gallery-hiv" class="upload-gallery collapse mt-2"></div>
-                </div>
+                </form>
+                <hr class="my-3" />
 
                 <!-- HEPA B -->
-                <div class="col-md-6">{{ lab_form.hepa_b.label_tag }} {{ lab_form.hepa_b }}</div>
-                <div class="col-md-3">{{ lab_form.hepa_b_date.label_tag }} {{ lab_form.hepa_b_date }}</div>
-                <div class="col-md-3">
-                    {{ lab_form.hepa_b_images }}
-                    <div class="form-text">
-                    <a href="#gallery-hepa" class="preview-uploads-link"
-                        data-bs-toggle="collapse"
-                        data-input-id="{{ lab_form.hepa_b_images.id_for_label }}"
-                        data-gallery-id="gallery-hepa">
-                        Preview uploads
-                    </a>
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.hepa_b.label_tag }} {{ lab_form.hepa_b }}</div>
+                    <div class="col-md-3">{{ lab_form.hepa_b_date.label_tag }} {{ lab_form.hepa_b_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.hepa_b_images }}
+                        <div class="form-text">
+                        <a href="#gallery-hepa" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.hepa_b_images.id_for_label }}"
+                            data-gallery-id="gallery-hepa">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-hepa" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                        </div>
                     </div>
-                    <div id="gallery-hepa" class="upload-gallery collapse mt-2"></div>
-                </div>
+                </form>
+                <hr class="my-3" />
 
                 <!-- Blood typing -->
-                <div class="col-md-6">{{ lab_form.blood_typing.label_tag }} {{ lab_form.blood_typing }}</div>
-                <div class="col-md-3">{{ lab_form.blood_typing_date.label_tag }} {{ lab_form.blood_typing_date }}</div>
-                <div class="col-md-3">
-                    {{ lab_form.blood_typing_images }}
-                    <div class="form-text">
-                    <a href="#gallery-bloodtyping" class="preview-uploads-link"
-                        data-bs-toggle="collapse"
-                        data-input-id="{{ lab_form.blood_typing_images.id_for_label }}"
-                        data-gallery-id="gallery-bloodtyping">
-                        Preview uploads
-                    </a>
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.blood_typing.label_tag }} {{ lab_form.blood_typing }}</div>
+                    <div class="col-md-3">{{ lab_form.blood_typing_date.label_tag }} {{ lab_form.blood_typing_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.blood_typing_images }}
+                        <div class="form-text">
+                        <a href="#gallery-bloodtyping" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.blood_typing_images.id_for_label }}"
+                            data-gallery-id="gallery-bloodtyping">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-bloodtyping" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand">Save</button>
+                        </div>
                     </div>
-                    <div id="gallery-bloodtyping" class="upload-gallery collapse mt-2"></div>
-                </div>
+                </form>
 
                 <!-- OGCT (50g) -->
-                <div class="col-md-6">{{ lab_form.ogct_50g.label_tag }} {{ lab_form.ogct_50g }}</div>
-                <div class="col-md-3">{{ lab_form.ogct_50g_date.label_tag }} {{ lab_form.ogct_50g_date }}</div>
-                <div class="col-md-3">
-                    {{ lab_form.ogct_50g_images }}
-                    <div class="form-text">
-                    <a href="#gallery-ogct" class="preview-uploads-link"
-                        data-bs-toggle="collapse"
-                        data-input-id="{{ lab_form.ogct_50g_images.id_for_label }}"
-                        data-gallery-id="gallery-ogct">
-                        Preview uploads
-                    </a>
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.ogct_50g.label_tag }} {{ lab_form.ogct_50g }}</div>
+                    <div class="col-md-3">{{ lab_form.ogct_50g_date.label_tag }} {{ lab_form.ogct_50g_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.ogct_50g_images }}
+                        <div class="form-text">
+                        <a href="#gallery-ogct" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.ogct_50g_images.id_for_label }}"
+                            data-gallery-id="gallery-ogct">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-ogct" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand">Save</button>
+                        </div>
                     </div>
-                    <div id="gallery-ogct" class="upload-gallery collapse mt-2"></div>
-                </div>
+                </form>
                 </div>
             </div>
 
             <div class="card-footer text-end">
-                <small class="text-muted me-2">You can upload multiple images per test.</small>
-                <button type="submit" class="btn btn-brand">Save Laboratory Results</button>
+                <small class="text-muted me-2">You can upload multiple images per test. Use the Save button next to each test to submit only that test's data.</small>
             </div>
-            </form>
+        </div>
 
 
 
@@ -627,4 +702,5 @@
 <script src="{% static 'maternal/js/smoothScroll.js' %}"></script>
 <script src="{% static 'maternal/js/mhrTable.js' %}"></script>
 <script src="{% static 'maternal/js/imagePreview.js' %}"></script>
+<script src="{% static 'maternal/js/api/save_lab_results.js' %}"></script>
 {% endblock %}

@@ -3,6 +3,7 @@ from django.shortcuts import redirect, render
 from django.core.paginator import Paginator
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_protect as csrf_required
+import json
 
 from authentication.guards import role_required, session_login_required
 from authentication.utils import nocache
@@ -25,6 +26,10 @@ from maternal.forms.tetanus_toxoid_form import TetanusToxoidForm
 from maternal.repository import MaternalHealthRecordRepository
 from midwife.services import fetch_maternal_registry
 from src.infra.database.connection_adapter import ConnectionAdapter
+from django.conf import settings
+import os
+from maternal.supa.supabase_storage_service import SupabaseStorageService
+from maternal.services.laboratory_service import LaboratoryService
 
 import logging
 
@@ -637,8 +642,7 @@ def maternal_health_record_form(request, record_id : int):
                             "prenatal_followup_formset": pf_formset,
                         })
                 elif form_type == 'laboratory_form':
-                    # Instantiate form with POST only and attach raw files to avoid
-                    # Django's single-file field validators interfering with multi-file inputs.
+                    # Instantiate form with POST only. Keep validation in the view.
                     lab_form = LaboratoryForm(
                         mhr_repo=REPOSITORY,
                         mhr_id=record_id,
@@ -648,43 +652,36 @@ def maternal_health_record_form(request, record_id : int):
                     lab_form._raw_files = request.FILES
                     if lab_form.is_valid():
                         paired = lab_form.cleaned_data.get('paired_tests') or []
-                        serializable_pairs = []
-                        for p in paired:
-                            imgs = p.get('images') or []
-                            names = [getattr(f, 'name', None) or str(f) for f in imgs]
-                            # coerce potentially non-serializable types (Decimal)
-                            desc = p.get('description')
-                            if isinstance(desc, (bytes, bytearray)):
-                                desc = desc.decode('utf-8', errors='ignore')
-                            try:
-                                # import here to avoid top-level if not needed
-                                from decimal import Decimal as _Decimal
-                                if isinstance(desc, _Decimal):
-                                    try:
-                                        desc = float(desc)
-                                    except Exception:
-                                        desc = str(desc)
-                            except Exception:
-                                # ignore introspection errors and fallback to str()
-                                pass
-
-                            serializable_pairs.append({
-                                'test_type': p.get('test_type'),
-                                'date': p.get('date').isoformat() if p.get('date') else None,
-                                'description': desc,
-                                'images': names,
-                            })
+                        svc = LaboratoryService(REPOSITORY, staff_id, record_id)
                         try:
-                            res = REPOSITORY.insert_maternal_lab_results(
-                                mhr_id=record_id,
-                                staff_id=staff_id,
-                                lab_results=serializable_pairs or None,
-                            )
+                            result = svc.save(paired)
                         except Exception:
-                            # Log full traceback for debugging the root cause (e.g., JSON serialization)
-                            logger.exception('Error inserting maternal lab results')
-                            raise
-                        if not res:
+                            logger.exception('Unexpected error while saving laboratory data')
+                            messages.error(request, "Something went wrong while saving Laboratory data.")
+                            return render(request, "maternal/health_record_form.html", {
+                                "risk_code_form": risk_code_form,
+                                "formset": formset,
+                                "identification_form": maternal_identification_form,
+                                "obstetric_form": obstetric_form,
+                                "medical_history_form": medical_history_form,
+                                "tt_form": tt_form,
+                                "present_pregnancy_form": presemt_pregnancy_form,
+                                "lab_form": lab_form,
+                                "check_list_form": check_list_form,
+                                "plan_form": plan_form,
+                                "micro_nutrients_form": micro_nutrients_form,
+                                "previous_pregnancy_entry_form": pp_entry_form,
+                                "prenatal_followup_entry_form": pf_entry_form,
+                                "prenatal_followup_formset": pf_formset,
+                            })
+
+                        # normalize service return value (support bool or dict)
+                        if isinstance(result, dict):
+                            success = bool(result.get('success'))
+                        else:
+                            success = bool(result)
+
+                        if not success:
                             messages.error(request, "Failed to save Laboratory data.")
                             return render(request, "maternal/health_record_form.html", {
                                 "risk_code_form": risk_code_form,
@@ -702,7 +699,7 @@ def maternal_health_record_form(request, record_id : int):
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
                             })
-                        
+
                         messages.success(request, "Laboratory data saved successfully.")
                         return redirect('maternal:maternal_health_record_form', record_id=record_id)
                     else:
@@ -780,6 +777,78 @@ def maternal_health_record_form(request, record_id : int):
         logger.error(f"Unexpected error: {str(e)}")
         messages.error(request, f"Something went wrong. Please try again later.")
         return redirect('maternal:maternal_health_record_form', record_id=record_id)
+
+
+@session_login_required
+@role_required(*ACCESS)
+@nocache
+@csrf_required
+def laboratory_save_api(request, record_id: int) -> JsonResponse:
+    """AJAX endpoint to save laboratory data.
+
+    Expects JSON payload (or form-encoded fields) containing the laboratory form fields.
+    Validates the payload using the LaboratoryForm (calls `is_clean()` if present,
+    otherwise falls back to `is_valid()`), calls the LaboratoryService, and returns
+    a JSON response indicating success or failure.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Only POST allowed.'}, status=405)
+
+    # parse payload: prefer JSON body, fall back to POST dict
+    payload = {}
+    try:
+        if request.content_type and request.content_type.startswith('application/json'):
+            payload = json.loads(request.body.decode('utf-8') or '{}')
+            print(f"payload: {payload}")
+        else:
+            # QueryDict -> normal dict (handles form-encoded or multipart without files)
+            payload = {k: v for k, v in request.POST.items()}
+    except Exception as e:
+        logger.exception('Failed to parse request payload for laboratory_save_api')
+        return JsonResponse({'success': False, 'message': 'Invalid JSON payload.'}, status=400)
+
+    # instantiate form with payload (no files expected in this JSON flow)
+    lab_form = LaboratoryForm(mhr_repo=REPOSITORY, mhr_id=record_id, data=payload)
+    # attach files if present (e.g., when frontend uses FormData)
+    if request.FILES:
+        lab_form._raw_files = request.FILES
+
+    # Prefer calling is_clean() if the form exposes it (user requested),
+    # otherwise fall back to the standard is_valid().
+    try:
+        is_clean_method = getattr(lab_form, 'is_clean', None)
+        if callable(is_clean_method):
+            valid = lab_form.is_clean()
+        else:
+            valid = lab_form.is_valid()
+    except Exception:
+        logger.exception('Error during form validation in laboratory_save_api')
+        return JsonResponse({'success': False, 'message': 'Validation error.'}, status=400)
+
+    if not valid:
+        # return form errors as JSON so the frontend can alert the user
+        return JsonResponse({'success': False, 'errors': lab_form.errors}, status=400)
+
+    # extract paired tests produced by the form's clean() and call service
+    paired = lab_form.cleaned_data.get('paired_tests') if hasattr(lab_form, 'cleaned_data') else getattr(lab_form, 'paired_tests', [])
+    svc = LaboratoryService(REPOSITORY, request.session.get('auth', {}).get('staff_id'), record_id)
+    try:
+        result = svc.save(paired)
+    except Exception:
+        logger.exception('Unexpected error while saving laboratory data (API)')
+        return JsonResponse({'success': False, 'message': 'Something went wrong while saving Laboratory data.'}, status=500)
+
+    if isinstance(result, dict):
+        success = bool(result.get('success'))
+        details = result.get('res')
+    else:
+        success = bool(result)
+        details = None
+
+    if not success:
+        return JsonResponse({'success': False, 'message': 'Failed to save Laboratory data.', 'details': details}, status=500)
+
+    return JsonResponse({'success': True, 'message': 'Laboratory data saved successfully.'})
 
 @session_login_required
 @role_required(*ACCESS)
