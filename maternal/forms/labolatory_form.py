@@ -1,14 +1,19 @@
 # maternal/forms/laboratory_form.py
+import json
+import logging
 from decimal import Decimal
 from typing import Any, Dict, List
 
 from django import forms
 from django.core.exceptions import ValidationError
-from django.forms.widgets import ClearableFileInput
+
 
 from maternal.forms.maternal_identification_form import add_bootstrap_classes
 from maternal.forms.widgets import MultiImageInput
 from maternal.repository import MaternalHealthRecordRepository
+# Note: form is responsible for form-related presentation logic (initials,
+# readonly flags, image-preview data). Repository lookups are allowed here to
+# populate the form; business rules for persistence remain in the service.
 
 
 class LaboratoryForm(forms.Form):
@@ -61,6 +66,94 @@ class LaboratoryForm(forms.Form):
         # repository and id are stored for possible future use
         self._mhr_repo = mhr_repo
         self._mhr_id = mhr_id
+        # track which tests already have DB records
+        self._existing_tests = set()
+        # Fetch existing lab results (presentation logic belongs to the form)
+        logger = logging.getLogger(__name__)
+        try:
+            rows = []
+            try:
+                rows = self._mhr_repo.fetch_lab_results_by_mhr_id(self._mhr_id) or []
+            except Exception:
+                logger.exception('Failed to fetch existing lab results for mhr %s', self._mhr_id)
+                rows = []
+
+            if rows:
+                id_to_key = {
+                    1: 'urinalysis', 2: 'cbc', 3: 'sgot_sgpt', 4: 'creatinine_serum',
+                    5: 'bua_bun', 6: 'syphilis', 7: 'hiv_test', 8: 'hepa_b',
+                    9: 'blood_typing', 10: 'ogct_50g', 11: 'ogtt_100g'
+                }
+
+                for r in rows:
+                    lab_id = r.get('lab_test_id') or r.get('lab_test')
+                    try:
+                        lab_id = int(lab_id) if lab_id is not None else None
+                    except Exception:
+                        lab_id = None
+                    if not lab_id:
+                        continue
+
+                    key = id_to_key.get(lab_id)
+                    if not key:
+                        logger.debug('Unmapped lab_test_id %s for mhr %s', lab_id, self._mhr_id)
+                        continue
+
+                    self._existing_tests.add(key)
+
+                    # populate result
+                    result = r.get('result')
+                    if result is not None:
+                        try:
+                            if isinstance(self.fields.get(key), forms.DecimalField):
+                                self.fields[key].initial = Decimal(str(result))
+                            else:
+                                self.fields[key].initial = result
+                        except Exception:
+                            self.fields[key].initial = result
+
+                    # populate date
+                    date_key = f"{key}_date"
+                    date_val = r.get('date_test') or r.get('date_tested')
+                    if date_val:
+                        try:
+                            self.fields[date_key].initial = date_val
+                        except Exception:
+                            self.fields[date_key].initial = str(date_val)
+
+                    # populate images: set initials and attach data attr for previews
+                    images_key = f"{key}_images"
+                    raw_imgs = r.get('result_img_path')
+                    imgs_list = []
+                    if raw_imgs:
+                        if isinstance(raw_imgs, str):
+                            try:
+                                imgs_list = json.loads(raw_imgs)
+                            except Exception:
+                                imgs_list = [raw_imgs]
+                        elif isinstance(raw_imgs, (list, tuple)):
+                            imgs_list = list(raw_imgs)
+
+                    if imgs_list:
+                        try:
+                            self.fields[images_key].initial = imgs_list
+                            # expose preview urls to the widget via data attribute
+                            self.fields[images_key].widget.attrs['data-existing-images'] = json.dumps(imgs_list)
+                        except Exception:
+                            self.fields[images_key].initial = imgs_list
+
+                    # make result/date readonly but keep image input enabled so
+                    # user can add images; preview click behavior will be handled
+                    # by front-end using the data-existing-images attribute.
+                    try:
+                        if 'readonly' not in self.fields[key].widget.attrs:
+                            self.fields[key].widget.attrs['readonly'] = True
+                        if 'readonly' not in self.fields[date_key].widget.attrs:
+                            self.fields[date_key].widget.attrs['readonly'] = True
+                    except Exception:
+                        logger.exception('Failed to mark fields readonly for key %s', key)
+        except Exception:
+            logger.exception('Unexpected error during LaboratoryForm init for mhr %s', self._mhr_id)
 
     # -- Small, focused helpers so the pairing behaviour can be plugged/removed --
     def _test_keys(self) -> List[str]:
@@ -166,69 +259,9 @@ class LaboratoryForm(forms.Form):
         """
         cleaned_data = super().clean()
 
-        # list of test keys handled by the form
-        test_keys = [
-            'urinalysis', 'cbc', 'sgot_sgpt', 'creatinine_serum', 'bua_bun',
-            'syphilis', 'hiv_test', 'hepa_b', 'blood_typing', 'ogct_50g'
-        ]
+        # Delegate pairing/validation to helper methods.
+        pairs = self._pair_all_tests(cleaned_data)
 
-        # helper to fetch images for a given key from available file containers
-        def images_for_key(key: str) -> List[Any]:
-            images_key = f"{key}_images"
-            imgs: List[Any] = []
-
-            # prefer the raw files attached by the view (lab_form._raw_files)
-            files_container = getattr(self, '_raw_files', None) or getattr(self, 'files', None)
-            if files_container:
-                getlist = getattr(files_container, 'getlist', None)
-                if callable(getlist):
-                    imgs = [i for i in list(files_container.getlist(images_key)) if i]
-                    if imgs:
-                        return imgs
-                single = files_container.get(images_key)
-                if single:
-                    return [single]
-
-            # fallback to any value present in cleaned_data
-            v = cleaned_data.get(images_key)
-            if not v:
-                return []
-            if isinstance(v, (list, tuple)):
-                return [i for i in list(v) if i]
-            return [v] if v else []
-
-        pairs: List[Dict[str, Any]] = []
-
-        for key in test_keys:
-            desc = cleaned_data.get(key)
-            date_key = f"{key}_date"
-            date_val = cleaned_data.get(date_key)
-            images = images_for_key(key)
-
-            # normalize description
-            if desc in (None, ''):
-                desc_val = 'N/A'
-            else:
-                desc_val = desc
-
-            # Determine if this test has any meaningful data
-            has_meaningful_value = desc not in (None, '') or bool(images) or bool(date_val)
-            if has_meaningful_value and not date_val:
-                # attach the error to the date field so it displays near the input
-                raise ValidationError({date_key: f'Date is required for {key}.'})
-
-            if not has_meaningful_value:
-                # skip empty tests
-                continue
-
-            pairs.append({
-                'test_type': key,
-                'date': date_val,
-                'description': desc_val,
-                'images': images,
-            })
-
-        # expose result for later processing; keep original cleaned_data unchanged
         cleaned_data['paired_tests'] = pairs
         self.paired_tests = pairs
 

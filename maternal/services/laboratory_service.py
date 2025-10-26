@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Tuple
 import logging
 import uuid
 from datetime import datetime
-from django.conf import settings
 
 logger = logging.getLogger(__name__)
 from maternal.supa.supabase_storage_service import SupabaseStorageService
@@ -26,6 +25,7 @@ class LaboratoryService:
         self.repository = repository
         self.staff_id = staff_id
         self.record_id = record_id
+        
 
     def build_payload(self, paired_tests) -> List[Dict[str, Any]]:
         """Convert cleaned paired_tests into the exact payload shape expected
@@ -58,7 +58,7 @@ class LaboratoryService:
             'OGCT 50G (24-28 WKS)': 10,
             'OGTT 100G': 11,
         }
-
+        
         serializable_pairs: List[Dict[str, Any]] = []
 
         for p in (paired_tests or []):
@@ -91,9 +91,51 @@ class LaboratoryService:
                 try:
                     lab_test_type_id = int(raw_test_type)
                 except Exception:
-                    # otherwise try to map by uppercased name
+                    # normalize string and try several heuristic matches
                     try:
-                        lab_test_type_id = name_to_id.get(str(raw_test_type).upper())
+                        s = str(raw_test_type).strip()
+                        s_lower = s.lower()
+
+                        # direct name map (case-insensitive)
+                        mapped = name_to_id.get(s.upper())
+                        if mapped:
+                            lab_test_type_id = mapped
+                        else:
+                            # common synonyms / slug forms
+                            if 'ogct' in s_lower and 'ogtt' not in s_lower:
+                                lab_test_type_id = 10
+                            elif 'ogtt' in s_lower:
+                                lab_test_type_id = 11
+                            elif 'cbc' in s_lower:
+                                lab_test_type_id = 2
+                            elif 'urinalysis' in s_lower or 'urine' in s_lower:
+                                lab_test_type_id = 1
+                            elif 'sgot' in s_lower or 'sgpt' in s_lower:
+                                lab_test_type_id = 3
+                            elif 'creatinine' in s_lower:
+                                lab_test_type_id = 4
+                            elif 'bua' in s_lower or 'bun' in s_lower:
+                                lab_test_type_id = 5
+                            elif 'syphilis' in s_lower or 'vdrl' in s_lower or 'rpr' in s_lower:
+                                lab_test_type_id = 6
+                            elif 'hiv' in s_lower:
+                                lab_test_type_id = 7
+                            elif 'hepa' in s_lower or 'hepatitis' in s_lower:
+                                lab_test_type_id = 8
+                            elif 'blood' in s_lower and 'typing' in s_lower or 'abo' in s_lower or 'rh' in s_lower:
+                                lab_test_type_id = 9
+                            else:
+                                # as a last resort, try to match by stripping non-alphanumerics
+                                import re
+                                norm = re.sub(r'[^a-z0-9]', ' ', s_lower)
+                                if 'ogct' in norm:
+                                    lab_test_type_id = 10
+                                elif 'ogtt' in norm:
+                                    lab_test_type_id = 11
+                                else:
+                                    lab_test_type_id = None
+                        if lab_test_type_id is None:
+                            logger.warning('Could not resolve lab_test_type_id for raw test_type: %s', raw_test_type)
                     except Exception:
                         lab_test_type_id = None
 
@@ -118,7 +160,7 @@ class LaboratoryService:
                 'result_img_path': imgs_normalized,
                 'result': result,
             })
-
+            
         return serializable_pairs
 
     def save(self, paired_tests) -> Dict[str, Any]:
@@ -273,12 +315,11 @@ class LaboratoryService:
         the repository layer. It raises on any repository error.
         """
         payload = self.build_payload(uploaded_pairs)
-        res = self.repository.insert_maternal_lab_results(
+        return self.repository.insert_maternal_lab_results(
             mhr_id=self.record_id,
             staff_id=self.staff_id,
             lab_results=payload or None,
         )
-        return res
 
     def _existing_lab_test_ids(self) -> set:
         """Return a set of lab_test_id ints that already exist for this record.
