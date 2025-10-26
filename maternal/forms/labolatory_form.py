@@ -61,7 +61,14 @@ class LaboratoryForm(forms.Form):
     form_type = forms.CharField(widget=forms.HiddenInput(attrs={'id': 'laboratory_form'}), initial="laboratory_form")
 
     def __init__(self, mhr_repo: MaternalHealthRecordRepository, mhr_id: int, *args, **kwargs):
+        # Accept an optional `raw_files` kwarg (e.g. request.FILES) so callers
+        # that don't pass files as the standard Form `files` arg can still
+        # provide uploaded files to the form for pairing.
+        raw_files = kwargs.pop('raw_files', None)
         super().__init__(*args, **kwargs)
+        # preserve raw_files separately; Django will also set `self.files` when
+        # the caller passes files to the Form constructor normally.
+        self._raw_files = raw_files
         add_bootstrap_classes(self)
         # repository and id are stored for possible future use
         self._mhr_repo = mhr_repo
@@ -173,7 +180,9 @@ class LaboratoryForm(forms.Form):
         images_key = f"{key}_images"
         imgs: List[Any] = []
 
-        files_container = getattr(self, 'files', None)
+        # Prefer explicitly provided raw files (form._raw_files) then fall
+        # back to the Form.files attribute populated by Django.
+        files_container = getattr(self, '_raw_files', None) or getattr(self, 'files', None)
         if files_container:
             # MultiValueDict from request.FILES supports getlist
             getlist = getattr(files_container, 'getlist', None)

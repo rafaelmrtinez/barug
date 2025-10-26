@@ -13,6 +13,89 @@ logger = logging.getLogger(__name__)
 from maternal.supa.supabase_storage_service import SupabaseStorageService
 
 
+class ExistingLabResultError(Exception):
+    """Raised when attempting to add/upload lab data for a test that already
+    exists for the maternal record.
+
+    Attributes:
+        tests: optional list of lab_test_type_id values (or test names) that
+            caused the conflict.
+    """
+    def __init__(self, message: str, tests: List[Any] = None):
+        super().__init__(message)
+        self.tests = tests or []
+
+
+def _map_test_type_to_id(raw_test_type: Any) -> int:
+    """Map a user-provided test_type (string or int-like) to the canonical
+    lab_test_type_id. Returns None when mapping fails.
+    """
+    if raw_test_type is None:
+        return None
+    # if int-like, coerce
+    try:
+        return int(raw_test_type)
+    except Exception:
+        pass
+
+    name_to_id = {
+        'URINALYSIS': 1,
+        'CBC': 2,
+        'SGOT/SGPT': 3,
+        'CREATININE SERUM': 4,
+        'BUA/BUN': 5,
+        'SYPHILIS': 6,
+        'HIV TEST': 7,
+        'HEPA B': 8,
+        'BLOOD TYPING': 9,
+        'OGCT 50G (24–28 WKS)': 10,
+        'OGCT 50G (24-28 WKS)': 10,
+        'OGTT 100G': 11,
+    }
+
+    try:
+        s = str(raw_test_type).strip()
+        s_lower = s.lower()
+        mapped = name_to_id.get(s.upper())
+        if mapped:
+            return mapped
+
+        # heuristics
+        if 'ogct' in s_lower and 'ogtt' not in s_lower:
+            return 10
+        if 'ogtt' in s_lower:
+            return 11
+        if 'cbc' in s_lower:
+            return 2
+        if 'urinalysis' in s_lower or 'urine' in s_lower:
+            return 1
+        if 'sgot' in s_lower or 'sgpt' in s_lower:
+            return 3
+        if 'creatinine' in s_lower:
+            return 4
+        if 'bua' in s_lower or 'bun' in s_lower:
+            return 5
+        if 'syphilis' in s_lower or 'vdrl' in s_lower or 'rpr' in s_lower:
+            return 6
+        if 'hiv' in s_lower:
+            return 7
+        if 'hepa' in s_lower or 'hepatitis' in s_lower:
+            return 8
+        if ('blood' in s_lower and 'typing' in s_lower) or 'abo' in s_lower or 'rh' in s_lower:
+            return 9
+
+        # last resort: strip non-alphanumerics and re-check
+        import re
+        norm = re.sub(r'[^a-z0-9]', ' ', s_lower)
+        if 'ogct' in norm:
+            return 10
+        if 'ogtt' in norm:
+            return 11
+    except Exception:
+        logger.exception('Error while mapping test type: %s', raw_test_type)
+    return None
+
+
 class LaboratoryService:
     """Service for building payloads and saving laboratory results.
 
@@ -43,24 +126,7 @@ class LaboratoryService:
         int-like value it will be used as-is.
         """
 
-        # mapping of known lab test names (case-insensitive) to their ids
-        name_to_id = {
-            'URINALYSIS': 1,
-            'CBC': 2,
-            'SGOT/SGPT': 3,
-            'CREATININE SERUM': 4,
-            'BUA/BUN': 5,
-            'SYPHILIS': 6,
-            'HIV TEST': 7,
-            'HEPA B': 8,
-            'BLOOD TYPING': 9,
-            'OGCT 50G (24–28 WKS)': 10,
-            'OGCT 50G (24-28 WKS)': 10,
-            'OGTT 100G': 11,
-        }
-        
         serializable_pairs: List[Dict[str, Any]] = []
-
         for p in (paired_tests or []):
             # normalize and extract result (was previously called description)
             result = p.get('description')
@@ -81,63 +147,9 @@ class LaboratoryService:
             imgs = p.get('images') or []
             imgs_normalized = [str(i) for i in imgs]
 
-            # determine lab_test_type_id
+            # determine lab_test_type_id using helper
             raw_test_type = p.get('test_type')
-            lab_test_type_id = None
-            if raw_test_type is None:
-                lab_test_type_id = None
-            else:
-                # if it's already an int-like value, coerce
-                try:
-                    lab_test_type_id = int(raw_test_type)
-                except Exception:
-                    # normalize string and try several heuristic matches
-                    try:
-                        s = str(raw_test_type).strip()
-                        s_lower = s.lower()
-
-                        # direct name map (case-insensitive)
-                        mapped = name_to_id.get(s.upper())
-                        if mapped:
-                            lab_test_type_id = mapped
-                        else:
-                            # common synonyms / slug forms
-                            if 'ogct' in s_lower and 'ogtt' not in s_lower:
-                                lab_test_type_id = 10
-                            elif 'ogtt' in s_lower:
-                                lab_test_type_id = 11
-                            elif 'cbc' in s_lower:
-                                lab_test_type_id = 2
-                            elif 'urinalysis' in s_lower or 'urine' in s_lower:
-                                lab_test_type_id = 1
-                            elif 'sgot' in s_lower or 'sgpt' in s_lower:
-                                lab_test_type_id = 3
-                            elif 'creatinine' in s_lower:
-                                lab_test_type_id = 4
-                            elif 'bua' in s_lower or 'bun' in s_lower:
-                                lab_test_type_id = 5
-                            elif 'syphilis' in s_lower or 'vdrl' in s_lower or 'rpr' in s_lower:
-                                lab_test_type_id = 6
-                            elif 'hiv' in s_lower:
-                                lab_test_type_id = 7
-                            elif 'hepa' in s_lower or 'hepatitis' in s_lower:
-                                lab_test_type_id = 8
-                            elif 'blood' in s_lower and 'typing' in s_lower or 'abo' in s_lower or 'rh' in s_lower:
-                                lab_test_type_id = 9
-                            else:
-                                # as a last resort, try to match by stripping non-alphanumerics
-                                import re
-                                norm = re.sub(r'[^a-z0-9]', ' ', s_lower)
-                                if 'ogct' in norm:
-                                    lab_test_type_id = 10
-                                elif 'ogtt' in norm:
-                                    lab_test_type_id = 11
-                                else:
-                                    lab_test_type_id = None
-                        if lab_test_type_id is None:
-                            logger.warning('Could not resolve lab_test_type_id for raw test_type: %s', raw_test_type)
-                    except Exception:
-                        lab_test_type_id = None
+            lab_test_type_id = _map_test_type_to_id(raw_test_type)
 
             # format date as YYYY-MM-DD
             date_val = p.get('date')
@@ -160,7 +172,6 @@ class LaboratoryService:
                 'result_img_path': imgs_normalized,
                 'result': result,
             })
-            
         return serializable_pairs
 
     def save(self, paired_tests) -> Dict[str, Any]:
@@ -170,8 +181,26 @@ class LaboratoryService:
             - success: bool
             - res: repository response
         """
-        # Orchestrator: upload images then persist payload. Both steps are
-        # delegated to small, focused helper methods to keep flow readable.
+        # Orchestrator: validate intent first (do not upload files if some
+        # tests already exist). We build the payload early so we can map
+        # test_type -> lab_test_type_id and compare against existing ids.
+        try:
+            existing_ids = self._existing_lab_test_ids()
+        except Exception:
+            logger.exception('Failed to fetch existing lab test ids; will attempt to persist all uploaded pairs')
+            existing_ids = set()
+
+        # map incoming pairs to canonical payload (lab_test_type_id etc.)
+        payload_preview = self.build_payload(paired_tests)
+
+        # If any of the incoming tests already exist for this mhr, reject
+        # the whole operation rather than allowing file uploads.
+        conflicts = [p.get('lab_test_type_id') for p in payload_preview if p.get('lab_test_type_id') in existing_ids]
+        if conflicts:
+            logger.info('Attempt to add existing lab tests for mhr %s: %s', self.record_id, conflicts)
+            raise ExistingLabResultError('Laboratory results for one or more tests already exist; cannot add or upload files.', tests=conflicts)
+
+        # No conflicts — proceed with uploads
         uploaded_pairs = []
         uploaded_paths: List[str] = []
 
@@ -186,62 +215,17 @@ class LaboratoryService:
             # bubble up so callers (views) can return appropriate errors
             raise
 
-        # Step 1.5: check existing lab_test_ids for this maternal record and
-        # decide which uploaded pairs actually need DB persistence. If a
-        # matching lab_test_id is already present we will skip persistence for
-        # that test and only keep the uploaded images.
+        # Step 2: persist payload in DB; on failure attempt cleanup of the
+        # files that were associated with the uploaded pairs.
         try:
-            existing_ids = self._existing_lab_test_ids()
+            res = self._persist_payload(uploaded_pairs)
         except Exception:
-            # If we cannot fetch existing ids, be conservative and proceed
-            # with persistence for all uploaded pairs (so we don't accidentally
-            # overwrite user's intent). Do not fail here.
-            logger.exception('Failed to fetch existing lab test ids; will attempt to persist all uploaded pairs')
-            existing_ids = set()
-        else:
-            logger.debug('Existing lab_test_ids for mhr %s: %s', self.record_id, existing_ids)
-
-        # Build the canonical payload and split into to_persist vs skipped
-        payload = self.build_payload(uploaded_pairs)
-        to_persist = []
-        persist_uploaded_paths: List[str] = []
-        skipped_info = []
-
-        for idx, entry in enumerate(payload):
-            lab_test_type_id = entry.get('lab_test_type_id')
-            if lab_test_type_id is not None and lab_test_type_id in existing_ids:
-                # skip persistence for this test; record advice for caller
-                skipped_info.append({
-                    'lab_test_type_id': lab_test_type_id,
-                    'note': 'existing_record_found'
-                })
-                logger.info('Skipping DB persistence for lab_test_type_id=%s (existing record found) on mhr=%s', lab_test_type_id, self.record_id)
-                # nothing else to do for this pair (images were already uploaded)
-                continue
-            # include in persistence payload
-            to_persist.append(entry)
-            logger.debug('Will persist lab_test_type_id=%s for mhr=%s', lab_test_type_id, self.record_id)
-            # gather uploaded file paths tied to this pair for cleanup if needed
-            per_paths = uploaded_pairs[idx].get('_uploaded_paths') or []
-            persist_uploaded_paths.extend(per_paths)
-
-        # If nothing to persist, we're done -- images uploaded only
-        if not to_persist:
-            logger.info('No new lab tests to persist for mhr=%s; uploaded images only. skipped=%s', self.record_id, skipped_info)
-            return {"success": True, "res": None, "skipped": skipped_info}
-
-        # Step 2: persist payload in DB; on failure attempt cleanup of only
-        # the files that were associated with the persisted payload.
-        try:
-            logger.info('Persisting %d new lab test(s) for mhr=%s: %s', len(to_persist), self.record_id, [p.get('lab_test_type_id') for p in to_persist])
-            res = self.repository.insert_maternal_lab_results(
-                mhr_id=self.record_id,
-                staff_id=self.staff_id,
-                lab_results=to_persist or None,
-            )
-        except Exception:
-            logger.exception('Error inserting maternal lab results; attempting to cleanup uploaded files for persisted items')
-            for path in persist_uploaded_paths:
+            logger.exception('Error inserting maternal lab results; attempting to cleanup uploaded files for this operation')
+            # gather any uploaded storage paths attached to the uploaded_pairs
+            to_cleanup = []
+            for up in uploaded_pairs:
+                to_cleanup.extend(up.get('_uploaded_paths') or [])
+            for path in to_cleanup:
                 try:
                     SupabaseStorageService.remove_file(path, 'maternal')
                 except Exception:
@@ -251,7 +235,7 @@ class LaboratoryService:
 
         logger.info('Successfully persisted lab results for mhr=%s; repo_response=%s', self.record_id, bool(res))
 
-        return {"success": bool(res), "res": res, "skipped": skipped_info}
+        return {"success": bool(res), "res": res}
 
     def _upload_images(self, paired_tests) -> Tuple[List[Dict[str, Any]], List[str]]:
         """Upload any file-like images to Supabase and return (uploaded_pairs, uploaded_paths).
@@ -318,7 +302,7 @@ class LaboratoryService:
         return self.repository.insert_maternal_lab_results(
             mhr_id=self.record_id,
             staff_id=self.staff_id,
-            lab_results=payload or None,
+            lab_results=payload or [],
         )
 
     def _existing_lab_test_ids(self) -> set:

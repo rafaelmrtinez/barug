@@ -695,6 +695,20 @@
 
 
 </div>
+        <!-- Image preview modal (used by imagePreview.js) -->
+        <div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content bg-transparent border-0">
+                    <div class="modal-header border-0">
+                        <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body d-flex justify-content-center align-items-center">
+                        <img id="imagePreviewModalImg" src="" alt="Preview" class="img-fluid" style="max-height:80vh; width:auto;" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
 {% endblock %}
 
 {% block js %}

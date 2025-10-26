@@ -29,7 +29,7 @@ from src.infra.database.connection_adapter import ConnectionAdapter
 from django.conf import settings
 import os
 from maternal.supa.supabase_storage_service import SupabaseStorageService
-from maternal.services.laboratory_service import LaboratoryService
+from maternal.services.laboratory_service import LaboratoryService, ExistingLabResultError
 
 import logging
 
@@ -799,7 +799,6 @@ def laboratory_save_api(request, record_id: int) -> JsonResponse:
     try:
         if request.content_type and request.content_type.startswith('application/json'):
             payload = json.loads(request.body.decode('utf-8') or '{}')
-            print(f"payload: {payload}")
         else:
             # QueryDict -> normal dict (handles form-encoded or multipart without files)
             payload = {k: v for k, v in request.POST.items()}
@@ -812,6 +811,8 @@ def laboratory_save_api(request, record_id: int) -> JsonResponse:
     # attach files if present (e.g., when frontend uses FormData)
     if request.FILES:
         lab_form._raw_files = request.FILES
+
+    print(f"LAB FORM FILES: {lab_form._raw_files}")
 
     # Prefer calling is_clean() if the form exposes it (user requested),
     # otherwise fall back to the standard is_valid().
@@ -834,6 +835,10 @@ def laboratory_save_api(request, record_id: int) -> JsonResponse:
     svc = LaboratoryService(REPOSITORY, request.session.get('auth', {}).get('staff_id'), record_id)
     try:
         result = svc.save(paired)
+    except ExistingLabResultError as e:
+        # Client attempted to add/upload tests that already exist
+        logger.info('Client attempted to add existing lab tests: %s', getattr(e, 'tests', None))
+        return JsonResponse({'success': False, 'message': str(e), 'conflicts': getattr(e, 'tests', [])}, status=409)
     except Exception:
         logger.exception('Unexpected error while saving laboratory data (API)')
         return JsonResponse({'success': False, 'message': 'Something went wrong while saving Laboratory data.'}, status=500)
