@@ -13,31 +13,51 @@ YES_NO_CHOICES = (("1", "Yes"), ("0", "No"))
 
 class PresentPregnancyForm(forms.Form):
     # Present pregnancy
-    gravida = forms.IntegerField(required=False)
-    para = forms.IntegerField(required=False)
+    gravida = forms.IntegerField(
+        required=False,
+        min_value=0,
+        error_messages={
+            'invalid': 'Please enter a whole number for gravida.',
+            'min_value': 'Gravida cannot be negative.'
+        }
+    )
+    para = forms.IntegerField(
+        required=False,
+        min_value=0,
+        error_messages={
+            'invalid': 'Please enter a whole number for para.',
+            'min_value': 'Para cannot be negative.'
+        }
+    )
 
     # fullterm / preterm are boolean-like choices: Yes / No.
     # Use TypedChoiceField with a coerce function that maps the posted string
     # to True/False and returns None when nothing is selected.
+    # Add placeholder option (empty string) so the dropdown displays a prompt.
+    FULLTERM_CHOICES = [('', 'Select Fullterm')] + list(YES_NO_CHOICES)
+    PRETERM_CHOICES = [('', 'Select Preterm')] + list(YES_NO_CHOICES)
+
     fullterm = forms.TypedChoiceField(
-        choices=YES_NO_CHOICES,
+        choices=FULLTERM_CHOICES,
         coerce=lambda x: True if x == "1" else (False if x == "0" else None),
-        required=False,
+        required=True,
         empty_value=None,
         label="Fullterm",
+        error_messages={'required': 'Please select whether the pregnancy is fullterm.'}
     )
 
     preterm = forms.TypedChoiceField(
-        choices=YES_NO_CHOICES,
+        choices=PRETERM_CHOICES,
         coerce=lambda x: True if x == "1" else (False if x == "0" else None),
-        required=False,
+        required=True,
         empty_value=None,
         label="Preterm",
+        error_messages={'required': 'Please select whether the pregnancy is preterm.'}
     )
 
-    lmp = forms.DateField(required=False, widget=forms.DateInput(
+    lmp = forms.DateField(required=True, widget=forms.DateInput(
         attrs={'type': 'date'}), label="LMP")
-    edc = forms.DateField(required=False, widget=forms.DateInput(
+    edc = forms.DateField(required=True, widget=forms.DateInput(
         attrs={'type': 'date'}), label="EDC")
     
     form_type = forms.CharField(widget=forms.HiddenInput(attrs={'id': 'present_pregnancy_form'}), initial="present_pregnancy_form")
@@ -46,83 +66,68 @@ class PresentPregnancyForm(forms.Form):
         super().__init__(*args, **kwargs)
         add_bootstrap_classes(self)
         # Populate initial values from repository (if available).
-        present_pregnancy_data = self._fetch_existing(mhr_repo, mhr_id)
-        if present_pregnancy_data:
-            # mark form as populated so callers can prevent re-insert
-            self._populate_from_existing(present_pregnancy_data)
-            # Wire up UI-level readonly behavior separately so callers
-            # can choose to skip or replace it later.
-            self._apply_readonly(['gravida', 'para', 'fullterm', 'preterm', 'lmp', 'edc'])
+        self._mhr_repo = mhr_repo
+        self._existing_data = self._mhr_repo.fetch_latest_present_pregnancy_by_mhr_id(mhr_id)
+        # If existing data is present, set initial values and disable inputs to prevent re-entry
+        if self._existing_data and isinstance(self._existing_data, dict):
+            # map repo keys to form fields
+            self.fields['gravida'].initial = self._existing_data.get('gravida')
+            self.fields['para'].initial = self._existing_data.get('para')
+            # existing stored values for booleans may be true/false; convert to '1'/'0' for choice fields
+            if self._existing_data.get('is_fullterm') is not None:
+                self.fields['fullterm'].initial = '1' if self._existing_data.get('is_fullterm') else '0'
+            if self._existing_data.get('is_preterm') is not None:
+                self.fields['preterm'].initial = '1' if self._existing_data.get('is_preterm') else '0'
+            self.fields['lmp'].initial = self._existing_data.get('lmp')
+            self.fields['edc'].initial = self._existing_data.get('edc')
+            # disable fields in UI to signal they are read-only
+            for fname in ('gravida', 'para', 'fullterm', 'preterm', 'lmp', 'edc'):
+                if fname in self.fields:
+                    self.fields[fname].widget.attrs['readonly'] = True
+                    # for select fields, also set disabled attribute
+                    # self.fields[fname].widget.attrs['disabled'] = True
         else:
-            self.populated = False
+            # No existing data
+            pass
             
     def clean(self):
         cleaned_data = super().clean()
-        # Server-side safeguard: prevent duplicate insert when data already exists.
-        self._validate_not_populated()
+        # If existing data present, prevent creating a new entry.
+        # Note: when fields are disabled in the HTML they are not included in POST data,
+        # so checking cleaned_data for submitted values will be unreliable. Instead,
+        # if an existing record is present and the form is bound (i.e. the user
+        # submitted the form), block the create and instruct the user to edit.
+        print(f"Existing data: {self._existing_data}")
+        if getattr(self, '_existing_data', None) and isinstance(self._existing_data, dict):
+            print(f"Form is bound: {self.is_bound}")
+            if self.is_bound:
+                self.add_error(None,
+                    "A present pregnancy record already exists for this patient. To change values, please edit the existing record or contact your administrator."
+                )
+                return cleaned_data
 
-        logger.debug("PresentPregnancyForm cleaned: %s", {k: v for k, v in cleaned_data.items() if k not in ['lmp', 'edc']})
+        # Validate fullterm/preterm selection: prevent placeholder values (empty -> None)
+        if cleaned_data.get('fullterm') is None:
+            self.add_error('fullterm', 'Please select Fullterm (Yes or No).')
+
+        if cleaned_data.get('preterm') is None:
+            self.add_error('preterm', 'Please select Preterm (Yes or No).')
+
+        # Validate LMP and EDC logic: LMP must be on or before EDC
+        lmp = cleaned_data.get('lmp')
+        edc = cleaned_data.get('edc')
+        if lmp and edc:
+            if lmp > edc:
+                self.add_error('edc', 'EDC cannot be earlier than LMP. Please correct the dates.')
+
+        # Ensure gravida/para are non-negative integers (field validators handle format)
+        gravida = cleaned_data.get('gravida')
+        para = cleaned_data.get('para')
+        if gravida is not None and gravida < 0:
+            self.add_error('gravida', 'Gravida cannot be negative.')
+        if para is not None and para < 0:
+            self.add_error('para', 'Para cannot be negative.')
+
         return cleaned_data
 
-    def _fetch_existing(self, mhr_repo: MaternalHealthRecordRepository, mhr_id: int):
-        """Fetch the latest present pregnancy record for the given maternal
-        record id. Return a dict-like object or None. The method swallows
-        repository exceptions and returns None to keep form construction
-        tolerant to repository failures.
-        """
-        try:
-            return mhr_repo.fetch_latest_present_pregnancy_by_mhr_id(mhr_id)
-        except Exception:
-            # Be conservative: don't let repo errors break form construction.
-            return None
 
-    @staticmethod
-    def _bool_to_choice(v):
-        """Convert boolean/None to the form choice string."""
-        if v is True:
-            return "1"
-        if v is False:
-            return "0"
-        return None
-
-    def _populate_from_existing(self, data: dict):
-        """Populate form initial values from repository data and set
-        self.populated = True.
-        """
-        self.populated = True
-        self.fields['gravida'].initial = data.get('gravida')
-        self.fields['para'].initial = data.get('para')
-        self.fields['fullterm'].initial = self._bool_to_choice(data.get('is_fullterm'))
-        self.fields['preterm'].initial = self._bool_to_choice(data.get('is_preterm'))
-        self.fields['lmp'].initial = data.get('lmp')
-        self.fields['edc'].initial = data.get('edc')
-
-    def _apply_readonly(self, field_names):
-        """Disable and mark widgets readonly for the provided field names.
-        This can be replaced or skipped by callers to change UI behavior.
-        """
-        for fname in field_names:
-            field = self.fields.get(fname)
-            if field is None:
-                continue
-            # Mark as disabled so the widget renders non-editable in browsers
-            field.disabled = True
-            # For input-like widgets, also add readonly attr to improve UX
-            try:
-                widget = field.widget
-                if widget is not None:
-                    existing = dict(getattr(widget, 'attrs', {}))
-                    existing.update({'readonly': 'readonly'})
-                    widget.attrs = existing
-            except Exception:
-                # If a widget doesn't accept attrs, skip it silently.
-                pass
-
-    def _validate_not_populated(self):
-        """Raise ValidationError when the form was populated from the DB.
-        Separated out so callers can override or skip this behavior.
-        """
-        if getattr(self, 'populated', False):
-            raise forms.ValidationError(
-                "Present pregnancy data already exists for this maternal record and cannot be inserted again."
-            )

@@ -603,35 +603,24 @@ class MaternalHealthRecordRepository:
         return rows or None
 
     def fetch_latest_present_pregnancy_by_mhr_id(self, maternal_record_id: int):
-        sql = """WITH latest_visit AS (
-            SELECT DISTINCT ON (v.maternal_record_id)
-                    v.anc_visit_id,
-                    v.maternal_record_id,
-                    v.visit_no,
-                    v.visit_date::date,
-                    v.trimester_stage_id,
-                    v.assessed_by_id
-            FROM public.maternal_anc_visit AS v
-            WHERE v.maternal_record_id = %s
-            ORDER BY v.maternal_record_id, v.visit_date DESC, v.anc_visit_id DESC
-            )
+        # Fetch the most recent present_pregnancy_status row for this maternal record.
+        # We prefer the latest preg_status_id (assumed auto-increment) as the most recent entry.
+        sql = """
             SELECT
-            lv.anc_visit_id,
-            lv.maternal_record_id,
-            lv.visit_no,
-            lv.visit_date,
-            lv.trimester_stage_id,
-            lv.assessed_by_id,
-            -- Present pregnancy (may be NULL if not recorded)
-            pps.gravida,
-            pps.para,
-            pps.is_fullterm,
-            pps.is_preterm,
-            pps.lmp,
-            pps.edc
-            FROM latest_visit AS lv
-            LEFT JOIN public.present_pregnancy_status AS pps
-            ON pps.anc_visit_id = lv.anc_visit_id;"""
+                pps.preg_status_id,
+                pps.anc_visit_id,
+                pps.maternal_record_id,
+                pps.gravida,
+                pps.para,
+                pps.is_fullterm,
+                pps.is_preterm,
+                pps.lmp::date AS lmp,
+                pps.edc::date AS edc
+            FROM public.present_pregnancy_status AS pps
+            WHERE pps.maternal_record_id = %s
+            ORDER BY pps.preg_status_id DESC NULLS LAST
+            LIMIT 1;
+        """
         params = (maternal_record_id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows[0] if rows else None
@@ -678,27 +667,6 @@ class MaternalHealthRecordRepository:
         params = (person_id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows
-
-    def fetch_obstetric_history_by_mhr_id(self, maternal_record_id: int):
-        sql = """SELECT
-            COALESCE(oh.num_children_born_alive, 0)      AS num_children_born_alive,
-            COALESCE(oh.num_children_living, 0)          AS num_children_living,
-            COALESCE(oh.num_abortion, 0)                 AS num_abortion,
-            COALESCE(oh.num_stillbirth, 0)               AS num_stillbirth_or_fetal_death,
-            COALESCE(oh.num_large_babies, 0)             AS num_large_babies,
-            COALESCE(oh.has_diabetes, false)             AS has_diabetes,
-            mh.previous_hospitalization,
-            mh.previous_preg_complication
-            FROM public.maternal_health_record m
-            LEFT JOIN public.obstetric_history oh
-            ON oh.maternal_record_id = m.maternal_record_id
-            LEFT JOIN public.medical_history mh
-            ON mh.maternal_record_id = m.maternal_record_id
-            WHERE m.maternal_record_id = %s
-            LIMIT 1;"""
-        params = (maternal_record_id,)
-        rows = self.ctx.execute_query_to_dict(sql, params)
-        return rows[0] if rows else None
 
     def fetch_all_mhr_form_basic_info_by_mhr_id(self, maternal_record_id: int):
         sql = """

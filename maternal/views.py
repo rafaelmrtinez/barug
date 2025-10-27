@@ -30,7 +30,7 @@ from midwife.services import fetch_maternal_registry
 from src.infra.database.connection_adapter import ConnectionAdapter
 
 from maternal.supa.supabase_storage_service import SupabaseStorageService
-from maternal.services.laboratory_service import LaboratoryService, ExistingLabResultError
+from maternal.services.laboratory_service import LaboratoryService, LaboratoryTestException
 
 import logging
 
@@ -640,6 +640,7 @@ def maternal_health_record_form(request, record_id : int):
                         data=request.POST
                     )
                     if micro_nutrients_form.is_valid():
+                        print(f'Micro Nutrients Form Data: {micro_nutrients_form.cleaned_data}')
                         res = REPOSITORY.insert_micronutrients(
                             mhr_id=record_id,
                             staff_id=staff_id,
@@ -982,8 +983,6 @@ def laboratory_save_api(request, record_id: int) -> JsonResponse:
     if request.FILES:
         lab_form._raw_files = request.FILES
 
-    print(f"LAB FORM FILES: {lab_form._raw_files}")
-
     # Prefer calling is_clean() if the form exposes it (user requested),
     # otherwise fall back to the standard is_valid().
     try:
@@ -1005,7 +1004,7 @@ def laboratory_save_api(request, record_id: int) -> JsonResponse:
     svc = LaboratoryService(REPOSITORY, request.session.get('auth', {}).get('staff_id'), record_id)
     try:
         result = svc.save(paired)
-    except (ExistingLabResultError, MaternalHealthRecordException) as e:
+    except (LaboratoryTestException, MaternalHealthRecordException) as e:
         # Client attempted to add/upload tests that already exist
         logger.info('Client attempted to add existing lab tests: %s', getattr(e, 'tests', None))
         return JsonResponse({'success': False, 'message': str(e), 'conflicts': getattr(e, 'tests', [])}, status=409)

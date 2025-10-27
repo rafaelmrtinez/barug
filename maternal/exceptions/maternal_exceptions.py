@@ -53,6 +53,9 @@ class MaternalHealthRecordException(Exception):
         "P6169",  # Record status ONGOING not found
         "P6170",  # Trimester stage lookup not found
         "P6171",  # ANC record for today's visit already exists
+        # codes from ANC findings/notes update function
+        "P6216",  # Only authorized staff (midwife/nurse) may update findings/notes
+        "P6217",  # ANC record for this visit was not found
         # codes from maternal checklist function
         "P6201",
         "P6202",
