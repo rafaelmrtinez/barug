@@ -25,6 +25,7 @@ class CheckListForm(forms.Form):
         add_bootstrap_classes(self)
         self.mhr_repo = mhr_repo
         self.mhr_id = mhr_id
+        self._existing_data = self.mhr_repo.fetch_maternal_checklist_by_mhr_id(self.mhr_id) or []
 
         # Populate choices from DB (ids & labels) and set initial selected items for this maternal record
         try:
@@ -35,11 +36,9 @@ class CheckListForm(forms.Form):
                 choices = [(str(r["checklist_item_id"]), r["checklist_name"].title()) for r in items]
                 self.fields["symptoms"].choices = choices
 
-            existing = self.mhr_repo.fetch_maternal_checklist_by_mhr_id(self.mhr_id) or []
-
             # existing is list of rows -> extract the checklist_item_id values and set as strings
             existing_ids = []
-            for row in existing:
+            for row in self._existing_data:
                 # row may already be an int id or a dict containing checklist_item_id
                 if isinstance(row, dict):
                     val = row.get("checklist_item_id")
@@ -60,10 +59,16 @@ class CheckListForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
-        
+
+        print(f'CheckListForm.clean called with data: {cleaned_data}')
+
         # incoming selected symptoms (as strings)
         incoming = cleaned_data.get("symptoms") or []
         incoming = [str(v) for v in incoming]
+        
+        if not incoming:
+            self.add_error('symptoms', "Please select at least one checklist item.")
+            return cleaned_data
 
         # fetch existing checklist items for this maternal record
         try:
@@ -76,16 +81,29 @@ class CheckListForm(forms.Form):
         existing_ids = []
         for row in existing:
             if isinstance(row, dict):
-                val = row.get("checklist_item_id") or row.get("checklist_item_id")
+                val = row.get("checklist_item_id")
             else:
                 val = row
             if val is not None:
                 existing_ids.append(str(val))
 
-        # exclude any incoming items that already exist in DB
-        new_items = [item for item in incoming if item not in existing_ids]
+        # find any incoming items that are already present in DB
+        duplicates = [item for item in incoming if item in existing_ids]
+        if duplicates:
+            # try to convert ids to human-friendly labels using the field choices
+            choice_map = {str(k): v for k, v in getattr(self.fields.get('symptoms'), 'choices', [])}
+            dup_labels = [choice_map.get(d, d) for d in duplicates]
+            friendly_list = ', '.join(dup_labels)
+            message = (
+                "The following checklist item(s) are already recorded for this patient: "
+                f"{friendly_list}. Please remove them from your selection or edit the existing checklist if you intended to change their values."
+            )
+            self.add_error('symptoms', message)
+            # return early so no further processing is done
+            return cleaned_data
 
-        # set cleaned symptoms to only the new (non-existing) items
+        # No duplicates -> keep only the new (non-existing) items (safe transform)
+        new_items = [item for item in incoming if item not in existing_ids]
         cleaned_data["symptoms"] = new_items
 
         return cleaned_data

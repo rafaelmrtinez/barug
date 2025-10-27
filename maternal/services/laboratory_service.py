@@ -11,9 +11,11 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 from maternal.supa.supabase_storage_service import SupabaseStorageService
+from barug.utility.custom_date_time_util import DateAndTimeUtility
+from datetime import date as _date
 
 
-class ExistingLabResultError(Exception):
+class LaboratoryTestException(Exception):
     """Raised when attempting to add/upload lab data for a test that already
     exists for the maternal record.
 
@@ -181,6 +183,11 @@ class LaboratoryService:
             - success: bool
             - res: repository response
         """
+        # Validate incoming paired_tests for required rules before any uploads
+        # or DB checks. This ensures user-provided data is well-formed and
+        # prevents unnecessary uploads.
+        self._validate_paired_tests(paired_tests)
+
         # Orchestrator: validate intent first (do not upload files if some
         # tests already exist). We build the payload early so we can map
         # test_type -> lab_test_type_id and compare against existing ids.
@@ -198,7 +205,7 @@ class LaboratoryService:
         conflicts = [p.get('lab_test_type_id') for p in payload_preview if p.get('lab_test_type_id') in existing_ids]
         if conflicts:
             logger.info('Attempt to add existing lab tests for mhr %s: %s', self.record_id, conflicts)
-            raise ExistingLabResultError('Laboratory results for one or more tests already exist; cannot add or upload files.', tests=conflicts)
+            raise LaboratoryTestException('Laboratory results for one or more tests already exist; cannot add or upload files.', tests=conflicts)
 
         # No conflicts — proceed with uploads
         uploaded_pairs = []
@@ -250,6 +257,16 @@ class LaboratoryService:
         for p in (paired_tests or []):
             test_type = p.get('test_type') or 'unknown'
             images = p.get('images') or []
+            # If there are no images for this pair, skip upload logic entirely.
+            if not images:
+                uploaded_pairs.append({
+                    'test_type': test_type,
+                    'date': p.get('date'),
+                    'description': p.get('description'),
+                    'images': [],
+                    '_uploaded_paths': [],
+                })
+                continue
             uploaded_images: List[str] = []
             per_pair_paths: List[str] = []
 
@@ -329,3 +346,72 @@ class LaboratoryService:
                 continue
 
         return ids
+
+    def _validate_paired_tests(self, paired_tests) -> None:
+        """Validate paired_tests before processing.
+
+        Rules enforced:
+        - description/result must not be null/empty; accept 'N/A' or 'n/a' as explicit placeholders.
+        - date must be present and valid; future dates are not allowed (Philippine timezone).
+
+        Raises ValueError listing the problems when validation fails.
+        """
+        print(f'validate paired_tests: {paired_tests}')
+        if not paired_tests:
+            raise LaboratoryTestException('No laboratory tests provided. Please add a valid test.')
+        
+        errors: List[str] = []
+        # current PH date
+        current_date = DateAndTimeUtility.parse_date(DateAndTimeUtility.get_current_date())
+        try:
+            for idx, p in enumerate(paired_tests or []):
+                test_type = p.get('test_type') or f'index_{idx}'
+
+                # normalize and check description/result
+                desc = p.get('description')
+                if isinstance(desc, (bytes, bytearray)):
+                    try:
+                        desc = desc.decode('utf-8', errors='ignore')
+                    except Exception:
+                        desc = None
+
+                if desc is None or (isinstance(desc, str) and desc.strip() == ''):
+                    errors.append(f"{test_type}: result/description is required. If there is no further description, enter 'N/A'.")
+                else:
+                    # allow explicit N/A (case-insensitive)
+                    if isinstance(desc, str) and desc.strip().lower() == 'n/a':
+                        pass
+
+                # validate date
+                date_val = p.get('date')
+                parsed_date = None
+                if date_val is None:
+                    errors.append(f"{test_type}: date is required and cannot be null.")
+                    continue
+
+                # if it's a date/datetime object, coerce to date
+                if hasattr(date_val, 'strftime'):
+                    try:
+                        # datetime -> date
+                        if isinstance(date_val, datetime):
+                            parsed_date = date_val.date()
+                        else:
+                            parsed_date = date_val
+                    except Exception:
+                        parsed_date = None
+                else:
+                    # try parsing string using utility
+                    parsed_date = DateAndTimeUtility.parse_date(date_val)
+
+                if parsed_date is None:
+                    errors.append(f"{test_type}: date is invalid or unrecognized ('{date_val}').")
+                    continue
+
+                if current_date and parsed_date > current_date:
+                    errors.append(f"{test_type}: date {parsed_date} is in the future; future dates are not allowed.")
+        except Exception:
+            logger.exception('Unexpected error validating paired_tests')
+
+        if errors:
+            # raise a simple ValueError so callers can return a friendly message
+            raise LaboratoryTestException('Validation errors: ' + '; '.join(errors))

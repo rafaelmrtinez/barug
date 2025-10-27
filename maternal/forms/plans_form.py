@@ -2,11 +2,21 @@ from django import forms
 
 from maternal.forms.maternal_identification_form import add_bootstrap_classes
 from maternal.repository import MaternalHealthRecordRepository
+from maternal.forms.form_utils import FormUtils
 
 
 class PlanForm(forms.Form):
     # Plans
-    plan_place_of_delivery = forms.CharField(required=False)
+    plan_place_of_delivery = forms.CharField(
+        required=True,
+        max_length=255,
+        widget=forms.TextInput(attrs={'maxlength': '255'}),
+        error_messages={
+            'required': "Please enter the planned place of delivery. If not applicable, enter 'N/A'.",
+            'max_length': 'Place of delivery must be 255 characters or fewer.',
+            'invalid': 'Please enter a valid place of delivery.'
+        }
+    )
     plan_newborn_screening = forms.BooleanField(
         required=False, label="Plan for newborn screening")
     form_type = forms.CharField(widget=forms.HiddenInput(attrs={'id': 'plan_form'}), initial='plan_form')
@@ -37,4 +47,30 @@ class PlanForm(forms.Form):
                 self.fields['plan_newborn_screening'].initial = bool(nbs_val)
                 # Disable the checkbox to prevent changes
                 self.fields['plan_newborn_screening'].disabled = True
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        pod = cleaned_data.get('plan_place_of_delivery')
+
+        # If field-level validators already flagged an error, stop to avoid duplicates
+        if self.errors.get('plan_place_of_delivery'):
+            return cleaned_data
+
+        # If plan_place_of_delivery is missing, add a friendly error and return early
+        if pod is None or (isinstance(pod, str) and pod.strip() == ''):
+            self.add_error('plan_place_of_delivery', "Please specify the planned place of delivery. If not applicable, enter 'N/A'.")
+            return cleaned_data
+
+        # Sanitize and validate the input (no emojis, remove non-printable chars)
+        normalized, err = FormUtils.sanitize_text(pod, 'Place of delivery')
+        if err:
+            # sanitize_text returns a friendly message when invalid (including emoji)
+            self.add_error('plan_place_of_delivery', err)
+            return cleaned_data
+
+        # store normalized value back into cleaned_data
+        cleaned_data['plan_place_of_delivery'] = normalized
+
+        return cleaned_data
         

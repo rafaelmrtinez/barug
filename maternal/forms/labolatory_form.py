@@ -75,6 +75,8 @@ class LaboratoryForm(forms.Form):
         self._mhr_id = mhr_id
         # track which tests already have DB records
         self._existing_tests = set()
+        # track which tests already have images stored in DB (to disable upload)
+        self._existing_image_tests = set()
         # Fetch existing lab results (presentation logic belongs to the form)
         logger = logging.getLogger(__name__)
         try:
@@ -146,6 +148,13 @@ class LaboratoryForm(forms.Form):
                             self.fields[images_key].initial = imgs_list
                             # expose preview urls to the widget via data attribute
                             self.fields[images_key].widget.attrs['data-existing-images'] = json.dumps(imgs_list)
+                            # mark this test as having existing images and disable further uploads
+                            self._existing_image_tests.add(key)
+                            # disable the image input so the user cannot click Upload
+                            try:
+                                self.fields[images_key].widget.attrs['disabled'] = True
+                            except Exception:
+                                pass
                         except Exception:
                             self.fields[images_key].initial = imgs_list
 
@@ -159,6 +168,44 @@ class LaboratoryForm(forms.Form):
                             self.fields[date_key].widget.attrs['readonly'] = True
                     except Exception:
                         logger.exception('Failed to mark fields readonly for key %s', key)
+                # Ensure tests without images but with a result and date are
+                # also treated as existing and marked readonly. This covers
+                # the case where a test row exists with text+date but no
+                # images; the user should not be able to edit those fields.
+                for key in self._test_keys():
+                    date_key = f"{key}_date"
+                    try:
+                        has_result = False
+                        has_date = False
+                        if key in self.fields:
+                            init_val = self.fields[key].initial
+                            has_result = init_val is not None and init_val != ''
+                        if date_key in self.fields:
+                            date_init = self.fields[date_key].initial
+                            has_date = date_init is not None and date_init != ''
+
+                        if has_result and has_date:
+                            # mark readonly for this specific test
+                            if key in self.fields:
+                                self.fields[key].widget.attrs['readonly'] = True
+                            if date_key in self.fields:
+                                self.fields[date_key].widget.attrs['readonly'] = True
+                            # also disable the image upload control for this test
+                            images_key = f"{key}_images"
+                            if images_key in self.fields:
+                                try:
+                                    self.fields[images_key].widget.attrs['disabled'] = True
+                                except Exception:
+                                    pass
+                            # record server-side to prevent crafted uploads
+                            self._existing_image_tests.add(key)
+
+                        # Ensure image input is disabled only for tests that had images
+                        images_key = f"{key}_images"
+                        if key in self._existing_image_tests and images_key in self.fields:
+                            self.fields[images_key].widget.attrs['disabled'] = True
+                    except Exception:
+                        logger.exception('Failed to finalize readonly/disabled for key %s', key)
         except Exception:
             logger.exception('Unexpected error during LaboratoryForm init for mhr %s', self._mhr_id)
 
@@ -216,6 +263,10 @@ class LaboratoryForm(forms.Form):
         date_key = f"{key}_date"
         date_val = cleaned_data.get(date_key)
         images = self._images_for_key(cleaned_data, key)
+
+        # Prevent uploading images when images already exist for this test in DB.
+        if getattr(self, '_existing_image_tests', None) and key in self._existing_image_tests and images:
+            raise ValidationError({f"{key}_images": f"Images already exist for {key}. To change them, edit the existing record or contact your administrator."})
 
         # normalize description
         if desc in (None, ''):
