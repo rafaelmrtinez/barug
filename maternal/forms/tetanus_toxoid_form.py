@@ -40,7 +40,7 @@ class TetanusToxoidForm(forms.Form):
 
         # fetch existing TT records for this maternal record
         self._existing_data = self._mhr_repo.fetch_maternal_tt_by_mhr_id(self._mhr_id) or []
-
+        
         # Prefer ordering by record id (tt_id) to avoid date display inaccuracies.
         # Fall back to date_given if tt_id is not present.
         try:
@@ -106,13 +106,111 @@ class TetanusToxoidForm(forms.Form):
         # remove form_type before validation
         cleaned_data.pop('form_type', None)
         
-        # require at least one TT date (TT1..TT5)
-        if not any(cleaned_data.get(field) for field in self.LABEL_TO_FIELD.values()):
+        # require at least one TT date (TT1..TT5 or FIM)
+        all_fields = list(self.LABEL_TO_FIELD.values()) + ['fim_date']
+        if not any(cleaned_data.get(field) for field in all_fields):
             raise forms.ValidationError("At least one Tetanus Toxoid date must be provided.")
-        
-        # if any TT provided, TT1 must be present
-        if cleaned_data and not cleaned_data.get('tt1_date'):
+
+        # Build mapping field -> dose number and collect existing and submitted info
+        field_to_number = {
+            'tt1_date': 1,
+            'tt2_date': 2,
+            'tt3_date': 3,
+            'tt4_date': 4,
+            'tt5_date': 5,
+            'fim_date': 6,
+        }
+
+        existing_numbers = set(self.existing_tt_by_number.keys()) if getattr(self, 'existing_tt_by_number', None) is not None else set(self.existing_tt_by_number.keys())
+        # existing_dates: set of date objects already recorded
+        existing_dates = set()
+        for info in getattr(self, 'existing_tt_by_number', {}).values():
+            dt = info.get('date_given')
+            if dt is not None:
+                existing_dates.add(dt)
+
+        # If all doses 1..6 are already present in DB, disallow further entries
+        if existing_numbers >= set(range(1, 7)):
+            raise forms.ValidationError("All Tetanus Toxoid doses (TT1..TT5, FIM) have already been recorded for this patient; unable to add more.")
+
+        submitted_numbers = set()
+        submitted_dates = {}
+        for field_name, num in field_to_number.items():
+            val = cleaned_data.get(field_name)
+            if val is not None:
+                submitted_numbers.add(num)
+                submitted_dates[num] = val
+
+        # If any dose other than TT1 is submitted but TT1 is neither in DB nor in submission, require TT1
+        if any(n != 1 for n in submitted_numbers) and 1 not in existing_numbers and 1 not in submitted_numbers:
             raise forms.ValidationError("TT1 date is required if any other TT date is provided.")
+
+        # # Prevent re-entering a dose that's already recorded
+        # for num in list(submitted_numbers):
+        #     if num in existing_numbers:
+        #         # get existing date for that dose
+        #         info = self.existing_tt_by_number.get(num, {})
+        #         existing_date = info.get('date_given')
+        #         field_name = next(k for k, v in field_to_number.items() if v == num)
+        #         self.add_error(field_name, f"TT{num} has already been recorded on {existing_date}. To change it, edit the existing record.")
+
+        # Ensure submitted dates do not duplicate any existing recorded date
+        # Note: if the submitted date equals the existing recorded date for the SAME dose
+        # (i.e. user left the field unchanged), treat that as not a *new* entry and do not
+        # raise a duplicate-date error. Only raise when the submitted date matches a date
+        # already used by another dose or when the user is attempting to change an already
+        # recorded dose (submit a different date for a dose that already exists).
+        for num, dt in submitted_dates.items():
+            # If this dose already exists in DB
+            if num in existing_numbers:
+                existing_info = self.existing_tt_by_number.get(num, {})
+                existing_date_for_same_dose = existing_info.get('date_given')
+                if dt == existing_date_for_same_dose:
+                    # User left the date unchanged for an already-recorded dose; ignore
+                    continue
+                else:
+                    # User is attempting to change an already-recorded dose — instruct them to edit
+                    field_name = next(k for k, v in field_to_number.items() if v == num)
+                    self.add_error(field_name, f"TT{num} has already been recorded on {existing_date_for_same_dose}. To change it, edit the existing record.")
+                    # skip further duplicate-date checks for this field
+                    continue
+
+            # For new doses, ensure their date doesn't clash with any already-recorded date
+            if dt in existing_dates:
+                field_name = next(k for k, v in field_to_number.items() if v == num)
+                self.add_error(field_name, f"A tetanus dose has already been recorded on {dt}. Please choose a different date.")
+
+        # Ensure submitted dates are unique among themselves
+        if len(submitted_dates.values()) != len(set(submitted_dates.values())):
+            # find duplicates and add generic error
+            raise forms.ValidationError("Please ensure submitted TT dates are unique — duplicate dates were provided.")
+
+        # Ensure no skipped doses: for each submitted dose, all prior doses must exist either in DB or be submitted
+        combined = existing_numbers.union(submitted_numbers)
+        for num in sorted(submitted_numbers):
+            for prior in range(1, num):
+                if prior not in combined:
+                    field_name = next(k for k, v in field_to_number.items() if v == num)
+                    self.add_error(field_name, f"Cannot record TT{num} before TT{prior} is recorded. Please record earlier doses first.")
+
+        # Ensure chronological order: each subsequent dose date must be on or after the previous dose date
+        # Build combined dates mapping (prefer submitted date over existing)
+        combined_dates = {}
+        for n in range(1, 7):
+            if n in submitted_dates:
+                combined_dates[n] = submitted_dates[n]
+            elif n in self.existing_tt_by_number:
+                combined_dates[n] = self.existing_tt_by_number[n].get('date_given')
+            else:
+                combined_dates[n] = None
+
+        for n in range(2, 7):
+            prev = combined_dates.get(n-1)
+            curr = combined_dates.get(n)
+            if prev is not None and curr is not None:
+                if curr < prev:
+                    field_name = next(k for k, v in field_to_number.items() if v == n)
+                    self.add_error(field_name, f"TT{n} date ({curr}) cannot be earlier than TT{n-1} date ({prev}). Please correct the dates.")
         
         # determine the last non-None entry among TT1..TT5 and FIM
         last_field = None

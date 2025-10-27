@@ -679,27 +679,6 @@ class MaternalHealthRecordRepository:
         rows = self.ctx.execute_query_to_dict(sql, params)
         return rows
 
-    def fetch_obstetric_history_by_mhr_id(self, maternal_record_id: int):
-        sql = """SELECT
-            COALESCE(oh.num_children_born_alive, 0)      AS num_children_born_alive,
-            COALESCE(oh.num_children_living, 0)          AS num_children_living,
-            COALESCE(oh.num_abortion, 0)                 AS num_abortion,
-            COALESCE(oh.num_stillbirth, 0)               AS num_stillbirth_or_fetal_death,
-            COALESCE(oh.num_large_babies, 0)             AS num_large_babies,
-            COALESCE(oh.has_diabetes, false)             AS has_diabetes,
-            mh.previous_hospitalization,
-            mh.previous_preg_complication
-            FROM public.maternal_health_record m
-            LEFT JOIN public.obstetric_history oh
-            ON oh.maternal_record_id = m.maternal_record_id
-            LEFT JOIN public.medical_history mh
-            ON mh.maternal_record_id = m.maternal_record_id
-            WHERE m.maternal_record_id = %s
-            LIMIT 1;"""
-        params = (maternal_record_id,)
-        rows = self.ctx.execute_query_to_dict(sql, params)
-        return rows[0] if rows else None
-
     def fetch_all_mhr_form_basic_info_by_mhr_id(self, maternal_record_id: int):
         sql = """
             SELECT
