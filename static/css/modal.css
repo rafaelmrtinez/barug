@@ -1,9 +1,129 @@
-.modal-dialog {
-    margin-top: 100px;
-    padding-top: 80px;
+/* ===== BARUG modal: visible icon, border, refined sizes ===== */
+
+/* Palette using your theme when available */
+:root{
+  --barug-deep: var(--brand-900, #3a1217);
+  --barug-deeper: var(--brand-800, #561c24);
+  --barug-tint: var(--brand-050, #fbf6f6);
+  --barug-ink: #111827;
+  --barug-muted: #6B7280;
+  --barug-line: #E0E3E7;
 }
 
-.btn-close:focus {
-    outline: none;
-    box-shadow: none;
+/* Ensure nothing gets clipped by the Bootstrap .modal container */
+#barugModal{
+  overflow: visible !important;        /* KEY fix for the badge clipping */
+}
+
+/* Size & position */
+#barugModal .modal-dialog{
+  margin-top: 150px;
+  margin-bottom: auto;
+  max-width: 640px;                    /* a bit wider for breathing room */
+}
+
+/* Card shell */
+#barugModal .modal-content{
+  position: relative;
+  overflow: visible;                    /* allow the badge to float */
+  border-radius: 16px;                  /* subtle curve */
+  border: 2px solid var(--barug-line);  /* clearer border as requested */
+  background: #fff;
+  box-shadow: 0 18px 50px rgba(16,24,40,.18);
+}
+
+/* Floating icon badge (kept inside the modal box so it won't clip) */
+#barugModal .modal-content::before{
+  content: "!";
+  width: 64px; height: 64px; border-radius: 50%;
+  display: grid; place-items: center;
+  position: absolute; top: -20px; left: 50%;
+  transform: translateX(-50%);
+  background: radial-gradient(120% 120% at 50% 40%, var(--barug-deep), var(--barug-deeper) 85%);
+  color: #fff; font-size: 1.25rem; font-weight: 800;
+  border: 5px solid #fff;
+  box-shadow: 0 6px 18px rgba(0,0,0,.2);
+}
+
+/* Header spacing accounts for badge */
+#barugModal .modal-header{
+  border: 0;
+  background: #fff;
+  text-align: center;
+  padding: 2.1rem 1.25rem .75rem;       /* space for the badge overlap */
+}
+
+#barugModal .modal-title{
+  margin: 0;
+  font-size: 1.35rem;                   /* slightly smaller = tighter look */
+  font-weight: 800;
+  color: var(--barug-ink);
+}
+
+/* Body */
+#barugModal .modal-body{
+  color: var(--barug-ink);
+  padding: .6rem 1.25rem .9rem;
+  font-size: 0.985rem;
+}
+#barugModal .modal-body ul{ margin: .35rem 0 .65rem; }
+#barugModal .modal-body li::marker{ color: var(--barug-deep); }
+
+/* Footer & actions */
+#barugModal .modal-footer{
+  border-top: 1px solid var(--barug-line);
+  background: #fff;
+  padding: .85rem 1.25rem 1.15rem;
+  display: flex; justify-content: center; gap: 12px;
+}
+
+/* Rectangular buttons with a LITTLE curve (not pills) */
+#barugModal [data-role="primary"],
+#barugModal [data-role="secondary"]{
+  border-radius: 10px;                  /* rectangle w/ slight curve */
+  padding: .68rem 1.05rem;
+  line-height: 1;
+  font-weight: 700;
+  font-size: .97rem;
+}
+
+/* Cancel = outlined brand */
+#barugModal [data-role="secondary"]{
+  background: #fff;
+  color: var(--barug-deep);
+  border: 2px solid var(--barug-deep);
+}
+#barugModal [data-role="secondary"]:hover{
+  background: var(--barug-tint);
+}
+
+/* Confirm = solid brand */
+#barugModal [data-role="primary"]{
+  background: var(--barug-deep);
+  color: #fff;
+  border: 2px solid var(--barug-deep);
+}
+#barugModal [data-role="primary"]:hover{
+  background: var(--barug-deeper);
+  border-color: var(--barug-deeper);
+}
+
+/* Accessible focus ring */
+#barugModal [data-role="primary"]:focus-visible,
+#barugModal [data-role="secondary"]:focus-visible{
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(58,18,23,.18);
+}
+
+/* Backdrop density */
+.modal-backdrop.show{ opacity: .45; }
+
+/* Responsive touch */
+@media (max-width: 480px){
+  #barugModal .modal-dialog{ max-width: 92vw; }
+  #barugModal .modal-content::before{
+    width: 56px; height: 56px; font-size: 1.1rem; border-width: 5px; top: -18px;
+  }
+  #barugModal .modal-title{ font-size: 1.22rem; }
+  #barugModal [data-role]{ padding: .64rem .95rem; font-size: .95rem; border-radius: 9px; }
 }

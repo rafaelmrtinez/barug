@@ -10,7 +10,7 @@ import re
 from django.db import connection
 from zoneinfo import ZoneInfo  # PH time
 from .. import form_shared as FS
-from .util import get_lupon_chair_name  # ← Pangkat/Lupon Chairman auto-fill
+from .util import get_lupon_chair_name, get_case_time_filed_from_kp7
 
 logger = logging.getLogger(__name__)
 
@@ -314,14 +314,7 @@ class KP16Handler:
 
         out["date_filed"] = self._fmt_full_date(date_obj)
 
-        # ---- Time Filed (h:mm am/pm) ----
-        time_answer = (out.get("time_filed") or "").strip()
-        t_obj = self._parse_time_any(time_answer)
-        if not t_obj and isinstance(case_time_by_num, _time):
-            t_obj = case_time_by_num
-        if not t_obj and isinstance(case_time_by_sub, _time):
-            t_obj = case_time_by_sub
-        out["time_filed"] = self._fmt_time_12h(t_obj) if t_obj else ""
+        out["time_filed"] = self._fmt_time_12h(get_case_time_filed_from_kp7(submission_id))
 
         # ---- entered date trio defaults = TODAY (PH) ----
         now_ph = _dt.now(ZoneInfo("Asia/Manila"))

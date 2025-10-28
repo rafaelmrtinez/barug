@@ -63,7 +63,10 @@
     <div class="text-muted small">Template: <code>case_hearing_schedule.html</code></div>
   </div>
 
-  <div class="summary mb-4">
+  <!-- Flags surfaced from the view -->
+  <div id="caseFlags" data-has-kp16="{{ has_kp16|yesno:'1,0' }}" hidden></div>
+
+  <div class="summary mb-2">
     <div class="row g-3 align-items-center">
       <div class="col-12 col-xl-3 col-lg-4 cell">
         <div class="k-label"><i class="bi bi-file-earmark-text"></i> Source</div>
@@ -113,11 +116,17 @@
       </div>
     </div>
 
-    <div id="attSummaryPill" class="mt-2"></div>
+    <!-- DEBUG chips -->
+    <div class="mt-2 d-flex gap-2 flex-wrap">
+      <div id="attSummaryPill"></div>
+      <div id="kp16Pill"></div>
+    </div>
+
+    <!-- for JS -->
     <div id="attData" data-att-count="{{ med_attendance_count|default_if_none:'0' }}" hidden></div>
   </div>
 
-  {% if not hearing_held and hearing_source == "KP-8" %}
+{% if hearing_source == "KP-8" and not hearing_held %}
     <div class="card-soft mb-4 actions-card">
       <div class="card-header d-flex align-items-center justify-content-between">
         <h6 class="section-title">Mediation Actions</h6>
@@ -188,7 +197,8 @@
         </div>
 
         <div class="mt-3">
-          <a id="settleBtn" class="btn btn-ghost" href="{% url 'lupon_mem:open_kp16_from_hearing' case_id %}">
+          <!-- include sid so the server knows which hearing -->
+          <a id="settleBtn" class="btn btn-ghost" href="{% url 'lupon_mem:open_kp16_from_hearing' case_id %}?sid={{ picked_submission_id }}">
             <i class="bi bi-journal-check me-1"></i> Record Settlement (KP-16)
           </a>
           <div id="settleGuardNote" class="form-text text-muted d-none">
@@ -255,6 +265,7 @@
 
 <script>
 (function(){
+  // date/time prettifier
   const node = document.getElementById('hearing-dt');
   if (node){
     const ds = (node.getAttribute('data-date') || '').trim();
@@ -275,12 +286,13 @@
     n = Number(n)||0; const s=["th","st","nd","rd"], v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]);
   }
 
-  const attData = document.getElementById('attData');
+  const attData  = document.getElementById('attData');
   const attCount = parseInt((attData?.getAttribute('data-att-count')||'0').trim(),10) || 0;
 
-  const pillHost = document.getElementById('attSummaryPill');
-  if (pillHost){
-    pillHost.innerHTML = attCount > 0
+  // Attendance DEBUG pill
+  const attPillHost = document.getElementById('attSummaryPill');
+  if (attPillHost){
+    attPillHost.innerHTML = attCount > 0
       ? `<span class="k-pill soft"><i class="bi bi-bug"></i> [DEBUG] ${ordinal(attCount)} Mediation Attendance attached (this hearing)</span>`
       : `<span class="k-pill soft"><i class="bi bi-bug"></i> [DEBUG] No Mediation Attendance yet (this hearing)</span>`;
   }
@@ -293,6 +305,17 @@
       : `Banner would be hidden until at least one attendance exists (count: 0).`;
   }
 
+  // KP-16 DEBUG pill
+  const flags   = document.getElementById('caseFlags');
+  const hasKP16 = (flags?.dataset.hasKp16 === '1');
+  const kp16PillHost = document.getElementById('kp16Pill');
+  if (kp16PillHost){
+    kp16PillHost.innerHTML = hasKP16
+      ? `<span class="k-pill"><i class="bi bi-journal-check"></i> [DEBUG] KP-16 on file</span>`
+      : `<span class="k-pill soft"><i class="bi bi-journal-x"></i> [DEBUG] No KP-16 yet</span>`;
+  }
+
+  // enable/disable KP-16 button based on attendance
   const settleBtn = document.getElementById('settleBtn');
   const settleGuardNote = document.getElementById('settleGuardNote');
   if (settleBtn){
@@ -309,21 +332,44 @@
     }
   }
 
+  // Guard submit:
+  // - PENDING: allow even if no attendance; if zero attendance, send att_slot_only=1 to consume the slot as "no-show".
+  // - SETTLED: require >=1 attendance AND KP-16 on file.
   const form = document.getElementById('medHeldForm');
+  const outcomeSel = document.getElementById('medOutcome');
+
   if (form) {
     form.addEventListener('submit', function(ev){
-      if (attCount <= 0) {
-        ev.preventDefault();
-        alert('Please add Mediation Attendance first before marking the mediation as held.');
-        return false;
-      }
-      const outcome = (document.getElementById('medOutcome')?.value || '').toUpperCase();
+      const outcome = (outcomeSel?.value || '').toUpperCase();
+
       if (outcome === 'SETTLED') {
-        ev.preventDefault();
-        alert('Please complete the Amicable Settlement (KP-16) before finalizing as SETTLED.');
-        window.location.href = "{% url 'lupon_mem:open_kp16_from_hearing' case_id %}";
-        return false;
+        if (attCount <= 0) {
+          ev.preventDefault();
+          alert('Please add Mediation Attendance first before marking the mediation as SETTLED.');
+          return false;
+        }
+        if (!hasKP16) {
+          ev.preventDefault();
+          alert('Please complete the Amicable Settlement (KP-16) before finalizing as SETTLED.');
+          window.location.href = "{% url 'lupon_mem:open_kp16_from_hearing' case_id %}?sid={{ picked_submission_id }}";
+          return false;
+        }
+        // ok to submit when SETTLED (+attendance +KP16)
+        return true;
       }
+
+      // outcome is PENDING / NOT SETTLED
+      // If there is no attendance yet, we still allow submission and tell the backend
+      // to increment/consume the attendance slot as a no-show so next will be "2nd".
+      if (attCount <= 0) {
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'att_slot_only';
+        hidden.value = '1'; // backend: treat as consumed slot without actual attendees
+        form.appendChild(hidden);
+      }
+      // proceed
+      return true;
     }, false);
   }
 })();

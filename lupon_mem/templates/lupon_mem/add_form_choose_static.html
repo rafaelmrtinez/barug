@@ -25,11 +25,22 @@
   #pageLoadingSmall{ position:fixed; inset:0; display:none; align-items:center; justify-content:center;
                      background:rgba(255,255,255,.65); backdrop-filter:blur(2px); z-index:2000; }
 
-  /* ——— Badge pills: improved contrast ——— */
+  /* ——— Badge pills: improved contrast & added reasons ——— */
   .hint-badge{ font-size:.72rem; font-weight:600; border:1px solid transparent; }
   .hint-badge.kp9{  background:#dff1ff; border-color:#83c5ff; color:#073b6f; }       /* New Summons */
   .hint-badge.kp18{ background:#ffe3e3; border-color:#ff9a9a; color:#7a1111; }      /* No-show (Complainant) */
   .hint-badge.kp19{ background:#fff1cc; border-color:#ffd24d; color:#5a4300; }      /* No-show (Respondent) */
+
+  .hint-badge.kp20{  background:#efeaff; border-color:#b9a6ff; color:#3b2a8a; }     /* CFA due to Repudiation */
+  .hint-badge.kp20a{ background:#eaf7ee; border-color:#bfe6cc; color:#0f5132; }     /* CFA: No Settlement */
+  .hint-badge.kp20b{ background:#fde2f0; border-color:#f7a8d0; color:#7a0d4d; }     /* CFA: Repeated No-Show */
+
+  .hint-badge.kp21{ background:#f0f9ff; border-color:#bae6fd; color:#0c4a6e; }      /* Bar Action */
+  .hint-badge.kp22{ background:#f0fdf4; border-color:#bbf7d0; color:#14532d; }      /* Bar Counterclaim */
+
+  .hint-badge.kp23{ background:#fff7ed; border-color:#fed7aa; color:#7c2d12; }      /* Motion for Execution */
+  .hint-badge.kp24{ background:#fef2f2; border-color:#fecaca; color:#7f1d1d; }      /* Hearing (Execution) */
+  .hint-badge.kp25{ background:#ecfeff; border-color:#a5f3fc; color:#164e63; }      /* Notice of Execution */
 </style>
 {% endblock %}
 
@@ -42,7 +53,6 @@
     </a>
   </div>
 
-  {# Optional gate message from the server explaining why these forms are allowed now #}
   {% if gate_msg %}
     <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
       {% bs_icon 'info-circle' extra_classes='me-2' %} {{ gate_msg }}
@@ -65,7 +75,8 @@
         <div class="form-meta">
           <span class="form-code">{% bs_icon 'file-earmark-text' %} {{ code }}</span>
           <div class="form-name" title="{{ name }}">{{ name }}</div>
-          {# Lightweight contextual badges so users know why these show up #}
+
+          {# Contextual reasons, purely visual #}
           {% if code|upper == 'MED-ATT-2025' %}
             <span class="badge rounded-pill hint-badge kp9 ms-1">{% bs_icon 'envelope' %} Med Attendance</span>
           {% endif %}
@@ -75,6 +86,22 @@
             <span class="badge rounded-pill hint-badge kp18 ms-1">{% bs_icon 'person-exclamation' %} No-show (Complainant)</span>
           {% elif code|upper == 'KP-19' %}
             <span class="badge rounded-pill hint-badge kp19 ms-1">{% bs_icon 'person-exclamation' %} No-show (Respondent)</span>
+          {% elif code|upper == 'KP-20' %}
+            <span class="badge rounded-pill hint-badge kp20 ms-1">{% bs_icon 'exclamation-triangle' %} Repudiation → CFA</span>
+          {% elif code|upper == 'KP-20A' %}
+            <span class="badge rounded-pill hint-badge kp20a ms-1">{% bs_icon 'check2-circle' %} No Settlement → CFA</span>
+          {% elif code|upper == 'KP-20B' %}
+            <span class="badge rounded-pill hint-badge kp20b ms-1">{% bs_icon 'person-x' %} Repeated No-Show → CFA</span>
+          {% elif code|upper == 'KP-21' %}
+            <span class="badge rounded-pill hint-badge kp21 ms-1">{% bs_icon 'ban' %} Bar Action (Compl.)</span>
+          {% elif code|upper == 'KP-22' %}
+            <span class="badge rounded-pill hint-badge kp22 ms-1">{% bs_icon 'ban' %} Bar Counterclaim (Resp.)</span>
+          {% elif code|upper == 'KP-23' %}
+            <span class="badge rounded-pill hint-badge kp23 ms-1">{% bs_icon 'gavel' %} Execution (Non-Compliance)</span>
+          {% elif code|upper == 'KP-24' %}
+            <span class="badge rounded-pill hint-badge kp24 ms-1">{% bs_icon 'calendar-event' %} Hearing on Execution</span>
+          {% elif code|upper == 'KP-25' %}
+            <span class="badge rounded-pill hint-badge kp25 ms-1">{% bs_icon 'bell' %} Notice of Execution</span>
           {% endif %}
         </div>
         <div class="form-action">

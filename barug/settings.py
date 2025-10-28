@@ -138,6 +138,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "authentication.context_processors.auth_context",
                 "lupon_mem.context_processors.lupon_badge_counts",
+                "clerk.context_processors.app_badge_counts",
             ],
         },
     },
@@ -177,7 +178,7 @@ DATABASES = {
         # "OPTIONS": {"sslmode": "require"},  # <-- add this for Supabase
         "OPTIONS": {
             "sslmode": "require",
-            "connect_timeout": 20,     # fail fast instead of hanging
+            "connect_timeout": 100,     # fail fast instead of hanging
             "options": "-c statement_timeout=5000"  # 5s cap per statement (protects slow queries)
         },  # <-- add this for Supabase
         "CONN_MAX_AGE": 120,

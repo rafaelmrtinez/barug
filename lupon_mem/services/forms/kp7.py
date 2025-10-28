@@ -1,17 +1,29 @@
+# lupon_mem/services/forms/kp7.py
+from __future__ import annotations
+from typing import Dict, Set
 from datetime import datetime, date
+import logging
+import re
+from zoneinfo import ZoneInfo  # For PH time
+
 from .. import form_shared as FS
 
-# Exact KP-7 field names expected in the PDF
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------
+# KP-7: Complaint Form
+# ---------------------------------------------------------------
+
 _KP7_FIELDS = [
     "complainants", "respondents", "case_num", "purpose",
     "complaint_details", "solutions_seeked",
     "date_created", "month_created", "year_received",
+    "case_time_filed",                 # ← ensure present
     "complainants_2",
     "date_received", "month_received", "year_received_2",
     "punong_barangay",
 ]
 
-# Accepted sources to fill each KP-7 target
 _KP7_SOURCES = {
     "complainants":      {"complainants", "complainant(s)", "complainant_name", "complainants_2"},
     "respondents":       {"respondents", "respondent(s)", "respondent_name", "respondents_2"},
@@ -22,6 +34,7 @@ _KP7_SOURCES = {
     "date_created":      {"date_created", "date_signed"},
     "month_created":     {"month_created"},
     "year_received":     {"year_received", "year_created"},
+    "case_time_filed":   {"case_time_filed", "time_filed"},
     "complainants_2":    {"complainants_2", "complainants"},
     "date_received":     {"date_received"},
     "month_received":    {"month_received"},
@@ -29,24 +42,29 @@ _KP7_SOURCES = {
     "punong_barangay":   {"punong_barangay", "brgy_capt", "brgy_captain", "chairman"},
 }
 
+
 class KP7Handler:
     """
-    KP-7: custom date logic + default Punong Barangay + Complaint Details WHAT/WHEN/WHERE.
+    KP-7: Complaint Form
+    Auto-fills current PH date/time, default Punong Barangay,
+    and constructs the WHAT/WHEN/WHERE complaint details.
     """
+
     def build_name_value_map(self, form_id: int, submission_id: int) -> dict:
         assert int(form_id) == 7
-
         answers_by_id = FS.load_answers(submission_id)
 
-        # Fetch labels & codes to lookup by either
+        # ---------------------------------------------------
+        # Lookup field definitions
+        # ---------------------------------------------------
         with FS.connection.cursor() as cur:
             cur.execute("""
                 SELECT f.field_id,
                        LOWER(COALESCE(kff.label_override, f.base_label)) AS label,
                        LOWER(f.field_code)
-                FROM kp_form_field kff
-                JOIN kp_field f ON f.field_id = kff.field_id
-                WHERE kff.form_id=%s
+                  FROM kp_form_field kff
+                  JOIN kp_field f ON f.field_id = kff.field_id
+                 WHERE kff.form_id=%s
             """, [form_id])
             rows = cur.fetchall()
 
@@ -61,7 +79,7 @@ class KP7Handler:
                 if field_code:
                     by_code[field_code.strip().lower()] = val
 
-        def _find_any(keys: set[str]) -> str:
+        def _find_any(keys: Set[str]) -> str:
             for k in keys:
                 k = k.strip().lower()
                 if k in by_label:
@@ -70,17 +88,27 @@ class KP7Handler:
                     return FS.normalize(by_code[k])
             return ""
 
-        out = {}
+        out: Dict[str, str] = {}
         for target, sources in _KP7_SOURCES.items():
             out[target] = _find_any(sources)
 
+        # ---------------------------------------------------
         # Propagate duplicates
+        # ---------------------------------------------------
         if not out.get("complainants_2") and out.get("complainants"):
             out["complainants_2"] = out["complainants"]
         if not out.get("year_received_2") and out.get("year_received"):
             out["year_received_2"] = out["year_received"]
 
-        # --------- Date helpers & rules ---------
+        # ---------------------------------------------------
+        # Date/time preparation
+        # ---------------------------------------------------
+        now_ph = datetime.now(ZoneInfo("Asia/Manila"))
+        today = now_ph.date()
+        t_day, t_month, t_year = f"{today.day:02d}", today.strftime("%B"), str(today.year)
+        t_time = now_ph.strftime("%I:%M %p")  # 12-hour, e.g. "03:41 PM"
+
+        # date parsing helper
         def _parts_from_value(v: str):
             v = (v or "").strip()
             if not v:
@@ -106,33 +134,20 @@ class KP7Handler:
                 return (f"{int(v):02d}", "", "")
             return ("", v, "")
 
-        def _full_date_string(day: str, month_name: str, year: str) -> str:
-            if month_name and day and year:
-                return f"{month_name} {day}, {year}"
-            if month_name and year:
-                return f"{month_name} {year}"
-            if month_name and day:
-                return f"{month_name} {day}"
-            return (month_name or day or year or "").strip()
-
-        today = date.today()
-        t_day, t_month, t_year = f"{today.day:02d}", today.strftime("%B"), str(today.year)
-
-        # "Made this" inputs
+        # made / received date derivation
         dd1, mo1, yr1 = _parts_from_value(out.get("date_created"))
         dd2, mo2, yr2 = _parts_from_value(out.get("month_created"))
         dd3, mo3, yr3 = _parts_from_value(out.get("year_received"))
-        made_day   = dd1 or dd2 or dd3
+        made_day = dd1 or dd2 or dd3
         made_month = mo1 or mo2 or mo3
-        made_year  = yr1 or yr2 or yr3
+        made_year = yr1 or yr2 or yr3
 
-        # "Received & filed" inputs
         rd1, rm1, ry1 = _parts_from_value(out.get("date_received"))
         rd2, rm2, ry2 = _parts_from_value(out.get("month_received"))
         rd3, rm3, ry3 = _parts_from_value(out.get("year_received_2"))
-        recv_day   = rd1 or rd2 or rd3
+        recv_day = rd1 or rd2 or rd3
         recv_month = rm1 or rm2 or rm3
-        recv_year  = ry1 or ry2 or ry3
+        recv_year = ry1 or ry2 or ry3
 
         made_any = any([made_day, made_month, made_year])
         recv_any = any([recv_day, recv_month, recv_year])
@@ -145,24 +160,41 @@ class KP7Handler:
             made_day, made_month, made_year = t_day, t_month, t_year
             recv_day, recv_month, recv_year = t_day, t_month, t_year
 
-        # IMPORTANT mapping for the PDF phrasing:
-        out["date_created"]   = made_month or t_month
-        out["month_created"]  = made_day   or t_day
-        out["year_received"]  = made_year  or t_year
+        out["date_created"] = made_month or t_month
+        out["month_created"] = made_day or t_day
+        out["year_received"] = made_year or t_year
+        out["date_received"] = recv_month or out["date_created"]
+        out["month_received"] = recv_day or out["month_created"]
+        out["year_received_2"] = recv_year or out["year_received"]
 
-        out["date_received"]   = recv_month or out["date_created"]
-        out["month_received"]  = recv_day   or out["month_created"]
-        out["year_received_2"] = recv_year  or out["year_received"]
+        # ---------------------------------------------------
+        # Auto-fill current time
+        # ---------------------------------------------------
+        if not out.get("case_time_filed"):
+            out["case_time_filed"] = t_time
 
-        # Default Punong Barangay / Brgy Captain
+        # ---------------------------------------------------
+        # Default Punong Barangay
+        # ---------------------------------------------------
         if not (out.get("punong_barangay") or "").strip():
             out["punong_barangay"] = "Lourdes Ramirez"
 
-        # --------- Complaint Details: WHAT / WHEN / WHERE ----------
-        # WHAT:
-        base_text = (out.get("complaint_details") or "").strip()
+        # ---------------------------------------------------
+        # Complaint Details (WHAT/WHEN/WHERE) — idempotent
+        # ---------------------------------------------------
+        def _strip_www(s: str) -> str:
+            """Remove any existing WHAT/WHEN/WHERE lines so rebuild is idempotent."""
+            if not s:
+                return ""
+            # Drop leading 'WHAT:' on the first line
+            s = re.sub(r'(?im)^\s*WHAT\s*:\s*', '', s, count=1)
+            # Remove any lines that start with WHEN: or WHERE:
+            lines = [ln for ln in s.splitlines() if not re.match(r'^\s*(WHEN|WHERE)\s*:', ln, re.I)]
+            return FS.sanitize_text("\n".join(lines).strip())
 
-        # WHEN: prefer incident_date; else constructed "Date Created"
+        # Start from a raw WHAT body (no previous labels)
+        raw_what = _strip_www(out.get("complaint_details", "").strip())
+
         incident_val = ""
         if "incident date" in by_label:
             incident_val = FS.normalize(by_label["incident date"])
@@ -171,11 +203,10 @@ class KP7Handler:
 
         if incident_val:
             idd, imo, iyr = _parts_from_value(incident_val)
-            when_text = _full_date_string(idd, imo, iyr) or incident_val
+            when_text = f"{imo} {idd}, {iyr}".strip().replace(" ,", ",")
         else:
-            when_text = _full_date_string(made_day, made_month, made_year)
+            when_text = f"{made_month} {made_day}, {made_year}".strip().replace(" ,", ",")
 
-        # WHERE: 1) answers/prefill 2) DB fallback (submission → case → report → address)
         where_text = ""
         if "incident location" in by_label:
             where_text = FS.normalize(by_label["incident location"])
@@ -184,67 +215,65 @@ class KP7Handler:
 
         if not where_text:
             with FS.connection.cursor() as cur2:
-                # get case id from submission
                 cur2.execute("""
-                    SELECT s.blotter_case_id
-                    FROM blotter_kp_submission s
-                    WHERE s.submission_id = %s
+                    SELECT bc.incident_location, br.incident_address_id
+                      FROM blotter_case bc
+                      LEFT JOIN blotter_report br
+                        ON br.blotter_report_id = bc.blotter_report_id
+                      JOIN blotter_kp_submission s
+                        ON s.blotter_case_id = bc.blotter_case_id
+                     WHERE s.submission_id = %s
                 """, [submission_id])
-                row_case = cur2.fetchone()
-                if row_case:
-                    case_id = row_case[0]
-                    # get incident_location and linked report
-                    cur2.execute("""
-                        SELECT bc.incident_location, bc.blotter_report_id
-                        FROM blotter_case bc
-                        WHERE bc.blotter_case_id = %s
-                    """, [case_id])
-                    row_bc = cur2.fetchone()
-                    if row_bc:
-                        bc_loc, rpt_id = (row_bc[0] or ""), row_bc[1]
-                        if bc_loc.strip():
-                            where_text = bc_loc.strip()
-                        elif rpt_id:
-                            # incident_address_id from report
-                            cur2.execute("""
-                                SELECT br.incident_address_id
-                                FROM blotter_report br
-                                WHERE br.blotter_report_id = %s
-                            """, [rpt_id])
-                            row_rpt = cur2.fetchone()
-                            addr_id = row_rpt[0] if row_rpt else None
-                            if addr_id:
-                                # addresss + purok_sitio to human-readable string
-                                cur2.execute("""
-                                    SELECT trim(
-                                        concat_ws(', ',
-                                            NULLIF(ps.purok_sitio_name,''),
-                                            NULLIF(a.street,''),
-                                            CASE WHEN a.barangay IS NOT NULL AND a.barangay <> '' THEN 'Brgy. '||a.barangay ELSE NULL END,
-                                            NULLIF(a.city,'')
-                                        )
-                                    ) AS full_addr
-                                    FROM addresss a
-                                    LEFT JOIN purok_sitio ps ON ps.purok_sitio_id = a.purok_sitio_id
-                                    WHERE a.address_id = %s
-                                """, [addr_id])
-                                row_addr = cur2.fetchone()
-                                if row_addr and row_addr[0]:
-                                    where_text = row_addr[0].strip()
+                row = cur2.fetchone()
+                if row:
+                    bc_loc, addr_id = row
+                    if bc_loc:
+                        where_text = bc_loc
+                    elif addr_id:
+                        cur2.execute("""
+                            SELECT trim(
+                                concat_ws(', ',
+                                    NULLIF(ps.purok_sitio_name, ''),
+                                    NULLIF(a.street, ''),
+                                    CASE WHEN a.barangay IS NOT NULL AND a.barangay <> ''
+                                         THEN 'Brgy. ' || a.barangay ELSE NULL END,
+                                    NULLIF(a.city, '')
+                                )
+                            )
+                              FROM addresss a
+                              LEFT JOIN purok_sitio ps
+                                ON ps.purok_sitio_id = a.purok_sitio_id
+                             WHERE a.address_id = %s
+                        """, [addr_id])
+                        addr_row = cur2.fetchone()
+                        if addr_row and addr_row[0]:
+                            where_text = addr_row[0]
 
         parts = []
-        parts.append(f"WHAT: {base_text}" if base_text else "WHAT:")
+        parts.append(f"WHAT: {raw_what}" if raw_what else "WHAT:")
         if when_text:
             parts.append(f"WHEN: {when_text}")
         parts.append(f"WHERE: {where_text}" if where_text else "WHERE:")
 
-        out["complaint_details"] = "\n".join(parts).strip()
+        new_details = "\n".join(parts).strip()
 
-        # Final sanitize & ensure all fields present
+        # Only write back if different to avoid churn on repeated runs
+        if FS.sanitize_text(out.get("complaint_details", "")) != new_details:
+            out["complaint_details"] = new_details
+
+        # ---------------------------------------------------
+        # Sanitize + ensure all fields exist
+        # ---------------------------------------------------
         for k, v in list(out.items()):
             if isinstance(v, str):
                 out[k] = FS.sanitize_text(v)
         for k in _KP7_FIELDS:
             out.setdefault(k, "")
+
+        # ---------------------------------------------------
+        # Save all computed answers into DB
+        # ---------------------------------------------------
+        FS.save_answers(submission_id, out)
+        logger.info("[KP7] Auto-filled & saved case_time_filed=%s (submission=%s)", out.get("case_time_filed"), submission_id)
 
         return out

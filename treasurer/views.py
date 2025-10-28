@@ -8,7 +8,7 @@ import re
 
 from django.conf import settings
 from django.contrib import messages
-from django.http import HttpRequest
+from django.http import HttpRequest, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils.html import escape
 from django.views.decorators.http import require_GET, require_POST
@@ -33,19 +33,18 @@ from .services.fees_service import (
 )
 from .utils.ui import STATUS_UI, ACTION_LABELS, titleize
 
+# >>> NEW: import extracted helpers (behavior unchanged)
+from .utils.helpers import (
+    _staff_id,
+    _fmt_occured_at,
+    _resolve_actor_name,
+    _extract_payment_method_label,
+    build_page_numbers,
+    split_name_main_sub,
+)
 
 TREASURER_ROLE = "Barangay Treasurer"
 PH_TZ = ZoneInfo("Asia/Manila")
-
-
-def _staff_id(request: HttpRequest) -> int | None:
-    """Prefer the staff_id we stash in session; fallback to request.profile."""
-    auth = request.session.get("auth") or {}
-    sid = auth.get("staff_id")
-    if sid:
-        return sid
-    prof = getattr(request, "profile", None) or getattr(request, "person_profile", None)
-    return getattr(prof, "staff_id", None)
 
 
 # ========= DASHBOARD =========
@@ -67,9 +66,6 @@ def dashboard(request: HttpRequest):
         "dashboard_json": dash,
     })
 
-
-from django.http import JsonResponse
-from django.views.decorators.http import require_GET
 
 @session_login_required
 @role_required(TREASURER_ROLE)
@@ -109,54 +105,6 @@ def queue(request: HttpRequest):
         "statuses": statuses,
         "status_options": status_options,
     })
-
-
-def _fmt_occured_at(val) -> str:
-    """Accepts a datetime or ISO string, returns a Manila-local formatted string."""
-    if not val:
-        return "—"
-    dt = None
-    if isinstance(val, datetime):
-        dt = val
-    elif isinstance(val, str):
-        dt = parse_datetime(val)
-    if not dt:
-        return str(val)
-    if timezone.is_naive(dt):
-        dt = timezone.make_aware(dt, timezone.utc)
-    dt_local = timezone.localtime(dt, PH_TZ)
-    return dt_local.strftime("%b %d, %Y • %I:%M %p")
-
-
-def _resolve_actor_name(ev: dict, header: dict) -> str:
-    """Return a friendly actor name for a timeline event."""
-    for k in ("staff_name", "resident_name"):
-        v = (ev.get(k) or "").strip()
-        if v:
-            return v
-    actor = (ev.get("actor") or "").strip()
-    if actor:
-        if actor.isdigit() and header.get("requester_full_name"):
-            return header["requester_full_name"]
-        return actor
-    ut = (ev.get("user_type_name") or "").strip().upper()
-    if ut == "PERSON" and header.get("requester_full_name"):
-        return header["requester_full_name"]
-    return "SYSTEM"
-
-
-def _extract_payment_method_label(payments: dict, timeline: List[dict]) -> str | None:
-    # Try payments bundle first (common names: latest_method_name / latest_payment_method)
-    for k in ("latest_method_name", "latest_payment_method", "latest_method", "method_name"):
-        v = (payments or {}).get(k)
-        if v:
-            return str(v)
-    # Otherwise scan timeline for last event carrying details.payment_method
-    for e in reversed(timeline or []):
-        d = e.get("details") or {}
-        if d.get("payment_method"):
-            return str(d["payment_method"])
-    return None
 
 
 # ========= DETAIL =========
@@ -350,14 +298,7 @@ def fees(request: HttpRequest):
     filtered = [r for r in items_all if passes_filters(r)]
 
     for r in filtered:
-        name = (r.get("name") or "").strip()
-        main, sub = name, None
-        for sep in [" – ", " — ", " - "]:
-            if sep in name:
-                parts = [p.strip() for p in name.split(sep, 1)]
-                if len(parts) == 2:
-                    main, sub = parts[0], parts[1]
-                break
+        main, sub = split_name_main_sub(r.get("name") or "")
         r["name_main"] = main
         r["name_sub"] = sub
 
@@ -374,23 +315,6 @@ def fees(request: HttpRequest):
         page_obj = paginator.page(page)
     except EmptyPage:
         page_obj = paginator.page(1)
-
-    def build_page_numbers(curr: int, total: int, radius: int = 2):
-        if total <= 1:
-            return [1]
-        nums = []
-        left = max(1, curr - radius)
-        right = min(total, curr + radius)
-        if left > 1:
-            nums.append(1)
-            if left > 2:
-                nums.append(None)
-        nums.extend(range(left, right + 1))
-        if right < total:
-            if right < total - 1:
-                nums.append(None)
-            nums.append(total)
-        return nums
 
     page_numbers = build_page_numbers(page_obj.number, paginator.num_pages)
     history = recent_fee_changes(limit=11)
@@ -537,9 +461,277 @@ def fee_add(request: HttpRequest):
     return redirect(f"{settings.FORCE_SCRIPT_NAME or ''}/treasurer/fees/?q={fee_code}")
 
 
+
+
+# ========= FEES (split add screens) =========
+from django.views.decorators.http import require_GET, require_POST
+
+
+@session_login_required
+@role_required(TREASURER_ROLE)
+def fee_add_existing(request: HttpRequest):
+    """
+    Add a fee using an EXISTING document type.
+    If ?doc_type=... is present, lock the dropdown and show a readonly field.
+    Renders: fee_purpose.html
+    """
+    doc_types = list_document_types()
+
+    # NEW: read suggested doc type from querystring (when coming from fees.html)
+    preselected = (request.GET.get("doc_type") or "").strip() or None
+
+    if request.method != "POST":
+        return render(
+            request,
+            "treasurer/fee_purpose.html",
+            {
+                "doc_types": doc_types,
+                "preselected_doc_type": preselected,  # <-- tells template to disable dropdown
+            },
+        )
+
+    staff_id = _staff_id(request) or 0
+    if staff_id <= 0:
+        messages.error(request, "Staff session is required.")
+        return redirect("treasurer:fee_add_existing")
+
+    # Existing doc type (required here; comes from dropdown OR hidden input when preselected)
+    doc_type_name = (request.POST.get("doc_type_name") or "").strip()
+
+    fee_code = (request.POST.get("fee_code") or "").strip()
+    fee_name = (request.POST.get("fee_name") or "").strip()
+    unit = "per_doc"  # fixed
+
+    try:
+        current_amount = float(Decimal(request.POST.get("current_amount") or "0"))
+    except Exception:
+        current_amount = -1
+
+    purpose_code  = (request.POST.get("purpose_code") or "").strip() or None
+    purpose_label = (request.POST.get("purpose_label") or "").strip() or None
+    default_offense_no_raw = (request.POST.get("default_offense_no") or "").strip()
+    default_offense_no = int(default_offense_no_raw) if default_offense_no_raw.isdigit() else None
+
+    try:
+        default_details = json.loads(request.POST.get("default_details") or "{}")
+        if not isinstance(default_details, dict):
+            default_details = {}
+    except Exception:
+        default_details = {}
+
+    ex_senior  = bool(request.POST.get("ex_senior"))
+    ex_pwd     = bool(request.POST.get("ex_pwd"))
+    ex_student = bool(request.POST.get("ex_student"))
+    is_active  = bool(request.POST.get("is_active")) if request.POST.get("is_active") is not None else True
+    reason     = (request.POST.get("reason") or "Initial create").strip() or "Initial create"
+
+    if not doc_type_name or not fee_code or not fee_name or current_amount is None or current_amount < 0:
+        messages.error(request, "Please fill Document Type, Fee Code/Name, and a valid Current Amount.")
+        return redirect("treasurer:fee_add_existing" + (f"?doc_type={doc_type_name}" if doc_type_name else ""))
+
+    payload = {
+        "p_doc_type_name": doc_type_name,
+        "p_fee_code": fee_code,
+        "p_fee_name": fee_name,
+        "p_current_amount": current_amount,
+        "p_unit": unit,
+        "p_max_amount": None,
+        "p_exempt_ftj": False,
+        "p_exempt_senior": ex_senior,
+        "p_exempt_pwd": ex_pwd,
+        "p_exempt_indigent": False,
+        "p_exempt_student": ex_student,
+        "p_is_active": is_active,
+        "p_purpose_code": purpose_code,
+        "p_purpose_label": purpose_label,
+        "p_default_details": default_details,
+        "p_default_offense_no": default_offense_no,
+        "p_surcharges": None,
+        "p_changed_by_staff_id": staff_id,
+        "p_reason": reason,
+    }
+
+    try:
+        add_fee(payload)
+    except Exception as e:
+        messages.error(request, f"Add fee failed: {escape(str(getattr(e, 'message', e)))}")
+        # keep the context when we bounce back
+        return redirect("treasurer:fee_add_existing" + (f"?doc_type={doc_type_name}" if doc_type_name else ""))
+
+    messages.success(request, f"Saved: {fee_code} – {fee_name} (Type: {doc_type_name}, Amount ₱{current_amount:,.2f}).")
+    return redirect(f"{settings.FORCE_SCRIPT_NAME or ''}/treasurer/fees/?q={fee_code}")
+
+
+@session_login_required
+@role_required(TREASURER_ROLE)
+def fee_add_new(request: HttpRequest):
+    """
+    Add a fee WITH a NEW document type (exactly like old combined view when switch ON).
+    Renders: fee_add.html
+    """
+    doc_types = list_document_types()  # just for reference/help if needed
+
+    if request.method != "POST":
+        return render(request, "treasurer/fee_add.html", {"doc_types": doc_types})
+
+    staff_id = _staff_id(request) or 0
+    if staff_id <= 0:
+        messages.error(request, "Staff session is required.")
+        return redirect("treasurer:fee_add_new")
+
+    # New doc type (required here)
+    doc_type_name_new = (request.POST.get("doc_type_name_new") or "").strip()
+
+    fee_code = (request.POST.get("fee_code") or "").strip()
+    fee_name = (request.POST.get("fee_name") or "").strip()
+    unit = "per_doc"  # fixed
+
+    try:
+        current_amount = float(Decimal(request.POST.get("current_amount") or "0"))
+    except Exception:
+        current_amount = -1
+
+    # PURPOSE (single)
+    purpose_code  = (request.POST.get("purpose_code") or "").strip() or None
+    purpose_label = (request.POST.get("purpose_label") or "").strip() or None
+    default_offense_no_raw = (request.POST.get("default_offense_no") or "").strip()
+    default_offense_no = int(default_offense_no_raw) if default_offense_no_raw.isdigit() else None
+
+    try:
+        default_details = json.loads(request.POST.get("default_details") or "{}")
+        if not isinstance(default_details, dict):
+            default_details = {}
+    except Exception:
+        default_details = {}
+
+    ex_senior  = bool(request.POST.get("ex_senior"))
+    ex_pwd     = bool(request.POST.get("ex_pwd"))
+    ex_student = bool(request.POST.get("ex_student"))
+    is_active  = bool(request.POST.get("is_active")) if request.POST.get("is_active") is not None else True
+    reason     = (request.POST.get("reason") or "Initial create").strip() or "Initial create"
+
+    if not doc_type_name_new or not fee_code or not fee_name or current_amount is None or current_amount < 0:
+        messages.error(request, "Please fill New Document Type, Fee Code/Name, and a valid Current Amount.")
+        return redirect("treasurer:fee_add_new")
+
+    payload = {
+        "p_doc_type_name": doc_type_name_new,
+        "p_fee_code": fee_code,
+        "p_fee_name": fee_name,
+        "p_current_amount": current_amount,
+        "p_unit": unit,
+        "p_max_amount": None,
+        "p_exempt_ftj": False,
+        "p_exempt_senior": ex_senior,
+        "p_exempt_pwd": ex_pwd,
+        "p_exempt_indigent": False,
+        "p_exempt_student": ex_student,
+        "p_is_active": is_active,
+        # purpose fields
+        "p_purpose_code": purpose_code,
+        "p_purpose_label": purpose_label,
+        "p_default_details": default_details,
+        "p_default_offense_no": default_offense_no,
+        "p_surcharges": None,
+        "p_changed_by_staff_id": staff_id,
+        "p_reason": reason,
+    }
+
+    try:
+        add_fee(payload)
+    except Exception as e:
+        messages.error(request, f"Add fee failed: {escape(str(getattr(e, 'message', e)))}")
+        return redirect("treasurer:fee_add_new")
+
+    messages.success(request, f"Saved: {fee_code} – {fee_name} (NEW Type: {doc_type_name_new}, Amount ₱{current_amount:,.2f}).")
+    return redirect(f"{settings.FORCE_SCRIPT_NAME or ''}/treasurer/fees/?q={fee_code}")
+
+
+@session_login_required
+@role_required(TREASURER_ROLE)
+def fee_add_new(request: HttpRequest):
+    """
+    Add a fee WITH a NEW document type (no switch; always new).
+    Renders: fee_add.html
+    """
+    # We still pull doc_types in case you want hints or client-side checks later.
+    doc_types = list_document_types()
+
+    if request.method != "POST":
+        return render(request, "treasurer/fee_add.html", {
+            "doc_types": doc_types,
+        })
+
+    staff_id = _staff_id(request) or 0
+    if staff_id <= 0:
+        messages.error(request, "Staff session is required.")
+        return redirect("treasurer:fee_add_new")
+
+    # Always NEW doc type on this screen
+    doc_type_name_new = (request.POST.get("doc_type_name_new") or "").strip()
+
+    fee_code = (request.POST.get("fee_code") or "").strip()
+    fee_name = (request.POST.get("fee_name") or "").strip()
+
+    # unit fixed to per_doc (hidden in template)
+    unit = "per_doc"
+
+    # amounts / flags
+    try:
+        current_amount = float(Decimal(request.POST.get("current_amount") or "0"))
+    except Exception:
+        current_amount = -1
+
+    ex_senior  = bool(request.POST.get("ex_senior"))
+    ex_pwd     = bool(request.POST.get("ex_pwd"))
+    ex_student = bool(request.POST.get("ex_student"))
+    is_active  = True if request.POST.get("is_active") is not None else False
+
+    reason = (request.POST.get("reason") or "Initial create").strip() or "Initial create"
+
+    if not doc_type_name_new or not fee_code or not fee_name or current_amount is None or current_amount < 0:
+        messages.error(request, "Please fill New Document Type, Fee Code/Name, and a valid Current Amount.")
+        return redirect("treasurer:fee_add_new")
+
+    payload = {
+        "p_doc_type_name": doc_type_name_new,
+        "p_fee_code": fee_code,
+        "p_fee_name": fee_name,
+        "p_current_amount": current_amount,
+        "p_unit": unit,
+        "p_max_amount": None,
+        "p_exempt_ftj": False,           # not exposed in the split pages
+        "p_exempt_senior": ex_senior,
+        "p_exempt_pwd": ex_pwd,
+        "p_exempt_indigent": False,      # not exposed in the split pages
+        "p_exempt_student": ex_student,
+        "p_is_active": is_active,
+        "p_purpose_code": None,
+        "p_purpose_label": None,
+        "p_default_details": {},
+        "p_default_offense_no": None,
+        "p_surcharges": None,            # not exposed in the split pages
+        "p_changed_by_staff_id": staff_id,
+        "p_reason": reason,
+    }
+
+    try:
+        add_fee(payload)
+    except Exception as e:
+        messages.error(request, f"Add fee failed: {escape(str(getattr(e, 'message', e)))}")
+        return redirect("treasurer:fee_add_new")
+
+    messages.success(request, f"Saved: {fee_code} – {fee_name} (NEW Type: {doc_type_name_new}, Amount ₱{current_amount:,.2f}).")
+    return redirect(f"{settings.FORCE_SCRIPT_NAME or ''}/treasurer/fees/?q={fee_code}")
+
+
+# at the imports top (already have _fmt_occured_at)
+from .services.fees_service import get_fee_timeline
+
 @session_login_required
 @role_required(TREASURER_ROLE)
 def fee_edit(request: HttpRequest, fee_code: str):
+    # Load fee + related info
     try:
         data = fetch_fee_full(fee_code)
     except Exception as e:
@@ -553,7 +745,45 @@ def fee_edit(request: HttpRequest, fee_code: str):
     units = ["per_doc", "per_copy", "per_event", "per_month", "per_year",
              "per_hour", "per_unit_per_day", "per_use"]
 
+    # ===== GET: render form + timeline =====
     if request.method != "POST":
+        # Build timeline (pre-format for template)
+        timeline = []
+        try:
+            tl = get_fee_timeline(fee_code) or []
+            for e in tl:
+                occ = e.get("occurred_at")
+                raw_event = (e.get("event") or "LOG").upper()
+                # normalize + preformat
+                d = e.get("details") or {}
+                if isinstance(d, str):
+                    try:
+                        d = json.loads(d) or {}
+                    except Exception:
+                        d = {}
+
+                item = {
+                    **e,
+                    "event": raw_event,
+                    "event_display": raw_event.replace("_", " "),  # <- Option A: preformatted for template
+                    "occur_fmt": _fmt_occured_at(occ),
+                    "details": d,
+                    "summary": None,
+                }
+
+                # nice summary for amount changes
+                if raw_event == "FEE_UPDATED" and ("old_amount" in d or "new_amount" in d):
+                    oldv = d.get("old_amount")
+                    newv = d.get("new_amount")
+                    try:
+                        item["summary"] = f"Amount changed: ₱{(oldv or 0):,.2f} → ₱{(newv or 0):,.2f}"
+                    except Exception:
+                        item["summary"] = "Amount changed."
+
+                timeline.append(item)
+        except Exception:
+            timeline = []
+
         return render(request, "treasurer/fee_edit.html", {
             "fee_code": fee_code,
             "fee": fee,
@@ -561,31 +791,56 @@ def fee_edit(request: HttpRequest, fee_code: str):
             "surcharges": surcharges,
             "doc_types": doc_types,
             "units": units,
+            "fee_timeline": timeline,   # <- for Change History panel
         })
 
+    # ===== POST: save changes =====
     staff_id = _staff_id(request) or 0
     if staff_id <= 0:
         messages.error(request, "Staff session is required.")
         return redirect("treasurer:fee_edit", fee_code=fee_code)
+
+    # helpers
+    def _as_bool(name: str) -> bool | None:
+        """
+        Interprets '1', 'true', 'on', 'yes' as True, '0' etc. as False.
+        With hidden '0' inputs plus checkbox '1', this returns True/False (not None).
+        """
+        v = request.POST.get(name)
+        if v is None:
+            return None
+        v = str(v).strip().lower()
+        return v in ("1", "true", "on", "yes")
+
+    def _as_float(name: str) -> float | None:
+        raw = (request.POST.get(name) or "").strip()
+        if raw == "":
+            return None
+        try:
+            return float(Decimal(raw))
+        except Exception:
+            return None
 
     payload: Dict[str, Any] = {
         "p_fee_code": fee_code,
         "p_changed_by_staff_id": staff_id,
         "p_new_name": (request.POST.get("fee_name") or "").strip() or None,
         "p_new_unit": (request.POST.get("unit") or "").strip() or None,
-        "p_new_current_amount": float(Decimal(request.POST.get("current_amount") or "0")) if request.POST.get("current_amount") else None,
-        "p_new_max_amount": float(Decimal(request.POST.get("max_amount") or "0")) if request.POST.get("max_amount") else None,
-        "p_exempt_ftj": True if request.POST.get("ex_ftj") else None,
-        "p_exempt_senior": True if request.POST.get("ex_senior") else None,
-        "p_exempt_pwd": True if request.POST.get("ex_pwd") else None,
-        "p_exempt_indigent": True if request.POST.get("ex_indigent") else None,
-        "p_exempt_student": True if request.POST.get("ex_student") else None,
-        "p_is_active": True if request.POST.get("is_active") else None,
+        "p_new_current_amount": _as_float("current_amount"),
+        "p_new_max_amount": _as_float("max_amount"),
+        # fixed: booleans from switches (unchecked -> "0" -> False)
+        "p_exempt_ftj": _as_bool("ex_ftj"),
+        "p_exempt_senior": _as_bool("ex_senior"),
+        "p_exempt_pwd": _as_bool("ex_pwd"),
+        "p_exempt_indigent": _as_bool("ex_indigent"),
+        "p_exempt_student": _as_bool("ex_student"),
+        "p_is_active": _as_bool("is_active"),
         "p_doc_type_name": (request.POST.get("doc_type_name") or "").strip() or None,
         "p_reason": (request.POST.get("reason") or "").strip() or None,
     }
 
-    purp_rows = []
+    # purposes (dynamic rows)
+    purp_rows: List[Dict[str, Any]] = []
     idx = 0
     while True:
         idx += 1
@@ -594,30 +849,35 @@ def fee_edit(request: HttpRequest, fee_code: str):
         dt_override = (request.POST.get(f"purp_{idx}_dtype") or "").strip()
         det = (request.POST.get(f"purp_{idx}_details") or "").strip()
         off = (request.POST.get(f"purp_{idx}_offense") or "").strip()
+
         if not pc and not lbl and not det and not off and not dt_override:
             if idx > 50:
                 break
             continue
+
         try:
             details = json.loads(det) if det else {}
             if not isinstance(details, dict):
                 details = {}
         except Exception:
             details = {}
+
         purp_rows.append({
             "request_document_type_name": dt_override or None,
             "purpose_code": pc or None,
             "purpose_label": lbl or None,
             "default_details": details,
-            "default_offense_no": int(off) if off.isdigit() else None
+            "default_offense_no": int(off) if off.isdigit() else None,
         })
+
     if purp_rows:
         payload["p_purposes"] = purp_rows
 
-    sr = []
+    # surcharges 1..3
+    sr: List[Dict[str, Any]] = []
     for k in ("1", "2", "3"):
         val = (request.POST.get(f"surcharge_{k}") or "").strip()
-        if val:
+        if val != "":
             try:
                 sr.append({"offense_no": int(k), "percent": float(Decimal(val))})
             except Exception:
@@ -625,6 +885,7 @@ def fee_edit(request: HttpRequest, fee_code: str):
     if sr:
         payload["p_surcharges"] = sr
 
+    # save
     try:
         upsert_fee(payload)
     except Exception as e:
@@ -633,6 +894,7 @@ def fee_edit(request: HttpRequest, fee_code: str):
 
     messages.success(request, f"{fee_code} saved.")
     return redirect("treasurer:fee_edit", fee_code=fee_code)
+
 
 
 # ---------- BUSINESS QUEUE ----------
@@ -895,23 +1157,6 @@ def business_renewal(request: HttpRequest):
     except EmptyPage:
         page_obj = paginator.page(1)
 
-    def build_page_numbers(curr: int, total: int, radius: int = 2):
-        if total <= 1:
-            return [1]
-        nums = []
-        left = max(1, curr - radius)
-        right = min(total, curr + radius)
-        if left > 1:
-            nums.append(1)
-            if left > 2:
-                nums.append(None)
-        nums.extend(range(left, right + 1))
-        if right < total:
-            if right < total - 1:
-                nums.append(None)
-            nums.append(total)
-        return nums
-
     page_numbers = build_page_numbers(page_obj.number, paginator.num_pages)
     period_type_all = sorted({(r.get("period_type") or "").upper() for r in rows if r.get("period_type")})
     year_all = sorted({int(r.get("period_year")) for r in rows if r.get("period_year")}, reverse=True)
@@ -1135,7 +1380,6 @@ def treasurer_complete_refund(request: HttpRequest, doc_request_id: int):
 
 
 # ========= REFUNDS LIST (payment_refund table) =========
-# ========= REFUNDS LIST (payment_refund table) =========
 @session_login_required
 @role_required(TREASURER_ROLE)
 @require_GET
@@ -1247,23 +1491,6 @@ def payment_refunds(request: HttpRequest):
     except EmptyPage:
         page_obj = paginator.page(1)
 
-    def build_page_numbers(curr: int, total: int, radius: int = 2):
-        if total <= 1:
-            return [1]
-        nums = []
-        left = max(1, curr - radius)
-        right = min(total, curr + radius)
-        if left > 1:
-            nums.append(1)
-            if left > 2:
-                nums.append(None)
-        nums.extend(range(left, right + 1))
-        if right < total:
-            if right < total - 1:
-                nums.append(None)
-            nums.append(total)
-        return nums
-
     page_numbers = build_page_numbers(page_obj.number, paginator.num_pages)
 
     status_choices = ["CREATED", "REQUESTED", "PENDING", "APPROVED", "COMPLETED", "DECLINED"]
@@ -1344,3 +1571,145 @@ def financial_report(request):
             "totals": payload["totals"],
         },
     )
+
+
+# 1) IMPORTS — extend your existing fees_service import block
+from .services.fees_service import (
+    search_fee_items, recent_fee_changes, update_fee_amount,
+    add_fee, fetch_fee_full, list_document_types, upsert_fee,
+    # NEW:
+    list_fee_document_types,
+    search_fee_items_by_doc_type_id,
+)
+
+# If you don't already have this helper here, reuse the split you imported from utils.helpers
+def _split_main_sub(name: str) -> tuple[str, str | None]:
+    name = (name or "").strip()
+    main, sub = name, None
+    for sep in [" – ", " — ", " - "]:
+        if sep in name:
+            parts = [p.strip() for p in name.split(sep, 1)]
+            if len(parts) == 2:
+                main, sub = parts[0], parts[1]
+            break
+    return main, sub
+
+
+# 2) NEW: Level-1 index (table of Document Types with counts)
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_GET
+def fees_index(request: HttpRequest):
+    q = (request.GET.get("q") or "").strip() or None
+    try:
+        per_page = int(request.GET.get("per_page", "10") or "10")
+    except Exception:
+        per_page = 10
+    if per_page not in (5, 10, 25, 50):
+        per_page = 10
+
+    # Fetch and filter by q (server-side, like your fees view)
+    types_all = list_fee_document_types() or []
+    if q:
+        q_up = q.upper()
+        types_all = [t for t in types_all
+                     if q_up in (t.get("request_document_type_name") or "").upper()]
+
+    # Paginate
+    paginator = Paginator(types_all, per_page)
+    try:
+        page = int(request.GET.get("page", "1") or "1")
+    except Exception:
+        page = 1
+    if page < 1:
+        page = 1
+    if paginator.num_pages >= 1 and page > paginator.num_pages:
+        page = paginator.num_pages
+    try:
+        page_obj = paginator.page(page)
+    except EmptyPage:
+        page_obj = paginator.page(1)
+
+    page_numbers = build_page_numbers(page_obj.number, paginator.num_pages)
+    history = recent_fee_changes(limit=6)
+
+    ctx = {
+        "q": q or "",
+        "per_page": per_page,
+        "is_paginated": paginator.num_pages > 1,
+        "paginator": paginator,
+        "page_obj": page_obj,
+        "page_numbers": page_numbers,
+        "history": history,
+    }
+    return render(request, "treasurer/fees_index.html", ctx)
+
+
+# 3) NEW: Level-2 (reuse fees.html; scoped to a single document type id)
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_GET
+def fees_by_type(request: HttpRequest, doc_type_id: int):
+    q = (request.GET.get("q") or "").strip() or None
+    try:
+        per_page = int(request.GET.get("per_page", "10") or "10")
+    except Exception:
+        per_page = 5
+    if per_page not in (5, 10, 25, 50):
+        per_page = 5
+
+    # Resolve the selected doc type name for breadcrumb
+    types = list_fee_document_types() or []
+    selected_doc_type = None
+    for t in types:
+        if int(t.get("request_document_type_id")) == int(doc_type_id):
+            selected_doc_type = t.get("request_document_type_name")
+            break
+    if not selected_doc_type:
+        messages.error(request, "Unknown document type.")
+        return redirect("treasurer:fees_index")
+
+    items_all = search_fee_items_by_doc_type_id(doc_type_id, q) or []
+    for r in items_all:
+        main, sub = _split_main_sub(r.get("name") or "")
+        r["name_main"] = main
+        r["name_sub"] = sub
+
+    paginator = Paginator(items_all, per_page)
+    try:
+        page = int(request.GET.get("page", "1") or "1")
+    except Exception:
+        page = 1
+    if page < 1:
+        page = 1
+    if paginator.num_pages >= 1 and page > paginator.num_pages:
+        page = paginator.num_pages
+    try:
+        page_obj = paginator.page(page)
+    except EmptyPage:
+        page_obj = paginator.page(1)
+
+    page_numbers = build_page_numbers(page_obj.number, paginator.num_pages)
+    history = recent_fee_changes(limit=6)
+
+    ctx = {
+        "q": q or "",
+        "per_page": per_page,
+        "is_paginated": paginator.num_pages > 1,
+        "paginator": paginator,
+        "page_obj": page_obj,
+        "page_numbers": page_numbers,
+        "history": history,
+
+        # Tell fees.html we’re scoped to a type
+        "selected_doc_type_id": doc_type_id,
+        "selected_doc_type": selected_doc_type,
+
+        # Hide multi-type chips in fees.html since we're already scoped
+        "doc_types": [],
+        "fee_types": [],
+        "doc_types_all": [],
+        "fee_types_all": [],
+        "active_count": 0,
+    }
+    return render(request, "treasurer/fees.html", ctx)

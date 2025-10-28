@@ -76,3 +76,66 @@ def get_lupon_chair_name(default: str = "") -> str:
     """
     rec = _get_official_by_role_id(ROLE_LUPON_PRESIDENT)
     return rec["name"] if rec and rec.get("name") else default
+
+
+def case_has_kp16(case_id: int) -> bool:
+    """
+    Returns True if the case has at least one KP-16 (Amicable Settlement) submission.
+    We ignore voided records.
+    """
+    sql = """
+        SELECT 1
+        FROM blotter_kp_submission s
+        JOIN kp_form f ON f.form_id = s.form_id
+        WHERE f.form_code = 'KP-16'
+          AND s.blotter_case_id = %s
+          AND COALESCE(s.is_void, FALSE) = FALSE
+        ORDER BY s.submitted_at DESC
+        LIMIT 1
+    """
+    with connection.cursor() as cur:
+        cur.execute(sql, [case_id])
+        return cur.fetchone() is not None
+
+
+from datetime import time as _time
+import re
+from django.db import connection
+
+def get_case_time_filed_from_kp7(submission_id: int) -> _time | None:
+    """
+    Returns the case_time_filed (TIME) saved in KP-7 form for the same blotter_case
+    as the given submission_id.
+    If not found or unparsable, returns None.
+    """
+    with connection.cursor() as cur:
+        cur.execute("""
+            SELECT a.value_json
+              FROM blotter_kp_submission s
+              JOIN blotter_case bc ON bc.blotter_case_id = s.blotter_case_id
+              JOIN blotter_kp_submission s7 ON s7.blotter_case_id = bc.blotter_case_id
+              JOIN kp_form kf7 ON kf7.form_id = s7.form_id
+              JOIN blotter_kp_answer a ON a.submission_id = s7.submission_id
+              JOIN kp_field f ON f.field_id = a.field_id
+             WHERE s.submission_id = %s
+               AND kf7.form_code = 'KP-7'
+               AND f.field_code = 'case_time_filed'
+             LIMIT 1;
+        """, [submission_id])
+        row = cur.fetchone()
+
+    if not row or not row[0]:
+        return None
+
+    txt = str(row[0]).strip().strip('"')
+    txt = re.sub(r"\s+", " ", txt)
+    try:
+        from datetime import datetime as _dt
+        for fmt in ("%I:%M %p", "%I:%M%p", "%H:%M", "%H:%M:%S"):
+            try:
+                return _dt.strptime(txt, fmt).time()
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return None

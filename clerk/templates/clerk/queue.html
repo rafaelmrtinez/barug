@@ -8,17 +8,10 @@
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
 <link rel="stylesheet" href="{% static 'css/paginator.css' %}">
 <style>
-  /* ─────────── Brand tokens (BARUG maroon) ─────────── */
   :root{
-    --brand-900:#3a1217;
-    --brand-800:#561c24;
-    --brand-700:#6d2932;    /* primary */
-    --brand-600:#7a323b;
-    --brand-100:#f3eaeb;    /* soft bg */
-    --brand-050:#fbf6f6;    /* very soft bg */
+    --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932; --brand-600:#7a323b;
+    --brand-100:#f3eaeb; --brand-050:#fbf6f6;
   }
-
-  /* Buttons */
   .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
   .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
   .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); background:#fff; }
@@ -26,7 +19,6 @@
   .btn-brand-subtle{ background:var(--brand-100); color:var(--brand-700); border-color:var(--brand-100); }
   .btn-brand-subtle:hover{ background:var(--brand-050); color:var(--brand-700); }
 
-  /* Inputs / focus ring */
   .form-control:focus, .form-select:focus, .form-check-input:focus{
     border-color:var(--brand-700);
     box-shadow:0 0 0 .25rem rgba(109,41,50,.25);
@@ -34,14 +26,12 @@
   }
   .form-check-input:checked{ background-color:var(--brand-700); border-color:var(--brand-700); }
 
-  /* Toolbar */
   .toolbar{ background:#fff; border:1px solid var(--bs-border-color,#dee2e6);
             border-radius:1rem; padding:.75rem; gap:.5rem; }
   .searchbox{ position:relative; flex:1; }
   .searchbox .bi{ position:absolute; left:.8rem; top:50%; transform:translateY(-50%); opacity:.6; color:var(--brand-700); }
   .searchbox input{ padding-left:2.35rem !important; }
 
-  /* Active filter chips */
   .filters-bar{ gap:.5rem; }
   .filter-chip{
     display:inline-flex; align-items:center; gap:.4rem;
@@ -53,18 +43,13 @@
   .filter-chip .x{ display:inline-grid; place-items:center; width:1rem; height:1rem; border-radius:50%;
                    background:#fff; border:1px solid rgba(109,41,50,.22); line-height:1; font-weight:700; color:var(--brand-700); }
 
-  /* Table polish */
   .table thead th{ border-bottom-width:2px; }
   .table tbody tr:hover{ background:#fcfcfd; }
 
-  /* Offcanvas (opaque + on top) */
   .offcanvas.filter-offcanvas{
-    width:420px; max-width:90vw;
-    --bs-offcanvas-bg:#fff;
-    background-color:var(--bs-offcanvas-bg)!important;
-    z-index:1200;
-    box-shadow:-2px 0 24px rgba(0,0,0,.12);
-    isolation:isolate;
+    width:420px; max-width:90vw; --bs-offcanvas-bg:#fff;
+    background-color:var(--bs-offcanvas-bg)!important; z-index:1200;
+    box-shadow:-2px 0 24px rgba(0,0,0,.12); isolation:isolate;
   }
   .offcanvas.filter-offcanvas .offcanvas-header{ border-bottom:1px solid var(--bs-border-color); }
   .offcanvas-footer{ position:sticky; bottom:-1px; background:#fff; border-top:1px solid var(--bs-border-color); padding-top:1rem; margin-top:1rem; }
@@ -77,21 +62,13 @@
     <div class="row">
       <div>
 
-        <!-- Toolbar: search + filter -->
+        <!-- Toolbar -->
         <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
           <div class="searchbox">
             {% bs_icon 'search' extra_classes='bi' %}
-            <input
-              type="text"
-              class="form-control"
-              id="search"
-              name="q"
-              placeholder="Search requests"
-              value="{{ q }}"
-            />
+            <input type="text" class="form-control" id="search" name="q" placeholder="Search requests" value="{{ q }}" />
           </div>
 
-          {# preserve current filters when searching #}
           {% for s in statuses %}<input type="hidden" name="status" value="{{ s }}">{% endfor %}
           {% for dt in doc_types %}<input type="hidden" name="doc_type" value="{{ dt }}">{% endfor %}
 
@@ -100,14 +77,9 @@
           </button>
 
           <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
-                  type="button"
-                  data-bs-toggle="offcanvas"
-                  data-bs-target="#filterPanel"
-                  aria-controls="filterPanel">
+                  type="button" data-bs-toggle="offcanvas" data-bs-target="#filterPanel" aria-controls="filterPanel">
             {% bs_icon 'sliders' extra_classes='me-2' %} Filters
-            {% if active_count %}
-              <span class="badge rounded-pill text-bg-light ms-2">{{ active_count }}</span>
-            {% endif %}
+            {% if active_count %}<span class="badge rounded-pill text-bg-light ms-2">{{ active_count }}</span>{% endif %}
           </button>
         </form>
 
@@ -115,25 +87,18 @@
         <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
           {% if statuses or doc_types %}
             <span class="text-muted me-1">Active:</span>
-
-            {# Status chips #}
             {% for s in statuses %}
-              <a class="filter-chip"
-                 title="Remove {{ s|title }}"
+              <a class="filter-chip" title="Remove {{ s|title }}"
                  href="?q={{ q|urlencode }}{% for t in statuses %}{% if t != s %}&status={{ t }}{% endif %}{% endfor %}{% for d in doc_types %}&doc_type={{ d }}{% endfor %}">
-                {{ s|title }} <span class="x" aria-hidden="true">×</span>
+                {{ s|title }} <span class="x">×</span>
               </a>
             {% endfor %}
-
-            {# Document type chips #}
             {% for d in doc_types %}
-              <a class="filter-chip"
-                 title="Remove {{ d|title }}"
+              <a class="filter-chip" title="Remove {{ d|title }}"
                  href="?q={{ q|urlencode }}{% for s in statuses %}&status={{ s }}{% endfor %}{% for t in doc_types %}{% if t != d %}&doc_type={{ t }}{% endif %}{% endfor %}">
-                {{ d|title }} <span class="x" aria-hidden="true">×</span>
+                {{ d|title }} <span class="x">×</span>
               </a>
             {% endfor %}
-
             <a class="btn btn-sm btn-outline-brand ms-1" href="?q={{ q|urlencode }}">
               {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
             </a>
@@ -154,7 +119,8 @@
           </thead>
           <tbody>
             {% if page_obj.object_list %}
-              {% for r in page_obj.object_list %}
+              {# oldest first #}
+              {% for r in page_obj.object_list reversed %}
                 <tr class="table-row-height">
                   <td>
                     <div class="text-muted small">
@@ -169,7 +135,15 @@
                       {% endif %}
                     </div>
                   </td>
-                  <td>{{ r.created_fmt|default:r.created_at|default:"—" }}</td>
+                  <td>
+                    {% with raw=r.created_at|default:r.created_fmt %}
+                      {% if raw and raw != '.' %}
+                        <span class="dt-cell" data-ts="{{ raw|escape }}">{{ raw }}</span>
+                      {% else %}
+                        —
+                      {% endif %}
+                    {% endwith %}
+                  </td>
                   <td><span class="{{ r.status_ui.cls }}">{{ r.status_ui.label }}</span></td>
                   <td>
                     <a class="btn btn-outline-brand btn-sm" href="{% url 'clerk:detail' r.doc_request_id %}">
@@ -195,17 +169,11 @@
   {% endif %}
 </div>
 
-<!-- Offcanvas Filters (non-blocking, opaque) -->
-<div
-  class="offcanvas offcanvas-end filter-offcanvas"
-  id="filterPanel"
-  tabindex="-1"
-  aria-labelledby="filterPanelLabel"
-  data-bs-backdrop="false"
-  data-bs-scroll="true"
-  style="margin-top: 100;"
->
-  <div class="offcanvas-header" style="margin-top: 50;">
+<!-- Offcanvas Filters -->
+<div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
+     aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true"
+     style="margin-top: 100px;">
+  <div class="offcanvas-header" style="margin-top: 50px;">
     <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
     <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
   </div>
@@ -214,22 +182,16 @@
     <form method="get" id="filterForm">
       <input type="hidden" name="q" value="{{ q }}">
 
-      <!-- Status filter -->
       <div class="mb-4">
         <div class="form-label fw-semibold d-flex justify-content-between align-items-center">
           <span>Statuses</span>
-          <div class="small">
-            <a href="#" id="selectAllStatuses" class="me-2">Select all</a>
-            <a href="#" id="clearAllStatuses">None</a>
-          </div>
+          <div class="small"><a href="#" id="selectAllStatuses" class="me-2">Select all</a><a href="#" id="clearAllStatuses">None</a></div>
         </div>
         <div class="row row-cols-1">
           {% for s in statuses_all %}
             <div class="col mb-2">
               <div class="form-check">
-                <input class="form-check-input status-box" type="checkbox"
-                       name="status" value="{{ s }}" id="st-{{ s }}"
-                       {% if s in statuses %}checked{% endif %}>
+                <input class="form-check-input status-box" type="checkbox" name="status" value="{{ s }}" id="st-{{ s }}" {% if s in statuses %}checked{% endif %}>
                 <label class="form-check-label" for="st-{{ s }}">{{ s|title }}</label>
               </div>
             </div>
@@ -237,22 +199,16 @@
         </div>
       </div>
 
-      <!-- Document type filter -->
       <div class="mb-3">
         <div class="form-label fw-semibold d-flex justify-content-between align-items-center">
           <span>Document Types</span>
-          <div class="small">
-            <a href="#" id="selectAllDocTypes" class="me-2">Select all</a>
-            <a href="#" id="clearAllDocTypes">None</a>
-          </div>
+          <div class="small"><a href="#" id="selectAllDocTypes" class="me-2">Select all</a><a href="#" id="clearAllDocTypes">None</a></div>
         </div>
         <div class="row row-cols-1">
           {% for d in doc_types_all %}
             <div class="col mb-2">
               <div class="form-check">
-                <input class="form-check-input doc-type-box" type="checkbox"
-                       name="doc_type" value="{{ d }}" id="dt-{{ d|slugify }}"
-                       {% if d in doc_types %}checked{% endif %}>
+                <input class="form-check-input doc-type-box" type="checkbox" name="doc_type" value="{{ d }}" id="dt-{{ d|slugify }}" {% if d in doc_types %}checked{% endif %}>
                 <label class="form-check-label" for="dt-{{ d|slugify }}">{{ d|title }}</label>
               </div>
             </div>
@@ -285,7 +241,7 @@
     if (selAllS) selAllS.addEventListener('click', e => { e.preventDefault(); statusBoxes().forEach(b => b.checked = true); });
     if (clrAllS) clrAllS.addEventListener('click', e => { e.preventDefault(); statusBoxes().forEach(b => b.checked = false); });
 
-    // Document types
+    // Doc types
     const docBoxes = () => Array.from(document.querySelectorAll('.doc-type-box'));
     const selAllD = document.getElementById('selectAllDocTypes');
     const clrAllD = document.getElementById('clearAllDocTypes');
@@ -295,7 +251,34 @@
 </script>
 
 <script>
-  // Safety guard: remove any stray backdrops from old double-inits
+  // Format date cells to "Month D, YYYY • h:mm am/pm" even if value is a plain string "YYYY-MM-DD HH:mm"
+  (function () {
+    const pad = n => n.toString().padStart(2, '0');
+    const fmt = d => {
+      const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+      const h24 = d.getHours();
+      const h12 = ((h24 + 11) % 12) + 1;
+      const ampm = h24 >= 12 ? 'pm' : 'am';
+      return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} • ${h12}:${pad(d.getMinutes())} ${ampm}`;
+    };
+
+    document.querySelectorAll('.dt-cell').forEach(el => {
+      const raw = (el.getAttribute('data-ts') || '').trim();
+      if (!raw || raw === '.') { el.textContent = '—'; return; }
+
+      // Accept "YYYY-MM-DD HH:mm" or ISO. Convert if space-separated.
+      let iso = raw.includes('T') ? raw : raw.replace(' ', 'T');
+      // Avoid timezone drift; treat as local if no timezone info present.
+      // Safari-safe: add ":00" seconds if missing
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(iso)) iso += ':00';
+      const d = new Date(iso);
+
+      if (isNaN(d.getTime())) { el.textContent = raw; return; } // fallback
+      el.textContent = fmt(d);
+    });
+  })();
+
+  // Offcanvas backdrop safety
   (function () {
     const oc = document.getElementById('filterPanel');
     if (!oc) return;

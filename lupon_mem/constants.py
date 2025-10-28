@@ -1,5 +1,12 @@
 # lupon_mem/constants.py
 
+# Roles used across views and templates
+LUPON_ROLES = {"BARANGAY LUPON MEMBER", "BARANGAY LUPON PRESIDENT"}
+LUPON_ROLES_LIST = [
+    "BARANGAY LUPON MEMBER",
+    "BARANGAY LUPON PRESIDENT",
+]
+
 KP_FORMS_CATALOG = [
     # ("KP-1",   "NOTICE TO CONSTITUTE THE LUPON"),
     # ("KP-2",   "APPOINTMENT LETTER"),

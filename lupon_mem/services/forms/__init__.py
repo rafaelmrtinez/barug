@@ -17,7 +17,15 @@ from lupon_mem.services.forms.kp17 import KP17Handler
 from lupon_mem.services.forms.kp18 import KP18Handler
 from lupon_mem.services.forms.kp19 import KP19Handler
 from lupon_mem.services.forms.kp20 import KP20Handler
-# (No KP-21..KP-26 yet)
+
+# NEW: KP-20A..KP-25 handlers you added
+from lupon_mem.services.forms.kp20a import KP20AHandler
+from lupon_mem.services.forms.kp20b import KP20BHandler
+from lupon_mem.services.forms.kp21 import KP21Handler
+from lupon_mem.services.forms.kp22 import KP22Handler
+from lupon_mem.services.forms.kp23 import KP23Handler
+from lupon_mem.services.forms.kp24 import KP24Handler
+from lupon_mem.services.forms.kp25 import KP25Handler
 
 # NEW: non-KP forms you added in SQL
 from lupon_mem.services.forms.ack_receipt import AckReceiptHandler
@@ -33,25 +41,35 @@ from lupon_mem.services.forms.med2_fta_set import Med2FtaSettledHandler
 from lupon_mem.services.forms.med2_settled import Med2SettledHandler
 from lupon_mem.services.forms.med3_folder import Med3FolderHandler
 from lupon_mem.services.forms.med3_settled import Med3SettledHandler
-
+from lupon_mem.services.forms.kp9_2 import KP9_2Handler
 
 # Map form_code → handler instance
 _REGISTRY = {
     # KP (existing)
-    "KP-7":  KP7Handler(),
-    "KP-8":  KP8Handler(),
-    "KP-9":  KP9Handler(),
-    "KP-10": KP10Handler(),
-    "KP-11": KP11Handler(),
-    "KP-12": KP12Handler(),
-    "KP-13": KP13Handler(),
-    "KP-14": KP14Handler(),
-    "KP-15": KP15Handler(),
-    "KP-16": KP16Handler(),
-    "KP-17": KP17Handler(),
-    "KP-18": KP18Handler(),
-    "KP-19": KP19Handler(),
-    "KP-20": KP20Handler(),
+    "KP-7":   KP7Handler(),
+    "KP-8":   KP8Handler(),
+    "KP-9":   KP9Handler(),
+    "KP-9-P2": KP9_2Handler(),  # KP-9 Officer's Return (Page 2)
+    "KP-10":  KP10Handler(),
+    "KP-11":  KP11Handler(),
+    "KP-12":  KP12Handler(),
+    "KP-13":  KP13Handler(),
+    "KP-14":  KP14Handler(),
+    "KP-15":  KP15Handler(),
+    "KP-16":  KP16Handler(),
+    "KP-17":  KP17Handler(),
+    "KP-18":  KP18Handler(),
+    "KP-19":  KP19Handler(),
+    "KP-20":  KP20Handler(),
+
+    # KP (newly added)
+    "KP-20A": KP20AHandler(),
+    "KP-20B": KP20BHandler(),
+    "KP-21":  KP21Handler(),
+    "KP-22":  KP22Handler(),
+    "KP-23":  KP23Handler(),
+    "KP-24":  KP24Handler(),
+    "KP-25":  KP25Handler(),
 
     # Non-KP forms (new)
     "ACK-RECEIPT":   AckReceiptHandler(),

@@ -8,17 +8,7 @@
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
 <link rel="stylesheet" href="{% static 'css/paginator.css' %}">
 <style>
-  /* ─────────── Brand tokens (BARUG maroon) ─────────── */
-  :root{
-    --brand-900:#3a1217;
-    --brand-800:#561c24;
-    --brand-700:#6d2932;    /* primary */
-    --brand-600:#7a323b;
-    --brand-100:#f3eaeb;    /* soft bg */
-    --brand-050:#fbf6f6;    /* very soft bg */
-  }
-
-  /* Buttons */
+  :root{ --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932; --brand-600:#7a323b; --brand-100:#f3eaeb; --brand-050:#fbf6f6; }
   .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
   .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
   .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); background:#fff; }
@@ -26,89 +16,46 @@
   .btn-brand-subtle{ background:var(--brand-100); color:var(--brand-700); border-color:var(--brand-100); }
   .btn-brand-subtle:hover{ background:var(--brand-050); color:var(--brand-700); }
 
-  /* Inputs / focus ring */
   .form-control:focus, .form-select:focus, .form-check-input:focus{
-    border-color:var(--brand-700);
-    box-shadow:0 0 0 .25rem rgba(109,41,50,.25);
-    outline:none;
+    border-color:var(--brand-700); box-shadow:0 0 0 .25rem rgba(109,41,50,.25); outline:none;
   }
-  .form-check-input:checked{ background-color:var(--brand-700); border-color:var(--brand-700); }
 
-  /* Toolbar */
-  .toolbar{ background:#fff; border:1px solid var(--bs-border-color,#dee2e6);
-            border-radius:1rem; padding:.75rem; gap:.5rem; }
+  .toolbar{ background:#fff; border:1px solid var(--bs-border-color,#dee2e6); border-radius:1rem; padding:.75rem; gap:.5rem; }
   .searchbox{ position:relative; flex:1; min-width:280px; }
   .searchbox .bi{ position:absolute; left:.8rem; top:50%; transform:translateY(-50%); opacity:.6; color:var(--brand-700); }
-  .searchbox input{ padding-left:2.35rem !important; }
+  .searchbox input{ padding-left:2.35rem!important; }
 
-  /* Active filter chips */
   .filters-bar{ gap:.5rem; }
-  .filter-chip{
-    display:inline-flex; align-items:center; gap:.4rem;
-    padding:.3rem .65rem; border-radius:999px; font-size:.8rem;
-    text-decoration:none; border:1px solid rgba(109,41,50,.18);
-    background:var(--brand-050); color:var(--brand-700);
-  }
+  .filter-chip{ display:inline-flex; align-items:center; gap:.4rem; padding:.3rem .65rem; border-radius:999px; font-size:.8rem;
+                text-decoration:none; border:1px solid rgba(109,41,50,.18); background:var(--brand-050); color:var(--brand-700); }
   .filter-chip:hover{ background:var(--brand-100); }
-  .filter-chip .x{ display:inline-grid; place-items:center; width:1rem; height:1rem; border-radius:50%;
-                   background:#fff; border:1px solid rgba(109,41,50,.22); line-height:1; font-weight:700; color:var(--brand-700); }
+  .filter-chip .x{ display:inline-grid; place-items:center; width:1rem; height:1rem; border-radius:50%; background:#fff;
+                   border:1px solid rgba(109,41,50,.22); line-height:1; font-weight:700; color:var(--brand-700); }
 
-  /* Table polish */
-  .table thead th{ border-bottom-width:2px; white-space:nowrap; }
+  .table thead th{ border-bottom-width:2px; white-space:nowrap; font-size:.83rem; letter-spacing:.02em; text-transform:uppercase; }
   .table tbody tr:hover{ background:#fcfcfd; }
 
-  /* Case # badge */
-  .code-badge{
-    display:inline-flex; align-items:center; gap:.25rem;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-    font-size:.9rem; line-height:1; padding:.35rem .55rem; border-radius:.5rem;
-    background:#f5f2ee; border:1px solid rgba(0,0,0,.06); color:var(--brand-800);
-    white-space:nowrap; font-variant-numeric: tabular-nums;
-  }
+  .code-badge{ display:inline-flex; align-items:center; gap:.25rem; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.9rem; line-height:1;
+               padding:.35rem .55rem; border-radius:.5rem; background:#f5f2ee; border:1px solid rgba(0,0,0,.06); color:var(--brand-800); white-space:nowrap; }
   .code-badge .hash{ opacity:.7; }
   th.col-actions{ width:120px; }
 
-  /* Settlement pills */
-  .pill{
-    display:inline-flex; align-items:center; gap:.4rem;
-    font-weight:600; font-size:.78rem; line-height:1;
-    padding:.35rem .6rem; border-radius:999px; border:1px solid;
-  }
-  .pill.settled{ background:#f3fff6; color:#0a6b2d; border-color:rgba(16,135,52,.25);}
-  .pill.pending{ background:#fffaf2; color:#995a00; border-color:rgba(153,90,0,.25);}
-  .pill.unsettled{ background:#fff5f5; color:#a31212; border-color:rgba(163,18,18,.25);}
+  /* Pills */
+  .pill{ display:inline-flex; align-items:center; gap:.4rem; font-weight:700; font-size:.75rem; line-height:1;
+         padding:.32rem .55rem; border-radius:999px; border:1px solid; }
+  .pill.state-open{ background:#eef7ff; color:#0b5cab; border-color:#cfe4ff; }
+  .pill.state-pending{ background:#fffaf2; color:#995a00; border-color:#f2ddbd; }
+  .pill.state-closed{ background:#f5f7f9; color:#334155; border-color:#e5e7eb; }
+  .pill.settled{ background:#f3fff6; color:#0a6b2d; border-color:rgba(16,135,52,.25); }
+  .pill.pending{ background:#fffaf2; color:#995a00; border-color:rgba(153,90,0,.25); }
+  .pill.unsettled{ background:#fff5f5; color:#a31212; border-color:rgba(163,18,18,.25); }
   .pill.na{ background:#f6f7f9; color:#4b5563; border-color:#e5e7eb; }
 
-  /* Offcanvas (opaque + on top) */
-  .offcanvas.filter-offcanvas{
-    width:420px; max-width:90vw;
-    --bs-offcanvas-bg:#fff;
-    background-color:var(--bs-offcanvas-bg)!important;
-    z-index:1200;
-    box-shadow:-2px 0 24px rgba(0,0,0,.12);
-    isolation:isolate;
-  }
-  .offcanvas.filter-offcanvas .offcanvas-header{ border-bottom:1px solid var(--bs-border-color); }
-  .offcanvas-footer{ position:sticky; bottom:-1px; background:#fff; border-top:1px solid var(--bs-border-color); padding-top:1rem; margin-top:1rem; }
-
-  /* Themed pagination */
-  .pagination .page-link{
-    border-color: var(--brand-700);
-    color: var(--brand-700);
-    background: #fff;
-  }
-  .pagination .page-link:hover{
-    background: var(--brand-100);
-    color: var(--brand-800);
-  }
-  .pagination .page-item.active .page-link{
-    background: var(--brand-700);
-    border-color: var(--brand-700);
-    color: #fff;
-  }
-  .pagination .page-item.disabled .page-link{
-    color:#9aa0a6; border-color:#dcdcdc; background:#fafafa;
-  }
+  /* Date+Time chip */
+  .dt-chip{ display:inline-flex; flex-direction:column; align-items:flex-start; gap:.1rem;
+            padding:.35rem .55rem; border-radius:.5rem; border:1px solid #e5e7eb; background:#fff; }
+  .dt-chip .date{ font-weight:700; color:#111827; font-size:.85rem; }
+  .dt-chip .time{ font-variant-numeric: tabular-nums; color:#6b7280; font-size:.8rem; }
 </style>
 {% endblock %}
 
@@ -116,7 +63,6 @@
 <div class="page-wrap">
   <div class="container-fluid pt-3 page-main">
 
-    <!-- Header actions -->
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h4 class="mb-0">Barangay Senior Santo Niño — Blotter Cases</h4>
       <div class="d-flex gap-2">
@@ -129,24 +75,17 @@
       </div>
     </div>
 
-    <!-- Toolbar: search + filters button -->
+    <!-- Toolbar -->
     <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
       <div class="searchbox">
         {% bs_icon 'search' extra_classes='bi' %}
-        <input
-          type="text"
-          class="form-control"
-          id="search"
-          name="q"
-          placeholder="Search case no., case name, or description"
-          value="{{ q }}"
-        />
+        <input type="text" class="form-control" id="search" name="q"
+               placeholder="Search case no. or case name" value="{{ q }}" />
       </div>
 
-      {# preserve selected filter IDs #}
-      {% if type_id %}<input type="hidden" name="type_id" value="{{ type_id }}">{% endif %}
-      {% if nature_id %}<input type="hidden" name="nature_id" value="{{ nature_id }}">{% endif %}
-      {% if settlement_id %}<input type="hidden" name="settlement_id" value="{{ settlement_id }}">{% endif %}
+      {# preserve filters #}
+      {% if state %}<input type="hidden" name="state" value="{{ state }}">{% endif %}
+      {% if settlement %}<input type="hidden" name="settlement" value="{{ settlement }}">{% endif %}
       {% if filed_from %}<input type="hidden" name="filed_from" value="{{ filed_from }}">{% endif %}
       {% if filed_to %}<input type="hidden" name="filed_to" value="{{ filed_to }}">{% endif %}
       <input type="hidden" name="per_page" value="{{ per_page|default:'10' }}">
@@ -155,13 +94,10 @@
         {% bs_icon 'search' extra_classes='me-2' %} Search
       </button>
 
-      <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
-              type="button"
-              data-bs-toggle="offcanvas"
-              data-bs-target="#filterPanel"
-              aria-controls="filterPanel">
+      <button class="btn btn-brand-subtle d-flex align-items-center ms-auto" type="button"
+              data-bs-toggle="offcanvas" data-bs-target="#filterPanel" aria-controls="filterPanel">
         {% bs_icon 'sliders' extra_classes='me-2' %} Filters
-        {% if type_id or nature_id or settlement_id or filed_from or filed_to %}
+        {% if state or settlement or filed_from or filed_to %}
           <span class="badge rounded-pill text-bg-light ms-2">●</span>
         {% endif %}
       </button>
@@ -169,61 +105,29 @@
 
     <!-- Active filters -->
     <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
-      {% if type_id or nature_id or settlement_id or filed_from or filed_to %}
+      {% if state or settlement or filed_from or filed_to %}
         <span class="text-muted me-1">Active:</span>
 
-        {# Type chip #}
-        {% if type_id %}
-          {% for tid, tname in type_choices %}
-            {% if type_id == tid|stringformat:"s" %}
-              <a class="filter-chip"
-                 title="Remove {{ tname }}"
-                 href="?q={{ q|urlencode }}{% if nature_id %}&nature_id={{ nature_id }}{% endif %}{% if settlement_id %}&settlement_id={{ settlement_id }}{% endif %}{% if filed_from %}&filed_from={{ filed_from }}{% endif %}{% if filed_to %}&filed_to={{ filed_to }}{% endif %}&per_page={{ per_page }}">
-                {{ tname }} <span class="x" aria-hidden="true">×</span>
-              </a>
-            {% endif %}
-          {% endfor %}
+        {% if state %}
+          <a class="filter-chip" href="?q={{ q|urlencode }}{% if settlement %}&settlement={{ settlement|urlencode }}{% endif %}{% if filed_from %}&filed_from={{ filed_from }}{% endif %}{% if filed_to %}&filed_to={{ filed_to }}{% endif %}&per_page={{ per_page }}">
+            State: {{ state }} <span class="x">×</span>
+          </a>
         {% endif %}
 
-        {# Nature chip #}
-        {% if nature_id %}
-          {% for nid, nname in nature_choices %}
-            {% if nature_id == nid|stringformat:"s" %}
-              <a class="filter-chip"
-                 title="Remove {{ nname }}"
-                 href="?q={{ q|urlencode }}{% if type_id %}&type_id={{ type_id }}{% endif %}{% if settlement_id %}&settlement_id={{ settlement_id }}{% endif %}{% if filed_from %}&filed_from={{ filed_from }}{% endif %}{% if filed_to %}&filed_to={{ filed_to }}{% endif %}&per_page={{ per_page }}">
-                {{ nname }} <span class="x" aria-hidden="true">×</span>
-              </a>
-            {% endif %}
-          {% endfor %}
+        {% if settlement %}
+          <a class="filter-chip" href="?q={{ q|urlencode }}{% if state %}&state={{ state|urlencode }}{% endif %}{% if filed_from %}&filed_from={{ filed_from }}{% endif %}{% if filed_to %}&filed_to={{ filed_to }}{% endif %}&per_page={{ per_page }}">
+            Settlement: {{ settlement }} <span class="x">×</span>
+          </a>
         {% endif %}
 
-        {# Settlement chip #}
-        {% if settlement_id %}
-          {% for sid, sname in settlement_choices %}
-            {% if settlement_id == sid|stringformat:"s" %}
-              <a class="filter-chip"
-                 title="Remove {{ sname }}"
-                 href="?q={{ q|urlencode }}{% if type_id %}&type_id={{ type_id }}{% endif %}{% if nature_id %}&nature_id={{ nature_id }}{% endif %}{% if filed_from %}&filed_from={{ filed_from }}{% endif %}{% if filed_to %}&filed_to={{ filed_to }}{% endif %}&per_page={{ per_page }}">
-                {{ sname }} <span class="x" aria-hidden="true">×</span>
-              </a>
-            {% endif %}
-          {% endfor %}
-        {% endif %}
-
-        {# Date chips #}
         {% if filed_from %}
-          <a class="filter-chip"
-             title="Remove start date"
-             href="?q={{ q|urlencode }}{% if type_id %}&type_id={{ type_id }}{% endif %}{% if nature_id %}&nature_id={{ nature_id }}{% endif %}{% if settlement_id %}&settlement_id={{ settlement_id }}{% endif %}{% if filed_to %}&filed_to={{ filed_to }}{% endif %}&per_page={{ per_page }}">
-            From {{ filed_from }} <span class="x" aria-hidden="true">×</span>
+          <a class="filter-chip" href="?q={{ q|urlencode }}{% if state %}&state={{ state|urlencode }}{% endif %}{% if settlement %}&settlement={{ settlement|urlencode }}{% endif %}{% if filed_to %}&filed_to={{ filed_to }}{% endif %}&per_page={{ per_page }}">
+            From {{ filed_from }} <span class="x">×</span>
           </a>
         {% endif %}
         {% if filed_to %}
-          <a class="filter-chip"
-             title="Remove end date"
-             href="?q={{ q|urlencode }}{% if type_id %}&type_id={{ type_id }}{% endif %}{% if nature_id %}&nature_id={{ nature_id }}{% endif %}{% if settlement_id %}&settlement_id={{ settlement_id }}{% endif %}{% if filed_from %}&filed_from={{ filed_from }}{% endif %}&per_page={{ per_page }}">
-            To {{ filed_to }} <span class="x" aria-hidden="true">×</span>
+          <a class="filter-chip" href="?q={{ q|urlencode }}{% if state %}&state={{ state|urlencode }}{% endif %}{% if settlement %}&settlement={{ settlement|urlencode }}{% endif %}{% if filed_from %}&filed_from={{ filed_from }}{% endif %}&per_page={{ per_page }}">
+            To {{ filed_to }} <span class="x">×</span>
           </a>
         {% endif %}
 
@@ -242,25 +146,41 @@
           <tr>
             <th>Case No.</th>
             <th>Name</th>
-            <th>Date Filed</th>
-            <th>Type</th>
-            <th>Nature</th>
+            <th>Filed</th>
+            <th>Case State</th>
             <th>Settlement</th>
-            <th class="col-actions"></th>
+            <th class="col-actions">Action</th>
           </tr>
         </thead>
         <tbody>
           {% for r in rows %}
           <tr>
             <td>
-              <span class="code-badge">
-                <span class="hash">#</span>{{ r.1 }}
-              </span>
+              <span class="code-badge"><span class="hash">#</span>{{ r.1 }}</span>
             </td>
             <td class="fw-semibold">{{ r.2 }}</td>
-            <td>{{ r.3 }}</td>
-            <td>{{ r.4 }}</td>
-            <td>{{ r.5 }}</td>
+
+            <td>
+              <span class="dt-chip">
+                <span class="date">{{ r.3 }}</span>
+                <span class="time">{% bs_icon 'clock' extra_classes='me-1' %} {{ r.4 }}</span>
+              </span>
+            </td>
+
+            <td>
+              {% with r.5|default:"—" as st %}
+                {% if st|lower == "open" %}
+                  <span class="pill state-open">{% bs_icon 'unlock' %} OPEN</span>
+                {% elif st|lower == "pending" %}
+                  <span class="pill state-pending">{% bs_icon 'hourglass-split' %} PENDING</span>
+                {% elif st|lower == "closed" %}
+                  <span class="pill state-closed">{% bs_icon 'lock' %} CLOSED</span>
+                {% else %}
+                  <span class="pill state-closed">{{ st }}</span>
+                {% endif %}
+              {% endwith %}
+            </td>
+
             <td>
               {% with r.6|default:"—" as s %}
                 {% if s|lower == "settled" %}
@@ -276,6 +196,7 @@
                 {% endif %}
               {% endwith %}
             </td>
+
             <td class="text-end">
               <a class="btn btn-outline-brand btn-sm" href="{% url 'lupon_mem:case_detail' r.0 %}">
                 {% bs_icon 'box-arrow-in-right' extra_classes='me-1' %} Open
@@ -283,7 +204,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="7" class="text-center py-5 text-muted">No matching cases.</td></tr>
+            <tr><td colspan="6" class="text-center py-5 text-muted">No matching cases.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -298,7 +219,6 @@
           No results
         {% endif %}
       </div>
-
       {% if total_pages > 1 %}
       <nav aria-label="Case list pages">
         <ul class="pagination mb-0">
@@ -308,13 +228,11 @@
           <li class="page-item {% if not has_prev %}disabled{% endif %}">
             <a class="page-link" href="?page={{ prev_page }}&{{ query_no_page }}">Prev</a>
           </li>
-
           {% for p in page_numbers %}
             <li class="page-item {% if p == page %}active{% endif %}">
               <a class="page-link" href="?page={{ p }}&{{ query_no_page }}">{{ p }}</a>
             </li>
           {% endfor %}
-
           <li class="page-item {% if not has_next %}disabled{% endif %}">
             <a class="page-link" href="?page={{ next_page }}&{{ query_no_page }}">Next</a>
           </li>
@@ -329,16 +247,9 @@
   </div>
 </div>
 
-<!-- Offcanvas Filters (opaque, non-blocking) -->
-<div
-  class="offcanvas offcanvas-end filter-offcanvas"
-  id="filterPanel"
-  tabindex="-1"
-  aria-labelledby="filterPanelLabel"
-  data-bs-backdrop="false"
-  data-bs-scroll="true"
-  style="margin-top: 150;"
->
+<!-- Offcanvas Filters -->
+<div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1" aria-labelledby="filterPanelLabel"
+     data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150px;">
   <div class="offcanvas-header">
     <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
     <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
@@ -349,44 +260,30 @@
       <input type="hidden" name="q" value="{{ q }}">
       <input type="hidden" name="per_page" value="{{ per_page|default:'10' }}">
 
-      <!-- Type (Complaint Title) dropdown -->
+      <!-- Case State -->
       <div class="mb-4">
         <div class="form-label fw-semibold d-flex justify-content-between align-items-center">
-          <span>Type of Case</span>
-          <a href="#" id="clearType" class="small">Clear</a>
+          <span>Case State</span>
+          <a href="#" id="clearState" class="small">Clear</a>
         </div>
-        <select class="form-select" name="type_id" id="type_id">
-          <option value="">All Types</option>
-          {% for tid, tname in type_choices %}
-            <option value="{{ tid }}" {% if type_id == tid|stringformat:"s" %}selected{% endif %}>{{ tname }}</option>
+        <select class="form-select" name="state" id="state">
+          <option value="">All States</option>
+          {% for s in state_choices %}
+            <option value="{{ s }}" {% if state == s %}selected{% endif %}>{{ s }}</option>
           {% endfor %}
         </select>
       </div>
 
-      <!-- Nature dropdown -->
-      <div class="mb-4">
-        <div class="form-label fw-semibold d-flex justify-content-between align-items-center">
-          <span>Nature</span>
-          <a href="#" id="clearNature" class="small">Clear</a>
-        </div>
-        <select class="form-select" name="nature_id" id="nature_id">
-          <option value="">All Natures</option>
-          {% for nid, nname in nature_choices %}
-            <option value="{{ nid }}" {% if nature_id == nid|stringformat:"s" %}selected{% endif %}>{{ nname }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <!-- Settlement dropdown -->
+      <!-- Settlement -->
       <div class="mb-4">
         <div class="form-label fw-semibold d-flex justify-content-between align-items-center">
           <span>Settlement</span>
           <a href="#" id="clearSettlement" class="small">Clear</a>
         </div>
-        <select class="form-select" name="settlement_id" id="settlement_id">
+        <select class="form-select" name="settlement" id="settlement">
           <option value="">All</option>
-          {% for sid, sname in settlement_choices %}
-            <option value="{{ sid }}" {% if settlement_id == sid|stringformat:"s" %}selected{% endif %}>{{ sname }}</option>
+          {% for s in settlement_choices %}
+            <option value="{{ s }}" {% if settlement == s %}selected{% endif %}>{{ s }}</option>
           {% endfor %}
         </select>
       </div>
@@ -431,11 +328,9 @@
         setVal(selectId, "");
       });
     };
-    bindClear('clearType','type_id');
-    bindClear('clearNature','nature_id');
-    bindClear('clearSettlement','settlement_id');
+    bindClear('clearState','state');
+    bindClear('clearSettlement','settlement');
 
-    // Safety guard: remove any stray backdrops from old double-inits
     const oc = document.getElementById('filterPanel');
     if (oc) {
       oc.addEventListener('show.bs.offcanvas', () => {

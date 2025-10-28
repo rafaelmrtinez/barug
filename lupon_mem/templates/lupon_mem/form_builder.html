@@ -5,7 +5,6 @@
   <meta charset="utf-8">
   <title>Form Builder</title>
 
-  <!-- Bootstrap & Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 
@@ -23,11 +22,9 @@
     .hero .title { font-weight:700; letter-spacing:.2px; margin:0; }
     .hero .eyebrow { text-transform:uppercase; font-size:.75rem; color:var(--muted); letter-spacing:.18rem; }
 
-    .badge-code{
-      display:inline-flex; gap:.35rem; font:500 12px ui-monospace,Menlo,Consolas,monospace;
+    .badge-code{ display:inline-flex; gap:.35rem; font:500 12px ui-monospace,Menlo,Consolas,monospace;
       padding:.35rem .55rem; border-radius:.5rem; background:#f7f4ef; color:var(--brand);
-      border:1px solid rgba(0,0,0,.06);
-    }
+      border:1px solid rgba(0,0,0,.06); }
     .hash{ opacity:.65; }
 
     .card{ border:1px solid rgba(0,0,0,.06); border-radius:16px; background:var(--card);
@@ -83,33 +80,17 @@
     .typeahead-item:hover{ background:var(--dropdown-hover); }
     .typeahead-empty{ padding:.6rem .8rem; color:#666; font-size:.9rem; }
 
-    /* visually hide but keep inputs posting */
-    .kp-offscreen{
-      position:absolute !important;
-      left:-10000px !important;
-      top:auto !important;
-      width:1px !important;
-      height:1px !important;
-      overflow:hidden !important;
-    }
+    .kp-offscreen{ position:absolute !important; left:-10000px !important; top:auto !important; width:1px !important; height:1px !important; overflow:hidden !important; }
 
-    /* Med Attendance chips */
     .att-chips{ display:flex; flex-wrap:wrap; gap:.4rem; }
-    .att-chip{
-      display:inline-flex; align-items:center; gap:.35rem; border:1px solid rgba(0,0,0,.08);
-      background:#fff; border-radius:999px; padding:.25rem .55rem;
-    }
+    .att-chip{ display:inline-flex; align-items:center; gap:.35rem; border:1px solid rgba(0,0,0,.08); background:#fff; border-radius:999px; padding:.25rem .55rem; }
     .att-chip .x{ border:0; background:transparent; padding:.1rem; line-height:1; opacity:.55; }
     .att-chip .x:hover{ opacity:1; }
 
-    /* Barangay logo */
-    .brgy-logo{
-      width:56px; height:56px; object-fit:contain; border-radius:50%;
-      border:2px solid #ffd100; box-shadow:0 2px 4px rgba(0,0,0,.06);
-    }
-    @media (min-width:992px){
-      .brgy-logo{ width:64px; height:64px; }
-    }
+    .brgy-logo{ width:56px; height:56px; object-fit:contain; border-radius:50%; border:2px solid #ffd100; box-shadow:0 2px 4px rgba(0,0,0,.06); }
+    @media (min-width:992px){ .brgy-logo{ width:64px; height:64px; } }
+
+    .kp17-box{ border:1px solid rgba(0,0,0,.06); background:#fffdf9; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:none; }
   </style>
 </head>
 
@@ -120,12 +101,15 @@
     <div class="d-flex align-items-center gap-3">
       <img src="{% static 'images/brgy-sto-nino.png' %}" alt="Barangay Sto. Niño" class="brgy-logo">
       <div>
-        <div class="eyebrow" style="color:#FC9700; letter-spacing:.42em; text-transform:uppercase;">
-          BARANGAY SEÑOR SANTO NIÑO
-        </div>
+        <div class="eyebrow" style="color:#FC9700; letter-spacing:.42em; text-transform:uppercase;">BARANGAY SEÑOR SANTO NIÑO</div>
         <h4 class="title mb-1" style="color:#7B1E22;">LUPONG TAGAPAMAYAPA</h4>
         <div class="d-flex flex-wrap align-items-center gap-2 subtle" style="margin-top:10px;">
-          <span class="badge-code"><span class="hash">KP Form No. </span>{{ form_id }}</span>
+          {% if header and header.0 %}
+            <span class="badge-code">{{ header.0 }}</span>
+          {% else %}
+            <span class="badge-code">KP-{{ form_id }}</span>
+          {% endif %}
+
           <span>— {{ header.2|default:header.1 }}</span>
           {% if submission_id %}
             <span class="ms-1">Editing submission
@@ -145,85 +129,64 @@
   <!-- Builder card -->
   <div class="card">
     <div class="card-header d-flex align-items-center justify-content-between">
-      <div class="d-flex align-items-center gap-2">
-        <i class="bi bi-ui-checks-grid text-warning"></i>
-        <strong>Fill out fields</strong>
-      </div>
-      <div class="small subtle">
-        Case <span class="badge-code"><span class="hash">#</span>{{ case_id }}</span>
-      </div>
+      <div class="d-flex align-items-center gap-2"><i class="bi bi-ui-checks-grid text-warning"></i><strong>Fill out fields</strong></div>
+      <div class="small subtle">Case <span class="badge-code"><span class="hash">#</span>{{ case_id }}</span></div>
     </div>
 
     <div class="card-body">
 
       {% if kp8_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
-        <div class="d-flex align-items-center gap-2">
-          <i class="bi bi-calendar2-event" style="font-size:1.1rem;"></i>
-          <strong>Please set the Hearing Date and the Hearing Time</strong>
-        </div>
-        <div class="mt-1" style="opacity:.95">
-          For <strong>KP Form No. 8</strong>, you are required to set the <strong>Hearing Date</strong> and <strong>Hearing Time</strong>.
-        </div>
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-calendar2-event" style="font-size:1.1rem;"></i><strong>Please set the Hearing Date and the Hearing Time</strong></div>
+        <div class="mt-1" style="opacity:.95">For <strong>KP Form No. 8</strong>, you are required to set the <strong>Hearing Date</strong> and <strong>Hearing Time</strong>.</div>
       </div>
       {% endif %}
 
       {% if kp10_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
-        <div class="d-flex align-items-center gap-2">
-          <i class="bi bi-calendar2-week" style="font-size:1.1rem;"></i>
-          <strong>Set the Hearing Details, Time, and Addressed To</strong>
-        </div>
-        <div class="mt-1" style="opacity:.95">
-          For <strong>KP Form No. 10</strong>, choose the <strong>Hearing Details (date)</strong>, the <strong>Hearing Time</strong>, and search a person for <strong>Addressed To</strong>.
-        </div>
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-calendar2-week" style="font-size:1.1rem;"></i><strong>Set the Hearing Details, Time, and Addressed To</strong></div>
+        <div class="mt-1" style="opacity:.95">For <strong>KP Form No. 10</strong>, choose the <strong>Hearing Details (date)</strong>, the <strong>Hearing Time</strong>, and search a person for <strong>Addressed To</strong>.</div>
       </div>
       {% endif %}
 
       {% if kp11_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
-        <div class="d-flex align-items-center gap-2">
-          <i class="bi bi-people" style="font-size:1.1rem;"></i>
-          <strong>Select the Pangkat Member</strong>
-        </div>
-        <div class="mt-1" style="opacity:.95">
-          For <strong>KP Form No. 11</strong>, search and pick the <strong>Pangkat Member Name</strong>. Other fields are auto-filled.
-        </div>
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-people" style="font-size:1.1rem;"></i><strong>Select the Pangkat Member</strong></div>
+        <div class="mt-1" style="opacity:.95">For <strong>KP Form No. 11</strong>, search and pick the <strong>Pangkat Member Name</strong>. Other fields are auto-filled.</div>
       </div>
       {% endif %}
 
       {% if kp12_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
-        <div class="d-flex align-items-center gap-2">
-          <i class="bi bi-clock-history" style="font-size:1.1rem;"></i>
-          <strong>Fill only the Created Day and Time</strong>
-        </div>
-        <div class="mt-1" style="opacity:.95">
-          For <strong>KP Form No. 12</strong>, just set <strong>Date Created (day)</strong> and <strong>Time Created</strong>. Other fields are auto-filled.
-        </div>
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-clock-history" style="font-size:1.1rem;"></i><strong>Fill only the Created Day and Time</strong></div>
+        <div class="mt-1" style="opacity:.95">For <strong>KP Form No. 12</strong>, just set <strong>Date Created (day)</strong> and <strong>Time Created</strong>. Other fields are auto-filled.</div>
       </div>
       {% endif %}
 
       {% if kp13_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
-        <div class="d-flex align-items-center gap-2">
-          <i class="bi bi-send-check" style="font-size:1.1rem;"></i>
-          <strong>Fill only: Subpoena To, Witness, Appearance Date &amp; Time</strong>
-        </div>
-        <div class="mt-1" style="opacity:.95">
-          For <strong>KP Form No. 13</strong>, only these four fields are required and shown.
-        </div>
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-send-check" style="font-size:1.1rem;"></i><strong>Fill only: Subpoena To, Witness, Appearance Date &amp; Time</strong></div>
+        <div class="mt-1" style="opacity:.95">For <strong>KP Form No. 13</strong>, only these four fields are required and shown.</div>
       </div>
       {% endif %}
 
       {% if kp14_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-file-earmark-text" style="font-size:1.1rem;"></i><strong>Everything is already filled.</strong></div>
+        <div class="mt-1" style="opacity:.95">Click <strong>Submit &amp; Generate PDF</strong> to create the <strong>Agreement for Arbitration</strong>.</div>
+      </div>
+      {% endif %}
+
+      {# NEW: KP-9-P2 helper banner (Officer’s Return) #}
+      {% if header.0 == 'KP-9-P2' %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
         <div class="d-flex align-items-center gap-2">
-          <i class="bi bi-file-earmark-text" style="font-size:1.1rem;"></i>
-          <strong>Everything is already filled.</strong>
+          <i class="bi bi-clipboard-check" style="font-size:1.1rem;"></i>
+          <strong>Officer’s Return helper</strong>
         </div>
         <div class="mt-1" style="opacity:.95">
-          Click <strong>Submit &amp; Generate PDF</strong> to create the <strong>Agreement for Arbitration</strong>.
+          Search names for <strong>Served To</strong>, <strong>Respondent/s</strong>, <strong>Proxy Name(s)</strong>, and the <strong>Officer Name</strong>.
+          Pick a <strong>Mode of Service (1–4)</strong> and we’ll write the narrative for you.
         </div>
       </div>
       {% endif %}
@@ -233,9 +196,7 @@
       <div class="mb-3">
         <div class="d-flex align-items-start justify-content-between">
           <div>
-            <div class="fw-semibold d-flex align-items-center">
-              <i class="bi bi-people me-2 text-warning"></i>Mediation attendees
-            </div>
+            <div class="fw-semibold d-flex align-items-center"><i class="bi bi-people me-2 text-warning"></i>Mediation attendees</div>
             <div id="attChips" class="att-chips mt-2"></div>
           </div>
           <div class="d-flex gap-2">
@@ -250,6 +211,97 @@
       </div>
       {% endif %}
       {% endwith %}
+
+      <!-- KP-17 ONLY -->
+      <div id="kp17RepudiationCapture" class="kp17-box">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <i class="bi bi-shield-exclamation text-warning"></i>
+          <strong>KP-17 Repudiation</strong>
+        </div>
+        <div class="row g-2">
+          <div class="col-12">
+            <label class="form-label fw-bold mb-2">Who is repudiating? <span class="text-danger">*</span></label>
+            <div class="d-flex flex-wrap gap-3">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="repudiating_party" id="repC" value="COMPLAINANT">
+                <label class="form-check-label" for="repC">Complainant</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="repudiating_party" id="repR" value="RESPONDENT">
+                <label class="form-check-label" for="repR">Respondent</label>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-bold" for="repudiating_person_id">Select person <span class="text-danger">*</span></label>
+            <select class="form-select" id="repudiating_person_id"></select>
+            <div class="form-text">Pick the exact filer from the chosen side.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KP-23 ONLY -->
+      <div id="kp23FilerCapture" class="kp17-box">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <i class="bi bi-person-check text-warning"></i>
+          <strong>KP-23: Who filed?</strong>
+        </div>
+        <div class="row g-2">
+          <div class="col-12">
+            <label class="form-label fw-bold mb-2">Filed by <span class="text-danger">*</span></label>
+            <div class="d-flex flex-wrap gap-3">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="kp23_filed_by_party" id="kp23C" value="COMPLAINANT">
+                <label class="form-check-label" for="kp23C">Complainant</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="kp23_filed_by_party" id="kp23R" value="RESPONDENT">
+                <label class="form-check-label" for="kp23R">Respondent</label>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-bold" for="kp23_filed_by_person_id">Select person <span class="text-danger">*</span></label>
+            <select class="form-select" id="kp23_filed_by_person_id"></select>
+            <div class="form-text">Pick the exact filer from the chosen side.</div>
+          </div>
+        </div>
+      </div>
+
+      {# NEW: KP-9-P2 Mode of Service (1–4) helper block #}
+      {% if header.0 == 'KP-9-P2' %}
+      <div id="kp9p2ModeBox" class="kp17-box" style="display:block;">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <i class="bi bi-list-ol text-warning"></i>
+          <strong>Mode of Service</strong>
+        </div>
+        <div class="row g-2">
+          <div class="col-12">
+            <div class="d-flex flex-wrap gap-3">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="kp9p2_mode" id="kp9p2_m1" value="1">
+                <label class="form-check-label" for="kp9p2_m1">1) Handing to respondent (personal)</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="kp9p2_mode" id="kp9p2_m2" value="2">
+                <label class="form-check-label" for="kp9p2_m2">2) Tendered; refused to receive</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="kp9p2_mode" id="kp9p2_m3" value="3">
+                <label class="form-check-label" for="kp9p2_m3">3) Left at dwelling with (Name)</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="kp9p2_mode" id="kp9p2_m4" value="4">
+                <label class="form-check-label" for="kp9p2_m4">4) Left at office/place of business with (Name)</label>
+              </div>
+            </div>
+            <div class="form-text text-muted mt-1">
+              We’ll fill the “Officer’s Return (Narrative)” and show the right “Proxy Name” field.
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
 
       <form id="formFields" class="needs-validation" novalidate autocomplete="off">
         {% csrf_token %}
@@ -299,53 +351,43 @@
                         label-req
                       {% endif %}
                     {% endif %}"
-                    for="f_{{ field_id }}">
-                    {{ label }}
-                  </label>
+                    for="f_{{ field_id }}">{{ label }}</label>
 
                   {% if type_name == "TEXT" %}
                     <input id="f_{{ field_id }}" type="text" class="form-control"
                            data-field-id="{{ field_id }}" data-code="{{ field_code }}"
                            value="{{ value|default:'' }}"
                            {% if is_required %}required{% endif %}>
-
                   {% elif type_name == "EMAIL" %}
                     <input id="f_{{ field_id }}" type="email" class="form-control"
                            data-field-id="{{ field_id }}" data-code="{{ field_code }}"
                            value="{{ value|default:'' }}"
                            {% if is_required %}required{% endif %}>
-
                   {% elif type_name == "PHONE" %}
                     <input id="f_{{ field_id }}" type="tel" class="form-control"
                            data-field-id="{{ field_id }}" data-code="{{ field_code }}"
                            value="{{ value|default:'' }}" placeholder="09XXXXXXXXX"
                            {% if is_required %}required{% endif %}>
-
                   {% elif type_name == "NUMBER" %}
                     <input id="f_{{ field_id }}" type="number" class="form-control"
                            data-field-id="{{ field_id }}" data-code="{{ field_code }}"
                            value="{{ value|default:'' }}"
                            {% if is_required %}required{% endif %}>
-
                   {% elif type_name == "DATE" %}
                     <input id="f_{{ field_id }}" type="date" class="form-control"
                            data-field-id="{{ field_id }}" data-code="{{ field_code }}"
                            value="{{ value|default:'' }}"
                            {% if is_required %}required{% endif %}>
-
                   {% elif type_name == "TIME" %}
                     <input id="f_{{ field_id }}" type="time" class="form-control"
                            data-field-id="{{ field_id }}" data-code="{{ field_code }}"
                            value="{{ value|default:'' }}"
                            {% if is_required %}required{% endif %}>
-
                   {% elif type_name == "CHECKBOX" %}
-                    <!-- NEW: proper checkbox support (needed by KP-17 fraud/violence/intimidation) -->
                     <input id="f_{{ field_id }}" type="checkbox" class="form-check-input ms-1"
                            data-field-id="{{ field_id }}" data-code="{{ field_code }}"
                            {% if value %}checked{% endif %}
                            {% if is_required %}required{% endif %}>
-
                   {% elif type_name == "CURRENCY" %}
                     <div class="input-group">
                       <span class="input-group-text">₱</span>
@@ -354,12 +396,10 @@
                              value="{{ value|default:'' }}"
                              {% if is_required %}required{% endif %}>
                     </div>
-
                   {% elif type_name == "TEXTAREA" %}
                     <textarea id="f_{{ field_id }}" class="form-control" rows="4"
                               data-field-id="{{ field_id }}" data-code="{{ field_code }}"
                               {% if is_required %}required{% endif %}>{{ value|default:'' }}</textarea>
-
                   {% else %}
                     <input id="f_{{ field_id }}" type="text" class="form-control"
                            data-field-id="{{ field_id }}" data-code="{{ field_code }}"
@@ -367,7 +407,6 @@
                            {% if is_required %}required{% endif %}>
                     <div class="form-text">Unsupported type <code>{{ type_name }}</code> (rendered as text)</div>
                   {% endif %}
-
                   <div class="invalid-feedback">This field is required.</div>
                 </div>
               </div>
@@ -381,9 +420,7 @@
     <div class="sticky-actions">
       <div class="hint"><i class="bi bi-info-circle me-1"></i> You can save a draft first, then submit later.</div>
       <div class="d-flex gap-2">
-        <a href="{% url 'lupon_mem:case_detail' case_id %}" class="btn btn-outline-brand">
-          <i class="bi bi-x-circle me-1"></i> Cancel
-        </a>
+        <a href="{% url 'lupon_mem:case_detail' case_id %}" class="btn btn-outline-brand"><i class="bi bi-x-circle me-1"></i> Cancel</a>
         <button id="saveBtn" class="btn btn-outline-brand">
           <span class="when-idle"><i class="bi bi-cloud-arrow-up me-1"></i> Save Draft</span>
           <span class="when-busy d-none"><span class="spinner-border spinner-border-sm me-1"></span> Saving…</span>
@@ -418,9 +455,7 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header border-0">
-        <h5 class="modal-title d-flex align-items-center">
-          <i class="bi bi-file-check me-2 text-warning"></i> Confirm Submit &amp; Generate PDF
-        </h5>
+        <h5 class="modal-title d-flex align-items-center"><i class="bi bi-file-check me-2 text-warning"></i> Confirm Submit &amp; Generate PDF</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -431,9 +466,7 @@
         </ul>
       </div>
       <div class="modal-footer border-0">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-          <i class="bi bi-x-circle me-1"></i> Cancel
-        </button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><i class="bi bi-x-circle me-1"></i> Cancel</button>
         <button type="button" id="confirmSubmitBtn" class="btn btn-brand">
           <span class="when-idle"><i class="bi bi-check2-square me-1"></i> Yes, Submit</span>
           <span class="when-busy d-none"><span class="spinner-border spinner-border-sm me-1"></span> Submitting…</span>
@@ -462,535 +495,40 @@
   </div>
 </div>
 
-<!-- Scripts -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-  // CSRF
-  function getCookie(name){
-    const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-    return m ? decodeURIComponent(m[2]) : null;
+<!-- Runtime config for the external JS -->
+<script id="fb-config" type="application/json">
+{
+  "form_id": {{ form_id|default:"0" }},
+  "form_code": "{{ header.0|default:form_code }}",
+  "case_id": {{ case_id }},
+  "submission_id": {% if submission_id %}{{ submission_id }}{% else %}null{% endif %},
+  "flags": {
+    "kp8_ui_minimal": {{ kp8_ui_minimal|yesno:"true,false" }},
+    "kp10_ui_minimal": {{ kp10_ui_minimal|yesno:"true,false" }},
+    "kp11_ui_minimal": {{ kp11_ui_minimal|yesno:"true,false" }},
+    "kp12_ui_minimal": {{ kp12_ui_minimal|yesno:"true,false" }},
+    "kp13_ui_minimal": {{ kp13_ui_minimal|yesno:"true,false" }},
+    "kp14_ui_minimal": {{ kp14_ui_minimal|yesno:"true,false" }},
+    "kp16_ui_minimal": {{ kp16_ui_minimal|yesno:"true,false" }},
+    "kp23_ui_minimal": {{ kp23_ui_minimal|yesno:"true,false" }}
+  },
+  "urls": {
+    "save_answers": "{% url 'lupon_mem:save_answers' %}",
+    "submit_form": "{% url 'lupon_mem:submit_form' %}",
+    "staff_suggest": "{% url 'lupon_mem:staff_suggest' %}",
+    "person_suggest": "{% url 'lupon_mem:person_suggest' %}",
+    "staff_suggest_all": "{% url 'lupon_mem:staff_suggest_all' %}",
+    "case_detail": "{% url 'lupon_mem:case_detail' case_id %}"
+  },
+  "parties": {
+    "complainants": {% if complainants %}{{ complainants|safe }}{% else %}[] {% endif %},
+    "respondents": {% if respondents %}{{ respondents|safe }}{% else %}[] {% endif %}
   }
-  const CSRF = getCookie('csrftoken');
-
-  const qs = s => document.querySelector(s);
-  const formEl    = qs("#formFields");
-  const saveBtn   = qs("#saveBtn");
-  const submitBtn = qs("#submitBtn");
-  const toastOk   = new bootstrap.Toast(qs("#toastOk"), { delay: 2200 });
-  const toastWarn = new bootstrap.Toast(qs("#toastWarn"), { delay: 3000 });
-
-  function collectAnswers(){
-    const obj = {};
-    formEl.querySelectorAll("[data-field-id]").forEach(i=>{
-      const fid = i.getAttribute("data-field-id");
-      // NEW: checkbox handling (needed by KP-17 fraud/violence/intimidation)
-      if (i.type === "checkbox") {
-        obj[fid] = i.checked ? "on" : "";
-      } else {
-        obj[fid] = i.value;
-      }
-    });
-    return obj;
-  }
-  function setBusy(btn, busy){
-    btn.querySelector(".when-idle").classList.toggle("d-none", busy);
-    btn.querySelector(".when-busy").classList.toggle("d-none", !busy);
-    btn.disabled = busy;
-  }
-  function setBusyEl(btn, busy){
-    btn?.querySelector(".when-idle")?.classList.toggle("d-none", busy);
-    btn?.querySelector(".when-busy")?.classList.toggle("d-none", !busy);
-    if (btn) btn.disabled = !!busy;
-  }
-  function showOk(msg){ qs("#toastOk .msg").textContent = msg || "Saved."; toastOk.show(); }
-  function showWarn(msg){ qs("#toastWarn .msg").textContent = msg || "Something went wrong."; toastWarn.show(); }
-
-  // Save / Submit
-  async function doSave(){
-    if (!formEl.checkValidity()){
-      formEl.classList.add('was-validated');
-      showWarn("Please complete required fields.");
-      throw new Error("Invalid form");
-    }
-    try{
-      setBusy(saveBtn, true);
-      const fd = new FormData(formEl);
-      fd.set("answers", JSON.stringify(collectAnswers()));
-      const res = await fetch("{% url 'lupon_mem:save_answers' %}", { method:"POST", headers:{"X-CSRFToken":CSRF}, body:fd });
-      if(!res.ok) throw new Error("HTTP " + res.status);
-      const j = await res.json();
-      if (j.ok){
-        if (!formEl.elements.submission_id){
-          const hid = document.createElement("input");
-          hid.type="hidden"; hid.name="submission_id"; hid.value=j.submission_id;
-          formEl.appendChild(hid);
-        }
-        showOk("Draft saved.");
-        return j;
-      }
-      throw new Error("Save failed.");
-    }catch(err){
-      showWarn(err.message || "Save failed.");
-      throw err;
-    }finally{
-      setBusy(saveBtn, false);
-    }
-  }
-
-  saveBtn.addEventListener("click", async (e)=>{ e.preventDefault(); await doSave(); });
-
-  // Remember a safe return URL
-  (function rememberReferrer(){
-    const u = new URL(location.href);
-    if (!u.searchParams.get("return_to") && document.referrer){
-      try{
-        const r = new URL(document.referrer);
-        if (r.origin === location.origin && !sessionStorage.getItem("formbuilder.returnTo")){
-          sessionStorage.setItem("formbuilder.returnTo", r.href);
-        }
-      }catch(_){}
-    }
-  })();
-
-  function resolveReturnTo(){
-    const u = new URL(location.href);
-    const rt = u.searchParams.get("return_to");
-    if (rt){
-      try{
-        const cand = new URL(rt, location.origin);
-        if (cand.origin === location.origin) return cand.href;
-      }catch(_){
-        if (rt.startsWith("/")) return rt;
-      }
-    }
-    const stored = sessionStorage.getItem("formbuilder.returnTo");
-    if (stored) return stored;
-    if (document.referrer){
-      try{
-        const r = new URL(document.referrer);
-        if (r.origin === location.origin) return r.href;
-      }catch(_){}
-    }
-    return "{% url 'lupon_mem:case_detail' case_id %}";
-  }
-
-  function caseDetailUrlFor(id){
-    const anchor = document.querySelector('.hero a[href*="/cases/"]');
-    if (anchor){
-      try{
-        const u = new URL(anchor.href, location.origin);
-        const parts = u.pathname.split("/");
-        const i = parts.findIndex(p => p === "cases");
-        if (i >= 0 && parts[i+1]){
-          parts[i+1] = String(id);
-          u.pathname = parts.join("/");
-          return u.href;
-        }
-      }catch(_){}
-    }
-    return `/lupon_mem/cases/${id}/`;
-  }
-
-  function gotoAfterSubmit(j){
-    if (j && j.redirect){ location.href = j.redirect; return; }
-    const c = formEl.elements.case_id && parseInt(formEl.elements.case_id.value, 10);
-    if (c && Number.isFinite(c)){ location.href = caseDetailUrlFor(c); return; }
-    location.href = resolveReturnTo();
-  }
-
-  // Confirm flow
-  const confirmModal = new bootstrap.Modal(document.getElementById("confirmSubmitModal"));
-  const confirmBtn   = document.getElementById("confirmSubmitBtn");
-
-  document.getElementById("submitBtn").addEventListener("click", (e)=>{
-    e.preventDefault();
-    confirmModal.show();
-  });
-
-  async function performSubmit(){
-    try{
-      setBusy(submitBtn, true);
-      setBusyEl(confirmBtn, true);
-
-      if (!formEl.elements.submission_id){
-        await doSave();
-      } else if (!formEl.checkValidity()){
-        formEl.classList.add("was-validated");
-        showWarn("Please complete required fields.");
-        return;
-      }
-
-      const payload = {
-        submission_id: parseInt(formEl.elements.submission_id.value),
-        case_id: parseInt(formEl.elements.case_id.value)
-      };
-
-      const res = await fetch("{% url 'lupon_mem:submit_form' %}", {
-        method: "POST",
-        headers: { "Content-Type":"application/json", "X-CSRFToken": CSRF },
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-
-      const j = await res.json();
-      if (j.ok){
-        try { window.open(j.download_url, "_blank"); }
-        catch(_) { location.href = j.download_url; return; }
-        setTimeout(()=>{ gotoAfterSubmit(j); }, 400);
-      } else {
-        showWarn(j.error || "Submit failed.");
-      }
-    }catch(err){
-      showWarn(err.message || "Submit failed.");
-    }finally{
-      setBusy(submitBtn, false);
-      setBusyEl(confirmBtn, false);
-      confirmModal.hide();
-    }
-  }
-  confirmBtn.addEventListener("click", (e)=>{ e.preventDefault(); performSubmit(); });
-
-  /* KP-10 derivations */
-  (function kp10Derivations(){
-    const dateEl = document.querySelector(
-      '[data-code="appearance_date"] input, [data-code="appearance_date"] textarea, [data-code="appearance_date"] select, input[data-code="appearance_date"], textarea[data-code="appearance_date"]'
-    );
-    if (!dateEl) return;
-
-    function byCode(code){
-      return document.querySelector(
-        `[data-code="${code}"] input, [data-code="${code}"] textarea, [data-code="${code}"] select, input[data-code="${code}"], textarea[data-code="${code}"], select[data-code="${code}"]`
-      );
-    }
-
-    const dayTargets = ["day_of","appearance_day"].map(byCode);
-    const yearEls = ["current_year","current_year_2","current_year_3"].map(byCode);
-    const todayEl = byCode("date_today");
-    const notifEl = byCode("date_notified");
-    const nDayEl  = byCode("notified_day_of");
-    const monthTargets = ["appearance_month","current_month","month_today","notified_month"].map(byCode);
-
-    const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-    const iso = d => d.toISOString().slice(0,10);
-
-    function deriveFromAppearance(){
-      const v = (dateEl.value || "").trim();
-      if (!v) return;
-      const parts = v.split("-").map(Number);
-      if (parts.length === 3 && parts.every(Number.isFinite)){
-        const [Y, M, D] = parts;
-        dayTargets.forEach(el => { if (el && !el.value) el.value = String(D); });
-        monthTargets.forEach(el => { if (el && !el.value) el.value = MONTHS[M-1]; });
-        yearEls.forEach(el => { if (el && !el.value) el.value = String(Y); });
-      }
-    }
-
-    function fillTodayDefaults(){
-      const now = new Date();
-      if (todayEl && !todayEl.value) todayEl.value = iso(now);
-      if (notifEl && !notifEl.value) notifEl.value = iso(now);
-      if (nDayEl  && !nDayEl.value)  nDayEl  .value = String(now.getDate());
-      yearEls.forEach(el => { if (el && !el.value) el.value = String(now.getFullYear()); });
-      monthTargets.forEach(el => { if (el && !el.value) el.value = MONTHS[now.getMonth()]; });
-    }
-
-    fillTodayDefaults();
-    deriveFromAppearance();
-    dateEl.addEventListener("change", deriveFromAppearance);
-
-    {% if kp10_ui_minimal %}
-    const wrapDate = document.querySelector('[data-code="appearance_date"]');
-    if (wrapDate){
-      const lbl = wrapDate.querySelector("label.form-label");
-      if (lbl){ lbl.textContent = "Hearing Details"; lbl.classList.add("label-req"); }
-    }
-    {% endif %}
-  })();
-
-  /* Typeaheads (KP-10, KP-11, KP-13, KP-15) */
-  {% if kp10_ui_minimal %}
-  (function(){
-    const wrap = document.querySelector('[data-code="addr_to"]');
-    const addr = document.querySelector('[data-code="addr_to"] input, [data-code="addr_to"] textarea, input[data-code="addr_to"], textarea[data-code="addr_to"]');
-    if(!wrap || !addr) return;
-    wrap.classList.add("typeahead-wrap");
-    const dd = document.createElement("div"); dd.className = "typeahead-dropdown"; wrap.appendChild(dd);
-    let timer=null, items=[];
-    function openDD(){ dd.style.display="block"; }
-    function closeDD(){ dd.style.display="none"; dd.innerHTML=""; items=[]; }
-    function render(list){
-      if(!list.length){ dd.innerHTML='<div class="typeahead-empty">No matches</div>'; openDD(); return; }
-      dd.innerHTML = list.map((r,i)=>`<button type="button" class="typeahead-item" data-i="${i}">${r.name}</button>`).join("");
-      openDD();
-    }
-    function fetchSuggest(q){
-      fetch("{% url 'lupon_mem:staff_suggest' %}?q="+encodeURIComponent(q), {headers:{'X-Requested-With':'fetch'}})
-        .then(r=>r.json()).then(j=>{ items=j.results||[]; render(items); }).catch(()=>closeDD());
-    }
-    function choose(i){ const row=items[i]; if(!row) return; addr.value=row.name; closeDD(); }
-    addr.addEventListener("input", ()=>{
-      const q=addr.value.trim(); if(q.length<2){ closeDD(); return; }
-      clearTimeout(timer); timer=setTimeout(()=>fetchSuggest(q),180);
-    });
-    dd.addEventListener("click", e=>{
-      const b=e.target.closest(".typeahead-item"); if(!b) return; choose(parseInt(b.dataset.i,10));
-    });
-    document.addEventListener("click", e=>{ if(!dd.contains(e.target) && e.target!==addr) closeDD(); });
-  })();
-  {% endif %}
-
-  {% if kp11_ui_minimal %}
-  (function(){
-    const wrap = document.querySelector('[data-code="pangkat_member_name"]');
-    const input = document.querySelector('[data-code="pangkat_member_name"] input, [data-code="pangkat_member_name"] textarea, input[data-code="pangkat_member_name"], textarea[data-code="pangkat_member_name"]');
-    if(!wrap || !input) return;
-    wrap.classList.add("typeahead-wrap");
-    const dd = document.createElement("div"); dd.className = "typeahead-dropdown"; wrap.appendChild(dd);
-    let timer=null, items=[];
-    function openDD(){ dd.style.display="block"; }
-    function closeDD(){ dd.style.display="none"; dd.innerHTML=""; items=[]; }
-    function render(list){
-      if(!list.length){ dd.innerHTML='<div class="typeahead-empty">No matches</div>'; openDD(); return; }
-      dd.innerHTML = list.map((r,i)=>`<button type="button" class="typeahead-item" data-i="${i}">${r.name}</button>`).join("");
-      openDD();
-    }
-    function fetchSuggest(q){
-      fetch("{% url 'lupon_mem:staff_suggest' %}?q="+encodeURIComponent(q), {headers:{'X-Requested-With':'fetch'}})
-        .then(r=>r.json()).then(j=>{ items=j.results||[]; render(items); }).catch(()=>closeDD());
-    }
-    function choose(i){ const row=items[i]; if(!row) return; input.value=row.name; closeDD(); }
-    input.addEventListener("input", ()=>{
-      const q=input.value.trim(); if(q.length<2){ closeDD(); return; }
-      clearTimeout(timer); timer=setTimeout(()=>fetchSuggest(q),180);
-    });
-    dd.addEventListener("click", e=>{
-      const b=e.target.closest(".typeahead-item"); if(!b) return; choose(parseInt(b.dataset.i,10));
-    });
-    document.addEventListener("click", e=>{ if(!dd.contains(e.target) && e.target!==input) closeDD(); });
-  })();
-  {% endif %}
-
-  (function(){  // KP-13
-    function enhance(code, url){
-      const wrap=document.querySelector(`[data-code="${code}"]`);
-      const input=document.querySelector(`[data-code="${code}"] input, [data-code="${code}"] textarea, input[data-code="${code}"], textarea[data-code="${code}"]`);
-      if(!wrap||!input) return;
-      wrap.classList.add("typeahead-wrap");
-      const dd=document.createElement("div"); dd.className="typeahead-dropdown"; wrap.appendChild(dd);
-      let t=null, items=[];
-      function open(){ dd.style.display="block"; }
-      function close(){ dd.style.display="none"; dd.innerHTML=""; items=[]; }
-      function render(list){
-        if(!list.length){ dd.innerHTML='<div class="typeahead-empty">No matches</div>'; open(); return; }
-        dd.innerHTML=list.map((r,i)=>`<button type="button" class="typeahead-item" data-i="${i}">${r.name}</button>`).join("");
-        open();
-      }
-      function fetchQ(q){
-        fetch(url+encodeURIComponent(q), {headers:{'X-Requested-With':'fetch'}})
-          .then(r=>r.json()).then(j=>{items=j.results||[]; render(items);}).catch(()=>close());
-      }
-      function choose(i){ const row=items[i]; if(!row) return; input.value=row.name; close(); }
-      input.addEventListener("input", ()=>{
-        const q=input.value.trim(); if(q.length<2){ close(); return; }
-        clearTimeout(t); t=setTimeout(()=>fetchQ(q),180);
-      });
-      dd.addEventListener("click", e=>{
-        const b=e.target.closest(".typeahead-item"); if(!b) return; choose(parseInt(b.dataset.i,10));
-      });
-      document.addEventListener("click", e=>{ if(!dd.contains(e.target) && e.target!==input) close(); });
-    }
-    enhance("subpoena_to", "{% url 'lupon_mem:person_suggest' %}?q=");
-    enhance("subpoena_witness", "{% url 'lupon_mem:person_suggest' %}?q=");
-  })();
-
-  (function(){ // KP-15
-    function enhanceStaff(code){
-      const wrap=document.querySelector(`[data-code="${code}"]`);
-      const input=document.querySelector(`[data-code="${code}"] input, [data-code="${code}"] textarea, input[data-code="${code}"], textarea[data-code="${code}"]`);
-      if(!wrap||!input) return;
-      wrap.classList.add("typeahead-wrap");
-      const dd=document.createElement("div"); dd.className="typeahead-dropdown"; wrap.appendChild(dd);
-      let t=null, items=[];
-      function open(){ dd.style.display="block"; }
-      function close(){ dd.style.display="none"; dd.innerHTML=""; items=[]; }
-      function render(list){
-        if(!list.length){ dd.innerHTML='<div class="typeahead-empty">No matches</div>'; open(); return; }
-        dd.innerHTML=list.map((r,i)=>`<button type="button" class="typeahead-item" data-i="${i}">${r.name}</button>`).join("");
-        open();
-      }
-      function fetchQ(q){
-        fetch("{% url 'lupon_mem:staff_suggest' %}?q="+encodeURIComponent(q), {headers:{'X-Requested-With':'fetch'}})
-          .then(r=>r.json()).then(j=>{items=j.results||[]; render(items);}).catch(()=>close());
-      }
-      function choose(i){ const row=items[i]; if(!row) return; input.value=row.name; close(); }
-      input.addEventListener("input", ()=>{
-        const q=input.value.trim(); if(q.length<2){ close(); return; }
-        clearTimeout(t); t=setTimeout(()=>fetchQ(q),180);
-      });
-      dd.addEventListener("click", e=>{
-        const b=e.target.closest(".typeahead-item"); if(!b) return; choose(parseInt(b.dataset.i,10));
-      });
-      document.addEventListener("click", e=>{ if(!dd.contains(e.target) && e.target!==input) close(); });
-    }
-    enhanceStaff("member");
-    enhanceStaff("member_two");
-  })();
-
-  /* MED ATT: picks -> autofill */
-  (function(){
-    const btnAdd   = document.getElementById("btnAddStaff");
-    const btnClear = document.getElementById("btnClearStaff");
-    const chipsBox = document.getElementById("attChips");
-    const hidden   = document.getElementById("med_att_staff_json");
-
-    const modalEl   = document.getElementById("staffPicker");
-    const modal     = modalEl ? new bootstrap.Modal(modalEl) : null;
-    const searchBox = document.getElementById("staffSearch");
-    const results   = document.getElementById("staffResults");
-
-    if(!btnAdd || !chipsBox) return;
-
-    const STORAGE_KEY = `med_attendees_case_{{ case_id }}_form_{{ form_id }}`;
-    const WORDS = ["one","two","three","four","five","six","seven","eight","nine","ten"];
-
-    function byCode(code){
-      return document.querySelector(
-        `[data-code="${code}"] input, [data-code="${code}"] textarea, [data-code="${code}"] select, input[data-code="${code}"], textarea[data-code="${code}"], select[data-code="${code}"]`
-      );
-    }
-    function findAttendeeSlot(i){
-      const w = WORDS[i];
-      return byCode(`person_${w}`) || byCode(`attendee_${i+1}`) || byCode(`attendee_${w}`);
-    }
-    function findPositionSlot(i){
-      const w = WORDS[i];
-      if (i === 0) return byCode("position_one") || byCode("pos_one") || byCode("position_1");
-      return byCode(`pos_${w}`) || byCode(`position_${w}`) || byCode(`position_${i+1}`);
-    }
-    function findContactSlot(i){
-      const w = WORDS[i];
-      return byCode(`contact_${w}`) || byCode(`mobile_${w}`) || byCode(`contact_${i+1}`) || byCode(i===0?"contact":"");
-    }
-    function write(el, val){
-      if (!el) return;
-      el.value = val ?? "";
-      el.dispatchEvent(new Event("input", { bubbles:true }));
-      el.dispatchEvent(new Event("change", { bubbles:true }));
-    }
-    function escapeHtml(s){ return (s||"").replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m])); }
-
-    let picks = [];
-    try { picks = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "[]"); } catch(_){}
-    renderChips(); pushToForm();
-
-    function persist(){ try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(picks)); } catch(_){} }
-
-    function renderChips(){
-      chipsBox.innerHTML = "";
-      picks.forEach((p,i)=>{
-        const span = document.createElement("span");
-        span.className = "att-chip";
-        span.innerHTML = `<i class="bi bi-person"></i><span>${escapeHtml(p.name)}</span>
-                          <button class="x" title="Remove" data-i="${i}">&times;</button>`;
-        span.querySelector(".x").onclick = ev => {
-          picks.splice(+ev.currentTarget.dataset.i,1);
-          persist(); renderChips(); pushToForm();
-        };
-        chipsBox.appendChild(span);
-      });
-      if (hidden) hidden.value = JSON.stringify(picks);
-    }
-
-    function clearAllSlots(){
-      for(let i=0;i<10;i++){
-        write(findAttendeeSlot(i), "");
-        write(findPositionSlot(i), "");
-        write(findContactSlot(i), "");
-      }
-    }
-    function pushToForm(){
-      clearAllSlots();
-      picks.forEach((p,i)=>{
-        write(findAttendeeSlot(i), p.name || "");
-        write(findPositionSlot(i), (p.role || p.position || "") );
-        write(findContactSlot(i),  (p.mobile || p.phone || p.contact || "") );
-      });
-    }
-
-    btnAdd.addEventListener("click", ()=>{
-      if(!modal) return;
-      results.innerHTML = "";
-      searchBox.value = "";
-      modal.show();
-      setTimeout(()=>searchBox.focus(), 80);
-    });
-    if (btnClear) btnClear.addEventListener("click", ()=>{ picks=[]; persist(); renderChips(); pushToForm(); });
-
-    let t=null;
-    if (searchBox){
-      searchBox.addEventListener("input", ()=>{
-        const q = searchBox.value.trim();
-        if (t) clearTimeout(t);
-        if (q.length < 2){ results.innerHTML=""; return; }
-        t = setTimeout(async ()=>{
-          results.innerHTML = '<div class="list-group-item text-muted">Searching…</div>';
-          try{
-            const r = await fetch("{% url 'lupon_mem:staff_suggest_all' %}?q=" + encodeURIComponent(q), {headers:{'X-Requested-With':'fetch'}});
-            const j = await r.json();
-            const rows = j.results || [];
-            results.innerHTML = rows.length ? rows.map(x=>{
-              const sid = x.id ?? x.staff_id ?? x.person_id ?? "";
-              const payload = btoa(unescape(encodeURIComponent(JSON.stringify(x))));
-              return `<button type="button" class="list-group-item list-group-item-action"
-                        data-sid="${String(sid)}" data-json="${payload}">
-                        ${escapeHtml(x.name || "")}
-                      </button>`;
-            }).join("") : '<div class="list-group-item text-muted">No matches</div>';
-          }catch(_){
-            results.innerHTML = '<div class="list-group-item text-danger">Search failed</div>';
-          }
-        }, 200);
-      });
-    }
-
-    results?.addEventListener("click", async (e)=>{
-      const btn = e.target.closest("button.list-group-item"); if (!btn) return;
-      let base = {};
-      try { base = JSON.parse(decodeURIComponent(escape(atob(btn.getAttribute("data-json") || "e30=")))); } catch(_){}
-      const sid = btn.getAttribute("data-sid") || base.id || base.staff_id || "";
-
-      const row = {
-        staff_id: sid,
-        person_id: base.person_id || null,
-        name: (base.name || "").trim(),
-        role: (base.role || base.position || "").trim(),
-        mobile: (base.mobile || base.phone || base.contact || "").trim()
-      };
-
-      if ((!row.role || !row.mobile) && sid){
-        try{
-          const lr = await fetch(`/lupon_mem/staff/lookup?staff_id=${encodeURIComponent(sid)}`);
-          if (lr.ok){
-            const lj = await lr.json();
-            if (lj.ok && lj.result){
-              row.name   = (lj.result.name   ?? row.name  ).trim();
-              row.role   = (lj.result.role   ?? row.role  ).trim();
-              row.mobile = (lj.result.mobile ?? row.mobile).trim();
-              row.person_id = lj.result.person_id ?? row.person_id;
-            }
-          }
-        }catch(_){}
-      }
-
-      if (picks.some(p => (p.staff_id||"") === (row.staff_id||"") && p.name === row.name)){
-        if (modal) modal.hide();
-        return;
-      }
-      picks.push(row);
-      persist(); renderChips(); pushToForm();
-      if (modal) modal.hide();
-    });
-  })();
+}
 </script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Your existing JS file; untouched -->
+<script src="{% static 'js/form_builder.js' %}"></script>
 </body>
 </html>

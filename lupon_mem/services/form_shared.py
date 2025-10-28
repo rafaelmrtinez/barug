@@ -5,6 +5,9 @@ from django.db import connection
 from django.core.exceptions import ValidationError
 from django.contrib.staticfiles import finders
 
+import json   # ✅ REQUIRED for json.dumps()
+import logging
+logger = logging.getLogger(__name__)
 # ------------- General helpers -------------
 
 def sanitize_text(s: str) -> str:
@@ -213,3 +216,107 @@ def first_page_png(src: fitz.Document, scale: float = 1.5) -> bytes:
     pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale))
     buf = io.BytesIO(pix.tobytes("png"))
     return buf.getvalue()
+
+
+
+# lupon_mem/services/form_shared.py
+
+def upsert_answers_by_keys(form_id: int, submission_id: int, keysets_to_values: list[tuple[set[str], str]]):
+    """
+    keysets_to_values: [({label/code variants...}, value_string), ...]
+    Finds the field_id of the first matching label/code for each keyset and upserts value.
+    """
+    import json as _json
+    from django.db import connection, transaction
+
+    with connection.cursor() as cur:
+        cur.execute("""
+            SELECT f.field_id,
+                   LOWER(COALESCE(kff.label_override, f.base_label)) AS label,
+                   LOWER(f.field_code) AS code
+              FROM kp_form_field kff
+              JOIN kp_field f ON f.field_id = kff.field_id
+             WHERE kff.form_id = %s
+        """, [form_id])
+        rows = cur.fetchall()
+
+    by_label, by_code = {}, {}
+    for fid, label, code in rows:
+        if label: by_label[label.strip().lower()] = int(fid)
+        if code:  by_code[code.strip().lower()]  = int(fid)
+
+    def _find(keys: set[str]):
+        for k in keys:
+            kk = k.strip().lower()
+            if kk in by_label: return by_label[kk]
+            if kk in by_code:  return by_code[kk]
+        return None
+
+    pairs = []
+    for keys, val in keysets_to_values:
+        if val in (None, "", "null"):
+            continue
+        fid = _find(keys)
+        if fid:
+            pairs.append((fid, val))
+
+    if not pairs:
+        return
+
+    with transaction.atomic():
+        with connection.cursor() as cur:
+            for fid, val in pairs:
+                cur.execute("""
+                    INSERT INTO blotter_kp_answer (submission_id, field_id, value_json)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (submission_id, field_id)
+                    DO UPDATE SET value_json = EXCLUDED.value_json
+                """, [submission_id, int(fid), _json.dumps(val)])
+
+
+def save_answers(submission_id: int, name_value_map: dict):
+    """
+    Saves or updates answers for the given KP submission.
+
+    Args:
+        submission_id (int): blotter_kp_submission ID
+        name_value_map (dict): mapping of field_code -> value
+    """
+    if not name_value_map:
+        return
+
+    try:
+        with connection.cursor() as cur:
+            # Match field_codes to their field_ids for this submission's form
+            cur.execute("""
+                SELECT s.form_id
+                  FROM blotter_kp_submission s
+                 WHERE s.submission_id = %s
+            """, [submission_id])
+            row = cur.fetchone()
+            if not row:
+                logger.warning("[save_answers] submission_id %s not found", submission_id)
+                return
+            form_id = row[0]
+
+            cur.execute("""
+                SELECT f.field_id, LOWER(f.field_code)
+                  FROM kp_form_field kff
+                  JOIN kp_field f ON f.field_id = kff.field_id
+                 WHERE kff.form_id = %s
+            """, [form_id])
+            field_map = {code: fid for fid, code in cur.fetchall()}
+
+            for code, val in name_value_map.items():
+                fid = field_map.get(code.lower())
+                if not fid:
+                    continue
+                cur.execute("""
+                    INSERT INTO blotter_kp_answer (submission_id, field_id, value_json)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (submission_id, field_id)
+                    DO UPDATE SET value_json = EXCLUDED.value_json
+                """, [submission_id, fid, json.dumps(val)])
+        logger.info("[save_answers] persisted %d fields for submission %s", len(name_value_map), submission_id)
+    except Exception as e:
+        logger.exception("[save_answers] failed for submission_id=%s: %s", submission_id, e)

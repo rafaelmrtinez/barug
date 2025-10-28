@@ -85,7 +85,8 @@ _KP17_SOURCES: Dict[str, Set[str]] = {
     "date_sworn":   {"date_sworn", "sworn_day"},
     "month_sworn":  {"month_sworn", "sworn_month"},
     "year_sworn":   {"year_sworn", "sworn_year"},
-    "place_sworned":{"place_sworned", "place_sworn", "place_of_sworn"},
+    # NOTE: allow multiple aliases for the sworn place
+    "place_sworned": {"place_sworned", "place_sworn", "place_of_oath", "oath_place"},
 
     # Chairman / Brgy Captain
     "chairman": {"chairman", "punong barangay", "barangay captain", "brgy_capt", "brgy captain"},
@@ -106,6 +107,7 @@ class KP17Handler:
       • Checkbox fields are set to "Yes" if any truthy indicator is present OR details text is provided.
       • Notified and Sworn date trios default to today (PH) if missing/incomplete.
       • Sanitize and ensure all PDF fields exist; log final ordered map.
+      • EXTRA LOGGING: dump answers, discovered fields, label/code maps, seed map, fallbacks.
     """
 
     # -------- helpers: parse/format --------
@@ -162,19 +164,26 @@ class KP17Handler:
             mm = f"{int(mm):02d}"
             if ap:
                 ap = ap.replace(".", "")
-                try: return _dt.strptime(f"{int(hh)}:{mm} {ap}", "%I:%M %p").time()
-                except Exception: pass
+                try:
+                    return _dt.strptime(f"{int(hh)}:{mm} {ap}", "%I:%M %p").time()
+                except Exception:
+                    pass
             else:
-                try: return _dt.strptime(f"{int(hh):02d}:{mm}", "%H:%M").time()
-                except Exception: pass
+                try:
+                    return _dt.strptime(f"{int(hh):02d}:{mm}", "%H:%M").time()
+                except Exception:
+                    pass
         for fmt in ("%H:%M", "%H:%M:%S", "%I:%M %p", "%I:%M%p", "%I %p"):
-            try: return _dt.strptime(txt, fmt).time()
-            except Exception: continue
+            try:
+                return _dt.strptime(txt, fmt).time()
+            except Exception:
+                continue
         return None
 
     @staticmethod
     def _boolish(v: str) -> bool:
-        if not v: return False
+        if not v:
+            return False
         t = v.strip().lower()
         return t in {"1","y","yes","true","on","checked","selected","t"}
 
@@ -230,6 +239,8 @@ class KP17Handler:
     def build_name_value_map(self, form_id: int, submission_id: int) -> dict:
         # Load saved answers for this submission (field_id -> raw string)
         answers_by_id = FS.load_answers(submission_id)
+        print("[KP17][answers_by_id]", json.dumps(answers_by_id, ensure_ascii=False))
+        logger.info("[KP17][answers_by_id] %s", json.dumps(answers_by_id, ensure_ascii=False))
 
         # Discover labels + codes present on this form
         with connection.cursor() as cur:
@@ -246,6 +257,9 @@ class KP17Handler:
             )
             rows = cur.fetchall()
 
+        print("[KP17][form_fields_raw]", rows)
+        logger.info("[KP17][form_fields_raw] %s", rows)
+
         # Index answers by lower-cased label & code
         by_label: Dict[str, str] = {}
         by_code: Dict[str, str] = {}
@@ -258,6 +272,11 @@ class KP17Handler:
                     by_label[label.strip().lower()] = val
                 if code:
                     by_code[code.strip().lower()] = val
+
+        print("[KP17][by_label]", json.dumps(by_label, ensure_ascii=False))
+        print("[KP17][by_code]", json.dumps(by_code, ensure_ascii=False))
+        logger.info("[KP17][by_label] %s", json.dumps(by_label, ensure_ascii=False))
+        logger.info("[KP17][by_code] %s", json.dumps(by_code, ensure_ascii=False))
 
         def _find_any(keys: Set[str]) -> str:
             for k in keys:
@@ -272,6 +291,9 @@ class KP17Handler:
         out: Dict[str, str] = {}
         for target, sources in _KP17_SOURCES.items():
             out[target] = _find_any(sources)
+
+        print("[KP17][seed_out]", json.dumps(out, ensure_ascii=False))
+        logger.info("[KP17][seed_out] %s", json.dumps(out, ensure_ascii=False))
 
         # Mirror secondary party lines when not provided
         if not (out.get("complainants_two") or "").strip():
@@ -307,6 +329,10 @@ class KP17Handler:
         date_ans = (out.get("date_filed") or "").strip()
         date_obj: Optional[_date] = self._try_parse_date(date_ans)
 
+        # -------- Ensure place_sworned has a value (prevents KP-17 ValidationError) --------
+        if not (out.get("place_sworned") or "").strip():
+            out["place_sworned"] = "Barangay Hall of Señor Santo Niño"
+
         # If answer is just day number, try to build with month/year from notified or filed trios
         if not date_obj and date_ans.isdigit():
             d = int(date_ans)
@@ -314,8 +340,10 @@ class KP17Handler:
             y_txt = (out.get("year_filed")  or out.get("year_notified")  or "").strip()
             m_num = self._month_name_to_number(m_txt)
             if m_num and y_txt.isdigit():
-                try: date_obj = _date(int(y_txt), m_num, d)
-                except Exception: pass
+                try:
+                    date_obj = _date(int(y_txt), m_num, d)
+                except Exception:
+                    pass
 
         if not date_obj and isinstance(date_by_num, _date):
             date_obj = date_by_num
@@ -326,7 +354,7 @@ class KP17Handler:
         if not date_obj:
             date_obj = _dt.now(ZoneInfo("Asia/Manila")).date()
 
-        out["date_filed"]  = self._fmt_full_date(date_obj)
+        out["date_filed"]   = self._fmt_full_date(date_obj)
         out["date_filed_2"] = str(date_obj.day)
         out["month_filed"]  = date_obj.strftime("%B")
         out["year_filed"]   = str(date_obj.year)
@@ -346,12 +374,10 @@ class KP17Handler:
         d_not = (out.get("date_notified") or "").strip()
         m_not = (out.get("month_notified") or "").strip()
         y_not = (out.get("year_notified") or "").strip()
-        # If any part missing, default to today
         if not d_not or not m_not or not y_not:
             out["date_notified"]  = str(now_ph.day)
             out["month_notified"] = now_ph.strftime("%B")
             out["year_notified"]  = str(now_ph.year)
-        # A separate "date_notified_2" often expects the day number; ensure it’s filled
         if not (out.get("date_notified_2") or "").strip():
             out["date_notified_2"] = out.get("date_notified")
 
@@ -375,7 +401,6 @@ class KP17Handler:
         out["intimidation_chkbx"] = decide_chk("intimidation_details", "intimidation_chkbx")
 
         # -------- Chairman / Brgy Captain syncing --------
-        # If only one is present, copy to the other.
         chair = (out.get("chairman") or "").strip()
         capt  = (out.get("brgy_capt") or "").strip()
         if chair and not capt:

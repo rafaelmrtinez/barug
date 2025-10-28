@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+<style>
+  :root{
+    /* Light maroon palette */
+    --brand-900:#3a1217;
+    --brand-800:#561c24;
+    --brand-700:#6d2932;
+    --brand-600:#7a323b;
+    --brand-300:#edc9cf;
+    --brand-200:#f7dfe3;
+    --brand-100:#fdf3f4;
+
+    --ink:#1f2937;
+    --muted:#6b7280;
+    --line:#e5e7eb;
+    --card:#ffffff;
+    --wash:#fafbfc;
+  }
+
+  body{ background:var(--wash); }
+  .page{ width:100%; }
+
+  /* Header */
+  .head{
+    background: var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:16px 20px;
+    display:flex; align-items:center; justify-content:space-between; gap:1rem;
+    box-shadow: 0 6px 16px rgba(17,24,39,.06);
+    margin:12px 0 18px;
+  }
+  .crumb{ color:var(--muted); font-size:.9rem; }
+  .head h4{ margin:2px 0 0; font-weight:800; color:var(--ink); letter-spacing:.2px; }
+  .badge-soft{
+    display:inline-flex; align-items:center; gap:.45rem; font-size:.8rem; padding:.25rem .6rem; border-radius:999px;
+    background:var(--brand-100); border:1px solid var(--brand-200); color:var(--brand-800); font-weight:700;
+  }
+
+  /* Cards */
+  .cardx{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:16px;
+    box-shadow:0 8px 18px rgba(17,24,39,.05);
+    color:var(--ink);
+  }
+  .cardx + .cardx{ margin-top:12px; }
+
+  .title{
+    display:flex; align-items:center; gap:.6rem; font-weight:800; color:var(--brand-900);
+    background:var(--brand-100);
+    border:1px solid var(--brand-200);
+    padding:8px 12px; border-radius:12px; margin-bottom:12px; letter-spacing:.15px;
+  }
+  .tag{
+    font-size:.72rem; font-weight:700; padding:.1rem .5rem; border-radius:6px;
+    background:#fff; border:1px solid var(--line); color:var(--muted);
+  }
+
+  /* Locked doc type */
+  .lock{
+    display:flex; flex-wrap:wrap; align-items:center; gap:.6rem; padding:10px 12px;
+    background:#fff; border:1px dashed var(--brand-300); border-radius:10px;
+  }
+  .lock .val{
+    display:inline-flex; align-items:center; gap:.4rem; background:var(--brand-100);
+    border:1px solid var(--brand-300); color:var(--brand-900);
+    padding:.25rem .65rem; border-radius:8px; font-weight:800; letter-spacing:.2px;
+  }
+
+  /* Inputs */
+  .form-label{ font-weight:700; color:var(--ink); }
+  .form-control, .form-select{
+    background:#fff; color:var(--ink); border:1px solid var(--line);
+  }
+  .form-control::placeholder{ color:#98a1b1; }
+  .form-control:focus,.form-select:focus{
+    border-color:var(--brand-700);
+    box-shadow:0 0 0 .18rem rgba(109,41,50,.20);
+  }
+  .helper{ font-size:.85rem; color:var(--muted); }
+  .code-input{
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    text-transform:uppercase; letter-spacing:.35px;
+  }
+  .input-group-text{
+    background:#fff; color:var(--ink); border:1px solid var(--line); font-weight:800;
+  }
+
+  /* Right column sticky */
+  @media (min-width: 1200px){
+    .sticky-rail{ position: sticky; top: 88px; }
+  }
+
+  /* Exemption chips (light) */
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{ position:relative; }
+  .chip input{ position:absolute; opacity:0; inset:0; cursor:pointer; }
+  .chip label{
+    user-select:none; cursor:pointer; display:inline-flex; align-items:center; gap:.45rem;
+    background:#fff; border:1px solid var(--line); border-radius:999px; padding:.5rem .9rem; color:var(--ink);
+  }
+  .chip input:checked + label{
+    border-color:var(--brand-700);
+    background:var(--brand-100);
+    color:var(--brand-900);
+  }
+  .chip label .dot{ width:10px;height:10px;border-radius:50%; border:2px solid var(--brand-700); }
+  .chip input:checked + label .dot{ background:var(--brand-700); }
+
+  /* Buttons */
+  .btn-primary{
+    background:linear-gradient(180deg, var(--brand-700), var(--brand-800));
+    border-color: var(--brand-800);
+  }
+  .btn-primary:hover{
+    background:linear-gradient(180deg, var(--brand-800), var(--brand-900));
+    border-color: var(--brand-900);
+  }
+  .btn-outline-secondary{
+    border-color: var(--brand-700); color:var(--brand-800); background:#fff;
+  }
+  .btn-outline-secondary:hover{
+    background:var(--brand-100); color:var(--brand-900); border-color: var(--brand-700);
+  }
+
+  /* Layout spacing */
+  .rail-actions{ margin-top:14px; display:flex; gap:.6rem; }
+</style>
+
+<div class="container-fluid page py-3">
+  <div class="head">
+    <div>
+      <div class="crumb">Treasurer / Fees / Add Purpose</div>
+      <h4>Add Fee <span class="badge-soft">Existing Document Type</span></h4>
+    </div>
+    <div class="text-muted small">All changes are audited.</div>
+  </div>
+
+  <form method="post" novalidate id="feeForm">
+    {% csrf_token %}
+
+    <div class="row g-3">
+      <!-- LEFT: main flow -->
+      <div class="col-12 col-xl-8">
+        <!-- Document Type -->
+        <div class="cardx">
+          <div class="title">Document Type <span class="tag">required</span></div>
+
+          {% if preselected_doc_type %}
+            <div class="lock mb-2">
+              <span>🔒</span>
+              <div class="fw-semibold">Filed under:</div>
+              <div class="val" id="docTypeDisplay">{{ preselected_doc_type }}</div>
+            </div>
+            <input type="hidden" name="doc_type_name" id="docTypeInput" value="{{ preselected_doc_type }}">
+            <div class="helper">Locked because you opened this from a specific type view.</div>
+          {% else %}
+            <label class="form-label mb-1">Choose an existing type</label>
+            <select name="doc_type_name" id="docTypeSelect" class="form-select" required>
+              <option value="">— Select —</option>
+              {% for t in doc_types %}
+                <option value="{{ t.document_type_name }}">{{ t.document_type_name }}</option>
+              {% endfor %}
+            </select>
+            <div class="helper mt-2">Creates a fee under the selected document type.</div>
+          {% endif %}
+        </div>
+
+        <!-- Naming & Coding -->
+        <div class="cardx">
+          <div class="title">Naming & Coding <span class="tag">automatic</span></div>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Custom Suffix (you type this)</label>
+              <input type="text" class="form-control" id="suffixInput" placeholder="e.g., TEST">
+              <div class="helper mt-1">We’ll build the Fee Code & Fee Name from the Document Type + this suffix.</div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Fee Code (auto, short)</label>
+              <input type="text" class="form-control code-input" name="fee_code" id="feeCode" readonly placeholder="auto…">
+              <div class="helper mt-1">Pattern: <code>DOC_ACRO_SUFFIX</code> (e.g., <code>BBC_TEST</code>).</div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Fee Name (auto)</label>
+              <input type="text" class="form-control" name="fee_name" id="feeName" readonly placeholder="auto…">
+              <div class="helper mt-1">Pattern: <code>Document Type — Suffix</code> (emdash).</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Purpose -->
+        <div class="cardx" hidden>
+          <div class="title">Purpose (what Clerk selects)</div>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Purpose Code</label>
+              <input type="text" class="form-control code-input" name="purpose_code" id="purposeCode" placeholder="auto…">
+              <div class="helper mt-1">Autofilled from suffix; you can override.</div>
+            </div>
+            <div class="col-md-8">
+              <label class="form-label">Purpose Label</label>
+              <input type="text" class="form-control" name="purpose_label" id="purposeLabel" placeholder="auto…">
+              <div class="helper mt-1">Autofilled from suffix; you can override.</div>
+            </div>
+
+            {# HIDDEN (as requested): details/offense #}
+            <input type="hidden" name="default_details" value="">
+            <input type="hidden" name="default_offense_no" value="">
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: pricing, exemptions, reason (sticky rail) -->
+      <div class="col-12 col-xl-4">
+        <div class="sticky-rail">
+          <!-- Pricing -->
+          <div class="cardx">
+            <div class="title">Pricing</div>
+            <input type="hidden" name="unit" value="per_doc">
+            {# Active by default; do not show #}
+            <input type="hidden" name="is_active" value="1">
+
+            <div class="mb-3">
+              <label class="form-label">Current Amount</label>
+              <div class="input-group">
+                <span class="input-group-text">₱</span>
+                <input type="number" step="0.01" class="form-control" name="current_amount" placeholder="e.g., 150" required>
+              </div>
+              <div class="helper mt-1">Base price (before exemptions/waivers).</div>
+            </div>
+          </div>
+
+          <!-- Exemptions -->
+          <div class="cardx mt-3">
+            <div class="title">Exemptions</div>
+            <div class="chips">
+              <div class="chip"><input type="checkbox" id="ex_senior" name="ex_senior"><label for="ex_senior"><span class="dot"></span> Senior</label></div>
+              <div class="chip"><input type="checkbox" id="ex_pwd" name="ex_pwd"><label for="ex_pwd"><span class="dot"></span> PWD</label></div>
+              <div class="chip"><input type="checkbox" id="ex_student" name="ex_student"><label for="ex_student"><span class="dot"></span> Student</label></div>
+            </div>
+          </div>
+
+          <!-- Reason (moved here, below exemptions) -->
+          <div class="cardx mt-3">
+            <div class="title">Reason / Note</div>
+            <input type="text" class="form-control" name="reason" placeholder="Initial create">
+            <div class="helper mt-1">Shown in the audit trail for this change.</div>
+          </div>
+
+          <!-- Actions at the very bottom of right rail -->
+          <div class="rail-actions">
+            <button type="submit" class="btn btn-primary px-4">Save Fee</button>
+            <a href="{% url 'treasurer:fees' %}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+  (function(){
+    const el = (id) => document.getElementById(id);
+    const docTypeSelect  = el('docTypeSelect');
+    const docTypeInput   = el('docTypeInput');
+    const docTypeDisplay = el('docTypeDisplay');
+    const suffixInput    = el('suffixInput');
+    const feeCode        = el('feeCode');
+    const feeName        = el('feeName');
+    const purposeCode    = el('purposeCode');
+    const purposeLabel   = el('purposeLabel');
+
+    const EMDASH = ' — ';
+    const trim = (s) => (s || '').trim();
+
+    // Short acronym from document type (BARANGAY BUSINESS CLEARANCE -> BBC)
+    const toAcronym = (s) => {
+      const words = trim(s).split(/\s+/).filter(Boolean);
+      return words.map(w => w[0]).join('').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
+    };
+
+    // Token for suffix & purpose code (UPPER + underscores)
+    const toToken = (s) => trim(s).toUpperCase()
+      .replace(/—/g, '-')  // normalize dash
+      .replace(/–/g, '-')
+      .replace(/[\s\-]+/g, '_')
+      .replace(/[^A-Z0-9_]/g, '')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
+
+    const getDocType = () => docTypeInput ? trim(docTypeInput.value) :
+                            docTypeSelect ? trim(docTypeSelect.value) : '';
+
+    const refresh = () => {
+      const docName   = getDocType();
+      const docAcr    = toAcronym(docName);  // SHORT
+      const suffixRaw = trim(suffixInput ? suffixInput.value : '');
+      const suffixTok = toToken(suffixRaw);
+
+      // Fee Code (SHORT): DOC_ACRO or DOC_ACRO_SUFFIX
+      const code = suffixTok ? `${docAcr}_${suffixTok}` : docAcr;
+      if (feeCode) feeCode.value = code;
+
+      // Fee Name: "Document Type — Suffix"
+      if (feeName) feeName.value = docName ? (docName + EMDASH + (suffixRaw || '')) : '';
+
+      // Prefill Purpose fields unless user typed
+      if (purposeLabel && (purposeLabel.dataset.touched !== '1')) {
+        purposeLabel.value = suffixRaw;
+      }
+      if (purposeCode && (purposeCode.dataset.touched !== '1')) {
+        purposeCode.value = suffixTok;
+      }
+
+      // Keep banner text in sync if user changes dropdown
+      if (docTypeDisplay && docTypeSelect) {
+        docTypeDisplay.textContent = docName;
+      }
+    };
+
+    if (docTypeSelect) docTypeSelect.addEventListener('change', refresh);
+    if (suffixInput)   suffixInput.addEventListener('input', refresh);
+    if (purposeLabel)  purposeLabel.addEventListener('input', () => { purposeLabel.dataset.touched = '1'; });
+    if (purposeCode)   purposeCode.addEventListener('input',  () => { purposeCode.dataset.touched  = '1'; });
+
+    refresh();
+  })();
+</script>
+{% endblock %}

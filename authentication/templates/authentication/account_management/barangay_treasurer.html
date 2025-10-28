@@ -1,3 +1,15 @@
+<style>
+.nav-link:hover {
+    color: #ffd000 !important;
+}
+.nav-link.active {
+    color: #ff8c00 !important;
+}
+.dropdown-item:hover {
+    color: #ff8c00 !important;
+}
+</style>
+
 <nav class="navbar navbar-expand-lg pt-0 pb-3">
     <div>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarText" aria-controls="navbarText" aria-expanded="false" aria-label="Toggle navigation">
@@ -34,15 +46,11 @@
                 <li class="nav-item me-3">
                     <a class="nav-link" href="{% url 'treasurer:dashboard' %}">Dashboard</a>
                 </li>
-                <li class="nav-item dropdown me-3">
-                    <a class="nav-link dropdown-toggle" href="#" id="resident_dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        Fee Management
-                    </a>
-                    <ul class="dropdown-menu" aria-labelledby="resident_dropdown">
-                        <li><a class="dropdown-item" href="{% url 'treasurer:fees' %}">Update Fees</a></li>
-                        <li><a class="dropdown-item" href="{% url 'treasurer:fee_add' %}">Add New Fee</a></li>
-                    </ul>
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'treasurer:fees_index' %}">Fee Catalog</a>
                 </li>
+
+                
                 <!-- <li class="nav-item me-3">
                     <a class="nav-link" href="{% url 'treasurer:fees' %}">XX Management</a>
                 </li>

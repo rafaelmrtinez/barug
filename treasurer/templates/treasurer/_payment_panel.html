@@ -1,0 +1,114 @@
+{# templates/treasurer/_payment_panel.html #}
+{% load static %}
+{% load bootstrap_icons %}
+
+{# --- derive flags (safe if a variable is missing) --- #}
+{% with
+    amt=amount_due|default:0
+%}
+{% with
+    is_waived=amt|floatformat:2 == "0.00" or amt == 0
+    has_added_by=requested_by_staff_id|default:0
+    status=(latest_status|default:"")|upper
+    has_or=has_or_number|default:False
+%}
+
+<div class="card shadow-sm border-0" style="border-radius:14px">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between" style="border-bottom:1px solid #eee">
+    <div class="fw-bold text-uppercase" style="letter-spacing:.5px">Take Payment</div>
+    {% if status %}
+      <span class="badge bg-secondary-subtle text-secondary fw-semibold">{{ status }}</span>
+    {% endif %}
+  </div>
+
+  <div class="card-body">
+
+    {# ========= Official Receipt summary ========= #}
+    <div class="mb-3 small text-muted">
+      <div>Official Receipt Number: <strong>{% if has_or %}{{ official_receipt_number }}{% else %}None yet{% endif %}</strong></div>
+      {% if not has_or %}
+        <div class="text-muted">No OR posted.</div>
+      {% endif %}
+    </div>
+
+    {# ========= ONLINE: Confirm & Post OR (when online payment is already PAID & no OR yet) ========= #}
+    {% if (not is_waived) and (not has_added_by) and (not has_or) and (status in "PAID,FOR CLERK REVIEW,FOR_TREASURER_REVIEW") %}
+      <form method="post" action="{% url 'treasurer:req_confirm_post_or' request_id %}" class="mb-3">
+        {% csrf_token %}
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">OR Payment Method</label>
+          <select name="or_method" class="form-select form-select-sm">
+            <option value="ONLINE_GCASH">ONLINE, GCASH</option>
+            <option value="ONLINE_BANK">ONLINE, BANK</option>
+            <option value="ONLINE_OTHERS">ONLINE, OTHERS</option>
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">OR Number (optional)</label>
+          <input name="or_number" class="form-control form-control-sm" placeholder="Leave blank to auto-generate">
+        </div>
+        <button class="btn btn-sm w-100" style="background:#0ea5e9; color:#fff; border-radius:10px">
+          Confirm &amp; Post OR — Move to Printing
+        </button>
+      </form>
+    {% endif %}
+
+    {# ========= WAIVED: Issue Waived OR (only when amount is fully waived) ========= #}
+    {% if is_waived and (not has_or) %}
+      <form method="post" action="{% url 'treasurer:req_issue_waived_or' request_id %}" class="mb-3">
+        {% csrf_token %}
+        <div class="small text-muted mb-2">Amount Due: <strong>₱0.00 (WAIVED)</strong></div>
+        <button class="btn btn-sm w-100" style="background:#22c55e; color:#fff; border-radius:10px">
+          Issue Waived OR (₱0.00) &amp; Move to Printing
+        </button>
+      </form>
+    {% endif %}
+
+    {# ========= WALK-IN: Accept Payment & Post OR (only when request was added by staff) ========= #}
+    {% if (not is_waived) and has_added_by and (not has_or) %}
+      <form method="post" action="{% url 'treasurer:req_accept_cash_post_or' request_id %}">
+        {% csrf_token %}
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Payment Method</label>
+          <select name="payment_method" class="form-select form-select-sm" required>
+            <option value="" selected disabled>Select…</option>
+            <option value="CASH">Cash</option>
+            <option value="GCASH">GCash (OTC)</option>
+            <option value="BANK">Bank Deposit</option>
+          </select>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Amount Paid (₱)</label>
+          <input type="number" step="0.01" min="0" name="amount_paid" class="form-control form-control-sm" placeholder="Enter amount received" required>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">OR Number (optional)</label>
+          <input name="or_number" class="form-control form-control-sm" placeholder="Leave blank to auto-generate">
+        </div>
+
+        <div class="small text-muted mb-2">Amount Due: <strong>₱{{ amount_due|floatformat:2 }}</strong></div>
+
+        <button class="btn btn-sm w-100" style="background:#6d2932; color:#fff; border-radius:10px">
+          Accept Payment &amp; Post OR
+        </button>
+      </form>
+    {% endif %}
+
+    {# ========= Fallback: nothing to do (already has OR or no matching state) ========= #}
+    {% if has_or %}
+      <div class="alert alert-success small mb-0" role="alert">
+        OR already posted. You can proceed to printing/release.
+      </div>
+    {% elif (not is_waived) and (not has_added_by) and (status not in "PAID,FOR CLERK REVIEW,FOR_TREASURER_REVIEW") %}
+      <div class="alert alert-warning small mb-0" role="alert">
+        Waiting for online payment (PAID) before posting the OR.
+      </div>
+    {% endif %}
+
+  </div>
+</div>
+
+{% endwith %}
+{% endwith %}

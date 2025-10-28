@@ -140,6 +140,8 @@ def _staff_id(request: HttpRequest) -> int | None:
 # ────────────────────────────────────────────────────────────
 BRGY_BUSINESS_DOC_NAME = "BARANGAY BUSINESS CLEARANCE"     # must match request_document_type_name
 BRGY_BUSINESS_PDF_FILE = "barangay-business-clearance.pdf" # the uploaded template filename
+# e.g., near BRGY_BUSINESS_DOC_NAME / BRGY_BUSINESS_PDF_FILE
+CTC_BRGY_BUSINESS_PDF_FILE = "ctc-barangay-business-clearance.pdf"
 
 # ────────────────────────────────────────────────────────────
 # SECTION: Missing-value advice (for logs)
@@ -800,16 +802,30 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
         doc_name_print = _safe_str(ref_line.get("document_type_name")) if (is_ctc and ref_line) else original_doc_name
         doc_name_upper = doc_name_print.strip().upper()
 
+        # The document to PRINT (for CTC we print the original's document)
+        doc_name_print = _safe_str(ref_line.get("document_type_name")) if (is_ctc and ref_line) else original_doc_name
+        doc_name_upper = doc_name_print.strip().upper()
+
         # Is this a (CTC of) Barangay Business Clearance?
         is_bc = (
             doc_name_upper == BRGY_BUSINESS_DOC_NAME
             or (is_ctc and ((line.get("details") or {}).get("ctc_of","").strip().upper() == BRGY_BUSINESS_DOC_NAME))
         )
 
-        # Template selection
+        # ✅ DEFAULT template (works for all other docs)
         template_file = _choose_template(doc_name_print, False)
-        if is_bc or (line.get("details") or {}).get("template_override") == BRGY_BUSINESS_PDF_FILE:
-            template_file = BRGY_BUSINESS_PDF_FILE
+
+        # Template selection
+        if is_bc:
+            if is_ctc:
+                template_file = CTC_BRGY_BUSINESS_PDF_FILE
+            else:
+                template_file = BRGY_BUSINESS_PDF_FILE
+
+        # (Optional) still honor a manual per-line override if you use it
+        if (line.get("details") or {}).get("template_override"):
+            template_file = (line["details"]["template_override"])
+            
         template_path = os.path.join(base_dir, template_file)
         print(f"[PRINT DEBUG] doc='{doc_name_print}' (from='{original_doc_name}') -> template='{template_file}' (CTC={is_ctc})")
 
@@ -946,6 +962,8 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
     resp = HttpResponse(zbuf.getvalue(), content_type="application/zip")
     resp["Content-Disposition"] = f'attachment; filename="{req_code}-documents.zip'
     return resp
+
+
 
 # ────────────────────────────────────────────────────────────
 # SECTION: Release / Decline
@@ -1202,13 +1220,21 @@ def person_submission_dets(request: HttpRequest, req_id: int):
 # ────────────────────────────────────────────────────────────
 # SECTION: AJAX helpers (search and purposes)
 # ────────────────────────────────────────────────────────────
+
+# ────────────────────────────────────────────────────────────
+# SECTION: AJAX helpers (search and purposes)
+# ────────────────────────────────────────────────────────────
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
 def ajax_owner_businesses(request: HttpRequest) -> HttpResponse:
     """
     Return <option> list of the selected owner's businesses.
-    Used when Document Type is 'Barangay Business Clearance'.
+    Used when Document Type is 'Barangay Business Clearance' or 'Certified True Copy' (CTC).
+
+    GET:
+      owner_person_id          (int, required)
+      require_has_clearance    ('1'|'true' to show ONLY businesses that already have a clearance)
     """
     try:
         owner_person_id = int(request.GET.get("owner_person_id") or 0)
@@ -1216,21 +1242,24 @@ def ajax_owner_businesses(request: HttpRequest) -> HttpResponse:
         owner_person_id = 0
 
     if not owner_person_id:
-        # Keep it simple so the select shows a clear message
         html = '<option value="">— select resident first —</option>'
         return HttpResponse(html)
 
+    require_has_clearance = str(request.GET.get("require_has_clearance") or "").lower() in ("1", "true", "yes")
+
     try:
-        resp = (
+        q = (
             supabase.table("business")
             .select(
-                "business_id, business_name, business_category_id, "
+                "business_id, business_name, business_category_id, has_business_clearance, "
                 "address:address_id(street, barangay, city)"
             )
             .eq("business_owner_id", owner_person_id)
-            .order("business_name")
-            .execute()
         )
+        if require_has_clearance:
+            q = q.eq("has_business_clearance", True)
+
+        resp = q.order("business_name").execute()
         rows = resp.data or []
     except Exception as e:
         rows = []
@@ -1252,6 +1281,7 @@ def ajax_purpose_options(request: HttpRequest):
     purposes = _fetch_purposes_by_request_type(req_type_id) if req_type_id else []
     html = render_to_string("clerk/doc_req/_purpose_options.html", {"purposes": purposes})
     return HttpResponse(html)
+
 
 @session_login_required
 @role_required(CLERK_ROLE)
@@ -1375,6 +1405,8 @@ def walkin_new(request: HttpRequest):
         "residents": residents,
     })
 
+
+
 # ────────────────────────────────────────────────────────────
 # SECTION: Business Clearance field derivation
 # ────────────────────────────────────────────────────────────
@@ -1393,13 +1425,17 @@ def _fetch_business_clearance_fields(business_id: int, subject_person_id: Option
     """
     Pull business + address + subject basics and return the semantic keys
     that the Business Clearance PDF expects (before mapping).
+
+    CHANGE: First line of business now comes from business_category_id ->
+    document_purpose.purpose_label (falls back to business_nature).
     """
-    # Business core + address
+    # Business core + address (+ category id)
     try:
         bq = (
             supabase.table("business")
             .select(
-                "business_name, business_nature, capital_invested, prev_yr_total_gross_sales, "
+                "business_name, business_nature, business_category_id, "
+                "capital_invested, prev_yr_total_gross_sales, "
                 "address:address_id(street, barangay, city, purok_sitio:purok_sitio_id(purok_sitio_name))"
             )
             .eq("business_id", business_id)
@@ -1438,9 +1474,33 @@ def _fetch_business_clearance_fields(business_id: int, subject_person_id: Option
     parts = [addr.get("street"), purok, addr.get("barangay"), addr.get("city")]
     business_address = ", ".join([str(p).strip() for p in parts if p])
 
-    # Lines of business: split into up to 5 bullets
+    # ---- NEW: category label via business_category_id -> document_purpose.purpose_label
+    category_label: Optional[str] = None
+    cat_id = b.get("business_category_id")
+    if cat_id:
+        try:
+            dpq = (
+                supabase.table("document_purpose")
+                .select("purpose_label")              # optionally also select request_document_type_id if you want to guard it (e.g., = 4)
+                .eq("document_purpose_id", int(cat_id))
+                .limit(1)
+                .execute()
+            )
+            category_label = ((dpq.data or [{}])[0] or {}).get("purpose_label")
+        except Exception as e:
+            print(f"[WALKIN DEBUG] fetch category label failed: {e}")
+
+    # Lines of business:
+    # 1) Prefer the category label for slot #1
+    # 2) Then append any comma-separated items from business_nature
     nature = (b.get("business_nature") or "").strip()
-    lob = [s.strip() for s in nature.split(",") if s.strip()]
+    extra = [s.strip() for s in nature.split(",") if s.strip()]
+    lob: List[str] = []
+    if category_label:
+        lob.append(category_label)
+        # avoid duplicate if the same text appears in business_nature
+        extra = [x for x in extra if x.lower() != category_label.lower()]
+    lob.extend(extra)
     while len(lob) < 5:
         lob.append("")
 
@@ -1461,6 +1521,7 @@ def _fetch_business_clearance_fields(business_id: int, subject_person_id: Option
     print("[WALKIN DEBUG] derived Business Clearance details:", json.dumps(details, indent=2, default=str))
     print("[WALKIN DEBUG] raw business row:", json.dumps(b, indent=2, default=str))
     return details
+
 
 # ────────────────────────────────────────────────────────────
 # SECTION: Walk-in create (payload builder + BC enrichment)
@@ -1654,6 +1715,7 @@ def walkin_create(request: HttpRequest):
 
     messages.success(request, f"Walk-in request created. ID: {new_id}")
     return redirect("clerk:detail", doc_request_id=new_id)
+
 
 
 # ────────────────────────────────────────────────────────────

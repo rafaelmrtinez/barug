@@ -6,58 +6,197 @@
   <title>Case Timeline — {{ header.case_num }}</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
-    :root { --c1:#0f172a; --c2:#64748b; --ok:#16a34a; --muted:#94a3b8; --line:#e2e8f0; --badge:#f1f5f9; }
-    * { box-sizing: border-box; }
-    body { margin:0; font:14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color:#0f172a; background:#fff; }
-    .wrap { max-width: 900px; margin: 24px auto; padding: 0 16px 40px; }
-    h1 { font-size: 20px; margin: 0 0 8px; }
-    .sub { color: var(--c2); margin-bottom: 20px; }
-    .header { display:flex; flex-wrap:wrap; gap:12px; align-items:baseline; margin-bottom:16px; }
-    .stat { display:inline-block; background:var(--badge); color:#0f172a; border-radius:999px; padding:4px 10px; font-size:12px; }
-    .timeline { position:relative; margin-top:10px; }
-    .timeline:before { content:""; position:absolute; left:14px; top:0; bottom:0; width:2px; background:var(--line); }
-    .item { position:relative; padding-left:40px; margin:20px 0; }
-    .dot { position:absolute; left:8px; top:6px; height:12px; width:12px; border-radius:50%; background:#0ea5e9; border:2px solid #fff; box-shadow:0 0 0 2px var(--line); }
-    .item.form .dot{ background:#8b5cf6; }
-    .item.report .dot{ background:#f59e0b; }
-    .item.case .dot{ background:#10b981; }
-    .title { font-weight:600; }
-    .subtitle { color:var(--c2); }
-    .meta { color:var(--muted); font-size:12px; margin-top:2px; }
-    .date { font-size:12px; color:var(--c2); }
-    .row { display:flex; justify-content:space-between; gap:12px; align-items:baseline; }
-    .empty { color:var(--muted); padding:16px; border:1px dashed var(--line); border-radius:8px; margin-top:12px; }
-    a.btn { display:inline-block; padding:6px 10px; border-radius:8px; border:1px solid var(--line); text-decoration:none; color:#0f172a; }
-    @media (max-width:600px){ .row{flex-direction:column; align-items:flex-start;} }
+    :root{
+      --ink:#0f172a; --muted:#64748b; --soft:#94a3b8; --line:#e5e7eb; --bg:#f8fafc; --panel:#ffffff;
+      --chip:#eef2f7; --chipb:#cbd5e1;
+      --report:#f59e0b; --case:#10b981; --form:#8b5cf6; --hearing:#0ea5e9; --conciliation:#06b6d4;
+      --payment:#16a34a; --or:#84cc16; --status:#9333ea; --media:#ef4444; --state:#111827;
+      --shadow:0 10px 20px rgba(2,6,23,.04), 0 2px 6px rgba(2,6,23,.06);
+      --radius:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; color:var(--ink);
+      background:linear-gradient(180deg,var(--bg),#fff 40%)
+    }
+    .wrap{max-width:1100px; margin:24px auto; padding:0 16px 56px}
+
+    /* Header */
+    .top{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px}
+    .title{display:flex; gap:12px; align-items:baseline}
+    h1{font-size:22px; margin:0}
+    .stat{display:inline-flex; align-items:center; gap:6px; background:var(--chip); color:var(--ink);
+          border:1px solid var(--chipb); border-radius:999px; padding:4px 10px; font-size:12px}
+    .btn{display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px;
+         border:1px solid var(--line); background:#fff; text-decoration:none; color:var(--ink); box-shadow:var(--shadow)}
+    .sub{color:var(--muted); margin:6px 0 18px}
+
+    /* Toolbar + Filters */
+    .toolbar{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:10px 0}
+    .filters{display:flex; flex-wrap:wrap; gap:8px; padding:10px; border:1px solid var(--line);
+      border-radius:12px; background:#fff; box-shadow:var(--shadow); position:sticky; top:8px; z-index:5}
+    .chip{display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; font-size:12px;
+          border:1px solid var(--line); background:var(--chip); cursor:pointer; user-select:none}
+    .chip input{accent-color:#0ea5e9}
+    .legend-dot{width:10px; height:10px; border-radius:50%}
+    .search{display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid var(--line);
+            background:#fff; border-radius:10px; box-shadow:var(--shadow)}
+    .search input{border:0; outline:0; font:inherit; width:220px}
+    .sort{display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid var(--line);
+          background:#fff; border-radius:10px; box-shadow:var(--shadow); cursor:pointer}
+
+    /* Timeline */
+    .timeline{position:relative; margin-top:14px}
+    .day{position:sticky; top:64px; background:#fff; padding:8px 4px; font-weight:700; color:#111827;
+         border-bottom:1px solid var(--line); z-index:4}
+    .group{position:relative; padding-left:0}
+    .items{position:relative}
+    .items:before{content:""; position:absolute; left:22px; top:0; bottom:0; width:2px; background:var(--line)}
+
+    .item{position:relative; margin:14px 0 0; padding-left:54px}
+    .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow);
+          padding:12px 14px}
+    .dot{position:absolute; left:16px; top:18px; height:14px; width:14px; border-radius:50%; border:2px solid #fff;
+         box-shadow:0 0 0 2px var(--line)}
+    .report .dot{background:var(--report)}
+    .case .dot{background:var(--case)}
+    .form .dot{background:var(--form)}
+    .hearing .dot{background:var(--hearing)}
+    .conciliation .dot{background:var(--conciliation)}
+    .payment .dot{background:var(--payment)}
+    .or .dot{background:var(--or)}
+    .status .dot{background:var(--status)}
+    .media .dot{background:var(--media)}
+    .state .dot{background:var(--state)}
+
+    .row{display:flex; justify-content:space-between; gap:12px; align-items:flex-start}
+    .left{min-width:0}
+    .right{white-space:nowrap; color:var(--muted); font-size:12px}
+    .kind-pill{font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:var(--chip); margin-right:6px}
+    .e-title{font-weight:700}
+    .subtitle{color:var(--muted); margin-top:2px}
+    .meta{color:var(--soft); font-size:12px; margin-top:6px}
+    .empty{color:var(--soft); padding:18px; border:1px dashed var(--line); border-radius:12px; margin-top:12px; background:#fff}
+
+    @media (max-width:720px){
+      .row{flex-direction:column; align-items:flex-start}
+      .day{top:56px}
+      .search input{width:150px}
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="header">
-      <h1>Case Timeline — {{ header.case_num }}</h1>
-      <span class="stat">{{ header.type_name }}</span>
-      <span class="stat">{{ header.nature_name }}</span>
+    <div class="top">
+      <div class="title">
+        <h1>Case Timeline — {{ header.case_num }}</h1>
+        <span class="stat">{{ header.type_name }}</span>
+        <span class="stat">{{ header.nature_name }}</span>
+      </div>
       <a class="btn" href="{% url 'lupon_mem:case_detail' header.case_id %}">Back to Case</a>
     </div>
     <p class="sub">{{ header.case_name }}</p>
 
-    {% if events %}
-      <div class="timeline">
-        {% for e in events %}
-          <div class="item {{ e.kind }}">
-            <span class="dot"></span>
-            <div class="row">
-              <div>
-                <div class="title">{{ e.title }}</div>
-                {% if e.subtitle %}<div class="subtitle">{{ e.subtitle }}</div>{% endif %}
-                {% if e.meta.submission_id %}
-                  <div class="meta">Submission #{{ e.meta.submission_id }} • Status: {{ e.meta.status }}</div>
-                {% endif %}
-              </div>
-              <div class="date">
-                {% if e.dt %}{{ e.dt|date:"M d, Y" }} {{ e.dt|date:"h:i A" }}{% else %}—{% endif %}
-              </div>
+    <!-- Toolbar: search + sort -->
+    <div class="toolbar">
+      <div class="search">
+        🔎 <input id="q" type="text" placeholder="Search title, remarks, OR…" />
+      </div>
+      <div class="sort" id="sortBtn" data-order="asc" title="Toggle sort order">
+        ⏱️ <span id="sortLabel">Oldest → Newest</span>
+      </div>
+    </div>
+
+    <!-- Filter chips -->
+    <div class="filters" id="filters">
+      <label class="chip"><span class="legend-dot" style="background:#f59e0b"></span>
+        <input type="checkbox" class="fbox" data-kind="report" checked> Report
+      </label>
+      <label class="chip"><span class="legend-dot" style="background:#10b981"></span>
+        <input type="checkbox" class="fbox" data-kind="case" checked> Case
+      </label>
+      <label class="chip"><span class="legend-dot" style="background:#8b5cf6"></span>
+        <input type="checkbox" class="fbox" data-kind="form" checked> Form
+      </label>
+      <label class="chip"><span class="legend-dot" style="background:#06b6d4"></span>
+        <input type="checkbox" class="fbox" data-kind="conciliation" checked> Conciliation
+      </label>
+      <label class="chip"><span class="legend-dot" style="background:#16a34a"></span>
+        <input type="checkbox" class="fbox" data-kind="payment" checked> Payment
+      </label>
+      <label class="chip"><span class="legend-dot" style="background:#84cc16"></span>
+        <input type="checkbox" class="fbox" data-kind="or" checked> Receipt
+      </label>
+      <label class="chip"><span class="legend-dot" style="background:#9333ea"></span>
+        <input type="checkbox" class="fbox" data-kind="status" checked> Status
+      </label>
+      <label class="chip"><span class="legend-dot" style="background:#ef4444"></span>
+        <input type="checkbox" class="fbox" data-kind="media" checked> Media
+      </label>
+      <label class="chip"><span class="legend-dot" style="background:#111827"></span>
+        <input type="checkbox" class="fbox" data-kind="state" checked> State
+      </label>
+    </div>
+
+    {% if groups %}
+      <div class="timeline" id="timeline">
+        {% for g in groups %}
+          <div class="group" data-group="{{ g.day|default_if_none:'-' }}">
+            <div class="day">
+              {% if g.day %}{{ g.day|date:"M d, Y" }}{% else %}(No date){% endif %}
             </div>
+
+            <div class="items">
+              {% for e in g.items %}
+                <div class="item {{ e.kind }}" data-kind="{{ e.kind }}">
+                  <span class="dot"></span>
+                  <div class="card">
+                    <div class="row">
+                      <div class="left">
+                        <span class="kind-pill">{{ e.kind|title }}</span>
+                        <span class="e-title">{{ e.title }}</span>
+                        {% if e.subtitle %}<div class="subtitle">{{ e.subtitle }}</div>{% endif %}
+
+                        {% if e.kind == 'form' and e.meta.submission_id %}
+                          <div class="meta">
+                            Submission #{{ e.meta.submission_id }} • Status: {{ e.meta.status }}{% if e.meta.by %} • by {{ e.meta.by }}{% endif %}
+                          </div>
+                        {% elif e.kind == 'hearing' and e.meta.progress_id %}
+                          <div class="meta">Progress #{{ e.meta.progress_id }}{% if e.meta.by %} • by {{ e.meta.by }}{% endif %}</div>
+                        {% elif e.kind == 'conciliation' and e.meta.progress_id %}
+                          <div class="meta">Progress #{{ e.meta.progress_id }}{% if e.meta.by %} • by {{ e.meta.by }}{% endif %}</div>
+                        {% elif e.kind == 'payment' %}
+                          <div class="meta">
+                            {% if e.meta.case_payment_id %}Case Payment #{{ e.meta.case_payment_id }}{% endif %}
+                            {% if e.meta.report_payment_id %}Report Payment #{{ e.meta.report_payment_id }}{% endif %}
+                            {% if e.meta.amount %} • ₱{{ e.meta.amount|floatformat:2 }}{% endif %}
+                            {% if e.meta.status %} • Status: {{ e.meta.status }}{% endif %}
+                            {% if e.meta.receipt %} • OR: {{ e.meta.receipt }}{% endif %}
+                            {% if e.meta.by %} • by {{ e.meta.by }}{% endif %}
+                          </div>
+                        {% elif e.kind == 'or' %}
+                          <div class="meta">
+                            OR: {{ e.meta.or_number }}{% if e.meta.amount %} • ₱{{ e.meta.amount|floatformat:2 }}{% endif %}{% if e.meta.by %} • by {{ e.meta.by }}{% endif %}
+                          </div>
+                        {% elif e.kind == 'status' and e.meta.kind %}
+                          <div class="meta">{{ e.meta.kind|title }}{% if e.meta.by %} • by {{ e.meta.by }}{% endif %}</div>
+                        {% elif e.kind == 'media' %}
+                          <div class="meta">
+                            {{ e.meta.kind|title }}{% if e.meta.submission_id %} • From submission #{{ e.meta.submission_id }}{% endif %}{% if e.meta.by %} • by {{ e.meta.by }}{% endif %}
+                          </div>
+                        {% endif %}
+                      </div>
+
+                      <div class="right">
+                        {% if e.dt %}{{ e.dt|date:"M d, Y · h:i A" }}{% else %}—{% endif %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+
           </div>
         {% endfor %}
       </div>
@@ -65,5 +204,65 @@
       <div class="empty">No events yet for this case.</div>
     {% endif %}
   </div>
+
+  <!-- Tiny utilities: filter + search + client-side sort -->
+  <script>
+    (function(){
+      const boxes = document.querySelectorAll('.fbox');
+      const groups = Array.from(document.querySelectorAll('.group'));
+      const search = document.getElementById('q');
+      const sortBtn = document.getElementById('sortBtn');
+      const sortLabel = document.getElementById('sortLabel');
+
+      function applyFilters(){
+        const on = {};
+        boxes.forEach(b => on[b.dataset.kind] = b.checked);
+
+        // Filter each item by kind and search text
+        const q = (search.value || '').toLowerCase();
+        document.querySelectorAll('.item[data-kind]').forEach(el => {
+          const okKind = on[el.dataset.kind];
+          let okText = true;
+          if (q) {
+            const text = el.textContent.toLowerCase();
+            okText = text.indexOf(q) !== -1;
+          }
+          el.style.display = (okKind && okText) ? '' : 'none';
+        });
+
+        // Hide an entire day group if all its items are hidden
+        groups.forEach(g => {
+          const visible = g.querySelectorAll('.item:not([style*="display: none"])').length > 0;
+          g.style.display = visible ? '' : 'none';
+        });
+      }
+
+      function reverseOrder(){
+        const wrapper = document.getElementById('timeline');
+        // Reverse groups in the DOM
+        groups.reverse().forEach(g => wrapper.appendChild(g));
+        // Reverse items inside each group
+        document.querySelectorAll('.items').forEach(ul => {
+          const children = Array.from(ul.children).reverse();
+          children.forEach(c => ul.appendChild(c));
+        });
+      }
+
+      // Events
+      boxes.forEach(b => b.addEventListener('change', applyFilters));
+      search.addEventListener('input', applyFilters);
+
+      sortBtn.addEventListener('click', () => {
+        const curr = sortBtn.getAttribute('data-order') || 'asc';
+        const next = (curr === 'asc') ? 'desc' : 'asc';
+        sortBtn.setAttribute('data-order', next);
+        sortLabel.textContent = next === 'asc' ? 'Oldest → Newest' : 'Newest → Oldest';
+        reverseOrder();
+      });
+
+      // Initial pass
+      applyFilters();
+    })();
+  </script>
 </body>
 </html>

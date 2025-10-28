@@ -192,7 +192,7 @@
               </div>
             </div>
 
-            <!-- Business (owner) — only for Barangay Business Clearance -->
+            <!-- Business (owner) — for Barangay Business Clearance and Certified True Copy (CTC) -->
             <div class="row g-3 mt-1 d-hidden" id="businessRow">
               <div class="col-12">
                 <label class="form-label label-req" for="businessSelect">Business (owner)</label>
@@ -298,7 +298,7 @@
   const sumQty       = document.getElementById('sumQty');
   const sumOffense   = document.getElementById('sumOffense');
 
-  // ------- Endpoints (make sure ajax_owner_businesses exists in urls.py) -------
+  // ------- Endpoints -------
   const URL_SEARCH     = "{% url 'clerk:ajax_resident_search' %}";
   const URL_PURPOSE    = "{% url 'clerk:ajax_purpose_options' %}";
   const URL_BIZ_BY_OWN = "{% url 'clerk:ajax_owner_businesses' %}";
@@ -318,6 +318,12 @@
   const isBusinessDoc   = (text) => (text||'').toLowerCase().includes('business');
   const isClearanceDoc  = (text) => (text||'').toLowerCase().includes('clearance');
 
+  // NEW: detect "Certified True Copy" doc type
+  const isCTCDoc        = (text) => {
+    const s = (text||'').toLowerCase();
+    return s.includes('certified') && s.includes('true') && s.includes('copy');
+  };
+
   // ------- PURPOSE INDEX (by document_purpose_id) -------
   // We will match: business.business_category_id == document_purpose_id
   let PURPOSE_INDEX = [];
@@ -330,8 +336,8 @@
       const pidInt = /^\d+$/.test(o.value) ? parseInt(o.value, 10) : null; // document_purpose_id
       PURPOSE_INDEX.push({
         idx: i,
-        value: o.value,       // original value (string)
-        purposeIdInt: pidInt, // parsed int of document_purpose_id
+        value: o.value,
+        purposeIdInt: pidInt,
         text: o.text
       });
     }
@@ -389,11 +395,12 @@
     panel.classList.add('d-none');
     document.getElementById('changeResidentBtn').classList.remove('d-hidden');
 
-    // If current doc is Business Clearance, fetch businesses for this owner
+    // If current doc requires business (Business Clearance OR CTC), fetch businesses
     const selectedText = docSel.options[docSel.selectedIndex]?.text || '';
-    if (isBusinessDoc(selectedText)){
+    const needsBusiness = isBusinessDoc(selectedText) || isCTCDoc(selectedText);
+    if (needsBusiness){
       businessRow.classList.remove('d-hidden');
-      if (id) loadOwnerBusinesses(id);
+      if (id) loadOwnerBusinesses(id, /* requireHasClearance */ isCTCDoc(selectedText));
     }
 
     clearAlert();
@@ -431,11 +438,15 @@
     }
   }
 
-  // ------- Load owner businesses -------
-  async function loadOwnerBusinesses(ownerId){
+  // ------- Load owner businesses (optionally require clearance) -------
+  async function loadOwnerBusinesses(ownerId, requireHasClearance=false){
     bizSel.innerHTML = '<option value="">Loading…</option>';
     try{
-      const resp = await fetch(`${URL_BIZ_BY_OWN}?owner_person_id=${encodeURIComponent(ownerId)}`, { headers: { "X-Requested-With":"fetch" }});
+      const url = new URL(URL_BIZ_BY_OWN, window.location.origin);
+      url.searchParams.set('owner_person_id', ownerId);
+      if (requireHasClearance) url.searchParams.set('require_has_clearance', '1');
+
+      const resp = await fetch(url.toString(), { headers: { "X-Requested-With":"fetch" }});
       const html = await resp.text();
       bizSel.innerHTML = html || '<option value="">— no businesses found —</option>';
 
@@ -446,10 +457,10 @@
         if (!o.value) continue;
         bizDump.push({ idx:i, id:o.value, text:o.text, business_category_id:o.getAttribute('data-bcat') });
       }
-      console.log('[BBC] Loaded businesses for owner:', ownerId);
+      console.log('[BBC/CTC] Loaded businesses for owner:', ownerId);
       console.table(bizDump);
     }catch(e){
-      console.error('[BBC] loadOwnerBusinesses failed:', e);
+      console.error('[BBC/CTC] loadOwnerBusinesses failed:', e);
       bizSel.innerHTML = '<option value="">Failed to load businesses</option>';
     }finally{
       bizHidden.value = '';
@@ -495,19 +506,30 @@
   function updateDocDependentToggles(){
     const selectedText = docSel.options[docSel.selectedIndex]?.text || '';
 
+    // Offense input visible only for "*clearance*"
     offenseWrap.classList.toggle('d-hidden', !isClearanceDoc(selectedText));
 
-    const isBiz = isBusinessDoc(selectedText);
-    businessRow.classList.toggle('d-hidden', !isBiz);
+    // Business row shown for Business Clearance OR CTC
+    const needsBusiness = isBusinessDoc(selectedText) || isCTCDoc(selectedText);
+    businessRow.classList.toggle('d-hidden', !needsBusiness);
 
     // If becoming visible and a resident is already chosen, fetch businesses
     const ownerId = document.getElementById('requested_by_person_id').value;
-    if (isBiz && ownerId){
-      loadOwnerBusinesses(ownerId);
-    }else if(!isBiz){
+    if (needsBusiness && ownerId){
+      // If CTC → require only businesses with clearance
+      loadOwnerBusinesses(ownerId, /* requireHasClearance */ isCTCDoc(selectedText));
+    }else if(!needsBusiness){
       bizSel.innerHTML = '<option value="">— select resident first —</option>';
       bizHidden.value = '';
       sumBiz.textContent = '—';
+    }
+
+    // Help text tweak (optional)
+    const help = businessRow.querySelector('.help');
+    if (help){
+      help.textContent = isCTCDoc(selectedText)
+        ? 'This list shows only the resident’s businesses that already have a business clearance.'
+        : 'This list shows businesses owned by the selected resident.';
     }
 
     updateSummary();
@@ -561,10 +583,13 @@
     if (!qtyInput.value || Number(qtyInput.value) < 1){ errors.push('Quantity must be at least 1.'); qtyInput.classList.add('is-invalid'); }
     else{ qtyInput.classList.remove('is-invalid'); }
 
-    // If Business Clearance, require a selected business
+    // If requires business (Business Clearance or CTC), require a selected business
     const selectedText = docSel.options[docSel.selectedIndex]?.text || '';
-    if (isBusinessDoc(selectedText) && !bizHidden.value){
-      errors.push('Please choose a business for Barangay Business Clearance.');
+    const needsBusiness = isBusinessDoc(selectedText) || isCTCDoc(selectedText);
+    if (needsBusiness && !bizHidden.value){
+      errors.push(isCTCDoc(selectedText)
+        ? 'Please choose a business that already has a clearance (for Certified True Copy).'
+        : 'Please choose a business for Barangay Business Clearance.');
     }
 
     if (errors.length){
