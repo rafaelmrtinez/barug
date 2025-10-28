@@ -78,6 +78,15 @@ class MaternalHealthRecordException(Exception):
         "P6272",  # EDD cannot be before LMP (after overlay).
         "P6273",  # Full-term and preterm cannot both be TRUE (after overlay).
         "P6274",  # Only one present pregnancy status allowed per ANC visit.
+        # codes from set_maternal_record_status SQL function
+        "P6229",  # Missing required params (staff id/status)
+        "P6230",  # Invalid status id
+        "P6231",  # Status not allowed (only COMPLETE/INCOMPLETE)
+        "P6232",  # Required ANC visits not met for COMPLETE
+        # codes from complete_maternal_visit_and_schedule SQL function
+        "P6221",  # Maternal health record id is required
+        "P6222",  # Visit COMPLETE status not found
+        "P6223",  # Schedule statuses PENDING/COMPLETED not found
     }
 
     def __init__(self, message):

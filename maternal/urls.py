@@ -3,6 +3,8 @@ from maternal import views
 
 app_name = 'maternal'
 
+API_VERSION = 1
+
 urlpatterns = [
     path('records/', views.records, name='maternal_records'),
     path('record/<int:person_id>/', views.record_detail, name='maternal_record_detail'),
@@ -12,4 +14,8 @@ urlpatterns = [
     path("find-mother-basic-info/<int:person_id>/", views.find_mother_basic_info, name="find_mother_basic_info"),
     path("form/prenatal/<int:mhr_id>/", views.health_worker_prenatal_form_view, name="bhw_prenatal_form"),
     path("api/form/prenatal/", views.prenatal_api, name="bhw_prenatal_api"),
+    # v1 API to update maternal health record status
+    path(f'api/v{API_VERSION}/mhr/status/update/', __import__('maternal.api.maternal_heal_status_api', fromlist=['']).MaternalHealthRecordStatusUpdateAPI.as_view(), name='mhr_status_update_api'),
+    # v1 API to complete a maternal visit schedule
+    path(f'api/v{API_VERSION}/mhr/visit/complete/', __import__('maternal.api.complete_maternal_visit_api', fromlist=['']).CompleteMaternalVisitAPI.as_view(), name='mhr_visit_complete_api'),
 ]
