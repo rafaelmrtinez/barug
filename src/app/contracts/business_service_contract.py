@@ -3,7 +3,8 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple
 from decimal import Decimal
 from src.app.transfer_objects.commands.business_cmd import (
-  RegisterBusinessProfileCmd
+  RegisterBusinessProfileCmd,
+  CreateRenewalRequestCmd,
 )
 from src.app.transfer_objects.dto.business_dto import (
   ResidentOwnerDTO,
@@ -102,4 +103,9 @@ class IBusinessRenewalQuoteService(ABC):
           quote_rows       : List[RenewalQuoteLineDTO]
           paid_history_rows: List[{period_year, or_number, paid_on}]
         """
+        pass
+    
+class IBusinessRenewalRequestService(ABC):
+    @abstractmethod
+    def request_renewal(self, cmd: CreateRenewalRequestCmd) -> int:
         pass

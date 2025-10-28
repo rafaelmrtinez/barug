@@ -87,9 +87,11 @@
           • Current year is <b>included</b> because it’s unpaid.
         </div>
       </div>
+      {% if show_summary_cta %}
       <div class="col-md-4 text-md-end">
-        <button type="button" class="btn btn-outline-brand">Create Renewal Request</button>
+        <a href="{{ summary_cta_href }}" class="btn btn-outline-brand">{{ summary_cta_label }}</a>
       </div>
+      {% endif %}
     </div>
   </div>
   <!-- ======================================================================= -->
@@ -328,10 +330,6 @@
         </div>
       </div>
 
-      <!-- Footer action -->
-      <div class="text-end pt-3 mt-3">
-        <button type="button" class="btn btn-submit">Request Document for the Business</button>
-      </div>
       <!-- ===================================================================== -->
 
     </div>

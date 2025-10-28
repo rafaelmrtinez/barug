@@ -10,7 +10,8 @@ from src.app.contracts.business_service_contract import (
     IResidentOwnerService,
     IBusinessRegistrationService,
     IBusinessRenewalService,
-    IBusinessRenewalQuoteService
+    IBusinessRenewalQuoteService,
+    IBusinessRenewalRequestService,
 )
 from src.domain.contracts.household_repository_contract import (
     IHouseholdRepository
@@ -21,7 +22,8 @@ from src.app.services.business_service import (
     BusinessRegistrationService,
     OwnerBusinessInfoService,
     BusinessRenewalService,
-    BusinessRenewalQuoteService
+    BusinessRenewalQuoteService,
+    BusinessRenewalRequestService,
 )
 from src.app.contracts.household_service_contract import (
     IHouseholdService
@@ -91,4 +93,9 @@ class AppContainer(containers.DeclarativeContainer):
     business_renewal_quote_service: providers.Factory[IBusinessRenewalQuoteService] = providers.Factory(
         BusinessRenewalQuoteService,
         quote_repo=infra.business_renewal_quote
+    )
+
+    business_renewal_request_service: providers.Factory[IBusinessRenewalRequestService] = providers.Factory(
+        BusinessRenewalRequestService,
+        repo=infra.business_renewal_request
     )

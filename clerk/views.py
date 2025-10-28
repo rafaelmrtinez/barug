@@ -99,10 +99,12 @@ from src.app.contracts.business_service_contract import (
     INonResidentOwnerService,
     IBusinessRenewalService,
     IBusinessRenewalQuoteService,
+    IBusinessRenewalRequestService,
 )
 from src.domain.contracts.business_repository_contract import IBusinessRepository
 from src.app.transfer_objects.commands.business_cmd import (
-    RegisterBusinessProfileCmd
+    RegisterBusinessProfileCmd,
+    CreateRenewalRequestCmd,
 )
 from src.app.services.business_notification import notify_registration_received
 from common.send_sms import send_sms
@@ -2878,6 +2880,30 @@ def business_information(
 
     grand_total, quote_rows, paid_rows = renewal_quote_svc.execute(business_id=b_id, year=current_year)
 
+    business_dict = dict(dto.business or {})
+    status_upper = (business_dict.get("business_status") or "").strip().upper()
+
+    renewal_href = reverse("clerk:create_renewal_request", kwargs={"b_id": b_id})
+    doc_req_href = reverse("clerk:walkin_new")
+
+    if status_upper == "ACTIVE":
+        show_summary_cta = False
+        summary_cta_href = None
+        summary_cta_label = None
+    elif status_upper == "PENDING":
+        show_summary_cta = True
+        summary_cta_href = doc_req_href
+        summary_cta_label = "Proceed to Document Request"
+    elif status_upper == "EXPIRED":
+        show_summary_cta = True
+        summary_cta_href = renewal_href
+        summary_cta_label = "Create Renewal Request"
+    else:
+        # Fallback: show renewal CTA for other non-active statuses
+        show_summary_cta = True
+        summary_cta_href = renewal_href
+        summary_cta_label = "Create Renewal Request"
+
     return render(
         request,
         "business/business_information.html",
@@ -2892,6 +2918,10 @@ def business_information(
             "grand_total": grand_total,
             "quote_rows": quote_rows,
             "paid_rows": paid_rows,
+            "business_status_upper": status_upper,
+            "show_summary_cta": show_summary_cta,
+            "summary_cta_href": summary_cta_href,
+            "summary_cta_label": summary_cta_label,
         },
     )
 
@@ -3035,3 +3065,118 @@ def ajax_renewal_search(
         request=request,
     )
     return HttpResponse(html, content_type="text/html; charset=utf-8")
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@inject
+def create_renewal_request(
+    request: HttpRequest,
+    b_id: int,
+    business_info: IBusinessInfoService = Provide[AppContainer.owner_business_service],
+    renewal_quote_svc: IBusinessRenewalQuoteService = Provide[AppContainer.business_renewal_quote_service],
+    svc: IBusinessRenewalRequestService = Provide[AppContainer.business_renewal_request_service],
+):
+    user_role = _auth_role_name(request)
+
+    if request.method == "POST":
+        try:
+            business_id = int(request.POST.get("business_id") or b_id)
+            period_type = (request.POST.get("period_type") or "ANNUAL").upper()
+            period_year = int(request.POST.get("period_year") or date.today().year)
+
+            # Quarter: only when QUARTERLY; accept "Q1"/"Q2"/... if provided
+            raw_q = request.POST.get("period_quarter")
+            period_quarter = None
+            if period_type == "QUARTERLY" and raw_q:
+                if raw_q.strip().upper().startswith("Q") and raw_q.strip()[1:].isdigit():
+                    period_quarter = int(raw_q.strip()[1:])
+                elif raw_q.isdigit():
+                    period_quarter = int(raw_q)
+
+            cmd = CreateRenewalRequestCmd(
+                business_id=business_id,
+                period_type=period_type,
+                period_year=period_year,
+                period_quarter=period_quarter,
+                created_by_user_id=_auth_staff_id(request),
+            )
+
+            new_id = svc.request_renewal(cmd)
+
+            messages.success(
+                request,
+                f"Renewal Request #{new_id} created for {period_type} {period_year} "
+                f"(status: FOR_TREASURER_REVIEW)."
+            )
+            # Redirect back to business info (or to a renewal-request detail page if you have one)
+            return redirect("clerk:business_information", b_id=business_id)
+
+        except Exception as e:
+            messages.error(request, f"Create renewal request failed: {e}")
+            return redirect("clerk:business_information", b_id=b_id)
+
+    person_id = request.GET.get("owner")
+    person_id = int(person_id) if person_id and str(person_id).isdigit() else None
+
+    dto = (
+        business_info.execute(person_id=person_id, business_id=b_id)
+        if person_id is not None
+        else business_info.execute_by_business_id(b_id)  # see helper below
+    )
+
+    def _compose_owner_full_name(data: dict) -> str | None:
+        last   = (data.get("last_name") or "").strip()
+        first  = (data.get("first_name") or "").strip()
+        middle = (data.get("middle_name") or "").strip()
+        suffix = (data.get("suffix") or "").strip()
+
+        parts = []
+        if last:
+            parts.append(last.upper())                   # LAST
+        if first:
+            parts.append((", " if parts else "") + first.title())  # , First
+        if middle:
+            parts.append(" " + middle[:1].upper() + ".")           #  M.
+        if suffix:
+            parts.append(" " + suffix.upper())                     #  JR / III, etc.
+        return "".join(parts) or None
+    
+    owner = dict(dto.owner or {})
+    owner["owner_full_name"] = _compose_owner_full_name(owner)
+
+    current_year = date.today().year
+
+    grand_total, quote_rows, paid_rows = renewal_quote_svc.execute(business_id=b_id, year=current_year)
+    
+    def to_decimal(x):
+        if x is None:
+            return Decimal("0")
+        return x if isinstance(x, Decimal) else Decimal(str(x))
+
+    quote_rows = quote_rows or []
+    base_sum  = sum(to_decimal(getattr(r, "base_fee", 0))   for r in quote_rows)
+    surch_sum = sum(to_decimal(getattr(r, "surcharge", 0))  for r in quote_rows)
+    header_status = ((dict(dto.business or {}).get("business_status") or "").strip().upper())
+    clearance_year = current_year
+
+    return render(request, "business/create_renewal_request.html", {
+        'page_path' : f'{user_role} / Renewal Request',
+        'page_title' : 'Renewal Request',
+        "owner": owner,
+        "business": dto.business,
+        "grand_total": grand_total,
+        "quote_rows": quote_rows,
+        "paid_rows": paid_rows,
+        "base_sum": base_sum,
+        "surch_sum": surch_sum, 
+        "header_status": header_status,      
+        "clearance_year": clearance_year,
+    })
+
+def renewal_request(request, b_id):
+    user_role = _auth_role_name(request)
+
+    return render(request, "business/renewal_request.html", {
+        'page_path' : f'{user_role} / Renewal Request : {b_id}',
+        'page_title' : f'Renewal Request : {b_id}',
+    })

@@ -12,6 +12,7 @@ from src.infra.exceptions.query_exec_exception import QueryExecutionException
 
 from src.app.transfer_objects.commands.business_cmd import (
     RegisterBusinessProfileCmd,
+    CreateRenewalRequestCmd
 )
 from src.app.transfer_objects.dto.business_dto import (
     BusinessListDTO,
@@ -26,13 +27,15 @@ from src.app.contracts.business_service_contract import (
     IBusinessRegistrationService,
     IBusinessInfoService,
     IBusinessRenewalService,
-    IBusinessRenewalQuoteService
+    IBusinessRenewalQuoteService,
+    IBusinessRenewalRequestService
 )
 from src.domain.contracts.business_repository_contract import (
     IBusinessRepository,
     IResidentOwnerRepository,
     IBusinessRenewalRepository,
     IBusinessRenewalQuoteRepository,
+    IBusinessRenewalRequestRepository
 )
 from src.infra.repositories.business_repository import (
     OwnerBusinessInformationRepository,
@@ -333,3 +336,15 @@ class BusinessRenewalQuoteService(IBusinessRenewalQuoteService):
         quote_rows  = self._quote_repo.fetch_quote_auto(business_id, year)
         paid_rows   = self._quote_repo.fetch_paid_history(business_id)
         return (grand_total, quote_rows, paid_rows)
+    
+class BusinessRenewalRequestService(IBusinessRenewalRequestService):
+    def __init__(self, repo: IBusinessRenewalRequestRepository):
+        self._repo = repo
+
+    def request_renewal(self, cmd: CreateRenewalRequestCmd) -> int:
+        # (optional) small validations
+        if cmd.period_type not in ("ANNUAL","QUARTERLY"):
+            raise ValueError("period_type must be ANNUAL or QUARTERLY")
+        if cmd.period_type == "ANNUAL":
+            object.__setattr__(cmd, "period_quarter", None)  # force None
+        return self._repo.request_renewal(cmd)

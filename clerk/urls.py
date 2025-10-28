@@ -44,10 +44,12 @@ urlpatterns = [
     path("business/business_owner_non-resident/", views.business_owner_nonresident, name="business_owner_nonres"),
     path("business/business_details/", views.business_details, name="business_details"),
     path("business/business_information_review/", views.business_information_review, name="business_information_review"),
-    path("business_list/", views.business_list, name="business_list"),
-    path("business_information/<int:b_id>/", views.business_information, name="business_information"),
+    path("business/business_list/", views.business_list, name="business_list"),
+    path("business/business_information/<int:b_id>/", views.business_information, name="business_information"),
     path("business/business_map/", views.business_map_list, name="business_map_list"),
     path("business/business_renewal/", views.renewal_list, name="renewal_list"),
+    path("business/create_renewal_request/<int:b_id>/", views.create_renewal_request, name="create_renewal_request"),
+    path("business/renewal_request/", views.renewal_request, name="renewal_request"),
 
     # OCR
     path('upload-id/', web_views.upload_valid_id_files, name='upload_id_files'),

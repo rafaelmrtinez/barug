@@ -6,7 +6,8 @@ from pprint import pformat
 from src.infra.contracts.connection_adapter import IConnectionAdapter
 from src.infra.exceptions.query_exec_exception import QueryExecutionException
 from src.app.transfer_objects.commands.business_cmd import (
-    RegisterBusinessProfileCmd
+    RegisterBusinessProfileCmd,
+    CreateRenewalRequestCmd
 )
 from src.app.transfer_objects.dto.business_dto import (
     BusinessListDTO,
@@ -23,6 +24,7 @@ from src.domain.contracts.business_repository_contract import (
     INonResidentOwnerRepository,
     IBusinessRenewalRepository,
     IBusinessRenewalQuoteRepository,
+    IBusinessRenewalRequestRepository,
 )
 
 try:
@@ -771,3 +773,21 @@ class BusinessRenewalQuoteRepository(IBusinessRenewalQuoteRepository):
             return self._ctx.execute_query_to_dict(sql, [business_id]) or []
         except Exception as e:
             raise QueryExecutionException(f"fetch_paid_history failed: {e}") from e
+        
+class BusinessRenewalRequestRepository(IBusinessRenewalRequestRepository):
+    def __init__(self, ctx: IConnectionAdapter):
+        self._ctx = ctx
+
+    def request_renewal(self, cmd: CreateRenewalRequestCmd) -> int:
+        try:
+            sql = "SELECT public.create_renewal_request_h(%s,%s,%s,%s,%s) AS id"
+            rows = self._ctx.execute_query_to_dict(sql, [
+                cmd.business_id,
+                cmd.period_type,
+                cmd.period_year,
+                cmd.period_quarter,
+                cmd.created_by_user_id,
+            ]) or []
+            return int(rows[0]["id"])
+        except Exception as e:
+            raise QueryExecutionException(f"create_renewal_request failed: {e}", "E_DB") from e
