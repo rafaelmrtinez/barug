@@ -141,7 +141,7 @@ class ChildBreastFeedingForm(forms.Form):
                 return
 
         if self._repo:
-            for ft in (self._repo.fetch_all_feeding_type() or []):
+            for ft in (self._repo.fetch_all_feeding_type_dict() or []):
                 choices.append((ft['feeding_type_id'], ft['feeding_type_name']))
         self.fields['type_of_feeding'].choices = choices
 
