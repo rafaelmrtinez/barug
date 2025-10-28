@@ -67,14 +67,16 @@ def child_immunization_http(request: HttpRequest) -> HttpResponse:
                     "message": f"Invalid date format: {date_given_str}. Expected YYYY-MM-DD."
                 }, status=400)
         else:
-            date_given = DateAndTimeUtility.get_current_date()
+            date_given = None
+        
         immunization_data = ImmunizationRequestVersion2(
             p_child_record_id=child_record_id,
             p_assessed_by_id=staff_id,
             p_immunization_type_id=immunization_type_id,
             p_immunization_stage_given_id=immunization_stage_given_id,
-            p_date_given=date_given
+            p_date_given=date_given or None
         )
+        
         service = ChildHealthService(ChildHealthRepository(ctx=CONNECTION))
         response = service.execute_insert_child_immunization(immunization=immunization_data)
         if not response:
@@ -88,45 +90,7 @@ def child_immunization_http(request: HttpRequest) -> HttpResponse:
         return JsonResponse({"message": "Invalid JSON data."}, status=400)
     except Exception as e:
         logger.exception("child_immunization_http failed: %s", e)
-        return JsonResponse({"ok": False, "error": "Internal Server Error"}, status=500)
-
-
-# @session_login_required
-# @role_required(*ACCESS)
-# @nocache
-# @require_http_methods(["POST"])
-# @csrf_protect
-# def child_immunization_http(request: HttpRequest) -> HttpResponse:
-#     # parse json data
-#     try:
-#         data = json.loads(request.body)
-#         staff = request.session.get("auth").get("staff_id")
-#         immunization_data = ImmunizationRequestVersion2(
-#             p_child_record_id=data.get("child_health_record_id"),
-#             p_assessed_by_id=staff,
-#             p_immunization_type_id=data.get("immunization_type_id"),
-#             p_immunization_stage_given_id=data.get("immunization_stage_given_id"),
-#             p_date_given=DateAndTimeUtility.get_current_date()
-#         )
-#         service = ChildHealthService(ChildHealthRepository(ctx=CONNECTION))
-#         response = service.execute_insert_child_immunization(immunization=immunization_data)
-#         if not response:
-#             # messages.error(request, "Failed to save immunization data.")
-#             return JsonResponse({"message": "Failed to save immunization data"}, status=500)
-#         # messages.success(request, "Immunization data saved successfully.")
-#         return JsonResponse({"message": response}, status=200)
-#     except (ChildHealthRecordException, ChildHealthDomainException) as chre:
-#         logger.warning("ChildHealthRecordException in child_new_born_screening_http: %s", chre.message)
-#         # messages.warning(request, f"Warning: {chre.message}")
-#         return JsonResponse({"message": chre.message}, status=400)
-#     except ValueError as ve:
-#         logger.warning("ValueError in child_new_born_screening_http: %s", str(ve))
-#         # messages.warning(request, f"Warning: {str(ve)}")
-#         return JsonResponse({"message": str(ve)}, status=400)
-#     except Exception as e:
-#         logger.exception("child_new_born_screening_http failed: %s", e)
-#         # messages.error(request, "Failed to submit Newborn Screening Data. Please try again.")
-#         return JsonResponse({"ok": False, "error": "Internal Server Error"}, status=500)    
+        return JsonResponse({"ok": False, "error": "Internal Server Error"}, status=500) 
 
 @session_login_required
 @role_required(*ACCESS)
@@ -169,6 +133,7 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                 is_success = CHILD_HEALTH_REPOSITORY.insert_new_born_screening_date(
                     p_child_record_id=child_health_record_id, 
                     p_assessed_by_id=staff_id, 
+                    feeding_type_id=screening_data.cleaned_data.get("type_of_feeding"),
                     p_referred_nbs_date=screening_data.cleaned_data.get("referred_for_newborn_screening"))
                 if is_success:
                     messages.success(request, "Newborn Screening data saved successfully.")
@@ -215,7 +180,6 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                 is_success = CHILD_HEALTH_REPOSITORY.insert_bf_check(
                     p_child_record_id=child_health_record_id,
                     p_assessed_by_id=staff_id,
-                    p_feeding_type_id=bf_data.cleaned_data.get("type_of_feeding"),
                     p_check_date=bf_data.cleaned_data.get("exclusive_bf_check_last")
                 )
                 if is_success:
@@ -250,7 +214,7 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                 messages.success(request, "Child Monitoring Log saved successfully.")
                 return redirect('child_health:child_health_entry', child_health_record_id=child_health_record_id)
             else:
-                messages.warning(request, "Please correct the errors below.")
+                MessageUtility.push_form_errors_as_messages(request, visit_data)
                 return render(
                     request,
                     "child_health/chr_entry.html",
@@ -281,6 +245,7 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                     is_low_birth_weight=birth_and_supplementation.cleaned_data.get("low_birth_weight") or None,
                     seen_2_6_mos=birth_and_supplementation.cleaned_data.get("birth_wt_seen") or None,
                     given_2_6_mos=birth_and_supplementation.cleaned_data.get("birth_wt_given_iron") or None,
+                    tt_status=birth_and_supplementation.cleaned_data.get("tt_id") or None
                 )
                 if not result:
                     messages.error(request, "Failed to save Birth and Supplementation data.")
@@ -438,8 +403,6 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
             },
         )
         
-        
-
 def fetch_person_and_house_basic_details_http(request: HttpRequest, person_id: int) -> JsonResponse:
     try:
         repo = CHILD_HEALTH_REPOSITORY
@@ -549,8 +512,6 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
             },
         )
     
-    
-
 @session_login_required
 @role_required(*ACCESS)
 @nocache

@@ -13,6 +13,10 @@ class ChildHealthRecordRepository:
     def __init__(self, ctx: ConnectionAdapter):
         self.ctx = ctx
         logger.info("ChildHealthRecordRepository initialized")
+        
+    def fetch_all_tt_types(self):
+        sql = """SELECT tt_type_id, tt_type_name FROM public.tt_type ORDER BY tt_type_id;"""
+        return self.ctx.execute_query(sql, [])
 
     def fetch_vitamin_by_chr_id(self, chr_id: int):
         sql = """ SELECT vit_stage_id
@@ -48,7 +52,7 @@ class ChildHealthRecordRepository:
                 cisr.date_completed
             FROM child_iron_supplement_record cisr
             WHERE cisr.child_record_id = %s
-            ORDER BY cisr.date_started DESC
+            ORDER BY cisr.child_iron_id DESC
             LIMIT 1;"""
         params = [chr_id]
         result = self.ctx.execute_query_to_dict(sql, params)
@@ -98,7 +102,7 @@ class ChildHealthRecordRepository:
     def insert_child_screening(
             self, chr_id, assessed_by_id, date_assessed,
             anemic_seen, anemic_given_iron, birth_weight,
-            is_low_birth_weight, seen_2_6_mos, given_2_6_mos,):
+            is_low_birth_weight, seen_2_6_mos, given_2_6_mos, tt_status):
 
         sql = """SELECT * FROM add_child_screening(
                 %s::INTEGER,
@@ -109,7 +113,8 @@ class ChildHealthRecordRepository:
                 %s::NUMERIC,
                 %s::BOOLEAN,
                 %s::DATE,
-                %s::DATE
+                %s::DATE,
+                %s::INTEGER                
             )
             """
         params = [
@@ -121,8 +126,11 @@ class ChildHealthRecordRepository:
             birth_weight,
             is_low_birth_weight,
             seen_2_6_mos,
-            given_2_6_mos
+            given_2_6_mos,
+            tt_status
         ]
+        
+        print(f"Insert Child Screening params: {params}")
         try:
             result = self.ctx.execute_query(sql, params)
             if not result:
@@ -170,19 +178,35 @@ class ChildHealthRecordRepository:
             raise e
 
     def fetch_new_born_screening_date_by_chr_id(self, chr_id: int) -> dict | None:
-        sql = """SELECT visit_id FROM child_visit WHERE child_record_id = %s ORDER BY visit_id ASC LIMIT 1;"""
+        # Pick the single most relevant feeding_type / newborn screening
+        # entry for this child. We resolve the latest visit for the child
+        # (by visit_date, falling back to visit_id) and return at most one
+        # row containing the feeding_type_name and referred_newborn_screening_date.
+        sql = """
+        WITH latest_visit AS (
+            SELECT cv.visit_id
+            FROM child_visit cv
+            WHERE cv.child_record_id = %s
+            ORDER BY cv.visit_date DESC NULLS LAST, cv.visit_id DESC
+            LIMIT 1
+        )
+        SELECT
+            ft.feeding_type_name,
+            ftns.referred_newborn_screening_date::date AS referred_newborn_screening_date
+        FROM feeding_type_nwbrn_scrnng ftns
+        LEFT JOIN feeding_type ft ON ft.feeding_type_id = ftns.feeding_type_id
+        WHERE ftns.visit_id = (SELECT visit_id FROM latest_visit)
+        LIMIT 1;
+        """
         params = [chr_id]
         result = self.ctx.execute_query_to_dict(sql, params)
-        if not result and isinstance(result, list):
+        if not result:
             return None
-        sql = """SELECT referred_newborn_screening_date FROM feeding_type_nwbrn_scrnng WHERE visit_id = %s;"""
-        params = [result[0]['visit_id']]
-        result = self.ctx.execute_query_to_dict(sql, params)
-        return result
+        return result[0]
 
-    def insert_new_born_screening_date(self, p_child_record_id, p_assessed_by_id, p_referred_nbs_date):
-        sql = """SELECT * FROM add_referred_newborn_screening_date(%s, %s, %s);"""
-        params = [p_child_record_id, p_assessed_by_id, p_referred_nbs_date]
+    def insert_new_born_screening_date(self, p_child_record_id, p_assessed_by_id, p_referred_nbs_date, feeding_type_id):
+        sql = """SELECT * FROM add_referred_newborn_screening_date(%s, %s, %s, %s);"""
+        params = [p_child_record_id, p_assessed_by_id, feeding_type_id, p_referred_nbs_date]
         try:
             result = self.ctx.execute_query(sql, params)
             if not result:
@@ -244,59 +268,19 @@ class ChildHealthRecordRepository:
             raise e
 
     def fetch_child_details_bf_display_by_chr_id(self, chr_id: int) -> dict | None:
-        sql = """WITH checks AS (
-            SELECT
-                cbc.bbf_check_id,
-                cbc.check_date,
-                cbc.child_record_id,
-                cbc.visit_id
-            FROM child_breastfeeding_check AS cbc
-            WHERE cbc.child_record_id = %s
-            ORDER BY
-                cbc.check_date DESC NULLS LAST,
-                cbc.visit_id  DESC,
-                cbc.bbf_check_id DESC
-            ),
-            latest_visit AS (
-            SELECT ch.visit_id
-            FROM checks ch
-            ORDER BY
-                ch.check_date DESC NULLS LAST,
-                ch.visit_id  DESC,
-                ch.bbf_check_id DESC
-            LIMIT 1
-            ),
-            latest_feeding_type AS (
-            SELECT
-                ftns.feeding_type_nwbrn_scrnng_id,
-                ftns.visit_id,
-                ftns.feeding_type_id,
-                ft.feeding_type_name,
-                ftns.referred_newborn_screening_date
-            FROM feeding_type_nwbrn_scrnng AS ftns
-            LEFT JOIN feeding_type AS ft
-                ON ft.feeding_type_id = ftns.feeding_type_id
-            WHERE ftns.visit_id = (SELECT visit_id FROM latest_visit)
-            )
-            SELECT
-            ch.bbf_check_id,
-            ch.check_date,
-            ch.child_record_id,
-            ch.visit_id,
-
-            -- Latest feeding type (same for all rows, based on latest visit_id)
-            lft.feeding_type_nwbrn_scrnng_id,
-            lft.visit_id                 AS latest_visit_id,
-            lft.feeding_type_id,
-            lft.feeding_type_name,
-            lft.referred_newborn_screening_date
-
-            FROM checks ch
-            LEFT JOIN latest_feeding_type lft ON TRUE
-            ORDER BY
-            ch.check_date DESC NULLS LAST,
-            ch.visit_id  DESC,
-            ch.bbf_check_id DESC;
+        # Return up to 5 breastfeeding check rows for the child_record_id.
+        # The caller expects up to 5 visit-associated check dates, ordered
+        # from the first visit to the last (ascending by visit_id).
+        sql = """
+        SELECT
+            cbc.bbf_check_id,
+            cbc.check_date::date AS check_date,
+            cbc.child_record_id,
+            cbc.visit_id
+        FROM public.child_breastfeeding_check AS cbc
+        WHERE cbc.child_record_id = %s
+        ORDER BY cbc.visit_id ASC, cbc.bbf_check_id ASC
+        LIMIT 5;
         """
         params = [chr_id]
         result = self.ctx.execute_query_to_dict(sql, params)
@@ -304,32 +288,10 @@ class ChildHealthRecordRepository:
             return None
         return result
 
-    # def insert_bf_check(
-    #         self, p_child_record_id, p_visit_no,
-    #         p_visit_date, p_assessed_by_id, p_feeding_type_id,
-    #         p_referred_newborn_screening_date, p_performer_id, p_user_type_id,
-    #         p_subsystem, p_log_details):
-    #     sql = """SELECT * FROM set_bf_check_and_newborn_screening(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"""
-    #     params = [
-    #         p_child_record_id, p_visit_no, p_visit_date, p_assessed_by_id,
-    #         p_feeding_type_id, p_referred_newborn_screening_date,
-    #         p_performer_id, p_user_type_id, p_subsystem, p_log_details]
-    #     try:
-    #         result = self.ctx.execute_query(sql, params)
-    #         if not result:
-    #             return None
-    #         return result[0]
-    #     except QueryExecutionException as e:
-    #         logger.error(f"Error inserting BF check: {e}")
-    #         if ChildHealthRecordException.is_child_health_record_exception(e.code):
-    #             raise ChildHealthRecordException(e.message) from e
-    #         raise e
-
-    def insert_bf_check(self, p_child_record_id, p_assessed_by_id, p_feeding_type_id, p_check_date):
-        sql = """SELECT * FROM set_feeding_and_add_bf_check(%s, %s, %s, %s);"""
+    def insert_bf_check(self, p_child_record_id, p_assessed_by_id, p_check_date):
+        sql = """SELECT * FROM set_feeding_and_add_bf_check(%s, %s, %s);"""
         params = [
-            p_child_record_id, p_assessed_by_id,
-            p_feeding_type_id, p_check_date]
+            p_child_record_id, p_assessed_by_id, p_check_date]
         try:
             result = self.ctx.execute_query(sql, params)
             if not result:
@@ -757,7 +719,11 @@ class ChildHealthRecordRepository:
         params = [id]
         return self.ctx.execute_query_to_dict(sql, params)
 
-    def fetch_all_feeding_type(self) -> list[dict]:
+    def fetch_all_feeding_type_tuple(self) -> list[dict]:
+        sql = """SELECT feeding_type_id, feeding_type_name FROM public.feeding_type;"""
+        return self.ctx.execute_query(sql, [])
+
+    def fetch_all_feeding_type_dict(self) -> list[dict]:
         sql = """SELECT feeding_type_id, feeding_type_name FROM public.feeding_type;"""
         return self.ctx.execute_query_to_dict(sql, [])
 

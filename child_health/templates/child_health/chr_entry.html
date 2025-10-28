@@ -97,11 +97,20 @@
                     <div class="col-md-4">
                         {{ new_born_screening.referred_for_newborn_screening.label_tag }}
                         {{ new_born_screening.referred_for_newborn_screening }}
-                        {% if new_born_screening.referred_for_newborn_screening.errors %}
+                        {% comment %} {% if new_born_screening.referred_for_newborn_screening.errors %}
                         {% for error in new_born_screening.referred_for_newborn_screening.errors %}
                         <small class="text-danger d-block">{{ error }}</small>
                         {% endfor %}
-                        {% endif %}
+                        {% endif %} {% endcomment %}
+                    </div>
+                    <div class="col-md-4">
+                        {{ new_born_screening.type_of_feeding.label_tag }}
+                        {{ new_born_screening.type_of_feeding }}
+                        {% comment %} {% if new_born_screening.feeding_type.errors %}
+                        {% for error in new_born_screening.feeding_type.errors %}
+                        <small class="text-danger d-block">{{ error }}</small>
+                        {% endfor %}
+                        {% endif %} {% endcomment %}
                     </div>
                     <input type="hidden" name="nbs_form" value="nbs_form">
                     <div class="d-flex justify-content-end gap-2 mt-3">
@@ -124,7 +133,7 @@
             method="post" novalidate>
             <div class="card-body" id="child-details">
                 {% csrf_token %}
-                <div class="col-md-4">
+                {% comment %} <div class="col-md-4">
                     {{ bf_form.type_of_feeding.label_tag }}
                     {{ bf_form.type_of_feeding }}
                     {% if bf_form.type_of_feeding.errors %}
@@ -132,7 +141,7 @@
                     <small class="text-danger">{{ error }}</small>
                     {% endfor %}
                     {% endif %}
-                </div>
+                </div> {% endcomment %}
                 <hr class="my-4">
                 <div class="row g-3">
                     <div class="col-12">
@@ -390,48 +399,48 @@
 
                 <div class="row g-3">
                     <!-- Date -->
-                    <div class="col-md-2">
+                    {% comment %} <div class="col-md-2">
                         {{ visit_form.date.label_tag }}
                         {{ visit_form.date }}
                         {% for error in visit_form.date.errors %}
                         <div class="text-danger small mt-1">{{ error }}</div>
                         {% endfor %}
-                    </div>
+                    </div> {% endcomment %}
 
                     <!-- Age -->
                     <div class="col-md-2">
                         {{ visit_form.age.label_tag }}
                         {{ visit_form.age }}
-                        {% for error in visit_form.age.errors %}
+                        {% comment %} {% for error in visit_form.age.errors %}
                         <div class="text-danger small mt-1">{{ error }}</div>
-                        {% endfor %}
+                        {% endfor %} {% endcomment %}
                     </div>
 
                     <!-- Weight -->
                     <div class="col-md-2">
                         {{ visit_form.weight.label_tag }}
                         {{ visit_form.weight }}
-                        {% for error in visit_form.weight.errors %}
+                        {% comment %} {% for error in visit_form.weight.errors %}
                         <div class="text-danger small mt-1">{{ error }}</div>
-                        {% endfor %}
+                        {% endfor %} {% endcomment %}
                     </div>
 
                     <!-- Temperature -->
                     <div class="col-md-2">
                         {{ visit_form.temp.label_tag }}
                         {{ visit_form.temp }}
-                        {% for error in visit_form.temp.errors %}
+                        {% comment %} {% for error in visit_form.temp.errors %}
                         <div class="text-danger small mt-1">{{ error }}</div>
-                        {% endfor %}
+                        {% endfor %} {% endcomment %}
                     </div>
 
                     <!-- Height -->
                     <div class="col-md-2">
                         {{ visit_form.height.label_tag }}
                         {{ visit_form.height }}
-                        {% for error in visit_form.height.errors %}
+                        {% comment %} {% for error in visit_form.height.errors %}
                         <div class="text-danger small mt-1">{{ error }}</div>
-                        {% endfor %}
+                        {% endfor %} {% endcomment %}
                     </div>
                 </div>
 
@@ -440,18 +449,18 @@
                     <div class="col-md-6">
                         {{ visit_form.findings.label_tag }}
                         {{ visit_form.findings }}
-                        {% for error in visit_form.findings.errors %}
+                        {% comment %} {% for error in visit_form.findings.errors %}
                         <div class="text-danger small mt-1">{{ error }}</div>
-                        {% endfor %}
+                        {% endfor %} {% endcomment %}
                     </div>
 
                     <!-- Notes -->
                     <div class="col-md-6">
                         {{ visit_form.notes.label_tag }}
                         {{ visit_form.notes }}
-                        {% for error in visit_form.notes.errors %}
+                        {% comment %} {% for error in visit_form.notes.errors %}
                         <div class="text-danger small mt-1">{{ error }}</div>
-                        {% endfor %}
+                        {% endfor %} {% endcomment %}
                     </div>
                 </div>
 
