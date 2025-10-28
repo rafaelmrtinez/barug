@@ -29,6 +29,7 @@ from src.app.transfer_objects.request.child_health_version_two.child_monitoring_
 from src.app.transfer_objects.request.child_health_version_two.immunization_request import ImmunizationRequestVersion2
 from src.domain.exceptions.child_health_domain_exception import ChildHealthDomainException
 from src.infra.database.connection_adapter import ConnectionAdapter
+from child_health.utilities.repository_payload_validator import RepositoryPayloadValidator
 
 import logging
 
@@ -462,11 +463,37 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
                         "form": child_information_form,
                     },
                 )
+            # Sanitize and validate inputs before repository call
+            payload = {
+                'staff_id': request.session.get("auth").get("staff_id"),
+                'child_id': request.POST.get("child_id"),
+                'birth_order': child_information_form.cleaned_data.get("birth_order"),
+                'place_of_delivery': child_information_form.cleaned_data.get("place_of_delivery"),
+            }
+            schema = {
+                'staff_id': {'type': 'int', 'required': True},
+                'child_id': {'type': 'int', 'required': True},
+                'birth_order': {'type': 'int', 'required': True},
+                'place_of_delivery': {'type': 'int', 'required': True},
+            }
+
+            cleaned_vals, v_errors = RepositoryPayloadValidator.validate_payload(payload, schema)
+            if v_errors:
+                for e in v_errors:
+                    messages.error(request, e)
+                return render(
+                    request,
+                    "child_health/create_chr.html",
+                    {
+                        "form": child_information_form,
+                    },
+                )
+
             res = CHILD_HEALTH_REPOSITORY.insert_chr_record(
-                p_staff_id=request.session.get("auth").get("staff_id"),
-                p_person_id=request.POST.get("child_id"),
-                p_birth_order=child_information_form.cleaned_data.get("birth_order").__str__(),
-                p_delivery_place_type_id=int(child_information_form.cleaned_data.get("place_of_delivery")),
+                p_staff_id=cleaned_vals.get('staff_id'),
+                p_person_id=cleaned_vals.get('child_id'),
+                p_birth_order=str(cleaned_vals.get('birth_order')),
+                p_delivery_place_type_id=cleaned_vals.get('place_of_delivery'),
             )
             if not res or not isinstance(res, tuple):
                 messages.error(request, "Failed to create child health record.")
