@@ -13,7 +13,6 @@ import logging
 log = logging.getLogger(__name__)
 
 from typing import Any, Dict, List, Optional
-, Optional
 from django.urls import reverse
 
 from django.conf import settings

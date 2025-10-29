@@ -44,6 +44,39 @@ user_fullname = 'lname, fname mname suffix'
 user_role = 'Admin'
 user_role_template = user_role.lower().replace(' ', '_')
 
+
+CAPTAIN_ROLE = "Barangay Captain"
+
+
+user_fullname = 'Admin'
+user_role = 'Admin'
+user_role_template = user_role.lower().replace(' ', '_')
+
+# Create your views here.
+
+def _auth_role_name(request: HttpRequest) -> str:
+    return (((request.session.get("auth") or {}).get("role_name")) or "Staff").title()
+
+def _to_int_or_none(val) -> Optional[int]:
+    try:
+        if val in (None, "", "None"):
+            return None
+        return int(val)
+    except Exception:
+        return None
+        
+@session_login_required
+@role_required("admin", "Admin")
+def dashboard(request):
+    return render(request, "captain_dashboard.html", {
+        'user_fullname' : user_fullname,
+        'user_role' : user_role,
+        'page_path' : f'Admin / Dashboard',
+        'page_title' : 'Dashboard',
+        'user_role_template' : user_role_template,
+    })
+
+
 # Create your views here.
 @session_login_required
 @role_required(ADMIN_ROLE)

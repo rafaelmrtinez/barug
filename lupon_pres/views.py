@@ -1,14 +1,59 @@
-from django.shortcuts import render
-from django.core.paginator import Paginator
-from .forms import SearchPerson
-from .forms import ResidentProfileform
-from .forms import Schedule
-from .forms import StaffFilters
+from __future__ import annotations
 
+import os
+os.environ.setdefault("HTTPX_DISABLE_HTTP2", "1")
+
+import io
+import logging
+import base64
+from io import BytesIO
+from datetime import datetime, time as dtime, date
+from typing import Any, Dict, List, Optional
+
+from django.conf import settings
+from django.templatetags.static import static
+from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import render, redirect
+from django.views.decorators.http import require_GET, require_http_methods
+
+from authentication.guards import session_login_required, role_required
+from authentication.utils import nocache
+
+# Reuse secretary services for DB/RPCs
+from secretary.models import Secretary
+
+# Your forms
+from .forms import (
+    SearchPerson,
+    ResidentProfileform,
+    Schedule,
+    StaffFilters,
+    UpdateInfo,
+    UpdateInfo,   # ← if this lives in lupon_pres.forms; otherwise import from secretary.forms
+)
+
+# Supabase upload helper you already use elsewhere
+from common.supabase_client import supabase
+from common.services.storage import upload_to_storage
+
+# Flash helpers
+from common.flash import flash_success, flash_warning, flash_db_error, flash_system_error
+from django.db import DatabaseError, OperationalError, IntegrityError
+from common.db_errors import _pg_err_tuple
+
+logger = logging.getLogger(__name__)
+
+
+ROLE_LUPON = 8
+WZ_KEY = "lpres_nonres_wizard"
+
+# App/role for guard
+LUPON_PRES_ROLE = "Barangay Lupon President"
 #need back-end for proper assignment
 user_fullname = 'lname, fname mname suffix'
 user_role = 'Barangay Lupon President'
 
+LUPON_PRES_ROLE = "Barangay Lupon President"
 user_role_template = user_role.lower().replace(' ', '_')
 
 # Create your views here.

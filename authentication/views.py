@@ -38,6 +38,7 @@ def _role_home(role_name: str) -> str:
     is_secy     = role in {"barangay secretary", "secretary"}
     is_nurse    = role in {"nurse", "barangay nurse"}
     is_super_admin = role in {"super admin", "superadmin", "super-admin"}
+    is_admin    = role in {"admin", "barangay admin"}  # << NEW
 
     # NEW: Lupon roles
     is_lupon_member = role in {
@@ -60,6 +61,7 @@ def _role_home(role_name: str) -> str:
     if is_treas:            return "treasurer:queue"
     if is_secy:             return "secretary:staff_selection"
     if is_nurse:            return "nurse:dashboard"
+    if is_admin:            return "staff_admin:dashboard"     # << NEW
     if is_super_admin:      return "metrics:health_check"
 
     # NEW: targets for Lupon roles (adjust if your URL namespaces differ)
@@ -152,7 +154,7 @@ def login(request):
         # 2) RPC
         try:
             logger.debug("RPC call_staff_login() | user=%s", username)
-            row = call_staff_login(username, form.cleaned_data.get("password") or "")
+            row = call_staff_login(username, (form.cleaned_data.get("password") or ""))
             logger.debug("RPC returned | user=%s row=%s", username, bool(row))
         except DatabaseError as e:
             msg = str(e)

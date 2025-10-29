@@ -4,6 +4,7 @@ from . import views
 app_name = "staff_admin"
 
 urlpatterns = [
+    path("dashboard/", views.dashboard, name="dashboard"),
     path("staff_selection/", views.staff_selection, name="staff_selection"),
     path("staff_selection/staff_selection_resident/", views.staff_selection_resident, name="staff_selection_resident"),
     path("staff_selection/staff_selection_non-resident_personal_info/", views.staff_selection_nonres, name="staff_selection_non-resident"),
