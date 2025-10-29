@@ -1,4 +1,4 @@
-# kp9.py
+# lupon_mem/services/forms/kp9.py
 from __future__ import annotations
 from typing import Dict, Set, Optional, List
 from datetime import date as _date, datetime as _dt
@@ -6,7 +6,9 @@ import json
 import logging
 
 from django.db import connection
-from .. import form_shared as FS
+from lupon_mem.services import form_shared as FS
+from lupon_mem.services import fields_util as FU  # use KP-8 getters
+from lupon_mem.services.forms import util as FormUtil
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +71,10 @@ class KP9Handler:
     Works with the minimal UI where only Summons Date/Time are saved.
     Missing values (complainants/respondents/case no./purpose, PB, today's stamps)
     are fetched from the blotter case and merged into the fill map.
+
+    NEW: If a KP-8 exists for the case, copy:
+      hearing_date (YYYY-MM-DD) → summon_date (day), summon_month (Month), summon_year (YYYY)
+      hearing_time               → summon_time
     """
 
     # ---------------- DB helpers ----------------
@@ -157,31 +163,7 @@ class KP9Handler:
             "summon_time": _hm(incident_time) or "",
         }
 
-    def _fetch_punong_barangay_from_db(self) -> str:
-        try:
-            with connection.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT trim(
-                        coalesce(p.first_name,'') || ' ' ||
-                        coalesce(p.middle_name,'') || ' ' ||
-                        coalesce(p.last_name,'')  || ' ' ||
-                        coalesce(p.suffix,'')
-                    ) AS name
-                    FROM staff s
-                    JOIN person p ON p.person_id = s.person_id
-                    JOIN rolee  r ON r.role_id   = s.role_id
-                    WHERE r.role_name = 'BARANGAY CAPTAIN'
-                    ORDER BY s.staff_id DESC
-                    LIMIT 1
-                    """
-                )
-                row = cur.fetchone()
-                if row and (row[0] or "").strip():
-                    return row[0].strip()
-        except Exception:
-            pass
-        return _DEFAULT_PUNONG_BARANGAY
+
 
     # ---------------- small utils ----------------
 
@@ -230,8 +212,56 @@ class KP9Handler:
         if not (out.get(key) or "").strip():
             out[key] = value
 
-    # ---------------- main ----------------
+    # ----------- NEW: overlay summon_* from latest KP-8 -----------
+    def _overlay_from_latest_kp8(self, case_id: int, out: Dict[str, str]) -> None:
+        """
+        Copy KP-8 hearing_date/hearing_time into KP-9 summon_* using fields_util helpers.
 
+        Mapping:
+          hearing_date (YYYY-MM-DD) -> summon_date (D), summon_month (Month), summon_year (YYYY)
+          hearing_time              -> summon_time
+        """
+        try:
+            rows = FU.get_latest_form_fields(case_id, "KP-8")
+            if not rows:
+                return
+
+            m = FU.rows_to_text_map(rows)
+
+            # Provided variable style:
+            kp8_hearing_date = FS.sanitize_text(m.get("hearing_date") or "")   # e.g., "2025-11-22"
+            ap_time          = FS.sanitize_text(m.get("hearing_time") or "")
+
+            # Parse date safely via fields_util helper
+            dt = FU.parse_date_safe(kp8_hearing_date)
+
+            # Build appearance_* based on parsed date
+            ap_date  = str(dt.day) if dt else ""           # "22"
+            ap_month = dt.strftime("%B") if dt else ""     # "November"
+            ap_year  = str(dt.year) if dt else ""          # "2025"
+
+            # Convert time to 12-hour format with AM/PM
+            if ap_time:
+                try:
+                    time_obj = _dt.strptime(ap_time, "%H:%M").time()
+                    ap_time = time_obj.strftime("%I:%M%p")
+                except Exception:
+                    pass  # Keep original format if parsing fails
+
+            # Apply to KP-9 summon_* (override when KP-8 provides data)
+            if ap_date:
+                out["summon_date"] = ap_date
+            if ap_month:
+                out["summon_month"] = ap_month
+            if ap_year:
+                out["summon_year"] = ap_year
+            if ap_time:
+                out["summon_time"] = ap_time
+
+        except Exception as e:
+            logger.warning("KP9: failed to overlay from KP-8 via fields_util: %s", e)
+
+    # ---------------- main ----------------
     def build_name_value_map(self, form_id: int, submission_id: int) -> dict:
         answers_by_id = FS.load_answers(submission_id)
 
@@ -283,6 +313,9 @@ class KP9Handler:
             for k, v in fallback.items():
                 self._ensure(out, k, v)
 
+            # Overlay summon_* from latest KP-8 (hearing_* → summon_*)
+            self._overlay_from_latest_kp8(case_id, out)
+
         # Respondents mirrors & default recipient
         resp_val = (out.get("respondents") or "").strip()
         if resp_val:
@@ -304,7 +337,7 @@ class KP9Handler:
             if v:
                 pb_from_inputs = v
                 break
-        pb_name = pb_from_inputs or self._fetch_punong_barangay_from_db()
+        pb_name = pb_from_inputs or FormUtil.get_captain_name(_DEFAULT_PUNONG_BARANGAY)
         self._ensure(out, "brgy_capt", pb_name)
 
         # Map purpose → PDF typo field "purapose"
@@ -315,7 +348,7 @@ class KP9Handler:
         self._ensure(out, "month_offcret", out.get("offcret_serve_month", ""))
         self._ensure(out, "ofcret_year",   out.get("offcret_serve_year", ""))
 
-        # Normalize triplets
+        # Normalize triplets (no change if summon_date is a plain day like "22")
         self._normalize_triplet(out, "summon_date", "summon_month", "summon_year")
         self._normalize_triplet(out, "curr_date",   "curr_month",  "curr_year")
         self._normalize_triplet(out, "offcret_serve_date", "offcret_serve_month", "offcret_serve_year")

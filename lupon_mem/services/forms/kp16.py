@@ -346,3 +346,48 @@ class KP16Handler:
 
         self._log_fill_map(out)
         return out
+
+    def persist_computed(self, *, form_id: int, submission_id: int, case_id: int, out_map: dict) -> None:
+        """Save computed values back to the database."""
+        import json as _json
+        
+        # Get field mappings for this form
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                SELECT kff.field_id, LOWER(COALESCE(kff.label_override, f.base_label)) AS label,
+                       LOWER(f.field_code) AS code
+                  FROM kp_form_field kff
+                  JOIN kp_field f ON f.field_id = kff.field_id
+                 WHERE kff.form_id = %s
+                """,
+                [form_id],
+            )
+            rows = cur.fetchall()
+        
+        # Create reverse mapping from PDF field names to database field_ids
+        field_mapping = {}
+        for field_id, label, code in rows:
+            label_lower = (label or "").strip().lower()
+            code_lower = (code or "").strip().lower()
+            
+            # Map PDF field names to database field_ids
+            for pdf_field, source_keys in _KP16_SOURCES.items():
+                if label_lower in source_keys or code_lower in source_keys:
+                    field_mapping[pdf_field] = field_id
+                    break
+        
+        # Save computed values to database
+        with connection.cursor() as cur:
+            for pdf_field, value in out_map.items():
+                if pdf_field in field_mapping and value:
+                    field_id = field_mapping[pdf_field]
+                    cur.execute(
+                        """
+                        INSERT INTO blotter_kp_answer (submission_id, field_id, value_json)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (submission_id, field_id)
+                        DO UPDATE SET value_json = EXCLUDED.value_json
+                        """,
+                        [submission_id, field_id, _json.dumps(value)]
+                    )

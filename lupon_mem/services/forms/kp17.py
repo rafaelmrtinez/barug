@@ -10,6 +10,10 @@ import re
 from django.db import connection
 from zoneinfo import ZoneInfo  # PH time
 from .. import form_shared as FS
+from ..fields_util import (
+    get_latest_form_fields,
+    get_field_text,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +24,8 @@ _KP17_FIELDS = [
     "respondents_2",
     "brgy_case_num",
     "purpose",
-    "date_filed",          # full, e.g., "October 07, 2025"
-    "time_filed",          # 12-hr "h:mm am/pm"
+    "date_filed",          # "October 07, 2025"
+    "time_filed",          # "h:mm am/pm"
     "fraud_details",
     "fraud_chkbx",
     "violence_chkbx",
@@ -38,9 +42,9 @@ _KP17_FIELDS = [
     "year_sworn",
     "place_sworned",
     "chairman",
-    "date_filed_2",        # day
-    "month_filed",
-    "year_filed",
+    "date_filed_2",        # today (day)
+    "month_filed",         # today (Month)
+    "year_filed",          # today (YYYY)
     "brgy_capt",
 ]
 
@@ -63,7 +67,7 @@ _KP17_SOURCES: Dict[str, Set[str]] = {
     # Purpose
     "purpose": {"purpose", "for", "case_purpose"},
 
-    # Filing date/time (answers may provide; DB is source of truth)
+    # Filing date/time (answers may provide; KP7/DB is source of truth)
     "date_filed": {"date_filed", "filed_date", "date_of_filing", "date created", "date_created", "date_today"},
     "time_filed": {"time_filed", "filed_time", "time_of_filing", "time_created"},
 
@@ -85,7 +89,6 @@ _KP17_SOURCES: Dict[str, Set[str]] = {
     "date_sworn":   {"date_sworn", "sworn_day"},
     "month_sworn":  {"month_sworn", "sworn_month"},
     "year_sworn":   {"year_sworn", "sworn_year"},
-    # NOTE: allow multiple aliases for the sworn place
     "place_sworned": {"place_sworned", "place_sworn", "place_of_oath", "oath_place"},
 
     # Chairman / Brgy Captain
@@ -97,23 +100,17 @@ class KP17Handler:
     """
     KP-17: REPUDIATION
 
-    Key behaviors:
-      • Pull values by label or field_code.
-      • Look up date/time filed from blotter_case using brgy_case_num; fallback to submission-linked case.
-      • Log RAW DB date/time fetched.
-      • Format date_filed -> "Month DD, YYYY" and time_filed -> "h:mm am/pm".
-      • Also fill date_filed_2/month_filed/year_filed from the final date_filed.
-      • If secondary party lines are blank, mirror primary ones.
-      • Checkbox fields are set to "Yes" if any truthy indicator is present OR details text is provided.
-      • Notified and Sworn date trios default to today (PH) if missing/incomplete.
-      • Sanitize and ensure all PDF fields exist; log final ordered map.
-      • EXTRA LOGGING: dump answers, discovered fields, label/code maps, seed map, fallbacks.
+    Prefers KP-7 for date/time filed:
+      • date_filed = KP7.month_created + KP7.date_created + KP7.year_received (swap-tolerant)
+      • time_filed = KP7.case_time_filed (rendered as "h:mm am/pm")
+    Falls back to blotter_case (by case num, then submission), then to today.
+    date_filed_2 / month_filed / year_filed are always today's PH date.
     """
 
     # -------- helpers: parse/format --------
 
     @staticmethod
-    def _try_parse_date(s: str) -> _date | None:
+    def _try_parse_date(s: str) -> Optional[_date]:
         if not s:
             return None
         txt = s.strip()
@@ -140,6 +137,22 @@ class KP17Handler:
                 return _dt.strptime(m.strip(), "%b").month
             except Exception:
                 return None
+
+    @staticmethod
+    def _month_to_fullname(m: str) -> Optional[str]:
+        """Accept '10', 'Oct', 'October' -> 'October'."""
+        if not m:
+            return None
+        ms = m.strip()
+        if ms.isdigit():
+            try:
+                return _dt(2000, int(ms), 1).strftime("%B")
+            except Exception:
+                return None
+        num = KP17Handler._month_name_to_number(ms)
+        if num:
+            return _dt(2000, num, 1).strftime("%B")
+        return None
 
     @staticmethod
     def _fmt_full_date(d: _date) -> str:
@@ -209,11 +222,11 @@ class KP17Handler:
         return row[0], row[1]
 
     @staticmethod
-    def _load_case_datetime_from_submission(submission_id: int) -> Tuple[Optional[_date], Optional[_time], Optional[str]]:
+    def _load_case_datetime_from_submission(submission_id: int) -> Tuple[Optional[_date], Optional[_time], Optional[str], Optional[int]]:
         with connection.cursor() as cur:
             cur.execute(
                 """
-                SELECT bc.date_filed, bc.time_filed, bc.blotter_case_num
+                SELECT bc.date_filed, bc.time_filed, bc.blotter_case_num, bc.blotter_case_id
                   FROM blotter_kp_submission s
                   JOIN blotter_case bc ON bc.blotter_case_id = s.blotter_case_id
                  WHERE s.submission_id = %s
@@ -222,8 +235,79 @@ class KP17Handler:
             )
             row = cur.fetchone()
         if not row:
-            return None, None, None
-        return row[0], row[1], row[2]
+            return None, None, None, None
+        return row[0], row[1], row[2], row[3]
+
+    # -------- KP-7 helpers via fields_util --------
+
+    @staticmethod
+    def _kp7_latest_fields(case_id: Optional[int]) -> Optional[Dict[str, Optional[str]]]:
+        """
+        Use fields_util.get_latest_form_fields(case_id, 'KP-7') and return a tiny map of relevant codes.
+        Returns dict with keys: month_created, date_created, year_received, case_time_filed (values may be None).
+        """
+        if not case_id:
+            return None
+        try:
+            rows = get_latest_form_fields(case_id, 'KP-7')
+        except Exception as e:
+            logger.warning("[KP17] get_latest_form_fields failed: %s", e)
+            return None
+        if not rows:
+            return None
+        # Pull by field_code
+        month_created = get_field_text(rows, "month_created")
+        date_created  = get_field_text(rows, "date_created")
+        year_received = get_field_text(rows, "year_received")
+        time_filed    = get_field_text(rows, "case_time_filed") or get_field_text(rows, "time_filed")
+        return {
+            "month_created": month_created,
+            "date_created": date_created,
+            "year_received": year_received,
+            "case_time_filed": time_filed,
+        }
+
+    @staticmethod
+    def _build_date_from_kp7_fields(month_txt: Optional[str], day_txt: Optional[str], year_txt: Optional[str]) -> Optional[_date]:
+        """
+        Build a date from KP-7 pieces, tolerating swapped inputs:
+          - month_txt may be "October", "Oct", or "10" (also accidentally "29")
+          - day_txt may be "29" (also accidentally "October")
+          - year_txt must be 4-digit numeric
+        Returns a date or None if impossible.
+        """
+        m_raw = (month_txt or "").strip()
+        d_raw = (day_txt or "").strip()
+        y_raw = (year_txt or "").strip()
+
+        if not (y_raw.isdigit() and len(y_raw) == 4):
+            return None
+        year = int(y_raw)
+
+        month_full = KP17Handler._month_to_fullname(m_raw)
+        day_int = int(d_raw) if d_raw.isdigit() else None
+
+        # If month invalid and day looks like month text/num, try swap
+        if month_full is None and not day_int:
+            month_full = KP17Handler._month_to_fullname(d_raw)
+
+        # If still no day, check if m_raw is actually a day number
+        if day_int is None and m_raw.isdigit():
+            try:
+                v = int(m_raw)
+                if 1 <= v <= 31:
+                    day_int = v
+            except Exception:
+                pass
+
+        if not month_full or not day_int:
+            return None
+
+        try:
+            month_num = _dt.strptime(month_full, "%B").month
+            return _date(year, month_num, day_int)
+        except Exception:
+            return None
 
     @staticmethod
     def _log_fill_map(out: Dict[str, str]) -> None:
@@ -305,8 +389,8 @@ class KP17Handler:
         case_num = (out.get("brgy_case_num") or "").strip()
         date_by_num, time_by_num = self._load_case_datetime_by_case_num(case_num) if case_num else (None, None)
 
-        # ---- Fallback: submission → blotter_case ----
-        date_by_sub, time_by_sub, case_num_from_sub = self._load_case_datetime_from_submission(submission_id)
+        # ---- Fallback: submission → blotter_case (also get case_id) ----
+        date_by_sub, time_by_sub, case_num_from_sub, case_id = self._load_case_datetime_from_submission(submission_id)
 
         # If brgy_case_num is blank, also fill from submission-derived case number
         if (not case_num) and case_num_from_sub:
@@ -315,58 +399,51 @@ class KP17Handler:
         # DEBUG: print raw DB values
         try:
             print(
-                "[KP17][DB RAW] by_case_num: date=%r time=%r ; by_submission: date=%r time=%r case_num=%r"
-                % (date_by_num, time_by_num, date_by_sub, time_by_sub, case_num_from_sub)
+                "[KP17][DB RAW] by_case_num: date=%r time=%r ; by_submission: date=%r time=%r case_num=%r case_id=%r"
+                % (date_by_num, time_by_num, date_by_sub, time_by_sub, case_num_from_sub, case_id)
             )
             logger.info(
-                "[KP17][DB RAW] by_case_num: date=%r time=%r ; by_submission: date=%r time=%r case_num=%r",
-                date_by_num, time_by_num, date_by_sub, time_by_sub, case_num_from_sub
+                "[KP17][DB RAW] by_case_num: date=%r time=%r ; by_submission: date=%r time=%r case_num=%r case_id=%r",
+                date_by_num, time_by_num, date_by_sub, time_by_sub, case_num_from_sub, case_id
             )
         except Exception as _e:
             logger.warning("KP17 raw DB print failed: %s", _e)
 
-        # -------- Date Filed (full + split trio) --------
-        date_ans = (out.get("date_filed") or "").strip()
-        date_obj: Optional[_date] = self._try_parse_date(date_ans)
+        # -------- Pull LATEST KP-7 via fields_util (PRIMARY SOURCE) --------
+        kp7_date_obj: Optional[_date] = None
+        kp7_time_obj: Optional[_time] = None
+        kp7_fields = self._kp7_latest_fields(case_id)
 
-        # -------- Ensure place_sworned has a value (prevents KP-17 ValidationError) --------
-        if not (out.get("place_sworned") or "").strip():
-            out["place_sworned"] = "Barangay Hall of Señor Santo Niño"
+        if kp7_fields:
+            month_txt = kp7_fields.get("month_created")
+            day_txt   = kp7_fields.get("date_created")
+            year_txt  = kp7_fields.get("year_received")
+            time_txt  = kp7_fields.get("case_time_filed")
 
-        # If answer is just day number, try to build with month/year from notified or filed trios
-        if not date_obj and date_ans.isdigit():
-            d = int(date_ans)
-            m_txt = (out.get("month_filed") or out.get("month_notified") or "").strip()
-            y_txt = (out.get("year_filed")  or out.get("year_notified")  or "").strip()
-            m_num = self._month_name_to_number(m_txt)
-            if m_num and y_txt.isdigit():
-                try:
-                    date_obj = _date(int(y_txt), m_num, d)
-                except Exception:
-                    pass
+            logger.info("[KP17][KP7 latest] month_created=%r date_created=%r year_received=%r case_time_filed=%r",
+                        month_txt, day_txt, year_txt, time_txt)
 
-        if not date_obj and isinstance(date_by_num, _date):
-            date_obj = date_by_num
-        if not date_obj and isinstance(date_by_sub, _date):
-            date_obj = date_by_sub
+            # Build the date exactly as: MonthName Day, Year (handles swapped inputs)
+            kp7_date_obj = self._build_date_from_kp7_fields(month_txt, day_txt, year_txt)
 
-        # Final fallback = today (PH)
+            # Parse time
+            if time_txt:
+                kp7_time_obj = self._parse_time_any(time_txt)
+
+        # -------- Decide date_filed/time_filed (priority: KP-7 > blotter_case > today) --------
+        date_obj: Optional[_date] = kp7_date_obj or (date_by_num if isinstance(date_by_num, _date) else None) or (date_by_sub if isinstance(date_by_sub, _date) else None)
+        time_obj: Optional[_time] = kp7_time_obj or (time_by_num if isinstance(time_by_num, _time) else None) or (time_by_sub if isinstance(time_by_sub, _time) else None)
+
+        # Final fallback = today (PH) for the full date (time left blank if none)
         if not date_obj:
             date_obj = _dt.now(ZoneInfo("Asia/Manila")).date()
 
-        out["date_filed"]   = self._fmt_full_date(date_obj)
-        out["date_filed_2"] = str(date_obj.day)
-        out["month_filed"]  = date_obj.strftime("%B")
-        out["year_filed"]   = str(date_obj.year)
+        out["date_filed"] = self._fmt_full_date(date_obj)
+        out["time_filed"] = self._fmt_time_12h(time_obj) if time_obj else ""
 
-        # -------- Time Filed (12-hr) --------
-        time_ans = (out.get("time_filed") or "").strip()
-        t_obj = self._parse_time_any(time_ans)
-        if not t_obj and isinstance(time_by_num, _time):
-            t_obj = time_by_num
-        if not t_obj and isinstance(time_by_sub, _time):
-            t_obj = time_by_sub
-        out["time_filed"] = self._fmt_time_12h(t_obj) if t_obj else ""
+        # -------- Ensure place_sworned has a value --------
+        if not (out.get("place_sworned") or "").strip():
+            out["place_sworned"] = "Barangay Hall of Señor Santo Niño"
 
         # -------- Notified trio defaults --------
         now_ph = _dt.now(ZoneInfo("Asia/Manila")).date()
@@ -407,6 +484,11 @@ class KP17Handler:
             out["brgy_capt"] = chair
         if capt and not chair:
             out["chairman"] = capt
+
+        # -------- TODAY (PH) split trio for filed date (as requested) --------
+        out["date_filed_2"] = str(now_ph.day)
+        out["month_filed"]  = now_ph.strftime("%B")
+        out["year_filed"]   = str(now_ph.year)
 
         # ---- Final sanitize & ensure all fields exist ----
         for k, v in list(out.items()):

@@ -309,6 +309,9 @@ def _lookup_person_contact(person_id: Optional[int]) -> Tuple[Optional[str], Opt
         print(f"[EMAIL DEBUG] lookup failed for person_id={person_id}: {e}")
         return None, None
 
+
+
+
 # ────────────────────────────────────────────────────────────
 # SECTION: Doc-type cache helper
 # ────────────────────────────────────────────────────────────

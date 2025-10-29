@@ -48,6 +48,16 @@ def render_final_pdf(submission_id: int):
     if has_widgets:
         # AcroForm path: use either specialized handler or generic handler
         name_to_value = handler.build_name_value_map(form_id, submission_id)
+        
+        # Persist computed values if handler supports it
+        if hasattr(handler, 'persist_computed'):
+            handler.persist_computed(
+                form_id=form_id,
+                submission_id=submission_id,
+                case_id=case_id,
+                out_map=name_to_value
+            )
+        
         FS.fill_acro_by_names(src, name_to_value)
     else:
         # Non-Acro path (draw text to coordinates) — answers-only, generic behavior
@@ -89,7 +99,7 @@ def render_final_pdf(submission_id: int):
                 text = FS.normalize(answers.get(str(field_id)))
                 if not text:
                     continue
-                fz = FS.to_float(fs, 11.0)
+                fz = FS.to_float(fs, 10.0)
 
                 left = fx * sx
                 top = page_h - (fy * sy)

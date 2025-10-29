@@ -8,6 +8,11 @@ from django.db import connection
 from zoneinfo import ZoneInfo
 from .. import form_shared as FS
 from .util import get_secretary_name, get_lupon_chair_name  # ← auto-fill lupon_sec & chairman
+from lupon_mem.services.fields_util import (
+    get_latest_form_fields,
+    get_field_text,
+    get_this_case_kp7_date_filed,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +28,8 @@ _KP20_FIELDS = [
 _KP20_SOURCES: Dict[str, Set[str]] = {
     "complainants": {"complainants","complainant(s)","party-complainants","parties_complainants"},
     "respondents": {"respondents","respondent(s)","party-respondents","parties_respondents"},
-    "respondents_2":{"respondents_2","respondents two","respondent_two","respondent 2","party-respondents-2"},
-    "brgy_case_number":{"brgy_case_number","brgy_case_num","case number","case_no","case_num","blotter_case_num"},
+    "respondents_2":{"respondents","respondent(s)","party-respondents","parties_respondents"},
+    "brgy_case_number":{"case_number","brgy_case_number","brgy_case_num","case number","case_no","case_num","blotter_case_num","barangay_case_number","barangay case number","barangay case no","brgy case no"},
     "purpose":{"purpose","for","case_purpose"},
     "date_filed":{"date_filed","filed_date","date_of_filing","date_created","date today","date_today"},
     "time_filed":{"time_filed","filed_time","time_of_filing","time_created"},
@@ -260,24 +265,60 @@ class KP20Handler:
         case_num = (out.get("brgy_case_number") or "").strip()
         d_by_num, t_by_num = _case_dt_by_case_num(case_num) if case_num else (None, None)
         d_by_sub, t_by_sub, case_num_from_sub, case_id = _case_dt_by_submission(submission_id)
-        if not case_num and case_num_from_sub:
+        
+        # Always ensure brgy_case_number is populated from database
+        if case_num_from_sub:
             out["brgy_case_number"] = str(case_num_from_sub)
 
-        # date_filed (Month DD, YYYY)
-        d_ans = (out.get("date_filed") or "").strip()
-        d_obj = _try_parse_date(d_ans) or d_by_num or d_by_sub or _dt.now(ZoneInfo("Asia/Manila")).date()
-        out["date_filed"] = _fmt_full(d_obj)
+        # -------- Pull LATEST KP-7 (PRIMARY SOURCE for filed date/time) --------
+        kp7_date_str = None
+        kp7_time_obj = None
+        
+        if case_id:
+            try:
+                # Use the dedicated function for KP-7 date
+                kp7_date_str = get_this_case_kp7_date_filed(case_id)
+                
+                # Get time from KP-7
+                kp7_rows = get_latest_form_fields(case_id, "KP-7")
+                if kp7_rows:
+                    time_text = get_field_text(kp7_rows, "case_time_filed") or get_field_text(kp7_rows, "time_filed")
+                    if time_text:
+                        kp7_time_obj = _parse_time(time_text)
+            except Exception:
+                pass
+        
+        # -------- date_filed/time_filed MUST come from KP-7 --------
+        if kp7_date_str:
+            out["date_filed"] = kp7_date_str
+        if kp7_time_obj:
+            out["time_filed"] = _fmt12(kp7_time_obj)
+        
+        # date_filed (Month DD, YYYY) - fallback if KP-7 failed
+        if not out.get("date_filed"):
+            d_obj = d_by_num or d_by_sub or _dt.now(ZoneInfo("Asia/Manila")).date()
+            out["date_filed"] = _fmt_full(d_obj)
+        
+        # time_filed (12h) - fallback if KP-7 failed
+        if not out.get("time_filed"):
+            t_ans = (out.get("time_filed") or "").strip()
+            t_obj = _parse_time(t_ans) or t_by_num or t_by_sub
+            out["time_filed"] = _fmt12(t_obj) if t_obj else ""
 
-        # time_filed (12h)
-        t_ans = (out.get("time_filed") or "").strip()
-        t_obj = _parse_time(t_ans) or t_by_num or t_by_sub
-        out["time_filed"] = _fmt12(t_obj) if t_obj else ""
-
-        # Complaint month/year → default to filed month/year if blank
-        if not (out.get("complaint_date_month") or "").strip():
-            out["complaint_date_month"] = d_obj.strftime("%B")
-        if not (out.get("complaint_year") or "").strip():
-            out["complaint_year"] = str(d_obj.year)
+        # Complaint month/year → use KP-7 date_filed if available
+        if kp7_date_str:
+            kp7_date_obj = _try_parse_date(kp7_date_str)
+            if kp7_date_obj:
+                if not (out.get("complaint_date_month") or "").strip():
+                    out["complaint_date_month"] = f"{kp7_date_obj.strftime('%B')} {kp7_date_obj.day}"
+                if not (out.get("complaint_year") or "").strip():
+                    out["complaint_year"] = str(kp7_date_obj.year)
+        else:
+            fallback_date = d_by_num or d_by_sub or _dt.now(ZoneInfo("Asia/Manila")).date()
+            if not (out.get("complaint_date_month") or "").strip():
+                out["complaint_date_month"] = f"{fallback_date.strftime('%B')} {fallback_date.day}"
+            if not (out.get("complaint_year") or "").strip():
+                out["complaint_year"] = str(fallback_date.year)
 
         # -------- Item 4: BY + GROUNDS (derive from latest KP-17 if missing) --------
         kp17_sid = _latest_kp17_submission_id(case_id) if case_id else None

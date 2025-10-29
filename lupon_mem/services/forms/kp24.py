@@ -8,6 +8,10 @@ from django.db import connection
 from zoneinfo import ZoneInfo
 from .. import form_shared as FS
 from .util import get_lupon_chair_name
+from lupon_mem.services.fields_util import (
+    get_this_case_kp7_date_filed,
+    get_this_case_kp7_time_filed,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +21,7 @@ _KP24_FIELDS = [
     "date_filed", "time_filed", "time_filed_2",
     "complaints_two", "respondents_two",
     "motion_date", "motion_month", "motion_year", "motion_time",
-    "filed_by", "this_date", "chairman", "this_year",
+    "filed_by", "this_date", "this_month", "chairman", "this_year",
     "complainants_sig", "respondents_sig",
 ]
 
@@ -61,6 +65,7 @@ _KP24_SOURCES: Dict[str, Set[str]] = {
 
     # Today fields come from current date
     "this_date": set(),
+    "this_month": set(),
     "chairman":  set(),
     "this_year": set(),
 
@@ -108,7 +113,7 @@ def _parse_time(s: str) -> Optional[_time]:
         except Exception: pass
     return None
 
-def _case_ctx_by_submission(submission_id: int) -> Tuple[Optional[_date], Optional[_time], Optional[str], Optional[int]]:
+def _case_ctx_by_submission(submission_id: int) -> Tuple[Optional[_date], Optional[_time], Optional[str], Optional[int]] :
     with connection.cursor() as cur:
         cur.execute(
             """
@@ -237,14 +242,34 @@ class KP24Handler:
             fb = _latest_kp23_filer_name_for_case(case_id or 0)
             if fb: out["filed_by"] = fb
 
-        # Date/Time Filed
-        d_ans = (out.get("date_filed") or "").strip()
-        d_obj = _try_parse_date(d_ans) or d_by_sub or _dt.now(ZoneInfo("Asia/Manila")).date()
-        out["date_filed"] = _fmt_full(d_obj)
-
-        t1 = (out.get("time_filed") or "").strip()
-        t1_obj = _parse_time(t1) or t_by_sub
-        out["time_filed"] = _fmt12(t1_obj) if t1_obj else ""
+        # Use KP-7 date/time filed as primary source
+        kp7_date_str = None
+        kp7_time_str = None
+        
+        if case_id:
+            try:
+                kp7_date_str = get_this_case_kp7_date_filed(case_id)
+                kp7_time_str = get_this_case_kp7_time_filed(case_id)
+            except Exception:
+                pass
+        
+        # date_filed: prefer KP-7, fallback to answers or case data
+        if kp7_date_str:
+            out["date_filed"] = kp7_date_str
+            d_obj = _try_parse_date(kp7_date_str) or _dt.now(ZoneInfo("Asia/Manila")).date()
+        else:
+            d_ans = (out.get("date_filed") or "").strip()
+            d_obj = _try_parse_date(d_ans) or d_by_sub or _dt.now(ZoneInfo("Asia/Manila")).date()
+            out["date_filed"] = _fmt_full(d_obj)
+        
+        # time_filed: prefer KP-7, fallback to answers or case data
+        if kp7_time_str:
+            out["time_filed"] = kp7_time_str
+            t1_obj = _parse_time(kp7_time_str)
+        else:
+            t1 = (out.get("time_filed") or "").strip()
+            t1_obj = _parse_time(t1) or t_by_sub
+            out["time_filed"] = _fmt12(t1_obj) if t1_obj else ""
 
         # Per instruction: 2nd box should show complainants name
         out["time_filed_2"] = out.get("complaints", "") or out.get("time_filed_2", "")
@@ -273,13 +298,13 @@ class KP24Handler:
         # Signature names
         if not (out.get("complainants_sig") or "").strip():
             out["complainants_sig"] = _party_names_for_case(case_id or 0, "C")
-
         out.setdefault("respondents_sig",  out.get("respondents",""))
 
         # “This” fields (today)
         today = _dt.now(ZoneInfo("Asia/Manila")).date()
-        out["this_date"] = str(today.day)
-        out["this_year"] = str(today.year)
+        out["this_date"]  = str(today.day)
+        out["this_month"] = today.strftime("%B").upper()
+        out["this_year"]  = str(today.year)
 
         # Chairman — default to PB; guard against accidental party-name values
         pb = get_lupon_chair_name(default="")

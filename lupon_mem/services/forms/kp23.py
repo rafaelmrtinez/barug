@@ -9,6 +9,11 @@ from zoneinfo import ZoneInfo
 from .. import form_shared as FS
 from ..kp16_utils import get_kp16_settlement_date_for_case, format_full  # ← KP-16 date helper
 from ..form_shared import upsert_answers_by_keys  # ← generic DB upsert by label/code
+from lupon_mem.services.fields_util import (
+    get_this_case_kp7_date_filed,
+    get_this_case_kp7_time_filed,
+    get_this_case_kp16_date_filed,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -144,29 +149,48 @@ class KP23Handler:
         if not (out.get("case_num") or "").strip() and case_num:
             out["case_num"] = str(case_num)
 
-        # KP-23 own date/time
-        d_ans = (out.get("date_filed") or "").strip()
-        d_obj = _try_parse_date(d_ans) or d_by_sub or _dt.now(ZoneInfo("Asia/Manila")).date()
-        out["date_filed"] = _fmt_full(d_obj)
-
-        t_ans = (out.get("time_filed") or "").strip()
-        t_obj = _parse_time(t_ans) or t_by_sub
-        out["time_filed"] = _fmt12(t_obj) if t_obj else ""
+        # Use KP-7 date/time filed as primary source
+        kp7_date_str = None
+        kp7_time_str = None
+        
+        if case_id:
+            try:
+                kp7_date_str = get_this_case_kp7_date_filed(case_id)
+                kp7_time_str = get_this_case_kp7_time_filed(case_id)
+            except Exception:
+                pass
+        
+        # date_filed: prefer KP-7, fallback to answers or case data
+        if kp7_date_str:
+            out["date_filed"] = kp7_date_str
+        else:
+            d_ans = (out.get("date_filed") or "").strip()
+            d_obj = _try_parse_date(d_ans) or d_by_sub or _dt.now(ZoneInfo("Asia/Manila")).date()
+            out["date_filed"] = _fmt_full(d_obj)
+        
+        # time_filed: prefer KP-7, fallback to answers or case data
+        if kp7_time_str:
+            out["time_filed"] = kp7_time_str
+        else:
+            t_ans = (out.get("time_filed") or "").strip()
+            t_obj = _parse_time(t_ans) or t_by_sub
+            out["time_filed"] = _fmt12(t_obj) if t_obj else ""
 
         # ---- “On _____” = KP-16 settlement date (via kp16_utils) ----
         if not (out.get("on_date") or "").strip():
-            d16 = get_kp16_settlement_date_for_case(case_id or 0)
-            if d16:
-                out["on_date"] = format_full(d16)
+            if case_id:
                 try:
-                    logger.info("[KP23] Using KP-16 settlement date for on_date: %s (case_id=%s)", out["on_date"], case_id)
-                    print(f"[KP23] on_date <= KP-16 settlement date: {out['on_date']} (case_id={case_id})")
+                    kp16_date_str = get_this_case_kp16_date_filed(case_id)
+                    if kp16_date_str:
+                        out["on_date"] = kp16_date_str
+                        logger.info("[KP23] Using KP-16 date filed for on_date: %s (case_id=%s)", out["on_date"], case_id)
+                        print(f"[KP23] on_date <= KP-16 date filed: {out['on_date']} (case_id={case_id})")
                 except Exception:
                     pass
 
-        # fallback: mirror KP-23 date_filed
+        # fallback: use KP-23 date_filed
         if not (out.get("on_date") or "").strip():
-            out["on_date"] = _fmt_full(d_obj)
+            out["on_date"] = out.get("date_filed", "")
 
         # Today trio
         today = _dt.now(ZoneInfo("Asia/Manila")).date()
@@ -193,12 +217,15 @@ class KP23Handler:
         try:
             out = out_map or {}
 
-            # --- on_date (prefer KP-16 date) ---
+            # --- on_date (prefer KP-16 date filed) ---
             on_date_val = (out.get("on_date") or "").strip()
             if not on_date_val:
-                d16 = get_kp16_settlement_date_for_case(case_id or 0)
-                if d16:
-                    on_date_val = format_full(d16)
+                try:
+                    kp16_date_str = get_this_case_kp16_date_filed(case_id or 0)
+                    if kp16_date_str:
+                        on_date_val = kp16_date_str
+                except Exception:
+                    pass
 
             # --- today trio (use exactly what was used in PDF; fallback PH today) ---
             ph_today = _dt.now(ZoneInfo("Asia/Manila")).date()

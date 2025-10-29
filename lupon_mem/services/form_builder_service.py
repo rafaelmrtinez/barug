@@ -338,11 +338,39 @@ def apply_answers_and_prefills(
     answers: Dict[str, Any],
     prefill_by_label: Dict[str,Any],
     prefill_by_code: Dict[str,Any],
+    form_id: int = None,
+    submission_id: int = None,
+    form_code: str = None,
 ):
+    # For KP-24, use handler to populate fields
+    handler_values = {}
+    if form_code == "KP-24" and submission_id:
+        try:
+            from lupon_mem.services.forms import get_handler
+            handler = get_handler(form_code)
+            handler_values = handler.build_name_value_map(form_id, submission_id)
+        except Exception:
+            pass
+    
     def _ans_or_prefill(field_id, label, code):
         v = answers.get(str(field_id))
         if v not in (None, "", "null"):
             return v
+        
+        # Check handler values first for KP-24
+        if handler_values:
+            code_lower = (code or "").strip().lower()
+            label_lower = (label or "").strip().lower()
+            # Map common field codes to handler keys
+            if code_lower == "complainants" or label_lower == "complainant(s)":
+                return handler_values.get("complaints", "")
+            elif code_lower == "respondents" or label_lower == "respondent(s)":
+                return handler_values.get("respondents", "")
+            elif code_lower in ("case_num", "brgy_case_num", "case_number"):
+                return handler_values.get("case_num", "")
+            elif code_lower == "purpose":
+                return handler_values.get("purpose", "")
+        
         key = (label or "").strip().lower()
         if key in prefill_by_label:
             return prefill_by_label[key]
@@ -391,6 +419,8 @@ def compute_ui_flags(form_code: str) -> Dict[str,bool]:
         "kp18_ui_minimal": (u == "KP-18"),
         "kp19_ui_minimal": (u == "KP-19"),
         "kp20_ui_minimal": (u == "KP-20"),
+        "kp20a_ui_minimal": (u == "KP-20A"),
+        "kp20b_ui_minimal": (u == "KP-20B"),
         "kp21_ui_minimal": (u == "KP-21"),
         "kp22_ui_minimal": (u == "KP-22"),
         "kp23_ui_minimal": (u == "KP-23"),

@@ -24,6 +24,7 @@ const FB = fbGetConfig();
 function normCode() { return String(FB.form_code || "").trim().toUpperCase(); }
 function isKP17() { return Number(FB.form_id) === 17 || normCode() === "KP-17"; }
 function isKP23() { return Number(FB.form_id) === 23 || normCode() === "KP-23"; }
+function isKP9() { return Number(FB.form_id) === 9 || normCode() === "KP-9"; }
 function isKP9P2() {
   const n = normCode().replace(/\s+/g, "");
   return n === "KP-9-P2" || n === "KP-9P2";
@@ -196,11 +197,18 @@ function caseDetailUrlFor(id){
   }catch(_){}
   return `/lupon_mem/cases/${id}/`;
 }
+function showRedirectOverlay(){
+  const overlay = document.getElementById('redirectOverlay');
+  if (overlay) overlay.style.display = 'flex';
+}
 function gotoAfterSubmit(j){
-  if (j && j.redirect){ location.href = j.redirect; return; }
-  const c = formEl.elements.case_id && parseInt(formEl.elements.case_id.value, 10);
-  if (c && Number.isFinite(c)){ location.href = caseDetailUrlFor(c); return; }
-  location.href = resolveReturnTo();
+  showRedirectOverlay();
+  setTimeout(() => {
+    if (j && j.redirect){ location.href = j.redirect; return; }
+    const c = formEl.elements.case_id && parseInt(formEl.elements.case_id.value, 10);
+    if (c && Number.isFinite(c)){ location.href = caseDetailUrlFor(c); return; }
+    location.href = resolveReturnTo();
+  }, 500);
 }
 
 /* ===== Confirm flow ===== */
@@ -222,6 +230,11 @@ document.getElementById("submitBtn")?.addEventListener("click", (e)=>{
   box.style.removeProperty('display');
   box.classList.remove('kp-offscreen');
   box.style.display = 'block';
+  
+  // For minimal UI, ensure it's always visible
+  if (FB.flags?.kp17_ui_minimal) {
+    box.style.display = 'block';
+  }
 
   const radioC = document.getElementById("repC");
   const radioR = document.getElementById("repR");
@@ -858,6 +871,44 @@ function bindCloseOnEscape(input, closeFn){
   });
 })();
 
+/* ===== KP-9: All fields filled, ready to submit ===== */
+(function initKP9(){
+  if (!isKP9()) return;
+  
+  // Hide all form fields since everything is pre-filled
+  const allFields = document.querySelectorAll('.kp-field');
+  allFields.forEach(field => {
+    field.classList.add('kp-offscreen');
+  });
+  
+  // Show a message that everything is ready
+  const cardBody = document.querySelector('.card-body');
+  if (cardBody) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'mb-3 p-3 rounded-3';
+    messageDiv.style.background = '#28a745';
+    messageDiv.style.color = '#fff';
+    messageDiv.innerHTML = `
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-check-circle" style="font-size:1.1rem;"></i>
+        <strong>All fields are already filled out</strong>
+      </div>
+      <div class="mt-1" style="opacity:.95">
+        For <strong>KP Form No. 9</strong>, all required information has been automatically populated. 
+        Click <strong>Submit &amp; Generate PDF</strong> to generate the summons for the respondent.
+      </div>
+    `;
+    
+    // Insert after any existing helper banners
+    const existingBanners = cardBody.querySelectorAll('.mb-3.p-3.rounded-3');
+    if (existingBanners.length > 0) {
+      existingBanners[existingBanners.length - 1].after(messageDiv);
+    } else {
+      cardBody.insertBefore(messageDiv, cardBody.firstChild);
+    }
+  }
+})();
+
 /* ===== KP-9-P2: respondents-only binding + narrative/visibility ===== */
 /* ===== KP-9-P2: respondents-only binding + narrative/visibility + single-line fill ===== */
 (function enhanceKP9P2(){
@@ -1050,5 +1101,23 @@ function bindCloseOnEscape(input, closeFn){
 
   // Initial compute
   onMode();
+})();
+
+/* ===== KP-15: Show up to award_description, make others readonly ===== */
+(function initKP15(){
+  if (!FB.flags?.kp15_ui_minimal) return;
+  
+  // Make all fields readonly except award_description
+  const allFields = document.querySelectorAll('.kp-field [data-field-id]');
+  allFields.forEach(field => {
+    const code = (field.dataset.code || '').toLowerCase();
+    if (code !== 'award_description') {
+      field.readOnly = true;
+      field.style.backgroundColor = '#f8f9fa';
+      if (field.type === 'checkbox') {
+        field.disabled = true;
+      }
+    }
+  });
 })();
 

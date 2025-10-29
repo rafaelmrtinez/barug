@@ -8,10 +8,15 @@ from django.db import connection
 from zoneinfo import ZoneInfo
 from .. import form_shared as FS
 from .util import get_secretary_name, get_lupon_chair_name
+from lupon_mem.services.fields_util import (
+    get_latest_form_fields,
+    get_field_text,
+    get_this_case_kp7_date_filed,
+)
 
 logger = logging.getLogger(__name__)
 
-# Exact PDF fields from kp_form_no_20_B_CFA.pdf
+# PDF field names for KP-20B (mirrors KP-20A layout)
 _KP20B_FIELDS = [
     "complainants","respondents","case_num","purpose",
     "case_num_2","date_filed","time_filed","to_respondents",
@@ -21,23 +26,24 @@ _KP20B_FIELDS = [
 _KP20B_SOURCES: Dict[str, Set[str]] = {
     "complainants": {"complainants","complainant(s)","party-complainants","parties_complainants"},
     "respondents": {"respondents","respondent(s)","party-respondents","parties_respondents"},
-    "case_num": {"case_num","case_no","brgy_case_num","brgy_case_number","blotter_case_num"},
-    "purpose": {"purpose","for","case_purpose"},
-    "case_num_2": {"case_num_2","case no 2","alt case no"},
+    "to_respondents":{"to_respondents","respondents","respondent(s)","party-respondents","parties_respondents"},
+    "case_num":{"case_number","brgy_case_number","brgy_case_num","case number","case_no","case_num","blotter_case_num","barangay_case_number","barangay case number","barangay case no","brgy case no"},
+    "case_num_2":{"case_number","brgy_case_number","brgy_case_num","case number","case_no","case_num","blotter_case_num","barangay_case_number","barangay case number","barangay case no","brgy case no"},
+    "purpose":{"purpose","for","case_purpose"},
     "date_filed":{"date_filed","filed_date","date_of_filing","date_created","date today","date_today"},
     "time_filed":{"time_filed","filed_time","time_of_filing","time_created"},
-    "to_respondents":{"to_respondents","to respondents","to party respondents"},
     "this_date":{"this_date","current_date","date_today","date_entered"},
     "this_month":{"this_month","current_month","month_today","month_entered"},
     "this_year":{"this_year","current_year","year_today","year_entered"},
-    "secretary":{"secretary","brgy secretary","lupon secretary","lupon_sec"},
+    "secretary":{"secretary","lupon_sec","lupon secretary","barangay secretary"},
     "chairman":{"chairman","punong barangay","barangay captain","brgy_capt"},
 }
 
 def _try_parse_date(s: str) -> Optional[_date]:
     if not s: return None
     txt = s.strip()
-    for fmt in ("%Y-%m-%d","%m/%d/%Y","%d/%m/%Y","%B %d, %Y","%b %d, %Y","%d %B %Y","%d %b %Y"):
+    fmts = ("%Y-%m-%d","%m/%d/%Y","%d/%m/%Y","%B %d, %Y","%b %d, %Y","%d %B %Y","%d %b %Y")
+    for fmt in fmts:
         try: return _dt.strptime(txt, fmt).date()
         except Exception: pass
     return None
@@ -74,18 +80,18 @@ def _case_dt_by_case_num(case_num: str) -> Tuple[Optional[_date], Optional[_time
         row = cur.fetchone()
     return (row[0], row[1]) if row else (None, None)
 
-def _case_dt_by_submission(submission_id: int) -> Tuple[Optional[_date], Optional[_time], Optional[str]]:
+def _case_dt_by_submission(submission_id: int) -> Tuple[Optional[_date], Optional[_time], Optional[str], Optional[int]]:
     with connection.cursor() as cur:
         cur.execute(
             """
-            SELECT bc.date_filed, bc.time_filed, bc.blotter_case_num
+            SELECT bc.date_filed, bc.time_filed, bc.blotter_case_num, bc.blotter_case_id
               FROM blotter_kp_submission s
               JOIN blotter_case bc ON bc.blotter_case_id = s.blotter_case_id
              WHERE s.submission_id=%s
             """,[submission_id]
         )
         row = cur.fetchone()
-    return (row[0], row[1], row[2]) if row else (None, None, None)
+    return (row[0], row[1], row[2], row[3]) if row else (None, None, None, None)
 
 class KP20BHandler:
     @staticmethod
@@ -100,6 +106,7 @@ class KP20BHandler:
     def build_name_value_map(self, form_id: int, submission_id: int) -> dict:
         answers = FS.load_answers(submission_id)
 
+        # label/code index for this form
         with connection.cursor() as cur:
             cur.execute(
                 """
@@ -132,19 +139,49 @@ class KP20BHandler:
 
         out: Dict[str, str] = {t: find(s) for t, s in _KP20B_SOURCES.items()}
 
+        # Case datetime via case number or submission (also get case_id)
         case_num = (out.get("case_num") or "").strip()
         d_by_num, t_by_num = _case_dt_by_case_num(case_num) if case_num else (None, None)
-        d_by_sub, t_by_sub, case_num_from_sub = _case_dt_by_submission(submission_id)
-        if not case_num and case_num_from_sub:
+        d_by_sub, t_by_sub, case_num_from_sub, case_id = _case_dt_by_submission(submission_id)
+        
+        # Always ensure case_num and case_num_2 are populated from database
+        if case_num_from_sub:
             out["case_num"] = str(case_num_from_sub)
+            out["case_num_2"] = str(case_num_from_sub)
 
-        d_ans = (out.get("date_filed") or "").strip()
-        d_obj = _try_parse_date(d_ans) or d_by_num or d_by_sub or _dt.now(ZoneInfo("Asia/Manila")).date()
-        out["date_filed"] = _fmt_full(d_obj)
-
-        t_ans = (out.get("time_filed") or "").strip()
-        t_obj = _parse_time(t_ans) or t_by_num or t_by_sub
-        out["time_filed"] = _fmt12(t_obj) if t_obj else ""
+        # -------- Pull LATEST KP-7 (PRIMARY SOURCE for filed date/time) --------
+        kp7_date_str = None
+        kp7_time_obj = None
+        
+        if case_id:
+            try:
+                # Use the dedicated function for KP-7 date
+                kp7_date_str = get_this_case_kp7_date_filed(case_id)
+                
+                # Get time from KP-7
+                kp7_rows = get_latest_form_fields(case_id, "KP-7")
+                if kp7_rows:
+                    time_text = get_field_text(kp7_rows, "case_time_filed") or get_field_text(kp7_rows, "time_filed")
+                    if time_text:
+                        kp7_time_obj = _parse_time(time_text)
+            except Exception:
+                pass
+        
+        # -------- date_filed/time_filed MUST come from KP-7 --------
+        if kp7_date_str:
+            out["date_filed"] = kp7_date_str
+        if kp7_time_obj:
+            out["time_filed"] = _fmt12(kp7_time_obj)
+        
+        # date_filed (Month DD, YYYY) - fallback if KP-7 failed
+        if not out.get("date_filed"):
+            d_obj = d_by_num or d_by_sub or _dt.now(ZoneInfo("Asia/Manila")).date()
+            out["date_filed"] = _fmt_full(d_obj)
+        
+        # time_filed (12h) - fallback if KP-7 failed
+        if not out.get("time_filed"):
+            t_obj = t_by_num or t_by_sub
+            out["time_filed"] = _fmt12(t_obj) if t_obj else ""
 
         today = _dt.now(ZoneInfo("Asia/Manila")).date()
         if not (out.get("this_date") or "").strip():  out["this_date"]  = str(today.day)

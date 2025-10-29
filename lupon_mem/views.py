@@ -1805,7 +1805,10 @@ def form_builder(request, case_id: int, form_id: int = None, submission_id: int 
         )
 
         # Apply values
-        fields_with_values = apply_answers_and_prefills(fields, answers, prefill_by_label, prefill_by_code)
+        fields_with_values = apply_answers_and_prefills(
+            fields, answers, prefill_by_label, prefill_by_code,
+            form_id=fid, submission_id=submission_id, form_code=form_code
+        )
 
     # Page 2 split marker
     page2_index = find_page2_index(fields_with_values)
@@ -1824,6 +1827,11 @@ def form_builder(request, case_id: int, form_id: int = None, submission_id: int 
     if flags["kp9_ui_minimal"]:
         allowed_codes = {"summon_date", "summon_time"}
         fields_with_values = [item for item in fields_with_values if ((item[6] or "").strip().lower() in allowed_codes)]
+        page2_index = None
+
+    # KP-15 minimal filter (show up to award_description)
+    if flags["kp15_ui_minimal"]:
+        fields_with_values = slice_until_code(fields_with_values, "award_description")
         page2_index = None
 
     return render(

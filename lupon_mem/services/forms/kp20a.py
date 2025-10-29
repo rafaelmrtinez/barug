@@ -8,33 +8,33 @@ from django.db import connection
 from zoneinfo import ZoneInfo
 from .. import form_shared as FS
 from .util import get_secretary_name, get_lupon_chair_name
+from lupon_mem.services.fields_util import (
+    get_latest_form_fields,
+    get_field_text,
+    get_this_case_kp7_date_filed,
+)
 
 logger = logging.getLogger(__name__)
 
 # PDF field names for KP-20A (mirrors KP-20 layout you already use)
 _KP20A_FIELDS = [
-    "complainants","respondents","brgy_case_number","purpose",
-    "date_filed","time_filed","respondents_2",
-    "complaint_date_month","complaint_year","by","ground_of",
-    "this_date","this_month","this_year","lupon_sec","chairman",
+    "complainants","respondents","case_number","purpose",
+    "date_filed","time_filed","to_respondents",
+    "this_date","this_month","this_year","chairman","secretary",
 ]
 
 _KP20A_SOURCES: Dict[str, Set[str]] = {
     "complainants": {"complainants","complainant(s)","party-complainants","parties_complainants"},
     "respondents": {"respondents","respondent(s)","party-respondents","parties_respondents"},
-    "respondents_2":{"respondents_2","respondents two","respondent_two","respondent 2","party-respondents-2"},
-    "brgy_case_number":{"brgy_case_number","brgy_case_num","case number","case_no","case_num","blotter_case_num"},
+    "to_respondents":{"to_respondents","respondents","respondent(s)","party-respondents","parties_respondents"},
+    "case_number":{"case_number","brgy_case_number","brgy_case_num","case number","case_no","case_num","blotter_case_num","barangay_case_number","barangay case number","barangay case no","brgy case no"},
     "purpose":{"purpose","for","case_purpose"},
     "date_filed":{"date_filed","filed_date","date_of_filing","date_created","date today","date_today"},
     "time_filed":{"time_filed","filed_time","time_of_filing","time_created"},
-    "complaint_date_month":{"complaint_date_month","month_of_complaint","current_month","month_today"},
-    "complaint_year":{"complaint_year","year_of_complaint","current_year","year_today"},
-    "by":{"by","issued_by","prepared_by","repudiated_by","affiant","affiant_name"},
-    "ground_of":{"ground_of","grounds","reason","basis","repudiation_grounds"},
     "this_date":{"this_date","current_date","date_today","date_entered"},
     "this_month":{"this_month","current_month","month_today","month_entered"},
     "this_year":{"this_year","current_year","year_today","year_entered"},
-    "lupon_sec":{"lupon_sec","lupon secretary","secretary"},
+    "secretary":{"secretary","lupon_sec","lupon secretary","barangay secretary"},
     "chairman":{"chairman","punong barangay","barangay captain","brgy_capt"},
 }
 
@@ -138,32 +138,58 @@ class KP20AHandler:
 
         out: Dict[str, str] = {t: find(s) for t, s in _KP20A_SOURCES.items()}
 
-        case_num = (out.get("brgy_case_number") or "").strip()
+        # Case datetime via case number or submission (also get case_id)
+        case_num = (out.get("case_number") or "").strip()
         d_by_num, t_by_num = _case_dt_by_case_num(case_num) if case_num else (None, None)
-        d_by_sub, t_by_sub, case_num_from_sub, _case_id = _case_dt_by_submission(submission_id)
-        if not case_num and case_num_from_sub:
-            out["brgy_case_number"] = str(case_num_from_sub)
+        d_by_sub, t_by_sub, case_num_from_sub, case_id = _case_dt_by_submission(submission_id)
+        
+        # Always ensure case_number is populated from database
+        if case_num_from_sub:
+            out["case_number"] = str(case_num_from_sub)
 
-        d_ans = (out.get("date_filed") or "").strip()
-        d_obj = _try_parse_date(d_ans) or d_by_num or d_by_sub or _dt.now(ZoneInfo("Asia/Manila")).date()
-        out["date_filed"] = _fmt_full(d_obj)
+        # -------- Pull LATEST KP-7 (PRIMARY SOURCE for filed date/time) --------
+        kp7_date_str = None
+        kp7_time_obj = None
+        
+        if case_id:
+            try:
+                # Use the dedicated function for KP-7 date
+                kp7_date_str = get_this_case_kp7_date_filed(case_id)
+                
+                # Get time from KP-7
+                kp7_rows = get_latest_form_fields(case_id, "KP-7")
+                if kp7_rows:
+                    time_text = get_field_text(kp7_rows, "case_time_filed") or get_field_text(kp7_rows, "time_filed")
+                    if time_text:
+                        kp7_time_obj = _parse_time(time_text)
+            except Exception:
+                pass
+        
+        # -------- date_filed/time_filed MUST come from KP-7 --------
+        if kp7_date_str:
+            out["date_filed"] = kp7_date_str
+        if kp7_time_obj:
+            out["time_filed"] = _fmt12(kp7_time_obj)
+        
+        # date_filed (Month DD, YYYY) - fallback if KP-7 failed
+        if not out.get("date_filed"):
+            d_obj = d_by_num or d_by_sub or _dt.now(ZoneInfo("Asia/Manila")).date()
+            out["date_filed"] = _fmt_full(d_obj)
+        
+        # time_filed (12h) - fallback if KP-7 failed
+        if not out.get("time_filed"):
+            t_obj = t_by_num or t_by_sub
+            out["time_filed"] = _fmt12(t_obj) if t_obj else ""
 
-        t_ans = (out.get("time_filed") or "").strip()
-        t_obj = _parse_time(t_ans) or t_by_num or t_by_sub
-        out["time_filed"] = _fmt12(t_obj) if t_obj else ""
 
-        if not (out.get("complaint_date_month") or "").strip():
-            out["complaint_date_month"] = d_obj.strftime("%B")
-        if not (out.get("complaint_year") or "").strip():
-            out["complaint_year"] = str(d_obj.year)
 
         today = _dt.now(ZoneInfo("Asia/Manila")).date()
         if not (out.get("this_date") or "").strip():  out["this_date"]  = str(today.day)
         if not (out.get("this_month") or "").strip(): out["this_month"] = today.strftime("%B")
         if not (out.get("this_year") or "").strip():  out["this_year"]  = str(today.year)
 
-        if not (out.get("lupon_sec") or "").strip():
-            out["lupon_sec"] = get_secretary_name(default=out.get("lupon_sec",""))
+        if not (out.get("secretary") or "").strip():
+            out["secretary"] = get_secretary_name(default=out.get("secretary",""))
         if not (out.get("chairman") or "").strip():
             out["chairman"] = get_lupon_chair_name(default=out.get("chairman",""))
 
