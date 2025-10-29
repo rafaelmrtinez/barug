@@ -4,11 +4,49 @@
 {% block css %}
 <link rel="stylesheet" href="{% static 'css/mhr-theme.css' %}">
 <link rel="stylesheet" href="{% static 'maternal/css/image-preview.css' %}">
+<style>
+/* Constrain the width of the status select and button so they don't push the title */
+.mhr-action-group { flex-shrink: 0; }
+.mhr-action-group select, .mhr-action-group .btn {
+    min-width: 9rem; /* equal width for dropdown and button */
+    max-width: 11rem;
+    width: 10rem;
+}
+/* Allow the title to shrink without overflowing the layout */
+.mhr-title {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.mhr-title h1 { margin: 0; }
+
+.mhr-locked .card-footer .btn { display: none !important; }     /* hide save buttons */
+.mhr-locked .card { opacity: 0.9; }                             /* subtle dim */
+.mhr-locked .locked-overlay {
+  border: 2px dashed #f0ad4e;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+</style>
+
 {% endblock %}
 
 {% block content %}
-<div class="container py-4 mt-5">
-    <h1 class="mb-3">Maternal Health Record</h1>
+<div class="container py-4 mt-5 {% if is_locked %}mhr-locked{% endif %}">
+    {% if is_locked %}
+    <div class="alert alert-warning" role="alert">
+        This maternal health record is locked (status: {{ mhr_status.initial.record_status_name|default:"" }}). Editing is disabled.
+    </div>
+    {% endif %}
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <div class="mhr-title">
+            <h1 class="mb-0">Maternal Health Record</h1>
+        </div>
+        <div class="mhr-action-group d-flex align-items-center gap-2">
+            {{ mhr_status.confirm_complete }}
+            <button id="btn-mark-complete" type="button" class="btn btn-brand btn-sm">Mark as Complete</button>
+        </div>
+    </div>
 
     {% include 'messages.html' %}
 
@@ -634,4 +672,7 @@
 <script src="{% static 'maternal/js/imagePreview.js' %}"></script>
 <script src="{% static 'maternal/js/api/save_lab_results.js' %}"></script>
 <script src="{% static 'maternal/js/prenatalApi.js' %}"></script>
+<script src="{% static 'maternal/js/mark_complete.js' %}"></script>
+<script src="{% static 'maternal/js/prenatal_status_api.js' %}"></script>
+<script src="{% static 'maternal/js/lock_forms.js' %}"></script>
 {% endblock %}

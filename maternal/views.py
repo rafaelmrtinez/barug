@@ -3,7 +3,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.core.paginator import Paginator
 from django.contrib import messages
-from django.views.decorators.csrf import csrf_protect as csrf_required
+from django.views.decorators.csrf import csrf_protect, csrf_exempt
 from django.views.decorators.http import require_http_methods
 import json
 
@@ -17,6 +17,7 @@ from maternal.forms.labolatory_form import LaboratoryForm
 from maternal.forms.maternal_identification_form import MaternalIdentificationForm
 from maternal.forms.maternal_record_form import RiskCodeForm
 from maternal.forms.medical_history_form import MedicalHistoryForm
+from maternal.forms.mhr_completion_form import MHRCompletionForm
 from maternal.forms.micro_nutrients_form import MicroNutrientsForm
 from maternal.forms.obstetric_history_form import ObstetricHistoryForm
 from maternal.forms.plans_form import PlanForm
@@ -26,10 +27,9 @@ from maternal.forms.present_pregnancy_form import PresentPregnancyForm
 from maternal.forms.previous_pregnancy_form import PreviousPregnancyForm, PreviousPregnancyFormSet
 from maternal.forms.tetanus_toxoid_form import TetanusToxoidForm
 from maternal.repository import MaternalHealthRecordRepository
-from midwife.services import fetch_maternal_registry
+from maternal.utils.form_lock import FormLockUtility
 from src.infra.database.connection_adapter import ConnectionAdapter
 
-from maternal.supa.supabase_storage_service import SupabaseStorageService
 from maternal.services.laboratory_service import LaboratoryService, LaboratoryTestException
 
 import logging
@@ -42,14 +42,12 @@ BHW_ACCESS = ("Barangay Health Worker", "bhw")
 MIDWIFE_ACCESS = ("MIDWIFE", "Midwife", "midwife")
 
 
-REPOSITORY: MaternalHealthRecordRepository = LazyRepositoryProxy(
-    repo_factory=lambda: MaternalHealthRecordRepository(
-        ConnectionAdapter()))
+REPOSITORY: MaternalHealthRecordRepository = LazyRepositoryProxy(repo_factory=lambda: MaternalHealthRecordRepository(ConnectionAdapter()))
 
 @session_login_required
 @role_required(*ACCESS)
 @nocache
-@csrf_required
+@csrf_protect
 def prenatal_api(request: HttpRequest) -> JsonResponse:
     """AJAX endpoint to save prenatal follow-up entry.
 
@@ -136,11 +134,10 @@ def prenatal_api(request: HttpRequest) -> JsonResponse:
     redirect_url = reverse('maternal:bhw_prenatal_form', args=[mhr_id]) if staff_role != 'midwife' else reverse('maternal:maternal_health_record_form', args=[mhr_id])
     return JsonResponse({'success': True, 'message': 'Prenatal Follow-up saved.', 'redirect': redirect_url})
     
-
 @session_login_required
 @role_required(*BHW_ACCESS)
 @nocache
-@csrf_required
+@csrf_protect
 def health_worker_prenatal_form_view(request: HttpRequest, mhr_id: int) -> HttpResponse:
     # Implementation for the health worker prenatal form view
     # Wrap the view logic with robust exception handling so unexpected errors
@@ -178,11 +175,10 @@ def health_worker_prenatal_form_view(request: HttpRequest, mhr_id: int) -> HttpR
         "prenatal_followup_formset": pf_formset,
     })
 
-
 @session_login_required
 @role_required(*ACCESS)
 @nocache
-@csrf_required
+@csrf_protect
 def find_mother_basic_info(request: HttpRequest, person_id: int) -> JsonResponse:
     basic_info = REPOSITORY.fetch_mother_basic_info_by_person_id(person_id)
     return JsonResponse(basic_info)
@@ -190,7 +186,7 @@ def find_mother_basic_info(request: HttpRequest, person_id: int) -> JsonResponse
 @session_login_required
 @role_required(*BHW_ACCESS)
 @nocache
-@csrf_required
+@csrf_protect
 def create_new_maternal_entry(request: HttpRequest) -> HttpResponse:
     try:
         role = request.session.get("auth", {}).get("role_name")
@@ -259,12 +255,21 @@ def create_new_maternal_entry(request: HttpRequest) -> HttpResponse:
 @session_login_required
 @role_required(*MIDWIFE_ACCESS)
 @nocache
-@csrf_required
+@csrf_protect
 def maternal_health_record_form(request, record_id : int):
     try:
         role = request.session.get("auth", {}).get("role_name")
         assistant = request.session.get("auth", {}).get("first_name") + " " + request.session.get("auth", {}).get("last_name")
         staff_id = request.session.get("auth", {}).get("staff_id")
+
+        mhr_status = MHRCompletionForm(repository=REPOSITORY, mhr_id=record_id)
+        
+        # fetch the current record status row (repo method already exists)
+        status_row = REPOSITORY.fetch_maternal_health_record_status_by_mhr_id(record_id) or {}
+        status_name = (status_row.get('record_status_name') or "").upper()
+        
+        # lock when COMPLETE or INCOMPLETE (incomplete semantics you described)
+        is_locked = status_name in ('COMPLETE', 'INCOMPLETE')
         
         maternal_identification_form = MaternalIdentificationForm(
                 role=role, maternal_repository=REPOSITORY, maternal_id=record_id)
@@ -358,6 +363,11 @@ def maternal_health_record_form(request, record_id : int):
         logger.info(f"FORM TYPE RECEIVED: {request.POST.get('form_type', None)}")
         
         if request.method == "POST":
+            
+            deny = FormLockUtility.deny_if_locked(request, REPOSITORY, record_id, api=False)
+            if deny:
+                return deny
+            
             form_type = request.POST.get("form_type", None) or None
             if form_type:
                 if form_type == "obstetric_history_form":
@@ -396,6 +406,8 @@ def maternal_health_record_form(request, record_id : int):
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
                                 "mhr_id": record_id,
+                                "mhr_status": mhr_status,
+                                "is_locked": is_locked,
                             })
                         
                         messages.success(request, "Obstetric History saved successfully.")
@@ -418,6 +430,8 @@ def maternal_health_record_form(request, record_id : int):
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
                             "mhr_id": record_id,
+                            "mhr_status": mhr_status,
+                            "is_locked": is_locked,
                         })
                 elif form_type == "medical_history_form":
                     medical_history_form = MedicalHistoryForm(
@@ -452,6 +466,8 @@ def maternal_health_record_form(request, record_id : int):
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
                                 "mhr_id": record_id,
+                                "mhr_status": mhr_status,
+                                "is_locked": is_locked,
                             })
                         
                         messages.success(request, "Medical History saved successfully.")
@@ -474,6 +490,8 @@ def maternal_health_record_form(request, record_id : int):
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
                             "mhr_id": record_id,
+                            "mhr_status": mhr_status,
+                            "is_locked": is_locked,
                         })
                 elif form_type == "tetanus_toxoid":
                     tt_form = TetanusToxoidForm(
@@ -505,6 +523,8 @@ def maternal_health_record_form(request, record_id : int):
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
                                 "mhr_id": record_id,
+                                "mhr_status": mhr_status,
+                                "is_locked": is_locked,
                             })
                         
                         messages.success(request, "Tetanus Toxoid data saved successfully.")
@@ -527,6 +547,8 @@ def maternal_health_record_form(request, record_id : int):
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
                             "mhr_id": record_id,
+                            "mhr_status": mhr_status,
+                            "is_locked": is_locked,
                         })
                 elif form_type == "check_list_form":
                     check_list_form = CheckListForm(
@@ -557,6 +579,8 @@ def maternal_health_record_form(request, record_id : int):
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
                                 "mhr_id": record_id,
+                                "mhr_status": mhr_status,
+                                "is_locked": is_locked,
                             })
                         
                         messages.success(request, "Checklist data saved successfully.")
@@ -579,6 +603,8 @@ def maternal_health_record_form(request, record_id : int):
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
                             "mhr_id": record_id,
+                            "mhr_status": mhr_status,
+                            "is_locked": is_locked,
                         })
                 elif form_type == "plan_form":
                     plan_form = PlanForm(
@@ -610,6 +636,8 @@ def maternal_health_record_form(request, record_id : int):
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
                                 "mhr_id": record_id,
+                                "mhr_status": mhr_status,
+                                "is_locked": is_locked,
                             })
                         
                         messages.success(request, "Plan data saved successfully.")
@@ -632,6 +660,8 @@ def maternal_health_record_form(request, record_id : int):
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
                             "mhr_id": record_id,
+                            "mhr_status": mhr_status,
+                            "is_locked": is_locked,
                         })
                 elif form_type == "micro_nutrients_form":
                     micro_nutrients_form = MicroNutrientsForm(
@@ -640,7 +670,6 @@ def maternal_health_record_form(request, record_id : int):
                         data=request.POST
                     )
                     if micro_nutrients_form.is_valid():
-                        print(f'Micro Nutrients Form Data: {micro_nutrients_form.cleaned_data}')
                         res = REPOSITORY.insert_micronutrients(
                             mhr_id=record_id,
                             staff_id=staff_id,
@@ -665,6 +694,8 @@ def maternal_health_record_form(request, record_id : int):
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
                                 "mhr_id": record_id,
+                                "mhr_status": mhr_status,
+                                "is_locked": is_locked,
                             })
                         
                         messages.success(request, "Micro Nutrients data saved successfully.")
@@ -686,6 +717,8 @@ def maternal_health_record_form(request, record_id : int):
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
                             "mhr_id": record_id,
+                            "mhr_status": mhr_status,
+                            "is_locked": is_locked,
                         })
                 elif form_type == 'previous_pregnancy_form':
                     
@@ -725,6 +758,8 @@ def maternal_health_record_form(request, record_id : int):
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
                                 "mhr_id": record_id,
+                                "mhr_status": mhr_status,
+                                "is_locked": is_locked,
                             })
                         
                         messages.success(request, "Previous Pregnancies data saved successfully.")
@@ -747,6 +782,8 @@ def maternal_health_record_form(request, record_id : int):
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
                             "mhr_id": record_id,
+                            "mhr_status": mhr_status,
+                            "is_locked": is_locked,
                         })
                 elif form_type == 'present_pregnancy_form':
                     presemt_pregnancy_form = PresentPregnancyForm(
@@ -783,6 +820,8 @@ def maternal_health_record_form(request, record_id : int):
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
                                 "mhr_id": record_id,
+                                "mhr_status": mhr_status,
+                                "is_locked": is_locked,
                             })
                         
                         messages.success(request, "Present Pregnancy data saved successfully.")
@@ -805,6 +844,8 @@ def maternal_health_record_form(request, record_id : int):
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
                             "mhr_id": record_id,
+                            "mhr_status": mhr_status,
+                            "is_locked": is_locked,
                         })
                 elif form_type == 'laboratory_form':
                     # Instantiate form with POST only. Keep validation in the view.
@@ -839,6 +880,8 @@ def maternal_health_record_form(request, record_id : int):
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
                                 "mhr_id": record_id,
+                                "mhr_status": mhr_status,
+                                "is_locked": is_locked,
                             })
 
                         # normalize service return value (support bool or dict)
@@ -865,6 +908,8 @@ def maternal_health_record_form(request, record_id : int):
                                 "prenatal_followup_entry_form": pf_entry_form,
                                 "prenatal_followup_formset": pf_formset,
                                 "mhr_id": record_id,
+                                "mhr_status": mhr_status,
+                                "is_locked": is_locked,
                             })
 
                         messages.success(request, "Laboratory data saved successfully.")
@@ -887,6 +932,8 @@ def maternal_health_record_form(request, record_id : int):
                             "prenatal_followup_entry_form": pf_entry_form,
                             "prenatal_followup_formset": pf_formset,
                             "mhr_id": record_id,
+                            "mhr_status": mhr_status,
+                            "is_locked": is_locked,
                         })
             else:
                 messages.warning(request, "No form type specified.")
@@ -906,6 +953,8 @@ def maternal_health_record_form(request, record_id : int):
                     "prenatal_followup_entry_form": pf_entry_form,
                     "prenatal_followup_formset": pf_formset,
                     "mhr_id": record_id,
+                    "mhr_status": mhr_status,
+                    "is_locked": is_locked,
                 })
         return render(request, "maternal/health_record_form.html", {
             "risk_code_form": risk_code_form,
@@ -923,6 +972,8 @@ def maternal_health_record_form(request, record_id : int):
             "prenatal_followup_entry_form": pf_entry_form,
             "prenatal_followup_formset": pf_formset,
             "mhr_id": record_id,
+            "mhr_status": mhr_status,
+            "is_locked": is_locked,
         })
     except MaternalHealthRecordException as e:
         logger.warning(f"Error in maternal health record form: {str(e)}")
@@ -943,17 +994,18 @@ def maternal_health_record_form(request, record_id : int):
             "prenatal_followup_entry_form": pf_entry_form,
             "prenatal_followup_formset": pf_formset,
             "mhr_id": record_id,
+            "mhr_status": mhr_status,
+            "is_locked": is_locked,
         })
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         messages.error(request, f"Something went wrong. Please try again later.")
         return redirect('maternal:maternal_health_record_form', record_id=record_id)
 
-
 @session_login_required
 @role_required(*MIDWIFE_ACCESS)
 @nocache
-@csrf_required
+@csrf_protect
 def laboratory_save_api(request, record_id: int) -> JsonResponse:
     """AJAX endpoint to save laboratory data.
 
@@ -964,6 +1016,10 @@ def laboratory_save_api(request, record_id: int) -> JsonResponse:
     """
     if request.method != 'POST':
         return JsonResponse({'success': False, 'message': 'Only POST allowed.'}, status=405)
+
+    deny = FormLockUtility.deny_if_locked(request, REPOSITORY, record_id, api=True)
+    if deny:
+        return deny
 
     # parse payload: prefer JSON body, fall back to POST dict
     payload = {}
@@ -1027,7 +1083,7 @@ def laboratory_save_api(request, record_id: int) -> JsonResponse:
 @session_login_required
 @role_required(*ACCESS)
 @nocache
-@csrf_required
+@csrf_protect
 def record_detail(request: HttpRequest, person_id: int) -> HttpResponse:
     maternal_health_record_id = REPOSITORY.fetch_maternal_health_record_id_by_person_id(person_id)['maternal_record_id']
     record = REPOSITORY.fetch_latest_maternal_record_by_person_and_maternal_id(person_id, maternal_record_id=maternal_health_record_id) or {}
@@ -1057,7 +1113,7 @@ def record_detail(request: HttpRequest, person_id: int) -> HttpResponse:
 @session_login_required
 @role_required(*ACCESS)
 @nocache
-@csrf_required
+@csrf_protect
 def records(request: HttpRequest) -> HttpResponse:
     q = (request.GET.get("q") or "").strip()
 
