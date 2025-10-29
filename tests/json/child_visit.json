@@ -1,0 +1,71 @@
+{
+    "p_child_record_id": 1,
+    "p_assessed_by_id": 0,
+    "p_visit_date": "2023-10-01",
+    "p_feeding_type_id": 1,
+    "p_referred_nbs_date": "2023-10-05",
+    "p_child_immunizations": [
+        {
+            "immunization_type_id": 1,
+            "date_given": "2023-10-01",
+            "immunization_stage_given_id": 1
+        },
+        {
+            "immunization_type_id": 2,
+            "date_given": "2023-10-02",
+            "immunization_stage_given_id": 2
+        }
+    ],
+    "p_bf_checks": [
+        {
+            "check_date": "2023-10-01"
+        },
+        {
+            "check_date": "2023-10-02"
+        }
+    ],
+    "p_monitoring_logs": [
+        {
+            "check_date": "2023-10-01",
+            "age": 12,
+            "weight": 9.5,
+            "temperature": 36.5,
+            "height": 75.0,
+            "findings": "Healthy",
+            "notes": "No issues"
+        },
+        {
+            "check_date": "2023-10-01",
+            "age": 12,
+            "weight": 9.5,
+            "temperature": 36.5,
+            "height": 75.0,
+            "findings": "Healthy",
+            "notes": "No issues"
+        }
+    ],
+    "p_screenings": {
+        "is_protected_at_birth": true,
+        "date_assessed": "2023-10-01",
+        "anemic_seen": false,
+        "anemic_given_iron": false,
+        "birth_weight": 3.2,
+        "is_low_birth_weight": false,
+        "iron_seen_2_6_mos": false,
+        "iron_given_2_6_mos": false
+    },
+    "p_iron_supplements": {
+        "date_started": "2023-10-01",
+        "date_completed": ""
+    },
+    "p_vitamin_a": [
+        {
+            "dose_no": 1,
+            "date_given": "2023-10-01"
+        },
+        {
+            "dose_no": 1,
+            "date_given": "2023-10-01"
+        }
+    ]
+}

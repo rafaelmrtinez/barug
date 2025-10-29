@@ -1,0 +1,533 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'child_health/css/chr-theme.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container py-4 mt-5">
+
+    {% include "messages.html" %}
+
+    <h1 class="mb-3">Child Health Record</h1>
+    <input type="hidden" id="child_id" value="{{ child_id }}">
+
+    <!-- Identification (NO header button) -->
+    <div class="card mb-3 card-brand">
+        <div class="card-header">Identification</div>
+        <input type="hidden" name="child_information_form" id="child_health_record_id"
+            value="{{ child_health_record_id }}">
+        <div class="card-body" id="identification">
+            <div class="row g-3">
+                <div class="col-md-2">
+                    {{ child_information_form.family_no.label_tag }}
+                    {{ child_information_form.family_no }}
+                </div>
+                <div class="col-md-2">
+                    {{ child_information_form.ufc_no.label_tag }}
+                    {{ child_information_form.ufc_no }}
+                </div>
+                <div class="col-md-4">
+                    {{ child_information_form.name.label_tag }}
+                    {{ child_information_form.name }}
+                </div>
+                <div class="col-md-2">
+                    {{ child_information_form.sex.label_tag }}
+                    {{ child_information_form.sex }}
+                </div>
+                <div class="col-md-2">
+                    {{ child_information_form.birth_order.label_tag }}
+                    {{ child_information_form.birth_order }}
+                </div>
+                <div class="col-md-3">
+                    {{ child_information_form.date_of_birth.label_tag }}
+                    {{ child_information_form.date_of_birth }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Place of Delivery (NO header button) -->
+    <div class="card mb-3 card-brand">
+        <div class="card-header">Place of Delivery</div>
+        <div class="card-body">
+            <div class="card-body row g-2" id="place-of-delivery">
+                <div class="col-md-12">
+                    {{ child_information_form.place_of_delivery.label_tag }} {{ child_information_form.place_of_delivery }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parent Information (NO header button) -->
+    <div class="card mb-3 card-brand">
+        <div class="card-header">Parent Information</div>
+        <div class="card-body">
+            <div class="row g-3" id="parent-info">
+                <div class="col-md-3">{{ child_information_form.mother.label_tag }} {{ child_information_form.mother }}
+                </div>
+                <div class="col-md-2">{{ child_information_form.mother_age.label_tag }} {{ child_information_form.mother_age }}</div>
+                <div class="col-md-2">{{ child_information_form.mother_occupation.label_tag }} {{ child_information_form.mother_occupation }}</div>
+                <div class="col-md-3">{{ child_information_form.father.label_tag }} {{ child_information_form.father }}
+                </div>
+                <div class="col-md-2">{{ child_information_form.father_age.label_tag }} {{ child_information_form.father_age }}</div>
+                <div class="col-md-2">{{ child_information_form.father_occupation.label_tag }} {{ child_information_form.father_occupation }}</div>
+            </div>
+
+            <!-- this row was outside .card-body; move it inside -->
+            <div class="row g-3 mt-2">
+                <div class="col-md-12">{{ child_information_form.address.label_tag }} {{ child_information_form.address }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Born Screening (WITH header button) -->
+    <div class="card mb-3 card-brand">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>New Born Screening</span>
+            <button type="button" class="btn btn-sm btn-outline-brand section-action" data-section="#nbs">Edit</button>
+        </div>
+        <div class="card-body" id="nbs">
+            <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
+                {{ new_born_screening.form_type }}
+                {% csrf_token %}
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        {{ new_born_screening.referred_for_newborn_screening.label_tag }}
+                        {{ new_born_screening.referred_for_newborn_screening }}
+                        {% comment %} {% if new_born_screening.referred_for_newborn_screening.errors %}
+                        {% for error in new_born_screening.referred_for_newborn_screening.errors %}
+                        <small class="text-danger d-block">{{ error }}</small>
+                        {% endfor %}
+                        {% endif %} {% endcomment %}
+                    </div>
+                    <div class="col-md-4">
+                        {{ new_born_screening.type_of_feeding.label_tag }}
+                        {{ new_born_screening.type_of_feeding }}
+                        {% comment %} {% if new_born_screening.feeding_type.errors %}
+                        {% for error in new_born_screening.feeding_type.errors %}
+                        <small class="text-danger d-block">{{ error }}</small>
+                        {% endfor %}
+                        {% endif %} {% endcomment %}
+                    </div>
+                    <input type="hidden" name="nbs_form" value="nbs_form">
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                        <button type="submit" class="btn btn-brand btn-sm flex-fill" style="max-width:150px;">Update
+                            Entry</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Child Details (WITH header button) -->
+    <div class="card mb-3 card-brand">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Child Details</span>
+            <button type="button" class="btn btn-sm btn-outline-brand section-action"
+                data-section="#child-details">Edit</button>
+        </div>
+        <form id="breastFeedingForm" action="{% url 'child_health:child_health_entry' child_health_record_id %}"
+            method="post" novalidate>
+            <div class="card-body" id="child-details">
+                {% csrf_token %}
+                {% comment %} <div class="col-md-4">
+                    {{ bf_form.type_of_feeding.label_tag }}
+                    {{ bf_form.type_of_feeding }}
+                    {% if bf_form.type_of_feeding.errors %}
+                    {% for error in bf_form.type_of_feeding.errors %}
+                    <small class="text-danger">{{ error }}</small>
+                    {% endfor %}
+                    {% endif %}
+                </div> {% endcomment %}
+                <hr class="my-4">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label fw-bold d-block mb-2">Exclusive Breastfeeding Check Dates</label>
+                        <div class="row g-2">
+                            <div class="col-md-3">{{ bf_form.exclusive_bf_check_1.label_tag }} {{ bf_form.exclusive_bf_check_1 }}</div>
+                            <div class="col-md-3">{{ bf_form.exclusive_bf_check_2.label_tag }} {{ bf_form.exclusive_bf_check_2 }}</div>
+                            <div class="col-md-3">{{ bf_form.exclusive_bf_check_3.label_tag }} {{ bf_form.exclusive_bf_check_3 }}</div>
+                            <div class="col-md-3">{{ bf_form.exclusive_bf_check_4.label_tag }} {{ bf_form.exclusive_bf_check_4 }}</div>
+                            <div class="col-md-3">{{ bf_form.exclusive_bf_check_5.label_tag }} {{ bf_form.exclusive_bf_check_5 }}</div>
+                            <div class="col-md-3">{{ bf_form.exclusive_bf_check_6.label_tag }} {{ bf_form.exclusive_bf_check_6 }}</div>
+                            <div class="col-md-3">{{ bf_form.exclusive_bf_check_7.label_tag }} {{ bf_form.exclusive_bf_check_7 }}</div>
+                            <div class="col-md-3">{{ bf_form.exclusive_bf_check_8.label_tag }} {{ bf_form.exclusive_bf_check_8 }}</div>
+                            <div class="col-md-3">{{ bf_form.exclusive_bf_check_9.label_tag }} {{ bf_form.exclusive_bf_check_9 }}</div>
+                            <div class="col-md-3">{{ bf_form.exclusive_bf_check_10.label_tag }} {{ bf_form.exclusive_bf_check_10 }}</div>
+                        </div>
+                    </div>
+                </div>
+                {{ bf_form.form_type }}
+                <div class="d-flex justify-content-end gap-2 mt-3">
+                    <button type="submit" class="btn btn-brand btn-sm flex-fill" style="max-width:150px;">Update
+                        Entry</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Immunization (per-row forms) -->
+    <div class="card mb-3 card-brand">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Immunization</span>
+            <button type="button" class="btn btn-sm btn-outline-brand section-action"
+                data-section="#immunization">Edit</button>
+        </div>
+
+        <div class="card-body table-responsive" id="immunization">
+            <table class="table table-bordered align-middle table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>Type of Immunization</th>
+                        <th>24 hrs</th>
+                        <th>1st</th>
+                        <th>2nd</th>
+                        <th>3rd</th>
+                        <th style="width:110px;">Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <!-- BCG -->
+                    <tr>
+                        <form method="post" id="bcgImmunizationForm">
+                            {% csrf_token %}
+                            <td>BCG</td>
+                            <td>{{ immunizations.bcg_24hr }}</td>
+                            <td>{{ immunizations.bcg_1st }}</td>
+                            <td>{{ immunizations.bcg_2nd }}</td>
+                            <td>{{ immunizations.bcg_3rd }}</td>
+                            <td>
+                                <button type="submit" class="btn btn-brand btn-sm w-100">Save</button>
+                            </td>
+                        </form>
+                    </tr>
+
+                    <!-- Hep. BV -->
+                    <tr>
+                        <form method="post" id="hepbvImmunizationForm" novalidate>
+                            {% csrf_token %}
+                            <td>Hep. BV</td>
+                            <td>{{ immunizations.hepbv_24hr }}</td>
+                            <td>{{ immunizations.hepbv_1st }}</td>
+                            <td>{{ immunizations.hepbv_2nd }}</td>
+                            <td>{{ immunizations.hepbv_3rd }}</td>
+                            <td>
+                                <button type="submit" class="btn btn-brand btn-sm w-100">Save</button>
+                            </td>
+                        </form>
+                    </tr>
+
+                    <!-- PCV -->
+                    <tr>
+                        <form method="post" id="pcvImmunizationForm" novalidate>
+                            {% csrf_token %}
+                            <td>PCV</td>
+                            <td>{{ immunizations.pcv_24hr }}</td>
+                            <td>{{ immunizations.pcv_1st }}</td>
+                            <td>{{ immunizations.pcv_2nd }}</td>
+                            <td>{{ immunizations.pcv_3rd }}</td>
+                            <td>
+                                <button type="submit" class="btn btn-brand btn-sm w-100">Save</button>
+                            </td>
+                        </form>
+                    </tr>
+
+                    <!-- OPV -->
+                    <tr>
+                        <form method="post" id="opvImmunizationForm" novalidate>
+                            {% csrf_token %}
+                            <td>OPV</td>
+                            <td>{{ immunizations.opv_24hr }}</td>
+                            <td>{{ immunizations.opv_1st }}</td>
+                            <td>{{ immunizations.opv_2nd }}</td>
+                            <td>{{ immunizations.opv_3rd }}</td>
+                            <td>
+                                <button type="submit" class="btn btn-brand btn-sm w-100">Save</button>
+                            </td>
+                        </form>
+                    </tr>
+
+                    <!-- AMV -->
+                    <tr>
+                        <form method="post" id="amvImmunizationForm" novalidate>
+                            {% csrf_token %}
+                            <td>AMV</td>
+                            <td>{{ immunizations.amv_24hr }}</td>
+                            <td>{{ immunizations.amv_1st }}</td>
+                            <td>{{ immunizations.amv_2nd }}</td>
+                            <td>{{ immunizations.amv_3rd }}</td>
+                            <td>
+                                <button type="submit" class="btn btn-brand btn-sm w-100">Save</button>
+                            </td>
+                        </form>
+                    </tr>
+
+                    <!-- Pentavalent -->
+                    <tr>
+                        <form method="post" id="pentavalentImmunizationForm" novalidate>
+                            {% csrf_token %}
+                            <td>Pentavalent</td>
+                            <td>{{ immunizations.pentavalent_24hr }}</td>
+                            <td>{{ immunizations.pentavalent_1st }}</td>
+                            <td>{{ immunizations.pentavalent_2nd }}</td>
+                            <td>{{ immunizations.pentavalent_3rd }}</td>
+                            <td>
+                                <button type="submit" class="btn btn-brand btn-sm w-100">Save</button>
+                            </td>
+                        </form>
+                    </tr>
+                </tbody>
+            </table>
+
+            {# Original footer button (now commented out per request) #}
+            {% comment %} <div class="d-flex justify-content-end gap-2 mt-3">
+                <button type="submit" class="btn btn-brand btn-sm flex-fill" style="max-width:150px;">Update
+                    Entry</button>
+            </div> {% endcomment %}
+        </div>
+    </div>
+
+
+    <!-- Birth & Supplementation (WITH header button) -->
+    <div class="card mb-3 card-brand">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Birth & Supplementation</span>
+            <button type="button" class="btn btn-sm btn-outline-brand section-action"
+                data-section="#supplementation">Edit</button>
+        </div>
+        <div class="card-body" id="supplementation">
+            <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
+                {% csrf_token %}
+                <div class="row g-3">
+                    <div class="col-md-4">{{ form.data_assessed.label_tag }} {{ form.data_assessed }}</div>
+                    <div class="col-md-3">{{ form.birth_weight.label_tag }} {{ form.birth_weight }}</div>
+                    <div class="col-md-4">
+                        {{ form.tt_status_mother.label_tag }} {{ form.tt_status_mother }}
+                        <input type="hidden" name="tt_status_mother" value="{{ form.tt_status_mother.value }}">
+                    </div>
+                    <div class="col-md-3">{{ form.anemia_2_59_seen.label_tag }} {{ form.anemia_2_59_seen }}</div>
+                    <div class="col-md-3">{{ form.anemia_2_59_given_iron.label_tag }} {{ form.anemia_2_59_given_iron }}</div>
+                    <div class="col-md-3">{{ form.birth_wt_seen.label_tag }} {{ form.birth_wt_seen }}</div>
+                    <div class="col-md-3">{{ form.birth_wt_given_iron.label_tag }} {{ form.birth_wt_given_iron }}</div>
+                    <div class="col-md-3">{{ form.low_birth_weight }} {{ form.low_birth_weight.label_tag }}</div>
+
+                    {{ form.form_type }}
+
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                        <button type="submit" class="btn btn-brand btn-sm flex-fill" style="max-width:150px;">Update
+                            Entry</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+     <!-- Birth & Supplementation (WITH header button) -->
+    <div class="card mb-3 card-brand">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Iron Intake Form</span>
+            <button type="button" class="btn btn-sm btn-outline-brand section-action"
+                data-section="#iron_intake">Edit</button>
+        </div>
+        <div class="card-body" id="iron_intake">
+            <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
+                {% csrf_token %}
+                <div class="row g-3">
+                    <div class="col-md-3">{{ iron_intake_form.date_iron_started.label_tag }} {{ iron_intake_form.date_iron_started }}</div>
+                    <div class="col-md-3">{{ iron_intake_form.date_iron_completed.label_tag }} {{ iron_intake_form.date_iron_completed }}</div>
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                        {{ iron_intake_form.form_type }}
+                        <button type="submit" class="btn btn-brand btn-sm flex-fill" style="max-width:150px;">Update
+                            Entry
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Birth & Supplementation (WITH header button) -->
+    <div class="card mb-3 card-brand">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Vitamin</span>
+            <button type="button" class="btn btn-sm btn-outline-brand section-action" data-section="#supplementation">
+                Edit
+            </button>
+        </div>
+        <div class="card-body" id="supplementation">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        {{ vitamin_form.vit_a_1 }} {{ vitamin_form.vit_a_1.label_tag }}
+                    </div>
+                    <div class="col-md-3">
+                        {{ vitamin_form.vit_a_2 }} {{ vitamin_form.vit_a_2.label_tag }}
+                    </div>
+                    <div class="col-md-3">
+                        {{ vitamin_form.vit_a_3 }} {{ vitamin_form.vit_a_3.label_tag }}
+                    </div>
+
+                    {{ vitamin_form.form_type }}
+
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                        <button type="submit" class="btn btn-brand btn-sm flex-fill" style="max-width:150px;">
+                            Update Entry
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Visit Entry (WITH header button) -->
+    <div class="card mb-3 card-brand">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Add Visit Entry</span>
+            <button type="button" class="btn btn-sm btn-outline-brand section-action" data-section="#visit-entry">
+                Edit
+            </button>
+        </div>
+
+        <div class="card-body" id="visit-entry">
+            <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
+                {% csrf_token %}
+
+                <div class="row g-3">
+                    <!-- Date -->
+                    {% comment %} <div class="col-md-2">
+                        {{ visit_form.date.label_tag }}
+                        {{ visit_form.date }}
+                        {% for error in visit_form.date.errors %}
+                        <div class="text-danger small mt-1">{{ error }}</div>
+                        {% endfor %}
+                    </div> {% endcomment %}
+
+                    <!-- Age -->
+                    <div class="col-md-2">
+                        {{ visit_form.age.label_tag }}
+                        {{ visit_form.age }}
+                        {% comment %} {% for error in visit_form.age.errors %}
+                        <div class="text-danger small mt-1">{{ error }}</div>
+                        {% endfor %} {% endcomment %}
+                    </div>
+
+                    <!-- Weight -->
+                    <div class="col-md-2">
+                        {{ visit_form.weight.label_tag }}
+                        {{ visit_form.weight }}
+                        {% comment %} {% for error in visit_form.weight.errors %}
+                        <div class="text-danger small mt-1">{{ error }}</div>
+                        {% endfor %} {% endcomment %}
+                    </div>
+
+                    <!-- Temperature -->
+                    <div class="col-md-2">
+                        {{ visit_form.temp.label_tag }}
+                        {{ visit_form.temp }}
+                        {% comment %} {% for error in visit_form.temp.errors %}
+                        <div class="text-danger small mt-1">{{ error }}</div>
+                        {% endfor %} {% endcomment %}
+                    </div>
+
+                    <!-- Height -->
+                    <div class="col-md-2">
+                        {{ visit_form.height.label_tag }}
+                        {{ visit_form.height }}
+                        {% comment %} {% for error in visit_form.height.errors %}
+                        <div class="text-danger small mt-1">{{ error }}</div>
+                        {% endfor %} {% endcomment %}
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-2">
+                    <!-- Findings -->
+                    <div class="col-md-6">
+                        {{ visit_form.findings.label_tag }}
+                        {{ visit_form.findings }}
+                        {% comment %} {% for error in visit_form.findings.errors %}
+                        <div class="text-danger small mt-1">{{ error }}</div>
+                        {% endfor %} {% endcomment %}
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="col-md-6">
+                        {{ visit_form.notes.label_tag }}
+                        {{ visit_form.notes }}
+                        {% comment %} {% for error in visit_form.notes.errors %}
+                        <div class="text-danger small mt-1">{{ error }}</div>
+                        {% endfor %} {% endcomment %}
+                    </div>
+                </div>
+
+                <!-- Hidden form_type -->
+                {{ visit_form.form_type }}
+
+                <!-- Submit button -->
+                <div class="d-flex justify-content-end gap-2 mt-3">
+                    <button type="submit" class="btn btn-brand btn-sm flex-fill" style="max-width:150px;">
+                        Update Entry
+                    </button>
+                </div>
+            </form>
+        </div>
+
+    </div>
+
+    <!-- Visits (WITH header button just to jump down) -->
+    <div class="card mb-3 card-brand">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Visits</span>
+            <button type="button" class="btn btn-sm btn-outline-brand section-action" data-section="#visits-table">Go to
+                Table</button>
+        </div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped table-sm align-middle" id="visits-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Age</th>
+                        <th>Wt</th>
+                        <th>Temp</th>
+                        <th>Ht</th>
+                        <th>Findings</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in visit_log %}
+                    <tr>
+                        <td>{{ v.check_date|date:"Y-m-d" }}</td>
+                        <td>{{ v.age|default_if_none:"—" }}</td>
+                        <td>{{ v.weight|default_if_none:"—"|floatformat:"-2" }}</td>
+                        <td>{{ v.temperature|default_if_none:"—"|floatformat:"-1" }}</td>
+                        <td>{{ v.height|default_if_none:"—"|floatformat:"-2" }}</td>
+                        <td>{{ v.findings|default_if_none:"" }}</td>
+                        <td>{{ v.notes|default_if_none:"" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center">No visits recorded yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+{% block script %}
+<script defer src="{% static 'child_health/js/sectionActions.js' %}"></script>
+{% comment %}
+<script defer src="{% static 'child_health/js/insertBF.js' %}"></script> {% endcomment %}
+<!-- <script defer src="{% static 'child_health/js/selector.js' %}"></script> -->
+<script defer src="{% static 'child_health/js/weightCalculator.js' %}"></script>
+<script defer src="{% static 'child_health/js/immunizationRequest.js' %}"></script>
+{% comment %} <script defer src="{% static 'child_health/js/vitaminCheckcboxPolicy.js' %}"></script> {% endcomment %}
+{% endblock %}
+{% endblock %}

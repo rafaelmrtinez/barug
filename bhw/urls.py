@@ -21,6 +21,7 @@ urlpatterns = [
     
     # BHW
     path("maternal/new/", views.maternal_new, name="maternal_new"),
-    # path("child/new/", views.maternal_new, name="maternal_new"), add
 
+    path("child/new/", views.child_new, name="child_new"),
+    path("add-child/", views.add_child, name="add_child"),
 ]

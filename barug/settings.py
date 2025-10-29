@@ -70,6 +70,8 @@ CORS_ALLOW_ALL_ORIGINS = True
 # Application definition
 
 INSTALLED_APPS = [
+    "maternal.apps.MaternalConfig",
+    "child_health.apps.ChildHealthConfig",
     "metrics.apps.MetricsConfig",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -130,6 +132,8 @@ TEMPLATES = [
             BASE_DIR / "staff_admin/templates/staff_admin",
             BASE_DIR / "treasurer/templates/treasurer",
             BASE_DIR / "midwife/templates/midwife",
+            BASE_DIR / "maternal/templates/maternal",
+            BASE_DIR / "child_health/templates/child_health",
         ],
         "APP_DIRS": True,
         "OPTIONS": {
@@ -164,6 +168,11 @@ SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET")
 SUPABASE_ID_UPLOADS_BUCKET = os.getenv("SUPABASE_ID_UPLOADS_BUCKET", "id-uploads")
+
+# DB connection tuning (env-driven; safe defaults for local/dev)
+DB_CONN_MAX_AGE = int(os.getenv("DB_CONN_MAX_AGE", "0"))           # 0 = close after each request
+DB_CONNECT_TIMEOUT = int(os.getenv("DB_CONNECT_TIMEOUT", "10"))    # seconds
+DB_SSL_MODE = os.getenv("DB_SSL_MODE", "require")                  # adjust for your environment
 SUPABASE_OCR_TEST_BUCKET = os.getenv("SUPABASE_OCR_TEST_BUCKET ", "ocr-testing")
 SUPABASE_BUSINESS_PROOF_BUCKET = os.getenv("SUPABASE_BUSINESS_PROOF_BUCKET", "business-proofs")
 
@@ -175,15 +184,22 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD"),
         "HOST": os.getenv("DB_HOST"),
         "PORT": os.getenv("DB_PORT"),
+        # keep connections short-lived by default to avoid exhausting pooled DB clients
+        "CONN_MAX_AGE": DB_CONN_MAX_AGE,
+        # health checks force Django to verify connection liveness before use
+        "CONN_HEALTH_CHECKS": True,
+        # do not wrap every request in a transaction by default
+        "ATOMIC_REQUESTS": False,
         "OPTIONS": {
-            "sslmode": "require",
-            "connect_timeout": 100,
-            "options": "-c statement_timeout=5000"
+            # common options for remote/postgres providers (Supabase etc.)
+            "sslmode": DB_SSL_MODE,
+            "connect_timeout": DB_CONNECT_TIMEOUT,
+            # application_name is useful when inspecting pg_stat_activity
+            "application_name": "barug",
+            # add other provider-specific options here if needed
         },
-        "CONN_MAX_AGE": 120,
     }
 }
-
 
 
 # Password validation
@@ -209,22 +225,114 @@ AUTH_PASSWORD_VALIDATORS = [
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
 
+# LOGGING = {
+#     "version": 1,
+#     "disable_existing_loggers": False,
+#     "handlers": {
+#         "console": {"class": "logging.StreamHandler"},
+#     },
+#     "loggers": {
+#         # our views module (adjust if your file path differs)
+#         "authentication.views": {
+#             "handlers": ["console"],
+#             "level": "DEBUG",          # show everything from DEBUG up
+#             "propagate": False,
+#         },
+#         # optional: DB to see SQL errors clearly
+#         "django.db.backends": {
+#             "handlers": ["console"],
+#             "level": "ERROR",
+#             "propagate": False,
+#         },
+#     },
+# }
+
+LOG_LEVEL = os.getenv("DJANGO_LOG_LEVEL", "INFO")
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+
+    "formatters": {
+        "verbose": {
+            "format": "{asctime} [{levelname}] {name} | {message} (pid:{process:d} tid:{thread:d})",
+            "style": "{",
+        },
+        "simple": {
+            "format": "[{levelname}] {message}",
+            "style": "{",
+        },
+        "sql": {
+            "format": "{asctime} [SQL] {duration:.3f}s | {message}",
+            "style": "{",
+        },
+    },
+
     "handlers": {
         "console": {"class": "logging.StreamHandler"},
+
+        "file_all": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(BASE_DIR, "barug/system_info", "app.log"),
+            "maxBytes": 5 * 1024 * 1024,
+            "backupCount": 5,
+            "level": LOG_LEVEL,
+            "formatter": "verbose",
+        },
+        "file_errors": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(BASE_DIR, "barug/system_info", "error.log"),
+            "maxBytes": 5 * 1024 * 1024,
+            "backupCount": 5,
+            "level": "ERROR",
+            "formatter": "verbose",
+        },
+        "file_sql": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(BASE_DIR, "barug/system_info", "sql.log"),
+            "maxBytes": 10 * 1024 * 1024,
+            "backupCount": 3,
+            "level": os.getenv("SQL_LOG_LEVEL", "ERROR"),
+            "formatter": "sql",
+        },
+        "console_app": {
+            "class": "logging.StreamHandler",
+            "level": LOG_LEVEL,
+            "formatter": "simple",
+        },
+        "console_db_error": {
+            "class": "logging.StreamHandler",
+            "level": "ERROR",
+            "formatter": "simple",
+        },
     },
+
     "loggers": {
         # our views module (adjust if your file path differs)
         "authentication.views": {
             "handlers": ["console"],
-            "level": "DEBUG",          # show everything from DEBUG up
+            "level": "DEBUG",       # show everything from DEBUG up
             "propagate": False,
         },
         # optional: DB to see SQL errors clearly
         "django.db.backends": {
-            "handlers": ["console"],
+            "handlers": ["console_db_error", "file_sql"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+
+        "": {
+            "handlers": ["file_all", "file_errors", "console_app"],
+            "level": "DEBUG",
+            "propagate": True,
+        },
+        "django": {
+            "handlers": ["file_all", "file_errors", "console_app"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["file_errors", "console_app"],
             "level": "ERROR",
             "propagate": False,
         },
@@ -281,6 +389,9 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "resident/static/resident"),
     os.path.join(BASE_DIR, "bhw/static/bhw"),
     os.path.join(BASE_DIR, "clerk/static/clerk"),
+    os.path.join(BASE_DIR, "midwife/static/midwife"),
+    os.path.join(BASE_DIR, "maternal/static/maternal"),
+    os.path.join(BASE_DIR, "child_health/static/child_health"),
 ]
 
 # STATICFILES_DIRS = [

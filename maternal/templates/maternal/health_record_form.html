@@ -1,0 +1,683 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/mhr-theme.css' %}">
+<link rel="stylesheet" href="{% static 'maternal/css/image-preview.css' %}">
+<style>
+/* Constrain the width of the status select and button so they don't push the title */
+.mhr-action-group { flex-shrink: 0; }
+.mhr-action-group select, .mhr-action-group .btn {
+    min-width: 9rem; /* equal width for dropdown and button */
+    max-width: 11rem;
+    width: 10rem;
+}
+/* Allow the title to shrink without overflowing the layout */
+.mhr-title {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.mhr-title h1 { margin: 0; }
+
+.mhr-locked .card-footer .btn { display: none !important; }     /* hide save buttons */
+.mhr-locked .card { opacity: 0.9; }                             /* subtle dim */
+.mhr-locked .locked-overlay {
+  border: 2px dashed #f0ad4e;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+</style>
+
+{% endblock %}
+
+{% block content %}
+<div class="container py-4 mt-5 {% if is_locked %}mhr-locked{% endif %}">
+    {% if is_locked %}
+    <div class="alert alert-warning" role="alert">
+        This maternal health record is locked (status: {{ mhr_status.initial.record_status_name|default:"" }}). Editing is disabled.
+    </div>
+    {% endif %}
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <div class="mhr-title">
+            <h1 class="mb-0">Maternal Health Record</h1>
+        </div>
+        <input type="hidden" id="mhr-id" value="{{ mhr_id }}">
+        <div class="mhr-action-group d-flex align-items-center gap-2">
+            {{ mhr_status.confirm_complete }}
+            <button id="btn-mark-complete" type="button" class="btn btn-brand btn-sm">Mark as Complete</button>
+        </div>
+    </div>
+
+    {% include 'messages.html' %}
+
+    {# ───────────────── Identification ───────────────── #}
+
+    <!-- Identification -->
+    <form method="post" class="card mb-3 card-brand" id="form-identification" action="">
+        {% csrf_token %}
+        <input type="hidden" name="section" value="identification">
+        <div class="card mb-3 card-brand">
+            <div class="card-header">Identification</div>
+            <div class="card-body">
+                <div id="identification" class="row g-3">
+                    <div class="col-md-3">{{ identification_form.family_no.label_tag }} {{ identification_form.family_no }}
+                    </div>
+                    <div class="col-md-6">{{ identification_form.name.label_tag }} {{ identification_form.name }}</div>
+                    <div class="col-md-3">{{ identification_form.date_of_birth.label_tag }} {{ identification_form.date_of_birth }}</div>
+                    <div class="col-md-2">{{ identification_form.age.label_tag }} {{ identification_form.age }}</div>
+                    <div class="col-md-2">{{ identification_form.age_group.label_tag }} {{ identification_form.age_group }}
+                    </div>
+                    <div class="col-md-8">{{ identification_form.address.label_tag }} {{ identification_form.address }}</div>
+                    <div class="col-md-4">{{ identification_form.husband_name.label_tag }} {{ identification_form.husband_name }}</div>
+                    <div class="col-md-4">{{ identification_form.occupation.label_tag }} {{ identification_form.occupation }}
+                    </div>
+                    <div class="col-md-2">{{ identification_form.weight_kg.label_tag }} {{ identification_form.weight_kg }}
+                    </div>
+                    <div class="col-md-2">{{ identification_form.height_cm.label_tag }} {{ identification_form.height_cm }}
+                    </div>
+                    <div class="col-md-2">{{ identification_form.bmi.label_tag }} {{ identification_form.bmi }}</div>
+                    <div class="col-md-2">{{ identification_form.bmi_category.label_tag }} {{ identification_form.bmi_category }}</div>
+                </div>
+            </div>
+            {% if request.session.auth.role_name == "barangay health worker" %}
+            <div class="card-footer text-end">
+                <button type="submit" class="btn btn-brand">Save Identification</button>
+            </div>
+            {% endif %}
+        </div>
+    </form>
+
+    {% if request.session.auth.role_name == "midwife" %}
+        <!-- Obstetric -->
+        <form method="post" class="card mb-3 card-brand" id="form-obstetric" action="">
+            {% csrf_token %}
+            {{ obstetric_form.form_type }}
+            <div class="card mb-3 card-brand">
+                <span class="card-header">Obstetric</span>
+                <div class="card-body">
+                    <div id="obstetric" class="row g-3">
+                        <div class="col-md-3">{{ obstetric_form.children_born_alive.label_tag }} {{ obstetric_form.children_born_alive }}</div>
+                        <div class="col-md-3">{{ obstetric_form.living_children.label_tag }} {{ obstetric_form.living_children }}
+                        </div>
+                        <div class="col-md-3">{{ obstetric_form.abortions.label_tag }} {{ obstetric_form.abortions }}</div>
+                        <div class="col-md-3">{{ obstetric_form.stillbirths.label_tag }} {{ obstetric_form.stillbirths }}</div>
+                        <div class="col-md-6 form-check mt-2 ms-2">{{ obstetric_form.history_large_babies.label_tag }} {{ obstetric_form.history_large_babies }}</div>
+                        <div class="col-md-6 form-check mt-2 ms-2">{{ obstetric_form.diabetes_history }} {{ obstetric_form.diabetes_history.label_tag }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer text-end">
+                <button type="submit" class="btn btn-brand">Save Obstetric</button>
+            </div>
+        </form>
+
+        <!-- Medical History -->
+        <form method="post" class="card mb-3 card-brand" id="form-medhist" action="">
+            {% csrf_token %}
+            {{ medical_history_form.form_type }}
+            <div class="card mb-3 card-brand">
+                <span class="card-header">Medical History</span>
+                <div class="card-body">
+                    <div id="medhist" class="row g-3">
+                        <div class="col-md-4">{{ medical_history_form.previous_illness.label_tag }} {{ medical_history_form.previous_illness }}</div>
+                        <div class="col-md-4">{{ medical_history_form.previous_hospitalization.label_tag }} {{ medical_history_form.previous_hospitalization }}</div>
+                        <div class="col-md-4">{{ medical_history_form.previous_preg_complications.label_tag }} {{ medical_history_form.previous_preg_complications }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer text-end">
+                <button type="submit" class="btn btn-brand">Save Medical History</button>
+            </div>
+        </form>
+
+        <!-- Previous Pregnancies - separated input (single entry) and read-only table -->
+        <!-- Single-entry form: user adds one previous pregnancy at a time -->
+        <form method="post" class="card mb-3 card-brand" id="form-prev-preg-entry" action="">
+            {% csrf_token %}
+            {{ previous_pregnancy_entry_form.form_type }}
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Previous Pregnancy (Add one)</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">{{ previous_pregnancy_entry_form.delivery_date.label }}</label>
+                        {{ previous_pregnancy_entry_form.delivery_date }}
+                        {% if previous_pregnancy_entry_form.delivery_date.errors %}
+                            <div class="text-danger small">{{ previous_pregnancy_entry_form.delivery_date.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label">{{ previous_pregnancy_entry_form.outcome.label }}</label>
+                        {{ previous_pregnancy_entry_form.outcome }}
+                        {% if previous_pregnancy_entry_form.outcome.errors %}
+                            <div class="text-danger small">{{ previous_pregnancy_entry_form.outcome.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label">{{ previous_pregnancy_entry_form.delivery_type.label }}</label>
+                        {{ previous_pregnancy_entry_form.delivery_type }}
+                        {% if previous_pregnancy_entry_form.delivery_type.errors %}
+                            <div class="text-danger small">{{ previous_pregnancy_entry_form.delivery_type.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label">{{ previous_pregnancy_entry_form.baby_weight_kg.label }}</label>
+                        {{ previous_pregnancy_entry_form.baby_weight_kg }}
+                        {% if previous_pregnancy_entry_form.baby_weight_kg.errors %}
+                            <div class="text-danger small">{{ previous_pregnancy_entry_form.baby_weight_kg.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-1">
+                        <label class="form-label">{{ previous_pregnancy_entry_form.gender.label }}</label>
+                        {{ previous_pregnancy_entry_form.gender }}
+                        {% if previous_pregnancy_entry_form.gender.errors %}
+                            <div class="text-danger small">{{ previous_pregnancy_entry_form.gender.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-1">
+                        <label class="form-label">{{ previous_pregnancy_entry_form.ballard_score.label }}</label>
+                        {{ previous_pregnancy_entry_form.ballard_score }}
+                        {% if previous_pregnancy_entry_form.ballard_score.errors %}
+                            <div class="text-danger small">{{ previous_pregnancy_entry_form.ballard_score.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-1">
+                        <label class="form-label">{{ previous_pregnancy_entry_form.apgar_score.label }}</label>
+                        {{ previous_pregnancy_entry_form.apgar_score }}
+                        {% if previous_pregnancy_entry_form.apgar_score.errors %}
+                            <div class="text-danger small">{{ previous_pregnancy_entry_form.apgar_score.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer text-end">
+                <button type="submit" class="btn btn-brand">Add Previous Pregnancy</button>
+            </div>
+        </form>
+
+        <!-- Read-only table of existing previous pregnancies -->
+        <div class="card mb-3 card-brand">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Previous Pregnancies</span>
+                <div class="small text-white">Read-only</div>
+            </div>
+            <div class="card-body table-responsive">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>Date of delivery</th>
+                            <th>Outcome</th>
+                            <th>Type</th>
+                            <th>Baby’s wt (kg)</th>
+                            <th>Gender</th>
+                            <th>Ballard</th>
+                            <th>Apgar</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if formset and formset.forms %}
+                            {% for f in formset %}
+                                <tr>
+                                    <td>{{ f.delivery_date.value|default:"—" }}</td>
+                                    <td>{{ f.outcome.value|default:"—" }}</td>
+                                    <td>{{ f.delivery_type.value|default:"—" }}</td>
+                                    <td>{{ f.baby_weight_kg.value|default:"—" }}</td>
+                                    <td>{{ f.gender.value|default:"—" }}</td>
+                                    <td>{{ f.ballard_score.value|default:"—" }}</td>
+                                    <td>{{ f.apgar_score.value|default:"—" }}</td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center text-muted">No previous pregnancies recorded.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tetanus Toxoid -->
+        <form method="post" class="card mb-3 card-brand" id="form-tt" action="">
+            {% csrf_token %}
+            {{ tt_form.form_type }}
+            <div class="card card-brand mb-3">
+                <span class="card-header">Tetanus Toxoid (dates given)</span>
+                <div class="card-body">
+                    <div id="tt" class="row g-3">
+                        <div class="col-md-2">{{ tt_form.tt1_date.label_tag }} {{ tt_form.tt1_date }}</div>
+                        <div class="col-md-2">{{ tt_form.tt2_date.label_tag }} {{ tt_form.tt2_date }}</div>
+                        <div class="col-md-2">{{ tt_form.tt3_date.label_tag }} {{ tt_form.tt3_date }}</div>
+                        <div class="col-md-2">{{ tt_form.tt4_date.label_tag }} {{ tt_form.tt4_date }}</div>
+                        <div class="col-md-2">{{ tt_form.tt5_date.label_tag }} {{ tt_form.tt5_date }}</div>
+                        <div class="col-md-2">{{ tt_form.fim_date.label_tag }} {{ tt_form.fim_date }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer text-end">
+                <button type="submit" class="btn btn-brand">Save Tetanus Toxoid</button>
+            </div>
+        </form>
+
+        <!-- Present Pregnancy -->
+        <form method="post" class="card mb-3 card-brand" id="form-present" action="">
+            {% csrf_token %}
+            {{ present_pregnancy_form.form_type }}
+            <div class="card card-brand mb-3">
+                <span class="card-header">Present Pregnancy</span>
+                <div class="card-body">
+                    <div id="present" class="row g-3">
+                        <div class="col-md-2">{{ present_pregnancy_form.gravida.label_tag }} {{ present_pregnancy_form.gravida }}
+                        </div>
+                        <div class="col-md-2">{{ present_pregnancy_form.para.label_tag }} {{ present_pregnancy_form.para }}</div>
+                        <div class="col-md-2">{{ present_pregnancy_form.fullterm.label_tag }} {{ present_pregnancy_form.fullterm }}
+                        </div>
+                        <div class="col-md-2">{{ present_pregnancy_form.preterm.label_tag }} {{ present_pregnancy_form.preterm }}
+                        </div>
+                        <div class="col-md-2">{{ present_pregnancy_form.lmp.label_tag }} {{ present_pregnancy_form.lmp }}</div>
+                        <div class="col-md-2">{{ present_pregnancy_form.edc.label_tag }} {{ present_pregnancy_form.edc }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer text-end">
+                <button type="submit" class="btn btn-brand">Save Present Pregnancy</button>
+            </div>
+        </form>
+
+        <!-- Laboratory Results -->
+        <div class="card mb-3 card-brand">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Laboratory Results</span>
+                <div class="d-flex gap-2">
+                    <button id="btn-download-all-lab-images" type="button" class="btn btn-sm btn-outline-secondary">Download all images</button>
+                    <button type="button" class="btn btn-sm btn-brand section-action" data-section="#labs">Edit</button>
+                </div>
+            </div>
+
+            <div id="labs" class="card-body">
+                <div class="row g-3">
+                <!-- header row -->
+                <div class="row align-items-center mb-2 mt-3">
+                    <div class="col-md-6">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="fw-semibold text-uppercase small text-muted">Results</span>
+                        <span class="flex-grow-1 border-bottom" style="opacity:.35;"></span>
+                    </div>
+                    </div>
+                    <div class="col-md-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="fw-semibold text-uppercase small text-muted">Date Conducted</span>
+                        <span class="flex-grow-1 border-bottom" style="opacity:.35;"></span>
+                    </div>
+                    </div>
+                    <div class="col-md-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="fw-semibold text-uppercase small text-muted">Attachments</span>
+                        <span class="flex-grow-1 border-bottom" style="opacity:.35;"></span>
+                    </div>
+                    </div>
+                </div>
+
+                <!-- Urinalysis -->
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.urinalysis.label_tag }} {{ lab_form.urinalysis }}</div>
+                    <div class="col-md-3">{{ lab_form.urinalysis_date.label_tag }} {{ lab_form.urinalysis_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.urinalysis_images }}
+                        <div class="form-text">
+                        <a href="#gallery-urinalysis" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.urinalysis_images.id_for_label }}"
+                            data-gallery-id="gallery-urinalysis">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-urinalysis" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                        </div>
+                    </div>
+                </form>
+                <hr class="my-3" />
+
+                <!-- CBC -->
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.cbc.label_tag }} {{ lab_form.cbc }}</div>
+                    <div class="col-md-3">{{ lab_form.cbc_date.label_tag }} {{ lab_form.cbc_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.cbc_images }}
+                        <div class="form-text">
+                        <a href="#gallery-cbc" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.cbc_images.id_for_label }}"
+                            data-gallery-id="gallery-cbc">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-cbc" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                        </div>
+                    </div>
+                </form>
+                <hr class="my-3" />
+
+                <!-- SGOT/SGPT -->
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.sgot_sgpt.label_tag }} {{ lab_form.sgot_sgpt }}</div>
+                    <div class="col-md-3">{{ lab_form.sgot_sgpt_date.label_tag }} {{ lab_form.sgot_sgpt_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.sgot_sgpt_images }}
+                        <div class="form-text">
+                        <a href="#gallery-sgotsgpt" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.sgot_sgpt_images.id_for_label }}"
+                            data-gallery-id="gallery-sgotsgpt">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-sgotsgpt" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                        </div>
+                    </div>
+                </form>
+                <hr class="my-3" />
+
+                <!-- Creatinine serum -->
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.creatinine_serum.label_tag }} {{ lab_form.creatinine_serum }}</div>
+                    <div class="col-md-3">{{ lab_form.creatinine_serum_date.label_tag }} {{ lab_form.creatinine_serum_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.creatinine_serum_images }}
+                        <div class="form-text">
+                        <a href="#gallery-creatinine" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.creatinine_serum_images.id_for_label }}"
+                            data-gallery-id="gallery-creatinine">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-creatinine" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                        </div>
+                    </div>
+                </form>
+                <hr class="my-3" />
+
+                <!-- BUA / BUN -->
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.bua_bun.label_tag }} {{ lab_form.bua_bun }}</div>
+                    <div class="col-md-3">{{ lab_form.bua_bun_date.label_tag }} {{ lab_form.bua_bun_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.bua_bun_images }}
+                        <div class="form-text">
+                        <a href="#gallery-buabun" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.bua_bun_images.id_for_label }}"
+                            data-gallery-id="gallery-buabun">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-buabun" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                        </div>
+                    </div>
+                </form>
+                <hr class="my-3" />
+
+                <!-- Syphilis -->
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.syphilis.label_tag }} {{ lab_form.syphilis }}</div>
+                    <div class="col-md-3">{{ lab_form.syphilis_date.label_tag }} {{ lab_form.syphilis_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.syphilis_images }}
+                        <div class="form-text">
+                        <a href="#gallery-syphilis" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.syphilis_images.id_for_label }}"
+                            data-gallery-id="gallery-syphilis">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-syphilis" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                        </div>
+                    </div>
+                </form>
+                <hr class="my-3" />
+
+                <!-- HIV -->
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.hiv_test.label_tag }} {{ lab_form.hiv_test }}</div>
+                    <div class="col-md-3">{{ lab_form.hiv_test_date.label_tag }} {{ lab_form.hiv_test_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.hiv_test_images }}
+                        <div class="form-text">
+                        <a href="#gallery-hiv" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.hiv_test_images.id_for_label }}"
+                            data-gallery-id="gallery-hiv">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-hiv" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                        </div>
+                    </div>
+                </form>
+                <hr class="my-3" />
+
+                <!-- HEPA B -->
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.hepa_b.label_tag }} {{ lab_form.hepa_b }}</div>
+                    <div class="col-md-3">{{ lab_form.hepa_b_date.label_tag }} {{ lab_form.hepa_b_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.hepa_b_images }}
+                        <div class="form-text">
+                        <a href="#gallery-hepa" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.hepa_b_images.id_for_label }}"
+                            data-gallery-id="gallery-hepa">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-hepa" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                        </div>
+                    </div>
+                </form>
+                <hr class="my-3" />
+
+                <!-- Blood typing -->
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.blood_typing.label_tag }} {{ lab_form.blood_typing }}</div>
+                    <div class="col-md-3">{{ lab_form.blood_typing_date.label_tag }} {{ lab_form.blood_typing_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.blood_typing_images }}
+                        <div class="form-text">
+                        <a href="#gallery-bloodtyping" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.blood_typing_images.id_for_label }}"
+                            data-gallery-id="gallery-bloodtyping">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-bloodtyping" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand">Save</button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- OGCT (50g) -->
+                <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="laboratory_form">
+                    <div class="col-md-6">{{ lab_form.ogct_50g.label_tag }} {{ lab_form.ogct_50g }}</div>
+                    <div class="col-md-3">{{ lab_form.ogct_50g_date.label_tag }} {{ lab_form.ogct_50g_date }}</div>
+                    <div class="col-md-3">
+                        {{ lab_form.ogct_50g_images }}
+                        <div class="form-text">
+                        <a href="#gallery-ogct" class="preview-uploads-link"
+                            data-bs-toggle="collapse"
+                            data-input-id="{{ lab_form.ogct_50g_images.id_for_label }}"
+                            data-gallery-id="gallery-ogct">
+                            Preview uploads
+                        </a>
+                        </div>
+                        <div id="gallery-ogct" class="upload-gallery collapse mt-2"></div>
+                        <div class="mt-2 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-sm btn-brand">Save</button>
+                        </div>
+                    </div>
+                </form>
+                </div>
+            </div>
+
+            <div class="card-footer text-end">
+                <small class="text-muted me-2">You can upload multiple images per test. Use the Save button next to each test to submit only that test's data.</small>
+            </div>
+        </div>
+
+
+
+        <!-- Checklist -->
+        <form method="post" class="card mb-3 card-brand" id="form-checklist" action="">
+            {% csrf_token %}
+            {{ check_list_form.form_type }}
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Checklist</span>
+                <button type="button" class="btn btn-sm btn-brand section-action" data-section="#checklist">Edit</button>
+            </div>
+            <div id="checklist" class="card-body">
+                <div class="row">
+                    <div class="col-12">
+                        {% if check_list_form.populated %}
+                        <div class="alert alert-secondary mb-3">
+                            Checklist for latest visit
+                            {% if check_list_form.latest_visit.visit_no %}
+                                (Visit {{ check_list_form.latest_visit.visit_no }})
+                            {% endif %}
+                            on {{ check_list_form.latest_visit.visit_date }} has already been recorded and is read-only.
+                        </div>
+                        {% endif %}
+                        {% for checkbox in check_list_form.symptoms %}
+                        <div class="form-check form-check-inline mb-2">
+                            {{ checkbox.tag }}
+                            <label class="form-check-label">{{ checkbox.choice_label }}</label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="col-12 mt-2">
+                        <div class="form-check">
+                            {{ check_list_form.preeclampsia_flag }} {{ check_list_form.preeclampsia_flag.label_tag }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer text-end">
+                <button type="submit" class="btn btn-brand">Save Checklist</button>
+            </div>
+        </form>
+
+        <!-- Plans -->
+        <form method="post" class="card mb-3 card-brand" id="form-plans" action="">
+            {% csrf_token %}
+            {{ plan_form.form_type }}
+            <div class="card card-brand mb-3">
+                <span class="card-header">Plans</span>
+                <div class="card-body">
+                    <div id="plans" class="row g-3">
+                        <div class="col-md-6">{{ plan_form.plan_place_of_delivery.label_tag }} {{ plan_form.plan_place_of_delivery }}</div>
+                        <div class="col-md-6 form-check mt-2">{{ plan_form.plan_newborn_screening }} {{ plan_form.plan_newborn_screening.label_tag }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer text-end">
+                <button type="submit" class="btn btn-brand">Save Plans</button>
+            </div>
+        </form>
+
+        <!-- Micronutrients -->
+        <form method="post" class="card mb-4 card-brand" id="form-micros" action="">
+            {% csrf_token %}
+            {{ micro_nutrients_form.form_type }}
+            <input type="hidden" name="section" value="micronutrients">
+            <div class="card card-brand mb-3">
+                <span class="card-header">Micronutrients</span>
+                <div class="card-body">
+                    <div id="micros" class="row g-3">
+                        <div class="col-md-6">{{ micro_nutrients_form.iron_folic_start.label_tag }} {{ micro_nutrients_form.iron_folic_start }}</div>
+                        <div class="col-md-6 form-check mt-2"> {{ micro_nutrients_form.iron_folic_end.label_tag }} {{ micro_nutrients_form.iron_folic_end }}</div>
+                        <div class="col-md-4">{{ micro_nutrients_form.deworming_date.label_tag }} {{ micro_nutrients_form.deworming_date }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer d-flex justify-content-between align-items-center">
+                <div class="text-muted small">Tip: Micronutrients are per maternal record (not per visit).</div>
+                <button type="submit" class="btn btn-brand">Save Micronutrients</button>
+            </div>
+        </form>
+    {% endif %}
+    {% include 'maternal/partial/prenatal_logs_and_entry.html' with mhr_id=mhr_id prenatal_form=prenatal_followup_entry_form %}
+</div>
+        <!-- Image preview modal (used by imagePreview.js) -->
+        <div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content bg-transparent border-0">
+                    <div class="modal-header border-0">
+                        <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body d-flex justify-content-center align-items-center">
+                        <img id="imagePreviewModalImg" src="" alt="Preview" class="img-fluid" style="max-height:80vh; width:auto;" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+{% endblock %}
+
+{% block js %}
+{{ block.super }}
+<script src="{% static 'maternal/js/smoothScroll.js' %}"></script>
+<script src="{% static 'maternal/js/mhrTable.js' %}"></script>
+<script src="{% static 'maternal/js/imagePreview.js' %}"></script>
+<script src="{% static 'maternal/js/api/save_lab_results.js' %}"></script>
+<script src="{% static 'maternal/js/prenatalApi.js' %}"></script>
+<script src="{% static 'maternal/js/mark_complete.js' %}"></script>
+<script src="{% static 'maternal/js/prenatal_status_api.js' %}"></script>
+<script src="{% static 'maternal/js/lock_forms.js' %}"></script>
+<script src="{% static 'maternal/js/downloadAllLabImages.js' %}"></script>
+{% endblock %}

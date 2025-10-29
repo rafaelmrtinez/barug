@@ -38,6 +38,8 @@ urlpatterns = [
     path("metrics/", include("metrics.urls", namespace="metrics")),
     path("payments/", include("payments.urls", namespace="payments")),
     path("notifications/", include("notifications.urls", namespace="notifications")),
+    path("maternal/", include("maternal.urls", namespace="maternal")),
+    path("child-health/", include("child_health.urls", namespace="child_health")),
 ]
 
 if settings.DEBUG:
