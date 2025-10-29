@@ -2,6 +2,7 @@ import io
 import logging
 import os
 import zipfile
+import tempfile
 from typing import Tuple, List
 
 import requests
@@ -104,43 +105,69 @@ class ImageDownloadService:
         if not urls:
             raise ValueError('No images found for this maternal record.')
 
-        bio = io.BytesIO()
-        # use ZIP_DEFLATED when available
-        try:
-            zf = zipfile.ZipFile(bio, mode='w', compression=zipfile.ZIP_DEFLATED)
-        except Exception:
-            zf = zipfile.ZipFile(bio, mode='w')
-
+        # For large downloads we stream files to a temporary zip on disk to
+        # avoid building the entire archive in memory. We'll download each
+        # image into a temporary file, add it to the zip under the
+        # folder/<filename> path, then remove the temporary file.
         session = requests.Session()
-        # set a short timeout for each request
         timeout = 30
 
-        for fetch_url, filename, folder in urls:
-            try:
-                resp = session.get(fetch_url, timeout=timeout, stream=True)
-                if resp.status_code == 200:
-                    # read content in chunks and write into an in-memory buffer
-                    content = resp.content
-                    # Ensure filenames are unique within the zip (within folder)
-                    # We'll list existing names in the target folder
-                    existing = [n for n in zf.namelist() if n.startswith(folder + '/')]
-                    unique_name = filename
-                    idx = 1
-                    name_root, ext = os.path.splitext(filename)
-                    candidate = f"{folder}/{unique_name}"
-                    while candidate in existing:
-                        unique_name = f"{name_root}-{idx}{ext}"
-                        candidate = f"{folder}/{unique_name}"
-                        idx += 1
-                    zf.writestr(candidate, content)
-                else:
-                    logger.warning('Failed to fetch %s (status=%s); skipping', fetch_url, resp.status_code)
-            except Exception:
-                logger.exception('Error fetching image %s; skipping', fetch_url)
-                continue
+        tmp = tempfile.NamedTemporaryFile(prefix=f'mhr_{mhr_id}_', suffix='.zip', delete=False)
+        tmp_path = tmp.name
+        tmp.close()
 
-        zf.close()
-        bio.seek(0)
-        zip_bytes = bio.read()
-        zip_name = f'mhr_{mhr_id}_lab_images.zip'
-        return zip_bytes, zip_name
+        try:
+            # create zip file on disk
+            try:
+                zf = zipfile.ZipFile(tmp_path, mode='w', compression=zipfile.ZIP_DEFLATED)
+            except Exception:
+                zf = zipfile.ZipFile(tmp_path, mode='w')
+
+            for fetch_url, filename, folder in urls:
+                try:
+                    resp = session.get(fetch_url, timeout=timeout, stream=True)
+                    if resp.status_code == 200:
+                        # write response to temporary file to avoid using memory
+                        img_tmp = tempfile.NamedTemporaryFile(prefix='img_', delete=False)
+                        img_path = img_tmp.name
+                        try:
+                            for chunk in resp.iter_content(chunk_size=8192):
+                                if chunk:
+                                    img_tmp.write(chunk)
+                            img_tmp.flush()
+                        finally:
+                            img_tmp.close()
+
+                        # ensure unique arcname within folder
+                        base_name = filename
+                        name_root, ext = os.path.splitext(base_name)
+                        candidate = f"{folder}/{base_name}"
+                        idx = 1
+                        existing = set([n for n in zf.namelist() if n.startswith(folder + '/')])
+                        while candidate in existing:
+                            base_name = f"{name_root}-{idx}{ext}"
+                            candidate = f"{folder}/{base_name}"
+                            idx += 1
+                        zf.write(img_path, arcname=candidate)
+                        # remove the image temp file
+                        try:
+                            os.remove(img_path)
+                        except Exception:
+                            logger.debug('Failed to remove temp image file %s', img_path)
+                    else:
+                        logger.warning('Failed to fetch %s (status=%s); skipping', fetch_url, resp.status_code)
+                except Exception:
+                    logger.exception('Error fetching image %s; skipping', fetch_url)
+                    continue
+
+            zf.close()
+            zip_name = f'mhr_{mhr_id}_lab_images.zip'
+            return tmp_path, zip_name
+        except Exception:
+            # cleanup on error
+            try:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except Exception:
+                pass
+            raise
