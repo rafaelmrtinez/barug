@@ -23,4 +23,5 @@ urlpatterns = [
     path(f'api/v{API_VERSION}/mhr/schedule/postpartum/', __import__('maternal.api.insert_postpartum_schedule_api', fromlist=['']).PostpartumScheduleAPI.as_view(), name='mhr_schedule_postpartum_api'),
     path(f'api/v{API_VERSION}/mhr/postpartum-record/', __import__('maternal.api.insert_postpartum_record_api', fromlist=['']).PostpartumRecordAPI.as_view(), name='mhr_postpartum_record_api'),
     path(f'api/v{API_VERSION}/mhr/side-panel/', __import__('maternal.api.mhr_side_panel_api', fromlist=['']).MhrSidePanelAPI.as_view(), name='mhr_side_panel_api'),
+    path(f'api/v{API_VERSION}/mhr/lab-images/zip/', __import__('maternal.api.download_image_download_api', fromlist=['']).DownloadImageDownload.as_view(), name='mhr_lab_images_zip_api'),
 ]

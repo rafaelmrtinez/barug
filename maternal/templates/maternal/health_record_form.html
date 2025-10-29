@@ -295,7 +295,10 @@
         <div class="card mb-3 card-brand">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span>Laboratory Results</span>
-                <button type="button" class="btn btn-sm btn-brand section-action" data-section="#labs">Edit</button>
+                <div class="d-flex gap-2">
+                    <button id="btn-download-all-lab-images" type="button" class="btn btn-sm btn-outline-secondary">Download all images</button>
+                    <button type="button" class="btn btn-sm btn-brand section-action" data-section="#labs">Edit</button>
+                </div>
             </div>
 
             <div id="labs" class="card-body">
