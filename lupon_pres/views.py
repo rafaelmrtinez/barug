@@ -213,10 +213,9 @@ def _upload_to_storage_retry(
 # Views
 # ───────────────────────────────────────────────────────────────────────────────
 
-# @session_login_required
-# @role_required(LUPON_PRES_ROLE)
-# @nocache
-@require_GET
+@session_login_required
+@role_required(LUPON_PRES_ROLE)
+@nocache
 def staff_selection(request: HttpRequest) -> HttpResponse:
     # Landing selector (Resident vs Non-Resident)
     return render(request, "members/staff_selection.html", {
@@ -228,12 +227,11 @@ def staff_selection(request: HttpRequest) -> HttpResponse:
     })
 
 
-# @session_login_required
-# @role_required(LUPON_PRES_ROLE)
-# @nocache
+@session_login_required
+@role_required(LUPON_PRES_ROLE)
+@nocache
 @require_GET
 def resident_suggest(request: HttpRequest) -> JsonResponse:
-    """Autocomplete for resident search."""
     q = (request.GET.get("q") or "").strip()
     if not q:
         return JsonResponse({"results": []})
@@ -263,9 +261,9 @@ def resident_suggest(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"results": [], "error": "Search failed"}, status=500)
 
 
-# @session_login_required
-# @role_required(LUPON_PRES_ROLE)
-# @nocache
+@session_login_required
+@role_required(LUPON_PRES_ROLE)
+@nocache
 @require_http_methods(["GET", "POST"])
 def staff_selection_resident(request: HttpRequest) -> HttpResponse:
 
@@ -301,7 +299,8 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
 
     # Staff id from session
     auth = request.session.get("auth") or {}
-    staff_id = auth.get("staff_id") or 6  # fallback demo
+    staff_id = auth.get("staff_id")
+    # fallback demo
 
     # Handle POST
     if request.method == "POST" and pid:
@@ -513,9 +512,9 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
 
 
 
-# @session_login_required
-# @role_required(LUPON_PRES_ROLE)
-# @nocache
+@session_login_required
+@role_required(LUPON_PRES_ROLE)
+@nocache
 @require_http_methods(["GET", "POST"])
 def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
     form = ResidentProfileform(request.POST or None)
@@ -570,9 +569,9 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
     })
 
 
-# @session_login_required
-# @role_required(LUPON_PRES_ROLE)
-# @nocache
+@session_login_required
+@role_required(LUPON_PRES_ROLE)
+@nocache
 @require_http_methods(["GET", "POST"])
 def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
     form = ResidentProfileform(request.POST or None, request.FILES or None)
@@ -665,9 +664,9 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
     })
 
 
-# @session_login_required
-# @role_required(LUPON_PRES_ROLE)
-# @nocache
+@session_login_required
+@role_required(LUPON_PRES_ROLE)
+@nocache
 @require_http_methods(["GET", "POST"])
 def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
     role_form = UpdateInfo(request.POST or None)
@@ -746,7 +745,8 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
 
     # session staff id
     auth = request.session.get("auth") or {}
-    staff_id = auth.get("staff_id") or 1
+    staff_id = auth.get("staff_id")
+    
     if not staff_id:
         flash_warning(request, "Your session is missing staff credentials.")
         return redirect(request.META.get("HTTP_REFERER") or request.path)
@@ -886,9 +886,9 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
     return redirect("lupon_pres:staff_selection")
 
 
-# @session_login_required
-# @role_required(LUPON_PRES_ROLE)
-# @nocache
+@session_login_required
+@role_required(LUPON_PRES_ROLE)
+@nocache
 def members_list(request: HttpRequest) -> HttpResponse:
     try:
         all_rows = Secretary.get_all_staff_info_summary() or []
@@ -938,9 +938,9 @@ def members_list(request: HttpRequest) -> HttpResponse:
 
 
 
-# @session_login_required
-# @role_required(LUPON_PRES_ROLE)
-# @nocache
+@session_login_required
+@role_required(LUPON_PRES_ROLE)
+@nocache
 @require_GET
 def staff_search_api(request: HttpRequest):
     q = (request.GET.get("q") or "").strip()
@@ -955,9 +955,9 @@ def staff_search_api(request: HttpRequest):
         return JsonResponse({"results": [], "error": "Search failed"}, status=500)
 
 
-# @session_login_required
-# @role_required(LUPON_PRES_ROLE)
-# @nocache
+@session_login_required
+@role_required(LUPON_PRES_ROLE)
+@nocache
 @require_GET
 def staff_filter_api(request: HttpRequest):
     # role_raw = (request.GET.get("role_id") or "").strip()
@@ -977,10 +977,9 @@ def staff_filter_api(request: HttpRequest):
         return JsonResponse({"results": [], "error": "Filter failed"}, status=500)
 
 
-# @session_login_required
-# @role_required(LUPON_PRES_ROLE)
-# @nocache
-@require_GET
+@session_login_required
+@role_required(LUPON_PRES_ROLE)
+@nocache
 def member_dets(request: HttpRequest, staff_code: str) -> HttpResponse:
 
     try:

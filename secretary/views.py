@@ -198,7 +198,6 @@ def _file_to_data_url(fileobj, fallback_mime="image/jpeg") -> str:
 @session_login_required
 @role_required(SECRETARY_ROLE)
 @nocache
-@require_GET
 def staff_selection(request: HttpRequest) -> HttpResponse:
     return render(request, "staff/staff_selection.html", {
         'user_fullname': user_fullname,
@@ -255,7 +254,7 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
     proof_file = request.FILES.get("proof_file") if hasattr(request, "FILES") else None
 
     auth = request.session.get("auth") or {}
-    staff_id = auth.get("staff_id") or 6
+    staff_id = auth.get("staff_id")
 
     # --- Collect BHW puroks: base + extra rows
     purok_ids: List[int] = []
@@ -1073,7 +1072,6 @@ def staff_filter_api(request):
 @session_login_required
 @role_required(SECRETARY_ROLE)
 @nocache
-# @require_http_methods(["GET"])
 def staff_dets(request, staff_code: str):
     try:
         rows = Secretary.get_staff_profile_display(staff_code) if staff_code else []

@@ -265,10 +265,9 @@ def _key_from_personal(personal: dict) -> str:
     return f"{initials}{b_str}{last8}-staff-app"
 
 
-# @session_login_required
-# @role_required(CAPTAIN_ROLE)
-# @nocache
-@require_GET
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@nocache
 def staff_selection(request: HttpRequest) -> HttpResponse:
     return render(request, "staff_selection.html", {
         "user_fullname": user_fullname,
@@ -278,9 +277,9 @@ def staff_selection(request: HttpRequest) -> HttpResponse:
         "user_role_template": user_role_template,
     })
 
-# @session_login_required
-# @role_required(CAPTAIN_ROLE)
-# @nocache
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@nocache
 @require_GET
 def resident_suggest(request: HttpRequest) -> JsonResponse:
     q = (request.GET.get("q") or "").strip()
@@ -311,9 +310,9 @@ def resident_suggest(request: HttpRequest) -> JsonResponse:
         logger.exception("resident_suggest failed")
         return JsonResponse({"results": [], "error": "Oops! Our system is having an issue for now. Please try again later."}, status=500)
 
-# @session_login_required
-# @role_required(CAPTAIN_ROLE)
-# @nocache
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@nocache
 @require_http_methods(["GET", "POST"])
 def staff_selection_resident(request: HttpRequest) -> HttpResponse:
     pid = (request.POST.get("pid") or "").strip()
@@ -324,7 +323,7 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
     proof_file = request.FILES.get("proof_file") if hasattr(request, "FILES") else None
 
     auth = request.session.get("auth") or {}
-    staff_id = auth.get("staff_id") or 3
+    staff_id = auth.get("staff_id")
 
     # --- Collect BHW puroks: base + extra rows
     purok_ids: List[int] = []
@@ -565,9 +564,9 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
         "placeholder_img": static("images/brgy-sto-nino.png"),
     })
 
-# @session_login_required
-# @role_required(CAPTAIN_ROLE)
-# @nocache
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@nocache
 @require_http_methods(["GET", "POST"])
 def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
     form = ResidentProfileform(request.POST if request.method == "POST" else None)
@@ -622,9 +621,9 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
         "redirect": "captain:staff_selection_non-resident_docs",
     })
 
-# @session_login_required
-# @role_required(CAPTAIN_ROLE)
-# @nocache
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@nocache
 @require_http_methods(["GET", "POST"])
 def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
     form = ResidentProfileform(request.POST or None, request.FILES or None)
@@ -729,9 +728,9 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
         "form": form,
     })
 
-# @session_login_required
-# @role_required(CAPTAIN_ROLE)
-# @nocache
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@nocache
 @require_http_methods(["GET", "POST"])
 def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
     """
@@ -835,7 +834,7 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
         return redirect("captain:staff_selection_non-resident_docs")
 
     auth = request.session.get("auth") or {}
-    staff_id = auth.get("staff_id") or 3
+    staff_id = auth.get("staff_id")
     if not staff_id:
         logger.error("Validation ✗ Missing staff_id")
         flash_warning(request, "Your session is missing staff credentials.")
@@ -978,9 +977,9 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
     _wiz_clear(request)
     return redirect("captain:staff_selection")
 
-# @session_login_required
-# @role_required(CAPTAIN_ROLE)
-# @nocache
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@nocache
 def staff_list(request: HttpRequest) -> HttpResponse:
     # Pull rows from stored function
     try:
@@ -1024,9 +1023,9 @@ def staff_list(request: HttpRequest) -> HttpResponse:
         "per_page": per_page,
     })
 
-# @session_login_required
-# @role_required(CAPTAIN_ROLE)
-# @nocache
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@nocache
 @require_GET
 def staff_search_api(request):
     q = (request.GET.get("q") or "").strip()
@@ -1042,9 +1041,9 @@ def staff_search_api(request):
         logger.exception("staff_search_api error: %s", e)
         return JsonResponse({"results": [], "error": "Search failed"}, status=500)
 
-# @session_login_required
-# @role_required(CAPTAIN_ROLE)
-# @nocache
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@nocache
 @require_GET
 def staff_filter_api(request):
     role_raw = (request.GET.get("role_id") or "").strip()
@@ -1063,10 +1062,9 @@ def staff_filter_api(request):
         logger.exception("staff_filter_api error: %s", e)
         return JsonResponse({"results": [], "error": "Filter failed"}, status=500)
 
-# @session_login_required
-# @role_required(CAPTAIN_ROLE)
-# @nocache
-@require_http_methods(["GET"])
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@nocache
 def staff_dets(request, staff_code: str):
     try:
         rows = Secretary.get_staff_profile_display(staff_code) if staff_code else []
@@ -1099,10 +1097,9 @@ def staff_dets(request, staff_code: str):
 
 
 
-# @session_login_required
-# @role_required(CAPTAIN_ROLE)
-# @nocache
-@require_http_methods(["GET", "POST"])
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@nocache
 def staff_account_requests_list(request: HttpRequest) -> HttpResponse:
     try:
         staff_req = Captain.list_requests() or []
@@ -1151,10 +1148,9 @@ def staff_account_requests_list(request: HttpRequest) -> HttpResponse:
 
 
 
-# @session_login_required
-# @role_required(CAPTAIN_ROLE)
-# @nocache
-@require_http_methods(["GET"])
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@nocache
 def pending_staff_dets(request, p_staff_acc_req_id: str):
     try:
         rows = Captain.get_pending_staff_details(p_staff_acc_req_id) if p_staff_acc_req_id else []
@@ -1190,14 +1186,14 @@ def pending_staff_dets(request, p_staff_acc_req_id: str):
 REQUEST_STATUS_APPROVED = 30
 REQUEST_STATUS_REJECTED = 4
 
-# @session_login_required
-# @role_required(CAPTAIN_ROLE)
-# @nocache
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@nocache
 @require_http_methods(["POST", "GET"])
 def process_staff_request(request: HttpRequest) -> HttpResponse:
 
     auth = request.session.get("auth") or {}
-    approver_id = auth.get("staff_id") or 5 
+    approver_id = auth.get("staff_id")
     try:
         approver_id = int(approver_id)
     except (TypeError, ValueError):

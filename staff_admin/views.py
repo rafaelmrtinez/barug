@@ -45,6 +45,9 @@ user_role = 'Admin'
 user_role_template = user_role.lower().replace(' ', '_')
 
 # Create your views here.
+@session_login_required
+@role_required(ADMIN_ROLE)
+@nocache
 def staff_selection(request):
     return render(request, "staff_admin/staff/staff_selection.html", {
         'user_fullname': user_fullname,
@@ -54,8 +57,8 @@ def staff_selection(request):
         'user_role_template': user_role_template,
     })
 
-# @session_login_required
-# @role_required(ADMIN_ROLE)
+@session_login_required
+@role_required(ADMIN_ROLE)
 @nocache
 @require_http_methods(["GET","POST"])
 def staff_selection_resident(request):
@@ -73,8 +76,8 @@ def staff_selection_resident(request):
         'sched_form': sched_form
     })
 
-# @session_login_required
-# @role_required(ADMIN_ROLE)
+@session_login_required
+@role_required(ADMIN_ROLE)
 @nocache
 @require_http_methods(["GET","POST"])
 def staff_selection_nonres(request):
@@ -88,8 +91,8 @@ def staff_selection_nonres(request):
         'form' : form,
     })
 
-# @session_login_required
-# @role_required(ADMIN_ROLE)
+@session_login_required
+@role_required(ADMIN_ROLE)
 @nocache
 @require_http_methods(["GET","POST"])
 def staff_selection_nonres_docs(request):
@@ -103,8 +106,8 @@ def staff_selection_nonres_docs(request):
         'form' : form,
     })
 
-# @session_login_required
-# @role_required(ADMIN_ROLE)
+@session_login_required
+@role_required(ADMIN_ROLE)
 @nocache
 @require_http_methods(["GET","POST"])
 def staff_selection_nonres_role_review(request):
@@ -121,10 +124,9 @@ def staff_selection_nonres_role_review(request):
     })
 
 
-# @session_login_required
-# @role_required(ADMIN_ROLE)
+@session_login_required
+@role_required(ADMIN_ROLE)
 @nocache
-@require_http_methods(["GET"])
 def staff_list(request):
 
     try:
@@ -168,7 +170,8 @@ def staff_list(request):
         "per_page": per_page,
     })
 
-
+@session_login_required
+@role_required(ADMIN_ROLE)
 @require_http_methods(["GET"])
 def staff_search_api(request):
     q = (request.GET.get("q") or "").strip()
@@ -182,7 +185,8 @@ def staff_search_api(request):
         logger.exception("staff_search_api error: %s", e)
         return JsonResponse({"results": [], "error": "Search failed"}, status=500)
 
-
+@session_login_required
+@role_required(ADMIN_ROLE)
 @require_http_methods(["GET"])
 def staff_filter_api(request):
     role_raw = (request.GET.get("role_id") or "").strip()
@@ -203,10 +207,9 @@ def staff_filter_api(request):
 
 
 
-# @session_login_required
-# @role_required(ADMIN_ROLE)
-# @nocache
-@require_http_methods(["GET"])
+@session_login_required
+@role_required(ADMIN_ROLE)
+@nocache
 def staff_dets(request, staff_code: str):
     form = UpdateInfo()
 
@@ -241,10 +244,9 @@ def staff_dets(request, staff_code: str):
     return render(request, "staff_admin/staff/person_dets.html", ctx)
 
 
-# @session_login_required
-# @role_required(ADMIN_ROLE)
-# @nocache
-@require_http_methods(["GET"])
+@session_login_required
+@role_required(ADMIN_ROLE)
+@nocache
 def staff_account_requests_list(request: HttpRequest) -> HttpResponse:
     try:
         staff_req = Captain.list_requests() or []
@@ -292,9 +294,9 @@ def staff_account_requests_list(request: HttpRequest) -> HttpResponse:
 
 
 
-# @session_login_required
-# @role_required(ADMIN_ROLE)
-# @nocache
+@session_login_required
+@role_required(ADMIN_ROLE)
+@nocache
 @require_http_methods(["GET"])
 def pending_staff_dets(request, p_staff_acc_req_id: str):
     try:
@@ -375,13 +377,13 @@ def _get_staff_by_code(staff_code: str) -> Optional[dict]:
             "suffix": row[5],
         }
 
-# @session_login_required
-# @role_required(ADMIN_ROLE)
-# @nocache
+@session_login_required
+@role_required(ADMIN_ROLE)
+@nocache
 @require_http_methods(["POST", "GET"])
 def process_staff_request(request: HttpRequest) -> HttpResponse:
     auth = request.session.get("auth") or {}
-    approver_id = int(auth.get("staff_id") or 1)
+    approver_id = auth.get("staff_id")
 
     # --- IDs & status
     staff_acc_req_id = int(
