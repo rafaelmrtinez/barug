@@ -733,10 +733,7 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
 @nocache
 @require_http_methods(["GET", "POST"])
 def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
-    """
-    GET: render previews from session (data URLs).
-    POST: upload base64 images to buckets, then insert DB record.
-    """
+
     role_form = ChooseRole(request.POST or None)
     sched_form = Schedule(request.POST or None)
 
