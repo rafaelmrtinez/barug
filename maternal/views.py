@@ -28,10 +28,8 @@ from maternal.forms.previous_pregnancy_form import PreviousPregnancyForm, Previo
 from maternal.forms.tetanus_toxoid_form import TetanusToxoidForm
 from maternal.repository import MaternalHealthRecordRepository
 from maternal.utils.form_lock import FormLockUtility
-from midwife.services import fetch_maternal_registry
 from src.infra.database.connection_adapter import ConnectionAdapter
 
-from maternal.supa.supabase_storage_service import SupabaseStorageService
 from maternal.services.laboratory_service import LaboratoryService, LaboratoryTestException
 
 import logging
@@ -136,7 +134,6 @@ def prenatal_api(request: HttpRequest) -> JsonResponse:
     redirect_url = reverse('maternal:bhw_prenatal_form', args=[mhr_id]) if staff_role != 'midwife' else reverse('maternal:maternal_health_record_form', args=[mhr_id])
     return JsonResponse({'success': True, 'message': 'Prenatal Follow-up saved.', 'redirect': redirect_url})
     
-
 @session_login_required
 @role_required(*BHW_ACCESS)
 @nocache
@@ -177,7 +174,6 @@ def health_worker_prenatal_form_view(request: HttpRequest, mhr_id: int) -> HttpR
         "mhr_id": mhr_id,
         "prenatal_followup_formset": pf_formset,
     })
-
 
 @session_login_required
 @role_required(*ACCESS)
