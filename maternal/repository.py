@@ -527,6 +527,92 @@ class MaternalHealthRecordRepository:
         except QueryExecutionException:
             logger.exception('Failed to fetch postpartum scheduled visits for mhr %s', maternal_record_id)
             return []
+
+    def fetch_latest_prenatal_status_by_mhr_id(self, maternal_record_id: int):
+        """
+        Return the status_id and status_name of the most recent prenatal (maternal)
+        scheduled visit for the given maternal_record_id. Returns a dict like:
+            { 'status_id': 1, 'status_name': 'PENDING' }
+        or None if no scheduled prenatal rows exist.
+        """
+        sql = """
+            SELECT s.status_id, ss.status_name
+            FROM public.maternal_visit_schedule AS s
+            LEFT JOIN public.schedule_status AS ss ON ss.status_id = s.status_id
+            WHERE s.maternal_record_id = %s
+            ORDER BY s.scheduled_date DESC NULLS LAST, s.scheduled_time DESC NULLS LAST, s.created_at DESC NULLS LAST
+            LIMIT 1;
+        """
+        params = (maternal_record_id,)
+        try:
+            rows = self.ctx.execute_query_to_dict(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException:
+            logger.exception('Failed to fetch latest prenatal status for mhr %s', maternal_record_id)
+            return None
+
+    def fetch_latest_postpartum_status_by_mhr_id(self, maternal_record_id: int):
+        """
+        Return the status_id and status_name of the most recent postpartum scheduled
+        visit for the given maternal_record_id. Returns a dict like:
+            { 'status_id': 1, 'status_name': 'PENDING' }
+        or None if no scheduled postpartum rows exist.
+        """
+        sql = """
+            SELECT s.status_id, ss.status_name
+            FROM public.postpartum_visit_schedule AS s
+            LEFT JOIN public.schedule_status AS ss ON ss.status_id = s.status_id
+            WHERE s.maternal_record_id = %s
+            ORDER BY s.scheduled_date DESC NULLS LAST, s.scheduled_time DESC NULLS LAST, s.created_at DESC NULLS LAST
+            LIMIT 1;
+        """
+        params = (maternal_record_id,)
+        try:
+            rows = self.ctx.execute_query_to_dict(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException:
+            logger.exception('Failed to fetch latest postpartum status for mhr %s', maternal_record_id)
+            return None
+
+    def fetch_postpartum_record_by_mhr_id(self, maternal_record_id: int):
+        """
+        Return the most recent postpartum record (from `postpartum_record`) for the given
+        maternal_record_id. Returns a dict like:
+            { 'postpartum_record_id': 123, 'maternal_record_id': 5, 'date_of_delivery': date(...), 'time_of_delivery': time(...), 'created_at': datetime(...), 'outcome': 'Healthy' }
+        or None if no postpartum record exists.
+        """
+        # Use the `postpartum_record` table as the canonical source for postpartum
+        # records (see example INSERT provided by caller). Return the latest row
+        # ordered by `created_at` (newest first).
+        sql = """
+            SELECT
+                pr.postpartum_record_id,
+                pr.maternal_record_id,
+                pr.created_at,
+                pr.date_of_delivery,
+                pr.time_of_delivery,
+                pr.attended_by_id,
+                pr.attended_by_rolename,
+                pr.place_of_delivery_id,
+                pr.outcome,
+                pr.iron_supplementation,
+                pr.vit_a_supplementation,
+                pr.mebendazole_given,
+                pr.lochial_discharges_baseline,
+                pr.pads_per_day_baseline,
+                pr.bf_initiated_at
+            FROM public.postpartum_record AS pr
+            WHERE pr.maternal_record_id = %s
+            ORDER BY pr.created_at DESC NULLS LAST, pr.date_of_delivery DESC NULLS LAST
+            LIMIT 1;
+        """
+        params = (maternal_record_id,)
+        try:
+            rows = self.ctx.execute_query_to_dict(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException:
+            logger.exception('Failed to fetch latest postpartum record for mhr %s', maternal_record_id)
+            return None
         
     def fetch_all_mhr_completion_status(self):
         """
