@@ -1,4 +1,4 @@
-from src.domain.contracts.scheduling_service_contract import ISchedulingService
+from src.app.contracts.scheduling_service import ISchedulingService
 from src.app.transfer_objects.request.reschedule_cmd import RescheduleRequest
 from src.domain.contracts.scheduling_repository_contract import ISchedulingRepository
 

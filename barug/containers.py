@@ -16,4 +16,12 @@ app = AppContainer(infra=infra)
 app.wire(modules=[
     "bhw.views",
     "midwife.views",
+    # maternal API endpoints that require application services (dependency-injected)
+    "maternal.api.complete_maternal_visit_api",
+    "maternal.api.download_image_download_api",
+    "maternal.api.insert_postpartum_record_api",
+    "maternal.api.insert_postpartum_schedule_api",
+    "maternal.api.insert_prenatal_schedule_api",
+    "maternal.api.maternal_heal_status_api",
+    "maternal.api.mhr_side_panel_api",
 ])

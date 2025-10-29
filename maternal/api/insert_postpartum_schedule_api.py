@@ -11,6 +11,8 @@ from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
 from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
 from src.app.services.maternal_schedule_service import MaternalScheduleService
+from dependency_injector.wiring import inject, Provide
+from barug.containers import app
 
 ALLOWED_ROLES = ("MIDWIFE", "Midwife", "midwife", "Barangay Health Worker", "bhw", "Super Admin")
 
@@ -26,7 +28,8 @@ class PostpartumScheduleAPI(View):
     staff_id comes from session: request.session['auth']['staff_id']
     """
 
-    def post(self, request: HttpRequest, *args, **kwargs) -> JsonResponse:
+    @inject
+    def post(self, request: HttpRequest, service: MaternalScheduleService = Provide[app.maternal_schedule_service], *args, **kwargs) -> JsonResponse:
         try:
             payload = json.loads(request.body.decode('utf-8') or '{}')
         except Exception:
@@ -68,8 +71,18 @@ class PostpartumScheduleAPI(View):
         except (TypeError, ValueError):
             return JsonResponse({'success': False, 'message': 'Invalid staff id in session.'}, status=400)
 
-        repo = MaternalHealthRecordRepository(ConnectionAdapter())
-        service = MaternalScheduleService(repo)
+        # If DI didn't resolve a service instance, try to resolve from container or construct
+        try:
+            need_resolve = not service or not hasattr(service, 'schedule_postpartum')
+        except Exception:
+            need_resolve = True
+
+        if need_resolve:
+            try:
+                service = app.maternal_schedule_service()
+            except Exception:
+                repo = MaternalHealthRecordRepository(ConnectionAdapter())
+                service = MaternalScheduleService(repo)
 
         try:
             res = service.schedule_postpartum(mhr_id, parsed_date, parsed_time, staff_id, visit, purpose)

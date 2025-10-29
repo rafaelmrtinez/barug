@@ -9,12 +9,13 @@ import requests
 from django.conf import settings
 
 from src.infra.utilities.supabase_storage_service import SupabaseStorageService
+from src.app.contracts.image_download_service import IImageDownloadService
 
 
 logger = logging.getLogger(__name__)
 
 
-class ImageDownloadService:
+class ImageDownloadService(IImageDownloadService):
     """Service to collect laboratory image files for a maternal record and
     return a ZIP archive bytes object.
 

@@ -1,9 +1,10 @@
 from src.domain.services.child_immunization_service import ChildImmunizationDomainService
 from src.infra.repositories.child_health_repository import ChildHealthRepository
 from src.app.transfer_objects.request.child_health_version_two.immunization_request import ImmunizationRequestVersion2
+from src.app.contracts.child_health_service import IChildHealthService
 
 
-class ChildHealthService:
+class ChildHealthService(IChildHealthService):
     
     def __init__(self, ch_repo: ChildHealthRepository):
         self._ch_repo = ch_repo

@@ -11,6 +11,7 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 from src.infra.utilities.supabase_storage_service import SupabaseStorageService
+from src.app.contracts.laboratory_service import ILaboratoryService
 from barug.utility.custom_date_time_util import DateAndTimeUtility
 from datetime import date as _date
 
@@ -98,7 +99,7 @@ def _map_test_type_to_id(raw_test_type: Any) -> int:
     return None
 
 
-class LaboratoryService:
+class LaboratoryService(ILaboratoryService):
     """Service for building payloads and saving laboratory results.
 
     Initialize with repository, staff_id and record_id. Call `build_payload`
