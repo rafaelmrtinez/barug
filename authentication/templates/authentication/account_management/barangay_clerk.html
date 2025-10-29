@@ -1,65 +1,210 @@
+{# templates/barangay_clerk.html #}
+{% load static %}
+{% load bootstrap_icons %}
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Barangay Clerk</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  {# Bootstrap & site CSS #}
+  <link href="{% static 'css/bootstrap.min.css' %}" rel="stylesheet">
+  <link href="{% static 'css/app.css' %}" rel="stylesheet">
+
+  <style>
+    :root{
+      --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932; --brand-600:#7a323b;
+      --accent:#f2c94c;
+    }
+    .navbar .badge{
+      font-weight:600; font-size:.72rem; padding:.28rem .45rem;
+      border:1px solid rgba(109,41,50,.15); background:#fff; color:var(--brand-700);
+    }
+    .dropdown-menu .badge{
+      border:1px solid rgba(109,41,50,.12);
+      background:#f9f5f5; color:var(--brand-700);
+    }
+    .nav-link.active{ font-weight:700; }
+  </style>
+</head>
+
+<body>
 <nav class="navbar navbar-expand-lg pt-0 pb-3">
-    <div>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarText" aria-controls="navbarText" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarText">
-            <ul class="navbar-nav me-auto mb-lg-0">
-                <li class="nav-item me-3">
-                    <a class="nav-link" href="{% url 'clerk:dashboard' %}">Dashboard</a>
-                </li>
-                <li class="nav-item me-3">
-                    <a class="nav-link" href="">Document Requests</a>
-                </li>
-                <li class="nav-item me-3">
-                    <a class="nav-link" href="{% url 'clerk:identity_verification' %}">Identity Verification</a>
-                </li>
-                <li class="nav-item me-3">
-                    <a class="nav-link" href="{% url 'clerk:business_list' %}">Business Records</a>
-                </li>
-                <li class="nav-item me-3">
-                    <a class="nav-link" href="">Activity Log</a>
-                </li>
-            </ul>
-        </div>
+  <div class="container-fluid px-0">
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+            data-bs-target="#navbarText" aria-controls="navbarText"
+            aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarText">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+
+        <li class="nav-item me-3">
+          <a class="nav-link" href="{% url 'clerk:dashboard' %}">Dashboard</a>
+        </li>
+
+        <!-- Resident Management -->
+        <li class="nav-item dropdown me-3">
+          <a class="nav-link dropdown-toggle" href="#" id="resident_dropdown"
+             role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            Resident Management
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="resident_dropdown">
+            <li><a class="dropdown-item" href="{% url 'resident:register_resident' %}">Register Resident</a></li>
+            <li><a class="dropdown-item" href="{% url 'resident:resident_records' %}">Resident Records</a></li>
+          </ul>
+        </li>
+
+        <!-- Business Management -->
+        <li class="nav-item me-3">
+          <a class="nav-link" href="{% url 'clerk:business_list' %}">Business Management</a>
+        </li>
+
+        <!-- Identity Verification with badge -->
+        <li class="nav-item me-3">
+          <a class="nav-link d-flex align-items-center gap-2" href="{% url 'clerk:identity_verification' %}">
+            Identity Verification
+            {% with n=app_badge_counts.idv_pending|default:0 %}
+              {% if n|add:0 > 0 %}
+                <span class="badge rounded-pill text-bg-danger">{{ n }}</span>
+              {% endif %}
+            {% endwith %}
+          </a>
+        </li>
+
+        <!-- Document Requests (dropdown with breakdown) -->
+        <li class="nav-item dropdown me-3">
+          <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#"
+             id="docreq_dropdown" role="button" data-bs-toggle="dropdown"
+             aria-expanded="false">
+            Document Requests
+            {% with t=app_badge_counts.doc_requests_total|default:0 %}
+              {% if t|add:0 > 0 %}
+                <span class="badge rounded-pill text-bg-secondary">{{ t }}</span>
+              {% endif %}
+            {% endwith %}
+          </a>
+
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="docreq_dropdown" style="min-width: 320px;">
+            <li>
+              <a class="dropdown-item d-flex justify-content-between align-items-center"
+                 href="{% url 'clerk:queue' %}">
+                All Document Requests
+                <span class="badge text-bg-secondary">
+                  {{ app_badge_counts.doc_requests_total|default:0 }}
+                </span>
+              </a>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+
+            <!-- Each line links to queue with the proper ?status=... filter.
+                 We include both variants where names have spaces vs underscores. -->
+            <li>
+              <a class="dropdown-item d-flex justify-content-between align-items-center"
+                 href="{% url 'clerk:queue' %}?status=FOR%20CLERK%20REVIEW">
+                For Clerk Review
+                <span class="badge text-bg-light">
+                  {{ app_badge_counts.doc_requests.for_clerk_review|default:0 }}
+                </span>
+              </a>
+            </li>
+
+            <li>
+              <a class="dropdown-item d-flex justify-content-between align-items-center"
+                 href="{% url 'clerk:queue' %}?status=FOR_TREASURER_REVIEW">
+                For Treasurer Review
+                <span class="badge text-bg-light">
+                  {{ app_badge_counts.doc_requests.for_treasurer_review|default:0 }}
+                </span>
+              </a>
+            </li>
+
+            <li>
+              <a class="dropdown-item d-flex justify-content-between align-items-center"
+                 href="{% url 'clerk:queue' %}?status=PAYMENT_INITIATED">
+                Payment Initiated
+                <span class="badge text-bg-light">
+                  {{ app_badge_counts.doc_requests.payment_initiated|default:0 }}
+                </span>
+              </a>
+            </li>
+
+            <li>
+              <a class="dropdown-item d-flex justify-content-between align-items-center"
+                 href="{% url 'clerk:queue' %}?status=PAID">
+                Paid
+                <span class="badge text-bg-light">
+                  {{ app_badge_counts.doc_requests.paid|default:0 }}
+                </span>
+              </a>
+            </li>
+
+            <li>
+              <a class="dropdown-item d-flex justify-content-between align-items-center"
+                 href="{% url 'clerk:queue' %}?status=FOR_PRINTING">
+                For Printing
+                <span class="badge text-bg-light">
+                  {{ app_badge_counts.doc_requests.for_printing|default:0 }}
+                </span>
+              </a>
+            </li>
+
+            <li>
+              <a class="dropdown-item d-flex justify-content-between align-items-center"
+                 href="{% url 'clerk:queue' %}?status=READY_FOR_PICKUP">
+                Ready for Pickup
+                <span class="badge text-bg-light">
+                  {{ app_badge_counts.doc_requests.ready_for_pickup|default:0 }}
+                </span>
+              </a>
+            </li>
+
+            <li>
+              <a class="dropdown-item d-flex justify-content-between align-items-center"
+                 href="{% url 'clerk:queue' %}?status=RELEASED">
+                Released
+                <span class="badge text-bg-light">
+                  {{ app_badge_counts.doc_requests.released|default:0 }}
+                </span>
+              </a>
+            </li>
+
+            <li><hr class="dropdown-divider"></li>
+
+            <li>
+              <a class="dropdown-item d-flex justify-content-between align-items-center"
+                 href="{% url 'clerk:queue' %}?status=DECLINED">
+                Declined / Rejected
+                <span class="badge text-bg-light">
+                  {{ app_badge_counts.doc_requests.declined|default:0 }}
+                </span>
+              </a>
+            </li>
+
+            <li>
+              <a class="dropdown-item d-flex justify-content-between align-items-center"
+                 href="{% url 'clerk:queue' %}?status=CANCELLED">
+                Cancelled
+                <span class="badge text-bg-light">
+                  {{ app_badge_counts.doc_requests.cancelled|default:0 }}
+                </span>
+              </a>
+            </li>
+          </ul>
+        </li>
+      </ul>
     </div>
+  </div>
 </nav>
 
-<nav class="navbar navbar-expand-lg pt-0 pb-3">
-    <div>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarText" aria-controls="navbarText" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarText">
-            <ul class="navbar-nav me-auto mb-lg-0">
-                <li class="nav-item me-3">
-                    <a class="nav-link" href="{% url 'clerk:dashboard' %}">Dashboard</a>
-                </li>
-                <li class="nav-item dropdown me-3">
-                    <a class="nav-link dropdown-toggle" href="#" id="resident_dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        Resident Management
-                    </a>
-                    <ul class="dropdown-menu" aria-labelledby="resident_dropdown">
-                        <li><a class="dropdown-item" href="{% url 'resident:register_resident' %}">Register Resident</a></li>
-                        <li><a class="dropdown-item" href="{% url 'resident:resident_records' %}">Resident Records</a></li>
-                    </ul>
-                </li>
-                <li class="nav-item me-3">
-                    <a class="nav-link" href="{% url 'clerk:business_list' %}">Business Management</a>
-                </li>
-                <li class="nav-item me-3">
-                    <a class="nav-link" href="{% url 'clerk:identity_verification' %}">Identity Verification</a>
-                </li>
-                <li class="nav-item dropdown me-3">
-                    <a class="nav-link dropdown-toggle" href="#" id="resident_dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        Document Requests
-                    </a>
-                    <ul class="dropdown-menu" aria-labelledby="resident_dropdown">
-                        <li><a class="dropdown-item" href="{% url 'clerk:queue' %}">For Printing/ Queue</a></li>
-                        <li><a class="dropdown-item" href="{% url 'clerk:walkin_new' %}">Walk-in Request</a></li>
-                        <li><a class="dropdown-item" href="{% url 'clerk:queue' %}">Request History</a></li>
-                    </ul>
-                </li>
-        </div>
-    </div>
-</nav>
+{# ───────────────────────────── Page Content Slot ───────────────────────────── #}
+<main class="container py-3">
+  {% block content %}{% endblock %}
+</main>
+
+<script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+</body>
+</html>

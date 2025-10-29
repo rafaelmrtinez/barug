@@ -127,14 +127,22 @@
 
                   <td><span class="{{ r.status_ui.cls }}">{{ r.status_ui.label }} ID: {{ r.business_id }}</span></td>
 
-                  <td class="text-end">
-                    <div class="row-actions">
+                <td class="text-end">
+                  <div class="row-actions">
+                    {% if r.business_id %}
                       <a class="btn btn-outline-brand btn-sm"
-                         href="{% url 'treasurer:business_detail' r.business_id r.doc_request_id  %}">
+                        href="{% url 'treasurer:business_detail' r.business_id r.doc_request_id %}">
                         {% bs_icon 'person-lines-fill' extra_classes='me-1' %} View
                       </a>
-                    </div>
-                  </td>
+                    {% else %}
+                      <a class="btn btn-outline-brand btn-sm"
+                        href="{% url 'treasurer:detail' r.doc_request_id %}">
+                        {% bs_icon 'person-lines-fill' extra_classes='me-1' %} View
+                      </a>
+                    {% endif %}
+                  </div>
+                </td>
+
                 </tr>
               {% endfor %}
             {% else %}

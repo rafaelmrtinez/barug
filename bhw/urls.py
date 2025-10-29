@@ -17,6 +17,9 @@ urlpatterns = [
     path("ajax/person-details/", views.ajax_person_details, name="ajax_person_details"),  # NEW
     
     path("verify-id/", views.verify_valid_id_view, name="verify_valid_id"),
+
+    
+    # BHW
     path("maternal/new/", views.maternal_new, name="maternal_new"),
 
     path("child/new/", views.child_new, name="child_new"),

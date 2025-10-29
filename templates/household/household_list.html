@@ -1,0 +1,220 @@
+{# household_list.html #}
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+{% load choiceextras %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<link rel="stylesheet" href="{% static 'css/filters.css' %}">
+
+<style>
+  .btn-outline-brand{ color:#6d2932; border-color:#6d2932; background:#fff; }
+  .btn-outline-brand:hover{ background:#6d2932; color:#fff; }
+
+  .table thead th{
+    font-size:.80rem;
+    text-transform:capitalize;
+    letter-spacing:.02em;
+    vertical-align:middle;
+    white-space:nowrap;
+    text-align:left;
+  }
+  .table tbody td{
+    font-size:.80rem;
+    vertical-align:middle;
+    text-align:left;
+    font-weight:600;
+  }
+  .id-pill{
+    display:inline-block; padding:.22rem .55rem; border-radius:999px;
+    background:#f8f1f2; border:1px solid rgba(109,41,50,.18); color:#6d2932;
+    font-weight:700; font-size:.78rem; line-height:1; font-variant-numeric: tabular-nums; letter-spacing:.03em;
+  }
+  .cat-badge{
+    display:inline-block; font-size:.74rem; padding:.28rem .52rem; line-height:1;
+    border-radius:999px; background:#f3eaeb; color:#6d2932; border:1px solid rgba(109,41,50,.18); font-weight:600;
+  }
+  .filter-chip{
+    display:inline-flex; align-items:center; gap:.35rem;
+    padding:.2rem .55rem; border-radius:999px; background:#f3eaeb;
+    border:1px solid rgba(109,41,50,.18); color:#6d2932; font-size:.78rem; text-decoration:none;
+  }
+  .filter-chip .x{ font-weight:700; }
+  .offcanvas.filter-offcanvas .offcanvas-footer{
+    position: sticky; bottom:0; padding:1rem 0; background:linear-gradient(180deg, transparent, #fff 30%);
+    display:flex; justify-content:flex-end; gap:.5rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap" style="margin-top: 40px;">
+  <div class="container-fluid pt-3 page-main">
+    <div class="row">
+
+      <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+        {% csrf_token %}
+        <div class="searchbox">
+          {% bs_icon 'search' extra_classes='bi' %}
+          {{ form.search }}
+        </div>
+
+        {# persist selections in hidden inputs #}
+        <input type="hidden" name="house_type" value="{{ request.GET.house_type|default:'' }}">
+        <input type="hidden" name="house_ownership" value="{{ request.GET.house_ownership|default:'' }}">
+
+        {# Filters button with active-count badge #}
+        {% with ht=request.GET.house_type|yesno:"1,0" ho=request.GET.house_ownership|yesno:"1,0" %}
+          {% with fc=0|add:ht|add:ho %}
+            <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
+                    type="button"
+                    data-bs-toggle="offcanvas"
+                    data-bs-target="#filterPanel"
+                    aria-controls="filterPanel">
+              {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+              {% if fc %}
+                <span class="badge rounded-pill text-bg-light ms-2">{{ fc }}</span>
+              {% endif %}
+            </button>
+          {% endwith %}
+        {% endwith %}
+      </form>
+
+      {# Active filter chips #}
+      <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
+        {% if request.GET.house_type or request.GET.house_ownership %}
+          <span class="text-muted me-1">Active:</span>
+
+          {% if request.GET.house_type %}
+            {% with label=form.house_type|choice_label:request.GET.house_type %}
+              <a class="filter-chip"
+                 href="?search={{ request.GET.search|urlencode }}{% if request.GET.house_ownership %}&house_ownership={{ request.GET.house_ownership|urlencode }}{% endif %}">
+                {{ label }} <span class="x">×</span>
+              </a>
+            {% endwith %}
+          {% endif %}
+
+          {% if request.GET.house_ownership %}
+            {% with label=form.house_ownership|choice_label:request.GET.house_ownership %}
+              <a class="filter-chip"
+                 href="?search={{ request.GET.search|urlencode }}{% if request.GET.house_type %}&house_type={{ request.GET.house_type|urlencode }}{% endif %}">
+                {{ label }} <span class="x">×</span>
+              </a>
+            {% endwith %}
+          {% endif %}
+
+          <a class="btn btn-sm btn-outline-brand ms-1" href="?search={{ request.GET.search|urlencode }}">
+            {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
+          </a>
+        {% else %}
+          <span class="text-muted small">No active filters.</span>
+        {% endif %}
+      </div>
+
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th scope="col">Household No</th>
+              <th scope="col">Head</th>
+              <th scope="col">Address</th>
+              <th scope="col">Type</th>
+              <th scope="col">Ownership</th>
+              <th scope="col" class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody id="results-body">
+            {% include "household/_household_list.html" with rows=page_obj.object_list %}
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div class="page-pagination">
+      {% include 'paginator.html' %}
+    </div>
+  {% endif %}
+
+  {# Offcanvas Filters #}
+  <div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
+      aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150px;">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+
+    <div class="offcanvas-body">
+      <form method="get" id="filterForm">
+        <div class="mb-3">
+          <label class="form-label">House Type</label>
+          {{ form.house_type }}
+        </div>
+        <div class="mb-3">
+          <label class="form-label">House Ownership</label>
+          {{ form.house_ownership }}
+        </div>
+
+        <input type="hidden" name="search" value="{{ request.GET.search|default:'' }}"/>
+
+        <div class="offcanvas-footer">
+          <div class="actions">
+            <a class="btn btn-outline-brand"
+               href="?search={{ request.GET.search|urlencode }}">Clear</a>
+            <button type="submit" class="btn btn-brand">Apply Filters</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const input = document.getElementById('search');
+  const tbody = document.getElementById('results-body');
+  const endpoint = "{% url search_url %}"
+
+  function currentParams() {
+    const params = new URLSearchParams();
+    params.set('q', (input?.value || '').trim());
+    params.set('tpl', 'rows');
+    const houseType = document.querySelector('input[name="house_type"]')?.value || '';
+    const houseOwnership = document.querySelector('input[name="house_ownership"]')?.value || '';
+    if (houseType) params.set('house_type', houseType);
+    if (houseOwnership) params.set('house_ownership', houseOwnership);
+    return params.toString();
+  }
+
+  let t = null;
+  function debounce(fn, delay) {
+    return function (...args) {
+      clearTimeout(t);
+      t = setTimeout(() => fn.apply(this, args), delay);
+    }
+  }
+
+  async function fetchRows() {
+    try {
+      const url = endpoint + "?" + currentParams();
+      const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+      if (!res.ok) throw new Error("Network error");
+      const html = await res.text();
+      tbody.innerHTML = html;
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="9" class="text-center py-3">Failed to load results</td></tr>`;
+      console.error(err);
+    }
+  }
+
+  if (input && tbody) {
+    input.addEventListener('input', debounce(fetchRows, 300));
+  }
+})();
+</script>
+{% endblock %}

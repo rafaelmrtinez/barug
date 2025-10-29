@@ -86,3 +86,4 @@ def send_email(
         if not fail_silently:
             raise
         return SimpleNamespace(ok=False, detail=str(e))
+

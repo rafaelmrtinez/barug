@@ -1,0 +1,116 @@
+{% load bootstrap_icons %}
+
+<style>
+  /* pills reused */
+  .pill{
+    display:inline-flex; align-items:center; gap:.4rem;
+    font-weight:600; font-size:.78rem; line-height:1;
+    padding:.35rem .6rem; border-radius:999px; border:1px solid;
+  }
+  .pill.settled{ background:#f3fff6; color:#0a6b2d; border-color:rgba(16,135,52,.25);}
+  .pill.pending{ background:#fffaf2; color:#995a00; border-color:rgba(153,90,0,.25);}
+  .pill.unsettled{ background:#fff5f5; color:#a31212; border-color:rgba(163,18,18,.25);}
+  .pill.na{ background:#f6f7f9; color:#4b5563; border-color:#e5e7eb; }
+
+  .code-badge{
+    display:inline-flex; align-items:center; gap:.25rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-size:.9rem; line-height:1; padding:.35rem .55rem; border-radius:.5rem;
+    background:#f5f2ee; border:1px solid rgba(0,0,0,.06);
+    color:#561c24; white-space:nowrap; font-variant-numeric:tabular-nums;
+  }
+  .code-badge .hash{ opacity:.7; }
+</style>
+
+<div class="table-responsive">
+  <table class="table align-middle">
+    <thead>
+      <tr>
+        <th style="width:160px">Case No.</th>
+        <th>Name</th>
+        <th>Date Filed</th>
+        <th>Type</th>
+        <th>Nature</th>
+        <th>Settlement</th>
+        <th style="width:120px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>
+          <span class="code-badge">
+            <span class="hash">#</span>{{ r.1 }}
+          </span>
+        </td>
+        <td class="fw-semibold">{{ r.2 }}</td>
+        <td>{{ r.3 }}</td>
+        <td>{{ r.4 }}</td>
+        <td>{{ r.5 }}</td>
+        <td>
+          {% with r.6|default:"—" as s %}
+            {% if s|lower == "settled" %}
+              <span class="pill settled">{% bs_icon 'check-circle' %} {{ s }}</span>
+            {% elif s|lower == "pending" or s|lower == "to be scheduled" or s|lower == "for hearing" %}
+              <span class="pill pending">{% bs_icon 'hourglass-split' %} {{ s }}</span>
+            {% elif s|lower == "unsettled" or s|lower == "failed" or s|lower == "terminated" %}
+              <span class="pill unsettled">{% bs_icon 'x-circle' %} {{ s }}</span>
+            {% elif s == "—" %}
+              <span class="pill na">{% bs_icon 'dash-circle' %} —</span>
+            {% else %}
+              <span class="pill na">{{ s }}</span>
+            {% endif %}
+          {% endwith %}
+        </td>
+        <td class="text-end">
+          <a class="btn btn-outline-brand btn-sm" href="{% url 'lupon_mem:case_detail' r.0 %}">
+            {% bs_icon 'box-arrow-in-right' extra_classes='me-1' %} Open
+          </a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" class="text-center py-5">
+          <div class="text-muted">No cases found.</div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mt-3">
+  <div class="text-muted small">
+    {% if total > 0 %}
+      Showing {{ first_item }}–{{ last_item }} of {{ total }}
+    {% else %}
+      No results
+    {% endif %}
+  </div>
+
+  {% if total_pages > 1 %}
+  <nav aria-label="Case list pages">
+    <ul class="pagination mb-0">
+      <li class="page-item {% if not has_prev %}disabled{% endif %}">
+        <a class="page-link" data-page="1" href="?page=1&{{ query_no_page }}">First</a>
+      </li>
+      <li class="page-item {% if not has_prev %}disabled{% endif %}">
+        <a class="page-link" data-page="{{ prev_page }}" href="?page={{ prev_page }}&{{ query_no_page }}">Prev</a>
+      </li>
+
+      {% for p in page_numbers %}
+        <li class="page-item {% if p == page %}active{% endif %}">
+          <a class="page-link" data-page="{{ p }}" href="?page={{ p }}&{{ query_no_page }}">{{ p }}</a>
+        </li>
+      {% endfor %}
+
+      <li class="page-item {% if not has_next %}disabled{% endif %}">
+        <a class="page-link" data-page="{{ next_page }}" href="?page={{ next_page }}&{{ query_no_page }}">Next</a>
+      </li>
+      <li class="page-item {% if not has_next %}disabled{% endif %}">
+        <a class="page-link" data-page="{{ total_pages }}" href="?page={{ total_pages }}&{{ query_no_page }}">Last</a>
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
+</div>

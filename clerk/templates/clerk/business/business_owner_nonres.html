@@ -1,197 +1,478 @@
 {% extends 'base.html' %}
-
 {% load static %}
 
 {% block css %}
-    <link rel="stylesheet" href="{% static 'css/form.css' %}">
-    <link rel="stylesheet" href="{% static 'css/button.css' %}">
-    <link rel="stylesheet" href="{% static 'css/modal.css' %}">
-    <link rel="stylesheet" href="{% static 'css/progress_bar.css' %}">
-    <link rel="stylesheet" href="{% static 'css/map_registration.css' %}">
-    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"/>
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/modal.css' %}">
+<link rel="stylesheet" href="{% static 'css/progress_bar.css' %}">
 
-    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
-    <script src="{% static 'js/map_registration.js' %}"></script>
+<script src="{% static 'js/business_owner_resident.js' %}" defer></script>
+<script src="{% static 'js/clear_button.js' %}" defer></script>
+<style>
+  .results-viewport{
+    height: 250px;
+    overflow-y: auto;
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: .75rem;
+  }
+
+  /* add space below every result item */
+  .results-viewport .result-item { margin-bottom: .75rem; }
+
+  /* optional: keep a little breathing room at the very bottom */
+  .results-viewport { padding-bottom: .5rem; }
+
+  /* Ensure outlined vs filled look matches brand */
+  .btn-fill-up{
+    background: var(--brand,#7B1E22);
+    border: 1px solid var(--brand,#7B1E22);
+    color: #fff;
+  }
+  .btn-fill-up:hover{ background: var(--brand-700,#6a1a1e); border-color: var(--brand-700,#6a1a1e); color:#fff; }
+
+  .btn-search{
+    background: transparent;
+    border: 1px solid var(--brand,#7B1E22);
+    color: var(--brand,#7B1E22);
+  }
+  .btn-search:hover{ background: rgba(123,30,34,.08); color: var(--brand,#7B1E22); }
+
+  /* Prevent hover "jump" (overrides any global .btn hover transforms) */
+#search-tab, #create-tab,
+#search-tab:hover, #create-tab:hover,
+#search-tab:focus-visible, #create-tab:focus-visible,
+#search-tab:active, #create-tab:active {
+  transform: none !important;
+  box-shadow: none !important;      /* optional: avoid shadow lift */
+  letter-spacing: normal !important; /* guard in case global hover changes spacing */
+}
+
+/* Keep transitions color-only so size never changes */
+#search-tab, #create-tab {
+  box-sizing: border-box;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+  border-width: 1px;   /* lock border width */
+  padding: .5rem 1rem; /* lock padding in case globals alter it on hover */
+}
+
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid pt-3 d-flex flex-column flex-grow-1">
+<div class="container-fluid pt-3 d-flex flex-column flex-grow-1" style="margin-top: 40px;">
 
+  <!-- Toggle buttons -->
+  <div class="mb-3 d-flex gap-2">
+    <!-- default: outlined (will be switched by JS) -->
+    <button id="search-tab" type="button" class="btn btn-search">
+      <i class="bi bi-search me-1"></i> Search existing non-resident owner
+    </button>
+    <!-- default: filled (will be switched by JS) -->
+    <button id="create-tab" type="button" class="btn btn-fill-up">
+      <i class="bi bi-person-plus me-1"></i> Fill-up owner credentials
+    </button>
+  </div>
 
-    <form method="post" class="d-flex flex-column flex-grow-1">
-        {% csrf_token %}
+  <!-- Tabs wrapper -->
+  <div class="tab-content" id="ownerTabsContent">
 
-        <h5>Personal Information</h5>
-        <div class="row">
-
-            <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                    {{form.last_name}}
-                    <label for="{{ form.last_name.id_for_label }}">{{ form.last_name.label }}</label>
-                </div>
-            </div>
-
-            <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                    {{form.first_name}}
-                    <label for="{{ form.first_name.id_for_label }}">{{ form.first_name.label }}</label>
-                </div>   
-            </div>
-
-            <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                    {{form.middle_name}}
-                    <label for="{{ form.middle_name.id_for_label }}">{{ form.middle_name.label }}</label>
-                </div>   
-            </div>
-
-            <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                    {{form.suffix}}
-                    <label for="{{ form.suffix.id_for_label }}">{{ form.suffix.label }}</label>
-                </div>   
-            </div>
-
+    <!-- ========== SEARCH PANE (PARTIAL) ========== -->
+    <div id="search-pane" class="tab-pane fade">
+      <div class="rounded-3 border bg-white p-3 shadow-sm">
+        <div class="sticky-top border-bottom bg-white">
+          <div class="container px-3 py-3">
+            <h3 class="fw-semibold">Account Management — Business Owners</h3>
+            <p class="mt-1 small text-muted">
+              Link a existing non-resident as a business owner by searching their record in the barangay system.
+            </p>
+          </div>
         </div>
 
-        <div class="row">
+        <div class="container px-3 py-4">
+          <section class="rounded-3 border bg-white p-4 shadow-sm">
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <h2 class="fs-5 fw-semibold mb-0">Non-Resident Owner Linking</h2>
+            </div>
+            <p class="small text-muted mb-4">
+              Search for a resident in the barangay records and assign them as the owner of a business.
+            </p>
 
-            <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="mb-3">
-                    <p class="form-label d-block">{{ form.sex.label }}</p>
-                    {% for radio in form.sex %}
-                    <div class="form-check form-check-inline">
+            <!-- Search form (GET) -->
+            <form method="get" class="rounded-3 border bg-light p-3" id="ownerSearchForm">
+              <div class="d-flex align-items-end justify-content-between gap-3">
+                <div class="flex-grow-1">
+                  <label class="form-label small" for="{{ search_form.search.id_for_label }}">Find Non-Resident Record</label>
+                  <div class="form-floating">
+                    {{ search_form.search }}
+                    <label for="{{ search_form.search.id_for_label }}">{{ search_form.search.label }}</label>
+                  </div>
+                  <div class="form-text">
+                    Type a Resident Code (e.g., P07-R123) or name (e.g., Juan Dela Cruz).
+                  </div>
+                </div>
+
+                <!-- Matches count at the FAR RIGHT -->
+                <div class="ms-auto text-end">
+                  <span
+                    id="matchesCount"
+                    class="badge bg-white text-dark border rounded-pill small px-2 py-1 {% if not search or selected %}d-none{% endif %}">
+                    {% if search and not selected %}{{ results|length }} Match{{ results|length|pluralize }}{% endif %}
+                  </span>
+                </div>
+              </div>
+            </form>
+
+            <!-- Results (server-rendered initial; then replaced by AJAX) -->
+            <div class="mt-4">
+              <div class="results-viewport p-2 {% if selected %}d-none{% endif %}" id="ownerResults">
+                {% if not search %}
+                  <div class="text-muted text-center py-4">Start by typing a code or name.</div>
+                {% else %}
+                  {% if results %}
+                    <div class="d-flex flex-column">
+                      {% for r in results %}
+                        <div class="result-item border rounded-3 p-3 d-flex align-items-start justify-content-between">
+                          <div class="pe-3">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                              <h6 class="mb-0 fw-semibold">{{ r.person_name }}</h6>
+                              <span class="badge bg-white text-dark border rounded-pill fw-semibold small px-2 py-1">
+                                {{ r.person_code }}
+                              </span>
+                            </div>
+                            <div class="text-muted small mt-1">
+                              {{ r.street }}
+                              {% if r.purok %}, {{ r.purok }}{% endif %}
+                              {% if r.barangay %}, {{ r.barangay }}{% endif %}
+                              {% if r.city %}, {{ r.city }}{% endif %}
+                            </div>
+                          </div>
+                          <form method="post" class="ms-2 m-0">
+                            {% csrf_token %}
+                            <input type="hidden" name="owner_person_id" value="{{ r.person_id }}">
+                            <input type="hidden" name="search" value="{{ search }}">
+                            <button type="submit" class="btn btn-submit btn-sm">Select as Owner</button>
+                          </form>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <div class="alert alert-light border">No results for <strong>{{ search }}</strong>.</div>
+                  {% endif %}
+                {% endif %}
+              </div>
+            </div>
+
+            {% if selected %}
+              <div class="mt-4" id="selectedCard">
+                <div class="card border-0 shadow-sm">
+                  <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                      <div>
+                        <h5 class="card-title mb-1">
+                          {{ selected.full_name|default:"—"|upper }}
+                        </h5>
+                        <div class="fw-semibold small text-muted">
+                          {{ selected.person_code|default:"—" }}
+                        </div>
+                      </div>
+                      <span class="badge" style="background-color: var(--bs-danger-text-emphasis);">
+                        {{ selected.residential_status_name|default:"—" }}
+                      </span>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <div class="row g-3">
+                      <div class="col-12 col-md-6">
+                        <div class="small text-muted">Sex</div>
+                        <div class="fw-semibold">{{ selected.sex_name|default:"—" }}</div>
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <div class="small text-muted">Date of Birth</div>
+                        <div class="fw-semibold text-uppercase">{{ selected.date_of_birth|date:"F j, Y" }}</div>
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <div class="small text-muted">Address</div>
+                        <div class="fw-semibold">
+                          {% with st=selected.street sp=selected.purok br=selected.barangay ct=selected.city %}
+                            {% if st %}{{ st }}{% endif %}
+                            {% if sp %}{% if st %}, {% endif %}{{ sp }}{% endif %}
+                            {% if br %}{% if st or sp %}, {% endif %}Brgy. {{ br }}{% endif %}
+                            {% if ct %}{% if st or sp or br %}, {% endif %}{{ ct }}{% endif %}
+                            {% if not st and not sp and not br and not ct %}—{% endif %}
+                          {% endwith %}
+                        </div>
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <div class="small text-muted">Civil Status</div>
+                        <div class="fw-semibold">{{ selected.civil_status|default:"—" }}</div>
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <div class="small text-muted">Nationality</div>
+                        <div class="fw-semibold">{{ selected.nationality|default:"—" }}</div>
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <div class="small text-muted">Religion</div>
+                        <div class="fw-semibold">{{ selected.religion|default:"—" }}</div>
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <div class="small text-muted">Mobile</div>
+                        <div class="fw-semibold">{{ selected.mobile|default:"—" }}</div>
+                      </div>
+                      <div class="col-12 col-md-6">
+                        <div class="small text-muted">Email</div>
+                        <div class="fw-semibold">{{ selected.email|default:"—" }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Selection summary bar with "Change" -->
+                <div class="alert alert-light border mt-3 mb-0">
+                  <div class="d-flex align-items-center justify-content-between">
+                    <div class="small">
+                      <span class="text-muted">Selected Resident:</span>
+                      <strong>
+                        {{ selected.full_name|default:"—"|upper }} — {{ selected.person_code|default:"—" }}
+                      </strong>
+                    </div>
+                    <a href="{% url 'clerk:business_owner_nonres' %}"
+                       id="changeSelected"
+                       class="small text-decoration-none"
+                       style="color: var(--bs-danger-text-emphasis);">
+                      Change
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              <div id="actionBar" class="mt-3 button-container justify-content-end mb-2 d-flex gap-2">
+                <button type="button" class="btn btn-reset" onclick="history.back()">Back</button>
+                <a class="btn btn-submit"
+                   id="continueBtn"
+                   href="{% url 'clerk:business_details' %}">
+                  Continue
+                </a>
+              </div>
+            {% endif %}
+
+          </section>
+        </div>
+      </div>
+    </div>
+    <!-- /SEARCH PANE -->
+
+    <!-- ========== CREATE/FILL-UP PANE ========== -->
+    <div id="create-pane" class="tab-pane fade show active">
+      <div class="rounded-3 border bg-white p-3 shadow-sm">
+        <div class="container px-3 py-3">
+          <h3 class="fw-semibold">Account Management — Business Owners</h3>
+          <p class="mt-1 small text-muted">
+            Link a resident as a business owner by searching their record in the barangay system.
+          </p>
+        </div>
+
+        <div class="container px-3 pb-4">
+          <section class="rounded-3 border bg-white p-4 shadow-sm">
+            <div class="container-fluid pt-3 d-flex flex-column flex-grow-1">
+
+              <form method="post" enctype="multipart/form-data" class="d-flex flex-column flex-grow-1">
+                {% csrf_token %}
+
+                <h5>Personal Information</h5>
+                <div class="row">
+                  <div class="col-lg-3 col-md-6 col-sm-12">
+                    <div class="form-floating mb-3">
+                      {{form.last_name}}
+                      <label for="{{ form.last_name.id_for_label }}">{{ form.last_name.label }}</label>
+                    </div>
+                  </div>
+
+                  <div class="col-lg-3 col-md-6 col-sm-12">
+                    <div class="form-floating mb-3">
+                      {{form.first_name}}
+                      <label for="{{ form.first_name.id_for_label }}">{{ form.first_name.label }}</label>
+                    </div>
+                  </div>
+
+                  <div class="col-lg-3 col-md-6 col-sm-12">
+                    <div class="form-floating mb-3">
+                      {{form.middle_name}}
+                      <label for="{{ form.middle_name.id_for_label }}">{{ form.middle_name.label }}</label>
+                    </div>
+                  </div>
+
+                  <div class="col-lg-3 col-md-6 col-sm-12">
+                    <div class="form-floating mb-3">
+                      {{form.suffix}}
+                      <label for="{{ form.suffix.id_for_label }}">{{ form.suffix.label }}</label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row">
+                  <div class="col-lg-3 col-md-6 col-sm-12">
+                    <div class="mb-3">
+                      <p class="form-label d-block">{{ form.sex.label }}</p>
+                      {% for radio in form.sex %}
+                      <div class="form-check form-check-inline">
                         {{ radio.tag }}
                         <label for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+                      </div>
+                      {% endfor %}
                     </div>
-                    {% endfor %}
+                  </div>
+
+                  <div class="col-lg-3 col-md-6 col-sm-12">
+                    <div class="form-floating mb-3">
+                      {{form.dob}}
+                      <label for="{{ form.dob.id_for_label }}">{{ form.dob.label }}</label>
+                    </div>
+                  </div>
+
+                  <div class="col-lg-3 col-md-6 col-sm-12">
+                    <div class="form-floating mb-3">
+                      {{form.civil_status}}
+                      <label for="{{ form.civil_status.id_for_label }}">{{ form.civil_status.label }}</label>
+                    </div>
+                  </div>
+
+                  <div class="col-lg-3 col-md-6 col-sm-12">
+                    <div class="form-floating mb-3">
+                      {{form.nationality}}
+                      <label for="{{ form.nationality.id_for_label }}">{{ form.nationality.label }}</label>
+                    </div>
+                  </div>
                 </div>
-            </div>
 
-            <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                    {{form.dob}}
-                    <label for="{{ form.dob.id_for_label }}">{{ form.dob.label }}</label>
-                </div>   
-            </div>
+                <div class="row">
+                  <div class="col-lg-3 col-md-6 col-sm-12">
+                    <div class="form-floating mb-3">
+                      {{form.religion}}
+                      <label for="{{ form.religion.id_for_label }}">{{ form.religion.label }}</label>
+                    </div>
+                  </div>
 
-            <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                    {{form.civil_status}}
-                    <label for="{{ form.civil_status.id_for_label }}">{{ form.civil_status.label }}</label>
-                </div>   
-            </div>
+                  <div class="col-lg-3 col-md-6 col-sm-12">
+                    <div class="form-floating mb-3">
+                      {{form.email}}
+                      <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+                    </div>
+                  </div>
 
-            <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                    {{form.nationality}}
-                    <label for="{{ form.nationality.id_for_label }}">{{ form.nationality.label }}</label>
-                </div>   
-            </div>
-
-        </div>
-
-        <div class="row">
-
-            <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                    {{form.religion}}
-                    <label for="{{ form.religion.id_for_label }}">{{ form.religion.label }}</label>
-                </div>  
-            </div>
-
-            <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                    {{form.home_address}}
-                    <label for="{{ form.home_address.id_for_label }}">{{ form.home_address.label }}</label>
+                  <div class="col-lg-3 col-md-6 col-sm-12">
+                    <div class="form-floating mb-3">
+                      {{form.mob_num}}
+                      <label for="{{ form.mob_num.id_for_label }}">{{ form.mob_num.label }}</label>
+                    </div>
+                  </div>
                 </div>
-            </div>
 
-            <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                    {{form.email}}
-                    <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
-                </div>   
-            </div>
-
-            <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                    {{form.mob_num}}
-                    <label for="{{ form.mob_num.id_for_label }}">{{ form.mob_num.label }}</label>
-                </div>   
-            </div>
-
-        </div>
-
-        <div class="modal fade" id="address_modal" tabindex="-1" aria-labelledby="home_address" aria-hidden="true">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="home_address">Home Address</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <div class="row">
+                  <div class="col-lg-3 col-md-6 col-sm-12">
+                    <div class="form-floating mb-3">
+                      {{form.street}}
+                      <label for="{{ form.street.id_for_label }}">{{ form.street.label }}</label>
                     </div>
-                    <div class="modal-body">
-                        <div class="row">
-                            <div class="col">
-                                <div class="map-container">
-                                    <div id="map"></div>
-                                    <div class="control">
-                                        <select id="style-selector">
-                                            <option value="mapbox/streets-v11">Streets</option>
-                                            <option value="mapbox/satellite-streets-v11">Satellite Streets</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
+                  </div>
 
-                            <div class="col">
-                                <div class="col-lg-12 col-md-12 col-sm-12">
-                                    <div class="form-floating mb-3">
-                                        {{form.street}}
-                                        <label for="{{ form.street.id_for_label }}">{{ form.street.label }}</label>
-                                    </div>  
-                                </div>
-
-                                <div class="col-lg-12 col-md-12 col-sm-12">
-                                    <div class="form-floating mb-3">
-                                        {{form.purok_sitio}}
-                                        <label for="{{ form.purok_sitio.id_for_label }}">{{ form.purok_sitio.label }}</label>
-                                    </div>   
-                                </div>
-
-                                <div class="col-lg-12 col-md-12 col-sm-12">
-                                    <div class="form-floating mb-3">
-                                        {{form.barangay}}
-                                        <label for="{{ form.barangay.id_for_label }}">{{ form.barangay.label }}</label>
-                                    </div>   
-                                </div>
-
-                                <div class="col-lg-12 col-md-12 col-sm-12">
-                                    <div class="form-floating mb-3">
-                                        {{form.city}}
-                                        <label for="{{ form.city.id_for_label }}">{{ form.city.label }}</label>
-                                    </div>   
-                                </div>
-                            </div>
-                        </div>
+                  <div class="col-lg-3 col-md-6 col-sm-12">
+                    <div class="form-floating mb-3">
+                      {{form.purok_sitio}}
+                      <label for="{{ form.purok_sitio.id_for_label }}">{{ form.purok_sitio.label }}</label>
                     </div>
+                  </div>
 
-                    <div class="modal-footer">
-                        <button class="btn btn-reset">Clear</button>
-                        <button type="button" class="btn btn-submit" onclick="fill_home_address()" data-bs-dismiss="modal">Save</button>
+                  <div class="col-lg-3 col-md-6 col-sm-12">
+                    <div class="form-floating mb-3">
+                      {{form.barangay}}
+                      <label for="{{ form.barangay.id_for_label }}">{{ form.barangay.label }}</label>
                     </div>
+                  </div>
+
+                  <div class="col-lg-3 col-md-6 col-sm-12">
+                    <div class="form-floating mb-3">
+                      {{form.city}}
+                      <label for="{{ form.city.id_for_label }}">{{ form.city.label }}</label>
+                    </div>
+                  </div>
                 </div>
+
+                <div class="mt-auto button-container">
+                  <button id="ClearBtn" type="button" class="btn btn-reset">Clear</button>
+                  <button type="submit" class="btn btn-submit">Continue</button>
+                </div>
+
+              </form>
+
             </div>
+          </section>
         </div>
-        
-        <div class="mt-auto button-container">
-            <button class="btn btn-reset">Clear</button>
-            <a class="btn btn-submit" href="{% url 'resident:socioeconomic_info' %}">Continue</a>
-        </div>
+      </div>
+    </div>
+    <!-- /CREATE PANE -->
 
-    </form>
-
+  </div> <!-- /tab-content -->
 
 </div>
+
+<div id="ownerPage"
+     data-search-url="{% url 'clerk:ajax_nonresident_owner_search' %}"
+     data-continue-base="{% url 'clerk:business_details' %}"
+     data-has-selected="{{ selected|yesno:'true,false' }}"
+     data-initial-search="{{ search|default_if_none:'' }}">
+</div>
+
+<script>
+// Controls the Search/Create tabs on the non-resident owner page.
+(function () {
+  const btnSearch  = document.getElementById('search-tab');
+  const btnCreate  = document.getElementById('create-tab');
+  const paneSearch = document.getElementById('search-pane');
+  const paneCreate = document.getElementById('create-pane');
+  const pageRoot   = document.getElementById('ownerPage');
+
+  function applyButtonStyle(btn, isActive) {
+    btn.classList.toggle('btn-fill-up', isActive); // filled
+    btn.classList.toggle('btn-search',  !isActive); // outlined
+  }
+
+  function setActiveTab(which) {
+    const isSearch = which === 'search';
+
+    // panes
+    paneSearch.classList.toggle('show',   isSearch);
+    paneSearch.classList.toggle('active', isSearch);
+    paneCreate.classList.toggle('show',   !isSearch);
+    paneCreate.classList.toggle('active', !isSearch);
+
+    // buttons
+    applyButtonStyle(btnSearch,  isSearch);
+    applyButtonStyle(btnCreate, !isSearch);
+
+    // a11y
+    btnSearch.setAttribute('aria-pressed',  String(isSearch));
+    btnCreate.setAttribute('aria-pressed',  String(!isSearch));
+  }
+
+  // Click handlers
+  btnSearch?.addEventListener('click', (e) => { e.preventDefault(); setActiveTab('search'); });
+  btnCreate?.addEventListener('click', (e) => { e.preventDefault(); setActiveTab('create'); });
+
+  // -------- Initial tab decision --------
+  // Prefer Search if a result is selected OR if there is a search term.
+  const hasSelected   = (pageRoot?.dataset.hasSelected || 'false') === 'true';
+  const initialSearch = (pageRoot?.dataset.initialSearch || '').trim();
+
+  if (hasSelected || initialSearch) {
+    setActiveTab('search');
+  } else {
+    setActiveTab('create');
+  }
+})();
+
+</script>
+
 {% endblock %}

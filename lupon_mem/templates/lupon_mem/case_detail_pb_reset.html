@@ -1,0 +1,12 @@
+PB Mediation Reset Logic:
+
+kp9_mediation choices should include:
+- Both attended → SETTLED (next: kp16_mediation)
+- Both attended → NOT SETTLED (within 15 days, <3 hearings) (next: kp8_reset)
+- Both attended → NOT SETTLED (15 days lapsed OR 3 hearings reached) (next: kp10)
+
+Add new steps:
+kp8_reset: Notice of Hearing (Reset PB Mediation)
+kp9_mediation_reset: Summons (Reset Mediation) with same choices but tracking hearing count
+
+This allows up to 3 PB mediation hearings within the 15-day window before moving to Pangkat.

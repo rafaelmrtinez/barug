@@ -1,0 +1,280 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<link rel="stylesheet" href="{% static 'css/filters.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <div class="container-fluid pt-3 page-main" style="margin-top: 40px;">
+    <div class="row">
+      <div>
+
+        {# ─── Toolbar: search + filters + add ─── #}
+        <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+          {% csrf_token %}
+          <div class="searchbox">
+            {% bs_icon 'search' extra_classes='bi' %}
+            {{form.search}}
+          </div>
+
+          {# preserve selected filters when searching #}
+          <input type="hidden" name="role" value="{{ request.GET.role|default:'' }}">
+
+           <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
+              type="button" data-bs-toggle="offcanvas" data-bs-target="#filterPanel" aria-controls="filterPanel">
+              {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+              {% if request.GET.role %}
+                <span class="badge rounded-pill text-bg-light ms-2">•</span>
+              {% endif %}
+            </button>
+
+          <a class="btn btn-outline-brand ms-2" href="{% url 'staff_admin:staff_selection' %}">
+            {% bs_icon 'plus-lg' extra_classes='me-2' %} Add Staff
+          </a>
+        </form>
+
+        {% include 'partials/messages.html' %}
+
+        {# ─── Active filter chips (show selected labels) ─── #}
+        <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
+          {% if request.GET.b_type or request.GET.ownership_type or request.GET.status %}
+            <span class="text-muted me-1">Active:</span>
+
+            {% if request.GET.b_type %}
+              <a class="filter-chip"
+                 href="?q={{ request.GET.q|urlencode }}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}">
+                {{ request.GET.b_type }}
+                <span class="x" aria-hidden="true">×</span>
+              </a>
+            {% endif %}
+
+            {% if request.GET.ownership_type %}
+              <a class="filter-chip"
+                 href="?q={{ request.GET.q|urlencode }}{% if request.GET.b_type %}&b_type={{ request.GET.b_type|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}">
+                {{ request.GET.ownership_type }}
+                <span class="x" aria-hidden="true">×</span>
+              </a>
+            {% endif %}
+
+            {% if request.GET.status %}
+              <a class="filter-chip"
+                 href="?q={{ request.GET.q|urlencode }}{% if request.GET.b_type %}&b_type={{ request.GET.b_type|urlencode }}{% endif %}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}">
+                {{ request.GET.status }}
+                <span class="x" aria-hidden="true">×</span>
+              </a>
+            {% endif %}
+
+            <a class="btn btn-sm btn-outline-brand ms-1" href="?q={{ request.GET.q|urlencode }}">
+              {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
+            </a>
+          {% else %}
+            <span class="text-muted small">No active filters.</span>
+          {% endif %}
+        </div>
+        
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Role</th>
+              <th scope="col">Account Status</th>
+              <th scope="col">View Info</th>
+            </tr>
+          </thead>
+          <tbody id="staff-tbody">
+            {% if page_obj.object_list %}
+              {% for r in page_obj.object_list %}
+                <tr class="table-row-height">
+                  <td>{{ r.full_name }}</td>
+                  <td>{{ r.role_name|default:"—" }}</td>
+                  <td>{{ r.account_status|default:"—" }}</td>
+                  <td>
+                    <div class="d-flex gap-1">
+                      <a class="btn btn-icon" href="{% url 'staff_admin:staff_details' staff_code=r.staff_code %}">
+                        {% bs_icon 'person-lines-fill' size='1em' %}
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr><td colspan="4" class="text-center">No records found</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div class="page-pagination"> 
+      {% include 'paginator.html' %}
+    </div>
+  {% endif %}
+
+  {# ─── Offcanvas: Role filter ─── #}
+{# ─── Offcanvas Filters (HARDCODED options) ─── #}
+<div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
+     aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150;">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+
+  <div class="offcanvas-body">
+  <form method="get" id="filterForm">
+    <div>
+      <label class="form-label">Role</label>
+      {{ form.role }}
+    </div>
+
+    <div>
+      <label class="form-label">Account Status</label>
+      {{ form.account_stat  }}
+    </div>
+
+    {# keep search term when applying role #}
+    <input type="hidden" name="q" value="{{ request.GET.q|default:'' }}"/>
+
+    <div class="offcanvas-footer">
+      <div class="d-flex justify-content-between">
+        <a class="btn btn-outline-brand" id="filterClearBtn" href="#" type="button">Clear</a>
+        <button type="submit" class="btn btn-brand">Apply Filters</button>
+      </div>
+    </div>
+  </form>
+  </div>
+</div>
+
+</div>
+
+<script>
+(function () {
+  const tbody = document.getElementById('staff-tbody');
+  const filterForm = document.getElementById('filterForm');
+  const clearBtn = document.getElementById('filterClearBtn');
+  const searchInput = document.querySelector('.searchbox input') || document.querySelector('input[name="search"]');
+  const pager = document.querySelector('.page-pagination');
+  if (!tbody) return;
+
+  const originalTbodyHTML = tbody.innerHTML;
+  const originalPagerHTML = pager ? pager.innerHTML : null;
+
+  function renderRows(rows) {
+    tbody.innerHTML = (rows && rows.length)
+      ? rows.map(r => {
+          const href = "{% url 'staff_admin:staff_details' staff_code='__CODE__' %}"
+                        .replace('__CODE__', encodeURIComponent(r.staff_code ?? ''));
+          const actionCell = r.staff_code
+            ? `<a class="btn btn-icon" href="${href}">
+                 <i class="bi bi-person-lines-fill"></i>
+               </a>`
+            : `<span class="text-muted">—</span>`;
+          return `
+            <tr class="table-row-height">
+              <td>${r.full_name ?? ''}</td>
+              <td>${r.role_name ?? '—'}</td>
+              <td>${r.account_status ?? '—'}</td>
+              <td><div class="d-flex gap-1">${actionCell}</div></td>
+            </tr>`;
+        }).join('')
+      : `<tr><td colspan="4" class="text-center">No records found</td></tr>`;
+
+    if (pager) pager.innerHTML = '';
+  }
+
+  async function fetchFilter(roleId, accId) {
+    const url = new URL("{% url 'staff_admin:staff_filter_api' %}", window.location.origin);
+    if (roleId) url.searchParams.set('role_id', roleId);
+    if (accId)  url.searchParams.set('account_status_id', accId);
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center">Loading…</td></tr>`;
+    try {
+      const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      renderRows(data.results || []);
+    } catch (e) {
+      console.error(e);
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Error loading filtered data.</td></tr>`;
+    }
+  }
+
+  if (filterForm) {
+    filterForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const roleSel = filterForm.querySelector('select[name="role"]');
+      const accSel  = filterForm.querySelector('select[name="account_stat"]');
+      const roleId = roleSel && roleSel.value ? roleSel.value : null;
+      const accId  = accSel  && accSel.value  ? accSel.value  : null;
+      if (searchInput) searchInput.value = '';
+      fetchFilter(roleId, accId);
+      try {
+        const panel = document.getElementById('filterPanel');
+        if (panel) bootstrap.Offcanvas.getOrCreateInstance(panel).hide();
+      } catch {}
+    });
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const roleSel = filterForm ? filterForm.querySelector('select[name="role"]') : null;
+      const accSel  = filterForm ? filterForm.querySelector('select[name="account_stat"]') : null;
+      if (roleSel) roleSel.value = '';
+      if (accSel)  accSel.value  = '';
+      if (searchInput) searchInput.value = '';
+      tbody.innerHTML = originalTbodyHTML;
+      if (pager && originalPagerHTML !== null) pager.innerHTML = originalPagerHTML;
+      try {
+        const panel = document.getElementById('filterPanel');
+        if (panel) bootstrap.Offcanvas.getOrCreateInstance(panel).hide();
+      } catch {}
+    });
+  }
+
+  let debounceTimer = null, currentCtrl = null;
+
+  async function doSearch(q) {
+    if (currentCtrl) currentCtrl.abort();
+    currentCtrl = new AbortController();
+    const url = new URL("{% url 'staff_admin:staff_search_api' %}", window.location.origin);
+    if (q) url.searchParams.set('q', q);
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center">Loading…</td></tr>`;
+    try {
+      const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' }, signal: currentCtrl.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      renderRows(data.results || []);
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      console.error(err);
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Search failed. Try again.</td></tr>`;
+    }
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        const q = searchInput.value.trim();
+        if (!q) {
+          tbody.innerHTML = originalTbodyHTML;
+          if (pager && originalPagerHTML !== null) pager.innerHTML = originalPagerHTML;
+          return;
+        }
+        doSearch(q);
+      }, 250);
+    });
+  }
+})();
+</script>
+
+{% endblock %}
