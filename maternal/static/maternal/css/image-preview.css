@@ -21,3 +21,14 @@
   max-height: 100%;
   display: block;
 }
+
+.upload-thumb { position: relative; }
+.download-thumb-btn {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 0.15rem 0.35rem;
+  font-size: 0.85rem;
+  border-radius: 0.35rem;
+  opacity: 0.95;
+}
