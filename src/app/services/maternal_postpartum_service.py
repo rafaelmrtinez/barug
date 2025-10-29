@@ -115,7 +115,32 @@ class MaternalPostpartumService:
         except Exception:
             raise MaternalHealthRecordException('Invalid pads_per_day_baseline.')
 
-        # call repository
+        # Domain rule: do not allow creating a postpartum record when there is
+        # already an existing postpartum record for this maternal health record.
+        # Fetch the latest postpartum record (if any) and block creation.
+        try:
+            existing_record = self.repo.fetch_postpartum_record_by_mhr_id(mhr_id)
+        except Exception:
+            # If repository check fails unexpectedly, raise a friendly error.
+            raise MaternalHealthRecordException('Unable to validate existing postpartum records. Please try again.')
+
+        if existing_record:
+            # There is already at least one postpartum record for this MHR.
+            raise MaternalHealthRecordException('A postpartum record already exists for this maternal health record. Duplicate postpartum records are not allowed.')
+
+        # Additionally, keep the existing check that prevents creating a postpartum
+        # record when there is an active/pending postpartum schedule.
+        try:
+            latest_pp_status = self.repo.fetch_latest_postpartum_status_by_mhr_id(mhr_id)
+        except Exception:
+            # If repository check fails unexpectedly, raise a friendly error.
+            raise MaternalHealthRecordException('Unable to validate existing postpartum status. Please try again.')
+
+        if latest_pp_status and int(latest_pp_status.get('status_id') or 0) == 1:
+            # Status 1 == PENDING / active
+            raise MaternalHealthRecordException('A pending postpartum schedule already exists. Complete or cancel it before adding a new postpartum record.')
+
+        # call repository to persist the postpartum record
         try:
             return self.repo.insert_postpartum_record_bhw(
                 p_added_by_id=added_by_id,

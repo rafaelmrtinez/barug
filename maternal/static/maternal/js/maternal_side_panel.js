@@ -249,13 +249,70 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         const container = document.getElementById('maternalSidePanel');
-        const mhrId = container ? container.dataset.mhrId : null;
+        // Prefer the latest maternal_record_id available on the page.
+        // The template may render multiple `data-mhr-id` attributes (one per record
+        // action button) or a top-level `data-mhr-id` which sometimes holds an
+        // older value. Scan the DOM for numeric MHR ids and pick the max.
+        const findLatestMhrFromDom = function () {
+            const ids = [];
+            // Collect values from any element that exposes data-mhr-id
+            document.querySelectorAll('[data-mhr-id]').forEach(function (el) {
+                const v = el.getAttribute('data-mhr-id');
+                if (v != null && String(v).trim() !== '') {
+                    const n = Number(String(v).trim());
+                    if (!Number.isNaN(n)) ids.push(n);
+                }
+            });
+            // Also look at the records table first column (MHR #) as a fallback
+            document.querySelectorAll('table.visit-table tbody tr').forEach(function (tr) {
+                const td = tr.querySelector('td');
+                if (td) {
+                    const t = td.textContent.trim();
+                    const n = Number(t);
+                    if (!Number.isNaN(n)) ids.push(n);
+                }
+            });
+            if (!ids.length) return null;
+            return String(Math.max.apply(null, ids));
+        };
+
+        let mhrId = container ? container.dataset.mhrId : null;
+        const computedLatest = findLatestMhrFromDom();
+        if (!mhrId || String(mhrId).trim() === '' || (computedLatest && Number(computedLatest) > Number(mhrId))) {
+            if (computedLatest) mhrId = computedLatest;
+        }
+
+        console.log('Maternal Side Panel: loading data for MHR ID', mhrId, '(computed latest:', computedLatest, ')');
+
         if (mhrId) fetchSidePanel(mhrId);
 
         // listen for postpartum:created events to refresh panel when record changes
         document.addEventListener('postpartum:created', function () {
+            // Recompute latest MHR id on refresh events in case the active record changed.
             const container = document.getElementById('maternalSidePanel');
-            const mhrId = container ? container.dataset.mhrId : null;
+            let mhrId = container ? container.dataset.mhrId : null;
+            const computedLatest = (function () {
+                const ids = [];
+                document.querySelectorAll('[data-mhr-id]').forEach(function (el) {
+                    const v = el.getAttribute('data-mhr-id');
+                    if (v != null && String(v).trim() !== '') {
+                        const n = Number(String(v).trim());
+                        if (!Number.isNaN(n)) ids.push(n);
+                    }
+                });
+                document.querySelectorAll('table.visit-table tbody tr').forEach(function (tr) {
+                    const td = tr.querySelector('td');
+                    if (td) {
+                        const t = td.textContent.trim();
+                        const n = Number(t);
+                        if (!Number.isNaN(n)) ids.push(n);
+                    }
+                });
+                return ids.length ? String(Math.max.apply(null, ids)) : null;
+            })();
+            if (!mhrId || String(mhrId).trim() === '' || (computedLatest && Number(computedLatest) > Number(mhrId))) {
+                if (computedLatest) mhrId = computedLatest;
+            }
             if (mhrId) fetchSidePanel(mhrId);
         });
     });
