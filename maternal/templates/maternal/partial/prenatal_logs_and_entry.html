@@ -81,7 +81,9 @@
 
             <div class="card-footer d-flex justify-content-end gap-2 mt-3">
                 <button type="reset" class="btn btn-outline-brand">Clear</button>
+                {% if request.session.auth.role_name == 'midwife'  %}
                 <button type="submit" class="btn btn-brand">Mark Visit as Complete</button>
+                {% endif %}
                 <button type="submit" class="btn btn-brand">Save</button>
             </div>
         </div>

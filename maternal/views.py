@@ -26,6 +26,7 @@ from maternal.forms.pre_natal_follow_up_form import PrenatalFollowUpEntryForm
 from maternal.forms.present_pregnancy_form import PresentPregnancyForm
 from maternal.forms.previous_pregnancy_form import PreviousPregnancyForm, PreviousPregnancyFormSet
 from maternal.forms.tetanus_toxoid_form import TetanusToxoidForm
+from maternal.forms.postpartum_record_form import PostpartumRecordForm
 from maternal.repository import MaternalHealthRecordRepository
 from maternal.utils.form_lock import FormLockUtility
 from src.infra.database.connection_adapter import ConnectionAdapter
@@ -211,14 +212,12 @@ def create_new_maternal_entry(request: HttpRequest) -> HttpResponse:
                     is_transferred=data.get("is_transferred", False),
                 )
                 if res:
-                    if res.get("create_maternal_health_record_bhw"):
-                        res = f"Maternal Record ID: {res.get('maternal_record_id')}"                
-                        messages.success(request, f"Maternal identification record created successfully. {res}")
-                        # Here you would typically save the data to the database
-                        # For now, just redirect or render a success message
-                        return render(request, "maternal/identification.html", {
-                            "identification_form": maternal_identification_form,
-                        })
+                    messages.success(request, f"Maternal identification record created successfully.")
+                    # Here you would typically save the data to the database
+                    # For now, just redirect or render a success message
+                    return render(request, "maternal/identification.html", {
+                        "identification_form": maternal_identification_form,
+                    })
                 else:
                     messages.error(request, "Failed to create maternal identification record.")
                     return render(request, "maternal/identification.html", {
@@ -1089,6 +1088,16 @@ def record_detail(request: HttpRequest, person_id: int) -> HttpResponse:
     record = REPOSITORY.fetch_latest_maternal_record_by_person_and_maternal_id(person_id, maternal_record_id=maternal_health_record_id) or {}
     all_records = REPOSITORY.fetch_all_maternal_records_for_person(person_id)
     basic_info = REPOSITORY.fetch_mhr_count_and_fam_id_by_person_id(person_id)
+    staff_name = request.session.get('auth', {}).get('first_name') + ' ' + request.session.get('auth', {}).get('last_name')
+    # prepare postpartum form pre-populated with maternal record id
+    postpartum_form = PostpartumRecordForm(
+        mhr_id=maternal_health_record_id,
+        role=request.session.get('auth', {}).get('role_name'),
+        staff_name=staff_name,
+        staff_id=request.session.get('auth', {}).get('staff_id'),
+        repository=REPOSITORY,
+    )
+
     return render(
         request,
         "maternal/record_history.html",
@@ -1107,6 +1116,7 @@ def record_detail(request: HttpRequest, person_id: int) -> HttpResponse:
             # history table (now includes latest)
             "all_records": all_records,
             "basic_info": basic_info,
+            "postpartum_form": postpartum_form,
         },
     )
 

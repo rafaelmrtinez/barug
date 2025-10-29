@@ -18,4 +18,9 @@ urlpatterns = [
     path(f'api/v{API_VERSION}/mhr/status/update/', __import__('maternal.api.maternal_heal_status_api', fromlist=['']).MaternalHealthRecordStatusUpdateAPI.as_view(), name='mhr_status_update_api'),
     # v1 API to complete a maternal visit schedule
     path(f'api/v{API_VERSION}/mhr/visit/complete/', __import__('maternal.api.complete_maternal_visit_api', fromlist=['']).CompleteMaternalVisitAPI.as_view(), name='mhr_visit_complete_api'),
+    # v1 API to insert prenatal and postpartum schedules
+    path(f'api/v{API_VERSION}/mhr/schedule/prenatal/', __import__('maternal.api.insert_prenatal_schedule_api', fromlist=['']).PrenatalScheduleAPI.as_view(), name='mhr_schedule_prenatal_api'),
+    path(f'api/v{API_VERSION}/mhr/schedule/postpartum/', __import__('maternal.api.insert_postpartum_schedule_api', fromlist=['']).PostpartumScheduleAPI.as_view(), name='mhr_schedule_postpartum_api'),
+    path(f'api/v{API_VERSION}/mhr/postpartum-record/', __import__('maternal.api.insert_postpartum_record_api', fromlist=['']).PostpartumRecordAPI.as_view(), name='mhr_postpartum_record_api'),
+    path(f'api/v{API_VERSION}/mhr/side-panel/', __import__('maternal.api.mhr_side_panel_api', fromlist=['']).MhrSidePanelAPI.as_view(), name='mhr_side_panel_api'),
 ]
