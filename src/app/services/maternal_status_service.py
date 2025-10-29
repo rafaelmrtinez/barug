@@ -6,8 +6,8 @@ used by controllers / API endpoints.
 """
 from typing import Optional
 
-from maternal.repository import MaternalHealthRecordRepository
-from maternal.exceptions.maternal_exceptions import MaternalHealthRecordException
+from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
+from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
 from src.domain.services.maternal_status_domain_service import MaternalStatusDomainService, MaternalStatusDomainException
 
 

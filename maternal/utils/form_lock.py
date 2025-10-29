@@ -2,7 +2,7 @@
 from django.http import JsonResponse
 from django.shortcuts import redirect
 
-from maternal.repository import MaternalHealthRecordRepository
+from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
 
 class FormLockUtility:
 

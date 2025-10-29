@@ -11,7 +11,7 @@ from authentication.guards import role_required, session_login_required
 from authentication.utils import nocache
 from barug.utility.lazy_repository import LazyRepositoryProxy
 from barug.utility.messages_util import MessageUtility
-from maternal.exceptions.maternal_exceptions import MaternalHealthRecordException
+from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
 from maternal.forms.check_list_form import CheckListForm
 from maternal.forms.labolatory_form import LaboratoryForm
 from maternal.forms.maternal_identification_form import MaternalIdentificationForm
@@ -27,11 +27,11 @@ from maternal.forms.present_pregnancy_form import PresentPregnancyForm
 from maternal.forms.previous_pregnancy_form import PreviousPregnancyForm, PreviousPregnancyFormSet
 from maternal.forms.tetanus_toxoid_form import TetanusToxoidForm
 from maternal.forms.postpartum_record_form import PostpartumRecordForm
-from maternal.repository import MaternalHealthRecordRepository
+from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
 from maternal.utils.form_lock import FormLockUtility
 from src.infra.database.connection_adapter import ConnectionAdapter
 
-from maternal.services.laboratory_service import LaboratoryService, LaboratoryTestException
+from src.app.services.laboratory_service import LaboratoryService, LaboratoryTestException
 
 import logging
 

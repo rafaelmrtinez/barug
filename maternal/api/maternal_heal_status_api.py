@@ -7,8 +7,8 @@ from django.views.decorators.csrf import csrf_protect as csrf_required
 
 from authentication.guards import session_login_required, role_required
 from src.infra.database.connection_adapter import ConnectionAdapter
-from maternal.repository import MaternalHealthRecordRepository
-from maternal.exceptions.maternal_exceptions import MaternalHealthRecordException
+from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
+from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
 from src.app.services.maternal_status_service import MaternalRecordStatusService
 
 LOGGER_ALLOWED_ROLES = ("MIDWIFE", "Midwife", "midwife", "Barangay Health Worker", "bhw", "Super Admin")

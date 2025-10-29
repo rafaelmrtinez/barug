@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
-from maternal.supa.supabase_storage_service import SupabaseStorageService
+from src.infra.utilities.supabase_storage_service import SupabaseStorageService
 from barug.utility.custom_date_time_util import DateAndTimeUtility
 from datetime import date as _date
 

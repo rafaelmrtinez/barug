@@ -2,7 +2,7 @@ import decimal
 from django import forms
 
 from maternal.constants import AGE_GROUPS
-from maternal.repository import MaternalHealthRecordRepository
+from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
 from src.infra.database.connection_adapter import ConnectionAdapter
 
 def add_bootstrap_classes(self):

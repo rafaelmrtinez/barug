@@ -1,7 +1,7 @@
 # maternal/forms/risk_code_form.py
 from django import forms
 from maternal.forms.maternal_identification_form import add_bootstrap_classes
-from maternal.repository import MaternalHealthRecordRepository
+from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
 
 class RiskCodeForm(forms.Form):
     # --- NEW: two category checkboxes (the only editable controls) ---

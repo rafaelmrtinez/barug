@@ -10,7 +10,7 @@ from django.core.exceptions import ValidationError
 
 from maternal.forms.maternal_identification_form import add_bootstrap_classes
 from maternal.forms.widgets import MultiImageInput
-from maternal.repository import MaternalHealthRecordRepository
+from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
 # Note: form is responsible for form-related presentation logic (initials,
 # readonly flags, image-preview data). Repository lookups are allowed here to
 # populate the form; business rules for persistence remain in the service.

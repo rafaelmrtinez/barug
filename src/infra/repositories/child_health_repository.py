@@ -1,4 +1,4 @@
-from child_health.exception.child_health_record_exception import ChildHealthRecordException
+from src.infra.exceptions.child_health_record_exception import ChildHealthRecordException
 from src.app.transfer_objects.request.child_health_version_two.immunization_request import ImmunizationRequestVersion2
 from src.infra.contracts.connection_adapter import IConnectionAdapter
 from src.infra.exceptions.query_exec_exception import QueryExecutionException

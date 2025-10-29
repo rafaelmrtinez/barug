@@ -2,8 +2,8 @@
 from typing import Optional
 from datetime import date as _date, datetime as _datetime
 
-from maternal.repository import MaternalHealthRecordRepository
-from maternal.exceptions.maternal_exceptions import MaternalHealthRecordException
+from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
+from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
 from src.domain.services.maternal_schedule_domain_service import MaternalScheduleDomainService
 
 
