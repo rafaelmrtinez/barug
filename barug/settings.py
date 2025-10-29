@@ -177,15 +177,9 @@ DATABASES = {
         "PORT": os.getenv("DB_PORT"),
         "OPTIONS": {
             "sslmode": "require",
-<<<<<<< HEAD
-            "connect_timeout": 100,     # fail fast instead of hanging
-            "options": "-c statement_timeout=5000"  # 5s cap per statement (protects slow queries)
-        },  # <-- add this for Supabase
-=======
-            "connect_timeout": 20,
+            "connect_timeout": 100,
             "options": "-c statement_timeout=5000"
-        }, 
->>>>>>> fc133096acc5b58547bda2bf7d9a37757d2b78d0
+        },
         "CONN_MAX_AGE": 120,
     }
 }

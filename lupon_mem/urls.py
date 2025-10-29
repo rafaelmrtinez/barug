@@ -21,9 +21,9 @@ urlpatterns = [
     path("cases/new/", views.case_new, name="case_new"),
     path("cases/<int:case_id>/", views.case_detail, name="case_detail"),
     path("cases/<int:case_id>/settlement", views.case_settlement_update, name="case_settlement_update"),
-    path("cases/<int:case_id>/close",  views.case_close,  name="case_close"),
-    path("cases/<int:case_id>/reopen", views.case_reopen, name="case_reopen"),
-    
+    # path("cases/<int:case_id>/close",  views.case_close,  name="case_close"),
+    # path("cases/<int:case_id>/reopen", views.case_reopen, name="case_reopen"),
+
     # chooser + builder
     path("cases/<int:case_id>/forms/add/", views.add_form_choose, name="add_form_choose"),
     path("cases/<int:case_id>/forms/<int:form_id>/build/", views.form_builder, name="form_builder"),
