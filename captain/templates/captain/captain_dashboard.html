@@ -1,0 +1,441 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+<style>
+  :root{
+    --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932; --brand-600:#7a3232;
+    --gold:#d4af37; --ink:#0f172a; --muted:#667085; --line:#e5e7eb; --bg:#fbf6f6; --card:#ffffff; --cap:#f6f7f9;
+    --ok:#0f5132; --ok-bg:#e8f7ef; --ok-br:#cce7da; --warn:#664d03; --warn-bg:#fff3cd; --warn-br:#ffe69c;
+    --danger:#842029; --danger-bg:#fdeaea; --danger-br:#f5c2c7;
+  }
+  body { background: var(--bg); }
+
+  .page-cap { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+  .page-cap h1 { font-size:1.375rem; font-weight:700; color:var(--brand-800); margin:0; }
+  .page-cap .subtitle { color:var(--muted); font-size:.95rem; }
+
+  .toolbar { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:10px 12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .toolbar .chip { border:1px solid var(--line); background:#fff; padding:6px 10px; border-radius:999px; font-size:.9rem; color:#374151; cursor:pointer; }
+  .toolbar .chip.active { background:var(--brand-700); color:#fff; border-color:var(--brand-700); }
+  .toolbar .spacer { flex:1; }
+
+  .cardx { background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,.03); }
+  .cardx .cap { padding:12px 14px; border-bottom:1px solid var(--line); background:var(--cap); border-top-left-radius:16px; border-top-right-radius:16px; }
+  .cardx .cap h2 { font-size:1rem; font-weight:700; color:#0f172a; margin:0; }
+  .cardx .body { padding:14px; }
+
+  .stat-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:14px; }
+  @media (max-width:1200px){ .stat-grid{ grid-template-columns:repeat(3,1fr);} }
+  @media (max-width:768px){ .stat-grid{ grid-template-columns:repeat(2,1fr);} }
+
+  .stat { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; display:flex; gap:10px; align-items:center; }
+  .stat .icon { width:40px; height:40px; border-radius:10px; background:#f3eaeb; display:grid; place-items:center; color:var(--brand-700); font-weight:700; }
+  .stat .meta { line-height:1.1; }
+  .stat .meta .label { color:var(--muted); font-size:.85rem; }
+  .stat .meta .value { font-size:1.35rem; font-weight:800; color:#0f172a; }
+  .trend { font-size:.8rem; }
+  .trend.ok { color:var(--ok); }
+  .trend.warn { color:#9a6700; }
+  .trend.danger { color:var(--danger); }
+
+  .table { width:100%; border-collapse:separate; border-spacing:0; }
+  .table th, .table td { padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  .table th { color:#0f172a; font-weight:700; font-size:.9rem; background:#fafafa; }
+  .table tr:last-child td { border-bottom:none; }
+
+  .pill { padding:4px 8px; border-radius:999px; font-size:.78rem; font-weight:600; border:1px solid var(--line); color:#374151; background:#fff; }
+  .pill.ok { color:var(--ok); background:var(--ok-bg); border-color:var(--ok-br); }
+  .pill.warn { color:#9a6700; background:var(--warn-bg); border-color:var(--warn-br); }
+  .pill.danger { color:var(--danger); background:var(--danger-bg); border-color:var(--danger-br); }
+  .pill.brand { color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
+
+  .link { text-decoration:none; color:var(--brand-700); font-weight:600; }
+  .link:hover { color:var(--brand-900); text-decoration:underline; }
+
+  .right-stacks { display:grid; gap:14px; }
+  .empty { border:1px dashed var(--line); border-radius:12px; padding:16px; color:var(--muted); text-align:center; }
+  .kbadge { background:var(--brand-700); color:#fff; padding:2px 8px; font-size:.72rem; border-radius:6px; font-weight:700; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2" style="margin-top: 40px;">
+
+  <div class="page-cap">
+    <div>
+      <h1>Barangay Captain Dashboard</h1>
+      <div class="subtitle">Wednesday, October 29, 2025</div>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <a class="btn btn-outline-secondary" href="#">Reports</a>
+      <a class="btn btn-outline-secondary" href="#">Schedules</a>
+      <a class="btn btn-primary" style="background:var(--brand-700); border-color:var(--brand-700);" href="#">New Announcement</a>
+    </div>
+  </div>
+
+  <div class="toolbar mb-3">
+    <span class="chip active">All</span>
+    <span class="chip">Lupon Cases</span>
+    <span class="chip">Document Requests</span>
+    <span class="chip">Business Renewals</span>
+    <span class="chip">Health</span>
+    <div class="spacer"></div>
+    <form class="d-flex" role="search">
+      <input class="form-control form-control-sm" type="search" placeholder="Search case / request / business…" value="">
+    </form>
+  </div>
+
+  <div class="stat-grid mb-3">
+    <div class="stat">
+      <div class="icon">KP</div>
+      <div class="meta">
+        <div class="label">Open Lupon Cases</div>
+        <div class="value">12</div>
+        <div class="trend warn">+3 vs last week</div>
+      </div>
+    </div>
+
+    <div class="stat">
+      <div class="icon">HR</div>
+      <div class="meta">
+        <div class="label">Hearings Today</div>
+        <div class="value">4</div>
+        <div class="trend ok">1 completed</div>
+      </div>
+    </div>
+
+    <div class="stat">
+      <div class="icon">SA</div>
+      <div class="meta">
+        <div class="label">Staff Requests (Pending)</div>
+        <div class="value">2</div>
+        <div class="trend warn">1 near SLA</div>
+      </div>
+    </div>
+
+    <div class="stat">
+      <div class="icon">DR</div>
+      <div class="meta">
+        <div class="label">Doc Requests (For Captain)</div>
+        <div class="value">5</div>
+        <div class="trend">2 approved today</div>
+      </div>
+    </div>
+
+    <div class="stat">
+      <div class="icon">BR</div>
+      <div class="meta">
+        <div class="label">Business Renewals</div>
+        <div class="value">8</div>
+        <div class="trend">2 overdue</div>
+      </div>
+    </div>
+
+    <div class="stat">
+      <div class="icon">HC</div>
+      <div class="meta">
+        <div class="label">Health Alerts</div>
+        <div class="value">1</div>
+        <div class="trend danger">1 critical</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-xl-7">
+      <div class="cardx mb-3">
+        <div class="cap">
+          <h2>Today's Hearing Agenda</h2>
+        </div>
+        <div class="body">
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th style="width:12%">Time</th>
+                  <th>Case No.</th>
+                  <th>Parties</th>
+                  <th style="width:20%">Stage</th>
+                  <th style="width:12%">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>09:00 AM</td>
+                  <td><a class="link" href="#">BC-2025-0012</a></td>
+                  <td>Juan Dela Cruz <span style="color:#9ca3af;">vs</span> Pedro Santos</td>
+                  <td><span class="pill brand">KP Mediation</span></td>
+                  <td>
+                    <div class="d-grid gap-1">
+                      <a class="btn btn-sm btn-outline-secondary" href="#">Open</a>
+                      <a class="btn btn-sm btn-outline-primary" style="border-color:var(--brand-700); color:var(--brand-700);" href="#">Attendance</a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>10:30 AM</td>
+                  <td><a class="link" href="#">BC-2025-0013</a></td>
+                  <td>Maria Lopez <span style="color:#9ca3af;">vs</span> ABC Sari-Sari</td>
+                  <td><span class="pill warn">Pangkat (1st)</span></td>
+                  <td>
+                    <div class="d-grid gap-1">
+                      <a class="btn btn-sm btn-outline-secondary" href="#">Open</a>
+                      <a class="btn btn-sm btn-outline-primary" style="border-color:var(--brand-700); color:var(--brand-700);" href="#">Attendance</a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>01:30 PM</td>
+                  <td><a class="link" href="#">BC-2025-0010</a></td>
+                  <td>XYZ Tricycle Assoc. <span style="color:#9ca3af;">vs</span> John Reyes</td>
+                  <td><span class="pill warn">Pangkat (2nd)</span></td>
+                  <td>
+                    <div class="d-grid gap-1">
+                      <a class="btn btn-sm btn-outline-secondary" href="#">Open</a>
+                      <a class="btn btn-sm btn-outline-primary" style="border-color:var(--brand-700); color:var(--brand-700);" href="#">Attendance</a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>03:00 PM</td>
+                  <td><a class="link" href="#">BC-2025-0007</a></td>
+                  <td>Brgy. Treasurer <span style="color:#9ca3af;">vs</span> JJ Hardware</td>
+                  <td><span class="pill danger">Arbitration</span></td>
+                  <td>
+                    <div class="d-grid gap-1">
+                      <a class="btn btn-sm btn-outline-secondary" href="#">Open</a>
+                      <a class="btn btn-sm btn-outline-primary" style="border-color:var(--brand-700); color:var(--brand-700);" href="#">Attendance</a>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="cardx">
+        <div class="cap">
+          <h2>Recent KP Activity</h2>
+        </div>
+        <div class="body">
+          <div class="table-responsive">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th style="width:14%">When</th>
+                  <th>Case</th>
+                  <th>Update</th>
+                  <th style="width:18%">Form</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Today 08:05</td>
+                  <td><a class="link" href="#">BC-2025-0012</a></td>
+                  <td>Attendance saved for mediation</td>
+                  <td><span class="kbadge">KP-8</span> <a class="link" href="#">view</a></td>
+                </tr>
+                <tr>
+                  <td>Yesterday 16:22</td>
+                  <td><a class="link" href="#">BC-2025-0010</a></td>
+                  <td>Summons served to respondent</td>
+                  <td><span class="kbadge">KP-9</span> <a class="link" href="#">view</a></td>
+                </tr>
+                <tr>
+                  <td>Oct 27, 10:11</td>
+                  <td><a class="link" href="#">BC-2025-0007</a></td>
+                  <td>Arbitration award prepared</td>
+                  <td><span class="kbadge">KP-15</span> <a class="link" href="#">view</a></td>
+                </tr>
+                <tr>
+                  <td>Oct 26, 14:40</td>
+                  <td><a class="link" href="#">BC-2025-0003</a></td>
+                  <td>Amicable settlement achieved</td>
+                  <td><span class="kbadge">KP-16</span> <a class="link" href="#">view</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="col-12 col-xl-5">
+      <div class="right-stacks">
+
+        <div class="cardx">
+          <div class="cap d-flex justify-content-between align-items-center">
+            <h2>Items Requiring Your Approval</h2>
+            <a class="link" href="#">View all</a>
+          </div>
+          <div class="body">
+            <div class="mb-3">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <strong>Staff Account Requests</strong>
+                <span class="pill warn">2 pending</span>
+              </div>
+              <div class="table-responsive">
+                <table class="table">
+                  <thead><tr><th>Applicant</th><th>Role</th><th style="width:30%">Action</th></tr></thead>
+                  <tbody>
+                    <tr>
+                      <td>Ana Morales</td>
+                      <td>Barangay Clerk</td>
+                      <td class="text-end">
+                        <a class="btn btn-sm btn-outline-success" href="#">Approve</a>
+                        <a class="btn btn-sm btn-outline-danger" href="#">Reject</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Rico Tan</td>
+                      <td>Lupon Member</td>
+                      <td class="text-end">
+                        <a class="btn btn-sm btn-outline-success" href="#">Approve</a>
+                        <a class="btn btn-sm btn-outline-danger" href="#">Reject</a>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <strong>Document Requests</strong>
+                <span class="pill">5 pending</span>
+              </div>
+              <div class="table-responsive">
+                <table class="table">
+                  <thead><tr><th>Request Code</th><th>Type</th><th style="width:30%">Action</th></tr></thead>
+                  <tbody>
+                    <tr>
+                      <td><a class="link" href="#">REQ-20251025-000200</a></td>
+                      <td>Barangay Clearance</td>
+                      <td class="text-end">
+                        <a class="btn btn-sm btn-outline-success" href="#">Approve</a>
+                        <a class="btn btn-sm btn-outline-danger" href="#">Reject</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><a class="link" href="#">REQ-20251026-000211</a></td>
+                      <td>Certificate of Residency</td>
+                      <td class="text-end">
+                        <a class="btn btn-sm btn-outline-success" href="#">Approve</a>
+                        <a class="btn btn-sm btn-outline-danger" href="#">Reject</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><a class="link" href="#">REQ-20251026-000215</a></td>
+                      <td>Business Clearance</td>
+                      <td class="text-end">
+                        <a class="btn btn-sm btn-outline-success" href="#">Approve</a>
+                        <a class="btn btn-sm btn-outline-danger" href="#">Reject</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><a class="link" href="#">REQ-20251027-000230</a></td>
+                      <td>Indigency Certificate</td>
+                      <td class="text-end">
+                        <a class="btn btn-sm btn-outline-success" href="#">Approve</a>
+                        <a class="btn btn-sm btn-outline-danger" href="#">Reject</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><a class="link" href="#">REQ-20251027-000233</a></td>
+                      <td>Barangay ID</td>
+                      <td class="text-end">
+                        <a class="btn btn-sm btn-outline-success" href="#">Approve</a>
+                        <a class="btn btn-sm btn-outline-danger" href="#">Reject</a>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <strong>Business Renewals</strong>
+                <span class="pill danger">8 pending, 2 overdue</span>
+              </div>
+              <div class="table-responsive">
+                <table class="table">
+                  <thead><tr><th>Business</th><th>Period</th><th style="width:30%">Action</th></tr></thead>
+                  <tbody>
+                    <tr>
+                      <td><a class="link" href="#">JJ Hardware</a></td>
+                      <td>2025 Annual</td>
+                      <td class="text-end">
+                        <a class="btn btn-sm btn-outline-primary" style="border-color:var(--brand-700); color:var(--brand-700);" href="#">Review</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><a class="link" href="#">ABC Sari-Sari</a></td>
+                      <td>2025 Q4</td>
+                      <td class="text-end">
+                        <a class="btn btn-sm btn-outline-primary" style="border-color:var(--brand-700); color:var(--brand-700);" href="#">Review</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><a class="link" href="#">Mauco Eatery</a></td>
+                      <td>2025 Q4</td>
+                      <td class="text-end">
+                        <a class="btn btn-sm btn-outline-primary" style="border-color:var(--brand-700); color:var(--brand-700);" href="#">Review</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><a class="link" href="#">Kanipaan Traders</a></td>
+                      <td>2025 Annual</td>
+                      <td class="text-end">
+                        <a class="btn btn-sm btn-outline-primary" style="border-color:var(--brand-700); color:var(--brand-700);" href="#">Review</a>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="cardx">
+          <div class="cap d-flex justify-content-between align-items-center">
+            <h2>Announcements</h2>
+            <a class="link" href="#">Manage</a>
+          </div>
+          <div class="body">
+            <ul class="list-unstyled mb-0" style="display:grid; gap:8px;">
+              <li style="border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:#fff;">
+                <div class="d-flex justify-content-between">
+                  <strong>Road Repair on Purok Kanipaan</strong>
+                  <span class="text-muted" style="font-size:.85rem;">Oct 29, 2025</span>
+                </div>
+                <div style="color:#374151; margin-top:4px;">Expect one-lane traffic from 8AM–5PM.</div>
+              </li>
+              <li style="border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:#fff;">
+                <div class="d-flex justify-content-between">
+                  <strong>Health Mission: Free Check-up</strong>
+                  <span class="text-muted" style="font-size:.85rem;">Oct 28, 2025</span>
+                </div>
+                <div style="color:#374151; margin-top:4px;">Visit Barangay Hall on Friday, 9AM–3PM.</div>
+              </li>
+              <li style="border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:#fff;">
+                <div class="d-flex justify-content-between">
+                  <strong>Solid Waste Schedule Update</strong>
+                  <span class="text-muted" style="font-size:.85rem;">Oct 27, 2025</span>
+                </div>
+                <div style="color:#374151; margin-top:4px;">Collection moved to Tuesdays and Fridays.</div>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
