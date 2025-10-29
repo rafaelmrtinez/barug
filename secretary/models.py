@@ -5,7 +5,7 @@ from django.db import connection, models
 logger = logging.getLogger(__name__)
 
 try:
-    from psycopg2.extras import Json as PGJson  # JSONB adapter (psycopg2)
+    from psycopg2.extras import Json as PGJson 
     _HAS_PGJSON = True
 except Exception:
     _HAS_PGJSON = False
@@ -53,6 +53,36 @@ class Secretary(models.Model):
             raise e
 
 
+    @staticmethod
+    def filter_staff_by_sched_day_and_account(p_day, p_acc_status_id):
+        try:
+            with connection.cursor() as cursor:
+                cursor.callproc(
+                    'filter_staff_by_sched_day_and_account',
+                    [p_day, p_acc_status_id]
+                )
+                cols = [col[0] for col in cursor.description]
+                rows = cursor.fetchall()
+                return [dict(zip(cols, row)) for row in rows]
+        except Exception as e:
+            raise e
+        
+    
+    @staticmethod
+    def filter_staff_by_purok_and_account(p_purok_sitio_id, p_acc_status_id):
+        try:
+            with connection.cursor() as cursor:
+                cursor.callproc(
+                    'filter_staff_by_purok_and_account',
+                    [p_purok_sitio_id, p_acc_status_id]
+                )
+                cols = [col[0] for col in cursor.description]
+                rows = cursor.fetchall()
+                return [dict(zip(cols, row)) for row in rows]
+        except Exception as e:
+            raise e
+
+
     @staticmethod 
     def get_resident_details(person_id): 
         try: 
@@ -91,9 +121,9 @@ class Secretary(models.Model):
         p_requested_by_id,
         p_person_id=None,
         p_role_id=None,
-        p_supporting_docs=None,   # list[str] -> PG TEXT[]
-        p_lupon_sched=None,       # list[dict] or None (JSONB)
-        p_bhw_purok_ids=None,     # list[int] or None (INT[])
+        p_supporting_docs=None,
+        p_lupon_sched=None,
+        p_bhw_purok_ids=None,
     ):
 
         # Precompute for exception log safety
@@ -114,7 +144,6 @@ class Secretary(models.Model):
                 )
 
                 if _HAS_PGJSON:
-                    # Use JSONB adapter; Python list[int] maps to int[] automatically
                     cursor.execute(
                         """
                         SELECT out_staff_acc_req_id, out_person_id
@@ -124,13 +153,12 @@ class Secretary(models.Model):
                             p_requested_by_id,
                             p_person_id,
                             p_role_id,
-                            docs_payload,  # TEXT[]
+                            docs_payload,
                             PGJson(sched_payload) if sched_payload is not None else None,  # JSONB
-                            purok_payload,  # int[]
+                            purok_payload, 
                         ],
                     )
                 else:
-                    # Fallback: cast JSON text explicitly
                     cursor.execute(
                         """
                         SELECT out_staff_acc_req_id, out_person_id
@@ -173,11 +201,9 @@ class Secretary(models.Model):
         p_requested_by_id,
         p_person_id=None,
         p_role_id=None,
-        p_supporting_docs=None,   # Python list[str] -> PG TEXT[]
-
-        p_lupon_sched=None,       # list[dict] or None (JSONB)
-        p_bhw_purok_ids=None,     # list[int] or None (INT[])
-
+        p_supporting_docs=None, 
+        p_lupon_sched=None,
+        p_bhw_purok_ids=None, 
         # used when p_person_id IS NULL
         p_first_name=None,
         p_last_name=None,
@@ -205,13 +231,7 @@ class Secretary(models.Model):
         p_valid_id_type_id=None,
         p_selfie_path=None,
     ):
-        """
-        Calls insert_staff_account_request(...) which now RETURNS TABLE
-        (staff_acc_req_id INT, person_id INT).
 
-        Returns:
-            dict: {"staff_acc_req_id": int, "person_id": int}
-        """
         # For error logs (don’t reference locals defined later)
         _docs_for_log  = p_supporting_docs if p_supporting_docs else None
         _sched_for_log = p_lupon_sched if p_lupon_sched else None
@@ -220,9 +240,9 @@ class Secretary(models.Model):
         try:
             with connection.cursor() as cursor:
                 # Normalize -> send NULLs if empty
-                sched_payload = None if not p_lupon_sched else p_lupon_sched     # JSONB (list[dict])
-                purok_payload = None if not p_bhw_purok_ids else p_bhw_purok_ids # INT[]   (list[int])
-                docs_payload  = None if not p_supporting_docs else p_supporting_docs  # TEXT[] (list[str])
+                sched_payload = None if not p_lupon_sched else p_lupon_sched
+                purok_payload = None if not p_bhw_purok_ids else p_bhw_purok_ids
+                docs_payload  = None if not p_supporting_docs else p_supporting_docs 
 
                 logger.info(
                     "DB ▶ insert_staff_account_request(by=%s, person=%s, role=%s, proof=%s, sched=%s, puroks=%s)",

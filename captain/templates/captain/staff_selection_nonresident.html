@@ -12,8 +12,12 @@
 <div class="container-fluid pt-3 d-flex flex-column flex-grow-1" style="margin-top: 40px;">
 
 
-    <form method="post" class="d-flex flex-column flex-grow-1">
+    <form method="post"
+        action="{% url 'captain:staff_selection_non-resident' %}"
+        class="d-flex flex-column flex-grow-1">
         {% csrf_token %}
+
+        {% include 'partials/messages.html' %}
 
         <h5>Personal Information</h5>
         <div class="row">
@@ -145,11 +149,61 @@
         
         <div class="mt-auto button-container">
             <button class="btn btn-reset">Clear</button>
-            <button type="submit" class="btn btn-submit">Continue</button>
+            <button type="submit" class="btn btn-submit"> Continue </button>
         </div>
 
     </form>
-
-
 </div>
+
+<script>
+(() => {
+  // Find the form (adjust selector if needed)
+  const form = document.querySelector('form[action*="staff_selection_non-resident"]');
+  if (!form) return;
+
+  // Clear button (must NOT be type="submit")
+  const clearBtn = form.querySelector('.btn.btn-reset');
+  if (!clearBtn) return;
+
+  function clearFormFields(f) {
+    f.querySelectorAll('input, select, textarea').forEach(el => {
+      if (el.name === 'csrfmiddlewaretoken') return; // keep CSRF
+
+      // Remove Bootstrap validation classes if any
+      el.classList.remove('is-valid', 'is-invalid');
+
+      const tag  = el.tagName.toLowerCase();
+      const type = (el.type || '').toLowerCase();
+
+      if (tag === 'select') {
+        const emptyOpt = Array.from(el.options).find(o => o.value === '');
+        if (emptyOpt) {
+          el.value = '';
+        } else {
+          el.selectedIndex = 0;
+        }
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      } else if (tag === 'textarea') {
+        el.value = '';
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      } else if (tag === 'input') {
+        if (['radio','checkbox'].includes(type)) {
+          el.checked = false;
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        } else {
+          el.value = '';
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+    });
+  }
+
+  clearBtn.addEventListener('click', (e) => {
+    e.preventDefault();         // do not submit
+    form.reset();               // back to initial defaults
+    clearFormFields(form);      // force to empty & update floating labels
+  });
+})();
+</script>
+
 {% endblock %}

@@ -53,33 +53,6 @@ STAFF_ACCOUNT_STATUS = [
     (1, "Active"), (2, "Inactive"), (3, "Deactivated"), (4, "Pending"),
 ]
 
-class SearchPerson(forms.Form):
-    search = forms.CharField(
-        widget=forms.TextInput(attrs={
-            'id' : 'search',
-            'class' : 'form-control', 
-            'placeholder' : 'Search',
-            'name': 'q'
-    }),
-        label= 'Search by Resident ID or Full Name',
-        required= True,
-    )
-
-class ChooseRole(forms.Form):
-    role = forms.TypedChoiceField(
-        label="Select a Role",
-        choices=[("", "— Select a Role —")] + ROLE_CHOICES,
-        coerce=int, empty_value=None, required=True,
-        widget=forms.Select(attrs={"id": "role", "class": "form-select"})
-    )
-    purok_sitio = forms.TypedChoiceField(
-        label="Assign to Purok/Sitio",
-        choices=[("", "— Select Purok/Sitio —")] + PUROK_CHOICES,
-        coerce=int, empty_value=None, required=False,
-        widget=forms.Select(attrs={"id": "purok_sitio", "class": "form-select"})
-    )
-
-
 class Schedule(forms.Form):
     day = forms.TypedChoiceField(
         label="Select a Day",
@@ -131,6 +104,7 @@ class StaffFilters(forms.Form):
         label='Filter by Role',
         required=False,
     )
+
     account_stat = forms.ChoiceField(
         choices=[("", "— Select Account Status —")] + STAFF_ACCOUNT_STATUS,
         widget=forms.Select(attrs={
@@ -142,6 +116,33 @@ class StaffFilters(forms.Form):
         required=False,
     )
 
+class SearchPerson(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search',
+            'name': 'q'
+    }),
+        label= 'Search by Resident ID or Full Name',
+        required= True,
+    )
+
+class ChooseRole(forms.Form):
+    role = forms.TypedChoiceField(
+        label="Select a Role",
+        choices=[("", "— Select a Role —")] + ROLE_CHOICES,
+        coerce=int, empty_value=None, required=True,
+        widget=forms.Select(attrs={"id": "role", "class": "form-select"})
+    )
+    purok_sitio = forms.TypedChoiceField(
+        label="Assign to Purok/Sitio",
+        choices=[("", "— Select Purok/Sitio —")] + PUROK_CHOICES,
+        coerce=int, empty_value=None, required=False,
+        widget=forms.Select(attrs={"id": "purok_sitio", "class": "form-select"})
+    )
+
+
 class ResidentProfileform(forms.Form):
     res_code = forms.CharField(
         widget=forms.TextInput(attrs={
@@ -150,7 +151,7 @@ class ResidentProfileform(forms.Form):
             'placeholder' : 'Resident ID',
     }),
         label= 'Resident ID',
-        # required= False,
+        required= False,
     )
     username = forms.CharField(
         widget=forms.TextInput(attrs={
@@ -159,14 +160,14 @@ class ResidentProfileform(forms.Form):
             'placeholder' : 'Username',
     }),
         label= 'Username',
-        # required= False,
+        required= False,
     )
     temp_pass = forms.CharField(
         widget=forms.TextInput(attrs={
             'id' : 'temp_pass'
     }),
         label= 'Temporary Password',
-        # required= False,
+        required= False,
     )
     res_status = forms.ChoiceField(
         widget=forms.Select(attrs={
@@ -174,7 +175,7 @@ class ResidentProfileform(forms.Form):
             'class' : 'form-select',
     }),
         label= 'Resident Status',
-        # required= False,
+        required= False,
     )
     reg_method = forms.CharField(
         widget=forms.TextInput(attrs={
@@ -183,7 +184,7 @@ class ResidentProfileform(forms.Form):
             'placeholder' : 'Registration Method',
     }),
         label= 'Registration Method',
-        # required= False,
+        required= False,
     )
     reg_date = forms.DateField(
         widget=forms.DateInput(attrs={
@@ -193,7 +194,7 @@ class ResidentProfileform(forms.Form):
             'placeholder' : 'Registration Date',
     }),
         label= 'Registration Date',
-        # required= False,
+        required= False,
     )
     acc_status = forms.CharField(
         widget=forms.TextInput(attrs={
@@ -202,7 +203,7 @@ class ResidentProfileform(forms.Form):
             'placeholder' : 'Account Status',
     }),
         label= 'Account Status',
-        # required= False,
+        required= False,
     )
     added_by = forms.CharField(
         widget=forms.TextInput(attrs={
@@ -211,7 +212,7 @@ class ResidentProfileform(forms.Form):
             'placeholder' : 'Addedd By'
     }),
         label= 'Added By',
-        # required= False,
+        required= False,
     )
     # PERSONAL INFORMATION
     last_name = forms.CharField(
@@ -240,7 +241,7 @@ class ResidentProfileform(forms.Form):
             'placeholder' : 'Middle Name',
     }),
         label= 'Middle Name',
-        required= True,
+        required= False,
     )
     suffix = forms.CharField(
         widget=forms.TextInput(attrs={
@@ -249,10 +250,10 @@ class ResidentProfileform(forms.Form):
             'placeholder' : 'Suffix',
     }),
         label= 'Suffix',
-        required= True,
+        required= False,
     )
     sex = forms.ChoiceField(
-        choices= [('male', 'Male'), ('female', 'Female')],
+        choices= [(1, 'Male'), (2, 'Female')],
         widget=forms.RadioSelect(attrs={
             'id' : 'sex',
             'class' : 'form-check-input',
@@ -299,7 +300,7 @@ class ResidentProfileform(forms.Form):
             'data-bs-target' : '#address_modal',
     }),
         label= 'Home Address',
-        required= True
+        required= False,
     )
     street = forms.CharField(
         widget=forms.TextInput(attrs={
@@ -324,7 +325,7 @@ class ResidentProfileform(forms.Form):
             'id' : 'barangay',
             'class' : 'form-control',
             'placeholder' : 'Barangay',
-            'readonly' : 'readonly',
+            # 'readonly' : 'readonly',
     }),
         label= 'Barangay',
         required= True,
@@ -334,7 +335,7 @@ class ResidentProfileform(forms.Form):
             'id' : 'city',
             'class' : 'form-control',
             'placeholder' : 'City',
-            'readonly' : 'readonly',
+            # 'readonly' : 'readonly',
     }),
         label= 'City',
         required= True,
@@ -415,6 +416,7 @@ class ResidentProfileform(forms.Form):
         widget=forms.ClearableFileInput(attrs={
             'id' : 'front_id',
             'class' : 'form-control',
+            'accept' : 'image/*',
     }),
         label= 'Front of the ID',
         required= True, 
@@ -423,6 +425,7 @@ class ResidentProfileform(forms.Form):
         widget=forms.ClearableFileInput(attrs={
             'id' : 'back_id',
             'class' : 'form-control',
+            'accept' : 'image/*',
     }),
         label= 'Back of the ID',
         required= True, 
@@ -431,6 +434,7 @@ class ResidentProfileform(forms.Form):
         widget=forms.ClearableFileInput(attrs={
             'id' : 'res_img',
             'class' : 'form-control',
+            'accept' : 'image/*',
     }),
         label= 'Selfie Holding the Valid ID',
         required= True,
@@ -439,6 +443,7 @@ class ResidentProfileform(forms.Form):
         widget=forms.ClearableFileInput(attrs={
             'id' : 'proof',
             'class' : 'form-control',
+            'accept' : 'image/*',
     }),
         label= 'Proof of Employment',
         required= True,

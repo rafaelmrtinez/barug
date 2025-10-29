@@ -7,7 +7,7 @@ os.environ.setdefault("HTTPX_DISABLE_HTTP2", "1")
 
 import io
 import logging
-from uuid import uuid4  # (kept only if you actually use later; safe to remove otherwise)
+from uuid import uuid4
 from datetime import datetime, time as dtime, date
 from typing import Any, Dict, List, Optional
 
@@ -128,11 +128,6 @@ def _same_file(a, b) -> bool:
 from io import BytesIO
 
 def _pil_autorotate_and_jpeg(file_obj, *, max_w=2200, max_h=2200, quality=85) -> BytesIO:
-    """
-    Load an uploaded image, auto-rotate using EXIF, bound to max size, and re-encode as JPEG.
-    Returns a BytesIO ready for upload_to_storage.
-    If Pillow is missing or anything fails, falls back to the original stream.
-    """
     try:
         from PIL import Image, ImageOps
         file_obj.seek(0)
@@ -154,11 +149,7 @@ def _pil_autorotate_and_jpeg(file_obj, *, max_w=2200, max_h=2200, quality=85) ->
 
 # utils
 def _prep_image_for_upload(file_obj, *, max_w=2200, max_h=2200, default_bg="white"):
-    """
-    Returns: (buf, mime, ext)
-      - If the image has transparency -> keep PNG  (image/png, .png)
-      - Else -> JPEG with autorotate + bounding   (image/jpeg, .jpg)
-    """
+
     try:
         from PIL import Image, ImageOps
         file_obj.seek(0)
@@ -349,9 +340,6 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
             flash_warning(request, "Please attach a proof of employment.")
             return redirect(request.META.get("HTTP_REFERER") or request.path)
 
-        # ===========================
-        # Upload PROOF to bucket (if any)
-        # ===========================
         BUCKET_FOR_PROOF = BUCKET_STAFF_PROOF
 
         try:
@@ -416,9 +404,6 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
             else:
                 uploaded_proof_url = proof_url
 
-        # ===========================
-        # Create staff request in DB
-        # ===========================
         try:
             result = Secretary.insert_res_staff_account_request(
                 p_requested_by_id=staff_id,
@@ -518,10 +503,7 @@ import re
 from datetime import datetime as _dt
 
 def _key_from_personal(personal: dict) -> str:
-    """
-    temp + L-initial + F-initial + M-initial + mmddyyyy + last 8 digits of mobile
-    e.g., 'nonres-lfm09212003XXXXXXXX-staff-app'
-    """
+
     last  = (personal.get("last_name")   or "").strip()
     first = (personal.get("first_name")  or "").strip()
     mid   = (personal.get("middle_name") or "").strip()
@@ -607,9 +589,7 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
 @nocache
 @require_http_methods(["GET", "POST"])
 def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
-    """
-    PREVIEW-ONLY (no bucket writes here)
-    """
+
     form = ResidentProfileform(request.POST or None, request.FILES or None)
     for f in ("last_name","first_name","middle_name","suffix","sex","dob",
               "civil_status","nationality","religion","email","mob_num",
@@ -760,10 +740,7 @@ def _upload_to_storage_retry(
 @nocache
 @require_http_methods(["GET", "POST"])
 def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
-    """
-    GET: render previews from session (data URLs).
-    POST: upload base64 images to buckets, then insert DB record.
-    """
+
     role_form = ChooseRole(request.POST or None)
     sched_form = Schedule(request.POST or None)
 
@@ -971,8 +948,6 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
         logger.exception("DB ✗ insert_nonres_staff_account_request failed")
         pgcode, primary = _pg_err_tuple(e)
 
-        # --- Your specific override(s) go here ---
-        # Example 1: match by custom pgcode
         if pgcode == "P5007":
             from django.contrib import messages
             messages.warning(
@@ -980,12 +955,6 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
                 "This person is already registered. Redirected you to the staff account request for this person."
             )
             return _smart_redirect(request, "secretary:staff_selection_resident")
-
-        # Example 2: match by message content
-        # if primary and "duplicate day" in primary.lower():
-        #     from django.contrib import messages
-        #     messages.error(request, "Only one schedule per day is allowed for this Lupon member.")
-        #     return redirect(request.path)
 
         flash_db_error(request, e)
         return redirect(request.path)
@@ -1018,15 +987,12 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
 @nocache
 def staff_list(request):
 
-    # Pull rows from stored function
     try:
         rows = Secretary.get_all_staff_info_summary() or []
-        # rows: [{staff_id, staff_code, full_name, role_name, residential_status}, ...]
     except Exception as e:
         logger.exception("Failed to load staff summaries: %s", e)
         rows = []
 
-    # Pagination only
     from django.core.paginator import Paginator
     try:
         per_page = int(request.GET.get("per_page") or 10)
@@ -1071,11 +1037,10 @@ def staff_search_api(request):
     q = (request.GET.get("q") or "").strip()
     try:
         if q:
-            # returns: full_name, role_name, residential_status (no staff_id unless you added it)
             results = Secretary.search_staff_by_name(q)[:50]
         else:
-            # returns: staff_id, staff_code, full_name, role_name, residential_status
-            results = Secretary.get_all_staff_info_summary()  # you can [:200] cap if needed
+           
+            results = Secretary.get_all_staff_info_summary()
         return JsonResponse({"results": results})
     except Exception as e:
         logger.exception("staff_search_api error: %s", e)
@@ -1108,7 +1073,7 @@ def staff_filter_api(request):
 @session_login_required
 @role_required(SECRETARY_ROLE)
 @nocache
-@require_http_methods(["GET"])
+# @require_http_methods(["GET"])
 def staff_dets(request, staff_code: str):
     try:
         rows = Secretary.get_staff_profile_display(staff_code) if staff_code else []
@@ -1137,6 +1102,6 @@ def staff_dets(request, staff_code: str):
         "profile": p,
         "doc_slides": doc_slides,
     }
-    return render(request, "person/staff_dets.html", ctx)
+    return render(request, "staff/staff_dets.html", ctx)
 
  

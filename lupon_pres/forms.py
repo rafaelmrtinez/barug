@@ -1,29 +1,93 @@
 from django import forms
 
+
+ROLE_CHOICES = [
+    (3,  "Barangay Captain"), (4,  "Barangay Secretary"),(5,  "Barangay Treasurer"), 
+    (6,  "Barangay Clerk"), (7,  "Barangay Lupon President"), (8,  "Barangay Lupon Member"), 
+    (9,  "Barangay Health Worker"), (10, "Nurse"), (11, "Midwife"),
+]
+
+# PUROK_CHOICES = [
+#     (1, "Kanipaan"), (2, "Pampango"), (3, "Lutaw-Lutaw"), (4, "Mauco"),
+# ]
+
+DAY_CHOICES = [
+    (1, "Monday"), (2, "Tuesday"), (3, "Wednesday"), (4, "Thursday"),
+    (5, "Friday"), (6, "Saturday"), (7, "Sunday"),
+]
+
+CIVIL_STATUS_CHOICES = [
+    (1, "Single"), (2, "Married"), (3, "Widowed"),
+    (4, "Separated"), (5, "Divorced"),
+]
+
+NATIONALITY_CHOICES = [
+    (1, "American"), (2, "Australian"), (3, "Brazilian"), (4, "British"),
+    (5, "Canadian"), (6, "Chinese"), (7, "Filipino"), (8, "French"),
+    (9, "German"), (10, "Indian"), (11, "Indonesian"), (12, "Italian"),
+    (13, "Japanese"), (14, "Korean"), (15, "Malaysian"), (16, "Russian"),
+    (17, "Saudi"), (18, "Spanish"), (19, "Thai"), (20, "Vietnamese"),
+    (21, "Others"),
+]
+
+RELIGION_CHOICES = [
+    (1, "Agnostic"), (2, "Born Again"), (3, "Buddhist"), (4, "Christian"),
+    (5, "Evangelical"), (6, "Hindu"), (7, "Iglesia ni Cristo"), (8, "Islam"),
+    (9, "Jehovah's Witness"), (10, "Orthodox"), (11, "Protestant"),
+    (12, "Roman Catholic"), (13, "Seventh-day Adventist"), (14, "Others"),
+]
+
+VALID_ID_TYPE_CHOICES = [
+    # (1,  "Philippine Passport"),
+    (2,  "Philippine National ID"), 
+    # (3,  "SSS/UMID Card"), 
+    # (4,  "GSIS eCard"), (5,  "PRC ID"), 
+    # (6,  "Driver's License"), 
+    # (7,  "PhilHealth ID"), (8,  "Voter's ID"),
+    # (9,  "Postal ID"), 
+    # (10, "Senior Citizen ID"), (11, "PWD ID"), (12, "OWWA ID"), (13, "IBP ID"),
+    # (14, "TIN ID"), (15, "School ID"), 
+    (16, "ePhil ID"),
+]
+
+STAFF_ACCOUNT_STATUS = [
+    (1, "Active"), (2, "Inactive"), (3, "Deactivated"), #(4, "Pending"),
+]
+
 class UpdateInfo(forms.Form):
     role = forms.ChoiceField(
         choices=[],
         widget=forms.Select(attrs={
-            "id": "role",
+            "id": "role_filter",
             "class": "form-select",
-            "disabled": "disabled",        # make read-only (for <select>)
-            "aria-disabled": "true",
-            "tabindex": "-1",
+            "name": "role",
         }),
-        label="Select a Role",
-        required=True,
+        label="Filter by Role",
+        required=False,
     )
-    day = forms.ChoiceField(
-        choices=[],
-        widget=forms.Select(attrs={
-            "id": "day",
-            "class": "form-select",
-            "disabled": "disabled",        # make read-only (for <select>)
-            "aria-disabled": "true",
-            "tabindex": "-1",
-        }),
+    # hidden twin so the value is submitted even when the select is disabled
+    role_locked = forms.CharField(widget=forms.HiddenInput(), required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["role"].choices = ROLE_CHOICES
+        self.fields["role"].initial = "8"          # ← the value you want
+        self.fields["role"].disabled = True        # ← disable the dropdown
+        self.fields["role"].widget.attrs["disabled"] = "disabled"  # (adds HTML attr)
+        self.fields["role_locked"].initial = self.fields["role"].initial
+
+    def clean(self):
+        cd = super().clean()
+        # ensure cleaned_data['role'] is set even if the field is disabled
+        if self.fields["role"].disabled:
+            cd["role"] = self.fields["role"].initial or cd.get("role_locked")
+        return cd
+    
+    day = forms.TypedChoiceField(
         label="Select a Day",
-        required=True,
+        choices=[("", "— Select a Day —")] + DAY_CHOICES,
+        coerce=int, empty_value=None, required=True,
+        widget=forms.Select(attrs={"id": "day", "class": "form-select"})
     )
     time_start = forms.TimeField(
         widget=forms.TimeInput(attrs={
@@ -31,8 +95,8 @@ class UpdateInfo(forms.Form):
             "class": "form-control",
             "type": "time",
             "step": "300",
-            "readonly": "readonly",        # make read-only (for <input>)
-            "tabindex": "-1",
+            # "readonly": "readonly",        # make read-only (for <input>)
+            # "tabindex": "-1",
         }),
         input_formats=["%H:%M", "%H:%M:%S"],
         label="Time-in",
@@ -44,21 +108,21 @@ class UpdateInfo(forms.Form):
             "class": "form-control",
             "type": "time",
             "step": "300",
-            "readonly": "readonly",        # make read-only (for <input>)
-            "tabindex": "-1",
+            # "readonly": "readonly",        # make read-only (for <input>)
+            # "tabindex": "-1",
         }),
         input_formats=["%H:%M", "%H:%M:%S"],
         label="Time-out",
         required=False,
     )
-    status = forms.ChoiceField(
-        choices=[],
+    status = forms.TypedChoiceField(
+        choices=[("", "— Select Status —")] + STAFF_ACCOUNT_STATUS, 
         widget=forms.Select(attrs={
             "id": "status",
             "class": "form-select",
-            "disabled": "disabled",        # make read-only (for <select>)
-            "aria-disabled": "true",
-            "tabindex": "-1",
+            # "disabled": "disabled",        # make read-only (for <select>)
+            # "aria-disabled": "true",
+            # "tabindex": "-1",
         }),
         label="Status",
         required=False,
@@ -75,23 +139,20 @@ class StaffFilters(forms.Form):
         label='Search Staff',
         required= False,
     )
-    day = forms.ChoiceField(
-        choices= [],
-        widget=forms.Select(attrs={
-            'id': 'day',
-            'class': 'form-select',
-        }),
-        label='Day',
-        required=False,
+    day = forms.TypedChoiceField(
+        label="Select a Day",
+        choices=[("", "— Select a Day —")] + DAY_CHOICES,
+        coerce=int, empty_value=None, required=False,
+        widget=forms.Select(attrs={"id": "day", "class": "form-select"})
     )
-    residential_stat = forms.ChoiceField(
-        choices=[],
+    account_stat = forms.ChoiceField(
+        choices=[("", "— Select Account Status —")] + STAFF_ACCOUNT_STATUS,
         widget=forms.Select(attrs={
-            'id': 'residential_stat',
+            'id': 'account_stat',
             'class': 'form-select',
-            'name': 'role',
+            'name': 'account_stat',
         }),
-        label='Residential Status',
+        label='Account Status',
         required=False,
     )
 
@@ -108,14 +169,11 @@ class SearchPerson(forms.Form):
     )
 
 class Schedule(forms.Form):
-    day = forms.ChoiceField(
-        choices = [],
-        widget=forms.Select(attrs={
-            'id' : 'day',
-            'class' : 'form-select',
-    }),
-        label= 'Select a Day',
-        required= True,
+    day = forms.TypedChoiceField(
+        label="Select a Day",
+        choices=[("", "— Select a Day —")] + DAY_CHOICES,
+        coerce=int, empty_value=None, required=True,
+        widget=forms.Select(attrs={"id": "day", "class": "form-select"})
     )
     time_start = forms.TimeField(
         widget=forms.TimeInput(attrs={
@@ -239,7 +297,7 @@ class ResidentProfileform(forms.Form):
             'placeholder' : 'Middle Name',
     }),
         label= 'Middle Name',
-        required= True,
+        required= False,
     )
     suffix = forms.CharField(
         widget=forms.TextInput(attrs={
@@ -248,10 +306,10 @@ class ResidentProfileform(forms.Form):
             'placeholder' : 'Suffix',
     }),
         label= 'Suffix',
-        required= True,
+        required= False,
     )
     sex = forms.ChoiceField(
-        choices= [('male', 'Male'), ('female', 'Female')],
+        choices= [('1', 'Male'), ('2', 'Female')],
         widget=forms.RadioSelect(attrs={
             'id' : 'sex',
             'class' : 'form-check-input',
@@ -269,32 +327,20 @@ class ResidentProfileform(forms.Form):
         label= 'Date of Birth',
         required= True,
     )
-    civil_status = forms.ChoiceField(
-        choices= [], 
-        widget=forms.Select(attrs={
-            'id' : 'civil_status',
-            'class' : 'form-select',
-    }),
-        label= 'Civil Status',
-        required= True,
+    civil_status = forms.TypedChoiceField(
+        choices=[("", "— Select civil status —")] + [(str(i), n) for i, n in CIVIL_STATUS_CHOICES],
+        coerce=int, empty_value=None, required=True,
+        widget=forms.Select(attrs={"class": "form-select", "id": "civil_status"})
     )
-    nationality = forms.ChoiceField(
-        choices= [], 
-        widget=forms.Select(attrs={
-            'id' : 'nationality',
-            'class' : 'form-select',
-    }),
-        label= 'Nationality',
-        required= True,
+    nationality = forms.TypedChoiceField(
+        choices=[("", "— Select nationality —")] + [(str(i), n) for i, n in NATIONALITY_CHOICES],
+        coerce=int, empty_value=None, required=True,
+        widget=forms.Select(attrs={"class": "form-select", "id": "nationality"})
     )
-    religion = forms.ChoiceField(
-        choices= [], 
-        widget=forms.Select(attrs={
-            'id' : 'religion',
-            'class' : 'form-select',
-    }),
-        label= 'Religion',
-        required= True,
+    religion = forms.TypedChoiceField(
+        choices=[("", "— Select religion —")] + [(str(i), n) for i, n in RELIGION_CHOICES],
+        coerce=int, empty_value=None, required=True,
+        widget=forms.Select(attrs={"class": "form-select", "id": "religion"})
     )
     home_address = forms.CharField(
         widget=forms.TextInput(attrs={
@@ -306,7 +352,7 @@ class ResidentProfileform(forms.Form):
             'data-bs-target' : '#address_modal',
     }),
         label= 'Home Address',
-        required= True
+        required= False
     )
     street = forms.CharField(
         widget=forms.TextInput(attrs={
@@ -331,7 +377,7 @@ class ResidentProfileform(forms.Form):
             'id' : 'barangay',
             'class' : 'form-control',
             'placeholder' : 'Barangay',
-            'readonly' : 'readonly',
+            # 'readonly' : 'readonly',
     }),
         label= 'Barangay',
         required= True,
@@ -341,7 +387,7 @@ class ResidentProfileform(forms.Form):
             'id' : 'city',
             'class' : 'form-control',
             'placeholder' : 'City',
-            'readonly' : 'readonly',
+            # 'readonly' : 'readonly',
     }),
         label= 'City',
         required= True,
@@ -410,14 +456,13 @@ class ResidentProfileform(forms.Form):
     #     required= True,
     # )
     # SUPPORTING DOCUMENTS
-    type_of_id = forms.ChoiceField(
-        choices= [], 
-        widget=forms.Select(attrs={
-            'id' : 'type_of_id',
-            'class' : 'form-select',
-    }),
-        label= 'ID Type',
-        required= True,
+    type_of_id = forms.TypedChoiceField(
+        label="Type of ID",
+        choices=[("", "— Select ID Type —")] + [(str(i), n) for i, n in VALID_ID_TYPE_CHOICES],
+        coerce=int,
+        empty_value=None,
+        required=True,
+        widget=forms.Select(attrs={"class": "form-select", "id": "type_of_id"})
     )
     front_id = forms.ImageField(
         widget=forms.ClearableFileInput(attrs={

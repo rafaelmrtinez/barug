@@ -1,3 +1,4 @@
+# captain/views.py
 from __future__ import annotations
 from django.templatetags.static import static
 
@@ -5,13 +6,12 @@ import os
 os.environ.setdefault("HTTPX_DISABLE_HTTP2", "1")
 
 import io
+import base64
 import logging
-from uuid import uuid4  # (kept only if you actually use later; safe to remove otherwise)
 from datetime import datetime, time as dtime, date
 from typing import Any, Dict, List, Optional
-
 from django.conf import settings
-from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import render, redirect
 from django.views.decorators.http import require_GET, require_http_methods
 
@@ -22,13 +22,20 @@ from common.supabase_client import supabase
 from common.services.storage import upload_to_storage
 
 from captain.models import Captain
-from .forms import (SearchPerson, ResidentProfileform, ChooseRole, StaffFilters, Schedule,)
+from secretary.models import Secretary
+import common.send_email as send_email
+from .forms import ResidentProfileform, ChooseRole, StaffFilters, Schedule
 
 from common.flash import flash_success, flash_warning, flash_db_error, flash_system_error
 from django.db import DatabaseError, OperationalError, IntegrityError
 from common.db_errors import _pg_err_tuple
+
+# Pagination
 from django.core.paginator import Paginator
 
+from django.http import JsonResponse, HttpResponse
+from django.urls import reverse
+from django.shortcuts import redirect
 
 logger = logging.getLogger(__name__)
 
@@ -36,21 +43,16 @@ ROLE_BHW = 9
 ROLE_LUPON = 8
 WZ_KEY = "staff_nonres_wizard"
 
-# Demo identity (kept as-is)
+CAPTAIN_ROLE = "Barangay Captain"
+
+# Demo identity (display only; real values usually come from session)
 user_fullname = "lname, fname mname suffix"
-user_role = "Barangay Captain"
+user_role = CAPTAIN_ROLE
 user_role_template = user_role.lower().replace(" ", "_")
 
 BUCKET_FINAL = getattr(settings, "SUPABASE_ID_UPLOADS_BUCKET", "id-uploads")
 BUCKET_STAFF_PROOF = getattr(settings, "SUPABASE_STAFF_PROOF_BUCKET", "staff-proof")
 
-# ─────────────────────────────
-# Helpers
-# ─────────────────────────────
-
-from django.http import JsonResponse, HttpResponse
-from django.urls import reverse
-from django.shortcuts import redirect
 
 def _smart_redirect(request, url_name, *args, **kwargs):
     url = reverse(url_name, args=args, kwargs=kwargs)
@@ -123,11 +125,7 @@ def _same_file(a, b) -> bool:
 from io import BytesIO
 
 def _pil_autorotate_and_jpeg(file_obj, *, max_w=2200, max_h=2200, quality=85) -> BytesIO:
-    """
-    Load an uploaded image, auto-rotate using EXIF, bound to max size, and re-encode as JPEG.
-    Returns a BytesIO ready for upload_to_storage.
-    If Pillow is missing or anything fails, falls back to the original stream.
-    """
+
     try:
         from PIL import Image, ImageOps
         file_obj.seek(0)
@@ -147,13 +145,7 @@ def _pil_autorotate_and_jpeg(file_obj, *, max_w=2200, max_h=2200, quality=85) ->
             pass
         return file_obj  # fallback
 
-# utils
 def _prep_image_for_upload(file_obj, *, max_w=2200, max_h=2200, default_bg="white"):
-    """
-    Returns: (buf, mime, ext)
-      - If the image has transparency -> keep PNG  (image/png, .png)
-      - Else -> JPEG with autorotate + bounding   (image/jpeg, .jpg)
-    """
     try:
         from PIL import Image, ImageOps
         file_obj.seek(0)
@@ -184,9 +176,6 @@ def _prep_image_for_upload(file_obj, *, max_w=2200, max_h=2200, default_bg="whit
             pass
         return file_obj, getattr(file_obj, "content_type", "application/octet-stream"), "jpg"
 
-# NEW: data-url helpers for preview-only flow (no bucket writes in Step 2)
-import base64
-
 def _bytes_to_data_url(b: bytes, mime: str = "image/jpeg") -> str:
     return f"data:{mime};base64,{base64.b64encode(b).decode('ascii')}"
 
@@ -198,7 +187,6 @@ def _file_to_data_url(fileobj, fallback_mime="image/jpeg") -> str:
         pass
     data = fileobj.read()
     return _bytes_to_data_url(data, mime=mime)
-
 
 import time as _time
 
@@ -243,15 +231,12 @@ def _upload_to_storage_retry(
             break
     raise last_err
 
-# === Non-resident flow helpers ===
+# === Non-resident key helper ===
 import re
 from datetime import datetime as _dt
 
 def _key_from_personal(personal: dict) -> str:
-    """
-    temp + L-initial + F-initial + M-initial + mmddyyyy + last 8 digits of mobile
-    e.g., 'nonres-lfm09212003XXXXXXXX-staff-app'
-    """
+
     last  = (personal.get("last_name")   or "").strip()
     first = (personal.get("first_name")  or "").strip()
     mid   = (personal.get("middle_name") or "").strip()
@@ -280,23 +265,22 @@ def _key_from_personal(personal: dict) -> str:
     return f"{initials}{b_str}{last8}-staff-app"
 
 
-@session_login_required
-@role_required(user_role)
-@nocache
+# @session_login_required
+# @role_required(CAPTAIN_ROLE)
+# @nocache
 @require_GET
-# Create your views here.
-def staff_selection(request):
+def staff_selection(request: HttpRequest) -> HttpResponse:
     return render(request, "staff_selection.html", {
-        'user_fullname': user_fullname,
-        'user_role': user_role,
-        'page_path': f'{user_role} / Account Verification',
-        'page_title': 'Account Verification',
-        'user_role_template': user_role_template,
+        "user_fullname": user_fullname,
+        "user_role": user_role,
+        "page_path": f"{user_role} / Account Verification",
+        "page_title": "Account Verification",
+        "user_role_template": user_role_template,
     })
 
-@session_login_required
-@role_required(user_role)
-@nocache
+# @session_login_required
+# @role_required(CAPTAIN_ROLE)
+# @nocache
 @require_GET
 def resident_suggest(request: HttpRequest) -> JsonResponse:
     q = (request.GET.get("q") or "").strip()
@@ -304,7 +288,7 @@ def resident_suggest(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"results": []})
 
     try:
-        rows = Captain.search_resident(q) or []
+        rows = Secretary.search_resident(q) or []
         out: List[Dict[str, Any]] = []
         for r in rows[:8]:
             full_name = (r.get("person_name") or "").strip()
@@ -323,18 +307,15 @@ def resident_suggest(request: HttpRequest) -> JsonResponse:
                 "subtitle": subtitle,
             })
         return JsonResponse({"results": out})
-    except Exception as e:
-        # For AJAX we still return JSON; logging kept
+    except Exception:
         logger.exception("resident_suggest failed")
         return JsonResponse({"results": [], "error": "Oops! Our system is having an issue for now. Please try again later."}, status=500)
 
-
-@session_login_required
-@role_required(user_role)
-@nocache
+# @session_login_required
+# @role_required(CAPTAIN_ROLE)
+# @nocache
 @require_http_methods(["GET", "POST"])
-def staff_selection_resident(request):
-
+def staff_selection_resident(request: HttpRequest) -> HttpResponse:
     pid = (request.POST.get("pid") or "").strip()
     role_str = (request.POST.get("role") or "").strip()
     role_id = int(role_str) if role_str.isdigit() else None
@@ -343,7 +324,7 @@ def staff_selection_resident(request):
     proof_file = request.FILES.get("proof_file") if hasattr(request, "FILES") else None
 
     auth = request.session.get("auth") or {}
-    staff_id = auth.get("staff_id") or 6
+    staff_id = auth.get("staff_id") or 3
 
     # --- Collect BHW puroks: base + extra rows
     purok_ids: List[int] = []
@@ -428,13 +409,10 @@ def staff_selection_resident(request):
             flash_warning(request, "Please attach a proof of employment.")
             return redirect(request.META.get("HTTP_REFERER") or request.path)
 
-        # ===========================
-        # Upload PROOF to bucket (if any)
-        # ===========================
         BUCKET_FOR_PROOF = BUCKET_STAFF_PROOF
 
         try:
-            rows_for_key = Captain.get_resident_details(int(pid)) or []
+            rows_for_key = Secretary.get_resident_details(int(pid)) or []
             res_for_key = rows_for_key[0] if rows_for_key else {}
         except (DatabaseError, OperationalError, IntegrityError) as e:
             flash_db_error(request, e)
@@ -478,7 +456,6 @@ def staff_selection_resident(request):
                 return redirect(request.META.get("HTTP_REFERER") or request.path)
 
         elif proof_url:
-            import re, base64
             m = re.match(r"^data:(.+?);base64,(.+)$", proof_url)
             if m:
                 _mime_hint, b64 = m.groups()
@@ -495,11 +472,8 @@ def staff_selection_resident(request):
             else:
                 uploaded_proof_url = proof_url
 
-        # ===========================
-        # Create staff request in DB
-        # ===========================
         try:
-            result = Captain.insert_res_staff_account_request(
+            result = Secretary.insert_res_staff_account_request(
                 p_requested_by_id=staff_id,
                 p_person_id=int(pid),
                 p_role_id=role_id,
@@ -507,7 +481,7 @@ def staff_selection_resident(request):
                 p_lupon_sched=(schedules if schedules else None),
                 p_bhw_purok_ids=(purok_ids if purok_ids else None),
             )
-            staff_req_id = result["staff_acc_req_id"]
+            _ = result.get("staff_acc_req_id")
             flash_success(request, "Staff account request created.")
             return redirect(request.META.get("HTTP_REFERER") or request.path)
 
@@ -519,6 +493,7 @@ def staff_selection_resident(request):
             flash_system_error(request, "System ✗ insert_staff_account_request failed.", exc=e)
             return redirect(request.META.get("HTTP_REFERER") or request.path)
 
+    # GET flow and rendering
     residents: List[Dict[str, Any]] = []
     res_details: Optional[Dict[str, Any]] = None
     doc_images: List[Dict[str, str]] = []
@@ -528,9 +503,9 @@ def staff_selection_resident(request):
 
     try:
         if res_search:
-            residents = Captain.search_resident(res_search) or []
+            residents = Secretary.search_resident(res_search) or []
         if res_id:
-            rows = Captain.get_resident_details(int(res_id)) or []
+            rows = Secretary.get_resident_details(int(res_id)) or []
             res_details = rows[0] if rows else None
 
         if res_details:
@@ -574,7 +549,7 @@ def staff_selection_resident(request):
     role_form = ChooseRole()
     sched_form = Schedule()
     proof_form = ResidentProfileform()
-    return render(request, "staff/staff_selection_resident.html", {
+    return render(request, "staff_selection_resident.html", {
         "user_fullname": user_fullname,
         "user_role": user_role,
         "page_path": f"{user_role} / Account Verification",
@@ -590,13 +565,19 @@ def staff_selection_resident(request):
         "placeholder_img": static("images/brgy-sto-nino.png"),
     })
 
-@session_login_required
-@role_required(user_role)
-@nocache
+# @session_login_required
+# @role_required(CAPTAIN_ROLE)
+# @nocache
 @require_http_methods(["GET", "POST"])
 def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
-    form = ResidentProfileform(request.POST or None)
-    for f in ("type_of_id", "front_id", "back_id", "res_img", "proof"):
+    form = ResidentProfileform(request.POST if request.method == "POST" else None)
+
+    # Ensure these fields are NOT required in Step 1 (Captain)
+    for f in (
+        "res_code", "username", "temp_pass", "res_status", "reg_method",
+        "reg_date", "acc_status", "added_by", "home_address",
+        "type_of_id", "front_id", "back_id", "res_img", "proof",
+    ):
         if f in form.fields:
             form.fields[f].required = False
 
@@ -626,33 +607,26 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
             })
             flash_success(request, "Personal information saved successfully.")
             logger.info("Step1 ✓ personal info saved to wizard")
-            return redirect("secretary:staff_selection_non-resident_docs")
+            return redirect("captain:staff_selection_non-resident_docs")
         else:
-            # Keep same logic: show validation message; do not expose internals
             logger.error("Validation ✗ Form errors: %s", form.errors.as_json())
             flash_warning(request, "Please correct the errors below.")
-            # fall-through to re-render with form errors
 
-    return render(request, "staff/staff_selection_nonresident.html", {
-        'user_fullname': user_fullname,
-        'user_role': user_role,
-        'page_path': f'{user_role} / Account Verification',
-        'page_title': 'Account Verification',
-        'user_role_template': user_role_template,
-        'form': form,
-        'redirect': 'secretary:staff_selection_non-resident_docs',
+    return render(request, "staff_selection_nonresident.html", {
+        "user_fullname": user_fullname,
+        "user_role": user_role,
+        "page_path": f"{user_role} / Account Verification",
+        "page_title": "Account Verification",
+        "user_role_template": user_role_template,
+        "form": form,
+        "redirect": "captain:staff_selection_non-resident_docs",
     })
 
-
-
-@session_login_required
-@role_required(user_role)
-@nocache
+# @session_login_required
+# @role_required(CAPTAIN_ROLE)
+# @nocache
 @require_http_methods(["GET", "POST"])
 def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
-    """
-    PREVIEW-ONLY (no bucket writes here)
-    """
     form = ResidentProfileform(request.POST or None, request.FILES or None)
     for f in ("last_name","first_name","middle_name","suffix","sex","dob",
               "civil_status","nationality","religion","email","mob_num",
@@ -667,7 +641,7 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
         if not personal:
             logger.error("Wizard ✗ Missing personal info in session")
             flash_warning(request, "Personal information is missing. Please complete Step 1.")
-            return redirect("secretary:staff_selection_non-resident")
+            return redirect("captain:staff_selection_non-resident")
 
     if request.method == "POST":
         valid_id_type_raw = (request.POST.get("type_of_id") or "").strip()
@@ -743,10 +717,10 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
 
         flash_success(request, "Documents loaded for preview. Please review and choose role.")
         logger.info("Step2 ✓ Preview-only complete (no uploads).")
-        return redirect("secretary:staff_selection_non-resident_role_review")
+        return redirect("captain:staff_selection_non-resident_role_review")
 
     # GET
-    return render(request, "staff/supporting_docs.html", {
+    return render(request, "supporting_docs.html", {
         "user_fullname": user_fullname,
         "user_role": user_role,
         "page_path": f"{user_role} / Account Verification",
@@ -755,41 +729,641 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
         "form": form,
     })
 
-def staff_selection_nonres_role_review(request):
-    role_form = ChooseRole()
-    sched_form = Schedule()
-    return render(request, "role.html", {
-        'user_fullname': user_fullname,
-        'user_role': user_role,
-        'page_path': f'{user_role} / Account Verification',
-        'page_title': 'Account Verification',
-        'user_role_template': user_role_template,
-        'role_form': role_form,
-        'sched_form': sched_form,
-    })
+# @session_login_required
+# @role_required(CAPTAIN_ROLE)
+# @nocache
+@require_http_methods(["GET", "POST"])
+def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
+    """
+    GET: render previews from session (data URLs).
+    POST: upload base64 images to buckets, then insert DB record.
+    """
+    role_form = ChooseRole(request.POST or None)
+    sched_form = Schedule(request.POST or None)
 
-def staff_list(request):
+    wiz = _wiz_get(request)
+    personal = wiz.get("personal") or {}
+    docs = wiz.get("docs") or {}
+
+    if request.method == "GET":
+        if not personal:
+            logger.error("Wizard ✗ Missing personal info in session")
+            flash_warning(request, "Personal information is missing. Please complete Step 1.")
+            return redirect("captain:staff_selection_non-resident")
+        if not docs:
+            logger.error("Wizard ✗ Missing docs info in session")
+            flash_warning(request, "Supporting documents are missing. Please complete Step 2.")
+            return redirect("captain:staff_selection_non-resident_docs")
+
+        return render(
+            request,
+            "role.html",
+            {
+                "user_fullname": user_fullname,
+                "user_role": user_role,
+                "page_path": f"{user_role} / Account Verification",
+                "page_title": "Account Verification",
+                "user_role_template": user_role_template,
+                "role_form": role_form,
+                "sched_form": sched_form,
+                "personal": personal,
+                "docs": docs,
+            },
+        )
+
+    role_str = (request.POST.get("role") or "").strip()
+    role_id = int(role_str) if role_str.isdigit() else None
+
+    purok_ids: List[int] = []
+    base_purok = (request.POST.get("purok_sitio") or "").strip()
+    if base_purok.isdigit():
+        purok_ids.append(int(base_purok))
+    for x in request.POST.getlist("purok_sitio_ids[]"):
+        x = (x or "").strip()
+        if x.isdigit():
+            purok_ids.append(int(x))
+
+    schedules: List[Dict[str, Any]] = []
+
+    def _push(d_s, ts_s, te_s):
+        if not d_s or not ts_s or not te_s:
+            return
+        if not str(d_s).isdigit():
+            return
+        d = int(d_s)
+        ts = _parse_hhmm(ts_s)
+        te = _parse_hhmm(te_s)
+        if d < 1 or d > 7 or not ts or not te or not (te > ts):
+            return
+        schedules.append({"day": d, "time_start": ts_s, "time_end": te_s})
+
+    _push(request.POST.get("day"), request.POST.get("time_start"), request.POST.get("time_end"))
+    for d, s, e in zip(
+        request.POST.getlist("day[]"),
+        request.POST.getlist("time_start[]"),
+        request.POST.getlist("time_end[]"),
+    ):
+        _push(d, s, e)
+
+    if not role_id:
+        flash_warning(request, "Please choose a staff role.")
+        return redirect(request.path)
+
+    if role_id == ROLE_BHW:
+        if len(purok_ids) < 1:
+            flash_warning(request, "Barangay Health Worker must be assigned to at least one Purok/Sitio.")
+            return redirect(request.path)
+        if len(purok_ids) != len(set(purok_ids)):
+            flash_warning(request, "Duplicate Purok/Sitio selections are not allowed.")
+            return redirect(request.path)
+
+    if role_id == ROLE_LUPON:
+        if len(schedules) < 1:
+            flash_warning(request, "Lupon Member must have at least one schedule.")
+            return redirect(request.path)
+        _days = [s["day"] for s in schedules]
+        if len(_days) != len(set(_days)):
+            flash_warning(request, "Duplicate day selections in schedule are not allowed.")
+            return redirect(request.path)
+
+    if not personal:
+        flash_warning(request, "Personal information is missing. Please go back to Step 1.")
+        return redirect("captain:staff_selection_non-resident")
+
+    if not docs:
+        flash_warning(request, "Supporting documents are missing. Please complete Step 2.")
+        return redirect("captain:staff_selection_non-resident_docs")
+
+    auth = request.session.get("auth") or {}
+    staff_id = auth.get("staff_id") or 3
+    if not staff_id:
+        logger.error("Validation ✗ Missing staff_id")
+        flash_warning(request, "Your session is missing staff credentials.")
+        return redirect(request.META.get("HTTP_REFERER") or request.path)
+
+    # decode from session (front_b64/back_b64/selfie_b64), upload now
+    front_b64 = docs.get("front_b64")
+    back_b64  = docs.get("back_b64")
+    selfie_b64= docs.get("selfie_b64")
+    proof_b64 = docs.get("proof_b64")
+    valid_id_type_id = docs.get("valid_id_type_id")
+
+    if not (front_b64 and back_b64 and selfie_b64):
+        logger.error("Step3 ✗ Missing base64 docs: %s", list(docs.keys()))
+        flash_warning(request, "Supporting documents are incomplete. Please re-upload.")
+        return redirect("captain:staff_selection_non-resident_docs")
+
+    final_base = f"person/{_key_from_personal(personal)}"
+    proof_final_base = f"staff_acc_req_proof/{_key_from_personal(personal)}"
+
+    try:
+        b_front  = base64.b64decode(front_b64)
+        b_back   = base64.b64decode(back_b64)
+        b_selfie = base64.b64decode(selfie_b64)
+        b_proof  = base64.b64decode(proof_b64) if proof_b64 else None
+    except Exception as e:
+        logger.error("Step3 ✗ Base64 decode failed: %s", e)
+        flash_system_error(request, "Images could not be decoded from session.", exc=e)
+        return redirect("captain:staff_selection_non-resident_docs")
+
+    try:
+        f_buf, f_mime, f_ext = _prep_image_for_upload(io.BytesIO(b_front))
+        b_buf, b_mime, b_ext = _prep_image_for_upload(io.BytesIO(b_back))
+        s_buf, s_mime, s_ext = _prep_image_for_upload(io.BytesIO(b_selfie))
+
+        up_front = _upload_to_storage_retry(
+            f_buf,
+            path=f"{final_base}/front.{f_ext}",
+            bucket=BUCKET_FINAL,
+            content_type=f_mime,
+            make_public=True,
+        )
+        up_back = _upload_to_storage_retry(
+            b_buf,
+            path=f"{final_base}/back.{b_ext}",
+            bucket=BUCKET_FINAL,
+            content_type=b_mime,
+            make_public=True,
+        )
+        up_selfie = _upload_to_storage_retry(
+            s_buf,
+            path=f"{final_base}/selfie.{s_ext}",
+            bucket=BUCKET_FINAL,
+            content_type=s_mime,
+            make_public=True,
+        )
+
+        up_proof = None
+        if b_proof is not None:
+            p_buf, p_mime, p_ext = _prep_image_for_upload(io.BytesIO(b_proof))
+            up_proof = _upload_to_storage_retry(
+                p_buf,
+                path=f"{proof_final_base}/staff-app-proof.{p_ext}",
+                bucket=BUCKET_STAFF_PROOF,
+                content_type=p_mime,
+                make_public=True,
+            )
+    except Exception as e:
+        logger.error("Step3 ✗ Upload failed: %s", e)
+        flash_system_error(request, "Final upload failed.", exc=e)
+        return redirect(request.path)
+
+    front_url = up_front.get("public_url") or up_front.get("signed_url")
+    back_url  = up_back.get("public_url") or up_back.get("signed_url")
+    self_url  = up_selfie.get("public_url") or up_selfie.get("signed_url")
+    proof_url = up_proof.get("public_url") or up_proof.get("signed_url") if up_proof else None
+
+    try:
+        req_id = Secretary.insert_nonres_staff_account_request(
+            p_requested_by_id=staff_id,
+            p_person_id=None,
+            p_role_id=role_id,
+            p_supporting_docs=([proof_url] if proof_url else None),
+            p_lupon_sched=schedules if schedules else None,
+            p_bhw_purok_ids=sorted(set(purok_ids)) if purok_ids else None,
+            p_first_name=personal.get("first_name"),
+            p_last_name=personal.get("last_name"),
+            p_middle_name=(personal.get("middle_name") or "").strip() or None,
+            p_suffix=(personal.get("suffix") or "").strip() or None,
+            p_birthdate=personal.get("birthdate"),
+            p_email=personal.get("email"),
+            p_mobile_num=personal.get("mobile_num"),
+            p_sex_id=personal.get("sex_id"),
+            p_civil_status_id=personal.get("civil_status_id"),
+            p_nationality_id=personal.get("nationality_id"),
+            p_religion_id=personal.get("religion_id"),
+            p_city=personal.get("city"),
+            p_barangay=personal.get("barangay"),
+            p_sitio_purok=personal.get("sitio_purok"),
+            p_street=personal.get("street"),
+            p_valid_id_front=front_url,
+            p_valid_id_back=back_url,
+            p_valid_id_type_id=valid_id_type_id,
+            p_selfie_path=self_url,
+        )
+    except (DatabaseError, OperationalError, IntegrityError) as e:
+        logger.exception("DB ✗ insert_nonres_staff_account_request failed")
+        pgcode, primary = _pg_err_tuple(e)
+
+        # Example: custom handling by pgcode if you use one
+        if pgcode == "P5007":
+            from django.contrib import messages
+            messages.warning(
+                request,
+                "This person is already registered. Redirected you to the staff account request for this person."
+            )
+            return _smart_redirect(request, "captain:staff_selection_resident")
+
+        flash_db_error(request, e)
+        return redirect(request.path)
+    except Exception as e:
+        logger.exception("System ✗ insert_nonres_staff_account_request failed")
+        flash_system_error(request, "Failed to create staff account request.", exc=e)
+        return redirect(request.path)
+
+    # Clean heavy base64 previews from session after success
+    try:
+        if "docs" in wiz:
+            for k in ("front_b64","back_b64","selfie_b64","proof_b64","front_preview","back_preview","selfie_preview","proof_preview"):
+                wiz["docs"].pop(k, None)
+            _wiz_set(request, "docs", wiz["docs"])
+    except Exception:
+        pass
+
+    logger.info(
+        "Step3 ✓ staff_request created: req_id=%s role_id=%s purok_ids=%s schedules_count=%s",
+        req_id, role_id, purok_ids, len(schedules)
+    )
+    flash_success(request, "Staff account request created.")
+    _wiz_clear(request)
+    return redirect("captain:staff_selection")
+
+# @session_login_required
+# @role_required(CAPTAIN_ROLE)
+# @nocache
+def staff_list(request: HttpRequest) -> HttpResponse:
+    # Pull rows from stored function
+    try:
+        rows = Secretary.get_all_staff_info_summary() or []
+        # rows: [{staff_id, staff_code, full_name, role_name, residential_status}, ...]
+    except Exception as e:
+        logger.exception("Failed to load staff summaries: %s", e)
+        rows = []
+
+    try:
+        per_page = int(request.GET.get("per_page") or 10)
+        if per_page <= 0:
+            per_page = 10
+    except ValueError:
+        per_page = 10
+
+    try:
+        page_number = int(request.GET.get("page") or 1)
+    except ValueError:
+        page_number = 1
+
     form = StaffFilters()
-    list = []
-    paginator = Paginator(list, 10)
-    page_number = request.GET.get('page')
+    paginator = Paginator(rows, per_page)
     page_obj = paginator.get_page(page_number)
 
+    # Session/user display info
+    auth = request.session.get("auth") or {}
+    _user_fullname = auth.get("full_name") or user_fullname
+    _user_role = auth.get("role_name") or user_role
+    _user_role_template = (_user_role or "").lower().replace(" ", "_")
+
     return render(request, "staff_list.html", {
-        'user_fullname' : user_fullname,
-        'user_role': user_role,
-        'page_path': f'{user_role} / Staff Lits',
-        'page_title': 'Staff List',
-        'user_role_template': user_role_template,
-        'page_obj': page_obj,
-        'form': form,
+        "user_fullname": _user_fullname,
+        "user_role": _user_role,
+        "page_path": f"{_user_role} / Staff List",
+        "page_title": "Staff List",
+        "user_role_template": _user_role_template,
+        "form": form,
+        "page_obj": page_obj,
+        "total_count": paginator.count,
+        "per_page": per_page,
     })
 
-def staff_dets(request, staff_id):
-    return render(request, "person/staff_dets.html", {
-        'user_fullname' : user_fullname,
-        'user_role' : user_role,
-        'page_path' : f'{user_role} / Staff Details : {staff_id}',
-        'page_title' : f'Staff Details : {staff_id}',
-        'user_role_template' : user_role_template,
+# @session_login_required
+# @role_required(CAPTAIN_ROLE)
+# @nocache
+@require_GET
+def staff_search_api(request):
+    q = (request.GET.get("q") or "").strip()
+    try:
+        if q:
+            # returns: full_name, role_name, residential_status (no staff_id unless you added it)
+            results = Secretary.search_staff_by_name(q)[:50]
+        else:
+            # returns: staff_id, staff_code, full_name, role_name, residential_status
+            results = Secretary.get_all_staff_info_summary()
+        return JsonResponse({"results": results})
+    except Exception as e:
+        logger.exception("staff_search_api error: %s", e)
+        return JsonResponse({"results": [], "error": "Search failed"}, status=500)
+
+# @session_login_required
+# @role_required(CAPTAIN_ROLE)
+# @nocache
+@require_GET
+def staff_filter_api(request):
+    role_raw = (request.GET.get("role_id") or "").strip()
+    acc_raw  = (request.GET.get("account_status_id") or "").strip()
+
+    role_id = int(role_raw) if role_raw.isdigit() else None
+    acc_id  = int(acc_raw)  if acc_raw.isdigit()  else None
+
+    try:
+        if role_id is None and acc_id is None:
+            rows = Secretary.get_all_staff_info_summary()
+        else:
+            rows = Secretary.filter_staff_by_role_and_account(role_id, acc_id)
+        return JsonResponse({"results": rows})
+    except Exception as e:
+        logger.exception("staff_filter_api error: %s", e)
+        return JsonResponse({"results": [], "error": "Filter failed"}, status=500)
+
+# @session_login_required
+# @role_required(CAPTAIN_ROLE)
+# @nocache
+@require_http_methods(["GET"])
+def staff_dets(request, staff_code: str):
+    try:
+        rows = Secretary.get_staff_profile_display(staff_code) if staff_code else []
+    except Exception:
+        logger.exception("get_staff_profile_display failed for staff_code=%s", staff_code)
+        rows = []
+
+    p = rows[0] if rows else None
+    placeholder = static("images/brgy-sto-nino.png")
+    def _img(v): return (v or "").strip() or placeholder
+
+    doc_slides = []
+    if p:
+        doc_slides = [
+            {"src": _img(p.get("valid_id_front_img_path")), "label": "Front of ID"},
+            {"src": _img(p.get("valid_id_back_img_path")),  "label": "Back of ID"},
+            {"src": _img(p.get("selfie_img_path")),         "label": "Selfie w/ ID"},
+        ]
+
+    ctx = {
+        "user_fullname": user_fullname,
+        "user_role": user_role,
+        "page_path": f"{user_role} / Staff Details : {staff_code}",
+        "page_title": f"Staff Details : {staff_code}",
+        "user_role_template": user_role_template,
+        "profile": p,
+        "doc_slides": doc_slides,
+    }
+    return render(request, "staff_dets.html", ctx)
+
+
+
+# @session_login_required
+# @role_required(CAPTAIN_ROLE)
+# @nocache
+@require_http_methods(["GET", "POST"])
+def staff_account_requests_list(request: HttpRequest) -> HttpResponse:
+    try:
+        staff_req = Captain.list_requests() or []
+    except Exception:
+        logger.exception("Error loading staff requests")
+        staff_req = []
+
+    # simple getters for dicts/objects
+    def get(row, key):
+        return row.get(key) if isinstance(row, dict) else getattr(row, key, None)
+
+    # keep only status_id == 29 OR status_name containing "WAITING FOR BARANGAY CAPTAIN"
+    filtered = []
+    for r in staff_req:
+        sid = get(r, "status_id") or get(r, "request_status_id")
+        name = (get(r, "status_name") or "").upper()
+        try:
+            sid = int(sid) if sid is not None else None
+        except (TypeError, ValueError):
+            sid = None
+        if sid == 29 or "WAITING FOR BARANGAY CAPTAIN" in name:
+            filtered.append(r)
+
+    try:
+        per_page = int(request.GET.get("per_page") or 10)
+        if per_page <= 0:
+            per_page = 10
+    except (TypeError, ValueError):
+        per_page = 10
+
+    paginator = Paginator(filtered, per_page)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    return render(request, "staff_account_req.html", {
+        "user_fullname": user_fullname,
+        "user_role": user_role,
+        "page_path": f"{user_role} / Staff Account Requests",
+        "page_title": "Staff Account Requests",
+        "user_role_template": user_role_template,
+        "page_obj": page_obj,
+        "staff_req": page_obj.object_list,
+        "total_count": paginator.count,
+        "per_page": per_page,
     })
+
+
+
+
+# @session_login_required
+# @role_required(CAPTAIN_ROLE)
+# @nocache
+@require_http_methods(["GET"])
+def pending_staff_dets(request, p_staff_acc_req_id: str):
+    try:
+        rows = Captain.get_pending_staff_details(p_staff_acc_req_id) if p_staff_acc_req_id else []
+    except Exception:
+        logger.exception("get_pending_staff_details failed for staff_code=%s", p_staff_acc_req_id)
+        rows = []
+
+    p = rows[0] if rows else None
+    placeholder = static("images/brgy-sto-nino.png")
+    def _img(v): return (v or "").strip() or placeholder
+
+    doc_slides = []
+    if p:
+        doc_slides = [
+            {"src": _img(p.get("valid_id_front_img_path")), "label": "Front of ID"},
+            {"src": _img(p.get("valid_id_back_img_path")),  "label": "Back of ID"},
+            {"src": _img(p.get("selfie_img_path")),         "label": "Selfie w/ ID"},
+        ]
+
+    ctx = {
+        "user_fullname": user_fullname,
+        "user_role": user_role,
+        "page_path": f"{user_role} / Staff Details : {p_staff_acc_req_id}",
+        "page_title": f"Staff Details : {p_staff_acc_req_id}",
+        "user_role_template": user_role_template,
+        "profile": p,
+        "doc_slides": doc_slides,
+    }
+    return render(request, "pending_staff_dets.html", ctx)
+
+
+
+REQUEST_STATUS_APPROVED = 30
+REQUEST_STATUS_REJECTED = 4
+
+# @session_login_required
+# @role_required(CAPTAIN_ROLE)
+# @nocache
+@require_http_methods(["POST", "GET"])
+def process_staff_request(request: HttpRequest) -> HttpResponse:
+
+    auth = request.session.get("auth") or {}
+    approver_id = auth.get("staff_id") or 5 
+    try:
+        approver_id = int(approver_id)
+    except (TypeError, ValueError):
+        flash_system_error(request, "Your session is missing staff credentials.")
+        return redirect(request.META.get("HTTP_REFERER") or request.path)
+
+    # --- ID
+    staff_acc_req_id_raw = (
+        request.POST.get("staff_acc_req_id")
+        or request.POST.get("id")
+        or request.GET.get("staff_acc_req_id")
+        or request.GET.get("id")
+        or getattr(getattr(request, "resolver_match", None), "kwargs", {}).get("staff_acc_req_id")
+    )
+    try:
+        staff_acc_req_id = int(staff_acc_req_id_raw)
+    except (TypeError, ValueError):
+        flash_system_error(request, "Invalid or missing staff account request ID.")
+        return redirect(request.META.get("HTTP_REFERER") or request.path)
+
+    # --- Decision
+    status_raw = request.POST.get("p_request_status_id")
+    if status_raw is None:
+        action_type = (request.POST.get("action_type") or "").strip().upper()
+        if action_type == "APPROVE":
+            status_id = REQUEST_STATUS_APPROVED
+        elif action_type == "REJECT":
+            status_id = REQUEST_STATUS_REJECTED
+        else:
+            flash_warning(request, "Missing or invalid action. Choose Approve or Reject.")
+            return redirect(request.META.get("HTTP_REFERER") or request.path)
+    else:
+        try:
+            status_id = int(status_raw)
+        except (TypeError, ValueError):
+            flash_warning(request, "Invalid request status ID.")
+            return redirect(request.META.get("HTTP_REFERER") or request.path)
+        if status_id not in (REQUEST_STATUS_APPROVED, REQUEST_STATUS_REJECTED):
+            flash_warning(request, "Unsupported request status ID.")
+            return redirect(request.META.get("HTTP_REFERER") or request.path)
+
+    remarks = (request.POST.get("remarks") or "").strip() or None
+    email_to = (request.POST.get("email") or "").strip()
+
+    try:
+        result_text = Captain.process_staff_account_request(
+            p_staff_acc_req_id=staff_acc_req_id,
+            p_approver_id=approver_id,
+            p_request_status_id=status_id,
+            p_remarks=remarks,
+        )
+
+        # =========================
+        # REJECTED: email + flash
+        # =========================
+        if status_id == REQUEST_STATUS_REJECTED:
+            if email_to:
+                subj = "Staff Account Request Update"
+                reason = remarks or "No specific reason was provided."
+                body_txt = (
+                    "Good day!\n\n"
+                    "Your staff account creation request has been REJECTED.\n\n"
+                    f"Reason/Remarks:\n{reason}\n\n"
+                    "Please contact the authorized staff if you have any concern.\n\n"
+                    "Barangay Sto. Niño"
+                )
+                body_html = f"""
+                    <p>Good day!</p>
+                    <p>Your staff account creation request has been <strong>REJECTED</strong>.</p>
+                    <p><strong>Reason/Remarks:</strong><br>{reason}</p>
+                    <p>Please contact the authorized staff if you have any concern.</p>
+                    <p>Barangay Sto. Niño</p>
+                """.strip()
+                send_email(
+                    subject=subj,
+                    to=[email_to],
+                    body_text=body_txt,
+                    body_html=body_html,
+                    from_name="Barangay Sto. Niño",
+                    fail_silently=True,
+                )
+            flash_success(request, "Staff account request rejected.")
+            return redirect(request.POST.get("next") or request.GET.get("next") or "captain:staff_account_requests_list")
+
+        # =========================
+        # APPROVED (two branches)
+        # =========================
+        if result_text == "TRUE":
+            # Captain step only: now waiting for Admin
+            flash_success(request, "Forwarded for Admin approval.")
+
+            if email_to:
+                subj = "Staff Account Request Update"
+                status_label = "WAITING FOR ADMIN'S APPROVAL"
+                body_txt = (
+                    "Good day!\n\n"
+                    "Your staff account request has been reviewed by the Barangay Captain.\n"
+                    f"Current Status: {status_label}\n\n"
+                    "You will receive another update after the Admin's final decision.\n\n"
+                    "Barangay Sto. Niño"
+                )
+                body_html = f"""
+                    <p>Good day!</p>
+                    <p>Your staff account request has been reviewed by the Barangay Captain.</p>
+                    <p><strong>Current Status:</strong> {status_label}</p>
+                    <p>You will receive another update after the Admin's final decision.</p>
+                    <p>Barangay Sto. Niño</p>
+                """.strip()
+                send_email(
+                    subject=subj,
+                    to=[email_to],
+                    body_text=body_txt,
+                    body_html=body_html,
+                    from_name="Barangay Sto. Niño",
+                    fail_silently=True,
+                )
+
+            return redirect(request.POST.get("next") or request.GET.get("next") or "captain:staff_account_requests_list")
+
+        # Admin final approval should return staff_code (we don't need it here just to email status)
+        if isinstance(result_text, str) and result_text.strip():
+            flash_success(request, f"Staff account approved. Staff Code: {result_text}")
+
+            if email_to:
+                subj = "Staff Account Request Update"
+                status_label = "APPROVED"
+                body_txt = (
+                    "Good day!\n\n"
+                    "Your staff account request has been APPROVED.\n"
+                    f"Current Status: {status_label}\n\n"
+                    "If you haven't received your credentials yet, please wait for the follow-up message "
+                    "with your username and temporary password, or contact the authorized staff.\n\n"
+                    "Barangay Sto. Niño"
+                )
+                body_html = f"""
+                    <p>Good day!</p>
+                    <p>Your staff account request has been <strong>APPROVED</strong>.</p>
+                    <p><strong>Current Status:</strong> {status_label}</p>
+                    <p>If you haven't received your credentials yet, please wait for the follow-up message with your username
+                    and temporary password, or contact the authorized staff.</p>
+                    <p>Barangay Sto. Niño</p>
+                """.strip()
+                send_email(
+                    subject=subj,
+                    to=[email_to],
+                    body_text=body_txt,
+                    body_html=body_html,
+                    from_name="Barangay Sto. Niño",
+                    fail_silently=True,
+                )
+        else:
+            flash_warning(
+                request,
+                "Request processed, but the system did not return a confirmation token. Please verify the status."
+            )
+
+        logger.info(
+            "process_staff_request ✓ req_id=%s approver_id=%s status=%s result=%r",
+            staff_acc_req_id, approver_id, status_id, result_text
+        )
+
+    except DatabaseError as db_err:
+        logger.exception("DB error processing staff account request (req_id=%s)", staff_acc_req_id)
+        flash_db_error(request, db_err)
+    except Exception as ex:
+        logger.exception("Unexpected error processing staff account request (req_id=%s)", staff_acc_req_id)
+        flash_system_error(request, "Unable to process the request.", exc=ex)
+
+    return redirect(request.POST.get("next") or request.GET.get("next") or "captain:staff_account_requests_list")

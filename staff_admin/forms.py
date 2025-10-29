@@ -1,6 +1,57 @@
 from django import forms
 
-from django import forms
+ROLE_CHOICES = [
+    (3,  "Barangay Captain"), (4,  "Barangay Secretary"),(5,  "Barangay Treasurer"), 
+    (6,  "Barangay Clerk"), (7,  "Barangay Lupon President"), (8,  "Barangay Lupon Member"), 
+    (9,  "Barangay Health Worker"), (10, "Nurse"), (11, "Midwife"),
+]
+
+PUROK_CHOICES = [
+    (1, "Kanipaan"), (2, "Pampango"), (3, "Lutaw-Lutaw"), (4, "Mauco"),
+]
+
+DAY_CHOICES = [
+    (1, "Monday"), (2, "Tuesday"), (3, "Wednesday"), (4, "Thursday"),
+    (5, "Friday"), (6, "Saturday"), (7, "Sunday"),
+]
+
+CIVIL_STATUS_CHOICES = [
+    (1, "Single"), (2, "Married"), (3, "Widowed"),
+    (4, "Separated"), (5, "Divorced"),
+]
+
+NATIONALITY_CHOICES = [
+    (1, "American"), (2, "Australian"), (3, "Brazilian"), (4, "British"),
+    (5, "Canadian"), (6, "Chinese"), (7, "Filipino"), (8, "French"),
+    (9, "German"), (10, "Indian"), (11, "Indonesian"), (12, "Italian"),
+    (13, "Japanese"), (14, "Korean"), (15, "Malaysian"), (16, "Russian"),
+    (17, "Saudi"), (18, "Spanish"), (19, "Thai"), (20, "Vietnamese"),
+    (21, "Others"),
+]
+
+RELIGION_CHOICES = [
+    (1, "Agnostic"), (2, "Born Again"), (3, "Buddhist"), (4, "Christian"),
+    (5, "Evangelical"), (6, "Hindu"), (7, "Iglesia ni Cristo"), (8, "Islam"),
+    (9, "Jehovah's Witness"), (10, "Orthodox"), (11, "Protestant"),
+    (12, "Roman Catholic"), (13, "Seventh-day Adventist"), (14, "Others"),
+]
+
+VALID_ID_TYPE_CHOICES = [
+    # (1,  "Philippine Passport"),
+    (2,  "Philippine National ID"), 
+    # (3,  "SSS/UMID Card"), 
+    # (4,  "GSIS eCard"), (5,  "PRC ID"), 
+    # (6,  "Driver's License"), 
+    # (7,  "PhilHealth ID"), (8,  "Voter's ID"),
+    # (9,  "Postal ID"), 
+    # (10, "Senior Citizen ID"), (11, "PWD ID"), (12, "OWWA ID"), (13, "IBP ID"),
+    # (14, "TIN ID"), (15, "School ID"), 
+    (16, "ePhil ID"),
+]
+
+STAFF_ACCOUNT_STATUS = [
+    (1, "Active"), (2, "Inactive"), (3, "Deactivated"), (4, "Pending"),
+]
 
 class UpdateInfo(forms.Form):
     role = forms.ChoiceField(
@@ -123,7 +174,7 @@ class StaffFilters(forms.Form):
         required= False,
     )
     role = forms.ChoiceField(
-        choices=[],
+        choices=[("", "— Select a Role —")] + ROLE_CHOICES,
         widget=forms.Select(attrs={
             'id': 'role_filter',
             'class': 'form-select',
@@ -132,16 +183,18 @@ class StaffFilters(forms.Form):
         label='Filter by Role',
         required=False,
     )
-    residential_stat = forms.ChoiceField(
-        choices=[],
+
+    account_stat = forms.ChoiceField(
+        choices=[("", "— Select Account Status —")] + STAFF_ACCOUNT_STATUS,
         widget=forms.Select(attrs={
-            'id': 'residential_stat',
+            'id': 'account_stat',
             'class': 'form-select',
-            'name': 'role',
+            'name': 'account_stat',
         }),
-        label='Residential Status',
+        label='Account Status',
         required=False,
     )
+
 
 class SearchPerson(forms.Form):
     search = forms.CharField(

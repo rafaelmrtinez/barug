@@ -33,7 +33,7 @@
       </p>
 
       <!-- Form #1: search/select (POST to same view) -->
-      <form id="controlsForm1" method="post" action="{% url 'secretary:staff_selection_resident' %}">
+      <form id="controlsForm6" method="post" action="{% url 'captain:staff_selection_resident' %}">
         {% csrf_token %}
         <div class="rounded-3 border bg-light p-3">
           <label class="form-label small">Find Resident Record</label>
@@ -187,7 +187,7 @@
       </div>
 
       <!-- ONLY SHOW THIS PART AFTER SELECTING A RESIDENT-->
-      <form id="controlsForm2" method="post" action="{% url 'secretary:staff_selection_resident' %}" novalidate>
+      <form id="controlsForm5" method="post" action="{% url 'captain:staff_selection_resident' %}" novalidate>
         {% csrf_token %}
         <input type="hidden" name="pid" id="pid" value="{{ res_details.person_id|default_if_none:'' }}">
 
@@ -297,7 +297,7 @@
         </div> <!-- ★ ADDED (close wrapper) -->
 
         <div class="mt-3 button-container justify-content-end mb-2 d-flex gap-2">
-          <button type="button" class="btn btn-reset">Back</button>
+          <a type="button" class="btn btn-reset" href="{% url 'captain:staff_selection' %}">Back</a>
           <button type="submit" class="btn btn-submit">Continue</button>
         </div>
       </form>
@@ -320,8 +320,8 @@
   };
 
   const el = {
-    formSearch: document.getElementById('controlsForm1'),
-    formMain:   document.getElementById('controlsForm2'),
+    formSearch: document.getElementById('controlsForm6'),
+    formMain:   document.getElementById('controlsForm5'),
     inputSearch:document.getElementById('residentSearch'),
     dd:         document.getElementById('residentDropdown'),
     pid:        document.getElementById('pid'),
@@ -428,7 +428,7 @@
     const query = (q || '').trim();
     if (!query) { renderDD([]); return; }
     try {
-      const url = "{% url 'secretary:resident_suggest' %}?q=" + encodeURIComponent(query);
+      const url = "{% url 'captain:resident_suggest' %}?q=" + encodeURIComponent(query);
       const resp = await fetch(url, { credentials: 'same-origin' });
       if (!resp.ok) { renderDD([]); return; }
       const data = await resp.json();
@@ -623,8 +623,8 @@
       const dd = qs('#residentDropdown'); if (dd) { dd.innerHTML=''; dd.classList.add('d-none'); }
 
       // Reset both forms (keeps CSRF intact)
-      qs('#controlsForm1')?.reset();
-      qs('#controlsForm2')?.reset();
+      qs('#controlsForm6')?.reset();
+      qs('#controlsForm5')?.reset();
 
       // Clear displayed resident details block near the change button
       const card = el.changeBtn.closest('.mt-4');
