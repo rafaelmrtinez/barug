@@ -77,6 +77,15 @@ def _to_int_or_none(val) -> Optional[int]:
         return int(val)
     except Exception:
         return None
+    
+def dashboard(request):
+    return render(request, "secretary_dashboard.html", {
+        'user_fullname' : user_fullname,
+        'user_role' : user_role,
+        'page_path' : f'{user_role} / Dashboard',
+        'page_title' : 'Dashboard',
+        'user_role_template' : user_role_template,
+    })
 
 @session_login_required
 @role_required(SECRETARY_ROLE)
