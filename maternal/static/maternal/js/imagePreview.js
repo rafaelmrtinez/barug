@@ -5,7 +5,7 @@
             galleryEl.innerHTML = '<small class="text-muted">No images yet.</small>';
             return;
         }
-
+// 
         filesOrUrls.forEach(item => {
             const url = typeof item === 'string' ? item : URL.createObjectURL(item);
             const tile = document.createElement('div');
