@@ -21,6 +21,17 @@ document.addEventListener('DOMContentLoaded', function () {
         if (hidden) hidden.value = mhrId || '';
     });
 
+    // postpartum record (modal with form)
+    document.body.addEventListener('click', function (ev) {
+        const btn = ev.target.closest && ev.target.closest('.btn-postpartum-record');
+        if (!btn) return;
+        const mhrId = btn.getAttribute('data-mhr-id');
+        const hidden = document.getElementById('id_maternal_record_id');
+        const form = document.getElementById('postpartumRecordForm');
+        if (form) form.reset();
+        if (hidden) hidden.value = mhrId || '';
+    });
+
     // Optional: enhance form submissions with basic UX (disable submit while posting)
     function enhanceForm(formId) {
         const form = document.getElementById(formId);
@@ -42,4 +53,5 @@ document.addEventListener('DOMContentLoaded', function () {
 
     enhanceForm('prenatalScheduleForm');
     enhanceForm('postpartumScheduleForm');
+    enhanceForm('postpartumRecordForm');
 });

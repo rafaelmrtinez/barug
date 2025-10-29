@@ -17,8 +17,43 @@ class MaternalHealthRecordRepository:
     def __init__(self, ctx: ConnectionAdapter):
         self.ctx = ctx
         
-    
-        
+    def insert_postpartum_record_bhw(
+        self, staff_id, mhr_id, date_of_delivery, time_of_delivery, attended_by_id,
+        attended_by_role_name, place_of_delivery_id, outcome, iron_supplementation,
+        vit_a_supplementation, mebendazole_given, lochial_discharges_baseline, pads_per_day_baseline):
+        """Insert a postpartum record (BHW) using DB function
+
+        Parameter order aligns with DB function signature:
+          p_added_by_id, p_maternal_record_id, p_date_of_delivery, p_time_of_delivery,
+          p_attended_by_id, p_attended_by_rolename, p_place_of_delivery_id, p_outcome,
+          p_iron_supplementation, p_vit_a_supplementation, p_mebendazole_given,
+          p_lochial_discharges_baseline, p_pads_per_day_baseline
+        """
+        sql = """SELECT * FROM insert_postpartum_record_bhw(%s::INTEGER, %s::INTEGER, %s::DATE, %s::TIME, %s::INTEGER, %s::TEXT, %s::INTEGER, %s::TEXT, %s::BOOLEAN, %s::BOOLEAN, %s::BOOLEAN, %s::TEXT, %s::INTEGER);"""
+        params = (
+            staff_id,
+            mhr_id,
+            date_of_delivery,
+            time_of_delivery,
+            attended_by_id,
+            attended_by_role_name,
+            place_of_delivery_id,
+            outcome,
+            iron_supplementation,
+            vit_a_supplementation,
+            mebendazole_given,
+            lochial_discharges_baseline,
+            pads_per_day_baseline,
+        )
+        try:
+            rows = self.ctx.execute_query(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException as e:
+            logger.error("Error inserting postpartum record for mhr %s: %s", mhr_id, getattr(e, 'message', e))
+            if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
+                raise MaternalHealthRecordException(e.message) from e
+            raise e
+
     def insert_maternal_visit_schedule(self, mhr_id, date, time, staff_id, purpose, notes):
         sql="""SELECT * FROM add_maternal_visit_schedule(%s::INTEGER, %s::DATE, %s::TIME, %s::INTEGER, %s::TEXT, %s::TEXT);"""
         params = (mhr_id, date, time, staff_id, purpose, notes)

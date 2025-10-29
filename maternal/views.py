@@ -26,6 +26,7 @@ from maternal.forms.pre_natal_follow_up_form import PrenatalFollowUpEntryForm
 from maternal.forms.present_pregnancy_form import PresentPregnancyForm
 from maternal.forms.previous_pregnancy_form import PreviousPregnancyForm, PreviousPregnancyFormSet
 from maternal.forms.tetanus_toxoid_form import TetanusToxoidForm
+from maternal.forms.postpartum_record_form import PostpartumRecordForm
 from maternal.repository import MaternalHealthRecordRepository
 from maternal.utils.form_lock import FormLockUtility
 from src.infra.database.connection_adapter import ConnectionAdapter
@@ -1089,6 +1090,12 @@ def record_detail(request: HttpRequest, person_id: int) -> HttpResponse:
     record = REPOSITORY.fetch_latest_maternal_record_by_person_and_maternal_id(person_id, maternal_record_id=maternal_health_record_id) or {}
     all_records = REPOSITORY.fetch_all_maternal_records_for_person(person_id)
     basic_info = REPOSITORY.fetch_mhr_count_and_fam_id_by_person_id(person_id)
+    # prepare postpartum form pre-populated with maternal record id
+    postpartum_form = PostpartumRecordForm(initial={
+        'maternal_record_id': record.get('maternal_record_id') or maternal_health_record_id,
+        'attended_by_rolename': request.session.get('auth', {}).get('role_name')
+    })
+
     return render(
         request,
         "maternal/record_history.html",
@@ -1107,6 +1114,7 @@ def record_detail(request: HttpRequest, person_id: int) -> HttpResponse:
             # history table (now includes latest)
             "all_records": all_records,
             "basic_info": basic_info,
+            "postpartum_form": postpartum_form,
         },
     )
 
