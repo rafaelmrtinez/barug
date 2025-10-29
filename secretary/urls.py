@@ -33,4 +33,8 @@ urlpatterns = [
     path("business/business_map/", views.business_map_list , name="business_map"),
     path("ajax/business_search/", views.ajax_business_search, name="ajax_business_search"),
     path("api/business/pins", views.api_business_pins, name="api_business_pins"),
+    path("staff_list/staff_details/<str:staff_code>/", views.staff_dets , name="staff_details"),
+
+    path("api/staff/search/", views.staff_search_api, name="staff_search_api"),
+    path("api/staff/filter/", views.staff_filter_api, name="staff_filter_api"),
 ]
