@@ -3,202 +3,11 @@
 {% load static %} 
 {% load bootstrap_icons %} 
 {% block css %}
-<style>
-  :root {
-    --brand-900: #2c0e16;
-    --brand-800: #44141e;
-    --brand-700: #6d2932;
-    --brand-600: #8b3a45;
-    --brand-050: #fbf6f6;
-    --brand-100: #f7eef0;
-    --ink: #1f2937;
-    --muted: #6b7280;
-    --ring: rgba(109, 41, 50, 0.35);
-  }
-  body {
-    background: #faf9fb;
-    color: var(--ink);
-  }
+  <link rel="stylesheet" href="{% static 'maternal/css/record_history.css' %}">
+{% endblock %}
 
-  /* Page */
-  .container-xxl {
-    max-width: 1320px;
-  }
-  .hero {
-    background: linear-gradient(90deg, var(--brand-900), var(--brand-700));
-    color: #fff;
-    border-radius: 20px;
-    padding: 1rem 1.25rem;
-  }
-  .hero .name {
-    font-weight: 700;
-    font-size: 1.35rem;
-  }
-  .hero .meta {
-    opacity: 0.85;
-  }
-  .hero .pill {
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    padding: 0.25rem 0.6rem;
-    border-radius: 999px;
-    font-weight: 600;
-    font-size: 0.8rem;
-  }
-  .hero .btn-hero {
-    background: #fff;
-    color: var(--brand-800);
-    border: none;
-  }
-  .card {
-    border: 1px solid rgba(68, 20, 30, 0.25);
-    border-radius: 18px;
-    background: #fff;
-  }
-  .card-title {
-    color: var(--brand-700);
-    font-weight: 700;
-  }
-  .muted {
-    color: var(--muted);
-  }
-  .kpi {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.92rem;
-  }
-  .kpi span:last-child {
-    font-weight: 600;
-  }
-
-  .visit-table thead th {
-    color: #6b7280;
-    font-weight: 600;
-  }
-  .visit-table td,
-  .visit-table th {
-    vertical-align: middle;
-  }
-
-  /* Modal sizing & polish */
-  .modal {
-    z-index: 1200;
-  }
-  .modal-backdrop {
-    z-index: 1190;
-  }
-  .modal.mhr .modal-header {
-    background: linear-gradient(90deg, var(--brand-800), var(--brand-700));
-    color: #fff;
-    border-top-left-radius: 18px;
-    border-top-right-radius: 18px;
-  }
-  .modal.mhr .modal-content {
-    border-radius: 18px;
-    border: 1px solid var(--brand-800);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
-  }
-  .modal.mhr .modal-title {
-    font-weight: 700;
-  }
-  .modal.mhr .badge-tri {
-    background: var(--brand-100);
-    color: var(--brand-800);
-    font-weight: 600;
-    border: 1px solid rgba(109, 41, 50, 0.25);
-  }
-  .modal.mhr .sticky-footer {
-    position: sticky;
-    bottom: -1px;
-    background: #fff;
-    border-top: 1px solid #eee;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    border-bottom-left-radius: 18px;
-    border-bottom-right-radius: 18px;
-  }
-
-  /* Expand room for forms */
-  .modal.mhr .modal-dialog.modal-xxl {
-    max-width: 1320px;
-  }
-  @media (max-width: 992px) {
-    .modal.mhr .modal-dialog {
-      margin: 0;
-    }
-  }
-
-  .side-summary {
-    background: var(--brand-050);
-    border-left: 1px dashed rgba(68, 20, 30, 0.25);
-    padding-left: 1rem;
-  }
-  .summary-row {
-    display: flex;
-    align-items: start;
-    gap: 0.6rem;
-    margin-bottom: 0.5rem;
-  }
-  .summary-row .icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    display: grid;
-    place-items: center;
-    background: #fff;
-    border: 1px solid #eee;
-    color: var(--brand-700);
-  }
-
-  .kbd {
-    font-variant: all-small-caps;
-    letter-spacing: 0.5px;
-    font-weight: 600;
-    color: #555;
-  }
-  .form-control:focus,
-  .form-select:focus {
-    border-color: var(--brand-600);
-    box-shadow: 0 0 0 0.25rem var(--ring);
-  }
-
-  .collection-card .input-group > .form-control,
-  .collection-card .input-group > .form-select {
-    min-width: 0;
-  }
-  .collection-table td {
-    vertical-align: middle;
-  }
-  .collection-table .col-val {
-    white-space: nowrap;
-  }
-  .table-min td,
-  .table-min th {
-    padding: 0.45rem 0.6rem;
-    font-size: 0.95rem;
-  }
-
-  .section-title {
-    font-weight: 700;
-    color: var(--brand-700);
-    margin-bottom: 0.25rem;
-  }
-  .section-sub {
-    font-size: 0.85rem;
-    color: var(--muted);
-    margin-bottom: 0.75rem;
-  }
-
-  /* Pills */
-  .btn-check + .btn.btn-sm {
-    border-radius: 999px;
-  }
-</style>
-{% endblock %} {% block content %}
-<div class="page-wrap">
+{% block content %}
+<div class="page-wrap record-history">
   <div class="container-xxl py-4 mt-5">
     <!-- Hero -->
     <div class="hero mb-4">
@@ -265,8 +74,8 @@
                 <tr>
                   <th>MHR #</th>
                   <th>Start Date</th>
-                  <th>Maternal Record Status</th>
-                  <th class="text-end">Open</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -282,30 +91,30 @@
                           href="{% url 'maternal:maternal_health_record_form' r.maternal_record_id %}">
                           <i class="bi bi-folder2-open me-1"></i> Open
                         </a>
-                        <button type="button" class="btn btn-primary btn-sm ms-2 btn-schedule"
+                        <button type="button" class="btn btn-mhr-schedule btn-sm ms-2 btn-schedule"
                           data-bs-toggle="modal" data-bs-target="#prenatalScheduleModal"
                           data-mhr-id="{{ r.maternal_record_id }}">
                           <i class="bi bi-calendar-plus me-1"></i> Schedule
+                        </button>
+                        <button type="button" class="btn btn-mhr-postpartum btn-sm ms-2 btn-postpartum"
+                          data-bs-toggle="modal" data-bs-target="#postpartumScheduleModal"
+                          data-mhr-id="{{ r.maternal_record_id }}">
+                          <i class="bi bi-clock-history me-1"></i> Postpartum Schedule
                         </button>
                       </td>
                       {% elif request.session.auth.role_name == "barangay health worker" %}
-                      <td class="text-end">
+                      <td>
                         <a class="btn btn-outline-secondary btn-sm"
                           href="{% url 'maternal:bhw_prenatal_form' r.maternal_record_id %}">
-                          <i class="bi bi-folder2-open me-1"></i> Prenatal Follow-up
+                          <i class="bi bi-folder2-open me-1"></i> Prenatal Follow-up Schedule
                         </a>
-                        <button type="button" class="btn btn-primary btn-sm ms-2 btn-schedule"
-                          data-bs-toggle="modal" data-bs-target="#prenatalScheduleModal"
-                          data-mhr-id="{{ r.maternal_record_id }}">
-                          <i class="bi bi-calendar-plus me-1"></i> Schedule
-                        </button>
                       </td>
                       {% endif %}
                     </tr>
                   {% endfor %}
                 {% else %}
                   <tr>
-                    <td colspan="5" class="text-center text-muted py-4">No records.</td>
+                    <td colspan="4" class="text-center text-muted py-4">No records.</td>
                   </tr>
                 {% endif %}
               </tbody>
@@ -392,73 +201,106 @@
     </div>
   </div>
 </div>
-{% block scripts %}
-<script defer src="{% static 'midwife/js/anc.js' %}"></script>
-<script defer src="{% static 'midwife/js/fetchMaternalRecord.js' %}"></script>
-{% endblock %}
-{% endblock %}
- 
-<!-- Prenatal Scheduling Modal -->
-<div class="modal fade mhr" id="prenatalScheduleModal" tabindex="-1" aria-labelledby="prenatalScheduleModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="prenatalScheduleModalLabel">Schedule Prenatal Visit</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+  <!-- Prenatal Scheduling Modal -->
+  <div class="modal fade mhr" id="prenatalScheduleModal" tabindex="-1" aria-labelledby="prenatalScheduleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="prenatalScheduleModalLabel">Schedule Prenatal Visit</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="prenatalScheduleForm" method="post" action="">
+          {% csrf_token %}
+          <input type="hidden" name="maternal_record_id" id="sched_maternal_record_id" value="" />
+          <div class="modal-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label for="sched_date" class="form-label">Schedule Date</label>
+                <input type="date" class="form-control" id="sched_date" name="schedule_date" required />
+              </div>
+              <div class="col-md-6">
+                <label for="sched_time" class="form-label">Schedule Time</label>
+                <input type="time" class="form-control" id="sched_time" name="schedule_time" required />
+              </div>
+
+              <div class="col-12">
+                <label for="sched_purpose" class="form-label">Purpose of Visit</label>
+                <input type="text" class="form-control" id="sched_purpose" name="purpose" placeholder="e.g. ANC visit, lab follow-up" required />
+              </div>
+
+              <div class="col-12">
+                <label for="sched_notes" class="form-label">Notes</label>
+                <textarea class="form-control" id="sched_notes" name="notes" rows="3" placeholder="Optional notes"></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer sticky-footer">
+            <div>
+              <small class="text-muted">You can edit the schedule later from the appointments list.</small>
+            </div>
+            <div>
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save Schedule</button>
+            </div>
+          </div>
+        </form>
       </div>
-      <form id="prenatalScheduleForm" method="post" action="">
-        {% csrf_token %}
-        <input type="hidden" name="maternal_record_id" id="sched_maternal_record_id" value="" />
-        <div class="modal-body">
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label for="sched_date" class="form-label">Schedule Date</label>
-              <input type="date" class="form-control" id="sched_date" name="schedule_date" required />
-            </div>
-            <div class="col-md-6">
-              <label for="sched_time" class="form-label">Schedule Time</label>
-              <input type="time" class="form-control" id="sched_time" name="schedule_time" required />
-            </div>
-
-            <div class="col-12">
-              <label for="sched_purpose" class="form-label">Purpose of Visit</label>
-              <input type="text" class="form-control" id="sched_purpose" name="purpose" placeholder="e.g. ANC visit, lab follow-up" required />
-            </div>
-
-            <div class="col-12">
-              <label for="sched_notes" class="form-label">Notes</label>
-              <textarea class="form-control" id="sched_notes" name="notes" rows="3" placeholder="Optional notes"></textarea>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer sticky-footer">
-          <div>
-            <small class="text-muted">You can edit the schedule later from the appointments list.</small>
-          </div>
-          <div>
-            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" class="btn btn-primary">Save Schedule</button>
-          </div>
-        </div>
-      </form>
     </div>
   </div>
-</div>
 
-<script>
-  // Populate maternal_record_id into the modal when a schedule button is clicked
-  (function(){
-    document.addEventListener('click', function(ev){
-      const btn = ev.target.closest && ev.target.closest('.btn-schedule');
-      if (!btn) return;
-      const mhrId = btn.getAttribute('data-mhr-id');
-      const hidden = document.getElementById('sched_maternal_record_id');
-      if (hidden) hidden.value = mhrId || '';
-      // optionally reset other fields
-      const form = document.getElementById('prenatalScheduleForm');
-      if (form) form.reset();
-      // set maternal id again after reset
-      if (hidden) hidden.value = mhrId || '';
-    });
-  })();
-</script>
+  <!-- Postpartum Scheduling Modal -->
+  <div class="modal fade mhr" id="postpartumScheduleModal" tabindex="-1" aria-labelledby="postpartumScheduleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="postpartumScheduleModalLabel">Schedule Postpartum Visit</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="postpartumScheduleForm" method="post" action="">
+          {% csrf_token %}
+          <input type="hidden" name="maternal_record_id" id="post_maternal_record_id" value="" />
+          <div class="modal-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label for="post_sched_date" class="form-label">Schedule Date</label>
+                <input type="date" class="form-control" id="post_sched_date" name="schedule_date" required />
+              </div>
+              <div class="col-md-6">
+                <label for="post_sched_time" class="form-label">Schedule Time</label>
+                <input type="time" class="form-control" id="post_sched_time" name="schedule_time" required />
+              </div>
+
+              <div class="col-md-6">
+                <label for="post_visit" class="form-label">Visit</label>
+                <input type="text" class="form-control" id="post_visit" name="visit" placeholder="e.g. 6-week check" required />
+              </div>
+
+              <div class="col-md-6">
+                <label for="post_purpose" class="form-label">Purpose</label>
+                <input type="text" class="form-control" id="post_purpose" name="purpose" placeholder="e.g. breastfeeding support" required />
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer sticky-footer">
+            <div>
+              <small class="text-muted">You can edit the schedule later from the appointments list.</small>
+            </div>
+            <div>
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save Schedule</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {% block scripts %}
+  <script defer src="{% static 'maternal/js/record_history.js' %}"></script>
+  <script defer src="{% static 'maternal/js/schedule_form_helpers.js' %}"></script>
+  <script defer src="{% static 'maternal/js/prenatal_schedule_api.js' %}"></script>
+  <script defer src="{% static 'maternal/js/postpartum_schedule_api.js' %}"></script>
+  <script defer src="{% static 'midwife/js/anc.js' %}"></script>
+  <script defer src="{% static 'midwife/js/fetchMaternalRecord.js' %}"></script>
+  {% endblock %}
+{% endblock %}

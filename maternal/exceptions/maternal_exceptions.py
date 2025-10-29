@@ -87,6 +87,15 @@ class MaternalHealthRecordException(Exception):
         "P6221",  # Maternal health record id is required
         "P6222",  # Visit COMPLETE status not found
         "P6223",  # Schedule statuses PENDING/COMPLETED not found
+    # codes from scheduling SQL functions (prenatal/postpartum)
+    "P6218",  # Scheduled date/time required or PENDING status missing
+    "P6219",  # Duplicate exact date+time schedule (commented guard)
+    "P6220",  # Pending schedule exists for this maternal record on date
+    "P6M05",  # Provided status id does not exist (note: as-seen in SQL)
+    "P6256",  # Postpartum record not found for maternal record
+    "P6257",  # Scheduled date/time required (postpartum)
+    "P6258",  # Pending postpartum schedule already exists on date
+    "P6147",  # Pending status not found (postpartum)
     }
 
     def __init__(self, message):

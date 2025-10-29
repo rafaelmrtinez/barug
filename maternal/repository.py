@@ -16,6 +16,32 @@ class MaternalHealthRecordRepository:
 
     def __init__(self, ctx: ConnectionAdapter):
         self.ctx = ctx
+        
+    
+        
+    def insert_maternal_visit_schedule(self, mhr_id, date, time, staff_id, purpose, notes):
+        sql="""SELECT * FROM add_maternal_visit_schedule(%s::INTEGER, %s::DATE, %s::TIME, %s::INTEGER, %s::TEXT, %s::TEXT);"""
+        params = (mhr_id, date, time, staff_id, purpose, notes)
+        try:
+            rows = self.ctx.execute_query(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException as e:
+            logger.error("Error inserting maternal visit schedule for mhr %s: %s", mhr_id, getattr(e, 'message', e))
+            if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
+                raise MaternalHealthRecordException(e.message) from e
+            raise e
+        
+    def insert_postpartum_visit_schedule(self, mhr_id, date, time, staff_id, purpose, notes):
+        sql="""SELECT * FROM add_postpartum_visit_schedule(%s::INTEGER, %s::DATE, %s::TIME, %s::INTEGER, %s::TEXT, %s::TEXT);"""
+        params = (mhr_id, date, time, staff_id, purpose, notes)
+        try:
+            rows = self.ctx.execute_query(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException as e:
+            logger.error("Error inserting postpartum visit schedule for mhr %s: %s", mhr_id, getattr(e, 'message', e))
+            if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
+                raise MaternalHealthRecordException(e.message) from e
+            raise e
 
     def fetch_latest_maternal_health_record_id_by_person_id(self, person_id: int):
         """Return the most recent maternal_record_id for a given person_id.
@@ -85,6 +111,60 @@ class MaternalHealthRecordRepository:
             return rows[0] if rows else None
         except QueryExecutionException as e:
             logger.error("Error fetching maternal health record status for mhr %s: %s", maternal_record_id, getattr(e, 'message', e))
+            raise
+        
+    def fetch_maternal_visit_statuses_by_mhr_id(self, mhr_id: int):
+        """
+        Return a list of maternal visit schedule rows for the given maternal_record_id.
+
+        Each item is a dict with keys:
+          - maternal_visit_schedule_id
+          - scheduled_date (date)
+          - scheduled_time (time)
+          - status_id
+          - status_name
+        """
+        sql = """
+            SELECT s.maternal_visit_schedule_id, s.scheduled_date, s.scheduled_time,
+                   s.status_id, ss.status_name
+            FROM public.maternal_visit_schedule AS s
+            LEFT JOIN public.schedule_status AS ss ON ss.status_id = s.status_id
+            WHERE s.maternal_record_id = %s
+            ORDER BY s.scheduled_date DESC, s.scheduled_time DESC;
+        """
+        params = (mhr_id,)
+        try:
+            rows = self.ctx.execute_query_to_dict(sql, params)
+            return rows or []
+        except QueryExecutionException as e:
+            logger.error("Error fetching maternal visit statuses for mhr %s: %s", mhr_id, getattr(e, 'message', e))
+            raise
+
+    def fetch_postpartum_visit_statuses_by_mhr_id(self, mhr_id: int):
+        """
+        Return a list of postpartum visit schedule rows for the given maternal_record_id.
+
+        Each item is a dict with keys:
+          - postpartum_visit_schedule_id
+          - scheduled_date (date)
+          - scheduled_time (time)
+          - status_id
+          - status_name
+        """
+        sql = """
+            SELECT s.postpartum_visit_schedule_id, s.scheduled_date, s.scheduled_time,
+                   s.status_id, ss.status_name
+            FROM public.postpartum_visit_schedule AS s
+            LEFT JOIN public.schedule_status AS ss ON ss.status_id = s.status_id
+            WHERE s.maternal_record_id = %s
+            ORDER BY s.scheduled_date DESC, s.scheduled_time DESC;
+        """
+        params = (mhr_id,)
+        try:
+            rows = self.ctx.execute_query_to_dict(sql, params)
+            return rows or []
+        except QueryExecutionException as e:
+            logger.error("Error fetching postpartum visit statuses for mhr %s: %s", mhr_id, getattr(e, 'message', e))
             raise
         
     def fetch_all_mhr_completion_status(self):
