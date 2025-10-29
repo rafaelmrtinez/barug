@@ -548,6 +548,96 @@ class MaternalHealthRecordRepository:
             logger.error("Error fetching MHR completion status: %s", getattr(e, 'message', e))
             raise
 
+    def fetch_latest_maternal_health_record_id_by_person_id(self, person_id: int):
+        """Return the most recent maternal_record_id for a given person_id.
+
+        Returns the maternal_record_id (int) or None if no record exists.
+        """
+        sql = """
+            SELECT maternal_record_id
+            FROM public.maternal_health_record
+            WHERE person_id = %s
+            ORDER BY created_at DESC NULLS LAST, maternal_record_id DESC
+            LIMIT 1;
+        """
+        params = (person_id,)
+        try:
+            rows = self.ctx.execute_query_to_dict(sql, params)
+            return rows[0]['maternal_record_id'] if rows else None
+        except QueryExecutionException as e:
+            logger.error("Error fetching latest maternal health record id for person %s: %s", person_id, getattr(e, 'message', e))
+            raise
+        
+    def insert_maternal_visit_and_schedule_completion(self, mhr_id, staff_id):
+        sql="""SELECT * FROM complete_maternal_visit_and_schedule(%s::INTEGER, %s::INTEGER);"""
+        params = (mhr_id, staff_id)
+        try:
+            rows = self.ctx.execute_query(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException as e:
+            logger.error("Error inserting maternal visit and schedule for mhr %s: %s", mhr_id, getattr(e, 'message', e))
+            if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
+                raise MaternalHealthRecordException(e.message) from e
+            raise e
+
+    def update_maternal_record_status(self, mhr_id, status_id, staff_id):
+        sql = """SELECT * FROM set_maternal_record_status(%s::INTEGER, %s::INTEGER, %s::INTEGER);"""
+        params = (mhr_id, status_id, staff_id)
+        try:
+            rows = self.ctx.execute_query(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException as e:
+            logger.error("Error updating maternal record status for mhr %s: %s", mhr_id, getattr(e, 'message', e))
+            if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
+                raise MaternalHealthRecordException(e.message) from e
+            raise e
+        
+    def fetch_maternal_health_record_status_by_mhr_id(self, maternal_record_id: int):
+        """
+        Return the record status id and name for a given maternal_record_id.
+
+        Example return:
+            { 'record_status_id': 1, 'record_status_name': 'ONGOING' }
+        or None if not found.
+        """
+        sql = """
+            SELECT
+                m.record_status_id,
+                rs.record_status_name
+            FROM public.maternal_health_record AS m
+            LEFT JOIN public.record_status AS rs
+                ON rs.record_status_id = m.record_status_id
+            WHERE m.maternal_record_id = %s
+            LIMIT 1;
+        """
+        params = (maternal_record_id,)
+        try:
+            rows = self.ctx.execute_query_to_dict(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException as e:
+            logger.error("Error fetching maternal health record status for mhr %s: %s", maternal_record_id, getattr(e, 'message', e))
+            raise
+        
+    def fetch_all_mhr_completion_status(self):
+        """
+        Return all possible maternal health record completion statuses as a list of dicts
+        with keys: 'record_status_id' and 'record_status_name'.
+
+        Example return:
+            [(1, 'ONGOING'), (2, 'COMPLETE'), (3, 'INCOMPLETE')]
+        """
+        sql = """
+            SELECT record_status_id, record_status_name
+            FROM public.record_status
+            ORDER BY record_status_id;
+        """
+        try:
+            rows = self.ctx.execute_query(sql, ())
+            return rows or []
+        except QueryExecutionException as e:
+            logger.error("Error fetching MHR completion status: %s", getattr(e, 'message', e))
+            raise
+
     def insert_anc_row_findings(self, mhr_id, staff_id, aog_weeks, aog_days, weight, bp_systolic, bp_diastolic):
         sql = """SELECT * FROM _get_or_create_today_maternal_visit(%s::INTEGER, %s::INTEGER, %s::INTEGER, %s::INTEGER, %s::NUMERIC, %s::INTEGER, %s::INTEGER);"""
         params = (mhr_id, staff_id, aog_weeks, aog_days, weight, bp_systolic, bp_diastolic)
