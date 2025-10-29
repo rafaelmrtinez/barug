@@ -32,7 +32,7 @@ class ImageDownloadService:
         self.bucket = bucket_name
 
     def _collect_image_urls(self, mhr_id: int) -> List[Tuple[str, str]]:
-        """Return list of tuples (fetch_url, filename, folder) for images attached to mhr.
+        """Return list of tuples (fetch_url, filename) for images attached to mhr.
 
         Attempts to normalise storage paths into public URLs when possible.
         """
@@ -73,22 +73,7 @@ class ImageDownloadService:
                             # fallback: treat the stored value as a path and try to fetch it directly
                             fetch_url = s
                         filename = os.path.basename(s.split('?')[0]) or f'image-{len(urls)}'
-                    # determine folder name for this lab row so files are grouped
-                    lab_name = None
-                    try:
-                        lab_name = r.get('lab_test_type_name') or r.get('lab_test_name') or r.get('lab_test') or r.get('lab_test_id')
-                    except Exception:
-                        lab_name = None
-                    # sanitize folder name
-                    folder = str(lab_name) if lab_name is not None else 'unknown_test'
-                    # replace problematic chars
-                    folder = folder.strip()
-                    # keep only safe characters
-                    import re
-                    folder = re.sub(r'[^A-Za-z0-9 _-]', '_', folder)
-                    folder = folder.replace(' ', '_') or 'unknown_test'
-
-                    urls.append((fetch_url, filename, folder))
+                    urls.append((fetch_url, filename))
                 except Exception:
                     logger.exception('Failed to normalise image entry: %s', img)
                     continue
@@ -115,24 +100,20 @@ class ImageDownloadService:
         # set a short timeout for each request
         timeout = 30
 
-        for fetch_url, filename, folder in urls:
+        for fetch_url, filename in urls:
             try:
                 resp = session.get(fetch_url, timeout=timeout, stream=True)
                 if resp.status_code == 200:
                     # read content in chunks and write into an in-memory buffer
                     content = resp.content
-                    # Ensure filenames are unique within the zip (within folder)
-                    # We'll list existing names in the target folder
-                    existing = [n for n in zf.namelist() if n.startswith(folder + '/')]
+                    # Ensure filenames are unique within the zip
                     unique_name = filename
                     idx = 1
-                    name_root, ext = os.path.splitext(filename)
-                    candidate = f"{folder}/{unique_name}"
-                    while candidate in existing:
+                    while unique_name in zf.namelist():
+                        name_root, ext = os.path.splitext(filename)
                         unique_name = f"{name_root}-{idx}{ext}"
-                        candidate = f"{folder}/{unique_name}"
                         idx += 1
-                    zf.writestr(candidate, content)
+                    zf.writestr(unique_name, content)
                 else:
                     logger.warning('Failed to fetch %s (status=%s); skipping', fetch_url, resp.status_code)
             except Exception:
