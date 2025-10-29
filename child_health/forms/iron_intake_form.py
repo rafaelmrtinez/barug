@@ -1,7 +1,7 @@
 from datetime import datetime
 from django import forms
 from barug.utility.custom_date_time_util import DateAndTimeUtility
-from child_health.repository import ChildHealthRecordRepository
+from src.infra.repositories.child_health_record_repository import ChildHealthRecordRepository
 from maternal.forms.maternal_identification_form import add_bootstrap_classes
 
 class IronIntakeForm(forms.Form):

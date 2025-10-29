@@ -4,7 +4,7 @@ from psycopg2.extras import Json
 from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.exceptions.query_exec_exception import QueryExecutionException
 
-from maternal.exceptions.maternal_exceptions import MaternalHealthRecordException
+from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
 import logging
 
 logger = logging.getLogger(__name__)

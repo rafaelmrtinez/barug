@@ -1,7 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 
-from child_health.repository import ChildHealthRecordRepository
+from src.infra.repositories.child_health_record_repository import ChildHealthRecordRepository
 from maternal.forms.maternal_identification_form import add_bootstrap_classes
 
 

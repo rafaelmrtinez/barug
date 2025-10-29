@@ -13,7 +13,7 @@ from authentication.utils import nocache
 from barug.utility.custom_date_time_util import DateAndTimeUtility
 from barug.utility.lazy_repository import LazyRepositoryProxy
 from barug.utility.messages_util import MessageUtility
-from child_health.exception.child_health_record_exception import ChildHealthRecordException
+from src.infra.exceptions.child_health_record_exception import ChildHealthRecordException
 from child_health.forms.child_bf_form import ChildBreastFeedingForm
 from child_health.forms.child_birth_supplemention import BirthAndSupplentationForm
 from child_health.forms.child_immunization_form import ChildImmunizationForm
@@ -22,7 +22,7 @@ from child_health.forms.child_visit_form import ChildVisitForm
 from child_health.forms.iron_intake_form import IronIntakeForm
 from child_health.forms.newborn_screening_form import NewbornScreeningForm
 from child_health.forms.vitamin_form import VitaminForm
-from child_health.repository import ChildHealthRecordRepository
+from src.infra.repositories.child_health_record_repository import ChildHealthRecordRepository
 from src.app.services.child_health_services import ChildHealthService
 from src.app.transfer_objects.request.child_health_version_two.child_monitoring_log import ChildMonitoringLog
 from src.app.transfer_objects.request.child_health_version_two.immunization_request import ImmunizationRequestVersion2

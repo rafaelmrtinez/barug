@@ -5,7 +5,7 @@ from django.forms.widgets import ClearableFileInput
 
 from maternal.forms.maternal_identification_form import add_bootstrap_classes
 from maternal.forms.widgets import MultiImageInput
-from maternal.repository import MaternalHealthRecordRepository
+from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
 
 
 class LaboratoryForm(forms.Form):

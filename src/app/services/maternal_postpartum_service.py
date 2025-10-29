@@ -1,8 +1,8 @@
 from datetime import date, time
 from typing import Any, Dict, Optional
 
-from maternal.repository import MaternalHealthRecordRepository
-from maternal.exceptions.maternal_exceptions import MaternalHealthRecordException
+from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
+from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
 
 
 def _to_bool(val: Any) -> bool:

@@ -1,7 +1,7 @@
 from django import forms
 
 from maternal.forms.maternal_identification_form import add_bootstrap_classes
-from maternal.repository import MaternalHealthRecordRepository
+from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
 from barug.utility.custom_date_time_util import DateAndTimeUtility
 
 

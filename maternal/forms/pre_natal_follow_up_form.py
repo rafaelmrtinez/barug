@@ -2,7 +2,7 @@ from django import forms
 
 from typing import Optional
 from maternal.forms.maternal_identification_form import add_bootstrap_classes
-from maternal.repository import MaternalHealthRecordRepository
+from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
 from maternal.forms.form_utils import FormUtils
 
 

@@ -1,4 +1,4 @@
-from maternal.exceptions.maternal_exceptions import MaternalHealthRecordException
+from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
 
 
 class MaternalScheduleDomainService:

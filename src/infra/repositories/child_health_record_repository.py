@@ -1,5 +1,5 @@
 from datetime import date
-from child_health.exception.child_health_record_exception import ChildHealthRecordException
+from src.infra.exceptions.child_health_record_exception import ChildHealthRecordException
 from src.app.transfer_objects.request.child_health_version_two.child_monitoring_log import ChildMonitoringLog
 from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.exceptions.query_exec_exception import QueryExecutionException

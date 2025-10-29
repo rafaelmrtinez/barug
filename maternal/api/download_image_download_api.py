@@ -7,7 +7,7 @@ from django.views.decorators.csrf import csrf_protect as csrf_required
 
 from authentication.guards import session_login_required, role_required
 from src.infra.database.connection_adapter import ConnectionAdapter
-from maternal.repository import MaternalHealthRecordRepository
+from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
 from src.app.services.image_download_service import ImageDownloadService
 
 

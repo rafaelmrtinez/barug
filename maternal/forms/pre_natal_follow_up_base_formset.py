@@ -2,7 +2,7 @@ from typing import Optional
 
 from django.forms import BaseFormSet, formset_factory
 from maternal.forms.pre_natal_follow_up_form import PrenatalFollowUpEntryForm
-from maternal.repository import MaternalHealthRecordRepository
+from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
 
 
 class PrenatalFollowUpBaseFormSet(BaseFormSet):

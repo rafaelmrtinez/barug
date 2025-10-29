@@ -3,7 +3,7 @@ from django import forms
 import logging
 
 from maternal.forms.maternal_identification_form import add_bootstrap_classes
-from maternal.repository import MaternalHealthRecordRepository
+from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
 
 logger = logging.getLogger(__name__)
 
