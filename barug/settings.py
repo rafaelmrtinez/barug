@@ -93,7 +93,8 @@ INSTALLED_APPS = [
     "midwife",
     "payments",
     "notifications",
-    "corsheaders"
+    "corsheaders",
+    "common",
 ]
 
 MIDDLEWARE = [
@@ -137,6 +138,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "authentication.context_processors.auth_context",
+                'django.template.context_processors.media',
                 "lupon_mem.context_processors.lupon_badge_counts",
                 "clerk.context_processors.app_badge_counts",
             ],
@@ -162,10 +164,8 @@ SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET")
 SUPABASE_ID_UPLOADS_BUCKET = os.getenv("SUPABASE_ID_UPLOADS_BUCKET", "id-uploads")
-SUPABASE_OCR_TEST_BUCKET = os.getenv("SUPABASE_OCR_TEST_BUCKET", "ocr-testing")
-
-MEDIA_ROOT = BASE_DIR / "media"        
-MEDIA_URL  = "/media/"
+SUPABASE_OCR_TEST_BUCKET = os.getenv("SUPABASE_OCR_TEST_BUCKET ", "ocr-testing")
+SUPABASE_BUSINESS_PROOF_BUCKET = os.getenv("SUPABASE_BUSINESS_PROOF_BUCKET", "business-proofs")
 
 DATABASES = {
     "default": {
@@ -175,12 +175,17 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD"),
         "HOST": os.getenv("DB_HOST"),
         "PORT": os.getenv("DB_PORT"),
-        # "OPTIONS": {"sslmode": "require"},  # <-- add this for Supabase
         "OPTIONS": {
             "sslmode": "require",
+<<<<<<< HEAD
             "connect_timeout": 100,     # fail fast instead of hanging
             "options": "-c statement_timeout=5000"  # 5s cap per statement (protects slow queries)
         },  # <-- add this for Supabase
+=======
+            "connect_timeout": 20,
+            "options": "-c statement_timeout=5000"
+        }, 
+>>>>>>> fc133096acc5b58547bda2bf7d9a37757d2b78d0
         "CONN_MAX_AGE": 120,
     }
 }
@@ -266,6 +271,9 @@ CACHES = {
     }
 }
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
@@ -278,7 +286,7 @@ STATICFILES_DIRS = [
     # os.path.join(BASE_DIR, "event_logs/static/event_logs"),
     os.path.join(BASE_DIR, "resident/static/resident"),
     os.path.join(BASE_DIR, "bhw/static/bhw"),
-    # os.path.join(BASE_DIR, "clerk/static/clerk"),
+    os.path.join(BASE_DIR, "clerk/static/clerk"),
 ]
 
 # STATICFILES_DIRS = [

@@ -1,0 +1,21 @@
+{# _household_list.html #}
+{% for r in rows %}
+<tr>
+  <td>
+    <span class="id-pill">{{ r.household_num }}</span>
+  </td>
+  <td>{{ r.household_head }}</td>
+  <td>{{ r.household_address }}</td>
+  <td><span class="cat-badge">{{ r.house_type_name }}</span></td>
+  <td>{{ r.household_ownership_name }}</td>
+  <td class="text-end">
+    <a class="btn btn-outline-brand btn-sm" href="#">
+        View
+    </a>
+  </td>
+</tr>
+{% empty %}
+<tr>
+  <td colspan="9" class="text-center py-3 text-muted">No households found.</td>
+</tr>
+{% endfor %}

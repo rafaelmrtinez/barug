@@ -1,6 +1,8 @@
 from django.urls import path
 from . import views
 from . import web_views
+from django.conf import settings
+from django.conf.urls.static import static
 
 app_name = 'clerk'
 
@@ -36,16 +38,27 @@ urlpatterns = [
     path("account-verification/<int:req_id>/approve/", views.approve_request, name="approve_request"),
     path("account-verification/<int:req_id>/decision/", views.decision_request, name="decision_request"),
 
-    # business
+    # BUSINESS
     path("business/business_owner/", views.business_owner, name="business_owner"),
     path("business/business_owner_resident/", views.business_owner_resident, name="business_owner_resident"),
     path("business/business_owner_non-resident/", views.business_owner_nonresident, name="business_owner_nonres"),
     path("business/business_details/", views.business_details, name="business_details"),
-    path("business_list/", views.business_list, name="business_list"),
-    path("business_information/<int:b_id>/", views.business_information, name="business_information"),
+    path("business/business_information_review/", views.business_information_review, name="business_information_review"),
+    path("business/business_list/", views.business_list, name="business_list"),
+    path("business/business_information/<int:b_id>/", views.business_information, name="business_information"),
+    path("business/business_map/", views.business_map_list, name="business_map_list"),
+    path("business/business_renewal/", views.renewal_list, name="renewal_list"),
+    path("business/create_renewal_request/<int:b_id>/", views.create_renewal_request, name="create_renewal_request"),
+    path("business/renewal_request/", views.renewal_request, name="renewal_request"),
 
     # OCR
     path('upload-id/', web_views.upload_valid_id_files, name='upload_id_files'),
     path("valid-id/upload/", web_views.upload_valid_id_files, name="valid_id_upload"),
     path("valid-id/test/", web_views.upload_valid_id_test_page, name="valid_id_test"),
+
+    path("ajax/business_search/", views.ajax_business_search, name="ajax_business_search"),
+    path("ajax/business_renewal_search/", views.ajax_business_search, name="ajax_renewal_search"),
+    path("ajax/resident_owner_search/", views.ajax_owner_search, name="ajax_owner_search"),
+    path("ajax/nonresident_owner_search/", views.ajax_nonresident_owner_search, name="ajax_nonresident_owner_search"),
+    path("api/business/pins", views.api_business_pins, name="api_business_pins"),
 ]

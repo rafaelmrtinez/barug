@@ -1,0 +1,88 @@
+
+  :root{
+    --brand-700:#6d2932; --brand-800:#561c24; --accent:#D4AF37;
+    --ink:#212529; --muted:#6c757d; --bg:#faf9f8; --ring:rgba(123,30,34,.18);
+  }
+  html,body{ background:var(--bg); }
+  .page-wrap{ max-width:1200px; margin:0 auto; padding:1.25rem; }
+
+  /* MAP + LEGEND */
+  #purokMap{ width:100%; height:420px; border-radius:12px; overflow:hidden; }
+    .legend{
+    position: absolute;
+    z-index: 2;
+    right: 12px;
+    bottom: 56px;   /* clears Mapbox attribution; tweak if needed */
+    top: auto;      /* make sure top is unset */
+    background:#fff;
+    border:1px solid rgba(0,0,0,.08);
+    border-radius:10px;
+    padding:.6rem .75rem;
+    font: 600 12px/1.2 system-ui, sans-serif;
+    box-shadow:0 6px 20px rgba(0,0,0,.06);
+    }
+
+  .legend h4{ margin:0 0 .4rem; font-size:12px; font-weight:800; letter-spacing:.02em; }
+  .legend .item{ display:flex; align-items:center; gap:.5rem; margin:.25rem 0; }
+  .legend .swatch{ width:14px; height:14px; border-radius:3px; border:1px solid rgba(0,0,0,.08); }
+
+  /* SEARCH + FILTERS */
+  .filters-card{
+    background:#fff; border:1px solid rgba(0,0,0,.06); border-radius:14px;
+    padding:1rem; margin-top:1rem; box-shadow:0 6px 24px rgba(0,0,0,.04);
+  }
+  .filters-grid{
+    display:grid; gap:.75rem;
+    grid-template-columns: repeat(12, 1fr);
+  }
+  .filters-grid > .cell-3{ grid-column: span 3; }
+  .filters-grid > .cell-2{ grid-column: span 2; }
+  .filters-grid > .cell-4{ grid-column: span 4; }
+  .filters-grid > .cell-6{ grid-column: span 6; }
+  .filters-actions{ display:flex; gap:.5rem; align-items:end; }
+
+  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
+  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
+  .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); background:#fff; }
+  .btn-outline-brand:hover{ background:var(--brand-700); color:#fff; }
+
+  /* RESULTS */
+  .results-wrap{ margin-top:1rem; }
+  .results-header{ display:flex; justify-content:space-between; align-items:center; margin:.5rem 0 .75rem; }
+  .results-count{ font-weight:600; color:var(--muted); }
+  .biz-card{
+    background:#fff; border:1px solid rgba(0,0,0,.06); border-radius:14px; padding:1rem;
+    box-shadow:0 6px 24px rgba(0,0,0,.04);
+  }
+  .biz-title{ font-size:1.05rem; font-weight:800; color:var(--ink); margin:0; }
+  .biz-sub{ color:var(--muted); font-size:.9rem; }
+  .badge{
+    display:inline-block; padding:.28rem .55rem; border-radius:.5rem; font-size:.75rem; font-weight:700;
+    border:1px solid rgba(0,0,0,.06); background:#fff;
+  }
+  .badge-status{ color:#fff; background:var(--brand-700); border-color:transparent; }
+  .biz-grid{
+    display:grid; grid-template-columns: 1.5fr 1fr auto; gap:.75rem; align-items:center;
+  }
+  .biz-meta{ display:flex; flex-wrap:wrap; gap:.4rem .75rem; font-size:.85rem; }
+  .meta-label{ color:var(--muted); }
+  .meta-val{ font-weight:600; }
+  .card-actions{ display:flex; gap:.5rem; justify-content:flex-end; }
+  .empty-state{
+    text-align:center; padding:2rem; color:var(--muted); background:#fff; border-radius:12px;
+    border:1px solid rgba(0,0,0,.06);
+  }
+
+  @media (max-width: 900px){
+    .filters-grid{ grid-template-columns: repeat(6, 1fr); }
+    .filters-grid > .cell-3{ grid-column: span 3; }
+    .filters-grid > .cell-2{ grid-column: span 3; }
+    .filters-grid > .cell-4{ grid-column: span 6; }
+    .filters-grid > .cell-6{ grid-column: span 6; }
+    .biz-grid{ grid-template-columns: 1fr; }
+    .card-actions{ justify-content:flex-start; }
+  }
+
+  .mapboxgl-ctrl-attrib a.mapbox-improve-map { 
+    display: none !important; 
+    }

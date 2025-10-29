@@ -279,7 +279,7 @@ def household_info(
 def dashboard(request: HttpRequest) -> HttpResponse:
     auth = request.session.get("auth")
     profile = getattr(request, "person_profile", None)
-    return render(request, "bhw/dashboard.html", {
+    return render(request, "bhw_dashboard.html", {
         "page_path": "Barangay Health Worker/Dashboard",
         "page_title": "Dashboard",
         "profile": profile,
@@ -402,19 +402,6 @@ def maternal_new(request: HttpRequest) -> HttpResponse:
         "page_path": "Barangay Health Worker / Maternal Records / New",
         "page_title": "New Maternal Record (BHW Intake)",
         "form": form,
-    })
-
-@session_login_required
-@role_required(*hv.ROLE_BHW)
-@nocache
-def dashboard(request: HttpRequest) -> HttpResponse:
-    auth = request.session.get("auth")
-    profile = getattr(request, "person_profile", None)
-    return render(request, "bhw/dashboard.html", {
-        "page_path": "Barangay Health Worker/Dashboard",
-        "page_title": "Dashboard",
-        "profile": profile,
-        "auth": auth,
     })
 
 @session_login_required

@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<style>
+  :root{
+    --brand-900:#3a1217;
+    --brand-800:#561c24;
+    --brand-700:#6d2932; /* primary maroon */
+    --brand-600:#7a3232;
+    --brand-100:#f3eaeb;
+    --brand-050:#fbf6f7;
+    --accent-500:#D4AF37; /* gold */
+    --ok:#22c55e;        /* green */
+    --warn:#f59e0b;      /* amber */
+    --danger:#ef4444;    /* red */
+    --muted:#718096;     /* gray */
+  }
+  .page-title{display:flex;align-items:center;gap:.6rem;margin-bottom:1rem}
+  .page-title .badge-role{background:var(--brand-100);color:var(--brand-700);border:1px solid var(--brand-700);padding:.25rem .55rem;border-radius:999px;font-size:.8rem}
+  .subtle{color:var(--muted);}
+  .card{border:1px solid #eee;border-radius:1rem;overflow:hidden;box-shadow:0 6px 16px rgba(0,0,0,.04)}
+  .card-header{display:flex;align-items:center;justify-content:space-between;padding:.8rem 1rem;background:linear-gradient(180deg,#fff, var(--brand-050));border-bottom:1px solid #eee}
+  .card-title{font-weight:700;color:var(--brand-800);margin:0}
+  .chip{display:inline-flex;align-items:center;gap:.35rem;border:1px solid #e5e7eb;border-radius:999px;padding:.25rem .6rem;font-size:.8rem;background:#fff}
+  .chip .dot{width:.5rem;height:.5rem;border-radius:999px;display:inline-block}
+  .chip.ok .dot{background:var(--ok)}
+  .chip.warn .dot{background:var(--warn)}
+  .chip.danger .dot{background:var(--danger)}
+  .stat-card{padding:1rem}
+  .stat-val{font-size:1.6rem;font-weight:800;color:var(--brand-900)}
+  .stat-label{font-size:.85rem;color:var(--muted)}
+  .stat-trend{font-size:.8rem}
+  .quick-actions .btn{border-radius:.8rem}
+  .btn-brand{background:var(--brand-700);color:#fff}
+  .btn-brand:hover{background:var(--brand-800);color:#fff}
+  .table thead th{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .table tbody td{vertical-align:middle}
+  .kpi{display:flex;align-items:center;gap:.6rem}
+  .kpi i{font-size:1.25rem;color:var(--brand-700)}
+  .pill{padding:.25rem .55rem;border-radius:999px;font-size:.75rem;border:1px solid #e5e7eb;background:#fff}
+  .pill.brand{border-color:var(--brand-700);color:var(--brand-700);background:var(--brand-100)}
+  .header-actions{display:flex;gap:.5rem;align-items:center}
+  .searchbar{display:flex;gap:.5rem}
+  .searchbar input{border-radius:.7rem}
+  .empty{padding:2rem;text-align:center;color:var(--muted)}
+  @media (max-width: 768px){
+    .grid-sm{display:grid;grid-template-columns:1fr;gap:1rem}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3" style="margin-top: 40px;">
+  <!-- PAGE HEADER -->
+  <p class="subtle mb-3">Today is · <span class="text-success"> bhw name</span></p>
+
+  <!-- TOP STATS -->
+  <div class="row g-3">
+    <div class="col-12 col-md-3">
+      <div class="card h-100">
+        <div class="card-header">
+          <span class="kpi">{% bs_icon "calendar-event" %}<span class="card-title">Today’s Visits</span></span>
+          <span class="chip ok"><span class="dot"></span> On Track</span>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val">{{ kpi_today_visits|default:12 }}</div>
+          <div class="stat-label">Child + Maternal schedules</div>
+          <div class="stat-trend text-success">{% bs_icon "arrow-up-right" %} +2 vs yesterday</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-3">
+      <div class="card h-100">
+        <div class="card-header">
+          <span class="kpi">{% bs_icon "capsule" %}<span class="card-title">Immunizations Due</span></span>
+          <span class="chip warn"><span class="dot"></span> Due Soon</span>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val">{{ kpi_immun_due|default:7 }}</div>
+          <div class="stat-label">Within next 7 days</div>
+          <div class="stat-trend text-warning">{% bs_icon "exclamation-triangle" %} Check vax stock</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-3">
+      <div class="card h-100">
+        <div class="card-header">
+          <span class="kpi">{% bs_icon "droplet" %}<span class="card-title">Vitamin A / Iron</span></span>
+          <span class="chip ok"><span class="dot"></span> Routine</span>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val">{{ kpi_micronutrients|default:4 }}</div>
+          <div class="stat-label">Pending supplements</div>
+          <div class="stat-trend text-success">{% bs_icon "check2-circle" %} Supplies ready</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-3">
+      <div class="card h-100">
+        <div class="card-header">
+          <span class="kpi">{% bs_icon "shield-exclamation" %}<span class="card-title">Alerts</span></span>
+          <span class="chip danger"><span class="dot"></span> Action</span>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val">{{ kpi_alerts|default:3 }}</div>
+          <div class="stat-label">Missed visits / follow-ups</div>
+          <div class="stat-trend text-danger">{% bs_icon "bell" %} Send reminders</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUICK ACTIONS -->
+  <div class="card my-3">
+    <div class="card-header">
+      <h5 class="card-title m-0">Quick Actions</h5>
+      <div class="header-actions">
+        <div class="searchbar">
+          <input type="text" class="form-control form-control-sm" placeholder="Search resident / ID…">
+          <button class="btn btn-outline-secondary btn-sm">{% bs_icon "search" %}</button>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="row g-2 quick-actions">
+        <div class="col-6 col-md-3 d-grid"><a href="#" class="btn btn-brand">{% bs_icon "person-lines-fill" %} Record Child Visit</a></div>
+        <div class="col-6 col-md-3 d-grid"><a href="#" class="btn btn-outline-secondary">{% bs_icon "journal-medical" %} New Maternal ANC</a></div>
+        <div class="col-6 col-md-3 d-grid"><a href="#" class="btn btn-outline-secondary">{% bs_icon "calendar-plus" %} Schedule Follow‑up</a></div>
+        <div class="col-6 col-md-3 d-grid"><a href="#" class="btn btn-outline-secondary">{% bs_icon "bar-chart" %} Generate Report</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TWO COLUMNS: LEFT tables / RIGHT reminders -->
+  <div class="row g-3">
+    <!-- LEFT: Today’s Appointments -->
+    <div class="col-12 col-lg-8">
+      <div class="card h-100">
+        <div class="card-header">
+          <h5 class="card-title m-0">Today’s Appointments</h5>
+          <div class="header-actions">
+            <span class="pill brand">{{ active_purok_name|default:"Purok Pampango" }}</span>
+            <div class="dropdown">
+              <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">Filter</button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="#">All</a></li>
+                <li><a class="dropdown-item" href="#">Child</a></li>
+                <li><a class="dropdown-item" href="#">Maternal</a></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Resident</th>
+                <th>Type</th>
+                <th>Purpose</th>
+                <th>Status</th>
+                <th class="text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {# ——— STATIC SAMPLE ROWS (replace with context data) ——— #}
+              <tr>
+                <td>08:30 AM</td>
+                <td>
+                  <div class="fw-semibold">Baby Ana Cruz</div>
+                  <div class="small subtle">2 mos · Household #KAN‑023</div>
+                </td>
+                <td><span class="pill">Child</span></td>
+                <td>BCG / Hep B (W24H)</td>
+                <td><span class="chip ok"><span class="dot"></span> Confirmed</span></td>
+                <td class="text-end">
+                  <a href="#" class="btn btn-sm btn-outline-secondary">Open</a>
+                </td>
+              </tr>
+              <tr>
+                <td>10:00 AM</td>
+                <td>
+                  <div class="fw-semibold">Maria Santos</div>
+                  <div class="small subtle">ANC Visit #2 · 22w</div>
+                </td>
+                <td><span class="pill">Maternal</span></td>
+                <td>ANC + TT2</td>
+                <td><span class="chip warn"><span class="dot"></span> Walk‑in</span></td>
+                <td class="text-end">
+                  <a href="#" class="btn btn-sm btn-outline-secondary">Open</a>
+                </td>
+              </tr>
+              <tr>
+                <td>01:30 PM</td>
+                <td>
+                  <div class="fw-semibold">Juan Dela Cruz</div>
+                  <div class="small subtle">1 yr 2 mos</div>
+                </td>
+                <td><span class="pill">Child</span></td>
+                <td>Vit A Stage 2</td>
+                <td><span class="chip danger"><span class="dot"></span> Overdue</span></td>
+                <td class="text-end">
+                  <a href="#" class="btn btn-sm btn-outline-secondary">Open</a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Reminders & Inventory -->
+    <div class="col-12 col-lg-4">
+      <div class="card mb-3">
+        <div class="card-header">
+          <h6 class="card-title m-0">Reminders</h6>
+          <span class="chip warn"><span class="dot"></span> Pending</span>
+        </div>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item d-flex justify-content-between align-items-start">
+            <div class="me-3">{% bs_icon "envelope" %} Send SMS reminders to 3 missed visits</div>
+            <a href="#" class="btn btn-sm btn-outline-secondary">Send</a>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-start">
+            <div class="me-3">{% bs_icon "capsule" %} Check OPV stock (low)</div>
+            <a href="#" class="btn btn-sm btn-outline-secondary">Inventory</a>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-start">
+            <div class="me-3">{% bs_icon "calendar-week" %} Confirm next week’s outreach schedule</div>
+            <a href="#" class="btn btn-sm btn-outline-secondary">View</a>
+          </li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h6 class="card-title m-0">Follow‑ups & Schedules</h6>
+          <span class="pill">Next 7 days</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table mb-0">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Resident</th>
+                <th>Type</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Thu · 10/30</td>
+                <td class="small">
+                  <div class="fw-semibold">Baby Carlo Reyes</div>
+                  <div class="subtle">DPT‑HepB‑HiB #1</div>
+                </td>
+                <td><span class="pill">Child</span></td>
+              </tr>
+              <tr>
+                <td>Fri · 10/31</td>
+                <td class="small">
+                  <div class="fw-semibold">Rosa D.</div>
+                  <div class="subtle">ANC #3 + Lab</div>
+                </td>
+                <td><span class="pill">Maternal</span></td>
+              </tr>
+              <tr>
+                <td>Mon · 11/03</td>
+                <td class="small">
+                  <div class="fw-semibold">Baby M. Cruz</div>
+                  <div class="subtle">Iron supplement</div>
+                </td>
+                <td><span class="pill">Child</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RECENT ACTIVITY -->
+  <div class="card my-3">
+    <div class="card-header">
+      <h5 class="card-title m-0">Recent Activity</h5>
+      <span class="subtle">Last 24 hours</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Activity</th>
+            <th>Purok</th>
+            <th>Logged by</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>08:05 AM</td>
+            <td>Completed child visit for <strong>Baby Ana Cruz</strong> · BCG recorded</td>
+            <td>Pampango</td>
+            <td>{{ bhw_name|default:"BHW User" }}</td>
+          </tr>
+          <tr>
+            <td>09:20 AM</td>
+            <td>Scheduled ANC #3 for <strong>Maria Santos</strong> on Nov 3, 10:30 AM</td>
+            <td>Lutaw‑Lutaw</td>
+            <td>{{ bhw_name|default:"BHW User" }}</td>
+          </tr>
+          <tr>
+            <td>11:10 AM</td>
+            <td>Sent SMS reminder to <strong>Juan Dela Cruz (guardian)</strong></td>
+            <td>Kanipaan</td>
+            <td>{{ bhw_name|default:"BHW User" }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
