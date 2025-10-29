@@ -1,7 +1,0 @@
-POST http://127.0.0.1:8000/maternal/anc/form/3/lab/save/ HTTP/1.1
-
-{
-    "form_type": "laboratory_form",
-    "urinalysis": "Normal",
-    "urinalysis_date": "2025-10-28"
-}

@@ -42,7 +42,8 @@ class MaternalHealthRecordException(Exception):
         "P6207",  # Lab test type id not found
         "P6208",  # Duplicate lab entry in same request
         "P6209",  # Duplicate lab entry already exists in DB for that date
-        "P6275",  # Result image path required / cannot be empty (commented rules)
+        # Result image path required / cannot be empty (commented rules)
+        "P6275",
         "P6276",  # Result image path array entries must be non-empty strings
         "P6277",  # Result image path must be string or array
         # codes from maternal ANC visit/row insertion function
@@ -54,7 +55,8 @@ class MaternalHealthRecordException(Exception):
         "P6170",  # Trimester stage lookup not found
         "P6171",  # ANC record for today's visit already exists
         # codes from ANC findings/notes update function
-        "P6216",  # Only authorized staff (midwife/nurse) may update findings/notes
+        # Only authorized staff (midwife/nurse) may update findings/notes
+        "P6216",
         "P6217",  # ANC record for this visit was not found
         # codes from maternal checklist function
         "P6201",
@@ -87,15 +89,24 @@ class MaternalHealthRecordException(Exception):
         "P6221",  # Maternal health record id is required
         "P6222",  # Visit COMPLETE status not found
         "P6223",  # Schedule statuses PENDING/COMPLETED not found
-    # codes from scheduling SQL functions (prenatal/postpartum)
-    "P6218",  # Scheduled date/time required or PENDING status missing
-    "P6219",  # Duplicate exact date+time schedule (commented guard)
-    "P6220",  # Pending schedule exists for this maternal record on date
-    "P6M05",  # Provided status id does not exist (note: as-seen in SQL)
-    "P6256",  # Postpartum record not found for maternal record
-    "P6257",  # Scheduled date/time required (postpartum)
-    "P6258",  # Pending postpartum schedule already exists on date
-    "P6147",  # Pending status not found (postpartum)
+        # codes from scheduling SQL functions (prenatal/postpartum)
+        "P6218",  # Scheduled date/time required or PENDING status missing
+        "P6219",  # Duplicate exact date+time schedule (commented guard)
+        "P6220",  # Pending schedule exists for this maternal record on date
+        "P6M05",  # Provided status id does not exist (note: as-seen in SQL)
+        "P6256",  # Postpartum record not found for maternal record
+        "P6257",  # Scheduled date/time required (postpartum)
+        "P6258",  # Pending postpartum schedule already exists on date
+        "P6147",  # Pending status not found (postpartum)
+        # codes introduced by insert_postpartum_record SQL function
+        "P6247",  # Postpartum record already exists for this maternal record
+        "P6248",  # Attended-by staff not found
+        "P6249",  # Place of delivery type not found
+        "P6250",  # Pads per day baseline cannot be negative
+        "P6251",  # Time of delivery provided without a delivery date
+        "P6252",  # Date of delivery cannot be in the future
+        "P6253",  # Time of delivery cannot be in the future
+        "P6254",  # BF initiation time cannot be in the future
     }
 
     def __init__(self, message):

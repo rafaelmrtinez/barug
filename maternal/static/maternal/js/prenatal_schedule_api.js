@@ -23,47 +23,22 @@
     }
 
     function showToast(message, isSuccess = false) {
+        // Delegate to reusable MHRToast helper if available
         try {
-            // ensure toast container
-            let container = document.getElementById('mhrToastContainer');
-            if (!container) {
-                container = document.createElement('div');
-                container.id = 'mhrToastContainer';
-                container.className = 'position-fixed top-0 end-0 p-3';
-                container.style.zIndex = '10800';
-                document.body.appendChild(container);
+            if (globalThis.MHRToast && typeof globalThis.MHRToast.show === 'function') {
+                globalThis.MHRToast.show(message, isSuccess);
+                return;
             }
-
-            // create toast element
-            const toastEl = document.createElement('div');
-            toastEl.className = 'toast align-items-center text-bg-' + (isSuccess ? 'success' : 'danger') + ' border-0';
-            toastEl.role = 'alert';
-            toastEl.ariaLive = 'assertive';
-            toastEl.ariaAtomic = 'true';
-
-            const toastBody = document.createElement('div');
-            toastBody.className = 'd-flex';
-            const body = document.createElement('div');
-            body.className = 'toast-body';
-            body.textContent = message;
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'btn-close btn-close-white me-2 m-auto';
-            btn.setAttribute('data-bs-dismiss', 'toast');
-            btn.ariaLabel = 'Close';
-
-            toastBody.appendChild(body);
-            toastBody.appendChild(btn);
-            toastEl.appendChild(toastBody);
-            container.appendChild(toastEl);
-
-            const bsToast = new globalThis.bootstrap.Toast(toastEl, { delay: 4000 });
-            bsToast.show();
-            // remove after hidden
-            toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
         } catch (_err) {
-            // fallback to console
-            console.warn('Toast unavailable, message:', message);
+            // ignore and fallback
+        }
+
+        // Fallback: simple alert-like behavior
+        try {
+            // eslint-disable-next-line no-alert
+            alert((isSuccess ? 'Success: ' : 'Error: ') + String(message));
+        } catch (_err) {
+            try { console.warn('Toast fallback:', message); } catch (_e) { /* ignore */ }
         }
     }
 

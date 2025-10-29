@@ -10,7 +10,7 @@ from authentication.guards import session_login_required, role_required
 from src.infra.database.connection_adapter import ConnectionAdapter
 from maternal.repository import MaternalHealthRecordRepository
 from maternal.exceptions.maternal_exceptions import MaternalHealthRecordException
-from maternal.forms.postpartum_record_form import PostpartumRecordForm
+from src.app.services.maternal_postpartum_service import MaternalPostpartumService
 
 
 ALLOWED_ROLES = ("MIDWIFE", "Midwife", "midwife", "Barangay Health Worker", "bhw", "Super Admin")
@@ -38,65 +38,20 @@ class PostpartumRecordAPI(View):
             # use POST dict
             payload = {k: v for k, v in request.POST.items()}
 
-        form = PostpartumRecordForm(data=payload)
-        if not form.is_valid():
-            if request.content_type and 'application/json' in (request.content_type or ''):
-                return JsonResponse({'success': False, 'message': 'Validation failed.', 'errors': form.errors}, status=400)
-            # for form POST, render to same page by redirecting with message
-            # store message in session and redirect back
-            request.session['postpartum_form_errors'] = form.errors
-            return HttpResponseRedirect(request.META.get('HTTP_REFERER', '/'))
-
-        data = form.cleaned_data
-
-        # parse date/time types
-        try:
-            if isinstance(data['date_of_delivery'], str):
-                parsed_date = date.fromisoformat(data['date_of_delivery'])
-            else:
-                parsed_date = data['date_of_delivery']
-        except Exception:
-            return JsonResponse({'success': False, 'message': 'Invalid date_of_delivery.'}, status=400)
-
-        try:
-            if isinstance(data['time_of_delivery'], str):
-                parts = data['time_of_delivery'].split(':')
-                hh = int(parts[0]); mm = int(parts[1]); ss = int(parts[2]) if len(parts) > 2 else 0
-                parsed_time = time(hh, mm, ss)
-            else:
-                parsed_time = data['time_of_delivery']
-        except Exception:
-            return JsonResponse({'success': False, 'message': 'Invalid time_of_delivery.'}, status=400)
-
-        try:
-            mhr_id = int(data['maternal_record_id'])
-        except Exception:
-            return JsonResponse({'success': False, 'message': 'Invalid maternal record id.'}, status=400)
-
+        # The service layer handles validation and sanitation. Build repo+service and delegate.
         staff_id = request.session.get('auth', {}).get('staff_id')
+        staff_role = request.session.get('auth', {}).get('role_name')
         try:
             staff_id = int(staff_id)
         except Exception:
             return JsonResponse({'success': False, 'message': 'Invalid staff id in session.'}, status=400)
 
         repo = MaternalHealthRecordRepository(ConnectionAdapter())
+        service = MaternalPostpartumService(repo)
 
         try:
-            res = repo.insert_postpartum_record_bhw(
-                staff_id,
-                mhr_id,
-                parsed_date,
-                parsed_time,
-                data.get('attended_by_id'),
-                data.get('attended_by_rolename'),
-                data.get('place_of_delivery_id'),
-                data.get('outcome'),
-                bool(data.get('iron_supplementation')),
-                bool(data.get('vit_a_supplementation')),
-                bool(data.get('mebendazole_given')),
-                data.get('lochial_discharges_baseline'),
-                data.get('pads_per_day_baseline'),
-            )
+            # service will validate/sanitize payload and perform insert
+            res = service.insert_postpartum_record(payload or {}, added_by_id=staff_id, attended_by_role_name=staff_role)
         except MaternalHealthRecordException as e:
             if request.content_type and 'application/json' in (request.content_type or ''):
                 return JsonResponse({'success': False, 'message': e.message or str(e)}, status=400)

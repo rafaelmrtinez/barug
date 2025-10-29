@@ -1,3 +1,4 @@
+from datetime import date, time
 from psycopg2.extras import Json
 
 from src.infra.database.connection_adapter import ConnectionAdapter
@@ -17,10 +18,47 @@ class MaternalHealthRecordRepository:
     def __init__(self, ctx: ConnectionAdapter):
         self.ctx = ctx
         
+    def fetch_anc_trimester_tracker_by_mhr_id(self, mhr_id: int):
+        """Return ANC trimester tracker data for the given maternal_record_id.
+
+        Returns a dict with keys:
+          - maternal_record_id
+          - first_trimester_completed (bool)
+          - second_trimester_completed (bool)
+          - third_trimester_completed (bool)
+        """
+        sql = """
+            SELECT * FROM get_anc_trimester_tracker(%s::INTEGER);
+        """
+        try:
+            rows = self.ctx.execute_query_to_dict(sql, (mhr_id,))
+            return rows if rows else None
+        except QueryExecutionException as e:
+            logger.error("Error fetching ANC trimester tracker for mhr %s: %s", mhr_id, getattr(e, 'message', e))
+            raise
+
+    def fetch_all_delivery_plan(self):
+        """Return all delivery place types from the database.
+
+        Uses self.ctx.execute_query (returns list of tuples) to match caller expectation.
+        Returns a list of rows or an empty list on no results.
+        """
+        sql = """
+            SELECT delivery_place_type_id, delivery_place_type_name
+            FROM public.delivery_place_type
+            ORDER BY delivery_place_type_id;
+        """
+        try:
+            rows = self.ctx.execute_query(sql, ())
+            return rows or []
+        except QueryExecutionException as e:
+            logger.error("Error fetching delivery place types: %s", getattr(e, 'message', e))
+            raise
+        
     def insert_postpartum_record_bhw(
-        self, staff_id, mhr_id, date_of_delivery, time_of_delivery, attended_by_id,
-        attended_by_role_name, place_of_delivery_id, outcome, iron_supplementation,
-        vit_a_supplementation, mebendazole_given, lochial_discharges_baseline, pads_per_day_baseline):
+        self, p_added_by_id: int, p_maternal_record_id: int, p_date_of_delivery: date, p_time_of_delivery: time, p_attended_by_id: int,
+        p_attended_by_rolename: str, p_place_of_delivery_id: int, p_outcome: str, p_iron_supplementation: bool,
+        p_vit_a_supplementation: bool, p_mebendazole_given: bool, p_lochial_discharges_baseline: int, p_pads_per_day_baseline):
         """Insert a postpartum record (BHW) using DB function
 
         Parameter order aligns with DB function signature:
@@ -29,27 +67,27 @@ class MaternalHealthRecordRepository:
           p_iron_supplementation, p_vit_a_supplementation, p_mebendazole_given,
           p_lochial_discharges_baseline, p_pads_per_day_baseline
         """
-        sql = """SELECT * FROM insert_postpartum_record_bhw(%s::INTEGER, %s::INTEGER, %s::DATE, %s::TIME, %s::INTEGER, %s::TEXT, %s::INTEGER, %s::TEXT, %s::BOOLEAN, %s::BOOLEAN, %s::BOOLEAN, %s::TEXT, %s::INTEGER);"""
+        sql = """SELECT * FROM create_postpartum_record_bhw(%s::INTEGER, %s::INTEGER, %s::DATE, %s::TIME, %s::INTEGER, %s::TEXT, %s::INTEGER, %s::TEXT, %s::BOOLEAN, %s::BOOLEAN, %s::BOOLEAN, %s::TEXT, %s::INTEGER);"""
         params = (
-            staff_id,
-            mhr_id,
-            date_of_delivery,
-            time_of_delivery,
-            attended_by_id,
-            attended_by_role_name,
-            place_of_delivery_id,
-            outcome,
-            iron_supplementation,
-            vit_a_supplementation,
-            mebendazole_given,
-            lochial_discharges_baseline,
-            pads_per_day_baseline,
+            p_added_by_id,
+            p_maternal_record_id,
+            p_date_of_delivery,
+            p_time_of_delivery,
+            p_attended_by_id,
+            p_attended_by_rolename,
+            p_place_of_delivery_id,
+            p_outcome,
+            p_iron_supplementation,
+            p_vit_a_supplementation,
+            p_mebendazole_given,
+            p_lochial_discharges_baseline,
+            p_pads_per_day_baseline,
         )
         try:
             rows = self.ctx.execute_query(sql, params)
             return rows[0] if rows else None
         except QueryExecutionException as e:
-            logger.error("Error inserting postpartum record for mhr %s: %s", mhr_id, getattr(e, 'message', e))
+            logger.error("Error inserting postpartum record for mhr %s: %s", p_maternal_record_id, getattr(e, 'message', e))
             if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
                 raise MaternalHealthRecordException(e.message) from e
             raise e
@@ -201,6 +239,294 @@ class MaternalHealthRecordRepository:
         except QueryExecutionException as e:
             logger.error("Error fetching postpartum visit statuses for mhr %s: %s", mhr_id, getattr(e, 'message', e))
             raise
+        
+    def fetch_latest_scheduled_visit_by_mhr_id(self, maternal_record_id: int):
+        """
+        Return the most recent scheduled visit (either prenatal or postpartum) for the
+        given maternal_record_id.
+
+        The query unions `maternal_visit_schedule` and `postpartum_visit_schedule` and
+        orders by scheduled_date, scheduled_time and created_at descending to pick
+        the latest scheduled visit row. Returns a dict or None.
+        """
+        sql = """
+        SELECT * FROM (
+            SELECT
+                'maternal'::text AS visit_type,
+                s.maternal_visit_schedule_id AS schedule_id,
+                s.maternal_record_id,
+                s.scheduled_date,
+                s.scheduled_time,
+                s.fulfilled_visit_id,
+                s.date_time_completed,
+                s.status_id,
+                ss.status_name,
+                s.visit_purpose,
+                s.notes,
+                s.marked_completed_by_id,
+                s.created_at
+            FROM public.maternal_visit_schedule AS s
+            LEFT JOIN public.schedule_status AS ss ON ss.status_id = s.status_id
+            WHERE s.maternal_record_id = %s
+
+            UNION ALL
+
+            SELECT
+                'postpartum'::text AS visit_type,
+                s.postpartum_visit_schedule_id AS schedule_id,
+                s.maternal_record_id,
+                s.scheduled_date,
+                s.scheduled_time,
+                s.fulfilled_visit_id,
+                s.date_time_completed,
+                s.status_id,
+                ss.status_name,
+                s.visit_purpose,
+                s.notes,
+                s.marked_completed_by_id,
+                s.created_at
+            FROM public.postpartum_visit_schedule AS s
+            LEFT JOIN public.schedule_status AS ss ON ss.status_id = s.status_id
+            WHERE s.maternal_record_id = %s
+        ) AS combined
+        ORDER BY combined.scheduled_date DESC NULLS LAST,
+                 combined.scheduled_time DESC NULLS LAST,
+                 combined.created_at DESC NULLS LAST
+        LIMIT 1;"""
+
+        params = (maternal_record_id, maternal_record_id)
+        try:
+            rows = self.ctx.execute_query_to_dict(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException:
+            logger.exception('Failed to fetch latest scheduled visit for mhr %s', maternal_record_id)
+            return None
+
+    def fetch_latest_prenatal_scheduled_by_mhr_id(self, maternal_record_id: int):
+        """
+        Return the most recent prenatal (maternal) scheduled visit for the given
+        maternal_record_id.
+
+        This returns a single dict (or None) with descriptive fields and names
+        (no raw recorded_by_id or maternal_record_id fields). Included fields:
+          - visit_type ('maternal')
+          - schedule_id
+          - scheduled_date
+          - scheduled_time
+          - date_time_completed
+          - status_name
+          - visit_purpose
+          - notes
+          - marked_completed_by_name
+          - created_at
+          - fulfilled_visit_no (if the schedule was fulfilled and maps to an ANC visit)
+          - fulfilled_visit_date
+          - trimester_stage_name
+        """
+        sql = """
+        SELECT * FROM (
+            SELECT
+                'maternal'::text AS visit_type,
+                s.maternal_visit_schedule_id AS schedule_id,
+                s.scheduled_date,
+                s.scheduled_time,
+                s.date_time_completed,
+                ss.status_name,
+                s.visit_purpose,
+                s.notes,
+                CONCAT(pc.first_name, ' ', pc.last_name) AS marked_completed_by_name,
+                s.created_at,
+                v.anc_visit_id AS fulfilled_anc_visit_id,
+                v.visit_no AS fulfilled_visit_no,
+                v.visit_date AS fulfilled_visit_date,
+                ts.trimester_stage_name
+            FROM public.maternal_visit_schedule AS s
+            LEFT JOIN public.schedule_status AS ss ON ss.status_id = s.status_id
+            LEFT JOIN public.person pc ON pc.person_id = s.marked_completed_by_id
+            LEFT JOIN public.maternal_anc_visit v ON v.anc_visit_id = s.fulfilled_visit_id
+            LEFT JOIN public.trimester_stage ts ON ts.trimester_stage_id = v.trimester_stage_id
+            WHERE s.maternal_record_id = %s
+        ) AS combined
+        ORDER BY combined.scheduled_date DESC NULLS LAST,
+                 combined.scheduled_time DESC NULLS LAST,
+                 combined.created_at DESC NULLS LAST
+        LIMIT 1;"""
+
+        params = (maternal_record_id,)
+        try:
+            rows = self.ctx.execute_query_to_dict(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException:
+            logger.exception('Failed to fetch latest prenatal scheduled visit for mhr %s', maternal_record_id)
+            return None
+
+    def fetch_latest_postpartum_scheduled_by_mhr_id(self, maternal_record_id: int):
+        """
+        Return the most recent postpartum scheduled visit for the given
+        maternal_record_id.
+
+        Returns a single dict (or None) with descriptive fields and names
+        (no raw recorded_by_id or maternal_record_id fields). Included fields:
+          - visit_type ('postpartum')
+          - schedule_id
+          - scheduled_date
+          - scheduled_time
+          - date_time_completed
+          - status_name
+          - visit_purpose
+          - notes
+          - marked_completed_by_name
+          - created_at
+          - fulfilled_visit_no (if the schedule was fulfilled and maps to a postpartum visit)
+          - fulfilled_visit_date
+        """
+        sql = """
+        SELECT * FROM (
+            SELECT
+                'postpartum'::text AS visit_type,
+                s.postpartum_visit_schedule_id AS schedule_id,
+                s.scheduled_date,
+                s.scheduled_time,
+                s.date_time_completed,
+                ss.status_name,
+                s.visit_purpose,
+                s.notes,
+                CONCAT(pc.first_name, ' ', pc.last_name) AS marked_completed_by_name,
+                s.created_at,
+                pv.pp_visit_id AS fulfilled_pp_visit_id,
+                pv.visit_no AS fulfilled_visit_no,
+                pv.visit_date AS fulfilled_visit_date
+            FROM public.postpartum_visit_schedule AS s
+            LEFT JOIN public.schedule_status AS ss ON ss.status_id = s.status_id
+            LEFT JOIN public.person pc ON pc.person_id = s.marked_completed_by_id
+            LEFT JOIN public.postpartum_visit pv ON pv.pp_visit_id = s.fulfilled_visit_id
+            WHERE s.maternal_record_id = %s
+        ) AS combined
+        ORDER BY combined.scheduled_date DESC NULLS LAST,
+                 combined.scheduled_time DESC NULLS LAST,
+                 combined.created_at DESC NULLS LAST
+        LIMIT 1;"""
+
+        params = (maternal_record_id,)
+        try:
+            rows = self.ctx.execute_query_to_dict(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException:
+            logger.exception('Failed to fetch latest postpartum scheduled visit for mhr %s', maternal_record_id)
+            return None
+
+    def fetch_all_prenatal_scheduled_by_mhr_id(self, maternal_record_id: int):
+        """
+        Return all prenatal (maternal) scheduled visits for the given maternal_record_id.
+
+        Each item is a dict with descriptive fields (no maternal_record_id, no raw recorded_by_id):
+          - visit_type ('maternal')
+          - schedule_id
+          - scheduled_date
+          - scheduled_time
+          - date_time_completed
+          - status_name
+          - visit_purpose
+          - notes
+          - marked_completed_by_name
+          - created_at
+          - fulfilled_anc_visit_id (nullable)
+          - fulfilled_visit_no (nullable)
+          - fulfilled_visit_date (nullable)
+          - trimester_stage_name (nullable)
+
+        Ordered by scheduled_date DESC, scheduled_time DESC, created_at DESC.
+        """
+        sql = """
+        SELECT
+            'maternal'::text AS visit_type,
+            s.maternal_visit_schedule_id AS schedule_id,
+            s.scheduled_date,
+            to_char(s.scheduled_date, 'YYYY-MM-DD') AS scheduled_date_str,
+            s.scheduled_time,
+            to_char(s.scheduled_time, 'HH24:MI') AS scheduled_time_hm,
+            s.date_time_completed,
+            s.status_id,
+            ss.status_name,
+            s.visit_purpose,
+            s.notes,
+            CONCAT(pc.first_name, ' ', pc.last_name) AS marked_completed_by_name,
+            s.created_at,
+            to_char(s.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at_iso,
+            v.anc_visit_id AS fulfilled_anc_visit_id,
+            v.visit_no AS fulfilled_visit_no,
+            v.visit_date AS fulfilled_visit_date,
+            ts.trimester_stage_name
+        FROM public.maternal_visit_schedule AS s
+        LEFT JOIN public.schedule_status AS ss ON ss.status_id = s.status_id
+        LEFT JOIN public.person pc ON pc.person_id = s.marked_completed_by_id
+        LEFT JOIN public.maternal_anc_visit v ON v.anc_visit_id = s.fulfilled_visit_id
+        LEFT JOIN public.trimester_stage ts ON ts.trimester_stage_id = v.trimester_stage_id
+        WHERE s.maternal_record_id = %s
+        ORDER BY s.scheduled_date DESC NULLS LAST, s.scheduled_time DESC NULLS LAST, s.created_at DESC NULLS LAST;"""
+
+        params = (maternal_record_id,)
+        try:
+            rows = self.ctx.execute_query_to_dict(sql, params)
+            return rows or []
+        except QueryExecutionException:
+            logger.exception('Failed to fetch prenatal scheduled visits for mhr %s', maternal_record_id)
+            return []
+
+    def fetch_all_postpartum_scheduled_by_mhr_id(self, maternal_record_id: int):
+        """
+        Return all postpartum scheduled visits for the given maternal_record_id.
+
+        Each item is a dict with descriptive fields (no maternal_record_id, no raw recorded_by_id):
+          - visit_type ('postpartum')
+          - schedule_id
+          - scheduled_date
+          - scheduled_time
+          - date_time_completed
+          - status_name
+          - visit_purpose
+          - notes
+          - marked_completed_by_name
+          - created_at
+          - fulfilled_pp_visit_id (nullable)
+          - fulfilled_visit_no (nullable)
+          - fulfilled_visit_date (nullable)
+
+        Ordered by scheduled_date DESC, scheduled_time DESC, created_at DESC.
+        """
+        sql = """
+        SELECT
+            'postpartum'::text AS visit_type,
+            s.postpartum_visit_schedule_id AS schedule_id,
+            s.scheduled_date,
+            to_char(s.scheduled_date, 'YYYY-MM-DD') AS scheduled_date_str,
+            s.scheduled_time,
+            to_char(s.scheduled_time, 'HH24:MI') AS scheduled_time_hm,
+            s.date_time_completed,
+            s.status_id,
+            ss.status_name,
+            s.visit_purpose,
+            s.notes,
+            CONCAT(pc.first_name, ' ', pc.last_name) AS marked_completed_by_name,
+            s.created_at,
+            to_char(s.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at_iso,
+            pv.pp_visit_id AS fulfilled_pp_visit_id,
+            pv.visit_no AS fulfilled_visit_no,
+            pv.visit_date AS fulfilled_visit_date
+        FROM public.postpartum_visit_schedule AS s
+        LEFT JOIN public.schedule_status AS ss ON ss.status_id = s.status_id
+        LEFT JOIN public.person pc ON pc.person_id = s.marked_completed_by_id
+        LEFT JOIN public.postpartum_visit pv ON pv.pp_visit_id = s.fulfilled_visit_id
+        WHERE s.maternal_record_id = %s
+        ORDER BY s.scheduled_date DESC NULLS LAST, s.scheduled_time DESC NULLS LAST, s.created_at DESC NULLS LAST;"""
+
+        params = (maternal_record_id,)
+        try:
+            rows = self.ctx.execute_query_to_dict(sql, params)
+            return rows or []
+        except QueryExecutionException:
+            logger.exception('Failed to fetch postpartum scheduled visits for mhr %s', maternal_record_id)
+            return []
         
     def fetch_all_mhr_completion_status(self):
         """

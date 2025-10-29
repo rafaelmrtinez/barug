@@ -28,6 +28,11 @@
     <button class="btn btn-brand d-flex align-items-center" type="submit">
     {% bs_icon 'search' extra_classes='me-2' %}Search
     </button>
+    {% if request.session.auth.role_name == 'barangay health worker'  %}
+    <button class="btn btn-brand d-flex align-items-center" type="submit">
+        <a href="{% url 'maternal:create_maternal_entry' %}" class="text-white" style="text-decoration: none;" >{% bs_icon 'plus-lg' extra_classes='me-2' %}New Record</a>
+    </button>
+    {% endif %}
 </form>
 
 <!-- Data Table -->

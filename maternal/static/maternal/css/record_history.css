@@ -47,6 +47,11 @@ body.record-history {
 .visit-table thead th { color: #6b7280; font-weight: 600; text-align: center; }
 .visit-table td, .visit-table th { vertical-align: middle; }
 
+/* Center all text in the visit table to improve readability */
+.visit-table td, .visit-table th, .visit-table td.text-end, .visit-table td.text-start {
+  text-align: center;
+}
+
 /* Modal sizing & polish */
 .modal { z-index: 1200; }
 .modal-backdrop { z-index: 1190; }
@@ -89,3 +94,28 @@ body.record-history {
 
 /* small spacing adjustments */
 .btn-schedule, .btn-postpartum { min-width: 110px; }
+
+/* Actions column layout: keep buttons on one line and avoid compressing other columns */
+.visit-table td.actions-cell {
+  white-space: nowrap; /* keep buttons and labels on single line */
+  width: 1%; /* allow column to shrink to content and not expand other columns */
+}
+.visit-table td.actions-cell .btn {
+  white-space: nowrap; /* ensure buttons themselves don't wrap */
+}
+
+/* On very small screens allow horizontal scrolling rather than compressing layout */
+.table-responsive {
+  overflow-x: auto;
+  overflow-y: visible; /* allow dropdown menus to overflow vertically out of the scrolling container */
+}
+
+/* Ensure dropdown menu appears above other UI */
+.dropdown-menu {
+  z-index: 3000;
+}
+
+/* Optional: reduce minimum button width so multiple buttons fit better */
+.visit-table td.actions-cell .btn {
+  min-width: 0;
+}
