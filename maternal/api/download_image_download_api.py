@@ -1,5 +1,6 @@
 import json
-from django.http import HttpResponse, JsonResponse, HttpRequest
+import os
+from django.http import HttpResponse, JsonResponse, HttpRequest, StreamingHttpResponse
 from django.views import View
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect as csrf_required
@@ -47,7 +48,7 @@ class DownloadImageDownload(View):
         svc = ImageDownloadService(repo)
 
         try:
-            zip_bytes, zip_name = svc.zip_lab_images_for_maternal_record(mhr_id)
+            tmp_path, zip_name = svc.zip_lab_images_for_maternal_record(mhr_id)
         except ValueError as e:
             return JsonResponse({'success': False, 'message': str(e)}, status=404)
         except Exception as e:
@@ -55,6 +56,29 @@ class DownloadImageDownload(View):
             logging.exception('Failed to build zip for mhr %s', mhr_id)
             return JsonResponse({'success': False, 'message': 'Server error building ZIP.'}, status=500)
 
-        response = HttpResponse(zip_bytes, content_type='application/zip')
-        response['Content-Disposition'] = f'attachment; filename="{zip_name}"'
-        return response
+        # Stream the temporary zip file back to the client and remove it after
+        def file_iterator(path, chunk_size=8192):
+            try:
+                with open(path, 'rb') as fh:
+                    while True:
+                        chunk = fh.read(chunk_size)
+                        if not chunk:
+                            break
+                        yield chunk
+            finally:
+                try:
+                    os.remove(path)
+                except Exception:
+                    pass
+
+        size = None
+        try:
+            size = os.path.getsize(tmp_path)
+        except Exception:
+            size = None
+
+        resp = StreamingHttpResponse(file_iterator(tmp_path), content_type='application/zip')
+        resp['Content-Disposition'] = f'attachment; filename="{zip_name}"'
+        if size:
+            resp['Content-Length'] = str(size)
+        return resp
