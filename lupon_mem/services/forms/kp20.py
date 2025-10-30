@@ -354,6 +354,17 @@ class KP20Handler:
         for k in _KP20_FIELDS:
             out.setdefault(k, "")
 
+        # ---------------------------------------------------
+        # Send notifications for KP-20 submission
+        # ---------------------------------------------------
+        try:
+            from notifications.views import notify_kp20_certification_file_action
+            if case_id:
+                case_num = out.get("brgy_case_number", "")
+                notify_kp20_certification_file_action(case_id, case_num)
+        except Exception as e:
+            logger.warning("[KP20] Failed to send notifications: %s", e)
+
         # Final ordered log of exactly what goes into the PDF
         self._log(out)
         return out

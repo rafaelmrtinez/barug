@@ -276,4 +276,22 @@ class KP7Handler:
         FS.save_answers(submission_id, out)
         logger.info("[KP7] Auto-filled & saved case_time_filed=%s (submission=%s)", out.get("case_time_filed"), submission_id)
 
+        # ---------------------------------------------------
+        # Send notifications for complaint filing
+        # ---------------------------------------------------
+        try:
+            from notifications.views import notify_kp7_complaint_filed
+            with FS.connection.cursor() as cur:
+                cur.execute(
+                    "SELECT blotter_case_id FROM blotter_kp_submission WHERE submission_id=%s",
+                    [submission_id]
+                )
+                row = cur.fetchone()
+                if row:
+                    case_id = row[0]
+                    case_num = out.get("case_num", "")
+                    notify_kp7_complaint_filed(case_id, case_num)
+        except Exception as e:
+            logger.warning("[KP7] Failed to send notifications: %s", e)
+
         return out

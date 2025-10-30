@@ -37,11 +37,11 @@ from django.http import JsonResponse
 
 from postgrest.exceptions import APIError
 from django.views.decorators.http import require_GET
-
+from django.views.decorators.http import require_POST
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
 from authentication.supabase_client import supabase
-from django.views.decorators.http import require_POST
+
 from .forms import (
     SearchVerificationRequest, SearchBusinessOwner, SelectOwnerForm , BusinessOwnerInfo,
     BusinessDetails, BusinessFilters, RequestedDocsFilters, SelectOwnerForm, RenewalFilters

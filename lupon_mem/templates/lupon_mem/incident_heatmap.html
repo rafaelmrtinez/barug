@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block css %}
+<link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+<style>
+    #map {
+        height: 500px;
+        width: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2>{{ page_title }}</h2>
+                <div class="btn-group">
+                    <button id="toggleHeatmap" class="btn btn-outline-primary">Toggle Heatmap</button>
+                    <button id="showStreets" class="btn btn-outline-secondary">Street View</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-lg-8">
+            <div id="map"></div>
+            <div id="streetView" style="display:none;" class="mt-3">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Street</th>
+                            <th>Barangay</th>
+                            <th>Incidents</th>
+                        </tr>
+                    </thead>
+                    <tbody id="streetTable"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5>Summary</h5>
+                    <p>Total Incidents: <span id="totalIncidents">{{ incident_data|length }}</span></p>
+                    <p>With Coordinates: <span id="mappedIncidents">0</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+<script>
+mapboxgl.accessToken = 'pk.eyJ1IjoicmFwaGJlbGwiLCJhIjoiY21jNHN6ODhtMDRteDJpcHdocXJpaTFpaiJ9.tkV7UFKy4yBlAtkZNYOS4A';
+
+const incidentData = {{ incident_data_json|safe }};
+let isHeatmapVisible = false;
+let isStreetViewVisible = false;
+
+const map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/streets-v11',
+    center: [123.9028, 10.2951],
+    zoom: 15
+});
+
+map.addControl(new mapboxgl.NavigationControl());
+
+map.on('load', function() {
+    // Filter incidents with valid coordinates
+    const validIncidents = incidentData.filter(incident => 
+        incident.lat && incident.lng && 
+        incident.lat !== 0 && incident.lng !== 0
+    );
+    
+    document.getElementById('mappedIncidents').textContent = validIncidents.length;
+    
+    if (validIncidents.length === 0) {
+        // No valid coordinates, show center marker only
+        new mapboxgl.Marker()
+            .setLngLat([123.9028, 10.2951])
+            .setPopup(new mapboxgl.Popup().setHTML('<h6>Sto. Niño Center</h6><p>No incident coordinates available</p>'))
+            .addTo(map);
+        return;
+    }
+    
+    // Add incident data source
+    map.addSource('incidents', {
+        type: 'geojson',
+        data: {
+            type: 'FeatureCollection',
+            features: validIncidents.map(incident => ({
+                type: 'Feature',
+                geometry: {
+                    type: 'Point',
+                    coordinates: [incident.lng, incident.lat]
+                },
+                properties: {
+                    name: incident.name,
+                    type: incident.type,
+                    date: incident.date,
+                    description: incident.description
+                }
+            }))
+        }
+    });
+    
+    // Add circle markers layer
+    map.addLayer({
+        id: 'incident-points',
+        type: 'circle',
+        source: 'incidents',
+        paint: {
+            'circle-radius': 8,
+            'circle-color': '#dc3545',
+            'circle-stroke-color': '#fff',
+            'circle-stroke-width': 2
+        }
+    });
+    
+    // Add heatmap layer (initially hidden)
+    map.addLayer({
+        id: 'incident-heatmap',
+        type: 'heatmap',
+        source: 'incidents',
+        layout: {
+            visibility: 'none'
+        },
+        paint: {
+            'heatmap-weight': 1,
+            'heatmap-intensity': 1,
+            'heatmap-color': [
+                'interpolate',
+                ['linear'],
+                ['heatmap-density'],
+                0, 'rgba(0,0,255,0)',
+                0.2, 'rgb(0,255,255)',
+                0.4, 'rgb(0,255,0)',
+                0.6, 'rgb(255,255,0)',
+                0.8, 'rgb(255,165,0)',
+                1, 'rgb(255,0,0)'
+            ],
+            'heatmap-radius': 30
+        }
+    });
+    
+    // Add click event for popups
+    map.on('click', 'incident-points', function(e) {
+        const coordinates = e.features[0].geometry.coordinates.slice();
+        const properties = e.features[0].properties;
+        
+        new mapboxgl.Popup()
+            .setLngLat(coordinates)
+            .setHTML(`
+                <div>
+                    <h6>${properties.name}</h6>
+                    <p><strong>Type:</strong> ${properties.type}</p>
+                    <p><strong>Date:</strong> ${properties.date}</p>
+                    <p><strong>Description:</strong> ${properties.description.substring(0, 100)}...</p>
+                </div>
+            `)
+            .addTo(map);
+    });
+    
+    // Change cursor on hover
+    map.on('mouseenter', 'incident-points', () => {
+        map.getCanvas().style.cursor = 'pointer';
+    });
+    
+    map.on('mouseleave', 'incident-points', () => {
+        map.getCanvas().style.cursor = '';
+    });
+    
+    // Fit map to show all incidents
+    if (validIncidents.length > 0) {
+        const bounds = new mapboxgl.LngLatBounds();
+        validIncidents.forEach(incident => {
+            bounds.extend([incident.lng, incident.lat]);
+        });
+        map.fitBounds(bounds, { padding: 50 });
+    }
+});
+
+// Toggle heatmap
+document.getElementById('toggleHeatmap').addEventListener('click', function() {
+    if (isHeatmapVisible) {
+        map.setLayoutProperty('incident-heatmap', 'visibility', 'none');
+        map.setLayoutProperty('incident-points', 'visibility', 'visible');
+        this.textContent = 'Show Heatmap';
+    } else {
+        map.setLayoutProperty('incident-points', 'visibility', 'none');
+        map.setLayoutProperty('incident-heatmap', 'visibility', 'visible');
+        this.textContent = 'Show Points';
+    }
+    isHeatmapVisible = !isHeatmapVisible;
+});
+
+// Show street view
+document.getElementById('showStreets').addEventListener('click', function() {
+    if (isStreetViewVisible) {
+        document.getElementById('map').style.display = 'block';
+        document.getElementById('streetView').style.display = 'none';
+        this.textContent = 'Street View';
+    } else {
+        document.getElementById('map').style.display = 'none';
+        document.getElementById('streetView').style.display = 'block';
+        this.textContent = 'Map View';
+        buildStreetView();
+    }
+    isStreetViewVisible = !isStreetViewVisible;
+});
+
+function buildStreetView() {
+    const streetCounts = {};
+    
+    incidentData.forEach(incident => {
+        const street = incident.street || 'Unknown Street';
+        const barangay = incident.barangay || 'Unknown Barangay';
+        const key = `${street}|${barangay}`;
+        
+        if (!streetCounts[key]) {
+            streetCounts[key] = {
+                street: street,
+                barangay: barangay,
+                count: 0
+            };
+        }
+        streetCounts[key].count++;
+    });
+    
+    const tbody = document.getElementById('streetTable');
+    tbody.innerHTML = '';
+    
+    Object.values(streetCounts)
+        .sort((a, b) => b.count - a.count)
+        .forEach(item => {
+            const row = tbody.insertRow();
+            row.insertCell(0).textContent = item.street;
+            row.insertCell(1).textContent = item.barangay;
+            row.insertCell(2).innerHTML = `<span class="badge bg-danger">${item.count}</span>`;
+        });
+}
+</script>
+{% endblock %}

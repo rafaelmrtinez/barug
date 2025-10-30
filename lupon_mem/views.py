@@ -2984,80 +2984,25 @@ def add_form_choose_static(request, case_id: int):
     can_kp23 = final_and_executory
 
     # ---- HARD GATES (bypass allowed for MED-ATT-2025) ----
-    if pending_summons and not allow_med_att:
-        messages.warning(
-            request,
-            "Please mark the latest summons attendance (ATTENDED / NO SHOW) before adding a new form."
-        )
-        return redirect("lupon_mem:case_detail", case_id=case_id)
+    # COMMENTED OUT FOR NOW - DISPLAY ALL FORMS
+    # if pending_summons and not allow_med_att:
+    #     messages.warning(
+    #         request,
+    #         "Please mark the latest summons attendance (ATTENDED / NO SHOW) before adding a new form."
+    #     )
+    #     return redirect("lupon_mem:case_detail", case_id=case_id)
 
-    if notice_outstanding and not allow_med_att:
-        messages.warning(
-            request,
-            "There is a scheduled mediation/conciliation hearing. Please record the outcome (HELD → Settled / Not Settled) first."
-        )
-        return redirect("lupon_mem:case_detail", case_id=case_id)
+    # if notice_outstanding and not allow_med_att:
+    #     messages.warning(
+    #         request,
+    #         "There is a scheduled mediation/conciliation hearing. Please record the outcome (HELD → Settled / Not Settled) first."
+    #     )
+    #     return redirect("lupon_mem:case_detail", case_id=case_id)
 
-    # ---- Decide allowed codes (KP-7..KP-25) ----
-    allowed_codes: list[str] = []
-    gate_msg = None
-
-    is_settled_text = ('SETTLED' in (settlement_status_name or ''))
-    latest_is_noshow = (latest_att_status == 'NO SHOW')
-
-    if allow_med_att:
-        allowed_codes = ['MED-ATT-2025']
-        gate_msg = "You are adding Mediation/Pangkat Attendance for the scheduled hearing."
-    else:
-        if not _has('KP-7'):
-            allowed_codes = ['KP-7']
-            gate_msg = "Start the case: file KP-7 (Complaint)."
-        else:
-            if not _has('KP-9'):
-                allowed_codes = ['KP-8', 'KP-9']
-                gate_msg = "Issue KP-9 (Summons). You may also schedule PB Mediation (KP-8)."
-            else:
-                if latest_is_noshow:
-                    if latest_att_party in ('COMPLAINANT','BOTH'):
-                        allowed_codes.append('KP-18')
-                    if latest_att_party in ('RESPONDENT','BOTH'):
-                        allowed_codes.append('KP-19')
-                    allowed_codes.append('KP-9')
-                    if repeated_ns_compl:
-                        allowed_codes.extend(['KP-21','KP-20B'])
-                    if repeated_ns_resp:
-                        allowed_codes.extend(['KP-22','KP-20B'])
-                    gate_msg = "Latest summons marked NO SHOW — issue the proper failure form(s) and/or a new summons."
-                else:
-                    # Normal running track
-                    allowed_codes.extend(['KP-8','KP-9','KP-10','KP-11','KP-12','MED-ATT-2025','KP-13'])
-                    allowed_codes.append('KP-16')
-
-                    if has_kp16 and within_repudiation_window:
-                        allowed_codes.append('KP-17')
-                    if has_kp16 and kp17_exists:
-                        allowed_codes.append('KP-20')  # CFA (repudiation)
-
-                    if (hearings_held >= 1) and (not is_settled_text) and (not notice_outstanding):
-                        allowed_codes.append('KP-20A')  # CFA (no settlement)
-
-                    if can_kp23:
-                        allowed_codes.append('KP-23')
-                        has_kp23 = _has('KP-23')
-                        has_kp24 = _has('KP-24')
-                        if has_kp23:
-                            allowed_codes.append('KP-24')
-                        if has_kp24:
-                            allowed_codes.append('KP-25')
-
-                    gate_msg = (
-                        "Proceed with Mediation/Pangkat flow. Use KP-16 when settled; "
-                        "KP-17 (within 10 days) if repudiated; KP-20A (no settlement); "
-                        "KP-20B (repeated non-appearance); KP-20 (repudiation). "
-                        "Use KP-23→24→25 for execution when a settlement/award is final and not complied with."
-                    )
-
-    # ---- order + dedupe ----
+    # ---- DISPLAY ALL FORMS (guards commented out) ----
+    from django.core.paginator import Paginator
+    
+    # Get all forms from KP-7 to KP-25 plus MED-ATT-2025
     wanted_order = [
         'KP-7','KP-8','KP-9','KP-10','KP-11','KP-12','KP-13',
         'MED-ATT-2025','KP-16','KP-17',
@@ -3066,20 +3011,23 @@ def add_form_choose_static(request, case_id: int):
         'KP-21','KP-22',
         'KP-23','KP-24','KP-25'
     ]
-    allowed_set = {c.upper() for c in allowed_codes}
-    allowed_codes = [c for c in wanted_order if c in allowed_set]
-
-    # ---- fetch display names for allowed codes ----
-    forms: list[tuple[str, str]] = []
-    if allowed_codes:
-        with connection.cursor() as cur:
-            cur.execute("""
-                SELECT UPPER(form_code) AS code, form_name
-                FROM kp_form
-                WHERE UPPER(form_code) = ANY(%s)
-                ORDER BY array_position(%s::text[], UPPER(form_code))
-            """, [allowed_codes, allowed_codes])
-            forms = [(code, name) for code, name in cur.fetchall()]
+    
+    # ---- fetch all forms ----
+    with connection.cursor() as cur:
+        cur.execute("""
+            SELECT UPPER(form_code) AS code, form_name
+            FROM kp_form
+            WHERE UPPER(form_code) = ANY(%s)
+            ORDER BY array_position(%s::text[], UPPER(form_code))
+        """, [wanted_order, wanted_order])
+        all_forms = [(code, name) for code, name in cur.fetchall()]
+    
+    # ---- pagination ----
+    paginator = Paginator(all_forms, 10)  # 10 forms per page
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+    
+    gate_msg = "All forms are displayed (guards temporarily disabled)"
 
     # ---- badges for template ----
     badge_flags = {
@@ -3097,15 +3045,79 @@ def add_form_choose_static(request, case_id: int):
 
     print(f"[add_form_choose_static] case_id={case_id} allow_med_att={allow_med_att} requested_code={requested_code} "
           f"pending_summons={pending_summons} latest_notice_outstanding={notice_outstanding} "
-          f"allowed_codes={allowed_codes} badge_flags={badge_flags}")
+          f"total_forms={len(all_forms)} badge_flags={badge_flags}")
 
     return render(request, "lupon_mem/add_form_choose_static.html", {
         "case_id": case_id,
-        "forms": forms,
+        "forms": page_obj.object_list,
+        "page_obj": page_obj,
         "gate_msg": gate_msg,
         "badge_flags": badge_flags,
     })
 
+
+
+@session_login_required
+@role_required(*LUPON_ROLES, "barangay treasurer")
+def incident_heatmap(request: HttpRequest):
+    """
+    Display barangay incident heatmap showing incident locations and frequency.
+    """
+    with connection.cursor() as cur:
+        # Get incident data with coordinates from blotter_report
+        cur.execute("""
+            SELECT 
+                br.blotter_report_id,
+                COALESCE(br.incident_subject, 'Unnamed Incident') as incident_name,
+                COALESCE(br.incident_desc, 'No description') as incident_desc,
+                br.date_time_reported::date as date_filed,
+                a.latitude,
+                a.longitude,
+                'Blotter Report' as incident_type
+            FROM blotter_report br
+            LEFT JOIN addresss a ON a.address_id = br.incident_address_id
+            WHERE a.latitude IS NOT NULL 
+              AND a.longitude IS NOT NULL
+              AND br.date_time_reported >= CURRENT_DATE - INTERVAL '1 year'
+            ORDER BY br.date_time_reported DESC
+            LIMIT 500
+        """)
+        incidents = cur.fetchall()
+
+        # Get incident type statistics
+        cur.execute("""
+            SELECT 
+                'Blotter Report' as incident_type,
+                COUNT(*) as count
+            FROM blotter_report br
+            WHERE br.date_time_reported >= CURRENT_DATE - INTERVAL '1 year'
+            GROUP BY 1
+            ORDER BY count DESC
+        """)
+        incident_stats = cur.fetchall()
+
+    # Format data for JavaScript
+    import json
+    incident_data = []
+    for incident in incidents:
+        incident_data.append({
+            'id': incident[0],
+            'name': incident[1] or 'Unnamed Case',
+            'description': incident[2] or 'No description',
+            'date': incident[3].strftime('%Y-%m-%d') if incident[3] else '',
+            'lat': float(incident[4]),
+            'lng': float(incident[5]),
+            'type': incident[6]
+        })
+
+    stats_data = [{'type': stat[0], 'count': stat[1]} for stat in incident_stats]
+
+    return render(request, "lupon_mem/incident_heatmap.html", {
+        "incident_data_json": json.dumps(incident_data),
+        "incident_data": incident_data,
+        "incident_stats": stats_data,
+        "page_title": "Barangay Incident Heatmap"
+    })
 
 
 @session_login_required
@@ -5503,3 +5515,48 @@ def _maybe_upsert_hearing_attendance(case_id: int, source_code: str, notice_sid:
                 compl_attended, resp_attended,
                 settlement or "", remarks or ""
             ])
+
+
+@session_login_required
+@role_required(*LUPON_ROLES, "barangay treasurer")
+@require_POST
+def case_close(request: HttpRequest, case_id: int):
+    """
+    POST only. Close a case -> sets state=CLOSED, stamps closed_at/closed_by, logs history.
+    """
+    note = (request.POST.get("close_note") or "").strip() or None
+
+    # Best-effort staff id discovery. Adjust to your auth model if needed.
+    staff_id    = (request.session.get("auth") or {}).get("staff_id")
+    if not staff_id:
+        messages.error(request, "Cannot determine current staff user.")
+        return redirect("lupon_mem:case_detail", case_id=case_id)
+
+    try:
+        close_case(case_id, staff_id, note)
+        messages.success(request, "Case has been closed.")
+    except Exception as e:
+        messages.error(request, f"Failed to close case: {e}")
+    return redirect("lupon_mem:case_detail", case_id=case_id)
+
+
+@session_login_required
+@role_required(*LUPON_ROLES, "barangay treasurer")
+@require_POST
+def case_reopen(request: HttpRequest, case_id: int):
+    """
+    POST only. Reopen a case -> sets state=OPEN, clears closed_* fields, logs history.
+    """
+    reason = (request.POST.get("reopen_reason") or "").strip() or None
+
+    staff_id    = (request.session.get("auth") or {}).get("staff_id")
+    if not staff_id:
+        messages.error(request, "Cannot determine current staff user.")
+        return redirect("lupon_mem:case_detail", case_id=case_id)
+
+    try:
+        reopen_case(case_id, staff_id, reason)
+        messages.success(request, "Case has been reopened.")
+    except Exception as e:
+        messages.error(request, f"Failed to reopen case: {e}")
+    return redirect("lupon_mem:case_detail", case_id=case_id)
