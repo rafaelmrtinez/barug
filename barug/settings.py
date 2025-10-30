@@ -15,6 +15,20 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY")
+PAYMENTS_DEV_BYPASS = os.getenv("PAYMENTS_DEV_BYPASS", "false").lower() in ("1","true","yes")
+PAYMONGO_SECRET_KEY    = os.getenv("PAYMONGO_SECRET_KEY")
+PAYMONGO_WEBHOOK_SECRET= os.getenv("PAYMONGO_WEBHOOK_SECRET")
+STAFF_SYSTEM_ID        =13
+
+DEBUG = True
+ALLOWED_HOSTS = ["*", "localhost", "127.0.0.1", ".ngrok-free.app"]
+CSRF_TRUSTED_ORIGINS = ["https://*.ngrok-free.app"]
+
+ANDROID_PACKAGE = "host.exp.exponent"
+
+SEMAPHORE_API_KEY = os.getenv("SEMAPHORE_API_KEY", "")
+SEMAPHORE_SENDER_NAME = os.getenv("SEMAPHORE_SENDER_NAME", "SEMAPHORE")
 
 # Email backend (Gmail SMTP)
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
@@ -30,6 +44,8 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
 DEFAULT_FROM_NAME  = os.getenv("DEFAULT_FROM_NAME", "Barangay Sto. Niño")
 
+# settings.py
+LUPON_AUTOGEN_MEDX = False  # turn OFF auto creation of MED1/2/3-SETTLED
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -48,9 +64,9 @@ if isProduction != None and isProduction == "True":
     ALLOWED_HOSTS = ["barug-development.onrender.com"]
 else:
     DEBUG = True
+
 ALLOWED_HOSTS = ['*']
-
-
+CORS_ALLOW_ALL_ORIGINS = True
 # Application definition
 
 INSTALLED_APPS = [
@@ -77,10 +93,15 @@ INSTALLED_APPS = [
     "staff_admin",
     "treasurer",
     "midwife",
+    "payments",
+    "notifications",
+    "corsheaders",
+    "common",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "django.middleware.gzip.GZipMiddleware",       # <-- add
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -90,6 +111,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "authentication.middleware.NoCacheMiddleware",
     "authentication.middleware.AttachProfileMiddleware",  # <— add
+    "corsheaders.middleware.CorsMiddleware"
 ]
 
 ROOT_URLCONF = "barug.urls"
@@ -120,6 +142,9 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "authentication.context_processors.auth_context",
+                'django.template.context_processors.media',
+                "lupon_mem.context_processors.lupon_badge_counts",
+                "clerk.context_processors.app_badge_counts",
             ],
         },
     },
@@ -148,6 +173,8 @@ SUPABASE_ID_UPLOADS_BUCKET = os.getenv("SUPABASE_ID_UPLOADS_BUCKET", "id-uploads
 DB_CONN_MAX_AGE = int(os.getenv("DB_CONN_MAX_AGE", "0"))           # 0 = close after each request
 DB_CONNECT_TIMEOUT = int(os.getenv("DB_CONNECT_TIMEOUT", "10"))    # seconds
 DB_SSL_MODE = os.getenv("DB_SSL_MODE", "require")                  # adjust for your environment
+SUPABASE_OCR_TEST_BUCKET = os.getenv("SUPABASE_OCR_TEST_BUCKET ", "ocr-testing")
+SUPABASE_BUSINESS_PROOF_BUCKET = os.getenv("SUPABASE_BUSINESS_PROOF_BUCKET", "business-proofs")
 
 DATABASES = {
     "default": {
@@ -346,6 +373,9 @@ CACHES = {
     }
 }
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
@@ -358,7 +388,7 @@ STATICFILES_DIRS = [
     # os.path.join(BASE_DIR, "event_logs/static/event_logs"),
     os.path.join(BASE_DIR, "resident/static/resident"),
     os.path.join(BASE_DIR, "bhw/static/bhw"),
-    # os.path.join(BASE_DIR, "clerk/static/clerk"),
+    os.path.join(BASE_DIR, "clerk/static/clerk"),
     os.path.join(BASE_DIR, "midwife/static/midwife"),
     os.path.join(BASE_DIR, "maternal/static/maternal"),
     os.path.join(BASE_DIR, "child_health/static/child_health"),

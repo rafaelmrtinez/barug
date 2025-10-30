@@ -1,7 +1,14 @@
-#map {
-    position: relative;
-    height: 100%;
-    width: 100%;
+#map{
+  position: relative;
+  height: 320px;      /* pick what fits your modal */
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;   /* keep controls inside rounded corners */
+}
+
+.mapboxgl-ctrl-bottom-right,
+.mapboxgl-ctrl-bottom-left{
+  bottom: 8px;
 }
 
 #style-selector {

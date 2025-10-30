@@ -1,0 +1,44 @@
+{% for r in rows %}
+<tr class="table-row-height">
+  <td>
+    <div class="fw-semibold">{{ r.business_name|title }}</div>
+    <div class="small-muted">{{ r.owner_fullname|title }}</div>
+  </td>
+  <td>
+    <span class="cat-badge">
+        {{ r.clearance_state|title }}
+    </span>
+  </td>
+  <td>{{ r.has_active_renewal_request|title }}</td>
+  <td>
+    {% with state=r.clearance_state|lower %}
+      <span class="validity-pill
+        {% if state == 'expired' %}expired
+        {% elif state == 'valid' %}valid
+        {% else %}none{% endif %}">
+        <i class="bi bi-calendar-range"></i>
+        <span class="range">
+          {% if r.valid_from and r.expires_on %}
+            {{ r.valid_from|date:"Y-m-d" }} – {{ r.expires_on|date:"Y-m-d" }}
+          {% else %}
+            None
+          {% endif %}
+        </span>
+      </span>
+    {% endwith %}
+  </td>
+  <td>{{ r.extension|title }}</td>
+  <td class="text-end">
+    <div class="d-inline-flex gap-1">
+      <a class="btn btn-outline-brand btn-sm" href="{% url url_name b_id=r.business_id %}">
+        <i class="bi bi-building"></i>
+        <span>View</span>
+      </a>
+    </div>
+  </td>
+</tr>
+{% empty %}
+<tr>
+  <td colspan="6" class="text-center py-4 text-muted">No businesses found.</td>
+</tr>
+{% endfor %}

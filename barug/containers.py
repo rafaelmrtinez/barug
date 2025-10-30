@@ -24,4 +24,7 @@ app.wire(modules=[
     "maternal.api.insert_prenatal_schedule_api",
     "maternal.api.maternal_heal_status_api",
     "maternal.api.mhr_side_panel_api",
+    "captain.views",
+    "clerk.views",
+    "secretary.views",
 ])

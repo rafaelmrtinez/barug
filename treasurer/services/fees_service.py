@@ -39,3 +39,20 @@ def upsert_fee(payload: Dict[str, Any]):
     res = supabase.rpc("treasurer_upsert_fee", payload).execute()
     if getattr(res, "error", None):
         raise RuntimeError(getattr(res.error, "message", "Upsert failed"))
+
+
+def list_fee_document_types():
+    return supabase.rpc("list_fee_document_types", {}).execute().data or []
+
+def search_fee_items_by_doc_type_id(doc_type_id: int, q: str | None):
+    return supabase.rpc("search_fee_items_by_doc_type_id", {
+        "p_doc_type_id": doc_type_id,
+        "p_query": q
+    }).execute().data or []
+
+
+def get_fee_timeline(fee_code: str):
+    res = supabase.rpc("get_fee_timeline", {"p_fee_code": fee_code, "p_limit": 100}).execute()
+    if getattr(res, "error", None):
+        return []
+    return res.data or []

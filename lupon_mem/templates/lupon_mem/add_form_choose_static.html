@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% load static bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<style>
+  .btn-brand{ color:#fff; background:#6d2932; border-color:#6d2932; }
+  .btn-brand:hover{ background:#561c24; border-color:#561c24; color:#fff; }
+  .btn-outline-brand{ color:#6d2932; border-color:#6d2932; background:#fff; }
+  .btn-outline-brand:hover{ background:#6d2932; color:#fff; }
+  .toolbar{ background:#fff; border:1px solid var(--bs-border-color); border-radius:1rem; padding:.75rem; gap:.5rem; }
+  .searchbox{ position:relative; flex:1; }
+  .searchbox .bi{ position:absolute; left:.8rem; top:50%; transform:translateY(-50%); opacity:.6; }
+  .searchbox input{ padding-left:2.35rem !important; }
+  .form-card{ display:flex; align-items:center; justify-content:space-between; gap:1rem;
+              background:#fff; border:1px solid var(--bs-border-color); border-radius:1rem;
+              padding:.9rem 1rem; transition:all .15s ease; }
+  .form-card:hover{ border-color:#6d2932; box-shadow:0 .125rem .75rem rgba(0,0,0,.06); }
+  .form-meta{ display:flex; align-items:center; gap:.9rem; min-width:0; }
+  .form-code{ display:inline-flex; align-items:center; gap:.35rem; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+              font-size:.9rem; padding:.35rem .55rem; border-radius:.5rem; background:#f5f2ee; border:1px solid rgba(0,0,0,.06); }
+  .form-name{ font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #pageLoadingSmall{ position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+                     background:rgba(255,255,255,.65); backdrop-filter:blur(2px); z-index:2000; }
+
+  /* ——— Badge pills: improved contrast & added reasons ——— */
+  .hint-badge{ font-size:.72rem; font-weight:600; border:1px solid transparent; }
+  .hint-badge.kp9{  background:#dff1ff; border-color:#83c5ff; color:#073b6f; }       /* New Summons */
+  .hint-badge.kp18{ background:#ffe3e3; border-color:#ff9a9a; color:#7a1111; }      /* No-show (Complainant) */
+  .hint-badge.kp19{ background:#fff1cc; border-color:#ffd24d; color:#5a4300; }      /* No-show (Respondent) */
+
+  .hint-badge.kp20{  background:#efeaff; border-color:#b9a6ff; color:#3b2a8a; }     /* CFA due to Repudiation */
+  .hint-badge.kp20a{ background:#eaf7ee; border-color:#bfe6cc; color:#0f5132; }     /* CFA: No Settlement */
+  .hint-badge.kp20b{ background:#fde2f0; border-color:#f7a8d0; color:#7a0d4d; }     /* CFA: Repeated No-Show */
+
+  .hint-badge.kp21{ background:#f0f9ff; border-color:#bae6fd; color:#0c4a6e; }      /* Bar Action */
+  .hint-badge.kp22{ background:#f0fdf4; border-color:#bbf7d0; color:#14532d; }      /* Bar Counterclaim */
+
+  .hint-badge.kp23{ background:#fff7ed; border-color:#fed7aa; color:#7c2d12; }      /* Motion for Execution */
+  .hint-badge.kp24{ background:#fef2f2; border-color:#fecaca; color:#7f1d1d; }      /* Hearing (Execution) */
+  .hint-badge.kp25{ background:#ecfeff; border-color:#a5f3fc; color:#164e63; }      /* Notice of Execution */
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3 page-main">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">Attach a KP Form</h4>
+    <a href="{% url 'lupon_mem:case_detail' case_id %}" class="btn btn-outline-brand d-flex align-items-center">
+      {% bs_icon 'arrow-left' extra_classes='me-2' %} Back to Case
+    </a>
+  </div>
+
+  {% if gate_msg %}
+    <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+      {% bs_icon 'info-circle' extra_classes='me-2' %} {{ gate_msg }}
+    </div>
+  {% endif %}
+
+  <form class="toolbar d-flex align-items-center flex-wrap mb-3" onsubmit="return false;">
+    <div class="searchbox">
+      {% bs_icon 'search' extra_classes='bi' %}
+      <input id="formSearch" type="text" class="form-control" placeholder="Search by code or form name…">
+    </div>
+    <button type="button" class="btn btn-outline-brand d-flex align-items-center" onclick="clearSearch()">
+      {% bs_icon 'x-circle' extra_classes='me-2' %} Clear
+    </button>
+  </form>
+
+  <div id="formList" class="d-flex flex-column gap-2">
+    {% for code, name in forms %}
+      <div class="form-card" data-code="{{ code|upper }}" data-name="{{ name|upper }}">
+        <div class="form-meta">
+          <span class="form-code">{% bs_icon 'file-earmark-text' %} {{ code }}</span>
+          <div class="form-name" title="{{ name }}">{{ name }}</div>
+
+          {# Contextual reasons, purely visual #}
+          {% if code|upper == 'MED-ATT-2025' %}
+            <span class="badge rounded-pill hint-badge kp9 ms-1">{% bs_icon 'envelope' %} Med Attendance</span>
+          {% endif %}
+          {% if code|upper == 'KP-9' %}
+            <span class="badge rounded-pill hint-badge kp9 ms-1">{% bs_icon 'envelope' %} New Summons</span>
+          {% elif code|upper == 'KP-18' %}
+            <span class="badge rounded-pill hint-badge kp18 ms-1">{% bs_icon 'person-exclamation' %} No-show (Complainant)</span>
+          {% elif code|upper == 'KP-19' %}
+            <span class="badge rounded-pill hint-badge kp19 ms-1">{% bs_icon 'person-exclamation' %} No-show (Respondent)</span>
+          {% elif code|upper == 'KP-20' %}
+            <span class="badge rounded-pill hint-badge kp20 ms-1">{% bs_icon 'exclamation-triangle' %} Repudiation → CFA</span>
+          {% elif code|upper == 'KP-20A' %}
+            <span class="badge rounded-pill hint-badge kp20a ms-1">{% bs_icon 'check2-circle' %} No Settlement → CFA</span>
+          {% elif code|upper == 'KP-20B' %}
+            <span class="badge rounded-pill hint-badge kp20b ms-1">{% bs_icon 'person-x' %} Repeated No-Show → CFA</span>
+          {% elif code|upper == 'KP-21' %}
+            <span class="badge rounded-pill hint-badge kp21 ms-1">{% bs_icon 'ban' %} Bar Action (Compl.)</span>
+          {% elif code|upper == 'KP-22' %}
+            <span class="badge rounded-pill hint-badge kp22 ms-1">{% bs_icon 'ban' %} Bar Counterclaim (Resp.)</span>
+          {% elif code|upper == 'KP-23' %}
+            <span class="badge rounded-pill hint-badge kp23 ms-1">{% bs_icon 'gavel' %} Execution (Non-Compliance)</span>
+          {% elif code|upper == 'KP-24' %}
+            <span class="badge rounded-pill hint-badge kp24 ms-1">{% bs_icon 'calendar-event' %} Hearing on Execution</span>
+          {% elif code|upper == 'KP-25' %}
+            <span class="badge rounded-pill hint-badge kp25 ms-1">{% bs_icon 'bell' %} Notice of Execution</span>
+          {% endif %}
+        </div>
+        <div class="form-action">
+          <a class="btn btn-brand btn-sm d-flex align-items-center use-form"
+             href="{% url 'lupon_mem:form_builder_by_code' case_id code %}">
+            {% bs_icon 'plus' extra_classes='me-2' %} Use this form
+          </a>
+        </div>
+      </div>
+    {% empty %}
+      <div class="text-muted py-5 text-center">No forms in catalog.</div>
+    {% endfor %}
+  </div>
+</div>
+
+<div id="pageLoadingSmall">
+  <div class="spinner-border text-danger" role="status" aria-label="Loading"></div>
+</div>
+
+<script>
+(function(){
+  const input   = document.getElementById('formSearch');
+  const list    = document.getElementById('formList');
+  const overlay = document.getElementById('pageLoadingSmall');
+
+  function filter() {
+    const q = (input.value || '').toUpperCase().trim();
+    list.querySelectorAll('.form-card').forEach(el => {
+      const code = el.getAttribute('data-code') || '';
+      const name = el.getAttribute('data-name') || '';
+      el.style.display = (!q || code.includes(q) || name.includes(q)) ? '' : 'none';
+    });
+  }
+  input.addEventListener('input', filter);
+  window.clearSearch = function(){ input.value=''; filter(); input.focus(); };
+
+  list.addEventListener('click', function(e){
+    const a = e.target.closest('a.use-form'); if (!a) return;
+    overlay.style.display = 'flex';
+  }, true);
+})();
+</script>
+{% endblock %}

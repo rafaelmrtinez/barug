@@ -14,6 +14,12 @@
     <link rel="stylesheet" href="{% static 'css/static_style.css' %}">
     <link rel="stylesheet" href="{% static 'css/header_pagetitle.css' %}">
     <link rel="stylesheet" href="{% static 'css/navbar.css' %}">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    {# ⬇️ Added: BARUG modal theme CSS (safe to include globally) #}
+    <link rel="stylesheet" href="{% static 'css/modal.css' %}">
 
     {% block css %}{% endblock %}
 
@@ -22,11 +28,28 @@
 </head>
 <body>
     {% include 'header.html' %}
-    {% comment %} {% include 'account_management/'|add:user_role_template|add:'.html' %} {% endcomment %}
-    {% comment %} {% include 'page_title.html' %} {% endcomment %}
+    {% include 'account_management/'|add:user_role_template|add:'.html' %}   
+    {% include 'page_title.html' %} 
+    {% block content %}
 
-    {% block content %}{% endblock%}
-        {# ⬇️ add this just before </body> ⬇️ #}
+    {# ⬇️ Added: a single reusable modal instance available to all pages #}
+{% include "partials/modal.html" with
+    modal_id="barugSwitchModal"
+    title="Switch to another account"
+    subtitle="Would you like to switch to a different account role?"
+    hero_icon_bi="exclamation-lg"
+    show_close="true"
+    primary_label="Switch"
+    secondary_label="Cancel"
+    primary_variant="primary"   /* not used by the custom CSS but harmless */
+    secondary_variant="ghost"   /* not used by the custom CSS but harmless */
+%}
+
+{% endblock%}
+    {# ⬇️ Added: modal controller (depends on Bootstrap JS already loaded by {% bootstrap_javascript %}) #}
+    <script src="{% static 'js/modal.js' %}"></script>
+
+    {# keep your existing JS block last #}
     {% block js %}{% endblock %}
 </body>
 </html>

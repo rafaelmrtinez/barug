@@ -343,10 +343,26 @@
                     <label class="form-label">Last Menstrual Period (LMP)</label>
                     <input name="lmp" id="lmp" type="date" class="form-control">
                   </div>
+                </div>
+
+                <hr class="my-4">
+
+                <!-- 5) Visit Basics -->
+                <div class="section-title">Visit Basics</div>
+                <div class="section-sub">Vitals and GA (trimester auto).</div>
+                <div class="row g-3">
+                  <div class="col-6 col-md-6"><label class="form-label">Visit Date <span class="text-danger">*</span></label><input name="visit_date" type="date" class="form-control" required></div>
                   <div class="col-6 col-md-6">
                     <label class="form-label">Estimated Date of Confinement (EDC)</label>
                     <input name="edc" id="edc" type="date" class="form-control">
                   </div>
+                  <div class="col-6 col-md-6"><label class="form-label">BP Systolic</label><input name="bp_sys" type="number" class="form-control" min="50" max="260" step="1" placeholder="110"></div>
+                  <div class="col-6 col-md-6"><label class="form-label">BP Diastolic</label><input name="bp_dia" type="number" class="form-control" min="30" max="160" step="1" placeholder="70"></div>
+                  <div class="col-6 col-md-6"><label class="form-label">Weight (kg)</label><input name="weight_kg" type="number" class="form-control" step="0.1" placeholder="54.0"></div>
+                  <div class="col-6 col-md-6"><label class="form-label">Fundic Height (cm)</label><input name="fundic_height_cm" type="number" class="form-control" step="1" placeholder="24"></div>
+                  <div class="col-6 col-md-6"><label class="form-label">FHR (bpm)</label><input name="fhr_bpm" type="number" class="form-control" step="1" placeholder="148"></div>
+                  <div class="col-6 col-md-6"><label class="form-label">Assessed by (Staff ID)</label><input name="assessed_by_id" type="number" class="form-control" placeholder="12"></div>
+                  <div class="col-12"><label class="form-label">Encounter notes</label><textarea name="notes" class="form-control" rows="2" placeholder="Free text notes…"></textarea></div>
                 </div>
 
                 <hr class="my-4">

@@ -1,0 +1,179 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/submission_dets.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container pt-5 px-0" style="margin-top:40px; margin-bottom:20px;">
+  <div class="row justify-content-center">
+    <div class="col-12">
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
+        <h4><strong>{{ heading_full_name|default:"" }}</strong></h4>
+        {% if role %}
+          <span class="badge bg-primary">{{ role }}</span>
+        {% endif %}
+      </div>
+
+      <div class="divider"></div>
+
+      <h4><strong>{{ profile.full_name|default:"—" }}</strong></h4>
+
+      <div class="row g-4">
+        <!-- Personal Information -->
+        <div class="col-md-6">
+          <div class="section-title mb-2">Personal Information</div>
+          <div class="kv">
+            <div class="kv-item"><span class="kv-key">Last Name</span><span class="kv-val">{{ profile.last_name|default:"" }}</span></div>
+            <div class="kv-item"><span class="kv-key">First Name</span><span class="kv-val">{{ profile.first_name|default:"" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Middle Name</span><span class="kv-val">{{ profile.middle_name|default:"" }}</span></div> 
+            <div class="kv-item"><span class="kv-key">Suffix</span><span class="kv-val">{{ profile.suffix|default:"" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Sex</span><span class="kv-val">{{ profile.sex|default:"" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Date of Birth</span><span class="kv-val">{{ profile.date_of_birth|date:"F d, Y"|default:"" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Civil Status</span><span class="kv-val">{{ profile.civil_status|default:"" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Nationality</span><span class="kv-val">{{ profile.nationality|default:"" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Religion</span><span class="kv-val">{{ profile.religion|default:"" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Home Address</span><span class="kv-val">{{ profile.home_address|default:"" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Email Address</span><span class="kv-val">{{ profile.email_address|default:"" }}</span></div>
+            <div class="kv-item"><span class="kv-key">Mobile Number</span><span class="kv-val">{{ profile.mobile_number|default:"" }}</span></div>
+          </div>
+        </div>
+
+        <!-- Staff Information -->
+        <div class="col-md-6">
+          <div class="section-title mb-2">Staff Information</div>
+          <div class="kv">
+            <div class="kv-item"><span class="kv-key">Role</span><span class="kv-val">{{ profile.role|default:"" }}</span></div>
+            <!-- <div class="kv-item"><span class="kv-key">Assigned Purok / Sitio</span><span class="kv-val">{{ profile.assigned_purok|default:"—" }}</span></div> -->
+            <div class="kv-item"><span class="kv-key">Schedule</span><span class="kv-val">{{ profile.schedule|default:"—" }}</span></div>
+          </div>
+
+          <div class="section-title mb-2 pt-4">Supporting Documents</div>
+          <div class="kv">
+            <div class="kv-item"><span class="kv-key">ID Type</span><span class="kv-val">{{ profile.id_type_name|default:"" }}</span></div>
+
+            <div class="doc-carousel carousel slide" id="docCarousel" data-bs-ride="false" aria-label="Supporting documents">
+              <div class="carousel-inner">
+                {% for s in doc_slides %}
+                  <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                    <div class="img-wrap">
+                      <img src="{{ s.src }}" class="doc-img" alt="{{ s.label }}">
+                    </div>
+                    <small class="text-muted d-block text-center mt-2">{{ s.label }}</small>
+                  </div>
+                {% endfor %}
+              </div>
+              <button class="carousel-control-prev doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="prev" aria-label="Previous">
+                <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
+              </button>
+              <button class="carousel-control-next doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="next" aria-label="Next">
+                <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
+              </button>
+            </div>
+
+            <div class="kv-item mt-3">
+              <span class="kv-key">Proof of Employment</span>
+              <span class="kv-val">
+                {% if profile.proof_of_employment_path %}
+                  <a href="{{ profile.proof_of_employment_path }}" target="_blank" rel="noopener">Open</a>
+                {% else %}—{% endif %}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- /row -->
+
+      <div class="divider"></div>
+
+      <!-- Form -->
+      <form id="staff-update-form" method="post" class="mt-3">
+        {% csrf_token %}
+
+        <!-- Role, Purok, Status -->
+        <div class="rounded-3 border bg-light p-3">
+          <div class="row g-3 align-items-end">
+            <!-- <div class="col-12 col-md-6">
+              <label class="form-label small">Select Staff Role</label>
+              <div class="form-floating">
+                {{ form.role }}
+                <label for="{{ form.role.id_for_label }}">{{ form.role.label }}</label>
+              </div>
+            </div> -->
+
+            <div class="col-12 col-md-6">
+              <label class="form-label small">Status</label>
+              <div class="form-floating">
+                {{ form.status }}
+                <label for="{{ form.status.id_for_label }}">{{ form.status.label }}</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Schedule -->
+        <div id="sched-section"> <!-- ★ ADDED (open wrapper) -->
+          <div class="rounded-3 border bg-light p-3 mt-4">
+            <div class="d-flex justify-content-between align-items-center">
+              <h6 class="mb-0">Schedules for Selected Resident</h6>
+              <button type="button" class="btn btn-submit btn-sm" id="add-sched">+ Add schedule</button>
+            </div>
+
+            <div id="sched-list">
+              <!-- Row 0 (uses your existing Django form fields) -->
+              <div class="sched-row rounded-3 border bg-white p-3 mt-3" data-index="0">
+                <div class="row g-3 align-items-end">
+                  <!-- Day -->
+                  <div class="col-12 col-md-4">
+                    <label class="form-label small">Day</label>
+                    <div class="form-floating">
+                      {{ form.day }}
+                      <label for="{{ sched_form.day.id_for_label }}">{{ sched_form.day.label }}</label>
+                    </div>
+                    <div class="form-text">Select the day for the schedule.</div>
+                  </div>
+
+                  <!-- Time Start -->
+                  <div class="col-12 col-md-4">
+                    <label class="form-label small">Time Start</label>
+                    <div class="form-floating">
+                      {{ form.time_start }}
+                      <label for="{{ sched_form.time_start.id_for_label }}">{{ sched_form.time_start.label }}</label>
+                    </div>
+                    <div class="form-text">Choose the start time.</div>
+                  </div>
+
+                  <!-- Time End -->
+                  <div class="col-12 col-md-4">
+                    <label class="form-label small">Time End</label>
+                    <div class="form-floating">
+                      {{ form.time_end }}
+                      <label for="{{ sched_form.time_end.id_for_label }}">{{ sched_form.time_end.label }}</label>
+                    </div>
+                    <div class="form-text">Choose the end time (after start).</div>
+                  </div>
+                </div>
+
+                <div class="mt-2 d-flex justify-content-end">
+                  <!-- Hidden for the first row so at least one remains -->
+                  <button type="button" class="btn btn-reset btn-sm remove-sched d-none">Remove</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div> <!-- ★ ADDED (close wrapper) -->
+
+        <!-- Buttons -->
+        <div class="mt-3 button-container justify-content-end mb-2 d-flex gap-2">
+          <button id="btn-secondary" type="reset" class="btn btn-reset d-none">Clear Changes</button>
+          <button id="btn-primary" type="button" class="btn btn-submit">Update</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

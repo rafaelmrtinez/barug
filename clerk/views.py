@@ -8,38 +8,58 @@ from __future__ import annotations
 # SECTION: Imports
 # ────────────────────────────────────────────────────────────
 import datetime as dt
+import copy
 from uuid import uuid4
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Iterable
 import io, os, zipfile, json, re
 from datetime import datetime
 from decimal import Decimal
 import logging
+import traceback
+import uuid
+from datetime import datetime, date, time
 
+from decimal import Decimal
+from django.forms import Form
+from django.urls import reverse
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.http import Http404, HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect, HttpResponsePermanentRedirect, HttpResponseBadRequest
 from django.shortcuts import redirect, render
 from django.utils.html import escape
 from django.utils import timezone
 from django.conf import settings
 from django.views.decorators.http import require_POST
+from django.template.loader import render_to_string
+from django.http import JsonResponse
 
 from postgrest.exceptions import APIError
+from django.views.decorators.http import require_GET
 
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
 from authentication.supabase_client import supabase
-
+from django.views.decorators.http import require_POST
 from .forms import (
     SearchVerificationRequest, SearchBusinessOwner, SelectOwnerForm , BusinessOwnerInfo,
-    BusinessDetails, BusinessFilters, RequestedDocsFilters
+    BusinessDetails, BusinessFilters, RequestedDocsFilters, SelectOwnerForm, RenewalFilters
 )
 
 # ---- email helper (uses your custom Gmail SMTP backend) ----
 from common.send_email import send_email
 
 # ---- services (PDF, request bundles, subject resolver, ID verification) ----
-from .services.requests_service import _fetch_bundle, _set_status
+# existing imports above…
+
+from .services.requests_service import (
+    _fetch_bundle,
+    _set_status,
+    confirm_and_send_to_printing,
+    confirm_forward_treasurer as svc_confirm_forward_treasurer,
+)
+
 from .services.subject_service import subject_view
 from .services.pdf_service import (
     _pdf_templates_dir, _get_all_pdf_field_names, _fill_pdf_with_values,
@@ -51,9 +71,50 @@ from .services.id_verification_service import (
     get_verification_status_for_person,
 )
 
+from treasurer.services.requests_service import build_auth_links
+
+
+def titleize(s):
+    txt = str(s or "")
+    return " ".join(txt.replace("_", " ").replace("-", " ").split()).title()
+
+def _norm(s) -> str:
+    """UPPER_CASE_WITH_UNDERSCORES normalizer for statuses/actions."""
+    return re.sub(r"[\s_]+", "_", str(s or "").strip().upper())
+
 # ────────────────────────────────────────────────────────────
 # SECTION: Logger + tiny email preview helpers
 # ────────────────────────────────────────────────────────────
+import logging
+log = logging.getLogger(__name__)
+from dataclasses import is_dataclass, asdict as dc_asdict
+from django.views.decorators.csrf import csrf_protect
+from dependency_injector.wiring import inject, Provide
+from src.app.bootstrap.app_containers import AppContainer
+from src.app.contracts.business_service_contract import (
+    IBusinessService,
+    IResidentOwnerService,
+    IBusinessRegistrationService,
+    IBusinessInfoService,
+    INonResidentOwnerService,
+    IBusinessRenewalService,
+    IBusinessRenewalQuoteService,
+    IBusinessRenewalRequestService,
+)
+from src.domain.contracts.business_repository_contract import IBusinessRepository
+from src.app.transfer_objects.commands.business_cmd import (
+    RegisterBusinessProfileCmd,
+    CreateRenewalRequestCmd,
+)
+from src.app.services.business_notification import notify_registration_received
+from common.send_sms import send_sms
+
+def _auth_role_name(request: HttpRequest) -> str:
+    return (((request.session.get("auth") or {}).get("role_name")) or "Staff").title()
+
+# =========================
+# Logger + tiny debug helpers
+# =========================
 logger = logging.getLogger(__name__)
 
 def _format_rcpt(rcpt: Any) -> str:
@@ -88,13 +149,15 @@ def _debug_email_preview(subject: str, to_list: List[Any], body_txt: str, body_h
 # ────────────────────────────────────────────────────────────
 STATUS_UI: Dict[str, Dict[str, str]] = {
     "FOR_TREASURER_REVIEW": {"label": "For Treasurer Review", "cls": "badge bg-warning-subtle text-warning-emphasis"},
+    "FOR CLERK REVIEW":     {"label": "For Clerk Review",     "cls": "badge bg-secondary-subtle text-secondary-emphasis"},
     "PAID":                 {"label": "Paid",                 "cls": "badge bg-primary-subtle text-primary-emphasis"},
     "FOR_PRINTING":         {"label": "For Printing",         "cls": "badge bg-info-subtle text-info-emphasis"},
     "READY_FOR_PICKUP":     {"label": "Ready for Pickup",     "cls": "badge bg-warning-subtle text-warning-emphasis"},
     "RELEASED":             {"label": "Released",             "cls": "badge bg-success-subtle text-success-emphasis"},
     "DECLINED":             {"label": "Declined",             "cls": "badge bg-danger-subtle text-danger-emphasis"},
 }
-CLERK_STATUSES_ALL = ["PAID", "FOR_PRINTING", "RELEASED", "DECLINED"]
+# include clerk-review in default list shown on queue if you want
+CLERK_STATUSES_ALL = ["FOR CLERK REVIEW", "PAID", "FOR_PRINTING", "RELEASED", "DECLINED"]
 CLERK_ROLE = "Barangay Clerk"
 
 def _titleize(s: str | None) -> str:
@@ -114,6 +177,8 @@ def _staff_id(request: HttpRequest) -> int | None:
 # ────────────────────────────────────────────────────────────
 BRGY_BUSINESS_DOC_NAME = "BARANGAY BUSINESS CLEARANCE"     # must match request_document_type_name
 BRGY_BUSINESS_PDF_FILE = "barangay-business-clearance.pdf" # the uploaded template filename
+# e.g., near BRGY_BUSINESS_DOC_NAME / BRGY_BUSINESS_PDF_FILE
+CTC_BRGY_BUSINESS_PDF_FILE = "ctc-barangay-business-clearance.pdf"
 
 # ────────────────────────────────────────────────────────────
 # SECTION: Missing-value advice (for logs)
@@ -281,11 +346,48 @@ def _lookup_person_contact(person_id: Optional[int]) -> Tuple[Optional[str], Opt
         print(f"[EMAIL DEBUG] lookup failed for person_id={person_id}: {e}")
         return None, None
 
+
+
+
 # ────────────────────────────────────────────────────────────
 # SECTION: Doc-type cache helper
 # ────────────────────────────────────────────────────────────
 _DOC_TYPES_ALL_CACHE: List[str] = []
 
+def _fetch_purposes_by_request_type(req_doc_type_id: int) -> List[Dict[str, Any]]:
+    q = (
+        supabase.table("document_purpose")
+        .select(
+            "document_purpose_id, request_document_type_id, purpose_code, purpose_label, "
+            "default_details, default_offense_no, business_category_id, "  # ← NEW
+            "fee_item:fee_item_id(fee_item_id, current_amount, "
+            "exempt_ftj, exempt_senior, exempt_pwd, exempt_indigent, exempt_student)"
+        )
+        .eq("request_document_type_id", req_doc_type_id)
+        .order("purpose_label")
+    ).execute()
+
+    rows = q.data or []
+    out = []
+    for r in rows:
+        fi = r.get("fee_item") or {}
+        out.append({
+            "document_purpose_id": r["document_purpose_id"],
+            "purpose_label": r.get("purpose_label"),
+            "purpose_code": r.get("purpose_code"),
+            "business_category_id": r.get("business_category_id"),  # ← NEW
+            "default_offense_no": r.get("default_offense_no"),
+            "default_details": r.get("default_details") or {},
+            "fee_item_id": fi.get("fee_item_id"),
+            "current_amount": fi.get("current_amount") or 0,
+            "exempt_ftj": bool(fi.get("exempt_ftj")),
+            "exempt_senior": bool(fi.get("exempt_senior")),
+            "exempt_pwd": bool(fi.get("exempt_pwd")),
+            "exempt_indigent": bool(fi.get("exempt_indigent")),
+            "exempt_student": bool(fi.get("exempt_student")),
+        })
+    return out
+    
 def _fetch_doc_types_all() -> List[str]:
     """Get the full list of document type names for the filter panel."""
     global _DOC_TYPES_ALL_CACHE
@@ -397,10 +499,62 @@ def queue(request: HttpRequest):
         "active_count": len(statuses) + len(doc_types),
     })
 
+
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+
+PH_TZ = ZoneInfo("Asia/Manila")
+
+def _fmt_occured_at(val) -> str:
+    """Accepts a datetime or ISO string, returns a Manila-local formatted string."""
+    if not val:
+        return "—"
+    dt = None
+    if isinstance(val, datetime):
+        dt = val
+    elif isinstance(val, str):
+        dt = parse_datetime(val)  # handles '...+00:00' etc.
+    if not dt:
+        return val  # show raw if parsing fails
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.utc)
+    # convert to Asia/Manila
+    dt_local = timezone.localtime(dt, PH_TZ)
+    return dt_local.strftime("%b %d, %Y • %I:%M %p")
+
+
+def _resolve_actor_name(ev: dict, header: dict) -> str:
+    """Return a friendly actor name for a timeline event."""
+    # Prefer explicit names on the event
+    for k in ("staff_name", "resident_name"):
+        v = (ev.get(k) or "").strip()
+        if v:
+            return v
+
+    actor = (ev.get("actor") or "").strip()
+    if actor:
+        # If it's an ID like "4", show the requester's name instead
+        if actor.isdigit() and header.get("requester_full_name"):
+            return header["requester_full_name"]
+        return actor
+
+    # Fallbacks by user type
+    ut = (ev.get("user_type_name") or "").strip().upper()
+    if ut == "PERSON" and header.get("requester_full_name"):
+        return header["requester_full_name"]
+
+    return "SYSTEM"
+
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
 def detail(request: HttpRequest, doc_request_id: int):
+    # small local normalizer so we can compare values robustly
+    def _norm(s) -> str:
+        return re.sub(r"[\s_]+", "_", str(s or "").strip().upper())
+
     try:
         data: Dict[str, Any] = _fetch_bundle(doc_request_id)
     except APIError as e:
@@ -412,17 +566,32 @@ def detail(request: HttpRequest, doc_request_id: int):
     payments = data.get("payments", {}) or {}
     timeline = data.get("timeline", []) or []
 
-    ui = STATUS_UI.get(header.get("status")) or {"label": header.get("status") or "—", "cls": "badge text-bg-secondary"}
+    # Authorization Letter assets (images / pdfs)
+    auth_links = build_auth_links(settings, header, lines)
+
+    # Status chip UI
+    ui = STATUS_UI.get(header.get("status")) or {
+        "label": header.get("status") or "—",
+        "cls": "badge text-bg-secondary"
+    }
+
+    # Enrich line items for display
     for l in lines:
-        l["purpose_display"] = _titleize(l.get("purpose_code"))
-        l["doc_purpose"] = (
-            l.get("purpose_display")
-            or l.get("purpose_label")
-            or l.get("purpose")
-            or (l.get("details") or {}).get("purpose_code")
+        details = l.get("details") or {}
+        # humanized purpose (fallback to details.purpose_code)
+        l["purpose_display"] = titleize(l.get("purpose_code") or details.get("purpose_code"))
+        # show applied waiver reasons as chips
+        l["reason_chips"] = list(l.get("reasons_applied") or details.get("reason_tags") or [])
+        # flag for full exemption (or explicit boolean if your backend sets it)
+        l["is_exempt"] = bool(
+            l.get("is_exempt")
+            or (
+                (l.get("waived_amount") or 0) > 0
+                and (l.get("base_amount") or 0) <= (l.get("waived_amount") or 0)
+            )
         )
 
-    # OR number and payment/receipt info (exposed for PDFs)
+    # OR number and receipt-ish fields exposed to UI/PDFs
     header["or_number"] = (
         payments.get("latest_or_number")
         or header.get("latest_or_number")
@@ -432,6 +601,7 @@ def detail(request: HttpRequest, doc_request_id: int):
     header["paid_amount"] = payments.get("latest_amount") or payments.get("amount")
     header["paid_date"]   = payments.get("latest_paid_at") or payments.get("paid_at") or payments.get("latest_or_time")
 
+    # Subject display fields
     subj = subject_view(header, {})
     header["is_on_behalf"] = subj["is_on_behalf"]
     header["subject_full_name"] = subj["full_name"]
@@ -440,7 +610,7 @@ def detail(request: HttpRequest, doc_request_id: int):
     header["subject_civil_status"] = subj["civil_status"]
     header["subject_nationality"] = subj["nationality"]
 
-    # --- NEW: CTC context for UI banner & modal ---
+    # --- CTC context for UI banner & modal (if any) ---
     ctc_mode = False
     ctc_of = None
     ctc_ref_request_id = None
@@ -460,10 +630,39 @@ def detail(request: HttpRequest, doc_request_id: int):
     except Exception:
         pass
 
+    # Timestamps formatted for Asia/Manila
+    header["created_fmt"] = _fmt_occured_at(header.get("created_at"))
+
+    for ev in timeline:
+        ev["occur_fmt"] = _fmt_occured_at(
+            ev.get("occurred_at") or ev.get("occurredAt") or ev.get("occur_time")
+        )
+        ev["display_actor"] = _resolve_actor_name(ev, header)
+
+    # === NEW: detect "paid" purely from status/timeline ===
+    was_marked_paid = False
+    if _norm(header.get("status")) == "PAID":
+        was_marked_paid = True
+    else:
+        for ev in timeline:
+            act = _norm(ev.get("action"))
+            to_status = _norm(ev.get("to_status"))
+            if (act == "STATUS_CHANGED" and to_status == "PAID") or act == "PAYMENT_ACCEPTED":
+                was_marked_paid = True
+                break
+
     return render(request, "clerk/detail.html", {
-        "header": header, "status_ui": ui, "lines": lines, "payments": payments, "timeline": timeline,
-        "ctc_mode": ctc_mode, "ctc_of": ctc_of,
-        "ctc_ref_request_id": ctc_ref_request_id, "ctc_ref_code": ctc_ref_code,
+        "header": header,
+        "status_ui": ui,
+        "lines": lines,
+        "payments": payments,
+        "timeline": timeline,
+        "ctc_mode": ctc_mode,
+        "ctc_of": ctc_of,
+        "ctc_ref_request_id": ctc_ref_request_id,
+        "ctc_ref_code": ctc_ref_code,
+        "auth_links": auth_links,
+        "was_marked_paid": was_marked_paid,  # <-- used by the template
     })
 
 # ────────────────────────────────────────────────────────────
@@ -643,16 +842,30 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
         doc_name_print = _safe_str(ref_line.get("document_type_name")) if (is_ctc and ref_line) else original_doc_name
         doc_name_upper = doc_name_print.strip().upper()
 
+        # The document to PRINT (for CTC we print the original's document)
+        doc_name_print = _safe_str(ref_line.get("document_type_name")) if (is_ctc and ref_line) else original_doc_name
+        doc_name_upper = doc_name_print.strip().upper()
+
         # Is this a (CTC of) Barangay Business Clearance?
         is_bc = (
             doc_name_upper == BRGY_BUSINESS_DOC_NAME
             or (is_ctc and ((line.get("details") or {}).get("ctc_of","").strip().upper() == BRGY_BUSINESS_DOC_NAME))
         )
 
-        # Template selection
+        # ✅ DEFAULT template (works for all other docs)
         template_file = _choose_template(doc_name_print, False)
-        if is_bc or (line.get("details") or {}).get("template_override") == BRGY_BUSINESS_PDF_FILE:
-            template_file = BRGY_BUSINESS_PDF_FILE
+
+        # Template selection
+        if is_bc:
+            if is_ctc:
+                template_file = CTC_BRGY_BUSINESS_PDF_FILE
+            else:
+                template_file = BRGY_BUSINESS_PDF_FILE
+
+        # (Optional) still honor a manual per-line override if you use it
+        if (line.get("details") or {}).get("template_override"):
+            template_file = (line["details"]["template_override"])
+            
         template_path = os.path.join(base_dir, template_file)
         print(f"[PRINT DEBUG] doc='{doc_name_print}' (from='{original_doc_name}') -> template='{template_file}' (CTC={is_ctc})")
 
@@ -790,6 +1003,8 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
     resp["Content-Disposition"] = f'attachment; filename="{req_code}-documents.zip'
     return resp
 
+
+
 # ────────────────────────────────────────────────────────────
 # SECTION: Release / Decline
 # ────────────────────────────────────────────────────────────
@@ -821,13 +1036,94 @@ def mark_released(request: HttpRequest, doc_request_id: int):
         messages.success(request, "Marked as released.")
     return redirect("clerk:detail", doc_request_id=doc_request_id)
 
+
 @session_login_required
 @role_required(CLERK_ROLE)
 @require_POST
 def decline(request: HttpRequest, doc_request_id: int):
+    print("\n" + "="*72)
+    print("[DECLINE DEBUG] called")
     reason = (request.POST.get("reason") or "").strip() or None
-    err = _set_status(doc_request_id, "DECLINED", _staff_id(request), reason)
-    messages.error(request, f"Failed: {escape(err)}") if err else messages.success(request, "Request declined.")
+    staff_id = _staff_id(request)
+
+    print(f"[DECLINE DEBUG] doc_request_id = {doc_request_id}")
+    print(f"[DECLINE DEBUG] staff_id       = {staff_id}")
+    print(f"[DECLINE DEBUG] reason         = {reason!r}")
+
+    # Load bundle first so we can inspect status/timeline/payments
+    try:
+        bundle = _fetch_bundle(doc_request_id)
+    except APIError as e:
+        messages.error(request, f"Unable to load request: {escape(getattr(e,'message', str(e)))}")
+        print("[DECLINE DEBUG] ERROR: _fetch_bundle failed:", e)
+        print("="*72 + "\n")
+        return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+    header    = (bundle or {}).get("header", {}) or {}
+    payments  = (bundle or {}).get("payments", {}) or {}
+    timeline  = (bundle or {}).get("timeline", []) or []
+
+    # Snapshot for logs
+    print(f"[DECLINE DEBUG] header.request_code     = {header.get('request_code')}")
+    print(f"[DECLINE DEBUG] header.status           = {header.get('status')}")
+    print(f"[DECLINE DEBUG] header.or_number        = {header.get('or_number')}")
+    print(f"[DECLINE DEBUG] payments.total_paid     = {float(payments.get('total_paid') or 0)}")
+    print(f"[DECLINE DEBUG] header.amount_due       = {float(header.get('amount_due') or 0)}")
+
+    # Determine paid-ness (now also looks at status/timeline)
+    def _norm(s): return re.sub(r"[\s_]+", "_", str(s or "").strip().upper())
+    status_now = _norm(header.get("status"))
+    has_or     = bool(header.get("or_number"))
+    total_paid = float(payments.get("total_paid") or 0)
+
+    timeline_paid = False
+    for ev in (timeline or []):
+        act = _norm(ev.get("action"))
+        to_status = _norm(ev.get("to_status"))
+        if act == "PAYMENT_ACCEPTED" or (act == "STATUS_CHANGED" and to_status == "PAID"):
+            timeline_paid = True
+            break
+
+    is_paid = (status_now == "PAID") or timeline_paid or (total_paid > 0) or has_or
+    print(f"[DECLINE DEBUG] is_paid?                = {is_paid}")
+    if timeline_paid:
+        print("[DECLINE DEBUG] timeline shows a payment event (PAYMENT_ACCEPTED/→PAID).")
+
+    # Path A: NOT paid → simple decline
+    if not is_paid:
+        print("[DECLINE DEBUG] PATH: simple decline (no refund)")
+        print(f"[DECLINE DEBUG] CALL: _set_status(doc_request_id={doc_request_id}, status='DECLINED', staff_id={staff_id}, reason={reason!r})")
+        err = _set_status(doc_request_id, "DECLINED", staff_id, reason)
+        print(f"[DECLINE DEBUG] RESULT: err = {err!r}")
+        print("="*72 + "\n")
+        if err:
+            messages.error(request, f"Failed: {escape(err)}")
+        else:
+            messages.success(request, "Request declined.")
+        return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+    # Path B: PAID → decline + open refund ticket (amount NULL lets SQL compute)
+    print("[DECLINE DEBUG] PATH: decline with REFUND ticket")
+    try:
+        from .services.requests_service import decline_and_request_refund
+    except Exception as e:
+        print("[DECLINE DEBUG] import decline_and_request_refund failed:", e)
+        messages.error(request, "Server error (refund handler missing).")
+        print("="*72 + "\n")
+        return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+    print(f"[DECLINE DEBUG] CALL: decline_and_request_refund(doc_request_id={doc_request_id}, staff_id={staff_id}, reason={reason!r}, refund_amount=None)")
+    err, refund_id = decline_and_request_refund(doc_request_id, int(staff_id), reason, refund_amount=None)
+    print(f"[DECLINE DEBUG] RESULT: err={err!r}, refund_id={refund_id!r}")
+    print("="*72 + "\n")
+
+    if err:
+        messages.error(request, f"Decline failed: {escape(err)}")
+    else:
+        msg = "Request declined. Refund ticket created and sent for Treasurer processing."
+        if refund_id:
+            msg = f"Request declined. Refund ticket #{refund_id} created and sent for Treasurer processing."
+        messages.success(request, msg)
     return redirect("clerk:detail", doc_request_id=doc_request_id)
 
 # ────────────────────────────────────────────────────────────
@@ -851,7 +1147,6 @@ def dashboard(request: HttpRequest):
     })
 
 @session_login_required
-@role_required(CLERK_ROLE)
 @role_required(CLERK_ROLE)
 @nocache
 def review_approve(request: HttpRequest):
@@ -913,7 +1208,6 @@ def review_approve(request: HttpRequest):
 
 @session_login_required
 @role_required(CLERK_ROLE)
-@role_required(CLERK_ROLE)
 @nocache
 def person_submission_dets(request: HttpRequest, req_id: int):
     """Details of a single person's submitted verification + latest status."""
@@ -964,8 +1258,54 @@ def person_submission_dets(request: HttpRequest, req_id: int):
 # ────────────────────────────────────────────────────────────
 # SECTION: AJAX helpers (search and purposes)
 # ────────────────────────────────────────────────────────────
-from django.template.loader import render_to_string
-from django.http import JsonResponse
+
+# ────────────────────────────────────────────────────────────
+# SECTION: AJAX helpers (search and purposes)
+# ────────────────────────────────────────────────────────────
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+def ajax_owner_businesses(request: HttpRequest) -> HttpResponse:
+    """
+    Return <option> list of the selected owner's businesses.
+    Used when Document Type is 'Barangay Business Clearance' or 'Certified True Copy' (CTC).
+
+    GET:
+      owner_person_id          (int, required)
+      require_has_clearance    ('1'|'true' to show ONLY businesses that already have a clearance)
+    """
+    try:
+        owner_person_id = int(request.GET.get("owner_person_id") or 0)
+    except Exception:
+        owner_person_id = 0
+
+    if not owner_person_id:
+        html = '<option value="">— select resident first —</option>'
+        return HttpResponse(html)
+
+    require_has_clearance = str(request.GET.get("require_has_clearance") or "").lower() in ("1", "true", "yes")
+
+    try:
+        q = (
+            supabase.table("business")
+            .select(
+                "business_id, business_name, business_category_id, has_business_clearance, "
+                "address:address_id(street, barangay, city)"
+            )
+            .eq("business_owner_id", owner_person_id)
+        )
+        if require_has_clearance:
+            q = q.eq("has_business_clearance", True)
+
+        resp = q.order("business_name").execute()
+        rows = resp.data or []
+    except Exception as e:
+        rows = []
+        logger.warning("ajax_owner_businesses failed: %s", e)
+
+    html = render_to_string("clerk/doc_req/_business_options.html", {"businesses": rows})
+    return HttpResponse(html)
+
 
 @session_login_required
 @role_required(CLERK_ROLE)
@@ -979,6 +1319,7 @@ def ajax_purpose_options(request: HttpRequest):
     purposes = _fetch_purposes_by_request_type(req_type_id) if req_type_id else []
     html = render_to_string("clerk/doc_req/_purpose_options.html", {"purposes": purposes})
     return HttpResponse(html)
+
 
 @session_login_required
 @role_required(CLERK_ROLE)
@@ -1102,6 +1443,8 @@ def walkin_new(request: HttpRequest):
         "residents": residents,
     })
 
+
+
 # ────────────────────────────────────────────────────────────
 # SECTION: Business Clearance field derivation
 # ────────────────────────────────────────────────────────────
@@ -1120,13 +1463,17 @@ def _fetch_business_clearance_fields(business_id: int, subject_person_id: Option
     """
     Pull business + address + subject basics and return the semantic keys
     that the Business Clearance PDF expects (before mapping).
+
+    CHANGE: First line of business now comes from business_category_id ->
+    document_purpose.purpose_label (falls back to business_nature).
     """
-    # Business core + address
+    # Business core + address (+ category id)
     try:
         bq = (
             supabase.table("business")
             .select(
-                "business_name, business_nature, capital_invested, prev_yr_total_gross_sales, "
+                "business_name, business_nature, business_category_id, "
+                "capital_invested, prev_yr_total_gross_sales, "
                 "address:address_id(street, barangay, city, purok_sitio:purok_sitio_id(purok_sitio_name))"
             )
             .eq("business_id", business_id)
@@ -1165,9 +1512,33 @@ def _fetch_business_clearance_fields(business_id: int, subject_person_id: Option
     parts = [addr.get("street"), purok, addr.get("barangay"), addr.get("city")]
     business_address = ", ".join([str(p).strip() for p in parts if p])
 
-    # Lines of business: split into up to 5 bullets
+    # ---- NEW: category label via business_category_id -> document_purpose.purpose_label
+    category_label: Optional[str] = None
+    cat_id = b.get("business_category_id")
+    if cat_id:
+        try:
+            dpq = (
+                supabase.table("document_purpose")
+                .select("purpose_label")              # optionally also select request_document_type_id if you want to guard it (e.g., = 4)
+                .eq("document_purpose_id", int(cat_id))
+                .limit(1)
+                .execute()
+            )
+            category_label = ((dpq.data or [{}])[0] or {}).get("purpose_label")
+        except Exception as e:
+            print(f"[WALKIN DEBUG] fetch category label failed: {e}")
+
+    # Lines of business:
+    # 1) Prefer the category label for slot #1
+    # 2) Then append any comma-separated items from business_nature
     nature = (b.get("business_nature") or "").strip()
-    lob = [s.strip() for s in nature.split(",") if s.strip()]
+    extra = [s.strip() for s in nature.split(",") if s.strip()]
+    lob: List[str] = []
+    if category_label:
+        lob.append(category_label)
+        # avoid duplicate if the same text appears in business_nature
+        extra = [x for x in extra if x.lower() != category_label.lower()]
+    lob.extend(extra)
     while len(lob) < 5:
         lob.append("")
 
@@ -1189,14 +1560,18 @@ def _fetch_business_clearance_fields(business_id: int, subject_person_id: Option
     print("[WALKIN DEBUG] raw business row:", json.dumps(b, indent=2, default=str))
     return details
 
+
 # ────────────────────────────────────────────────────────────
 # SECTION: Walk-in create (payload builder + BC enrichment)
 # ────────────────────────────────────────────────────────────
+
 @session_login_required
 @role_required(CLERK_ROLE)
 @require_POST
 def walkin_create(request: HttpRequest):
-    """POST handler that builds the same payload the mobile sends into `create_document_request`."""
+    """POST handler that builds the same payload the mobile sends, but routes through
+    create_document_request_walkin so we tag channel=WALKIN and filed_by clerk staff.
+    """
     # DEBUG: dump important POST data (sanitized)
     try:
         safe_post = {
@@ -1309,7 +1684,6 @@ def walkin_create(request: HttpRequest):
         doc_type_name = ""
 
     if doc_type_name.strip().upper() in {BRGY_BUSINESS_DOC_NAME, "CERTIFIED TRUE COPY"}:
-    # do something
         if not business_id:
             messages.error(request, "Business is required for Barangay Business Clearance.")
             return redirect(f"{request.path.replace('/create/','/')}?request_document_type_id={req_doc_type_id or ''}")
@@ -1319,6 +1693,7 @@ def walkin_create(request: HttpRequest):
             ln["details"] = {**(ln.get("details") or {}), **bc_details}
         print("[WALKIN DEBUG] lines after Business Clearance enrichment:\n", json.dumps(lines, indent=2, default=str))
 
+    # Debug preview in client-shape for parity with mobile logs
     payload_client_shape = {
         "requested_by": requested_by,
         "on_behalf_of": (subject_id if (is_on_behalf and subject_id) else None),
@@ -1327,24 +1702,29 @@ def walkin_create(request: HttpRequest):
         "purpose_notes": purpose_notes,
         "lines": lines,
     }
-    print("\n[WALKIN DEBUG] (client-shape) create_document_request payload:\n",
-        json.dumps(payload_client_shape, indent=2, default=str))
+    print("\n[WALKIN DEBUG] (client-shape) create_document_request_walkin payload:\n",
+          json.dumps(payload_client_shape, indent=2, default=str))
 
-    # CALL THE RPC with the names your function expects
-    rpc_args = {
-        "p_requested_by": requested_by,
-        "p_on_behalf_of": (subject_id if (is_on_behalf and subject_id) else None),
-        "p_is_on_behalf": is_on_behalf,
-        "p_business_id": business_id,
-        "p_purpose_notes": purpose_notes,
-        "p_lines": lines,  # supabase client will JSON-encode this list into jsonb
+    # ==== CALL THE WALK-IN RPC (NEW) ====
+    staff_id = (request.session.get("auth") or {}).get("staff_id") or _staff_id(request)
+    if not staff_id:
+        messages.error(request, "Missing staff context. Please login again.")
+        return redirect("clerk:walkin_new")
+
+    walkin_args = {
+        "p_requester_person_id": int(requested_by),
+        "p_subject_person_id":   int(subject_id or requested_by),
+        "p_business_id":         business_id,        # may be None
+        "p_purpose_notes":       purpose_notes,      # may be None
+        "p_lines":               lines,              # list; Supabase will JSON-encode to jsonb
+        "p_clerk_user_id":       int(staff_id),
     }
 
-    print("[WALKIN DEBUG] (rpc-shape) args sent to create_document_request:\n",
-        json.dumps(rpc_args, indent=2, default=str))
+    print("[WALKIN DEBUG] (rpc-shape) args sent to create_document_request_walkin:\n",
+          json.dumps(walkin_args, indent=2, default=str))
 
     try:
-        res = supabase.rpc("create_document_request", rpc_args).execute()
+        res = supabase.rpc("create_document_request_walkin", walkin_args).execute()
         print("[WALKIN DEBUG] RPC result .data :", getattr(res, "data", None))
         print("[WALKIN DEBUG] RPC result .error:", getattr(res, "error", None))
     except Exception as e:
@@ -1352,19 +1732,20 @@ def walkin_create(request: HttpRequest):
         messages.error(request, f"RPC failed: {e}")
         return redirect("clerk:walkin_new")
 
-    # Handle supabase response forms (scalar / obj / list)
     if getattr(res, "error", None):
         messages.error(request, f"Supabase error: {escape(res.error.message)}")
         return redirect("clerk:walkin_new")
 
+    # Function RETURNS int, but be defensive about shapes
     data = res.data
     new_id = None
-    if isinstance(data, list) and data:
-        new_id = data[0]
-    elif isinstance(data, dict) and "doc_request_id" in data:
-        new_id = data["doc_request_id"]
-    else:
+    if isinstance(data, int):
         new_id = data
+    elif isinstance(data, list) and data:
+        first = data[0]
+        new_id = first if isinstance(first, int) else (first.get("doc_request_id") if isinstance(first, dict) else None)
+    elif isinstance(data, dict):
+        new_id = data.get("doc_request_id") or data.get("id")
 
     if not new_id:
         messages.error(request, "Could not obtain new request ID from RPC.")
@@ -1373,48 +1754,484 @@ def walkin_create(request: HttpRequest):
     messages.success(request, f"Walk-in request created. ID: {new_id}")
     return redirect("clerk:detail", doc_request_id=new_id)
 
+
+
 # ────────────────────────────────────────────────────────────
-# SECTION: Business screens (stubs; clerk-only)
+# SECTION: Confirm (PAID → FOR_PRINTING)
 # ────────────────────────────────────────────────────────────
-BIZ_DRAFT_KEY = "biz_reg_draft"
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_POST
+def confirm_request(request: HttpRequest, doc_request_id: int):
+    """
+    Confirm (PAID → FOR_PRINTING). If not fully paid, do nothing and advise to use
+    the 'Confirm & Forward to Treasurer' action.
+    """
+    try:
+        bundle = _fetch_bundle(doc_request_id)
+    except APIError as e:
+        messages.error(request, f"Unable to load request: {e}")
+        return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+    header = (bundle or {}).get("header", {}) or {}
+    payments = (bundle or {}).get("payments", {}) or {}
+
+    amount_due  = float(header.get("amount_due") or 0)
+    total_paid  = float(payments.get("total_paid") or 0)
+
+    if total_paid + 1e-6 < amount_due:
+        messages.warning(
+            request,
+            "This request is not fully paid yet. Use “Confirm & Forward to Treasurer”."
+        )
+        return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+    # fully paid → move to FOR_PRINTING
+    staff_id = 2
+    err = confirm_and_send_to_printing(doc_request_id, int(staff_id), notes="Clerk confirmed (paid)")
+    if err:
+        messages.error(request, f"Failed to move to FOR PRINTING: {err}")
+    else:
+        messages.success(request, "Confirmed. Status is now FOR PRINTING.")
+    return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+# ────────────────────────────────────────────────────────────
+# NEW: Confirm & Forward to Treasurer (FOR_CLERK_REVIEW/PAID → FOR_TREASURER_REVIEW)
+# ────────────────────────────────────────────────────────────
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_POST
+def confirm_forward_treasurer(request: HttpRequest, doc_request_id: int):
+    """
+    Clerk confirm (FOR CLERK REVIEW/PAID → FOR_TREASURER_REVIEW).
+    Always routes through the RPC that logs CONFIRMED_BY_CLERK and sets status.
+    """
+    staff_id = (request.session.get("auth") or {}).get("staff_id") or _staff_id(request)
+    notes = (request.POST.get("reason") or "").strip() or None
+
+    err = svc_confirm_forward_treasurer(doc_request_id, int(staff_id), notes)
+    if err:
+        messages.error(request, f"Failed to forward to Treasurer: {err}")
+    else:
+        messages.success(request, "Confirmed. Sent to Treasurer for payment review.")
+    return redirect("clerk:detail", doc_request_id=doc_request_id)
+
+# =========================
+# Business screens (stubs; clerk-only)
+# =========================
 
 def _auth_staff_id(request: HttpRequest) -> Optional[int]:
     return ((request.session.get("auth") or {}).get("staff_id")) or None
 
-def _auth_role_name(request: HttpRequest) -> str:
-    return (((request.session.get("auth") or {}).get("role_name")) or "Staff").title()
-
-def _get_draft(request: HttpRequest) -> Dict[str, Any]:
-    return request.session.get(BIZ_DRAFT_KEY) or {}
-
-def _save_draft(request: HttpRequest, draft: Dict[str, Any]) -> None:
-    request.session[BIZ_DRAFT_KEY] = draft
-    request.session.modified = True
-
-def _clear_draft(request: HttpRequest) -> None:
-    if BIZ_DRAFT_KEY in request.session:
-        del request.session[BIZ_DRAFT_KEY]
-        request.session.modified = True
-
-def _js(v):
-    """Make values JSON-safe for Supabase RPC."""
+def _sstrip(v: Any) -> Optional[str]:
+    """Strip only if string; return None for empty strings; pass through other types."""
     if v is None:
         return None
-    if isinstance(v, Decimal):
-        return float(v)                 # or str(v) if you prefer exact text
-    if isinstance(v, (dt.date, dt.datetime, dt.time)):
-        return v.isoformat()            # 'YYYY-MM-DD' / 'HH:MM:SS'
-    return v
+    if isinstance(v, str):
+        t = v.strip()
+        return t or None
+    return v  # keep non-strings as-is
 
-#DO NOT TOUCH THIS FUNCTION
-@session_login_required
-@role_required("Barangay Clerk")
-@nocache
+def _to_str_num(v: Any, default: str = "0") -> str:
+    """Convert Decimal/int/float to string for session JSON safety."""
+    if v is None or v == "":
+        return default
+    try:
+        return str(v)
+    except Exception:
+        return default
+
+def _to_float_or_none(val) -> Optional[float]:
+    try:
+        if val in (None, "", "None"):
+            return None
+        return float(val)
+    except Exception:
+        return None
+
+def _to_int_or_none(val) -> Optional[int]:
+    try:
+        if val in (None, "", "None"):
+            return None
+        return int(val)
+    except Exception:
+        return None
+
+def _parse_date_iso(s: Any) -> Any:
+    if isinstance(s, date):
+        return s
+    if isinstance(s, str) and s:
+        try:
+            return date.fromisoformat(s)
+        except ValueError:
+            return s
+    return s
+
+def _parse_time_hms(s: Any) -> Any:
+    if isinstance(s, time):
+        return s
+    if isinstance(s, str) and s:
+        try:
+            parts = s.split(":")
+            if len(parts) == 2:
+                h, m = parts
+                return time(int(h), int(m), 0)
+            elif len(parts) == 3:
+                h, m, sec = parts
+                return time(int(h), int(m), int(sec))
+        except Exception:
+            return s
+    return s
+
+def _fmt_peso(v: Any) -> str:
+    # We stored money-like values as strings earlier; accept Decimal/float/string
+    if v in (None, "", "None"):
+        return "₱ 0.00"
+    try:
+        num = float(v) if not isinstance(v, (int, float)) else v
+        return f"₱ {num:,.2f}"
+    except Exception:
+        return f"₱ {v}"
+
+def _json_safe(val):
+    """Recursively convert Decimals, dates, times, etc. to JSON-serializable types."""
+    if isinstance(val, Decimal):
+        # choose float for numbers (you already stringified money fields separately)
+        return float(val)
+    if isinstance(val, (list, tuple)):
+        return [ _json_safe(v) for v in val ]
+    if isinstance(val, dict):
+        return { k: _json_safe(v) for k, v in val.items() }
+    # dates/times in your code are already converted to isoformat or HH:MM:SS
+    return val
+
+def _owner_full_name(o: dict) -> str:
+    last = (o.get("last_name") or "").strip()
+    first = (o.get("first_name") or "").strip()
+    mid = (o.get("middle_name") or "").strip()
+    suffix = (o.get("suffix") or "").strip()
+    parts: List[str] = []
+    if last: parts.append(last.upper())
+    if first: parts.append(", " + first.title())
+    if mid: parts.append(" " + (mid[0].upper() + "."))
+    if suffix: parts.append(" " + suffix.upper())
+    if parts:
+        return "".join(parts)
+    # 🔽 DTO fallback
+    fn = (o.get("full_name") or "").strip()
+    return fn or "—"
+
+def _join_addr(parts: List[str]) -> str:
+    return ", ".join([p.strip() for p in parts if p and p.strip()])
+
+def _choices_to_map(choices: Iterable) -> Dict[Any, str]:
+    """
+    Convert Django choices (which may include optgroups) to {value: label}.
+    Safely handles:
+      - [("", "— Select —"), (1, "ONE"), (2, "TWO")]
+      - [("WEEKDAYS", [(1,"Mon"), (2,"Tue")]), ("WEEKEND", [(6,"Sat"), (7,"Sun")])]
+    """
+    out: Dict[Any, str] = {}
+    for item in choices or []:
+        # Optgroup: (group_label, list_of_choices)
+        if isinstance(item, (list, tuple)) and len(item) == 2 and isinstance(item[1], (list, tuple)):
+            _group_label, _group_choices = item
+            for v, lbl in _group_choices:
+                out[_coerce_key(v)] = str(lbl)
+        else:
+            # Regular choice: (value, label)
+            try:
+                v, lbl = item
+                out[_coerce_key(v)] = str(lbl)
+            except Exception:
+                continue
+    return out
+
+def _coerce_key(v: Any) -> Any:
+    """Try to turn numeric-looking keys into int for easy matching; else leave as-is."""
+    if v is None:
+        return None
+    # If already an int, or your TypedChoiceField coerces to int, this keeps it as int.
+    if isinstance(v, int):
+        return v
+    # Try to int-ify strings like "1"
+    try:
+        return int(v)
+    except Exception:
+        return v  # keep original (e.g., "" for blank choice)
+
+def _field_map(form: Form, field_name: str) -> Dict[Any, str]:
+    field = form.fields.get(field_name)
+    if not field:
+        return {}
+    return _choices_to_map(field.choices)
+
+def fetch_display_maps_from_forms() -> Dict[str, Dict[Any, str]]:
+    """
+    Build all needed {id: label} maps directly from your static Django forms.
+    Adjust field names if yours differ.
+    """
+    owner_form = BusinessOwnerInfo()
+    biz_form = BusinessDetails()
+
+    return {
+        # Owner-side lookups
+        "sex": _field_map(owner_form, "sex"),
+        "civil_status": _field_map(owner_form, "civil_status"),
+        "nationality": _field_map(owner_form, "nationality"),
+        "religion": _field_map(owner_form, "religion"),
+
+        # Business-side lookups
+        "ownership_type": _field_map(biz_form, "ownership_type"),
+        "business_category": _field_map(biz_form, "b_category"),
+
+        # Operating day labels (fallback if one is missing)
+        "operating_day": _field_map(biz_form, "opt_days_start") or _field_map(biz_form, "opt_days_end"),
+    }
+
+def build_owner_display(owner: dict, maps: Dict[str, Dict[Any, str]]) -> Dict[str, Any]:
+    sex_name = (
+        owner.get("sex_name")
+        or maps.get("sex", {}).get(owner.get("sex_id"))
+        or owner.get("sex")
+    )
+    civil_name = (
+        owner.get("civil_status_name")
+        or owner.get("civil_status")
+        or maps.get("civil_status", {}).get(owner.get("civil_status_id"))
+        or owner.get("civil_status_id")
+    )
+    nat_name = (
+        owner.get("nationality_name")
+        or owner.get("nationality")
+        or maps.get("nationality", {}).get(owner.get("nationality_id"))
+        or owner.get("nationality_id")
+    )
+    rel_name = (
+        owner.get("religion_name")
+        or owner.get("religion")
+        or maps.get("religion", {}).get(owner.get("religion_id"))
+        or owner.get("religion_id")
+    )
+
+    full_name = _owner_full_name(owner)
+    addr = _join_addr([
+        owner.get("street") or "",
+        owner.get("purok_sitio") or "",
+        owner.get("barangay") or "",
+        owner.get("city") or "",
+    ])
+
+    res_name = _normalize_residency_name(
+        owner.get("residency_name") or owner.get("residential_status_name")
+    )
+
+    return {
+        "full_name": full_name,
+        "person_code": owner.get("person_code"),
+        "sex_name": sex_name or "—",
+        "dob": owner.get("dob") or owner.get("date_of_birth") or "—",
+        "civil_status_name": civil_name or "—",
+        "nationality_name": nat_name or "—",
+        "religion_name": rel_name or "—",
+        "mobile": owner.get("mobile") or "—",
+        "email": owner.get("email") or "—",
+        "address_display": addr or (owner.get("address_line") or "—"),
+        "residency_name": res_name,
+    }
+
+def build_business_display(biz: dict, maps: Dict[str, Dict[int, str]]) -> Dict[str, Any]:
+    """
+    Return a label-rich dict strictly for display.
+    """
+    owner_type_name = maps.get("ownership_type", {}).get(biz.get("ownership_type")) or biz.get("ownership_type_name")
+    cat_name = maps.get("business_category", {}).get(biz.get("b_category")) or biz.get("b_category_name")  # 👈 NEW
+
+    # Operating day labels from form choices (fallback to raw if missing)
+    day_map = maps.get("operating_day", {}) or {}
+    opt_days_start_lbl = day_map.get(biz.get("opt_days_start")) or biz.get("opt_days_start")
+    opt_days_end_lbl   = day_map.get(biz.get("opt_days_end"))   or biz.get("opt_days_end")
+
+    addr = _join_addr([
+        biz.get("street") or "",
+        biz.get("purok_sitio") or "",
+        biz.get("barangay") or "",
+        biz.get("city") or "",
+    ])
+
+    return {
+        "b_name": biz.get("b_name") or "—",
+        "b_nature": biz.get("b_nature") or "—",
+        "ownership_type_name": owner_type_name or biz.get("ownership_type") or "—",
+        "b_category_name": cat_name or biz.get("b_category") or "—",  # 👈 NEW (label-first, raw fallback)
+        "b_category": biz.get("b_category"),                           # 👈 NEW (raw id)
+
+        "address_display": addr or "—",
+        "latitude": biz.get("latitude"),
+        "longitude": biz.get("longitude"),
+        "b_desc": biz.get("b_desc") or "—",
+        "date_est": biz.get("date_est") or "—",
+        "dti": biz.get("dti") or "—",
+        "capital_display": _fmt_peso(biz.get("capital_invested")),
+        "prevgross_display": _fmt_peso(biz.get("prevgross")),
+        "inc_est": _fmt_peso(biz.get("inc_est")),
+        "employees_display": biz.get("emp_num") or "—",
+
+        # expose both label and raw for completeness
+        "opt_days_start_name": opt_days_start_lbl,
+        "opt_days_end_name": opt_days_end_lbl,
+        "opt_days_start": biz.get("opt_days_start"),
+        "opt_days_end": biz.get("opt_days_end"),
+        "opt_start": biz.get("opt_start"),
+        "opt_end": biz.get("opt_end"),
+        "proof_name": biz.get("proof_name") or "—",
+    }
+ 
+def _normalize_owner_rows(rows):
+    """
+    Normalize DTOs/objects into dicts the template & AJAX both expect.
+    """
+    payload = []
+    for r in rows or []:
+        if isinstance(r, dict):
+            d = r
+        elif is_dataclass(r):
+            d = dc_asdict(r)
+        elif hasattr(r, "_asdict"):
+            try:
+                d = r._asdict()
+            except Exception:
+                d = getattr(r, "__dict__", {}) or {}
+        else:
+            d = getattr(r, "__dict__", {}) or {}
+
+        payload.append({
+            "person_id": d.get("person_id"),
+            "person_code": d.get("person_code") or "",
+            "person_name": d.get("full_name") or d.get("person_name") or "",
+            "street": d.get("street") or "",
+            "purok": d.get("purok") or "",
+            "barangay": d.get("barangay") or "",
+            "city": d.get("city") or "",
+            # optional extras if your SQL provides them
+            "sex_name": d.get("sex_name") or "",
+            "date_of_birth": d.get("date_of_birth") or "",
+            "residential_status_name": d.get("residential_status_name") or "",
+            "address_line": d.get("address_line") or "",
+        })
+    return payload
+
+def _asdict_loose(obj: Any) -> Dict[str, Any]:
+    """Return a plain dict from dataclass / namedtuple / dict / generic object."""
+    if obj is None:
+        return {}
+    if isinstance(obj, dict):
+        return obj
+    if is_dataclass(obj):
+        return dc_asdict(obj)
+    if hasattr(obj, "_asdict"):
+        try:
+            return obj._asdict()
+        except Exception:
+            pass
+    out: Dict[str, Any] = {}
+    for k in dir(obj):
+        if k.startswith("_"):
+            continue
+        try:
+            v = getattr(obj, k)
+        except Exception:
+            continue
+        if callable(v):
+            continue
+        out[k] = v
+    return out
+
+def _normalize_residency_name(s: Optional[str]) -> str:
+    if not s:
+        return "NON-RESIDENT"
+    x = (str(s) or "").strip().upper()
+    if x in {"RESIDENT", "R"}: return "RESIDENT"
+    if x in {"NON RESIDENT", "NON-RESIDENT", "NONRESIDENT", "NR"}: return "NON-RESIDENT"
+    if x in {"TRANSIENT", "T"}: return "TRANSIENT"
+    return x or "NON-RESIDENT"
+
+def _owner_payload_common_from_dict(src: Any) -> Dict[str, Any]:
+    d = _asdict_loose(src)
+
+    dob_val = d.get("dob") or d.get("date_of_birth")
+    if isinstance(dob_val, date):
+        dob_str = dob_val.isoformat()
+    elif isinstance(dob_val, str):
+        dob_str = dob_val
+    else:
+        dob_str = None
+
+    payload = {
+        "owner_person_id": _to_int_or_none(d.get("owner_person_id") or d.get("person_id")),
+        # keep split names if available + full_name for display fallback
+        "last_name": _sstrip(d.get("last_name")) or "",
+        "first_name": _sstrip(d.get("first_name")) or "",
+        "middle_name": _sstrip(d.get("middle_name")),
+        "suffix": _sstrip(d.get("suffix")),
+        "full_name": _sstrip(d.get("full_name")),
+
+        "dob": dob_str,
+        "email": _sstrip(d.get("email")),
+        "mobile": _sstrip(d.get("mobile") or d.get("mob_num")),
+
+        # IDs if you ever have them (DTO strings will not coerce to int)
+        "sex_id": _to_int_or_none(d.get("sex_id") or d.get("sex")),
+        "civil_status_id": _to_int_or_none(d.get("civil_status_id")),
+        "nationality_id": _to_int_or_none(d.get("nationality_id")),
+        "religion_id": _to_int_or_none(d.get("religion_id")),
+
+        # 🔽 carry human-readable labels from DTO
+        "sex_name": _sstrip(d.get("sex_name")),
+        "civil_status_name": _sstrip(d.get("civil_status")),
+        "nationality_name": _sstrip(d.get("nationality")),
+        "religion_name": _sstrip(d.get("religion")),
+
+        # address
+        "street": _sstrip(d.get("street")) or "",
+        "purok_sitio": _sstrip(d.get("purok_sitio") or d.get("purok")) or "",
+        "barangay": _sstrip(d.get("barangay")) or "",
+        "city": _sstrip(d.get("city")) or "",
+        "address_line": _sstrip(d.get("address_line")),  # optional fallback for display
+
+        "person_code": _sstrip(d.get("person_code")),
+        "residency_name": _normalize_residency_name(d.get("residency_name") or d.get("residential_status_name") or "NON-RESIDENT"),
+    }
+    return payload
+
+def _save_temp_upload(upload, subdir: str) -> dict:
+    """
+    Save an uploaded file to default_storage under tmp/<subdir>/<uuid>_<name>.
+    Returns a dict with storage 'path' plus metadata for later preview/upload.
+    """
+    if not upload:
+        return {}
+
+    # Build a storage-relative path like: "tmp/bizproof/uuid_name.jpg"
+    fname = f"{uuid.uuid4().hex}_{upload.name}"
+    storage_path = "/".join(["tmp", subdir.strip("/"), fname])
+
+    # Write into whatever backend default_storage is configured to use
+    default_storage.save(storage_path, ContentFile(upload.read()))
+
+    return {
+        "path": storage_path,                      # <-- use this everywhere
+        "name": upload.name,
+        "ctype": getattr(upload, "content_type", None),
+        "size": getattr(upload, "size", None),
+    }
+
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
 def business_owner(request: HttpRequest):
-    user_role = (request.session.get("auth") or {}).get("role_name").title()
+    user_role = _auth_role_name(request)
     return render(
         request,
         "business/business_owner.html",
@@ -1424,58 +2241,56 @@ def business_owner(request: HttpRequest):
         },
     )
 
-#DO NOT TOUCH THIS FUNCTION
 @session_login_required
-@role_required("Barangay Clerk")
+@role_required(CLERK_ROLE)
+@csrf_protect
 @nocache
-def business_owner_resident(request: HttpRequest) -> HttpResponse:
+@inject
+def business_owner_resident(
+    request: HttpRequest,
+    resident_owner_service: IResidentOwnerService = Provide[AppContainer.resident_owner_service],
+) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+    """
+    Page render:
+      - preserves server-side render if `?search=` is present
+      - front-end enhances with AJAX type-ahead
+    """
     user_role = _auth_role_name(request)
-
-    # allow "Change" to clear selection
-    if request.GET.get("clear") == "1":
-        draft = _get_draft(request)
-        draft.pop("owner_person_id", None)
-        _save_draft(request, draft)
-        messages.info(request, "Selection cleared.")
-        return redirect("clerk:business_owner_resident")
-
-    # POST: selecting an owner
-    search_form = SearchBusinessOwner(request.GET or None)
+    form = SearchBusinessOwner(request.GET or None)
     select_form = SelectOwnerForm(request.POST or None)
 
-    if request.method == "POST":
-        if select_form.is_valid():
-            owner_person_id = select_form.cleaned_data["owner_person_id"]
-            draft = _get_draft(request)
-            draft["owner_person_id"] = int(owner_person_id)
-            _save_draft(request, draft)
-            messages.success(request, "Owner selected. Review details below or continue.")
-            return redirect("clerk:business_owner_resident")
-        else:
-            messages.error(request, "Please select a resident owner.")
+    search = (request.GET.get("search") or request.POST.get("search") or "").strip()
 
-    # GET: searching residents
-    q = ""
-    results: List[Dict[str, Any]] = []
-    if search_form.is_bound and search_form.is_valid():
-        q = (search_form.cleaned_data.get("search") or "").strip()
-        if q:
-            try:
-                resp = supabase.rpc("search_person_by_code_or_name", {"p_key": q}).execute()
-                results = resp.data or []
-            except APIError as e:
-                messages.error(request, f"Search error: {getattr(e,'message',str(e))}")
-
-    # Load selected resident (if any)
-    selected = None
-    owner_person_id = (_get_draft(request) or {}).get("owner_person_id")
-    if owner_person_id:
+    rows: List[Dict[str, Any]] = []
+    if search:
         try:
-            sel = supabase.rpc("get_details", {"p_person_id": int(owner_person_id)}).execute()
-            data = sel.data
-            selected = (data[0] if isinstance(data, list) and data else data) or None
-        except APIError as e:
-            messages.error(request, f"Failed to load selected resident: {getattr(e,'message',e)}")
+            rows = resident_owner_service.execute(search=search) or []
+        except Exception:
+            log.exception("Owner search failed for %r", search)  # <-- keep a trace
+            rows = []
+
+    results_payload = _normalize_owner_rows(rows)
+
+    selected: dict | None = None
+    if request.method == "POST" and select_form.is_valid():
+        try:
+            owner_id = int(select_form.cleaned_data["owner_person_id"])
+            selected = resident_owner_service.get_owner_details(owner_id)
+        except Exception:
+            log.exception("Fetching owner details failed for id=%s", request.POST.get("owner_person_id"))
+            selected = None
+
+    if selected:
+        owner_payload = _owner_payload_common_from_dict(selected)
+
+        request.session["bizreg_owner"] = owner_payload
+        request.session.set_expiry(1800)
+
+        messages.success(request, "Owner selected. Continue with business details.")
+
+    # keep form pristine if invalid
+    if search and not form.is_valid():
+        form = SearchBusinessOwner()
 
     return render(
         request,
@@ -1483,156 +2298,296 @@ def business_owner_resident(request: HttpRequest) -> HttpResponse:
         {
             "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
             "page_title": "Business Owner Information",
-            "search_form": search_form,  # GET form
-            "select_form": select_form,  # POST form
-            "q": q,
-            "results": results,
+            "form": form,
+            "select_form": select_form,
+            "search": search,           # single source of truth (no 'q')
+            "results": results_payload, # server-rendered initial list (optional)
             "selected": selected,
         },
     )
 
-#DO NOT TOUCH THIS FUNCTION
-def business_owner_nonresident(request: HttpRequest):
-    user_role = (request.session.get("auth") or {}).get("role_name").title()
-    form = BusinessOwnerInfo()
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_GET
+@inject
+def ajax_owner_search(
+    request: HttpRequest,
+    resident_owner_service: IResidentOwnerService = Provide[AppContainer.resident_owner_service],
+):
+    """
+    AJAX endpoint for live search.
+    Expects: ?search=<term>
+    Returns: {"results": [ ...normalized rows... ]}
+    """
+    search = (request.GET.get("search") or "").strip()
+    if not search:
+        return JsonResponse({"results": []})
+
+    try:
+        rows = resident_owner_service.execute(search=search) or []
+    except Exception:
+        rows = []
+
+    payload = _normalize_owner_rows(rows)
+    return JsonResponse({"results": payload})
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@csrf_protect
+@nocache
+@inject
+def business_owner_nonresident(
+    request: HttpRequest,
+    resident_owner_service: IResidentOwnerService = Provide[AppContainer.resident_owner_service],
+) -> HttpResponse:
+    user_role = _auth_role_name(request)
+
+    # Forms
+    search_form = SearchBusinessOwner(request.GET or None)
+    select_form = SelectOwnerForm(request.POST or None)  # for "Select as Owner" button
+    create_form: BusinessOwnerInfo | None = None         # for Fill-up tab
+
+    # Single source of truth for the current search term
+    search = (request.GET.get("search") or request.POST.get("search") or "").strip()
+
+    # --- SEARCH (non-residents only) ---
+    results_payload: list[dict] = []
+    if search:
+        try:
+            # Prefer kwarg if the service supports it, else fall back to a dedicated method
+            try:
+                rows = resident_owner_service.execute(search=search, only_nonresident=True)
+            except TypeError:
+                rows = getattr(resident_owner_service, "execute_nonresident")(search=search)
+
+            # Normalize to the payload the template/JS expects
+            results_payload = _normalize_owner_rows(rows)
+
+            # DEBUG: log if no results so you can see what was searched
+            if not results_payload:
+                # use both print (visible in runserver) and logger (if configured)
+                msg = f"[nonresident search] No results. term={search!r}, only_nonresident=True"
+                print(msg, flush=True)
+                log.info(msg)
+
+        except Exception as e:
+            # Keep the page responsive even if the repository errors out
+            log.exception("Non-resident search failed for %r: %s", search, e)
+            print(f"[nonresident search] ERROR for {search!r}: {e}", flush=True)
+            results_payload = []
+
+    selected = None
+
+    if request.method == "POST" and "owner_person_id" in request.POST:
+        # --- PATH A: selecting an existing person from search results ---
+        if select_form.is_valid():
+            try:
+                owner_id = int(select_form.cleaned_data["owner_person_id"])
+                selected = resident_owner_service.get_owner_details(owner_id)
+            except Exception:
+                log.exception(
+                    "Fetching non-resident owner details failed for id=%s",
+                    request.POST.get("owner_person_id"),
+                )
+                selected = None
+
+        if selected:
+            owner_payload = _owner_payload_common_from_dict(selected)
+            # ensure display badge stays consistent
+            owner_payload["residency_name"] = _normalize_residency_name(
+                owner_payload.get("residency_name") or "NON-RESIDENT"
+            )
+            # Store ONLY JSON-safe types in session
+            request.session["bizreg_owner"] = owner_payload
+            request.session.set_expiry(1800)
+            messages.success(request, "Owner selected. Continue with business details.")
+        # If invalid, fall through and re-render with errors on search tab.
+
+    elif request.method == "POST":
+        # --- PATH B: fill-up / create flow ---
+        create_form = BusinessOwnerInfo(request.POST, request.FILES or None)
+        if create_form.is_valid():
+            cd = create_form.cleaned_data
+            dob_val = cd["dob"]
+            dob_str = dob_val.isoformat() if isinstance(dob_val, date) else str(dob_val)
+
+            owner_payload: Dict[str, Any] = {
+                "owner_person_id": cd.get("owner_person_id") or None,  # usually None for brand-new
+                "last_name": cd["last_name"].strip(),
+                "first_name": cd["first_name"].strip(),
+                "middle_name": (cd.get("middle_name") or "").strip() or None,
+                "suffix": (cd.get("suffix") or "").strip() or None,
+                "dob": dob_str,  # JSON-safe string
+                "email": (cd.get("email") or "").strip() or None,
+                "mobile": (cd.get("mob_num") or "").strip() or None,
+                "sex_id": int(cd["sex"]),
+                "civil_status_id": int(cd["civil_status"]),
+                "nationality_id": int(cd["nationality"]),
+                "religion_id": int(cd["religion"]),
+                "street": cd["street"].strip(),
+                "purok_sitio": (cd.get("purok_sitio") or "").strip(),
+                "barangay": cd["barangay"].strip(),
+                "city": cd["city"].strip(),
+                "residency_name": "NON-RESIDENT",
+            }
+
+            request.session["bizreg_owner"] = owner_payload
+            request.session.set_expiry(1800)
+            messages.success(request, "Owner info saved. Continue with business details.")
+            return redirect("clerk:business_details")
+        else:
+            # form errors: stay on create tab and show errors
+            messages.error(request, "Please correct the errors below.")
+
+    # Default create_form on GET (or when selection path used)
+    if create_form is None:
+        # IMPORTANT: copy before converting strings to date objects for form initial
+        saved_raw = request.session.get("bizreg_owner") or {}
+        saved = copy.deepcopy(saved_raw)  # <- do NOT mutate the session dict
+
+        # Convert ISO string -> date only for the initial dict (keeps session JSON-safe)
+        if "dob" in saved and isinstance(saved["dob"], str):
+            try:
+                saved["dob"] = date.fromisoformat(saved["dob"])
+            except ValueError:
+                pass
+
+        create_form = BusinessOwnerInfo(initial=saved or None)
+
+    # Keep search form pristine if invalid in GET
+    if search and not search_form.is_valid():
+        search_form = SearchBusinessOwner()
+
     return render(
         request,
         "business/business_owner_nonres.html",
         {
             "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
             "page_title": "Business Owner Information",
-            "form": form,
+            # Search tab context
+            "search_form": search_form,
+            "search": search,
+            "results": results_payload,
+            "selected": selected,
+            # Create tab context
+            "form": create_form,
         },
     )
 
-#DO NOT TOUCH THIS FUNCTION
 @session_login_required
-@role_required("Barangay Clerk")
+@role_required(CLERK_ROLE)
+@require_GET
+@inject
+def ajax_nonresident_owner_search(
+    request: HttpRequest,
+    resident_owner_service: IResidentOwnerService = Provide[AppContainer.resident_owner_service],
+):
+    q = (request.GET.get("search") or "").strip()
+    if not q:
+        return JsonResponse({"results": []})
+
+    try:
+        rows = resident_owner_service.execute(search=q, only_nonresident=True)
+    except TypeError:
+        # Service doesn’t accept the kwarg; try a dedicated nonresident method if present
+        fn = getattr(resident_owner_service, "execute_nonresident", None)
+        rows = fn(search=q) if callable(fn) else []
+    except Exception:
+        rows = []
+
+    return JsonResponse({"results": _normalize_owner_rows(rows)})
+
+@session_login_required
+@role_required(CLERK_ROLE)
 @nocache
-def business_details(request: HttpRequest) -> HttpResponse:
+def business_details(request: HttpRequest):
     user_role = _auth_role_name(request)
-    staff_id = _auth_staff_id(request)
-    if not staff_id:
-        messages.error(request, "Missing staff context. Please log in again.")
-        return redirect("login")
 
-    # bucket from settings (required)
-    BUCKET = getattr(settings, "SUPABASE_BUCKET", None)
-    if not BUCKET:
-        messages.error(request, "Storage bucket is not configured. Set SUPABASE_BUCKET in settings.")
-        return redirect("clerk:business_owner_resident")
-
-    draft = _get_draft(request)
-    owner_person_id = draft.get("owner_person_id")
-    if not owner_person_id:
-        messages.warning(request, "Please choose a resident owner first.")
-        return redirect("clerk:business_owner_resident")
-
-    form = BusinessDetails(request.POST or None, request.FILES or None)
-
+    owner = request.session.get("bizreg_owner")
+    if not owner:
+        messages.warning(request, "No owner info found. Please fill the form first.")
+        return redirect("clerk:business_owner")
+    
     if request.method == "POST":
+        form = BusinessDetails(request.POST, request.FILES or None)
+
         if form.is_valid():
             cd = form.cleaned_data
 
-            # upload proof file(s) to the configured bucket
-            uploaded_paths: List[str] = []
-            files = request.FILES.getlist("proof")
-            for f in files:
-                ext = f.name.rsplit(".", 1)[-1].lower() if "." in f.name else ""
-                key = f"business-proofs/{uuid4().hex}.{ext}"
-                try:
-                    supabase.storage.from_(BUCKET).upload(
-                        key, f.read(), {"content-type": f.content_type}
-                    )
-                    uploaded_paths.append(key)
-                except Exception as e:
-                    messages.error(request, f"Failed to upload proof '{f.name}': {e}")
-                    return render(
-                        request,
-                        "business/business_details.html",
-                        {
-                            "page_path": f"{user_role} / Business Records / Add Business / Business Information",
-                            "page_title": "Business Information",
-                            "form": form,
-                        },
-                    )
-                
-            # coerce ints from choices
-            btype_id   = int(cd["b_type"])           if cd.get("b_type") else None
-            own_id     = int(cd["ownership_type"])   if cd.get("ownership_type") else None
-            day_start  = int(cd["opt_days_start"])   if cd.get("opt_days_start") else None
-            day_end    = int(cd["opt_days_end"])     if cd.get("opt_days_end") else None
-            has_clearance = (cd.get("prev_clearance") == "yes")
+            # Build a JSON-serializable payload for session
+            payload: Dict[str, Any] = {
+                # strings → strip safely
+                "b_name": _sstrip(cd.get("b_name")) or "",
+                "b_nature": _sstrip(cd.get("b_nature")),
+                "b_address": _sstrip(cd.get("b_address")) or "",
+                "b_desc": _sstrip(cd.get("b_desc")),
+                "dti": _sstrip(cd.get("dti")),
+                "inc_est": _sstrip(cd.get("inc_est")),
 
-            payload = {
-                "p_performer_staff_id": int(staff_id),
-                "p_owner_person_id": int(owner_person_id),
+                # choice/ids
+                "ownership_type": _to_int_or_none(cd.get("ownership_type")),
+                "b_category": _to_int_or_none(cd.get("b_category")),
 
-                # business
-                "p_business_name": cd.get("b_name"),
-                "p_business_location_desc": cd.get("b_desc"),
-                "p_business_nature": cd.get("b_nature"),
+                # numbers (keep JSON-safe as strings)
+                "capital_invested": _to_str_num(cd.get("capital_invested"), "0"),
+                "prevgross": _to_str_num(cd.get("prevgross"), "0"),
+                "emp_num": _to_int_or_none(cd.get("emp_num") or 0),
 
-                "p_prev_yr_total_gross_sales": _js(cd.get("prevgross")),
-                "p_date_est": _js(cd.get("date_est")),
-                "p_dti_sec_reg_num": cd.get("dti"),
-                "p_capital_invested": _js(cd.get("capital_invested")),
-                "p_mnthly_gross_incom_est": _js(cd.get("inc_est")),
-                "p_num_of_emp": cd.get("emp_num"),
-                "p_has_business_clearance": has_clearance,
+                # days/time
+                "opt_days_start": _to_int_or_none(cd.get("opt_days_start")),
+                "opt_days_end": _to_int_or_none(cd.get("opt_days_end")),
+                "opt_start": cd["opt_start"].strftime("%H:%M:%S") if cd.get("opt_start") else None,
+                "opt_end": cd["opt_end"].strftime("%H:%M:%S") if cd.get("opt_end") else None,
 
-                "p_business_type_id": btype_id,
-                "p_ownership_type_id": own_id,
+                # date
+                "date_est": (cd["date_est"].isoformat() if cd.get("date_est") else None),
 
-                # operating schedule
-                "p_operating_day_start": day_start,
-                "p_operating_day_end": day_end,
-                "p_operating_hour_start": _js(cd.get("opt_start")),
-                "p_operating_hour_end": _js(cd.get("opt_end")),
+                # geo
+                "latitude": _to_float_or_none(cd.get("latitude")),
+                "longitude": _to_float_or_none(cd.get("longitude")),
 
-                # business address
-                "p_business_latitude": _js(cd.get("latitude")),
-                "p_business_longitude": _js(cd.get("longitude")),
-                "p_business_city": cd.get("city"),
-                "p_business_barangay": cd.get("barangay"),
-                "p_business_street": cd.get("street"),
-                "p_business_purok_sitio_name": cd.get("purok_sitio"),
-
-                # proofs
-                "p_business_proof_files": uploaded_paths or None,
+                # address modal fields (strings)
+                "street": _sstrip(cd.get("street")) or "",
+                "purok_sitio": _sstrip(cd.get("purok_sitio")) or "",
+                "barangay": _sstrip(cd.get("barangay")) or "",
+                "city": _sstrip(cd.get("city")) or "",
             }
 
-            try:
-                resp = supabase.rpc("register_business_and_owner", payload).execute()
-                rows = resp.data or []
-                if not rows:
-                    messages.warning(request, "The server did not return IDs, but the request may have been processed.")
-                else:
-                    first = rows[0]
-                    _ = first.get("business_id") if isinstance(first, dict) else first[0]
-                    _ = first.get("owner_person_id") if isinstance(first, dict) else first[1]
+            proof_pairs = []
+            if request.FILES:
+                files = request.FILES.getlist("proof") if "proof" in request.FILES else []
+                for up in files:
+                    info = _save_temp_upload(up, "bizproof")  # stores under tmp/bizproof/...
+                    if info and info.get("path"):
+                        proof_pairs.append(info)
+            
+            if proof_pairs:
+                # human label; keep for the details card
+                payload["proof_name"] = ", ".join(p["name"] for p in proof_pairs)
+                # ✅ store temp info for preview/submit later
+                payload["proof_tmp_pairs"] = proof_pairs
 
-                _clear_draft(request)
-                messages.success(request, "Business registered successfully.")
-                return redirect("clerk:business_list")
+            payload = _json_safe(payload)
 
-            except APIError as e:
-                code = getattr(e, "code", None) or getattr(e, "error", None) or ""
-                detail = getattr(e, "message", None) or str(e)
-                if "P6057" in code or "P6057" in detail:
-                    messages.error(request, "Invalid business type. Please pick a valid type.")
-                elif "P6058" in code or "P6058" in detail:
-                    messages.error(request, "Invalid ownership type. Please pick a valid type.")
-                elif "P6061" in code or "P6061" in detail:
-                    messages.error(request, "Invalid operating day range. Start must be ≤ End within 1..7.")
-                elif "P6062" in code or "P6062" in detail:
-                    messages.error(request, "Invalid operating hour range. Start time must be before end time.")
-                elif "P6065" in code or "P6065" in detail:
-                    messages.error(request, "Missing link type 'BUSINESS PROFILING'. Contact admin.")
-                else:
-                    messages.error(request, f"RPC error: {detail}")
+            request.session["bizreg_business"] = payload
+            request.session.set_expiry(1800)  # 30 minutes
+
+            messages.success(request, "Business details saved.")
+            return redirect("clerk:business_information_review")
         else:
-            messages.error(request, "Please fix the errors in the Business Information form.")
+            messages.error(request, "Please correct the errors below.")
+    else:
+        saved = request.session.get("bizreg_business") or {}
+
+        # Convert back to proper field types for form initial
+        if "date_est" in saved:
+            saved["date_est"] = _parse_date_iso(saved["date_est"])
+        if "opt_start" in saved:
+            saved["opt_start"] = _parse_time_hms(saved["opt_start"])
+        if "opt_end" in saved:
+            saved["opt_end"] = _parse_time_hms(saved["opt_end"])
+
+        form = BusinessDetails(initial=saved or None)
 
     return render(
         request,
@@ -1641,150 +2596,601 @@ def business_details(request: HttpRequest) -> HttpResponse:
             "page_path": f"{user_role} / Business Records / Add Business / Business Information",
             "page_title": "Business Information",
             "form": form,
+            "owner": owner,
         },
     )
 
-#DO NOT TOUCH THIS FUNCTION
 @session_login_required
-@role_required("Barangay Clerk")
+@role_required(CLERK_ROLE)
 @nocache
-def business_registration_reset(request: HttpRequest) -> HttpResponse:
-    _clear_draft(request)
-    messages.info(request, "Registration draft cleared.")
-    return redirect("clerk:business_owner_resident")
+@inject
+def business_information_review(
+    request: HttpRequest,
+    business_registration_service: IBusinessRegistrationService = Provide[AppContainer.business_registration_service],
+):
+    user_role = _auth_role_name(request)
 
-#DO NOT TOUCH THIS FUNCTION
+    owner = request.session.get("bizreg_owner")
+    if not owner:
+        return redirect("clerk:business_owner")
+
+    business = request.session.get("bizreg_business")
+    if not business:
+        return redirect("clerk:business_details")
+    
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").lower()
+        if action == "confirm_add":
+            # Accept single or multiple files (template may use name="proof")
+            uploads = []
+            if "proof" in request.FILES:
+                uploads = request.FILES.getlist("proof")
+
+            if not uploads:
+                for p in (business or {}).get("proof_tmp_pairs", []) or []:
+                    spath = p.get("path")
+                    if not spath:
+                        continue
+                    try:
+                        # default_storage.open works across any backend (local/S3/Supabase)
+                        uploads.append(default_storage.open(spath, "rb"))
+                    except Exception:
+                        pass
+
+            lat_post = _to_float_or_none(request.POST.get("latitude"))
+            lng_post = _to_float_or_none(request.POST.get("longitude"))
+            if lat_post is not None:
+                business["latitude"] = lat_post
+            if lng_post is not None:
+                business["longitude"] = lng_post
+
+            cmd = RegisterBusinessProfileCmd(
+                owner=owner,
+                business=business,
+                performer_staff_id=_auth_staff_id(request),
+                proof_files_uploads=uploads,
+            )
+
+            try:
+                business_id, owner_person_id = business_registration_service.business_registration(cmd)
+
+                for p in (business or {}).get("proof_tmp_pairs", []) or []:
+                    spath = p.get("path")
+                    if spath:
+                        try:
+                            default_storage.delete(spath)
+                        except Exception:
+                            pass
+
+                # try:
+                #     notify_registration_received(owner=owner, business=business, business_id=business_id)
+                # except Exception:
+                #     pass
+
+                # try:
+                #     owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
+                #     if owner_mobile:
+                #         bname = (business.get("b_name") or "your business").strip()
+                #         msg = (
+                #             f"BARUG: Business Registration received for '{bname}'.\n"
+                #             f"Ref: {business_id: 06d}.\n"
+                #             f"Sign in to the mobile app to request the necessary business documents."
+                #         )
+                #         # fail_silently so we don't break the user flow
+                #         send_sms(owner_mobile, msg, fail_silently=True)
+                # except Exception:
+                #     # fully swallow—logging optional
+                #     pass
+
+                request.session.pop("bizreg_owner", None)
+                request.session.pop("bizreg_business", None)
+                messages.success(request, f'Business #{business_id} created for owner #{owner_person_id}.')
+                return redirect("clerk:business_information", b_id=business_id)
+            except Exception as e:
+                print("[business_information_review] Failed to register business:", e, flush=True)
+                traceback.print_exc()
+                messages.error(request, f"Failed to register business: {e}")
+                return redirect("clerk:business_information_review")
+
+    
+     # Normalize a few fields for nicer display on the review page
+    owner = dict(owner)  # shallow copy so we can tweak for display
+    if "dob" in owner:
+        owner["dob"] = _parse_date_iso(owner["dob"])
+
+    business = dict(business)
+    if "date_est" in business:
+        business["date_est"] = _parse_date_iso(business["date_est"])
+    if "opt_start" in business:
+        business["opt_start"] = _parse_time_hms(business["opt_start"])
+    if "opt_end" in business:
+        business["opt_end"] = _parse_time_hms(business["opt_end"])
+
+    maps = fetch_display_maps_from_forms()
+    owner_disp = build_owner_display(owner, maps)
+    biz_disp   = build_business_display(business, maps)
+
+    tmp_pairs = (business.get("proof_tmp_pairs") or [])
+    proof_urls = []
+    for p in tmp_pairs:
+        spath = p.get("path")
+        if not spath:
+            continue
+        try:
+            proof_urls.append(default_storage.url(spath))
+        except Exception:
+            # If your storage backend has no .url(), fall back to MEDIA_URL (dev only)
+            url = (getattr(settings, "MEDIA_URL", "/media/").rstrip("/") + "/" + spath)
+            proof_urls.append(url)
+
+        
+    return render(
+        request,
+        "business/business_information_review.html",
+        {
+            "page_path": f"{user_role} / Business Records / Add Business / Business Information",
+            "page_title": "Business Information",
+            "owner": owner,                 # raw for future DB insert
+            "business": business,           # raw for future DB insert
+            "owner_disp": owner_disp,       # labels for display
+            "biz_disp": biz_disp,           # labels for display
+            "proof_urls": proof_urls,
+        },
+    )
+
 @session_login_required
-@role_required("Barangay Clerk")
+@role_required(CLERK_ROLE)
+@csrf_protect
 @nocache
-def business_list(request: HttpRequest):
-    user_role = (request.session.get("auth") or {}).get("role_name").title()
-    form = BusinessFilters()
-    rows, rpc_error = [], None
-    try:
-        resp = supabase.rpc("get_business_summary", {}).execute()
-        rows = resp.data or []
-    except Exception as e:
-        rpc_error = str(e)
-        rows = []
+@inject
+def business_list(
+    request: HttpRequest,
+    business_service: IBusinessService = Provide[AppContainer.business_service],
+) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+    
+    user_role = _auth_role_name(request)
+    form = BusinessFilters(request.GET or None)
 
-    paginator = Paginator(rows, 15)
-    page_obj = paginator.get_page(request.GET.get("page"))
+    search = request.GET.get("search")
+    b_category = _to_int_or_none(request.GET.get("b_category"))
+    ownership_type = _to_int_or_none(request.GET.get("ownership_type"))
+    status = _to_int_or_none(request.GET.get("status"))
 
-    context = {
-        "page_path": f"{user_role} / Business Records",
-        "page_title": "Business Records",
-        "form": form,
-        "rows": rows,
-        "rpc_error": rpc_error,
-        "page_obj": page_obj,
+    rows = business_service.execute(
+        search= search,
+        b_category= b_category,
+        ownership_type= ownership_type,
+        status= status,
+    )
+
+    paginator = Paginator(rows, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    if (search or b_category is not None or ownership_type is not None or status is not None) and not form.is_valid():
+        form = BusinessFilters()
+
+    return render(request, "business/business_list.html", {
+        'page_path': f'{user_role} / Business Records',
+        'page_title': 'Business Records',
+        'form' : form,
+        'page_obj' : page_obj,
+        'filters' : {
+            'search' : search,
+            'b_category' : b_category,
+            'ownership_type' :ownership_type,
+            'status' : status,
+        },
+        'url_name' : 'clerk:business_information',
+        'search_url': 'clerk:ajax_business_search',
+        'is_clerk': (user_role == CLERK_ROLE),
+    })
+
+AJAX_BUSINESS_PARTIALS = {
+    # key      -> template path
+    "cards": "business/_businesses.html",         # your map list cards
+    "rows":  "business/_business_list.html",      # table rows for list page
+}
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_GET
+@inject
+def ajax_business_search(
+    request: HttpRequest,
+    business_service: IBusinessService = Provide[AppContainer.business_service],
+) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseBadRequest("GET only")
+
+    # only allow XHR (optional, but nice)
+    if request.headers.get("x-requested-with") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR required")
+    
+    tpl_key = (request.GET.get("tpl") or "cards").strip().lower()
+    template_name = AJAX_BUSINESS_PARTIALS.get(tpl_key)
+    if not template_name:
+        return HttpResponseBadRequest("Unknown partial")
+
+    q = request.GET.get("q", "") or None
+    b_category = request.GET.get("b_category")
+    ownership_type = request.GET.get("ownership_type")
+    status = request.GET.get("status")
+
+    rows = business_service.execute(
+        search=q,
+        b_category=_to_int_or_none(b_category),
+        ownership_type=_to_int_or_none(ownership_type),
+        status=_to_int_or_none(status),
+    )[:50]
+
+    base_ctx = {
+        "url_name": "clerk:business_information",
     }
 
-    return render(request, "business/business_list.html", context)
+    context = {**base_ctx, ("rows" if tpl_key == "rows" else "cards"): rows}
+    html = render_to_string(template_name, context, request=request)
+    return HttpResponse(html)
 
-#DO NOT TOUCH THIS FUNCTION
 @session_login_required
-@role_required("Barangay Clerk")
+@role_required(CLERK_ROLE)
 @nocache
-def business_information(request: HttpRequest, b_id: int):
-    user_role = (request.session.get("auth") or {}).get("role_name").title()
+@inject
+def business_information(
+    request, 
+    b_id: int,
+    business_info: IBusinessInfoService = Provide[AppContainer.owner_business_service],
+    renewal_quote_svc: IBusinessRenewalQuoteService = Provide[AppContainer.business_renewal_quote_service],
+) -> HttpResponse:
+    user_role = _auth_role_name(request)
+    
+    person_id = request.GET.get("owner")
+    person_id = int(person_id) if person_id and str(person_id).isdigit() else None
 
-    b_resp = supabase.rpc("get_business_details", {"p_business_id" : b_id}).execute()
-    b_rows = b_resp.data or []
-    b = b_rows[0] if b_rows else None
+    dto = (
+        business_info.execute(person_id=person_id, business_id=b_id)
+        if person_id is not None
+        else business_info.execute_by_business_id(b_id)  # see helper below
+    )
 
-    raw_days = str(b.get("operating_days") or "").strip()
-    operating_days_list = [d.strip() for d in raw_days.split(",") if d.strip()] if raw_days else []
-    b["operating_days_list"] = operating_days_list
+    def _compose_owner_full_name(data: dict) -> str | None:
+        last   = (data.get("last_name") or "").strip()
+        first  = (data.get("first_name") or "").strip()
+        middle = (data.get("middle_name") or "").strip()
+        suffix = (data.get("suffix") or "").strip()
 
-    owner = None
-    owner_id = b.get("owner_person_id") or None
+        parts = []
+        if last:
+            parts.append(last.upper())                   # LAST
+        if first:
+            parts.append((", " if parts else "") + first.title())  # , First
+        if middle:
+            parts.append(" " + middle[:1].upper() + ".")           #  M.
+        if suffix:
+            parts.append(" " + suffix.upper())                     #  JR / III, etc.
+        return "".join(parts) or None
+    
+    def _compose_full_address_from_owner(data: dict) -> str | None:
+        street      = (data.get("street") or "").strip()
+        sitio_purok = (data.get("sitio_purok") or "").strip()
+        barangay    = (data.get("barangay") or "").strip()
+        city        = (data.get("city") or "").strip()
 
-    if owner_id:
-        p_resp = supabase.rpc("get_details", {"p_person_id" : owner_id}).execute()
-        p_rows = p_resp.data or []
-        owner = p_rows[0] if p_rows else None
+        # Order strictly: STREET, PUROK/SITIO, BARANGAY, CITY
+        parts = [p for p in [street, sitio_purok, barangay, city] if p]
+        return ", ".join(parts) if parts else None
 
-    if not b:
-        raise Http404(f"Business {b_id} not found.")
+    owner = dict(dto.owner or {})
+    owner["owner_full_name"] = _compose_owner_full_name(owner)
+    owner["full_address"]    = _compose_full_address_from_owner(owner)
+
+    operating_days = (dto.business.get("operating_days") or "").strip()  # e.g., "Mon, Tue, Wed"
+    days = [d.strip() for d in operating_days.split(",")] if operating_days else []
+    operating_days_start_name = days[0] if days else None
+    operating_days_end_name = days[-1] if days else None
+
+    formatted_id = f"{int(b_id):06d}"
+    current_year = date.today().year
+
+    grand_total, quote_rows, paid_rows = renewal_quote_svc.execute(business_id=b_id, year=current_year)
+
+    business_dict = dict(dto.business or {})
+    status_upper = (business_dict.get("business_status") or "").strip().upper()
+
+    renewal_href = reverse("clerk:create_renewal_request", kwargs={"b_id": b_id})
+    doc_req_href = reverse("clerk:walkin_new")
+
+    if status_upper == "ACTIVE":
+        show_summary_cta = False
+        summary_cta_href = None
+        summary_cta_label = None
+    elif status_upper == "PENDING":
+        show_summary_cta = True
+        summary_cta_href = doc_req_href
+        summary_cta_label = "Proceed to Document Request"
+    elif status_upper == "EXPIRED":
+        show_summary_cta = True
+        summary_cta_href = renewal_href
+        summary_cta_label = "Create Renewal Request"
+    else:
+        # Fallback: show renewal CTA for other non-active statuses
+        show_summary_cta = True
+        summary_cta_href = renewal_href
+        summary_cta_label = "Create Renewal Request"
 
     return render(
         request,
         "business/business_information.html",
         {
-            "page_path": f"{user_role} / Business Records / Business Details : {b_id}",
-            "page_title": f"Business Details : {b_id}",
-            "b": b,
-            "owner" : owner,
+            "page_path": f"{user_role} / Business Records / Business Details : {formatted_id}",
+            "page_title": f"Business Details : {formatted_id}",
+            "owner": owner,
+            "business": dto.business,
+            "business_files": (dto.business_proof or {}).get("files") or [],
+            "operating_days_start_name": operating_days_start_name,
+            "operating_days_end_name": operating_days_end_name,
+            "grand_total": grand_total,
+            "quote_rows": quote_rows,
+            "paid_rows": paid_rows,
+            "business_status_upper": status_upper,
+            "show_summary_cta": show_summary_cta,
+            "summary_cta_href": summary_cta_href,
+            "summary_cta_label": summary_cta_label,
         },
     )
 
-#DO NOT TOUCH THIS FUNCTION
-# Hannah's Code (kept as-is; unrelated to printing)
-def business_owner_nonresident(request: HttpRequest):
-    user_fullname, user_role_template = _profile_fallbacks(request)
-    form = BusinessOwnerInfo()
+@session_login_required
+@role_required(CLERK_ROLE)
+@csrf_protect
+@nocache
+@inject
+def business_map_list(
+    request: HttpRequest,
+    business_service: IBusinessService = Provide[AppContainer.business_service],
+) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+    
+    user_role = _auth_role_name(request)
+    form = BusinessFilters(request.GET or None)
+
+    search = request.GET.get("search")
+    b_category = _to_int_or_none(request.GET.get("b_category"))
+    ownership_type = _to_int_or_none(request.GET.get("ownership_type"))
+    status = _to_int_or_none(request.GET.get("status"))
+
+    rows = business_service.execute(
+        search=search,
+        b_category=b_category,
+        ownership_type=ownership_type,
+        status=status,
+    )
+
+    paginator = Paginator(rows, 5)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    if (search or b_category is not None or ownership_type is not None or status is not None) and not form.is_valid():
+        form = BusinessFilters()
+
     return render(
         request,
-        "business/business_owner_nonres.html",
+        "business/business_map_list.html",
         {
-            "user_fullname": user_fullname,
-            "user_role": user_fullname,
-            "page_path": f"{user_fullname} / Business Records / Add Business / Business Owner Information",
-            "page_title": "Business Owner Information",
-            "user_role_template": user_role_template,
-            "form": form,
-        },
+            'page_path': f"{user_role} / Business Map",
+            'page_title': "Business Map",
+            'form': form,
+            'page_obj' : page_obj,
+            'filters' : {
+                'search' : search,
+                'b_category' : b_category,
+                'ownership_type' :ownership_type,
+                'status' : status,
+            },
+            "pins_url": reverse("clerk:api_business_pins"),
+            'search_url': 'clerk:ajax_business_search',
+        }
     )
 
-def _rpc_approve_person_by_clerk(request: HttpRequest, person_id: int, status_id: int, remarks: str | None):
-    auth = request.session.get("auth") or {}
-    staff_id = auth.get("staff_id") or _staff_id(request)
-    if not staff_id:
-        raise Http404("Staff not found in session.")
-    payload = {"p_clerk_staff_id": staff_id, "p_person_id": person_id, "p_status_id": status_id, "p_remarks": remarks}
-    try:
-        return supabase.rpc("approve_person_by_clerk", payload).execute()
-    except APIError as e:
-        try:
-            msg = e.message.get("message")
-        except Exception:
-            msg = str(e)
-        raise APIError({"message": msg or "Update failed."})
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+@inject
+def api_business_pins(
+    request: HttpRequest,
+    business_repo: IBusinessRepository = Provide[AppContainer.infra.business],
+):
+    if request.method != "GET":
+        return HttpResponseBadRequest("GET only")
+
+    pins = business_repo.fetch_business_pins(
+        search=(request.GET.get("search") or None),
+        b_category=_to_int_or_none(request.GET.get("b_category")),
+        ownership_type=_to_int_or_none(request.GET.get("ownership_type")),
+        status=_to_int_or_none(request.GET.get("status")),
+    )
+    return JsonResponse(pins, safe=False)
 
 @session_login_required
 @role_required(CLERK_ROLE)
-@require_POST
-def approve_request(request: HttpRequest, req_id: int):
-    try:
-        _rpc_approve_person_by_clerk(request, req_id, STATUS_APPROVED, None)
-        messages.success(request, "Request approved.")
-    except APIError as e:
-        try:
-            messages.warning(request, e.message.get("message"))
-        except Exception:
-            messages.warning(request, "This request cannot be approved.")
-    return redirect("clerk:person_details", req_id=req_id)
+@csrf_protect
+@nocache
+@inject
+def renewal_list(
+    request: HttpRequest,
+    business_renewal_repo: IBusinessRenewalService = Provide[AppContainer.business_renewal_service],
+) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+    
+    user_role = _auth_role_name(request)
+
+    form = RenewalFilters(request.GET or None)
+
+    search = request.GET.get("search")
+    clearance_state = request.GET.get("clearance_state")
+
+    rows = business_renewal_repo.execute(
+        search=search,
+        clearance_state=clearance_state
+    )
+
+    paginator = Paginator(rows, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    if (search or clearance_state is not None) and not form.is_valid():
+        form = RenewalFilters()
+
+    return render(request, "business/renewal_list.html", {
+        'page_path': f'{user_role} / Resident List',
+        'page_title': 'Resident List',
+        'form' : form,
+        'page_obj' : page_obj,
+        'filters' : {
+            'search' : search,
+            'clearance_state' : clearance_state,
+        },
+        'url_name' : 'clerk:business_information',
+        'search_url' : 'clerk:ajax_renewal_search',
+    })
 
 @session_login_required
 @role_required(CLERK_ROLE)
-@require_POST
-def decision_request(request: HttpRequest, req_id: int):
-    action = (request.POST.get("action") or "").lower()
-    remarks = (request.POST.get("remarks") or "").strip()
-    if action not in ("reject","decline"):
-        messages.error(request, "Invalid action.")
-        return redirect("clerk:person_details", req_id=req_id)
-    if not remarks:
-        messages.error(request, "Remarks are required.")
-        return redirect("clerk:person_details", req_id=req_id)
-    status_id = STATUS_REJECTED if action == "reject" else STATUS_DECLINE
-    try:
-        _rpc_approve_person_by_clerk(request, req_id, status_id, remarks)
-        messages.success(request, f"Request marked as {'Rejected' if status_id==STATUS_REJECTED else 'Declined'}.")
-    except APIError as e:
+@require_GET
+@inject
+def ajax_renewal_search(
+    request:HttpRequest,
+    business_renewal_repo: IBusinessRenewalService = Provide[AppContainer.business_renewal_service],
+) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseBadRequest("GET only")
+    
+    if request.headers.get("x-requested-with") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR required")
+
+    q = request.GET.get("q", "") or None
+    clearance_state = request.GET.get("clearance_state")
+
+    rows = business_renewal_repo.execute(
+        search=q,
+        clearance_state=_to_int_or_none(clearance_state)
+    )[:50]
+
+    html = render_to_string(
+        "business/_renewal_rows.html",
+        {"rows": rows},
+        request=request,
+    )
+    return HttpResponse(html, content_type="text/html; charset=utf-8")
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@inject
+def create_renewal_request(
+    request: HttpRequest,
+    b_id: int,
+    business_info: IBusinessInfoService = Provide[AppContainer.owner_business_service],
+    renewal_quote_svc: IBusinessRenewalQuoteService = Provide[AppContainer.business_renewal_quote_service],
+    svc: IBusinessRenewalRequestService = Provide[AppContainer.business_renewal_request_service],
+):
+    user_role = _auth_role_name(request)
+
+    if request.method == "POST":
         try:
-            messages.warning(request, e.message.get("message"))
-        except Exception:
-            messages.warning(request, "This request cannot be updated right now.")
-    return redirect("clerk:person_details", req_id=req_id)
+            business_id = int(request.POST.get("business_id") or b_id)
+            period_type = (request.POST.get("period_type") or "ANNUAL").upper()
+            period_year = int(request.POST.get("period_year") or date.today().year)
+
+            # Quarter: only when QUARTERLY; accept "Q1"/"Q2"/... if provided
+            raw_q = request.POST.get("period_quarter")
+            period_quarter = None
+            if period_type == "QUARTERLY" and raw_q:
+                if raw_q.strip().upper().startswith("Q") and raw_q.strip()[1:].isdigit():
+                    period_quarter = int(raw_q.strip()[1:])
+                elif raw_q.isdigit():
+                    period_quarter = int(raw_q)
+
+            cmd = CreateRenewalRequestCmd(
+                business_id=business_id,
+                period_type=period_type,
+                period_year=period_year,
+                period_quarter=period_quarter,
+                created_by_user_id=_auth_staff_id(request),
+            )
+
+            new_id = svc.request_renewal(cmd)
+
+            messages.success(
+                request,
+                f"Renewal Request #{new_id} created for {period_type} {period_year} "
+                f"(status: FOR_TREASURER_REVIEW)."
+            )
+            # Redirect back to business info (or to a renewal-request detail page if you have one)
+            return redirect("clerk:business_information", b_id=business_id)
+
+        except Exception as e:
+            messages.error(request, f"Create renewal request failed: {e}")
+            return redirect("clerk:business_information", b_id=b_id)
+
+    person_id = request.GET.get("owner")
+    person_id = int(person_id) if person_id and str(person_id).isdigit() else None
+
+    dto = (
+        business_info.execute(person_id=person_id, business_id=b_id)
+        if person_id is not None
+        else business_info.execute_by_business_id(b_id)  # see helper below
+    )
+
+    def _compose_owner_full_name(data: dict) -> str | None:
+        last   = (data.get("last_name") or "").strip()
+        first  = (data.get("first_name") or "").strip()
+        middle = (data.get("middle_name") or "").strip()
+        suffix = (data.get("suffix") or "").strip()
+
+        parts = []
+        if last:
+            parts.append(last.upper())                   # LAST
+        if first:
+            parts.append((", " if parts else "") + first.title())  # , First
+        if middle:
+            parts.append(" " + middle[:1].upper() + ".")           #  M.
+        if suffix:
+            parts.append(" " + suffix.upper())                     #  JR / III, etc.
+        return "".join(parts) or None
+    
+    owner = dict(dto.owner or {})
+    owner["owner_full_name"] = _compose_owner_full_name(owner)
+
+    current_year = date.today().year
+
+    grand_total, quote_rows, paid_rows = renewal_quote_svc.execute(business_id=b_id, year=current_year)
+    
+    def to_decimal(x):
+        if x is None:
+            return Decimal("0")
+        return x if isinstance(x, Decimal) else Decimal(str(x))
+
+    quote_rows = quote_rows or []
+    base_sum  = sum(to_decimal(getattr(r, "base_fee", 0))   for r in quote_rows)
+    surch_sum = sum(to_decimal(getattr(r, "surcharge", 0))  for r in quote_rows)
+    header_status = ((dict(dto.business or {}).get("business_status") or "").strip().upper())
+    clearance_year = current_year
+
+    return render(request, "business/create_renewal_request.html", {
+        'page_path' : f'{user_role} / Renewal Request',
+        'page_title' : 'Renewal Request',
+        "owner": owner,
+        "business": dto.business,
+        "grand_total": grand_total,
+        "quote_rows": quote_rows,
+        "paid_rows": paid_rows,
+        "base_sum": base_sum,
+        "surch_sum": surch_sum, 
+        "header_status": header_status,      
+        "clearance_year": clearance_year,
+    })
+
+def renewal_request(request, b_id):
+    user_role = _auth_role_name(request)
+
+    return render(request, "business/renewal_request.html", {
+        'page_path' : f'{user_role} / Renewal Request : {b_id}',
+        'page_title' : f'Renewal Request : {b_id}',
+    })
