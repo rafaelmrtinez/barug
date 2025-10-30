@@ -27,8 +27,14 @@
         </div>
     </div> -->
 
-    <form method="post" class="d-flex flex-column flex-grow-1">
+    <form method="post"
+        action="{% url 'staff_admin:staff_selection_nonres_docs' %}"
+        enctype="multipart/form-data"
+        class="d-flex flex-column flex-grow-1">
+
         {% csrf_token %}
+
+        <!-- {% include 'partials/messages.html' %} -->
 
         <h5>Supporting Documents</h5>
         <div class="row">
@@ -71,8 +77,8 @@
         </div>
 
         <div class="mt-auto button-container">
-            <button class="btn btn-reset">Clear</button>
-            <a class="btn btn-submit" href="{% url 'staff_admin:staff_selection_non-resident_role_review' %}">Continue</a>
+            <a type="button" class="btn btn-reset" href="{% url 'staff_admin:staff_selection_non-resident' %}">Back</a>
+            <button type="submit" class="btn btn-submit"> Continue </button>
         </div>
 
     </form>
