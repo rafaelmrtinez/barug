@@ -216,6 +216,11 @@
           {% bs_icon 'envelope' extra_classes='me-1' %} Summons / Attendance
         </a>
 
+        <!-- Update Settlement Status button -->
+        <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#updateSettlementModal">
+          {% bs_icon 'hand-thumbs-up' extra_classes='me-1' %} Update Settlement
+        </button>
+
         <!-- Lupon Flow button -->
         <button class="btn btn-outline-brand" type="button" data-bs-toggle="offcanvas" data-bs-target="#luponFlowCanvas" aria-controls="luponFlowCanvas">
           {% bs_icon 'diagram-3' extra_classes='me-1' %} Lupon Flow
@@ -355,10 +360,10 @@
   {% if block_due_to_hearing %}
     <div class="helper-note d-inline-flex align-items-center gap-2 mb-2">
       {% bs_icon 'info-circle' %}
-      A hearing is scheduled. You can still record <strong>Attendance</strong> for it:
-      <a class="btn btn-link p-0 ms-1" href="{% url 'lupon_mem:add_form_choose_static' case_id %}?allow_med_att=1&from=hearing">
+      <!-- A hearing is scheduled. You can still record <strong>Attendance</strong> for it: -->
+      <!-- <a class="btn btn-link p-0 ms-1" href="{% url 'lupon_mem:add_form_choose_static' case_id %}?allow_med_att=1&from=hearing">
         {% bs_icon 'calendar-check' %} Add Med/Pangkat Attendance
-      </a>
+      </a> -->
     </div>
   {% endif %}
 
@@ -561,6 +566,38 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-brand" type="submit">{% bs_icon 'check2' extra_classes='me-1' %} Confirm Reopen</button>
+        <button class="btn btn-brand-subtle" type="button" data-bs-dismiss="modal">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ======= UPDATE SETTLEMENT STATUS MODAL ======= -->
+<div class="modal fade" id="updateSettlementModal" tabindex="-1" aria-labelledby="updateSettlementLabel" aria-hidden="true" style="margin-top: 150px;">
+  <div class="modal-dialog">
+    <form method="post" action="{% url 'lupon_mem:update_settlement_status' case_id %}" class="modal-content">
+      {% csrf_token %}
+      <div class="modal-header">
+        <h5 class="modal-title" id="updateSettlementLabel">{% bs_icon 'hand-thumbs-up' %} Update Settlement Status</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Settlement Status</label>
+          <select name="settlement_status" class="form-select" required>
+            <option value="">Select status...</option>
+            <option value="SETTLED">SETTLED</option>
+            <option value="NOT SETTLED">NOT SETTLED</option>
+            <option value="PENDING">PENDING</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Notes (optional)</label>
+          <textarea name="notes" class="form-control" rows="3" placeholder="Additional notes about the settlement status..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-brand" type="submit">{% bs_icon 'check2' extra_classes='me-1' %} Update Status</button>
         <button class="btn btn-brand-subtle" type="button" data-bs-dismiss="modal">Cancel</button>
       </div>
     </form>

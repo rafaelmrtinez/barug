@@ -3194,3 +3194,7 @@ def renewal_request(request, b_id):
         'page_path' : f'{user_role} / Renewal Request : {b_id}',
         'page_title' : f'Renewal Request : {b_id}',
     })
+
+
+def decision_request():
+    pass

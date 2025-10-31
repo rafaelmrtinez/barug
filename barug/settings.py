@@ -171,7 +171,7 @@ SUPABASE_ID_UPLOADS_BUCKET = os.getenv("SUPABASE_ID_UPLOADS_BUCKET", "id-uploads
 
 # DB connection tuning (env-driven; safe defaults for local/dev)
 DB_CONN_MAX_AGE = int(os.getenv("DB_CONN_MAX_AGE", "0"))           # 0 = close after each request
-DB_CONNECT_TIMEOUT = int(os.getenv("DB_CONNECT_TIMEOUT", "10"))    # seconds
+DB_CONNECT_TIMEOUT = int(os.getenv("DB_CONNECT_TIMEOUT", "100"))    # seconds
 DB_SSL_MODE = os.getenv("DB_SSL_MODE", "require")                  # adjust for your environment
 SUPABASE_OCR_TEST_BUCKET = os.getenv("SUPABASE_OCR_TEST_BUCKET ", "ocr-testing")
 SUPABASE_BUSINESS_PROOF_BUCKET = os.getenv("SUPABASE_BUSINESS_PROOF_BUCKET", "business-proofs")
