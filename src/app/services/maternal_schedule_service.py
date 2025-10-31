@@ -3,11 +3,12 @@ from typing import Optional
 from datetime import date as _date, datetime as _datetime
 
 from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
+from src.app.contracts.maternal_schedule_service import IMaternalScheduleService
 from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
 from src.domain.services.maternal_schedule_domain_service import MaternalScheduleDomainService
 
 
-class MaternalScheduleService:
+class MaternalScheduleService(IMaternalScheduleService):
     """Application service to orchestrate prenatal/postpartum scheduling.
 
     This layer is intentionally thin: it validates/coerces parameters when

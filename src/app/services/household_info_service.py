@@ -1,8 +1,9 @@
 from typing import Any
 from src.infra.repositories.household_info_repository import HouseholdInfoRepository
+from src.app.contracts.household_info_service import IHouseholdInformationService
 
 
-class HouseholdInformationService:
+class HouseholdInformationService(IHouseholdInformationService):
     
     def __init__(self, household_info_repository: HouseholdInfoRepository):
         self._household_info_repository = household_info_repository

@@ -10,6 +10,8 @@ from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
 from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
 from src.app.services.maternal_status_service import MaternalRecordStatusService
+from dependency_injector.wiring import inject, Provide
+from barug.containers import app
 
 LOGGER_ALLOWED_ROLES = ("MIDWIFE", "Midwife", "midwife", "Barangay Health Worker", "bhw", "Super Admin")
 
@@ -26,7 +28,8 @@ class MaternalHealthRecordStatusUpdateAPI(View):
     The staff_id is taken from the session (`request.session['auth']['staff_id']`).
     """
 
-    def post(self, request: HttpRequest, *args, **kwargs) -> JsonResponse:
+    @inject
+    def post(self, request: HttpRequest, service: MaternalRecordStatusService = Provide[app.maternal_status_service], *args, **kwargs) -> JsonResponse:
         try:
             payload = json.loads(request.body.decode('utf-8') or '{}')
         except Exception:
@@ -57,9 +60,18 @@ class MaternalHealthRecordStatusUpdateAPI(View):
         except (TypeError, ValueError):
             return JsonResponse({'success': False, 'message': 'Invalid staff id in session.'}, status=400)
 
-        # instantiate repository and service
-        repo = MaternalHealthRecordRepository(ConnectionAdapter())
-        service = MaternalRecordStatusService(repo)
+        # Use injected service when available; fallback to container or local construction
+        try:
+            need_resolve = not service or not hasattr(service, 'is_valid_status')
+        except Exception:
+            need_resolve = True
+
+        if need_resolve:
+            try:
+                service = app.maternal_status_service()
+            except Exception:
+                repo = MaternalHealthRecordRepository(ConnectionAdapter())
+                service = MaternalRecordStatusService(repo)
 
         # validate status id against allowed set
         if not service.is_valid_status(status_id):

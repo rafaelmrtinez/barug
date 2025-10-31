@@ -2,6 +2,7 @@ from datetime import date
 from src.infra.exceptions.child_health_record_exception import ChildHealthRecordException
 from src.app.transfer_objects.request.child_health_version_two.child_monitoring_log import ChildMonitoringLog
 from src.infra.database.connection_adapter import ConnectionAdapter
+from src.domain.contracts.child_health_record_repository import IChildHealthRecordRepository
 from src.infra.exceptions.query_exec_exception import QueryExecutionException
 
 import logging
@@ -9,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class ChildHealthRecordRepository:
+class ChildHealthRecordRepository(IChildHealthRecordRepository):
     def __init__(self, ctx: ConnectionAdapter):
         self.ctx = ctx
         logger.info("ChildHealthRecordRepository initialized")

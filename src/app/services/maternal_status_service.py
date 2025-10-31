@@ -9,9 +9,10 @@ from typing import Optional
 from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
 from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
 from src.domain.services.maternal_status_domain_service import MaternalStatusDomainService, MaternalStatusDomainException
+from src.app.contracts.maternal_status_service import IMaternalRecordStatusService
 
 
-class MaternalRecordStatusService:
+class MaternalRecordStatusService(IMaternalRecordStatusService):
 
     def __init__(self, repository: MaternalHealthRecordRepository):
         self.repo = repository

@@ -2,6 +2,7 @@ from datetime import date, time
 from psycopg2.extras import Json
 
 from src.infra.database.connection_adapter import ConnectionAdapter
+from src.domain.contracts.maternal_health_record_repository import IMaternalHealthRecordRepository
 from src.infra.exceptions.query_exec_exception import QueryExecutionException
 
 from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 logger = logging.getLogger(__name__)
 
 
-class MaternalHealthRecordRepository:
+class MaternalHealthRecordRepository(IMaternalHealthRecordRepository):
 
     def __init__(self, ctx: ConnectionAdapter):
         self.ctx = ctx

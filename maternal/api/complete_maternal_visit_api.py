@@ -8,6 +8,8 @@ from django.views.decorators.csrf import csrf_protect as csrf_required
 from authentication.guards import session_login_required, role_required
 from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
+from dependency_injector.wiring import inject, Provide
+from barug.containers import app
 from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
 
 
@@ -24,7 +26,8 @@ class CompleteMaternalVisitAPI(View):
     staff_id is taken from session (request.session['auth']['staff_id']).
     """
 
-    def post(self, request: HttpRequest, *args, **kwargs) -> JsonResponse:
+    @inject
+    def post(self, request: HttpRequest, repo: MaternalHealthRecordRepository = Provide[app.infra.maternal_health_record_repository], *args, **kwargs) -> JsonResponse:
         try:
             payload = json.loads(request.body.decode('utf-8') or '{}')
         except Exception:
@@ -47,8 +50,6 @@ class CompleteMaternalVisitAPI(View):
             staff_id = int(staff_id)
         except (TypeError, ValueError):
             return JsonResponse({'success': False, 'message': 'Invalid staff id in session.'}, status=400)
-
-        repo = MaternalHealthRecordRepository(ConnectionAdapter())
 
         try:
             res = repo.insert_maternal_visit_and_schedule_completion(mhr_id, staff_id)

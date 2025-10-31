@@ -8,7 +8,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class ChildHealthRepository:
+from src.domain.contracts.child_health_repository import IChildHealthRepository
+
+
+class ChildHealthRepository(IChildHealthRepository):
 
     def __init__(self, ctx: IConnectionAdapter):
         self._ctx = ctx
