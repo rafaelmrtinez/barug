@@ -23,6 +23,7 @@ from src.infra.repositories.family_repository import FamilyRepository
 from src.infra.repositories.household_info_repository import HouseholdInfoRepository
 from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
 from src.infra.repositories.maternal_repository import MaternalRepository
+from src.infra.repositories.maternal_report_repository import MaternalReportRepository
 from src.infra.repositories.scheduling_repository import ActiveScheduleRepository
 from src.infra.repositories.week_range_repository import WeekRangeRepository
 from src.infra.storage.supabase_storage import SupabaseStorage
@@ -98,6 +99,12 @@ class InfraContainer(containers.DeclarativeContainer):
 
     maternal_repository: providers.Factory[IMaternalRepository] = providers.Factory(
         MaternalRepository,
+        ctx=context,
+    )
+
+    # provider for report generation repository (used by maternal report API/service)
+    maternal_report_repository = providers.Factory(
+        MaternalReportRepository,
         ctx=context,
     )
 
