@@ -46,7 +46,9 @@ class PdfGenerator:
         self.heading_style = ParagraphStyle(
             "Heading",
             parent=self.sample["Heading2"],
-            fontName="Times-Roman",
+            # Use a semi-bold font for section headings so they are
+            # visually identifiable in the generated PDF.
+            fontName="Times-Bold",
             fontSize=12,
             leading=14,
             spaceAfter=6,

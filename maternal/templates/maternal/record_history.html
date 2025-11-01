@@ -68,7 +68,7 @@
             <small class="text-muted">Total: {{ all_records|length|default:0 }}</small>
           </div>
 
-          <div class="table-responsive mt-2">
+          <div class="table-responsive mt-2 position-static">
             <table class="table table-sm visit-table align-middle">
               <thead>
                 <tr>
@@ -87,32 +87,58 @@
                       <td>{{ r.status_name|default:"N/A" }}</td>
                       {% if request.session.auth.role_name == "midwife" %}
                       <td class="text-end actions-cell">
-                        <a class="btn btn-outline-secondary btn-sm"
-                          href="{% url 'maternal:maternal_health_record_form' r.maternal_record_id %}">
-                          <i class="bi bi-folder2-open me-1"></i> Open
-                        </a>
-                        <button type="button" class="btn btn-mhr-schedule btn-sm ms-2 btn-schedule"
-                          data-bs-toggle="modal" data-bs-target="#prenatalScheduleModal"
-                          data-mhr-id="{{ r.maternal_record_id }}">
-                          <i class="bi bi-calendar-plus me-1"></i> Prenatal Schedule
-                        </button>
-                        <button type="button" class="btn btn-mhr-postpartum btn-sm ms-2 btn-postpartum"
-                          data-bs-toggle="modal" data-bs-target="#postpartumScheduleModal"
-                          data-mhr-id="{{ r.maternal_record_id }}">
-                          <i class="bi bi-clock-history me-1"></i> Postpartum Schedule
-                        </button>
+                        <div class="dropdown d-inline-block position-static">
+                          <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" id="actionsDropdown{{ r.maternal_record_id }}" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
+                            Actions
+                          </button>
+                          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="actionsDropdown{{ r.maternal_record_id }}">
+                            <li>
+                              <a class="dropdown-item" href="{% url 'maternal:maternal_health_record_form' r.maternal_record_id %}">
+                                <i class="bi bi-folder2-open me-2"></i> Open
+                              </a>
+                            </li>
+                            <li>
+                              <button class="dropdown-item btn-schedule" type="button" data-bs-toggle="modal" data-bs-target="#prenatalScheduleModal" data-mhr-id="{{ r.maternal_record_id }}">
+                                <i class="bi bi-calendar-plus me-2"></i> Prenatal Schedule
+                              </button>
+                            </li>
+                            <li>
+                              <button class="dropdown-item btn-postpartum" type="button" data-bs-toggle="modal" data-bs-target="#postpartumScheduleModal" data-mhr-id="{{ r.maternal_record_id }}">
+                                <i class="bi bi-clock-history me-2"></i> Postpartum Schedule
+                              </button>
+                            </li>
+                            <li>
+                              <button class="dropdown-item btn-generate-summary" type="button" data-mhr-id="{{ r.maternal_record_id }}">
+                                <i class="bi bi-file-earmark-pdf me-2"></i> Generate PDF Summary
+                              </button>
+                            </li>
+                          </ul>
+                        </div>
                       </td>
                       {% elif request.session.auth.role_name == "barangay health worker" %}
-                      <td class="actions-cell">
-                        <a class="btn btn-outline-secondary btn-sm"
-                          href="{% url 'maternal:bhw_prenatal_form' r.maternal_record_id %}">
-                          <i class="bi bi-folder2-open me-1"></i> Prenatal Follow-up Schedule
-                        </a>
-                        <button type="button" class="btn btn-mhr-postpartum btn-sm ms-2 btn-postpartum-record"
-                          data-bs-toggle="modal" data-bs-target="#postpartumRecordModal"
-                          data-mhr-id="{{ r.maternal_record_id }}">
-                          <i class="bi bi-plus-circle me-1"></i> Add Postpartum Record
-                        </button>
+                      <td class="actions-cell text-end">
+                        <div class="dropdown d-inline-block position-static">
+                          <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" id="actionsDropdownBHW{{ r.maternal_record_id }}" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
+                            Actions
+                          </button>
+                          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="actionsDropdownBHW{{ r.maternal_record_id }}">
+                            <li>
+                              <a class="dropdown-item" href="{% url 'maternal:bhw_prenatal_form' r.maternal_record_id %}">
+                                <i class="bi bi-folder2-open me-2"></i> Prenatal Follow-up Schedule
+                              </a>
+                            </li>
+                            <li>
+                              <button class="dropdown-item btn-postpartum-record" type="button" data-bs-toggle="modal" data-bs-target="#postpartumRecordModal" data-mhr-id="{{ r.maternal_record_id }}">
+                                <i class="bi bi-plus-circle me-2"></i> Add Postpartum Record
+                              </button>
+                            </li>
+                            <li>
+                              <button class="dropdown-item btn-generate-summary" type="button" data-mhr-id="{{ r.maternal_record_id }}">
+                                <i class="bi bi-file-earmark-pdf me-2"></i> Generate PDF Summary
+                              </button>
+                            </li>
+                          </ul>
+                        </div>
                       </td>
                       {% endif %}
                     </tr>
@@ -261,5 +287,6 @@
   {% comment %} <script defer src="{% static 'midwife/js/anc.js' %}"></script> {% endcomment %}
   {% comment %} <script defer src="{% static 'midwife/js/fetchMaternalRecord.js' %}"></script> {% endcomment %}
   <script defer src="{% static 'maternal/js/postpartum_record_api.js' %}"></script>
+  <script defer src="{% static 'maternal/js/generate_pdf_summary.js' %}"></script>
   {% endblock %}
 {% endblock %}

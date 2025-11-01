@@ -10,6 +10,32 @@ import logging
 
 logger = logging.getLogger(__name__)
 from src.app.utility.maternal_report_helpers import MaternalReportHelpers
+from reportlab.platypus import Paragraph
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.enums import TA_CENTER
+
+
+# Paragraph style for table cells: wrap long text and center contents
+TABLE_PARAGRAPH_STYLE = ParagraphStyle(
+    "TableBody",
+    fontName="Times-Roman",
+    fontSize=10,
+    leading=12,
+    alignment=TA_CENTER,
+)
+
+
+def _fmt(value) -> str:
+    """Format a value for display in the PDF: return 'N/A' for None or
+    empty strings, otherwise return the string representation.
+    Keeps numeric zero (0) intact.
+    """
+    if value is None:
+        return "N/A"
+    if isinstance(value, str):
+        s = value.strip()
+        return s if s != "" else "N/A"
+    return str(value)
 
 
 class MaternalReportService:
@@ -60,10 +86,10 @@ class MaternalReportService:
             # Patient Info
             p = payload.get("patient_info") or {}
             patient_lines = [
-                f"Name: {p.get('first_name','')} {p.get('middle_name','') or ''} {p.get('last_name','')}",
-                f"Age: {AgeCalculator.get_readable_age_from_payload(p)}",
-                f"Contact: {p.get('mobile_num','')}",
-                f"Family #: {p.get('family_num','')}",
+                f"Name: {_fmt(p.get('first_name'))} {_fmt(p.get('middle_name'))} {_fmt(p.get('last_name'))}",
+                f"Age: {_fmt(AgeCalculator.get_readable_age_from_payload(p))}",
+                f"Contact: {_fmt(p.get('mobile_num'))}",
+                f"Family #: {_fmt(p.get('family_num'))}",
             ]
 
             # BMI calculation: compute numeric BMI if possible, place after Height
@@ -73,16 +99,16 @@ class MaternalReportService:
             weight_display = str(weight_val) if weight_val is not None else ""
             height_display = str(height_val) if height_val is not None else ""
             bmi_display = bmi_value or ""
-            patient_lines.append(f"Weight: {weight_display} kg | Height: {height_display} m | BMI: {bmi_display}")
-            patient_lines.append(f"BMI Status: {p.get('bmi_status_name','')}")
+            patient_lines.append(f"Weight: {_fmt(weight_display)} kg | Height: {_fmt(height_display)} m | BMI: {_fmt(bmi_display)}")
+            patient_lines.append(f"BMI Status: {_fmt(p.get('bmi_status_name'))}")
             sections.append({"heading": "Patient Info", "content": "<br/>".join(patient_lines)})
 
             # Pregnancy Summary
             ps = payload.get("pregnancy_summary") or {}
             preg_lines = [
-                f"Trimester: {ps.get('trimester_stage_name','')}",
-                f"LMP: {ps.get('lmp','')}",
-                f"EDC: {ps.get('edc','')}",
+                f"Trimester: {_fmt(ps.get('trimester_stage_name'))}",
+                f"LMP: {_fmt(ps.get('lmp'))}",
+                f"EDC: {_fmt(ps.get('edc'))}",
                 f"Transferred: {MaternalReportHelpers.bool_to_yesno(ps.get('is_transferred', None))}",
             ]
             sections.append({"heading": "Pregnancy Summary", "content": "<br/>".join(preg_lines)})
@@ -90,14 +116,18 @@ class MaternalReportService:
             # Medical & Obstetric History
             med = payload.get("medical_history") or {}
             obst = payload.get("obstetric_history") or {}
-            med_lines = [f"Previous Illnesses: {med.get('previous_illness','')}", f"Previous Hospitalization: {med.get('previous_hospitalization','')}", f"Previous Pregnancy Complications: {med.get('previous_preg_complication','')}"]
+            med_lines = [
+                f"Previous Illnesses: {_fmt(med.get('previous_illness'))}",
+                f"Previous Hospitalization: {_fmt(med.get('previous_hospitalization'))}",
+                f"Previous Pregnancy Complications: {_fmt(med.get('previous_preg_complication'))}",
+            ]
             sections.append({"heading": "Medical History", "content": "<br/>".join(med_lines)})
             obst_lines = [
-                f"Children Born Alive: {obst.get('num_children_born_alive','')}",
-                f"Children Living: {obst.get('num_children_living','')}",
-                f"Abortions: {obst.get('num_abortion','')}",
-                f"Stillbirths: {obst.get('num_stillbirth','')}",
-                f"Large Babies: {obst.get('num_large_babies','')}",
+                f"Children Born Alive: {_fmt(obst.get('num_children_born_alive'))}",
+                f"Children Living: {_fmt(obst.get('num_children_living'))}",
+                f"Abortions: {_fmt(obst.get('num_abortion'))}",
+                f"Stillbirths: {_fmt(obst.get('num_stillbirth'))}",
+                f"Large Babies: {_fmt(obst.get('num_large_babies'))}",
                 f"Diabetes: {MaternalReportHelpers.bool_to_yesno(obst.get('has_diabetes', None))}",
             ]
             sections.append({"heading": "Obstetric History", "content": "<br/>".join(obst_lines)})
@@ -118,32 +148,35 @@ class MaternalReportService:
                 else:
                     display_name = raw_test_name
 
-                lab_table.append([display_name, l.get("result", ""), str(l.get("date_tested", ""))])
-            sections.append({"heading": "Lab Results Summary", "content": lab_table})
+                lab_table.append([display_name, l.get("result", ""), l.get("date_tested", "")])
+            # wrap lab table cells in Paragraphs so long text wraps and is centered
+            lab_table_wrapped = [[Paragraph(_fmt(cell), TABLE_PARAGRAPH_STYLE) for cell in row] for row in lab_table]
+            sections.append({"heading": "Lab Results Summary", "content": lab_table_wrapped})
 
             # Vaccination record
             vax = payload.get("vaccination_records") or []
             vax_table = [["TT Type", "Date Given"]]
             for v in vax:
-                vax_table.append([v.get("tt_type_name", ""), str(v.get("date_given", ""))])
-            sections.append({"heading": "Vaccination Record", "content": vax_table})
+                vax_table.append([v.get("tt_type_name", ""), v.get("date_given", "")])
+            vax_table_wrapped = [[Paragraph(_fmt(cell), TABLE_PARAGRAPH_STYLE) for cell in row] for row in vax_table]
+            sections.append({"heading": "Vaccination Record", "content": vax_table_wrapped})
 
             # Micronutrients
             micron = payload.get("micronutrients") or {}
             micron_lines = [
-                f"Iron Start: {micron.get('iron_start_date','')}",
-                f"Iron End: {micron.get('iron_end_date','')}",
-                f"Deworming Given: {micron.get('deworming_given_date','')}",
+                f"Iron Start: {_fmt(micron.get('iron_start_date'))}",
+                f"Iron End: {_fmt(micron.get('iron_end_date'))}",
+                f"Deworming Given: {_fmt(micron.get('deworming_given_date'))}",
             ]
             sections.append({"heading": "Micronutrient Intake", "content": "<br/>".join(micron_lines)})
 
-            # Checklist findings
+            # Checklist findings — render as left-aligned bullet list (do not center)
             checklist = payload.get("checklist_findings") or []
             if checklist:
-                chk_table = [["Item"]]
-                for c in checklist:
-                    chk_table.append([c.get("checklist_name", "")])
-                sections.append({"heading": "Checklist Findings", "content": chk_table})
+                bullet_lines = [f"• {_fmt(c.get('checklist_name'))}" for c in checklist]
+                # use a paragraph with line breaks so the PdfGenerator will render
+                # this as a left-aligned block (it uses body_style for strings)
+                sections.append({"heading": "Checklist Findings", "content": "<br/>".join(bullet_lines)})
 
             # Build document title
             name = p.get('first_name','')
