@@ -11,8 +11,17 @@
     const BACKOFF_BASE_MS = 1000; // exponential backoff base
 
     function showMessage(message, level = 'info') {
-        // Try to use site toast utilities if available, otherwise fallback to alert
+        // Prefer the project's MHRToast (see maternal/static/maternal/js/mhr_toast.js)
         try {
+            if (globalThis.MHRToast && typeof globalThis.MHRToast.show === 'function') {
+                // MHRToast only supports success (green) or danger (red). Map
+                // our semantic levels so informational messages appear green
+                // and only explicit 'danger' is shown as red.
+                const isSuccess = String(level).toLowerCase() !== 'danger';
+                globalThis.MHRToast.show(String(message), isSuccess);
+                return;
+            }
+            // backward-compatible fallbacks
             if (typeof globalThis.showToast === 'function') {
                 globalThis.showToast(message, level);
                 return;
@@ -22,7 +31,7 @@
                 return;
             }
         } catch (_e) {
-            // ignore and fallback
+            // ignore and fallback to alert
         }
         // final fallback
         alert(message);

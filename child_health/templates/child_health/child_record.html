@@ -61,9 +61,23 @@
                                     <td>{{ record.record_created_at|date:"Y-m-d H:i" }}</td>
                                     {% if request.session.auth.role_name == "midwife" %}
                                     <td>
-                                        <a href="{% url 'child_health:child_health_entry' record.child_record_id %}" class="btn btn-outline-brand btn-sm">
-                                            {% bs_icon 'folder2-open' extra_classes='me-1' %}Open
-                                        </a>
+                                        <div class="dropdown position-static">
+                                            <button class="btn btn-outline-brand btn-sm dropdown-toggle" type="button" id="actionDropdown{{ record.child_record_id }}" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
+                                                {% bs_icon 'three-dots-vertical' extra_classes='me-1' %} Actions
+                                            </button>
+                                            <ul class="dropdown-menu" aria-labelledby="actionDropdown{{ record.child_record_id }}">
+                                                <li>
+                                                    <a class="dropdown-item" href="{% url 'child_health:child_health_entry' record.child_record_id %}">
+                                                        {% bs_icon 'folder2-open' extra_classes='me-1' %}Open
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <button class="dropdown-item btn-generate-child-summary" data-child-id="{{ record.child_record_id }}" type="button">
+                                                        {% bs_icon 'file-earmark-pdf' extra_classes='me-1' %}Generate Child Health Report Summary
+                                                    </button>
+                                                </li>
+                                            </ul>
+                                        </div>
                                     </td>
                                     {% endif %}
                                 </tr>
@@ -115,4 +129,9 @@
         </div>
     </div>
 </div>
+                <!-- Toast utility (used by generator) -->
+                <script defer src="{% static 'maternal/js/mhr_toast.js' %}"></script>
+                <!-- Child report script -->
+                <script src="{% static 'child_health/js/generate_child_summary.js' %}"></script>
+
 {% endblock %}
