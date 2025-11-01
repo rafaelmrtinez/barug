@@ -392,6 +392,7 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "midwife/static/midwife"),
     os.path.join(BASE_DIR, "maternal/static/maternal"),
     os.path.join(BASE_DIR, "child_health/static/child_health"),
+    os.path.join(BASE_DIR, "captain/static/captain"),
 ]
 
 # STATICFILES_DIRS = [
