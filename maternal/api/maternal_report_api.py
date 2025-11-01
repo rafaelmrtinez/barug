@@ -10,6 +10,7 @@ from barug import containers as app
 
 from barug.settings import BASE_DIR
 from src.infra.database.connection_adapter import ConnectionAdapter
+from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
 from src.infra.repositories.maternal_report_repository import MaternalReportRepository
 from src.app.services.maternal_report_service import MaternalReportService
 from src.infra.utilities.pdf_generator import PdfGenerator
@@ -123,6 +124,8 @@ class MaternalReportAPI(View):
             filename = f"maternal_summary_{mhr_id}.pdf"
             response['Content-Disposition'] = f'inline; filename="{filename}"'
             return response
+        except MaternalHealthRecordException as mhe:
+            return JsonResponse({'success': False, 'message': str(mhe)}, status=404)
         except Exception:
             import logging
             logging.exception('Failed generating maternal report for mhr %s', mhr_id)

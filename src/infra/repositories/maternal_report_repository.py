@@ -89,7 +89,16 @@ class MaternalReportRepository:
         return result
 
     def fetch_lab_results(self, maternal_record_id: int) -> List[Dict[str, Any]]:
-        sql = "SELECT lab_test_id, result, result_img_path, date_tested FROM public.lab_result WHERE maternal_record_id = %s ORDER BY date_tested DESC;"
+        # Note: the `lab_result` table uses `lab_test_id` to reference the
+        # type in `lab_test_type` (see sample INSERTs). Join on that column.
+        sql = (
+            "SELECT l.lab_test_id, l.result, l.result_img_path, l.date_tested, "
+            "t.lab_test_type_name "
+            "FROM public.lab_result l "
+            "LEFT JOIN public.lab_test_type t ON t.lab_test_type_id = l.lab_test_id "
+            "WHERE l.maternal_record_id = %s "
+            "ORDER BY l.date_tested DESC;"
+        )
         try:
             return self.ctx.execute_query_to_dict(sql, (maternal_record_id,)) or []
         except QueryExecutionException:

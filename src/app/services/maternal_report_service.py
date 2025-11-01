@@ -1,5 +1,6 @@
 from typing import Optional
 
+from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
 from src.infra.repositories.maternal_report_repository import MaternalReportRepository
 from src.infra.utilities.pdf_generator import PdfGenerator
 from src.infra.utilities.age_calculator import AgeCalculator
@@ -8,6 +9,7 @@ import os
 import logging
 
 logger = logging.getLogger(__name__)
+from src.app.utility.maternal_report_helpers import MaternalReportHelpers
 
 
 class MaternalReportService:
@@ -41,31 +43,19 @@ class MaternalReportService:
         try:
             payload = self._repo.assemble_report_payload(maternal_record_id)
 
+            # Ensure the maternal health record exists. If the repository
+            # returned no patient info then the requested maternal_record_id
+            # does not exist (or has been deleted); raise an error so callers
+            # can handle it explicitly.
+            if not payload.get("patient_info"):
+                logger.error("Maternal health record %s not found", maternal_record_id)
+                raise MaternalHealthRecordException(f"Maternal health record not found")
+
             # Build sections in an order matching requested report structure
             sections = []
 
             # small helpers used to sanitize and compute values for the PDF
-            def _bool_to_yesno(val):
-                if val is True or str(val).lower() == "true":
-                    return "Yes"
-                if val is False or str(val).lower() == "false":
-                    return "No"
-                return str(val) if val is not None else ""
-
-            def _compute_bmi(weight_val, height_val) -> Optional[str]:
-                try:
-                    if weight_val is None or height_val is None:
-                        return None
-                    w = float(weight_val)
-                    h = float(height_val)
-                    if h > 3:
-                        h = h / 100.0
-                    if h <= 0:
-                        return None
-                    bmi = w / (h * h)
-                    return f"{bmi:.1f}"
-                except Exception:
-                    return None
+            # (extracted to MaternalReportHelpers static methods)
 
             # Patient Info
             p = payload.get("patient_info") or {}
@@ -79,7 +69,7 @@ class MaternalReportService:
             # BMI calculation: compute numeric BMI if possible, place after Height
             weight_val = p.get('weight')
             height_val = p.get('height')
-            bmi_value = _compute_bmi(weight_val, height_val)
+            bmi_value = MaternalReportHelpers.compute_bmi(weight_val, height_val)
             weight_display = str(weight_val) if weight_val is not None else ""
             height_display = str(height_val) if height_val is not None else ""
             bmi_display = bmi_value or ""
@@ -93,7 +83,7 @@ class MaternalReportService:
                 f"Trimester: {ps.get('trimester_stage_name','')}",
                 f"LMP: {ps.get('lmp','')}",
                 f"EDC: {ps.get('edc','')}",
-                f"Transferred: {_bool_to_yesno(ps.get('is_transferred', None))}",
+                f"Transferred: {MaternalReportHelpers.bool_to_yesno(ps.get('is_transferred', None))}",
             ]
             sections.append({"heading": "Pregnancy Summary", "content": "<br/>".join(preg_lines)})
 
@@ -108,16 +98,27 @@ class MaternalReportService:
                 f"Abortions: {obst.get('num_abortion','')}",
                 f"Stillbirths: {obst.get('num_stillbirth','')}",
                 f"Large Babies: {obst.get('num_large_babies','')}",
-                f"Diabetes: {_bool_to_yesno(obst.get('has_diabetes', None))}",
+                f"Diabetes: {MaternalReportHelpers.bool_to_yesno(obst.get('has_diabetes', None))}",
             ]
             sections.append({"heading": "Obstetric History", "content": "<br/>".join(obst_lines)})
 
             # Lab Results Summary (table) - do not expose internal ID numbers
             labs = payload.get("lab_results") or []
-            lab_table = [["Test", "Result", "Date Tested"]]
+            lab_table = [["Test Type", "Result", "Date Tested"]]
             for l in labs:
-                test_name = l.get("test_name") or l.get("lab_test_name") or ""
-                lab_table.append([test_name, l.get("result", ""), str(l.get("date_tested", ""))])
+                # Prefer the lab test type name (new field from repository). If both
+                # the type and the original test name exist, show the type with
+                # the original name in parentheses so callers see both pieces.
+                raw_test_name = l.get("test_name") or l.get("lab_test_name") or ""
+                type_name = l.get("lab_test_type_name") or ""
+                if type_name and raw_test_name:
+                    display_name = f"{type_name} ({raw_test_name})"
+                elif type_name:
+                    display_name = type_name
+                else:
+                    display_name = raw_test_name
+
+                lab_table.append([display_name, l.get("result", ""), str(l.get("date_tested", ""))])
             sections.append({"heading": "Lab Results Summary", "content": lab_table})
 
             # Vaccination record
@@ -163,21 +164,11 @@ class MaternalReportService:
 
             left_img_to_use = None
             right_img_to_use = None
-            # if caller provided paths, try to resolve them relative to static/images
-            def _resolve_image(path_val: Optional[str]):
-                if not path_val:
-                    return None
-                # if absolute path and exists, use it
-                if os.path.isabs(path_val) and os.path.exists(path_val):
-                    return path_val
-                # last resort: try the value as-is (relative to cwd or URL)
-                return path_val if os.path.exists(path_val) else None
-
             # Only use images if the caller explicitly provided them. Do not
             # fall back to the default image here — the view or caller will
             # handle defaulting logic if desired.
-            left_img_to_use = _resolve_image(left_image) if left_image else None
-            right_img_to_use = _resolve_image(right_image) if right_image else None
+            left_img_to_use = MaternalReportHelpers.resolve_image(left_image) if left_image else None
+            right_img_to_use = MaternalReportHelpers.resolve_image(right_image) if right_image else None
 
             pdf_bytes = self._pdf.generate(
                 title=title,
