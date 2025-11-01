@@ -51,8 +51,10 @@ class PdfGenerator:
             fontName="Times-Bold",
             fontSize=12,
             leading=14,
-            spaceAfter=6,
-            spaceBefore=8,
+            # increase spacing around headings so horizontal rules and
+            # tables don't collide with heading text
+            spaceBefore=10,
+            spaceAfter=10,
         )
 
         # Runtime attributes populated by generate() before build()
@@ -73,8 +75,10 @@ class PdfGenerator:
                     ("FONTSIZE", (0, 0), (-1, -1), 10),
                     ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
                 ]
             )
         )
@@ -199,10 +203,13 @@ class PdfGenerator:
             if isinstance(content, list) and content and isinstance(content[0], (list, tuple)):
                 table = self._build_table(content, available_width=doc.width)
                 elems.append(table)
-                elems.append(Spacer(1, 8))
+                # add a slightly larger spacer after tables so following
+                # horizontal rules or headings don't overlap
+                elems.append(Spacer(1, 12))
             else:
                 elems.append(Paragraph(str(content), self.body_style))
-                elems.append(Spacer(1, 6))
+                # paragraphs get a bit more breathing room as well
+                elems.append(Spacer(1, 10))
 
             try:
                 hr = HRFlowable(width="100%", thickness=0.6, lineCap="round", color=colors.grey)

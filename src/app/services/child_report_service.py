@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple, List
 
 from src.infra.utilities.pdf_generator import PdfGenerator
 from src.infra.utilities.age_calculator import AgeCalculator
@@ -56,13 +56,93 @@ class ChildReportService:
         right_image: Optional[str] = None,
         generated_by_name: Optional[str] = None,
         generated_by_role: Optional[str] = None,
-    ) -> bytes:
+    ) -> Tuple[bytes, List[str]]:
         try:
             payload = self._repo.assemble_report_payload(child_record_id)
+
+            # Track missing fields so callers (API) can surface a warning
+            missing_fields: List[str] = []
 
             if not payload.get("patient_info"):
                 logger.error("Child health record %s not found", child_record_id)
                 raise ChildHealthRecordException("Child health record not found")
+
+            # Quick presence checks for many required fields from the
+            # user's checklist. We collect human-readable labels for any
+            # missing items and return them to the API which will expose
+            # them via a response header.
+            hi = payload.get("health_record_info") or {}
+            sp = payload.get("screening_package") or {}
+            ml = payload.get("monitoring_logs") or []
+            imm_mat = payload.get("immunization_matrix") or []
+            nb = payload.get("newborn_screening") or {}
+            bf_by_person = payload.get("feeding_checks_by_person") or []
+            basic_person = payload.get("basic_by_person") or {}
+
+            # Identification block
+            if not (hi.get("child_full_name") or payload["patient_info"].get("first_name")):
+                missing_fields.append("child full name")
+            if not (hi.get("date_of_birth") or payload["patient_info"].get("birthdate")):
+                missing_fields.append("birthdate")
+            if not (hi.get("child_gender") or payload["patient_info"].get("sex")):
+                missing_fields.append("sex/gender")
+            if not (hi.get("family_num") or payload["patient_info"].get("family_num")):
+                missing_fields.append("family number")
+            if not (hi.get("ufc_num") or basic_person.get("ufc_num") or payload["patient_info"].get("family_num")):
+                missing_fields.append("ufc number")
+
+            # Place of delivery
+            if not (hi.get("place_of_delivery") or payload["patient_info"].get("delivery_place_type_name")):
+                missing_fields.append("place of delivery")
+
+            # Parents data
+            if not (hi.get("mother_full_name") or payload["patient_info"].get("mother_first_name")):
+                missing_fields.append("mother name")
+            if not (hi.get("mothers_age") and hi.get("mothers_occupation") or basic_person.get("MOTHER_OCCUPATION")):
+                # we check occupation/age but tolerate partials
+                missing_fields.append("mother age/occupation")
+            if not (hi.get("father_full_name") or payload["patient_info"].get("father_first_name")):
+                missing_fields.append("father name")
+            if not (hi.get("fathers_age") and hi.get("fathers_occupation") or basic_person.get("FATHER_OCCUPATION")):
+                missing_fields.append("father age/occupation")
+
+            # Address
+            if not (hi.get("child_complete_address") or basic_person.get("ADDRESS")):
+                missing_fields.append("complete address")
+
+            # Newborn screening / feeding type
+            if not (nb and (nb.get("feeding_type_name") or nb.get("referred_nbs_date"))):
+                missing_fields.append("newborn screening (feeding type / referred date)")
+
+            # Breastfeeding checks (we expect up to the last 5 checks)
+            if not bf_by_person:
+                # fallback to breastfeeding_checks already in payload
+                if not payload.get("breastfeeding_checks"):
+                    missing_fields.append("breastfeeding checks")
+
+            # Immunizations
+            if not imm_mat and not payload.get("all_immunizations"):
+                missing_fields.append("immunizations")
+
+            # Screening details (birth weight, anemia, iron seen/given for 2-6 mos)
+            if not (sp and (sp.get("birth_weight") is not None)):
+                missing_fields.append("birth weight")
+            if not (sp and (sp.get("anemic_2_59_seen_date") or sp.get("anemic_2_59_given_iron_date"))):
+                missing_fields.append("anemia screening/iron given details")
+            if not (sp and (sp.get("seen_2_6_mos_date") or sp.get("given_2_6_mos_date"))):
+                missing_fields.append("iron (2-6 months) seen/given dates")
+
+            # Iron supplementation dates
+            if not (sp and (sp.get("iron_date_started") or sp.get("iron_date_completed") or payload.get("iron_supplements"))):
+                missing_fields.append("iron supplementation dates")
+
+            # Vitamin A stages
+            if not (sp and (sp.get("vit_a_given_1") or sp.get("vit_a_given_2") or sp.get("vit_a_given_3") or payload.get("vitamin_a"))):
+                missing_fields.append("vitamin A dates (stages 1-3)")
+
+            # Visits / monitoring logs with measurements
+            if not ml:
+                missing_fields.append("visit monitoring logs (weight/temp/height/findings/notes)")
 
             sections = []
 

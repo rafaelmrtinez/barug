@@ -113,6 +113,7 @@ class InfraContainer(containers.DeclarativeContainer):
     child_report_repository = providers.Factory(
         ChildReportRepository,
         ctx=context,
+        child_health_repo=child_health_record_repository,
     )
 
     supabase_client = providers.Object(supabase)

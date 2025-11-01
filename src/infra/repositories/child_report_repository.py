@@ -1,9 +1,13 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.exceptions.query_exec_exception import QueryExecutionException
 
 import logging
+
+if TYPE_CHECKING:
+    # import for type checking only to avoid import-time coupling
+    from src.infra.repositories.child_health_record_repository import ChildHealthRecordRepository
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +19,12 @@ class ChildReportRepository:
     into a PDF document.
     """
 
-    def __init__(self, ctx: ConnectionAdapter):
+    def __init__(self, ctx: ConnectionAdapter, child_health_repo: Optional['ChildHealthRecordRepository'] = None):
         self.ctx = ctx
+        # allow injecting a ChildHealthRecordRepository instance for
+        # testing or DI container wiring. Default is None and we will
+        # lazily construct the helper when needed.
+        self._child_health_repo: Optional['ChildHealthRecordRepository'] = child_health_repo
 
     def fetch_patient_info(self, child_record_id: int) -> Optional[Dict[str, Any]]:
         sql = """
@@ -144,4 +152,89 @@ class ChildReportRepository:
         payload["visit_schedules"] = self.fetch_visit_schedules(child_record_id)
         payload["feeding_types"] = self.fetch_feeding_types(child_record_id)
         payload["vitamin_a"] = self.fetch_vitamin_a(child_record_id)
+
+        # Enrich payload with data from the more feature-complete
+        # ChildHealthRecordRepository whenever possible. This repo
+        # contains several helper queries that return the fields the
+        # PDF consumer expects (ufc_num, parent occupations, complete
+        # address, monitoring logs, screening package, immunization
+        # matrices, etc.). We resolve it at runtime using the same
+        # ConnectionAdapter context.
+        try:
+            # prefer injected repo when provided (via DI container)
+            ch_repo = self._child_health_repo
+            if ch_repo is None:
+                # import at runtime to avoid import-time coupling
+                from src.infra.repositories.child_health_record_repository import ChildHealthRecordRepository
+                ch_repo = ChildHealthRecordRepository(self.ctx)
+
+            # High level child/household info (ufc, address, parents, place_of_delivery)
+            try:
+                hr = ch_repo.fetch_child_health_record_info_by_chr_id(child_record_id)
+                # normalize: many repo helpers return a list of rows; prefer a
+                # single dict for the service. If a list is returned, take
+                # the first element.
+                if isinstance(hr, list):
+                    payload["health_record_info"] = hr[0] if hr else None
+                else:
+                    payload["health_record_info"] = hr
+            except Exception:
+                payload["health_record_info"] = None
+
+            # Screening package: birth weight, iron/vitamin A aggregation
+            try:
+                payload["screening_package"] = ch_repo.fetch_child_screening_package(child_record_id)
+            except Exception:
+                payload["screening_package"] = None
+
+            # Monitoring logs (weight, temp, height, findings, notes)
+            try:
+                payload["monitoring_logs"] = ch_repo.fetch_child_monitoring_logs(child_record_id) or []
+            except Exception:
+                payload["monitoring_logs"] = []
+
+            # Immunization matrices and detailed immunizations
+            try:
+                payload["immunization_matrix"] = ch_repo.fetch_immunization_dates_matrix_by_chr_id(child_record_id) or []
+            except Exception:
+                payload["immunization_matrix"] = []
+            try:
+                payload["all_immunizations"] = ch_repo.fetch_all_child_immunizations_by_chr_id(child_record_id) or []
+            except Exception:
+                payload["all_immunizations"] = []
+
+            # Newborn screening / feeding type for person (if we have person_id)
+            person_id = None
+            try:
+                if payload.get("patient_info") and payload["patient_info"].get("person_id"):
+                    person_id = payload["patient_info"].get("person_id")
+            except Exception:
+                person_id = None
+
+            if person_id:
+                try:
+                    payload["newborn_screening"] = ch_repo.fetch_child_newborn_screening_by_person_id(person_id)
+                except Exception:
+                    payload["newborn_screening"] = None
+
+                try:
+                    payload["feeding_checks_by_person"] = ch_repo.fetch_all_feeding_check_dates_by_person_id(person_id) or []
+                except Exception:
+                    payload["feeding_checks_by_person"] = []
+
+                try:
+                    payload["basic_by_person"] = ch_repo.fetch_child_basic_information_by_person_id(person_id)
+                except Exception:
+                    payload["basic_by_person"] = None
+            else:
+                payload["newborn_screening"] = None
+                payload["feeding_checks_by_person"] = []
+                payload["basic_by_person"] = None
+
+        except Exception:
+            # Non-fatal: if enrichment fails, we still return the base
+            # payload assembled earlier so the service can generate a
+            # partial report and surface missing-field warnings.
+            logger.exception("Failed to enrich child report payload for %s", child_record_id)
+
         return payload

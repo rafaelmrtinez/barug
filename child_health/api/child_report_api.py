@@ -104,7 +104,7 @@ class ChildReportAPI(View):
                 gen_name = None
                 gen_role = None
 
-            pdf_bytes = service.generate_child_summary_pdf(
+            result = service.generate_child_summary_pdf(
                 child_id,
                 header_lines=header_lines,
                 watermark=watermark_param,
@@ -114,9 +114,27 @@ class ChildReportAPI(View):
                 generated_by_role=gen_role,
             )
 
+            # Service now returns a tuple (pdf_bytes, missing_fields)
+            pdf_bytes = result
+            missing_fields = []
+            try:
+                if isinstance(result, tuple) or isinstance(result, list):
+                    pdf_bytes, missing_fields = result[0], result[1]
+            except Exception:
+                # fall back: assume result is raw bytes
+                pdf_bytes = result
+
             response = HttpResponse(pdf_bytes, content_type='application/pdf')
             filename = f"child_summary_{child_id}.pdf"
             response['Content-Disposition'] = f'inline; filename="{filename}"'
+            if missing_fields:
+                # Expose a simple CSV of missing fields so clients can surface
+                # a helpful message (also logged server-side).
+                try:
+                    response['X-Report-Missing-Fields'] = ', '.join(missing_fields)
+                    logger.warning('Child report %s generated with missing fields: %s', child_id, response['X-Report-Missing-Fields'])
+                except Exception:
+                    logger.exception('Failed to set missing-fields header')
             return response
         except ChildHealthRecordException as chre:
             return JsonResponse({'success': False, 'message': str(chre)}, status=404)
