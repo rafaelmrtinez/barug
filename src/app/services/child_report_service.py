@@ -56,7 +56,7 @@ class ChildReportService:
         right_image: Optional[str] = None,
         generated_by_name: Optional[str] = None,
         generated_by_role: Optional[str] = None,
-    ) -> Tuple[bytes, List[str]]:
+    ) -> Tuple[bytes, List[str], str]:
         try:
             payload = self._repo.assemble_report_payload(child_record_id)
 
@@ -271,7 +271,17 @@ class ChildReportService:
                 additional_signatory_role=generated_by_role,
             )
 
-            return pdf_bytes
+            # Build filename in service layer: lastname_firstname_id (sanitized)
+            first = (p.get('first_name') or '').strip()
+            last = (p.get('last_name') or '').strip()
+
+            def _sanitize(s: str) -> str:
+                # keep alphanumerics and underscores
+                return ''.join(ch for ch in s.replace(' ', '_') if (ch.isalnum() or ch == '_')).lower() or 'unknown'
+
+            fname = f"{_sanitize(last)}_{_sanitize(first)}_{child_record_id}.pdf"
+
+            return pdf_bytes, missing_fields, fname
         except Exception:
             logger.exception("Failed to generate child summary PDF for child record %s", child_record_id)
             raise

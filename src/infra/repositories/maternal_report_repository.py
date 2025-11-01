@@ -26,16 +26,29 @@ class MaternalReportRepository:
             p.first_name,
             p.last_name,
             p.middle_name,
+            p.birthdate,
             p.age,
             p.mobile_num,
+            p.occupation AS patient_occupation,
             f.family_num,
+            fu.ufc_num,
             m.weight,
             m.height,
-            bs.bmi_status_name
+            bs.bmi_status_name,
+            -- husband info
+            h.person_id AS husband_id,
+            (h.first_name || ' ' || COALESCE(h.middle_name, '') || ' ' || h.last_name) AS husband_full_name,
+            h.occupation AS husband_occupation,
+            -- full address
+            TRIM(BOTH ', ' FROM CONCAT_WS(', ', NULLIF(a.street, ''), NULLIF(ps.purok_sitio_name, ''), NULLIF(a.barangay, ''), NULLIF(a.city, ''))) AS address
         FROM public.maternal_health_record m
         LEFT JOIN public.person p ON p.person_id = m.person_id
         LEFT JOIN public.family_unit f ON f.family_id = m.family_id
+        LEFT JOIN public.family_unit fu ON fu.family_id = m.family_id
+        LEFT JOIN public.addresss a ON a.address_id = p.address_id
+        LEFT JOIN public.purok_sitio ps ON ps.purok_sitio_id = a.purok_sitio_id
         LEFT JOIN public.bmi_status bs ON bs.bmi_status_id = m.bmi_status_id
+        LEFT JOIN public.person h ON h.person_id = m.husband_id
         WHERE m.maternal_record_id = %s
         LIMIT 1;"""
         try:
@@ -51,6 +64,10 @@ class MaternalReportRepository:
             m.is_transferred,
             ps.lmp,
             ps.edc,
+            ps.gravida,
+            ps.para,
+            ps.is_fullterm,
+            ps.is_preterm,
             ts.trimester_stage_name
         FROM public.maternal_health_record m
         LEFT JOIN public.present_pregnancy_status ps ON ps.maternal_record_id = m.maternal_record_id
@@ -70,7 +87,11 @@ class MaternalReportRepository:
         try:
             mh_sql = "SELECT previous_illness, previous_hospitalization, previous_preg_complication FROM public.medical_history WHERE maternal_record_id = %s LIMIT 1;"
             oh_sql = "SELECT num_children_born_alive, num_children_living, num_abortion, num_stillbirth, num_large_babies, has_diabetes FROM public.obstetric_history WHERE maternal_record_id = %s LIMIT 1;"
-            prev_sql = "SELECT date_of_deliveries, outcome, baby_weight FROM public.previous_pregnancy_info WHERE maternal_record_id = %s LIMIT 1;"
+            prev_sql = (
+                "SELECT ppi.date_of_deliveries, ppi.outcome, ppi.baby_weight, ppi.baby_sex, ppi.ballard_score, ppi.apgar_score, ppi.delivery_type_id, dt.delivery_type_name "
+                "FROM public.previous_pregnancy_info ppi LEFT JOIN public.delivery_type dt ON dt.delivery_type_id = ppi.delivery_type_id "
+                "WHERE ppi.maternal_record_id = %s ORDER BY ppi.date_of_deliveries DESC LIMIT 1;"
+            )
 
             mh = self.ctx.execute_query_to_dict(mh_sql, (maternal_record_id,))
             oh = self.ctx.execute_query_to_dict(oh_sql, (maternal_record_id,))
@@ -113,6 +134,23 @@ class MaternalReportRepository:
             logger.exception("Failed to fetch vaccination records for mhr %s", maternal_record_id)
             return []
 
+    def fetch_plan_and_baseline(self, maternal_record_id: int) -> Optional[Dict[str, Any]]:
+        sql = "SELECT plan_and_baseline_id, new_born_screening_plan, place_of_delivery_plan FROM public.plan_and_baseline WHERE maternal_record_id = %s LIMIT 1;"
+        try:
+            rows = self.ctx.execute_query_to_dict(sql, (maternal_record_id,))
+            return rows[0] if rows else None
+        except QueryExecutionException:
+            logger.exception("Failed to fetch plan and baseline for mhr %s", maternal_record_id)
+            return None
+
+    def fetch_anc_rows(self, maternal_record_id: int) -> List[Dict[str, Any]]:
+        sql = "SELECT anc_row_id, anc_visit_id, anc_date, aog_weeks, aog_days, weight_kg, bp_systolic, bp_diastolic, leopolds_findings, notes FROM public.maternal_anc_row WHERE maternal_record_id = %s ORDER BY anc_date ASC;"
+        try:
+            return self.ctx.execute_query_to_dict(sql, (maternal_record_id,)) or []
+        except QueryExecutionException:
+            logger.exception("Failed to fetch ANC rows for mhr %s", maternal_record_id)
+            return []
+
     def fetch_micronutrients(self, maternal_record_id: int) -> Optional[Dict[str, Any]]:
         sql = "SELECT iron_start_date, iron_end_date, deworming_given_date FROM public.micronutrients WHERE maternal_record_id = %s LIMIT 1;"
         try:
@@ -140,4 +178,6 @@ class MaternalReportRepository:
         payload["vaccination_records"] = self.fetch_vaccination_records(maternal_record_id)
         payload["micronutrients"] = self.fetch_micronutrients(maternal_record_id)
         payload["checklist_findings"] = self.fetch_checklist_findings(maternal_record_id)
+        payload["plan_and_baseline"] = self.fetch_plan_and_baseline(maternal_record_id)
+        payload["anc_rows"] = self.fetch_anc_rows(maternal_record_id)
         return payload

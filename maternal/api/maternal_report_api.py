@@ -110,7 +110,7 @@ class MaternalReportAPI(View):
                 gen_name = None
                 gen_role = None
 
-            pdf_bytes = service.generate_maternal_summary_pdf(
+            result = service.generate_maternal_summary_pdf(
                 mhr_id,
                 header_lines=header_lines,
                 watermark=watermark_param,
@@ -120,8 +120,22 @@ class MaternalReportAPI(View):
                 generated_by_role=gen_role,
             )
 
+            # Service returns (pdf_bytes, filename)
+            pdf_bytes = None
+            filename = None
+            try:
+                if isinstance(result, (tuple, list)):
+                    pdf_bytes = result[0]
+                    if len(result) >= 2:
+                        filename = result[1]
+                else:
+                    pdf_bytes = result
+            except Exception:
+                pdf_bytes = result
+
             response = HttpResponse(pdf_bytes, content_type='application/pdf')
-            filename = f"maternal_summary_{mhr_id}.pdf"
+            if not filename:
+                filename = f"maternal_summary_{mhr_id}.pdf"
             response['Content-Disposition'] = f'inline; filename="{filename}"'
             return response
         except MaternalHealthRecordException as mhe:

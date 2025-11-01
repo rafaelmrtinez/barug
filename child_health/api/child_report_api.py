@@ -113,19 +113,28 @@ class ChildReportAPI(View):
                 generated_by_name=gen_name,
                 generated_by_role=gen_role,
             )
-
-            # Service now returns a tuple (pdf_bytes, missing_fields)
-            pdf_bytes = result
+            # Service returns (pdf_bytes, missing_fields, filename)
+            pdf_bytes = None
             missing_fields = []
+            filename = None
             try:
-                if isinstance(result, tuple) or isinstance(result, list):
-                    pdf_bytes, missing_fields = result[0], result[1]
+                if isinstance(result, (tuple, list)):
+                    # pdf bytes always first
+                    if len(result) >= 1:
+                        pdf_bytes = result[0]
+                    if len(result) >= 2:
+                        missing_fields = result[1] or []
+                    if len(result) >= 3:
+                        filename = result[2]
+                else:
+                    pdf_bytes = result
             except Exception:
                 # fall back: assume result is raw bytes
                 pdf_bytes = result
 
             response = HttpResponse(pdf_bytes, content_type='application/pdf')
-            filename = f"child_summary_{child_id}.pdf"
+            if not filename:
+                filename = f"child_summary_{child_id}.pdf"
             response['Content-Disposition'] = f'inline; filename="{filename}"'
             if missing_fields:
                 # Expose a simple CSV of missing fields so clients can surface
