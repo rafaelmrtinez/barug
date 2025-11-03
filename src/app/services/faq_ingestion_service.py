@@ -4,12 +4,10 @@ from io import BytesIO
 import logging
 
 from src.infra.repositories.faq_ingestion_repository import FAQIngestionRepository
+from src.infra.repositories.faq_excel_parser import parse_workbook, ParseError
+from src.domain.services.faq_validator import validate_and_sanitize_rows, FAQValidationError
 
 logger = logging.getLogger(__name__)
-
-
-class FAQValidationError(Exception):
-    pass
 
 
 class FAQIngestionService:
@@ -41,109 +39,19 @@ class FAQIngestionService:
         # Collapse multiple whitespace to single space
         s = " ".join(s.split())
         return s
-
     def _validate_and_extract(self, file_bytes: bytes, filename: str) -> List[Tuple[str, str]]:
-        """Validate the workbook and return a list of (question, answer) tuples.
+        """Coordinate infra parsing and domain validation, returning sanitized tuples.
 
-        Raises FAQValidationError with a human-friendly message on failure.
+        Raises domain-level FAQValidationError on validation problems.
         """
-        # file size
-        if len(file_bytes) > self.max_file_size:
-            raise FAQValidationError(f"File too large (>{self.max_file_size} bytes).")
-
-        ext = Path(filename).suffix.lower()
-        if ext not in (".xlsx", ".xls"):
-            raise FAQValidationError("Invalid file type. Only .xlsx and .xls are allowed.")
-
-        # Lazy import openpyxl / xlrd to avoid adding heavy deps at module import time
-        rows = []
         try:
-            if ext == ".xlsx":
-                from openpyxl import load_workbook
-                wb = load_workbook(filename=BytesIO(file_bytes), read_only=True, data_only=True)
-                ws = wb.worksheets[0]
-                iterator = ws.iter_rows(values_only=True)
-                header_row = next(iterator, None)
-                if not header_row:
-                    raise FAQValidationError("Workbook first sheet is empty.")
-                header = [ (str(c).strip().lower() if c is not None else "") for c in header_row ]
-                # collect rows
-                for r in iterator:
-                    rows.append(list(r))
-            else:
-                # .xls support via xlrd
-                import xlrd
-                book = xlrd.open_workbook(file_contents=file_bytes)
-                sheet = book.sheet_by_index(0)
-                if sheet.nrows == 0:
-                    raise FAQValidationError("Workbook first sheet is empty.")
-                header = [ str(sheet.cell_value(0, c)).strip().lower() for c in range(sheet.ncols) ]
-                for ri in range(1, sheet.nrows):
-                    row = [ sheet.cell_value(ri, c) if c < sheet.ncols else None for c in range(len(header)) ]
-                    rows.append(row)
-        except FAQValidationError:
-            raise
-        except Exception as exc:
-            logger.exception("Failed to read workbook: %s", exc)
-            raise FAQValidationError("Failed to parse Excel workbook. Ensure the file is a valid Excel document.")
+            header, rows = parse_workbook(file_bytes, filename, max_file_size=self.max_file_size)
+        except ParseError as pe:
+            # Convert infra parse errors into domain-facing validation errors
+            raise FAQValidationError(str(pe))
 
-        # headers must be exactly two columns: question and answer (case-insensitive)
-        if len(header) != 2:
-            raise FAQValidationError("Workbook must have exactly two columns: question and answer.")
-
-        header_normalized = [h.strip().lower() for h in header]
-        if set(header_normalized) != {"question", "answer"}:
-            raise FAQValidationError("Headers must be exactly: 'question' and 'answer' (case-insensitive).")
-
-        # map header order to indices
-        q_idx = header_normalized.index("question")
-        a_idx = header_normalized.index("answer")
-
-        # before sanitizing, compute how many non-empty data rows exist
-        # (some spreadsheets include many blank rows in the used range). If
-        # the number of non-empty rows exceeds the configured limit, fail
-        # early with a clear error so callers know the file is too large.
-        non_empty_count = 0
-        for row in rows:
-            if any((c is not None and str(c).strip() != '') for c in row):
-                non_empty_count += 1
-        if non_empty_count > self.max_rows:
-            raise FAQValidationError(f"Too many rows ({non_empty_count}). Limit is {self.max_rows}.")
-
-        # validate rows and sanitize
-        sanitized = []
-        errors = []
-        for i, row in enumerate(rows, start=1):
-            if i > self.max_rows:
-                break
-            # ensure row has at least two cells
-            q_raw = row[q_idx] if q_idx < len(row) else None
-            a_raw = row[a_idx] if a_idx < len(row) else None
-            q = self._sanitize_cell(q_raw)
-            a = self._sanitize_cell(a_raw)
-            if not q and not a:
-                # skip entirely blank rows silently
-                continue
-            # require both question and answer present
-            if not q or not a:
-                errors.append(f"Row {i+1}: missing question or answer")
-                continue
-            # enforce reasonable lengths (avoid abuse)
-            if len(q) > 2000 or len(a) > 5000:
-                errors.append(f"Row {i+1}: content too long")
-                continue
-            sanitized.append((q, a))
-
-        if errors:
-            raise FAQValidationError("Validation failed: " + "; ".join(errors[:10]))
-
-        if len(sanitized) == 0:
-            raise FAQValidationError("No valid FAQ rows found in the workbook.")
-        print(f"Debug: Total sanitized rows = {len(sanitized)}")
-        if len(sanitized) > self.max_rows:
-            print(f"Warning: {len(sanitized) - self.max_rows} rows exceeded the limit and will be ignored.")
-            raise FAQValidationError(f"Too many FAQ rows: limit is {self.max_rows}.")
-
+        # Delegate header/row validation and sanitization to domain layer
+        sanitized = validate_and_sanitize_rows(header, rows, max_rows=self.max_rows)
         return sanitized
 
     def ingest_and_upload(self, file_obj, filename: str, uploaded_by: str) -> dict:
@@ -178,13 +86,13 @@ class FAQIngestionService:
         # At this point we can either upload the original file (per API
         # contract) or send parsed JSON. The endpoint expects base64 file in
         # JSON; we'll send the original bytes encoded by the repository.
-        # response = self.repo.upload_via_json(file_bytes, filename, uploaded_by)
+        response = self.repo.upload_via_json(file_bytes, filename, uploaded_by)
         
         # mock response
-        response = {
-            "status": "ok",
-            "http_status": 200,
-            "message": f"Received {len(limited_rows)} FAQ entries from {uploaded_by}."
-        }
+        # response = {
+        #     "status": "ok",
+        #     "http_status": 200,
+        #     "message": f"Received {len(limited_rows)} FAQ entries from {uploaded_by}."
+        # }
         
         return {"uploaded": True, "count": len(limited_rows), "response": response}
