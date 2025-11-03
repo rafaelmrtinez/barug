@@ -70,6 +70,7 @@ CORS_ALLOW_ALL_ORIGINS = True
 # Application definition
 
 INSTALLED_APPS = [
+    "doc_ingest.apps.DocIngestConfig",
     "maternal.apps.MaternalConfig",
     "child_health.apps.ChildHealthConfig",
     "metrics.apps.MetricsConfig",

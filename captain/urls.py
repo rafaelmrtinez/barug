@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from doc_ingest.api.faq_ingest_api import FAQIngestAPI
 
 app_name = 'captain'
 
@@ -40,4 +41,6 @@ urlpatterns = [
     path("api/business/pins", views.api_business_pins, name="api_business_pins"),
 
     path("staff-requests/process/", views.process_staff_request, name="process_staff_request"),
+    # FAQ upload endpoint used by captain UI (multipart or JSON)
+    path("api/upload_faqs/", FAQIngestAPI.as_view(), name="upload_faqs"),
 ]

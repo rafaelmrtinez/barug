@@ -4,7 +4,7 @@
     const uploadBtn = document.getElementById('faqUploadBtn');
     const previewContainer = document.getElementById('faqPreviewContainer');
     const msgEl = document.getElementById('faqMsg');
-    const spinner = document.getElementById('faqSpinner');
+    
     let selectedFile = null;
 
     function showMsg(text, type = 'info') {
@@ -218,6 +218,41 @@
         showMsg('Preview closed.', 'info');
     }
 
+    // Expose an explicit reset API so other modules can reset paginator state
+    // This is used by faqs_api.js after a successful upload to fully clear UI
+    function reset() {
+        try {
+            // clear DOM preview and controls
+            const controls = document.getElementById('faqPreviewControls');
+            if (controls) controls.remove();
+            previewContainer.style.display = 'none';
+            previewContainer.innerHTML = '';
+
+            // reset internal state
+            previewState.headers = null;
+            previewState.rows = null;
+            previewState.currentPage = 1;
+            previewState.pageSize = 10;
+
+            // reset buttons
+            try { previewBtn.innerText = ORIGINAL_PREVIEW_TEXT; } catch (_e) { /* ignore */ }
+            try { previewBtn.disabled = true; } catch (_e) { /* ignore */ }
+            try { uploadBtn.disabled = true; } catch (_e) { /* ignore */ }
+
+            showMsg('', 'info');
+        } catch (err) {
+            console.debug('FAQ paginator reset failed', err);
+        }
+    }
+
+    // make reset available globally for faqs_api.js to call
+    try {
+        if (!globalThis.FAQPaginator) globalThis.FAQPaginator = {};
+        globalThis.FAQPaginator.reset = reset;
+    } catch (_e) {
+        // ignore if globalThis not writable
+    }
+
     previewBtn.addEventListener('click', async () => {
         // If preview is currently visible, close it (toggle)
         if (previewContainer.style.display && previewContainer.style.display !== 'none') {
@@ -267,49 +302,9 @@
         }
     });
 
-    function getCookie(name) {
-        const value = `; ${document.cookie}`;
-        const parts = value.split(`; ${name}=`);
-        if (parts.length === 2) return parts.pop().split(';').shift();
-    }
+    
 
-    uploadBtn.addEventListener('click', async () => {
-        if (!selectedFile) return showMsg('No file selected.', 'danger');
-        try {
-            spinner.style.display = 'inline-block';
-            uploadBtn.disabled = true;
-            previewBtn.disabled = true;
-            showMsg('Uploading file...', 'info');
-            const fd = new FormData();
-            fd.append('file', selectedFile);
-
-            const csrf = getCookie('csrftoken');
-            const resp = await fetch('/captain/api/upload_faqs/', {
-                method: 'POST',
-                body: fd,
-                headers: csrf ? { 'X-CSRFToken': csrf } : {},
-                credentials: 'same-origin'
-            });
-            const data = await resp.json().catch(() => null);
-            if (resp.ok) {
-                showMsg((data && data.message) ? data.message : 'FAQs updated successfully.', 'success');
-                // Optionally close the modal after a short delay
-                setTimeout(() => {
-                    const modalEl = document.getElementById('uploadFaqModal');
-                    const modal = bootstrap.Modal.getInstance(modalEl);
-                    if (modal) modal.hide();
-                }, 900);
-            } else {
-                showMsg((data && data.message) ? data.message : 'Failed to update FAQs.', 'danger');
-            }
-        } catch (err) {
-            console.error(err);
-            showMsg('Unexpected error uploading the file.', 'danger');
-        } finally {
-            spinner.style.display = 'none';
-            uploadBtn.disabled = false;
-            previewBtn.disabled = !selectedFile;
-        }
-    });
+    // Upload logic moved to `faqs_api.js` to keep this module single-responsibility.
+    // faqs_paginator.js handles previewing and pagination only.
 
 })();
