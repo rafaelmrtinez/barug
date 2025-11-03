@@ -11,7 +11,7 @@
 	const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB client-side
 	const MAX_ROWS = 500;
 	// API endpoint to call (server-side route)
-	const ENDPOINT = '/docs/api/faq-upload/';
+	const ENDPOINT = '/docs/api/v1/faq-upload/';
 
 	function getCookie(name) {
 		const value = `; ${document.cookie}`;

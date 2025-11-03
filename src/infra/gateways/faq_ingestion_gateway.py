@@ -3,7 +3,7 @@ from typing import Optional
 import requests
 
 
-class FAQIngestionRepository:
+class FAQIngestionGateway:
     """Repository responsible for sending FAQ Excel files to the upstream
     Supabase function endpoint.
 
@@ -44,6 +44,36 @@ class FAQIngestionRepository:
         files = {"file": (filename, file_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
         data = {"uploaded_by": uploaded_by}
         resp = requests.post(self.endpoint, files=files, data=data, timeout=self.timeout)
+        resp.raise_for_status()
+        try:
+            return resp.json()
+        except Exception:
+            return {"status": "ok", "http_status": resp.status_code}
+
+    def get_faqs(self, version: str = "1") -> dict:
+        """Retrieve FAQs from the upstream edge function via GET.
+
+        The edge function follows the pattern: /functions/v{version}/faqs-api
+        Returns the decoded JSON response as a dict. Raises requests.HTTPError
+        on non-2xx responses.
+        """
+        # construct endpoint replacing the function name and version
+        base = self.endpoint
+        # attempt to derive base domain if endpoint points to a different function
+        # e.g. https://.../functions/v1/upload-api -> https://.../functions/v{version}/faqs-api
+        try:
+            # split at '/functions/' and rebuild
+            parts = base.split('/functions/')
+            if len(parts) == 2:
+                domain = parts[0]
+                endpoint = f"{domain}/functions/v{version}/faqs-api"
+            else:
+                # fallback: replace upload-api with faqs-api
+                endpoint = base.replace('upload-api', 'faqs-api')
+        except Exception:
+            endpoint = base.replace('upload-api', 'faqs-api')
+
+        resp = requests.get(endpoint, timeout=self.timeout)
         resp.raise_for_status()
         try:
             return resp.json()

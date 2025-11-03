@@ -83,10 +83,10 @@ class FAQIngestAPI(View):
                     service = app.faq_ingestion_service()
                 except Exception:
                     # last-resort direct construction to avoid failing at import-time
-                    from src.infra.repositories.faq_ingestion_repository import FAQIngestionRepository
+                    from src.infra.gateways.faq_ingestion_gateway import FAQIngestionGateway
                     from src.app.services.faq_ingestion_service import FAQIngestionService
 
-                    service = FAQIngestionService(FAQIngestionRepository())
+                    service = FAQIngestionService(FAQIngestionGateway())
 
             # Delegate to service (service performs its own guards/validation)
             result = service.ingest_and_upload(file_bytes, filename, uploaded_by)

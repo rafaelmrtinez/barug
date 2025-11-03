@@ -135,6 +135,7 @@ TEMPLATES = [
             BASE_DIR / "midwife/templates/midwife",
             BASE_DIR / "maternal/templates/maternal",
             BASE_DIR / "child_health/templates/child_health",
+            BASE_DIR / "doc_ingest/templates/doc_ingest",
         ],
         "APP_DIRS": True,
         "OPTIONS": {
@@ -394,6 +395,7 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "maternal/static/maternal"),
     os.path.join(BASE_DIR, "child_health/static/child_health"),
     os.path.join(BASE_DIR, "captain/static/captain"),
+    os.path.join(BASE_DIR, "doc_ingest/static/doc_ingest"),
 ]
 
 # STATICFILES_DIRS = [

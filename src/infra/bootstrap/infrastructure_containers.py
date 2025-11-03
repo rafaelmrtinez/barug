@@ -45,7 +45,7 @@ from src.infra.repositories.business_repository import (
     BusinessRenewalQuoteRepository,
     BusinessRenewalRequestRepository,
 )
-from src.infra.repositories.faq_ingestion_repository import FAQIngestionRepository
+from src.infra.gateways.faq_ingestion_gateway import FAQIngestionGateway
 from src.domain.contracts.household_repository_contract import (
     IHouseholdRepository,
 )
@@ -119,7 +119,7 @@ class InfraContainer(containers.DeclarativeContainer):
 
     # FAQ ingestion repo (external function caller)
     faq_ingestion_repository = providers.Factory(
-        FAQIngestionRepository,
+        FAQIngestionGateway,
     )
 
     supabase_client = providers.Object(supabase)

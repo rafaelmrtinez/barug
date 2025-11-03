@@ -1,11 +1,12 @@
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 from pathlib import Path
 from io import BytesIO
 import logging
 
-from src.infra.repositories.faq_ingestion_repository import FAQIngestionRepository
-from src.infra.repositories.faq_excel_parser import parse_workbook, ParseError
+from src.infra.gateways.faq_ingestion_gateway import FAQIngestionGateway
+from src.infra.utilities.faq_excel_parser import parse_workbook, ParseError
 from src.domain.services.faq_validator import validate_and_sanitize_rows, FAQValidationError
+from src.app.transfer_objects.dto.faq_dto import FAQDTO
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +26,10 @@ class FAQIngestionService:
     DEFAULT_MAX_ROWS = 500
     DEFAULT_MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
 
-    def __init__(self, repository: Optional[FAQIngestionRepository] = None,
+    def __init__(self, repository: Optional[FAQIngestionGateway] = None,
                  max_rows: int = DEFAULT_MAX_ROWS,
                  max_file_size: int = DEFAULT_MAX_FILE_SIZE):
-        self.repo = repository or FAQIngestionRepository()
+        self.repo = repository or FAQIngestionGateway()
         self.max_rows = int(max_rows)
         self.max_file_size = int(max_file_size)
 
@@ -96,3 +97,22 @@ class FAQIngestionService:
         # }
         
         return {"uploaded": True, "count": len(limited_rows), "response": response}
+
+    def fetch_faqs(self, version: int = 1) -> List[Dict[str, str]]:
+        """Fetch FAQs from the upstream edge function and return a list of
+        dicts containing only the 'question' and 'answer' keys for client use.
+
+        The repository/gateway is still used to hydrate full DTOs so we keep
+        that behavior for future use, but this method restricts the returned
+        payload to the minimal shape the client needs.
+        """
+        try:
+            resp = self.repo.get_faqs(str(int(version)))
+        except Exception:
+            # propagate error to caller (API view will translate into an HTTP error)
+            raise
+
+        faqs = FAQDTO.list_from_response(resp)
+
+        # Return only question/answer for each FAQ to the client
+        return [{"question": f.question, "answer": f.answer} for f in faqs]
