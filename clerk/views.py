@@ -34,6 +34,7 @@ from django.conf import settings
 from django.views.decorators.http import require_POST
 from django.template.loader import render_to_string
 from django.http import JsonResponse
+from django.db import connection
 
 from postgrest.exceptions import APIError
 from django.views.decorators.http import require_GET
@@ -1925,6 +1926,101 @@ def _owner_full_name(o: dict) -> str:
 def _join_addr(parts: List[str]) -> str:
     return ", ".join([p.strip() for p in parts if p and p.strip()])
 
+def _norm_mobile(s: str | None) -> str | None:
+    if not s:
+        return None
+    # Keep digits only, drop leading +63/0 normalization to last 10–11 digits
+    digits = re.sub(r"\D+", "", s)
+    if digits.startswith("63"):
+        digits = digits[2:]
+    if digits.startswith("0"):
+        digits = digits[1:]
+    # Return last 10 or 11 digits if present
+    return digits[-11:] if len(digits) >= 11 else (digits[-10:] if len(digits) >= 10 else digits or None)
+
+def _find_duplicate_owner(*, email: str | None, mobile: str | None,
+                          last_name: str | None, first_name: str | None,
+                          dob_iso: str | None, barangay: str | None, city: str | None) -> int | None:
+    """
+    Duplicate rules (short-circuit in this order):
+      1) Exact email (case-insensitive)
+      2) Normalized mobile match (digits, PH-friendly)
+      3) Same LAST, FIRST, DOB — and same city+barangay if provided
+
+    Returns person_id if found, else None.
+    """
+    email = (email or "").strip().lower() or None
+    m_norm = _norm_mobile(mobile)
+
+    with connection.cursor() as cur:
+        # 1) Email (case-insensitive)
+        if email:
+            cur.execute("""
+                SELECT person_id
+                FROM person
+                WHERE lower(coalesce(email,'')) = %s
+                ORDER BY person_id DESC
+                LIMIT 1
+            """, [email])
+            row = cur.fetchone()
+            if row:
+                return int(row[0])
+
+        # 2) Mobile (normalized)
+        if m_norm:
+            cur.execute("""
+                SELECT p.person_id
+                FROM person p
+                CROSS JOIN LATERAL regexp_replace(coalesce(p.mobile_num,''), '\\D+', '', 'g') AS p_digits
+                WHERE right(
+                        CASE
+                          WHEN p_digits LIKE '63%' THEN substr(p_digits, 3)
+                          WHEN p_digits LIKE '0%'  THEN substr(p_digits, 2)
+                          ELSE p_digits
+                        END,
+                        GREATEST(10, LEAST(length(
+                            CASE
+                              WHEN p_digits LIKE '63%' THEN substr(p_digits, 3)
+                              WHEN p_digits LIKE '0%'  THEN substr(p_digits, 2)
+                              ELSE p_digits
+                            END
+                        ), 11))
+                      ) = %s
+                ORDER BY p.person_id DESC
+                LIMIT 1
+            """, [m_norm])
+            row = cur.fetchone()
+            if row:
+                return int(row[0])
+
+        # 3) Name + DOB (+ optional city/barangay to reduce false-positives)
+        if last_name and first_name and dob_iso:
+            params = [last_name.strip().upper(), first_name.strip().upper(), dob_iso]
+            where_loc = ""
+            if city:
+                where_loc += " AND upper(coalesce(a.city,'')) = %s"
+                params.append(city.strip().upper())
+            if barangay:
+                where_loc += " AND upper(coalesce(a.barangay,'')) = %s"
+                params.append(barangay.strip().upper())
+
+            cur.execute(f"""
+                SELECT p.person_id
+                FROM person p
+                LEFT JOIN addresss a ON a.address_id = p.address_id
+                WHERE upper(coalesce(p.last_name,''))  = %s
+                  AND upper(coalesce(p.first_name,'')) = %s
+                  AND p.birthdate = %s
+                  {where_loc}
+                ORDER BY p.person_id DESC
+                LIMIT 1
+            """, params)
+            row = cur.fetchone()
+            if row:
+                return int(row[0])
+
+    return None
+
 def _choices_to_map(choices: Iterable) -> Dict[Any, str]:
     """
     Convert Django choices (which may include optgroups) to {value: label}.
@@ -2408,9 +2504,65 @@ def business_owner_nonresident(
         create_form = BusinessOwnerInfo(request.POST, request.FILES or None)
         if create_form.is_valid():
             cd = create_form.cleaned_data
+
+            # 0) Prepare raw fields for duplicate probing
             dob_val = cd["dob"]
             dob_str = dob_val.isoformat() if isinstance(dob_val, date) else str(dob_val)
+            email   = (cd.get("email")   or "").strip() or None
+            mobile  = (cd.get("mob_num") or "").strip() or None
 
+            # 1) Duplicate check — short-circuit to existing PERSON if any
+            dup_person_id = _find_duplicate_owner(
+                email=email,
+                mobile=mobile,
+                last_name=cd["last_name"],
+                first_name=cd["first_name"],
+                dob_iso=dob_str,
+                barangay=(cd.get("barangay") or "").strip() or None,
+                city=(cd.get("city") or "").strip() or None,
+            )
+
+            if dup_person_id:
+                # Fetch full details for display (best effort)
+                try:
+                    selected = resident_owner_service.get_owner_details(dup_person_id)
+                except Exception:
+                    selected = None
+
+                dup_name = (getattr(selected, "full_name", None) or "Existing Person").strip() or "Existing Person"
+
+                # >>> print to server console instead of using messages/alerts <<<
+                print(
+                    f"[dup-check] Possible duplicate found: {dup_name} (ID #{dup_person_id}). "
+                    "Use the Search tab to select the existing record.",
+                    flush=True,
+                )
+
+                # Preload search results so the clerk can pick quickly (optional)
+                try:
+                    preload_term = dup_name
+                    preload_rows = resident_owner_service.execute(search=preload_term, only_nonresident=True)
+                    results_payload = _normalize_owner_rows(preload_rows)
+                    search_form = SearchBusinessOwner(initial={"search": preload_term})
+                except Exception as _e:
+                    print(f"[dup-check] preload search failed: {getattr(_e, 'args', _e)}", flush=True)
+
+                # Re-render the same page (stay on create tab w/ filled form)
+                return render(
+                    request,
+                    "business/business_owner_nonres.html",
+                    {
+                        "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
+                        "page_title": "Business Owner Information",
+                        "search_form": search_form,
+                        "search": (preload_term if 'preload_term' in locals() else search),
+                        "results": results_payload,
+                        "selected": None,
+                        "form": create_form,
+                    },
+                )
+
+            # 2) No duplicate → keep your original creation payload in session
             owner_payload: Dict[str, Any] = {
                 "owner_person_id": cd.get("owner_person_id") or None,  # usually None for brand-new
                 "last_name": cd["last_name"].strip(),
@@ -2418,16 +2570,16 @@ def business_owner_nonresident(
                 "middle_name": (cd.get("middle_name") or "").strip() or None,
                 "suffix": (cd.get("suffix") or "").strip() or None,
                 "dob": dob_str,  # JSON-safe string
-                "email": (cd.get("email") or "").strip() or None,
-                "mobile": (cd.get("mob_num") or "").strip() or None,
+                "email": email,
+                "mobile": mobile,
                 "sex_id": int(cd["sex"]),
                 "civil_status_id": int(cd["civil_status"]),
                 "nationality_id": int(cd["nationality"]),
                 "religion_id": int(cd["religion"]),
                 "street": cd["street"].strip(),
                 "purok_sitio": (cd.get("purok_sitio") or "").strip(),
-                "barangay": cd["barangay"].strip(),
-                "city": cd["city"].strip(),
+                "barangay": (cd["barangay"]).strip(),
+                "city": (cd["city"]).strip(),
                 "residency_name": "NON-RESIDENT",
             }
 

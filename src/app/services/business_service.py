@@ -210,6 +210,7 @@ class BusinessRegistrationService(IBusinessRegistrationService):
         # For your current UI, OwnerBusinessInfoService lists directly from storage,
         # so storing is optional. Still, we’ll return the same pair:
         return business_id, owner_person_id
+    
 class OwnerBusinessInfoService(IBusinessInfoService):
     def __init__(
         self,
