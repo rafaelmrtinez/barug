@@ -40,6 +40,7 @@ from django.views.decorators.http import require_POST
 from django.db import connection, transaction
 from django.urls import reverse
 from django.conf import settings
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
@@ -230,71 +231,110 @@ def case_new(request: HttpRequest) -> HttpResponse:
 @session_login_required
 @role_required(*LUPON_ROLES, "barangay treasurer")
 def report_list(request: HttpRequest):
-    q_raw        = (request.GET.get("q") or "").strip()
-    f_payment    = (request.GET.get("payment") or "").strip()            # '', PAID, UNPAID, DECLINED
-    f_blotter    = (request.GET.get("blotter_status") or "").strip()     # '', FOR LUPON REVIEW, REVIEWED
-    f_date_from  = (request.GET.get("date_from") or "").strip()
-    f_date_to    = (request.GET.get("date_to") or "").strip()
+    start_time = time.time()
+    q_raw = (request.GET.get("q") or "").strip()
+    f_payment = (request.GET.get("payment") or "").strip()
+    f_blotter = (request.GET.get("blotter_status") or "").strip()
+    f_date_from = (request.GET.get("date_from") or "").strip()
+    f_date_to = (request.GET.get("date_to") or "").strip()
+    f_sort = (request.GET.get("sort") or "oldest").strip()
 
     auth = request.session.get("auth") or {}
-    user_role = (auth.get("role_name") or auth.get("role") or "").strip()
+    user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
 
-    # ✅ Payment filter now includes DECLINED
     payment_options = ["", "PAID", "UNPAID", "DECLINED"]
     blotter_options = ["", "FOR LUPON REVIEW", "REVIEWED"]
 
     with connection.cursor() as cur:
+        # Optimized query for Supabase
         sql = """
-        WITH base AS (
-          SELECT
-            br.blotter_report_id                               AS id,
-            COALESCE(br.incident_subject,'(no subject)')       AS subject,
-            to_char(br.date_time_reported,'YYYY-MM-DD HH24:MI') AS reported_at,
-            br.date_time_reported                               AS reported_sort,
-            ps.payment_status_name                              AS payment_status,
-            CASE
-              WHEN ps.payment_status_name IS NULL OR ps.payment_status_name = '' THEN 'FOR LUPON REVIEW'
-              WHEN UPPER(ps.payment_status_name) IN ('PAID','UNPAID','DECLINED') THEN 'REVIEWED'
-              ELSE NULL
-            END                                                 AS blotter_status
-          FROM blotter_report br
-          LEFT JOIN payment_status ps ON ps.payment_status_id = br.payment_status_id
-        )
-        SELECT id, subject, reported_at, payment_status, blotter_status
-        FROM base
+        SELECT 
+            br.blotter_report_id AS id,
+            COALESCE(br.incident_subject, '(no subject)') AS subject,
+            to_char(br.date_time_reported, 'FMMonth DD, YYYY at FMHH12:MI AM') AS reported_at,
+            COALESCE(ps.payment_status_name, '') AS payment_status,
+            CASE 
+                WHEN ps.payment_status_name IS NULL OR ps.payment_status_name = '' THEN 'FOR LUPON REVIEW'
+                WHEN UPPER(ps.payment_status_name) IN ('PAID','UNPAID','DECLINED') THEN 'REVIEWED'
+                ELSE 'FOR LUPON REVIEW'
+            END AS blotter_status
+        FROM blotter_report br
+        LEFT JOIN payment_status ps ON ps.payment_status_id = br.payment_status_id
         WHERE 1=1
         """
         params = []
 
+        # Add filters
         if q_raw:
-            sql += " AND subject ILIKE CONCAT('%%', %s, '%%')"
-            params.append(q_raw)
+            sql += " AND br.incident_subject ILIKE %s"
+            params.append(f"%{q_raw}%")
 
-        # ✅ Allow PAID / UNPAID / DECLINED filters
         if f_payment and f_payment.upper() in ("PAID", "UNPAID", "DECLINED"):
-            sql += " AND UPPER(payment_status) = UPPER(%s)"
-            params.append(f_payment)
-
-        if f_blotter:
-            sql += " AND blotter_status = %s"
-            params.append(f_blotter)
+            sql += " AND UPPER(ps.payment_status_name) = %s"
+            params.append(f_payment.upper())
 
         if f_date_from:
-            sql += " AND reported_sort::date >= %s"
+            sql += " AND br.date_time_reported::date >= %s"
             params.append(f_date_from)
         if f_date_to:
-            sql += " AND reported_sort::date <= %s"
+            sql += " AND br.date_time_reported::date <= %s"
             params.append(f_date_to)
 
-        sql += " ORDER BY reported_sort DESC LIMIT 500"
+        if f_blotter:
+            if f_blotter == 'FOR LUPON REVIEW':
+                sql += " AND (ps.payment_status_name IS NULL OR ps.payment_status_name = '')"
+            elif f_blotter == 'REVIEWED':
+                sql += " AND UPPER(ps.payment_status_name) IN ('PAID','UNPAID','DECLINED')"
+
+        # Add sorting based on filter
+        if f_sort == "newest":
+            sql += " ORDER BY br.date_time_reported DESC LIMIT 200"
+        else:
+            sql += " ORDER BY br.date_time_reported ASC LIMIT 200"
+        
         cur.execute(sql, params)
         rows = cur.fetchall()
+        
+        # Get statistics with a single fast query
+        stats_sql = """
+        SELECT 
+            COUNT(*) FILTER (WHERE ps.payment_status_name IS NULL OR ps.payment_status_name = '') AS for_review,
+            COUNT(*) FILTER (WHERE UPPER(ps.payment_status_name) IN ('PAID','UNPAID','DECLINED')) AS reviewed,
+            COUNT(*) FILTER (WHERE UPPER(ps.payment_status_name) = 'PAID') AS paid,
+            COUNT(*) FILTER (WHERE UPPER(ps.payment_status_name) = 'UNPAID') AS unpaid
+        FROM blotter_report br
+        LEFT JOIN payment_status ps ON ps.payment_status_id = br.payment_status_id
+        """
+        cur.execute(stats_sql)
+        stats = cur.fetchone()
+        stats_dict = {
+            'for_review': stats[0] or 0,
+            'reviewed': stats[1] or 0, 
+            'paid': stats[2] or 0,
+            'unpaid': stats[3] or 0
+        }
 
+    # Add pagination
+    page = request.GET.get('page', 1)
+    paginator = Paginator(rows, 10)  # 10 reports per page
+    
+    try:
+        reports = paginator.page(page)
+    except PageNotAnInteger:
+        reports = paginator.page(1)
+    except EmptyPage:
+        reports = paginator.page(paginator.num_pages)
+
+    execution_time = time.time() - start_time
+    log.info(f"PERFORMANCE: report_list executed in {execution_time:.3f} seconds")
+    print(f"🚀 REPORT_LIST PERFORMANCE: {execution_time:.3f} seconds")
+    
     return render(
         request,
-        "lupon_mem/report_list.html",
+        "lupon_mem/report_list_fast.html",
         {
-            "rows": rows,
+            "reports": reports,
+            "rows": reports.object_list,  # Keep for backward compatibility
             "q": q_raw,
             "user_role": user_role,
             "LUPON_ROLES_LIST": LUPON_ROLES_LIST,
@@ -304,6 +344,11 @@ def report_list(request: HttpRequest):
             "f_blotter": f_blotter,
             "f_date_from": f_date_from,
             "f_date_to": f_date_to,
+            "f_sort": f_sort,
+            "stats": stats_dict,
+            "execution_time": f"{execution_time:.3f}s",
+            "page_path": f"{user_role} / Blotter Reports",
+            "page_title": "Blotter Reports",
         },
     )
 

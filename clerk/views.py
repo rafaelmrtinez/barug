@@ -768,6 +768,9 @@ def _apply_pdf_field_mapping(
 # ────────────────────────────────────────────────────────────
 # SECTION: Printing action
 # ────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────
+# SECTION: Printing action
+# ────────────────────────────────────────────────────────────
 @session_login_required
 @role_required(CLERK_ROLE)
 @require_POST
@@ -1002,7 +1005,6 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
     resp = HttpResponse(zbuf.getvalue(), content_type="application/zip")
     resp["Content-Disposition"] = f'attachment; filename="{req_code}-documents.zip'
     return resp
-
 
 
 # ────────────────────────────────────────────────────────────

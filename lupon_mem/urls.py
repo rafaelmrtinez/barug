@@ -4,6 +4,9 @@ from . import views
 from . import views_reports
 from . import views_api
 from . import views_cases
+from . import views_progress  # ← ADDED: import for flow progress API
+from . import views_hearing_api
+from . import views_resident_records
 
 from lupon_mem.views_sql import (
     SubmissionViewSQL,
@@ -34,7 +37,7 @@ urlpatterns = [
     path("cases/<int:case_id>/forms/<int:form_id>/build/", views.form_builder, name="form_builder"),
     # alias so templates can use 'form_build'
     path("cases/<int:case_id>/forms/<int:form_id>/build/", views.form_builder, name="form_build"),
-    path("cases/<int:case_id>/submissions/<int:submission_id>/edit/", views.form_builder, name="form_edit"),
+    path("cases/<int:case_id>/submissions/<int:submission_id>/edit/", views.form_builder, name="form_builder"),
     path("cases/<int:case_id>/forms/choose/", views.add_form_choose_static, name="add_form_choose_static"),
     path("cases/<int:case_id>/forms/code/<slug:form_code>/build/", views.form_builder_by_code, name="form_builder_by_code"),
     path("cases/<int:case_id>/generate-summary/", views.generate_settlement_summary,
@@ -90,7 +93,12 @@ urlpatterns = [
     path("reports/<int:report_id>/decline/",  views_reports.report_decline, name="report_decline"), # added to views_reports 
     path("reports/<int:report_id>/pay-open/", views_reports.report_pay_and_open_case, name="report_pay_and_open_case"), # added to views_reports
 
+    # ===== ADDED: flow progress API (namespaced) =====
+    path("api/case/<int:case_id>/flow-progress", views_progress.flow_progress_api, name="flow_progress_api"),
+    path("api/hearing-status/<int:case_id>/", views_hearing_api.hearing_status_api, name="hearing_status_api"),
+
     # apis
+    path("api/mediation-hearings/<int:case_id>/", views_cases.mediation_hearings_api, name="mediation_hearings_api"),
     path("api/submissions/<int:submission_id>/pdf/", views_api.submission_pdf, name="submission_pdf"),
     path("api/preview/", views_api.preview_image, name="preview_image"),
     path("api/save-answers/", views_api.save_answers, name="save_answers"),
@@ -102,6 +110,11 @@ urlpatterns = [
     path("person/lookup/", views_api.person_lookup, name="person_lookup"),
     path("person_suggest/", views_api.person_suggest, name="person_suggest"),
     path("staff/lookup", views_api.staff_lookup, name="staff_lookup"),
+    # resident records
+    path("residents/", views_resident_records.resident_records_list, name="resident_records_list"),
+    path("residents/<int:person_id>/", views_resident_records.resident_records_detail, name="resident_records_detail"),
+    path("api/residents/search/", views_resident_records.resident_records_api, name="resident_records_api"),
+
     # misc
     path("dashboard/", views.dashboard, name="dashboard"),
     path("incident-heatmap/", views.incident_heatmap, name="incident_heatmap"),

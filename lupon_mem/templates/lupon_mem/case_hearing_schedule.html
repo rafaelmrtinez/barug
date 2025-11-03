@@ -66,6 +66,14 @@
   <!-- Flags surfaced from the view -->
   <div id="caseFlags" data-has-kp16="{{ has_kp16|yesno:'1,0' }}" hidden></div>
 
+  <!-- Outcome + attendance flags for JS -->
+  <div id="hearingOutcome"
+       data-outcome="{{ settlement_outcome|default_if_none:'' }}"
+       data-compl-att="{{ compl_attended_last|yesno:'1,0' }}"
+       data-resp-att="{{ resp_attended_last|yesno:'1,0' }}"
+       data-kp14-url="{{ kp14_url|default_if_none:'' }}"
+       hidden></div>
+
   <div class="summary mb-2">
     <div class="row g-3 align-items-center">
       <div class="col-12 col-xl-3 col-lg-4 cell">
@@ -91,18 +99,19 @@
         {% endif %}
       </div>
 
-      <div class="col-12 col-xl-4 col-lg-4 cell">
+      <div class="col-12 col-xl-3 col-lg-4 cell">
         <div class="k-label"><i class="bi bi-person-lines-fill"></i> Parties</div>
         <div class="k-value text-truncate" title="{{ complainants|join:', ' }} vs {{ respondents|join:', ' }}">
           {{ complainants|join:", " }} <span class="text-muted">vs</span> {{ respondents|join:", " }}
         </div>
       </div>
 
-      <div class="col-12 col-xl-2 col-lg-12">
+      <div class="col-12 col-xl-3 col-lg-12">
         <div class="k-label"><i class="bi bi-flag"></i> Status</div>
         <div class="k-value">
           {% if hearing_held %}
-            Held
+            <span class="k-pill"><i class="bi bi-check2-circle"></i> Held</span>
+            <span id="heldOutcomePill" class="k-pill soft d-none"></span>
             {% if held_at_fmt %}<span class="k-note d-block mt-1">{{ held_at_fmt }}</span>{% endif %}
           {% else %}
             Not Held
@@ -116,6 +125,14 @@
       </div>
     </div>
 
+    <!-- Outcome details -->
+    <div id="outcomeDetailRow" class="mt-2 d-none">
+      <div class="k-note">
+        <span id="attNote"></span>
+        <span id="arbNote" class="ms-2"></span>
+      </div>
+    </div>
+
     <!-- DEBUG chips -->
     <div class="mt-2 d-flex gap-2 flex-wrap">
       <div id="attSummaryPill"></div>
@@ -126,132 +143,130 @@
     <div id="attData" data-att-count="{{ med_attendance_count|default_if_none:'0' }}" hidden></div>
   </div>
 
-{% if hearing_source == "KP-8" and not hearing_held %}
-    <div class="card-soft mb-4 actions-card">
-      <div class="card-header d-flex align-items-center justify-content-between">
-        <h6 class="section-title">Mediation Actions</h6>
-        {% if dev_mode %}<span class="badge text-bg-secondary">Dev mode</span>{% endif %}
-      </div>
-      <div class="card-body">
-
-        <div id="attSuccessBanner" class="alert alert-success" role="alert">
-          <i class="bi bi-bug me-1"></i>
-          <strong>[DEBUG]</strong> <span class="msg">
-            {% if med_attendance_count|default:0 > 0 %}
-              {{ med_attendance_ord_label }}
-            {% else %}
-              Banner would be hidden until at least one attendance exists (count: 0).
-            {% endif %}
-          </span>
-        </div>
-
-        <div class="toolbar">
-          {% if med_attendance_count|default:0 > 0 %}
-            <button class="btn btn-outline-brand disabled-soft" disabled
-                    title="Mediation attendance is already attached for this hearing.">
-              <i class="bi bi-person-check me-1"></i> Mediation Attendance Attached
-            </button>
-          {% else %}
-            <a class="btn btn-outline-brand"
-               href="{% url 'lupon_mem:open_mediation_attendance' case_id %}?code=MED-ATT-2025&from=hearing&sid={{ picked_submission_id }}">
-              <i class="bi bi-person-check me-1"></i> Add Mediation Attendance
-            </a>
-          {% endif %}
-          <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#uploadDocsModal">
-            <i class="bi bi-images me-1"></i> Add Documentation Photos
-          </button>
-        </div>
-
-        <div class="divider-soft"></div>
-
-        <div class="fieldset">
-          <form id="medHeldForm" class="form-row"
-                method="post" action="{% url 'lupon_mem:mediation_complete' case_id %}">
-            {% csrf_token %}
-            {% if picked_submission_id %}
-              <input type="hidden" name="submission_id" value="{{ picked_submission_id }}">
-            {% endif %}
-
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="cmpAtt" name="compl_attended" value="1" checked>
-              <label class="form-check-label" for="cmpAtt">Complainant attended</label>
-            </div>
-
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="rspAtt" name="resp_attended" value="1" checked>
-              <label class="form-check-label" for="rspAtt">Respondent attended</label>
-            </div>
-
-            <select id="medOutcome" name="settlement" required class="form-select w-auto">
-              <option value="">Outcome…</option>
-              <option value="PENDING">Pending / Not Settled</option>
-              <option value="SETTLED">Settled</option>
-            </select>
-
-            <input type="text" name="remarks" class="form-control w-auto" placeholder="Remarks (optional)">
-
-            <button class="btn btn-brand">
-              <i class="bi bi-check2-circle me-1"></i> Mark Mediation as Held
-            </button>
-          </form>
-        </div>
-
-        <div class="mt-3">
-          <!-- include sid so the server knows which hearing -->
-          <a id="settleBtn" class="btn btn-ghost" href="{% url 'lupon_mem:open_kp16_from_hearing' case_id %}?sid={{ picked_submission_id }}">
-            <i class="bi bi-journal-check me-1"></i> Record Settlement (KP-16)
-          </a>
-          <div id="settleGuardNote" class="form-text text-muted d-none">
-            Add at least one mediation attendance to enable settlement.
-          </div>
-        </div>
-      </div>
+  {% if hearing_source == "KP-8" and not hearing_held %}
+  <div class="card-soft mb-4 actions-card">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <h6 class="section-title">Mediation Actions</h6>
+      {% if dev_mode %}<span class="badge text-bg-secondary">Dev mode</span>{% endif %}
     </div>
+    <div class="card-body">
 
-    <div class="modal fade" id="uploadDocsModal" tabindex="-1" aria-hidden="true" style="margin-top: 150;">
-      <div class="modal-dialog">
-        <form class="modal-content" method="post"
-              action="{% url 'lupon_mem:hearing_media_upload' case_id %}"
-              enctype="multipart/form-data">
-          <div class="modal-header">
-            <h5 class="modal-title" style="color:var(--brand)"><i class="bi bi-images me-1"></i> Add Documentation Photos</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            {% csrf_token %}
+      <div id="attSuccessBanner" class="alert alert-success" role="alert">
+        <i class="bi bi-bug me-1"></i>
+        <strong>[DEBUG]</strong> <span class="msg">
+          {% if med_attendance_count|default:0 > 0 %}
+            {{ med_attendance_ord_label }}
+          {% else %}
+            Banner would be hidden until at least one attendance exists (count: 0).
+          {% endif %}
+        </span>
+      </div>
+
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>
+        <strong>New Process:</strong> Record attendance and outcome in one step below.
+        No need to add separate mediation attendance forms.
+      </div>
+
+      <div class="toolbar">
+        <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#uploadDocsModal">
+          <i class="bi bi-images me-1"></i> Add Documentation Photos
+        </button>
+      </div>
+
+      <div class="divider-soft"></div>
+
+      <div class="fieldset">
+        <form id="medHeldForm" class="form-row"
+              method="post" action="{% url 'lupon_mem:mediation_complete' case_id %}">
+          {% csrf_token %}
+          {% if picked_submission_id %}
             <input type="hidden" name="submission_id" value="{{ picked_submission_id }}">
-            <input type="file" name="photos[]" accept="image/*" multiple class="form-control" required>
-            <div class="form-text mt-2">You can select multiple images.</div>
+          {% endif %}
+
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="cmpAtt" name="compl_attended" value="1" checked>
+            <label class="form-check-label" for="cmpAtt">Complainant attended</label>
           </div>
-          <div class="modal-footer">
-            <button type="submit" class="btn btn-brand">Upload</button>
+
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="rspAtt" name="resp_attended" value="1" checked>
+            <label class="form-check-label" for="rspAtt">Respondent attended</label>
           </div>
+
+          <select id="medOutcome" name="settlement" required class="form-select w-auto">
+            <option value="">What happened?</option>
+            <option value="SETTLED">Both Attended → Settled</option>
+            <option value="NOT_SETTLED">Both Attended → Not Settled</option>
+            <option value="ARBITRATION">Both Attended → Agree to Arbitration</option>
+            <option value="COMPLAINANT_NO_SHOW">Complainant No Show</option>
+            <option value="RESPONDENT_NO_SHOW">Respondent No Show</option>
+            <option value="BOTH_NO_SHOW">Both No Show</option>
+          </select>
+
+          <input type="text" name="remarks" class="form-control w-auto" placeholder="Remarks (optional)">
+
+          <button class="btn btn-brand">
+            <i class="bi bi-check2-circle me-1"></i> Record Hearing Outcome
+          </button>
         </form>
       </div>
+
+      <div class="mt-3">
+        <a id="settleBtn" class="btn btn-ghost" href="{% url 'lupon_mem:open_kp16_from_hearing' case_id %}?sid={{ picked_submission_id }}">
+          <i class="bi bi-journal-check me-1"></i> Record Settlement (KP-16)
+        </a>
+        <div id="settleGuardNote" class="form-text text-muted d-none">
+          Add at least one mediation attendance to enable settlement.
+        </div>
+      </div>
     </div>
+  </div>
+
+  <div class="modal fade" id="uploadDocsModal" tabindex="-1" aria-hidden="true" style="margin-top: 150;">
+    <div class="modal-dialog">
+      <form class="modal-content" method="post"
+            action="{% url 'lupon_mem:hearing_media_upload' case_id %}"
+            enctype="multipart/form-data">
+        <div class="modal-header">
+          <h5 class="modal-title" style="color:var(--brand)"><i class="bi bi-images me-1"></i> Add Documentation Photos</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          {% csrf_token %}
+          <input type="hidden" name="submission_id" value="{{ picked_submission_id }}">
+          <input type="file" name="photos[]" accept="image/*" multiple class="form-control" required>
+          <div class="form-text mt-2">You can select multiple images.</div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-brand">Upload</button>
+        </div>
+      </form>
+    </div>
+  </div>
   {% endif %}
 
   {% if mediation_photos %}
-    <div class="card-soft mb-4 doc-card">
-      <div class="card-header d-flex align-items-center justify-content-between">
-        <h6 class="section-title mb-0">Documentation Photos</h6>
-        {% if hearing_held %}<span class="badge text-bg-success">HELD</span>{% endif %}
-      </div>
-      <div class="card-body">
-        <div class="row g-3 doc-grid">
-          {% for p in mediation_photos %}
-            <div class="col-6 col-md-4 col-lg-3 col-xl-2">
-              <a class="tile d-block text-decoration-none" href="{{ p.display_url }}" target="_blank" rel="noopener" title="Open image in new tab">
-                <div class="ratio ratio-4x3">
-                  <img src="{{ p.display_url }}" alt="documentation" class="w-100 h-100 rounded" style="object-fit:cover;">
-                </div>
-                <div class="small text-muted mt-1 caption">{{ p.caption|default:" " }}</div>
-              </a>
-            </div>
-          {% endfor %}
-        </div>
+  <div class="card-soft mb-4 doc-card">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <h6 class="section-title mb-0">Documentation Photos</h6>
+      {% if hearing_held %}<span class="badge text-bg-success">HELD</span>{% endif %}
+    </div>
+    <div class="card-body">
+      <div class="row g-3 doc-grid">
+        {% for p in mediation_photos %}
+          <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+            <a class="tile d-block text-decoration-none" href="{{ p.display_url }}" target="_blank" rel="noopener" title="Open image in new tab">
+              <div class="ratio ratio-4x3">
+                <img src="{{ p.display_url }}" alt="documentation" class="w-100 h-100 rounded" style="object-fit:cover;">
+              </div>
+              <div class="small text-muted mt-1 caption">{{ p.caption|default:" " }}</div>
+            </a>
+          </div>
+        {% endfor %}
       </div>
     </div>
+  </div>
   {% elif hearing_held %}
     <div class="alert alert-light border text-muted">No documentation photos were uploaded for this hearing.</div>
   {% endif %}
@@ -297,14 +312,6 @@
       : `<span class="k-pill soft"><i class="bi bi-bug"></i> [DEBUG] No Mediation Attendance yet (this hearing)</span>`;
   }
 
-  const successBanner = document.getElementById('attSuccessBanner');
-  if (successBanner){
-    const msg = successBanner.querySelector('.msg');
-    msg.textContent = attCount > 0
-      ? `${ordinal(attCount)} mediation attendance successfully attached.`
-      : `Banner would be hidden until at least one attendance exists (count: 0).`;
-  }
-
   // KP-16 DEBUG pill
   const flags   = document.getElementById('caseFlags');
   const hasKP16 = (flags?.dataset.hasKp16 === '1');
@@ -332,45 +339,108 @@
     }
   }
 
-  // Guard submit:
-  // - PENDING: allow even if no attendance; if zero attendance, send att_slot_only=1 to consume the slot as "no-show".
-  // - SETTLED: require >=1 attendance AND KP-16 on file.
+  // Auto-set attendance checkboxes based on outcome selection
   const form = document.getElementById('medHeldForm');
   const outcomeSel = document.getElementById('medOutcome');
+  const cmpAttBox = document.getElementById('cmpAtt');
+  const rspAttBox = document.getElementById('rspAtt');
 
+  if (outcomeSel && cmpAttBox && rspAttBox) {
+    outcomeSel.addEventListener('change', function() {
+      const outcome = this.value;
+      switch(outcome) {
+        case 'SETTLED':
+        case 'NOT_SETTLED':
+        case 'ARBITRATION':
+          cmpAttBox.checked = true;
+          rspAttBox.checked = true;
+          break;
+        case 'COMPLAINANT_NO_SHOW':
+          cmpAttBox.checked = false;
+          rspAttBox.checked = true;
+          break;
+        case 'RESPONDENT_NO_SHOW':
+          cmpAttBox.checked = true;
+          rspAttBox.checked = false;
+          break;
+        case 'BOTH_NO_SHOW':
+          cmpAttBox.checked = false;
+          rspAttBox.checked = false;
+          break;
+      }
+    });
+  }
+
+  // Form validation + next steps
   if (form) {
     form.addEventListener('submit', function(ev){
-      const outcome = (outcomeSel?.value || '').toUpperCase();
+      const outcome = outcomeSel?.value || '';
+      if (!outcome) {
+        ev.preventDefault();
+        alert('Please select what happened in the hearing.');
+        return false;
+      }
 
       if (outcome === 'SETTLED') {
-        if (attCount <= 0) {
-          ev.preventDefault();
-          alert('Please add Mediation Attendance first before marking the mediation as SETTLED.');
-          return false;
-        }
-        if (!hasKP16) {
-          ev.preventDefault();
-          alert('Please complete the Amicable Settlement (KP-16) before finalizing as SETTLED.');
-          window.location.href = "{% url 'lupon_mem:open_kp16_from_hearing' case_id %}?sid={{ picked_submission_id }}";
-          return false;
-        }
-        // ok to submit when SETTLED (+attendance +KP16)
-        return true;
+        setTimeout(() => {
+          if (confirm('Hearing marked as SETTLED. Do you want to create the Settlement Agreement (KP-16) now?')) {
+            window.location.href = "{% url 'lupon_mem:open_kp16_from_hearing' case_id %}?sid={{ picked_submission_id }}";
+          }
+        }, 600);
       }
 
-      // outcome is PENDING / NOT SETTLED
-      // If there is no attendance yet, we still allow submission and tell the backend
-      // to increment/consume the attendance slot as a no-show so next will be "2nd".
-      if (attCount <= 0) {
-        const hidden = document.createElement('input');
-        hidden.type = 'hidden';
-        hidden.name = 'att_slot_only';
-        hidden.value = '1'; // backend: treat as consumed slot without actual attendees
-        form.appendChild(hidden);
+      if (outcome === 'ARBITRATION') {
+        setTimeout(() => {
+          const to = (document.getElementById('hearingOutcome')?.dataset.kp14Url || "").trim()
+                 || "{% url 'lupon_mem:form_builder_by_code' case_id 'KP-14' %}";
+          if (confirm('Parties agreed to ARBITRATION. Do you want to prepare Agreement to Arbitrate (KP-14) now?')) {
+            window.location.href = to + "?sid={{ picked_submission_id }}";
+          }
+        }, 600);
       }
-      // proceed
       return true;
     }, false);
+  }
+
+  // ===== After-the-fact rendering when the hearing is already HELD =====
+  const outcomeHost = document.getElementById('hearingOutcome');
+  const heldOutcomePill = document.getElementById('heldOutcomePill');
+  const outcomeDetailRow = document.getElementById('outcomeDetailRow');
+
+  if (outcomeHost && "{{ hearing_held|yesno:'1,0' }}" === "1") {
+    const outcome = (outcomeHost.dataset.outcome || "").toUpperCase();
+    const cAtt = outcomeHost.dataset.complAtt === "1";
+    const rAtt = outcomeHost.dataset.respAtt === "1";
+
+    if (outcome) {
+      heldOutcomePill?.classList.remove('d-none');
+      if (outcome === 'ARBITRATION' || outcome === 'ARBITRATED') {
+        heldOutcomePill.innerHTML = `<i class="bi bi-handshake"></i> Agreed to Arbitration`;
+      } else if (outcome === 'SETTLED') {
+        heldOutcomePill.innerHTML = `<i class="bi bi-journal-check"></i> Settled`;
+      } else if (outcome === 'NOT_SETTLED') {
+        heldOutcomePill.innerHTML = `<i class="bi bi-x-circle"></i> Not Settled`;
+      } else {
+        heldOutcomePill.innerHTML = `<i class="bi bi-info-circle"></i> ${outcome.replaceAll('_',' ')}`;
+      }
+    }
+
+    const attNote = document.getElementById('attNote');
+    const arbNote = document.getElementById('arbNote');
+    if (attNote || arbNote) {
+      outcomeDetailRow?.classList.remove('d-none');
+      if (attNote) {
+        if (cAtt && rAtt) attNote.textContent = 'Both parties attended.';
+        else if (cAtt && !rAtt) attNote.textContent = 'Only the complainant attended.';
+        else if (!cAtt && rAtt) attNote.textContent = 'Only the respondent attended.';
+        else attNote.textContent = 'No parties attended.';
+      }
+      if (arbNote && (outcome === 'ARBITRATION' || outcome === 'ARBITRATED')) {
+        const fallback = "{% url 'lupon_mem:form_builder_by_code' case_id 'KP-14' %}";
+        const url = (outcomeHost.dataset.kp14Url || fallback) + "?sid={{ picked_submission_id }}";
+        arbNote.innerHTML = `Next step: <a class="text-decoration-none" href="${url}"><strong>Prepare KP-14</strong></a>`;
+      }
+    }
   }
 })();
 </script>

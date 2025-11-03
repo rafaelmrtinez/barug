@@ -85,7 +85,7 @@ from django.http import HttpRequest
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from lupon_mem.services.all_helpers import *
-
+from lupon_mem.services.all_helpers import _hearing_gate
 
 # caching / logging
 from django.core.cache import cache
@@ -1448,7 +1448,7 @@ def add_form_choose_static(request, case_id: int):
             return c.fetchall()
 
     # ---- hearing gate (your existing util) ----
-    gate = _hearing_gate(case_id)
+    gate = hearing_gate(case_id)
     latest_notice_outstanding = bool(gate.get("latest_notice_outstanding"))
 
     # ---- case snapshot (settlement text) ----
@@ -2081,7 +2081,6 @@ def _case_has_kp16(case_id: int) -> bool:
         """, [case_id])
         return cur.fetchone() is not None
 
-
 @session_login_required
 @role_required(*LUPON_ROLES, "barangay treasurer")
 def case_hearing_schedule(request, case_id: int):
@@ -2093,7 +2092,11 @@ def case_hearing_schedule(request, case_id: int):
     - Count Med-ATT within the time window of the currently picked hearing.
     - Re-enable 'Add Mediation Attendance' for subsequent hearings.
     - Expose has_kp16 to the template (for the JS guard + [DEBUG] pill).
+    - NEW: Expose settlement_outcome + last attendance + KP-14 URL for ARBITRATION UI.
     """
+    from django.utils import timezone
+    from django.urls import reverse
+
     sid = _toi(request.GET.get("sid"))
 
     # 1) All KP-8/KP-12 hearing notices for this case, ascending by time
@@ -2132,6 +2135,12 @@ def case_hearing_schedule(request, case_id: int):
             "hearing_label": None,
             "has_kp16": _case_has_kp16(case_id),
             "kp16_just_created": (request.GET.get("kp16") == "1"),
+
+            # NEW: keep template JS happy even when no hearing exists
+            "settlement_outcome": "",
+            "compl_attended_last": False,
+            "resp_attended_last": False,
+            "kp14_url": reverse("lupon_mem:form_builder_by_code", args=[case_id, "KP-14"]),
         })
 
     # 2) Decide which hearing to show (by sid or latest)
@@ -2246,6 +2255,33 @@ def case_hearing_schedule(request, case_id: int):
     has_kp16 = _case_has_kp16(case_id)
     kp16_just_created = (request.GET.get("kp16") == "1")
 
+    # ===== NEW: Pull the computed outcome/attendance from fn_case_mediation_hearings =====
+    settlement_outcome = ""
+    compl_attended_last = False
+    resp_attended_last = False
+    with connection.cursor() as cur:
+        cur.execute("SELECT * FROM fn_case_mediation_hearings(%s)", [case_id])
+        cols = [c[0] for c in cur.description] if cur.description else []
+        rows = [dict(zip(cols, r)) for r in cur.fetchall()] if cols else []
+
+    # Prefer the row that matches the currently picked notice (sid)
+    chosen = None
+    if rows:
+        for r in rows:
+            if int(r.get("notice_sid") or 0) == int(picked_submission_id or 0):
+                chosen = r
+                break
+        if not chosen:
+            chosen = rows[-1]  # fallback to latest
+
+    if chosen:
+        settlement_outcome = (chosen.get("settlement_outcome") or "").upper()
+        compl_attended_last = (str(chosen.get("complainant_attended") or "").upper() == "TRUE")
+        resp_attended_last  = (str(chosen.get("respondent_attended") or "").upper() == "TRUE")
+
+    # Build KP-14 link for the UI (used when ARBITRATION)
+    kp14_url = reverse("lupon_mem:form_builder_by_code", args=[case_id, "KP-14"])
+
     return render(request, "lupon_mem/case_hearing_schedule.html", {
         "case_id": case_id,
         "hearing_source": hearing_source,
@@ -2272,8 +2308,13 @@ def case_hearing_schedule(request, case_id: int):
         # Flags for JS guard + debug UI
         "has_kp16": has_kp16,
         "kp16_just_created": kp16_just_created,
-    })
 
+        # ===== NEW: for arbitration/settlement UI =====
+        "settlement_outcome": settlement_outcome,         # e.g. ARBITRATION / SETTLED / NOT SETTLED / BOTH_NO_SHOW...
+        "compl_attended_last": compl_attended_last,       # bool for JS
+        "resp_attended_last": resp_attended_last,         # bool for JS
+        "kp14_url": kp14_url,                             # link to build KP-14
+    })
 
 @session_login_required
 @role_required(*LUPON_ROLES, "barangay treasurer")
@@ -2511,6 +2552,7 @@ def _maybe_upsert_hearing_attendance(
     settlement: str | None,
     remarks: str | None,
 ) -> None:
+    print(f"[_maybe_upsert_hearing_attendance] case_id={case_id}, notice_sid={notice_sid}, settlement='{settlement}'")
     with connection.cursor() as cur:
         # ensure cache table exists
         cur.execute("""
@@ -2527,6 +2569,8 @@ def _maybe_upsert_hearing_attendance(
         """)
 
         # try UPDATE first
+        settlement_value = settlement or ""
+        print(f"[_maybe_upsert_hearing_attendance] Attempting UPDATE with settlement_value='{settlement_value}'")
         cur.execute("""
             UPDATE hearing_attendance
                SET held_at = NOW(),
@@ -2539,12 +2583,15 @@ def _maybe_upsert_hearing_attendance(
                AND notice_submission_id = %s
         """, [
             compl_attended, resp_attended,
-            (settlement or ""), (remarks or ""),
+            settlement_value, (remarks or ""),
             case_id, source_code, notice_sid
         ])
+        
+        print(f"[_maybe_upsert_hearing_attendance] UPDATE affected {cur.rowcount} rows")
 
         # if no existing row, INSERT
         if cur.rowcount == 0:
+            print(f"[_maybe_upsert_hearing_attendance] Attempting INSERT with settlement_value='{settlement_value}'")
             cur.execute("""
                 INSERT INTO hearing_attendance
                   (blotter_case_id, source_code, notice_submission_id,
@@ -2554,40 +2601,248 @@ def _maybe_upsert_hearing_attendance(
             """, [
                 case_id, source_code, notice_sid,
                 compl_attended, resp_attended,
-                (settlement or ""), (remarks or "")
+                settlement_value, (remarks or "")
             ])
+            print(f"[_maybe_upsert_hearing_attendance] INSERT completed")
+        
+        print(f"[_maybe_upsert_hearing_attendance] Function completed")
 
 
 # =========================== VIEWS ===========================
 # ---------- Server-side finalize: blocks SETTLED without KP-16 ----------
+# lupon_mem/views_mediation.py  (or wherever your view lives)
+
+
+
+# =========================== VIEWS ===========================
+# ---------- Server-side finalize: blocks SETTLED without KP-16 ----------
+# views_hearings.py (or wherever your mediation_complete lives)
+from django.contrib import messages
+from django.db import connection, transaction
+from django.urls import reverse
+
 @session_login_required
 @role_required(*LUPON_ROLES)
-@csrf_protect
-@require_post_view
-def mediation_complete(request: HttpRequest, case_id: int):
-    """
-    Mark a KP-11 mediation as HELD.
-    Input names unchanged (submission_id, compl_attended, resp_attended, settlement, held_remarks).
-    """
-    submission_id  = post_int(request, "submission_id")
-    compl_attended = post_bool(request, "compl_attended")
-    resp_attended  = post_bool(request, "resp_attended")
-    settlement     = post_str(request, "settlement", "")
-    held_remarks   = post_str(request, "held_remarks", "")
+@require_POST
+def mediation_complete(request, case_id: int):
+    # Raw parse
+    settlement      = (request.POST.get("settlement") or "").upper().strip()
+    remarks         = (request.POST.get("remarks") or "").strip() or None
+    raw_sid         = request.POST.get("submission_id")
+    submission_id   = int(raw_sid) if raw_sid and raw_sid.isdigit() else None
+    compl_attended  = bool(request.POST.get("compl_attended"))
+    resp_attended   = bool(request.POST.get("resp_attended"))
+    att_slot_only   = bool(request.POST.get("att_slot_only"))   # consume slot as no-show
+    staff_id        = (request.session.get("auth") or {}).get("staff_id")
 
-    ok, msg = svc_hear.mark_mediation_held(
-        case_id=case_id, submission_id=submission_id,
-        compl_attended=compl_attended, resp_attended=resp_attended,
-        settlement=settlement or None, held_remarks=held_remarks or None
+    print(f"[mediation_complete] START - case_id={case_id}, submission_id={submission_id}")
+    print(f"[mediation_complete] compl_attended={compl_attended}, resp_attended={resp_attended}")
+    print(f"[mediation_complete] settlement='{settlement}', remarks='{remarks}'")
+    print(f"[mediation_complete] staff_id={staff_id}")
+
+    # Allow direct settlement; attendance can be written later
+    has_att = _has_med_attendance(case_id)
+    print(f"[mediation_complete] has_att={has_att}, allowing direct settlement")
+
+    # Ensure we are acting on a valid KP-8 (or pick latest KP-8 if none provided)
+    with connection.cursor() as cur:
+        if not submission_id:
+            cur.execute("""
+                SELECT s.submission_id
+                  FROM blotter_kp_submission s
+                  JOIN kp_form f ON f.form_id = s.form_id
+                 WHERE s.blotter_case_id = %s
+                   AND UPPER(f.form_code) = 'KP-8'
+                 ORDER BY (UPPER(s.status)='SUBMITTED') DESC,
+                          s.submitted_at DESC NULLS LAST,
+                          s.submission_id DESC
+                 LIMIT 1
+            """, [case_id])
+            r = cur.fetchone()
+            submission_id = int(r[0]) if r else None
+
+        cur.execute("""
+            SELECT COUNT(*)
+              FROM blotter_kp_submission s
+              JOIN kp_form f ON f.form_id = s.form_id
+             WHERE s.submission_id = %s
+               AND s.blotter_case_id = %s
+               AND UPPER(f.form_code) = 'KP-8'
+        """, [submission_id, case_id])
+        valid = (cur.fetchone() or [0])[0] == 1
+
+    if not submission_id or not valid:
+        messages.error(request, "Invalid KP-8 submission selected.")
+        return redirect("lupon_mem:case_hearing_schedule", case_id=case_id)
+
+    # Rank (1st/2nd/…) of this schedule among all notices (KP-8/KP-12)
+    with connection.cursor() as cur:
+        cur.execute("""
+            WITH sched AS (
+              SELECT s.submission_id,
+                     ROW_NUMBER() OVER (
+                       PARTITION BY s.blotter_case_id
+                       ORDER BY s.submitted_at ASC NULLS LAST, s.submission_id ASC
+                     ) AS rn
+              FROM blotter_kp_submission s
+              JOIN kp_form f ON f.form_id = s.form_id
+              WHERE s.blotter_case_id = %s
+                AND UPPER(f.form_code) IN ('KP-8','KP-12')
+            )
+            SELECT rn FROM sched WHERE submission_id = %s
+        """, [case_id, submission_id])
+        row = cur.fetchone()
+        sched_rn = int(row[0]) if row else None
+
+    # Resolve progress type: HEARING HELD
+    with connection.cursor() as cur:
+        cur.execute("""
+            SELECT case_progress_type_id
+              FROM case_progress_type
+             WHERE UPPER(case_progress_type_name) = 'HEARING HELD'
+             LIMIT 1
+        """)
+        row = cur.fetchone()
+        if not row:
+            messages.error(request, "Progress type 'HEARING HELD' not configured.")
+            return redirect("lupon_mem:case_hearing_schedule", case_id=case_id)
+        progress_type_id = int(row[0])
+
+    # If not SETTLED and no attendance exists but user chose to consume a slot, insert a no-show record first
+    print(f"[mediation_complete] Step 4 check: settlement={settlement}, has_att={has_att}, att_slot_only={att_slot_only}")
+    if settlement != "SETTLED" and not has_att and att_slot_only:
+        print(f"[mediation_complete] Step 4: Creating no-show attendance slot")
+        try:
+            _maybe_upsert_hearing_attendance(
+                case_id=case_id,
+                source_code="KP-8",
+                notice_sid=submission_id,
+                compl_attended=False,
+                resp_attended=False,
+                settlement="PENDING",
+                remarks=(remarks or "NO-SHOW") + " (slot consumed: no-show)",
+            )
+            has_att = True
+        except Exception:
+            messages.warning(request, "Proceeding without recording a no-show attendance slot.")
+    else:
+        print(f"[mediation_complete] Step 4: Skipping no-show slot creation")
+
+    # Insert HEARING HELD tracking (remark includes outcome)
+    outcome_suffix = f", outcome={settlement}" if settlement else ""
+    held_remarks = remarks or f"KP-8 held (sched #{sched_rn}); comp_att={compl_attended}, resp_att={resp_attended}{outcome_suffix}"
+    with transaction.atomic():
+        with connection.cursor() as cur:
+            cur.execute("""
+                INSERT INTO case_progress_tracking
+                    (blotter_case_id, case_progress_type_id, date_processed, remarks, processed_by_id)
+                VALUES (%s, %s, now(), %s, %s)
+                RETURNING progress_tracking_id, date_processed
+            """, [case_id, progress_type_id, held_remarks, staff_id])
+
+    # Outcome branches
+    print(f"[mediation_complete] settlement={settlement}, case_id={case_id}")
+    if settlement == "SETTLED":
+        # Set case to SETTLED and auto-create KP-16 if missing
+        try:
+            with connection.cursor() as cur:
+                cur.execute("SELECT * FROM fn_set_case_settlement(%s,%s,%s,%s)",
+                            [case_id, 'SETTLED', 'Marked settled from KP-8 mediation', staff_id])
+            print(f"[mediation_complete] Case {case_id} set to SETTLED successfully")
+            messages.success(request, "Mediation marked HELD and case set to SETTLED. Settlement agreement (KP-16) created automatically.")
+        except Exception as e:
+            print(f"[mediation_complete] Error setting case to SETTLED: {e}")
+            messages.success(request, "Mediation marked HELD. (Could not update case settlement automatically.)")
+
+        # Ensure KP-16 exists
+        try:
+            with connection.cursor() as cur:
+                cur.execute("""
+                    SELECT 1
+                      FROM blotter_kp_submission s
+                      JOIN kp_form f ON f.form_id = s.form_id
+                     WHERE s.blotter_case_id = %s
+                       AND UPPER(f.form_code) = 'KP-16'
+                       AND UPPER(s.status) = 'SUBMITTED'
+                """, [case_id])
+                kp16_exists = cur.fetchone() is not None
+
+            if not kp16_exists:
+                print(f"[mediation_complete] No KP-16 exists, creating one automatically")
+                kp16_sid = _create_and_submit_form_from_prefill(
+                    case_id=case_id,
+                    form_code="KP-16",
+                    prefill=_prefill_minimal_for_case(case_id)
+                )
+                if kp16_sid:
+                    print(f"[mediation_complete] Created KP-16 submission_id={kp16_sid}")
+            else:
+                print(f"[mediation_complete] KP-16 already exists for case {case_id}")
+        except Exception as e:
+            print(f"[mediation_complete] Error creating KP-16: {e}")
+
+    elif settlement == "ARBITRATION":
+        # Optional: mark case ARBITRATED (you already have settlement_status_id=8 seeded)
+        try:
+            with connection.cursor() as cur:
+                cur.execute("SELECT * FROM fn_set_case_settlement(%s,%s,%s,%s)",
+                            [case_id, 'ARBITRATED', 'Agreed to arbitration from KP-8 mediation', staff_id])
+            messages.success(request, "Mediation marked HELD and case set to ARBITRATED.")
+        except Exception as e:
+            print(f"[mediation_complete] Error setting case to ARBITRATED: {e}")
+            messages.success(request, "Mediation marked HELD. (Could not update case settlement automatically.)")
+
+        # Ensure KP-14 (Agreement to Arbitrate) exists
+        try:
+            with connection.cursor() as cur:
+                cur.execute("""
+                    SELECT 1
+                      FROM blotter_kp_submission s
+                      JOIN kp_form f ON f.form_id = s.form_id
+                     WHERE s.blotter_case_id = %s
+                       AND UPPER(f.form_code) = 'KP-14'
+                       AND UPPER(s.status) = 'SUBMITTED'
+                """, [case_id])
+                kp14_exists = cur.fetchone() is not None
+
+            if not kp14_exists:
+                kp14_sid = _create_and_submit_form_from_prefill(
+                    case_id=case_id,
+                    form_code="KP-14",
+                    prefill=_prefill_minimal_for_case(case_id)
+                )
+                if kp14_sid:
+                    print(f"[mediation_complete] Created KP-14 submission_id={kp14_sid}")
+            else:
+                print(f"[mediation_complete] KP-14 already exists for case {case_id}")
+        except Exception as e:
+            print(f"[mediation_complete] Error creating KP-14: {e}")
+
+        # Notifications (guard import)
+        try:
+            from notifications.views import notify_kp14_agreement_arbitration  # adjust module if needed
+            notify_kp14_agreement_arbitration(case_id=case_id)
+        except Exception as e:
+            print(f"[KP14] Notification skipped: {e}")
+
+    else:
+        print(f"[mediation_complete] Settlement not SETTLED/ARBITRATION, just marking held")
+        messages.success(request, "Mediation marked HELD.")
+
+    # Persist attendance + the chosen settlement string (e.g., ARBITRATION)
+    print(f"[mediation_complete] Recording attendance: compl={compl_attended}, resp={resp_attended}, settlement={settlement}")
+    _maybe_upsert_hearing_attendance(
+        case_id=case_id,
+        source_code="KP-8",
+        notice_sid=submission_id,
+        compl_attended=compl_attended,
+        resp_attended=resp_attended,
+        settlement=settlement or "PENDING",
+        remarks=remarks,
     )
 
-    case_num = svc_hear.get_case_num(case_id)
-    if ok:
-        flash_success(request, f"Mediation held (Case {case_num}).")
-    else:
-        flash_warning(request, f"Could not mark mediation held: {msg}")
-
-    return redirect(reverse("lupon_mem:case_detail", kwargs={"case_id": case_id}))
+    print(f"[mediation_complete] END - redirecting to hearing schedule")
+    return redirect(f"{reverse('lupon_mem:case_hearing_schedule', args=[case_id])}?sid={submission_id}")
 
 @session_login_required
 @role_required(*LUPON_ROLES)
@@ -3027,7 +3282,7 @@ def mark_hearing_held_dev(request, case_id: int):
     return redirect("lupon_mem:case_hearing_list", case_id=case_id)
 
 
-    from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST
 from django.core.files.uploadedfile import UploadedFile
 
 @session_login_required

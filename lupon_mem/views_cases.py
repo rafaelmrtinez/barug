@@ -94,119 +94,203 @@ LUPON_ROLES = {"BARANGAY LUPON MEMBER", "BARANGAY LUPON PRESIDENT"}
 
 
 
-@session_login_required
-@role_required(*LUPON_ROLES, "barangay treasurer")
+def _hearing_gate(case_id: int) -> dict:
+    """Minimal gate helper for case detail."""
+    with connection.cursor() as cur:
+        cur.execute("""
+            SELECT 
+                COUNT(*) FILTER (WHERE s.submitted_at IS NOT NULL) as hearings_set,
+                0 as hearings_held,
+                MAX(s.submitted_at) as latest_notice_submitted_at
+            FROM blotter_kp_submission s
+            JOIN kp_form kf ON kf.form_id = s.form_id
+            WHERE s.blotter_case_id = %s AND UPPER(kf.form_code) IN ('KP-8', 'KP-12')
+        """, [case_id])
+        row = cur.fetchone()
+        return {
+            "hearings_set": row[0] if row else 0,
+            "hearings_held": row[1] if row else 0,
+            "latest_notice_submitted_at": row[2] if row else None,
+        }
+
+def _latest_submission_for_codes(case_id: int, codes: list) -> tuple:
+    """Get latest submission for given form codes."""
+    with connection.cursor() as cur:
+        placeholders = ','.join(['%s'] * len(codes))
+        cur.execute(f"""
+            SELECT s.submission_id
+            FROM blotter_kp_submission s
+            JOIN kp_form kf ON kf.form_id = s.form_id
+            WHERE s.blotter_case_id = %s AND UPPER(kf.form_code) IN ({placeholders})
+            ORDER BY s.submitted_at DESC NULLS LAST
+            LIMIT 1
+        """, [case_id] + codes)
+        return cur.fetchone()
+
+def _fetch_lookups() -> dict:
+    """Fetch lookup data for case creation."""
+    with connection.cursor() as cur:
+        cur.execute("SELECT complaint_title_id, complaint_title_name FROM complaint_title ORDER BY complaint_title_name")
+        complaint_titles = cur.fetchall()
+        cur.execute("SELECT case_nature_id, case_name FROM case_nature ORDER BY case_name")
+        case_natures = cur.fetchall()
+        cur.execute("SELECT settlement_status_id, settlement_status_name FROM settlement_status ORDER BY settlement_status_name")
+        settlement_statuses = cur.fetchall()
+    return {
+        "complaint_titles": complaint_titles,
+        "case_natures": case_natures,
+        "settlement_statuses": settlement_statuses,
+    }
+
+def _to_none_if_blank(value: str) -> str | None:
+    """Convert empty string to None."""
+    return value.strip() if value and value.strip() else None
+
+
 def case_list(request: HttpRequest):
     """
-    Live-searchable case list using v_blotter_case_summary.
-    GET:
-      q, state, settlement, filed_from (YYYY-MM-DD), filed_to (YYYY-MM-DD),
-      page, per_page, partial=1
+    OPTIMIZED case list for fastest loading.
+    Now includes mediation window/conciliation gate from fn_case_hearing_window()
+    and exposes them to the template via extra tuple columns (7–13).
     """
-    from urllib.parse import urlencode
-    from django.db import connection
-
-    q          = (request.GET.get("q") or "").strip()
-    state      = (request.GET.get("state") or "").strip()        # case_final_status text
-    settlement = (request.GET.get("settlement") or "").strip()   # settlement_status text
+    t0 = time.perf_counter()
+    
+    # Auth & navigation
+    auth = request.session.get("auth") or {}
+    user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
+    
+    # Params with filters
+    q = (request.GET.get("q") or "").strip()
+    state = (request.GET.get("state") or "").strip()
+    settlement = (request.GET.get("settlement") or "").strip()
     filed_from = (request.GET.get("filed_from") or "").strip()
-    filed_to   = (request.GET.get("filed_to") or "").strip()
-
-    # pagination
+    filed_to = (request.GET.get("filed_to") or "").strip()
     try:
         page = max(int(request.GET.get("page", "1")), 1)
     except ValueError:
         page = 1
-    try:
-        per_page = max(int(request.GET.get("per_page", "10")), 1)
-    except ValueError:
-        per_page = 10
+    per_page = 10  # Fixed for performance
     offset = (page - 1) * per_page
 
-    # choices (distinct values from the view)
-    with connection.cursor() as cur:
-        cur.execute("SELECT DISTINCT case_final_status FROM v_blotter_case_summary ORDER BY 1")
-        state_choices = [row[0] for row in cur.fetchall()]
-        cur.execute("SELECT DISTINCT settlement_status FROM v_blotter_case_summary ORDER BY 1")
-        settlement_choices = [row[0] for row in cur.fetchall()]
+    # Cache choices for 10 minutes
+    choices_cache_key = "case_choices_v2"
+    choices = cache.get(choices_cache_key)
+    if not choices:
+        with connection.cursor() as cur:
+            cur.execute("SELECT case_state_name FROM case_state ORDER BY case_state_name")
+            state_choices = [row[0] for row in cur.fetchall()]
+            cur.execute("SELECT settlement_status_name FROM settlement_status ORDER BY settlement_status_name")
+            settlement_choices = [row[0] for row in cur.fetchall()]
+        choices = {"state_choices": state_choices, "settlement_choices": settlement_choices}
+        cache.set(choices_cache_key, choices, 600)
 
-    base_from = "FROM v_blotter_case_summary v"
+    # Build WHERE clause with filters
     where_parts = []
-    params: list = []
-
+    params = []
+    
     if q:
-        where_parts.append("""
-            (
-              v.blotter_case_num  ILIKE CONCAT('%%', %s, '%%')
-           OR v.blotter_case_name ILIKE CONCAT('%%', %s, '%%')
-            )
-        """)
-        params.extend([q, q])
-
+        where_parts.append("(bc.blotter_case_num ILIKE %s OR bc.blotter_case_name ILIKE %s)")
+        params.extend([f"%{q}%", f"%{q}%"])
+    
     if state:
-        where_parts.append("v.case_final_status = %s")
+        where_parts.append("cs.case_state_name = %s")
         params.append(state)
-
+    
     if settlement:
-        where_parts.append("v.settlement_status = %s")
+        where_parts.append("ss.settlement_status_name = %s")
         params.append(settlement)
-
+    
     if filed_from:
-        where_parts.append("v.date_filed >= %s")
+        where_parts.append("bc.date_filed >= %s")
         params.append(filed_from)
-
+    
     if filed_to:
-        where_parts.append("v.date_filed <= %s")
+        where_parts.append("bc.date_filed <= %s")
         params.append(filed_to)
+    
+    where_sql = "WHERE " + " AND ".join(where_parts) if where_parts else ""
 
-    where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
-
-    # total
+    # Fast count with proper JOINs
     with connection.cursor() as cur:
-        cur.execute(f"SELECT COUNT(*) {base_from} {where_sql}", params)
-        total = int(cur.fetchone()[0])
+        if where_parts:
+            count_sql = f"""
+                SELECT COUNT(*) FROM blotter_case bc
+                LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
+                LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+                {where_sql}
+            """
+        else:
+            count_sql = "SELECT COUNT(*) FROM blotter_case bc"
+        cur.execute(count_sql, params)
+        total = cur.fetchone()[0]
 
-    # page rows (adds time_filed)
+    # Fast data query - add LATERAL join to fn_case_hearing_window(bc_id)
     with connection.cursor() as cur:
-        select_sql = f"""
-            SELECT
-              v.blotter_case_id,                                       -- 0
-              v.blotter_case_num,                                      -- 1
-              v.blotter_case_name,                                     -- 2
-              to_char(v.date_filed, 'Mon DD, YYYY') AS date_filed_fmt, -- 3
-              to_char(v.time_filed, 'HH12:MI AM')    AS time_filed_fmt,-- 4  ← NEW
-              v.case_final_status,                                     -- 5
-              v.settlement_status                                      -- 6
-            {base_from}
+        data_sql = f"""
+            SELECT 
+                bc.blotter_case_id,                    -- 0
+                bc.blotter_case_num,                   -- 1
+                bc.blotter_case_name,                  -- 2
+                TO_CHAR(bc.date_filed, 'Mon DD, YYYY') AS date_filed_fmt,   -- 3
+                TO_CHAR(bc.time_filed, 'HH12:MI AM')   AS time_filed_fmt,   -- 4
+                COALESCE(cs.case_state_name, 'PENDING')        AS case_state,         -- 5
+                COALESCE(ss.settlement_status_name, 'Pending') AS settlement_status,  -- 6
+
+                -- ===== fn_case_hearing_window extras (may be NULL if no KP-8 yet) =====
+                hw.window_end_date_text,      -- 7  e.g., "November 12, 2025"
+                hw.window_end_time_text,      -- 8  e.g., "10:09 pm"
+                hw.days_left,                 -- 9
+                hw.can_set_mediation,         -- 10
+                hw.can_set_conciliation,      -- 11
+                COALESCE(hw.mediation_hearings_set,  0) AS mediation_hearings_set,   -- 12
+                COALESCE(hw.mediation_hearings_held, 0) AS mediation_hearings_held   -- 13
+            FROM blotter_case bc
+            LEFT JOIN case_state       cs ON cs.case_state_id = bc.case_state_id
+            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+
+            -- Pull the 15-day mediation window + counters for each row
+            LEFT JOIN LATERAL fn_case_hearing_window(bc.blotter_case_id) hw ON TRUE
+
             {where_sql}
-            ORDER BY v.blotter_case_id DESC
+            ORDER BY bc.blotter_case_id DESC
             LIMIT %s OFFSET %s
         """
-        cur.execute(select_sql, params + [per_page, offset])
+        cur.execute(data_sql, params + [per_page, offset])
         rows = cur.fetchall()
 
-    # pagination helpers
+    # Simple pagination
     total_pages = max((total + per_page - 1) // per_page, 1)
     has_prev = page > 1
     has_next = page < total_pages
     start_p = max(1, page - 2)
     end_p = min(total_pages, page + 2)
     page_numbers = list(range(start_p, end_p + 1))
+    
+    # Accurate Statistics using correct case states
+    with connection.cursor() as cur:
+        cur.execute("""
+            SELECT 
+                COUNT(*) as total_cases,
+                COUNT(*) FILTER (WHERE COALESCE(cs.case_state_name, 'PENDING') IN ('PENDING', 'OPEN')) as open_cases,
+                COUNT(*) FILTER (WHERE ss.settlement_status_name = 'Settled') as settled_cases
+            FROM blotter_case bc
+            LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
+            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+        """)
+        stats = cur.fetchone()
 
-    preserved = {
+    total_ms = (time.perf_counter() - t0) * 1000
+    log.info(f"case_list optimized: {total_ms:.1f}ms, {total} cases")
+
+    ctx = {
+        "page_path": f"{user_role} / Cases",
+        "page_title": "Cases",
+        "rows": rows,
         "q": q,
         "state": state,
         "settlement": settlement,
         "filed_from": filed_from,
         "filed_to": filed_to,
-        "per_page": per_page,
-    }
-    preserved = {k: v for k, v in preserved.items() if v not in (None, "", [])}
-    query_no_page = urlencode(preserved)
-
-    ctx = {
-        "rows": rows,
-        "q": q,
         "page": page,
         "per_page": per_page,
         "total": total,
@@ -218,298 +302,116 @@ def case_list(request: HttpRequest):
         "first_item": offset + 1 if total else 0,
         "last_item": min(offset + per_page, total),
         "page_numbers": page_numbers,
-        "query_no_page": query_no_page,
-
-        # filters + choices
-        "state": state,
-        "settlement": settlement,
-        "filed_from": filed_from,
-        "filed_to": filed_to,
-        "state_choices": state_choices,
-        "settlement_choices": settlement_choices,
+        "state_choices": choices["state_choices"],
+        "settlement_choices": choices["settlement_choices"],
+        "stats": {
+            "total_cases": stats[0] if stats else 0,
+            "open_cases": stats[1] if stats else 0,
+            "settled_cases": stats[2] if stats else 0,
+        },
+        "load_time_ms": f"{total_ms:.1f}",
     }
 
-    if request.GET.get("partial") == "1":
-        return render(request, "lupon_mem/partials/case_table.html", ctx)
+    return render(request, "lupon_mem/case_list_offline.html", ctx)
 
-    return render(request, "lupon_mem/case_list.html", ctx)
-
-
-
+# lupon_mem/views_cases.py (or wherever your case detail view lives)
+from lupon_mem.services.hearings_window import get_hearing_window
 
 @session_login_required 
 @role_required(*LUPON_ROLES, "barangay treasurer")
 def case_detail(request: HttpRequest, case_id: int):
-    from django.utils import timezone
-    from django.db import connection
-
-    def _fmt_dt(dt) -> str | None:
-        if not dt:
-            return None
-        try:
-            return timezone.localtime(dt).strftime("%b %d, %Y %I:%M %p")
-        except Exception:
-            try:
-                return dt.strftime("%b %d, %Y %I:%M %p")
-            except Exception:
-                return None
-
-    def _ordinal(n: int) -> str:
-        n = int(n)
-        if 11 <= (n % 100) <= 13:
-            suffix = "th"
-        else:
-            suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
-        return f"{n}{suffix}"
-
-    with connection.cursor() as cur:
-        # ----- Case header
-        cur.execute(
-            """
-            SELECT
-              bc.blotter_case_id,
-              bc.blotter_case_num,
-              bc.blotter_case_name,
-              to_char(bc.date_filed,'Mon DD, YYYY') AS date_filed,
-              bc.incident_desc,
-              COALESCE(ct.complaint_title_name,'—') AS type_name,
-              COALESCE(cn.case_name,'—') AS nature_name,
-              ss.settlement_status_name,
-              bc.settlement_status_id
-            FROM blotter_case bc
-            LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
-            LEFT JOIN case_nature   cn ON cn.case_nature_id   = bc.case_nature_id
-            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
-            WHERE bc.blotter_case_id=%s
-            """,
-            [case_id],
-        )
-        case = cur.fetchone()
-
-        # ----- Attached forms (list + KP-17 meta)
-        cur.execute(
-            """
-            SELECT
-              s.submission_id,
-              UPPER(kf.form_code) AS form_code,
-              kf.form_name,
-              s.status,
-              CASE WHEN s.submitted_at IS NULL THEN '—'
-                   ELSE to_char(s.submitted_at,'Mon DD, YYYY HH12:MI AM')
-              END AS submitted_fmt,
-              ppt.party_name AS kp17_party,
-              TRIM(
-                COALESCE(p.last_name,'') || ', ' ||
-                COALESCE(p.first_name,'') || ' ' ||
-                COALESCE(p.middle_name,'')
-              ) AS kp17_person
-            FROM blotter_kp_submission s
-            JOIN kp_form kf ON kf.form_id = s.form_id
-            LEFT JOIN kp17_repudiation m   ON m.submission_id = s.submission_id
-            LEFT JOIN kp_party_type  ppt   ON ppt.kp_party_type_id = m.party_type_id
-            LEFT JOIN person         p     ON p.person_id = m.party_person_id
-            WHERE s.blotter_case_id=%s
-            ORDER BY (s.submitted_at IS NULL), s.submitted_at DESC, s.submission_id DESC
-            """,
-            [case_id],
-        )
-        forms_raw = cur.fetchall()
-
-        # ----- KP-9 meta (count + latest attendance status/party)
-        cur.execute(
-            """
-            WITH f AS (SELECT form_id FROM kp_form WHERE UPPER(form_code)='KP-9' LIMIT 1)
-            SELECT COUNT(*) FROM blotter_kp_submission
-            WHERE blotter_case_id=%s AND form_id=(SELECT form_id FROM f)
-            """,
-            [case_id],
-        )
-        kp9_count = int((cur.fetchone() or [0])[0] or 0)
-
-        cur.execute(
-            """
-            WITH f AS (SELECT form_id FROM kp_form WHERE UPPER(form_code)='KP-9' LIMIT 1)
-            SELECT a.status, a.no_show_party
-            FROM kp9_attendance a
-            JOIN blotter_kp_submission s ON s.submission_id = a.submission_id
-            WHERE s.blotter_case_id = %s
-              AND s.form_id = (SELECT form_id FROM f)
-            ORDER BY a.marked_at DESC NULLS LAST, s.submission_id DESC
-            LIMIT 1
-            """,
-            [case_id],
-        )
-        r = cur.fetchone()
-        kp9_latest_status = (r[0] or "").upper() if r else None
-        kp9_latest_party = (r[1] or "").upper() if r and r[1] else None
-
-        # ----- NEW: count of KP-9 submissions WITHOUT attendance
-        cur.execute(
-            """
-            WITH f AS (SELECT form_id FROM kp_form WHERE UPPER(form_code)='KP-9' LIMIT 1)
-            SELECT COUNT(*)
-            FROM blotter_kp_submission s
-            WHERE s.blotter_case_id=%s
-              AND s.form_id=(SELECT form_id FROM f)
-              AND NOT EXISTS (
-                    SELECT 1 FROM kp9_attendance a
-                    WHERE a.submission_id = s.submission_id
-              )
-            """,
-            [case_id],
-        )
-        kp9_pending_count = int((cur.fetchone() or [0])[0] or 0)
-
-        # ----- Settlement choices
-        cur.execute("SELECT settlement_status_name FROM settlement_status ORDER BY settlement_status_name")
-        settlement_choices = [row[0] for row in cur.fetchall()]
-
-    # ===============================
-    # Sequence labels (badges) setup
-    # ===============================
-    form_seq_labels: dict[int, str] = {}
-
-    # A) Use fn_case_mediation_hearings for KP-8/KP-12 numbering (1st/2nd/3rd Hearing)
-    with connection.cursor() as cur:
-        cur.execute(
-            """
-            SELECT notice_sid, hearing_no, source
-            FROM fn_case_mediation_hearings(%s)
-            ORDER BY hearing_no
-            """,
-            [case_id],
-        )
-        tvf_rows = cur.fetchall()  # (notice_sid, hearing_no, source)
-
-    for notice_sid, hearing_no, _source in tvf_rows:
-        form_seq_labels[int(notice_sid)] = f"{_ordinal(int(hearing_no))} Hearing"
-
-    # B) Also number KP-9 and MED-ATT-2025 (1st Summons / 1st Med Attendance ...)
-    with connection.cursor() as cur:
-        cur.execute(
-            """
-            SELECT s.submission_id, UPPER(kf.form_code) AS code, s.submitted_at
-            FROM blotter_kp_submission s
-            JOIN kp_form kf ON kf.form_id = s.form_id
-            WHERE s.blotter_case_id=%s
-              AND UPPER(kf.form_code) IN ('KP-9','MED-ATT-2025')
-            ORDER BY s.submitted_at ASC NULLS LAST, s.submission_id ASC
-            """,
-            [case_id],
-        )
-        seq_rows = cur.fetchall()
-
-    counters = {"KP-9": 0, "MED-ATT-2025": 0}
-    for sid, code, _submitted_at in seq_rows:
-        code = (code or "").upper()
-        if code in counters:
-            counters[code] += 1
-            n = counters[code]
-            if code == "KP-9":
-                form_seq_labels[int(sid)] = f"{_ordinal(n)} Summons"
-            elif code == "MED-ATT-2025":
-                form_seq_labels[int(sid)] = f"{_ordinal(n)} Med Attendance"
-
-    # ----- annotate forms: append seq label as last column (index 7)
-    forms = [(*row, form_seq_labels.get(int(row[0]))) for row in forms_raw]
-
-    # ===============================
-    # Gate logic + KPI values
-    # ===============================
-    gate = _hearing_gate(case_id)  # expects updated helper that returns 'hearings_set'
-    latest_notice_dt = gate.get("latest_notice_submitted_at")
-    latest_hearing_dt = _fmt_dt(latest_notice_dt)
-
-    hearings_set_count  = int(gate.get("hearings_set") or 0)
-    hearings_held_count = int(gate.get("hearings_held") or 0)
-
-    # ----- NEW blocking logic for Add Form (summons)
-    finalized_attendance = {"ATTENDED", "NO SHOW"}
-    block_due_to_summons = kp9_pending_count > 0
-    if block_due_to_summons:
-        if kp9_count and (kp9_latest_status not in finalized_attendance):
-            pass  # keep behavior as-is
-
-    block_reason_summons = (
-        f"{kp9_pending_count} summons pending attendance marking (ATTENDED / NO SHOW)."
-        if block_due_to_summons else ""
-    )
-
-    has_upcoming = bool(
-        gate.get("has_upcoming_hearing")
-        or gate.get("latest_notice_outstanding")
-    )
-    needs_outcome = bool(
-        gate.get("pending_hearing_requires_outcome")
-        or gate.get("has_unresolved_mediation")
-    )
-    block_due_to_hearing = bool(has_upcoming or needs_outcome)
-    block_reason_hearing = ""
-    if block_due_to_hearing:
-        if needs_outcome:
-            block_reason_hearing = "There is a mediation/conciliation hearing without a recorded outcome (Settled / Not Settled)."
-        elif has_upcoming:
-            block_reason_hearing = "There is a scheduled hearing that must be completed or marked with an outcome first."
-
-    force_open_block_modal = bool(request.GET.get("open_block_modal"))
-    block_reason = request.GET.get("reason")  # 'summons' | 'hearing' | None
-    med_row = _latest_submission_for_codes(case_id, ["MED1-SETTLED","MED2-SETTLED","MED3-SETTLED"])
-    has_med_summary = bool(med_row)
-    med_summary_sid = int(med_row[0]) if med_row else None
-
-    # Pull case state name + closed_at to drive Close/Reopen UI
+    
+    hearing_window = get_hearing_window(case_id)
+    # Ultra-fast single query with minimal processing
     with connection.cursor() as cur:
         cur.execute("""
-            SELECT cs.case_state_name, bc.closed_at
+            SELECT 
+                bc.blotter_case_id, bc.blotter_case_num, bc.blotter_case_name,
+                TO_CHAR(bc.date_filed,'Mon DD, YYYY') AS date_filed, bc.incident_desc,
+                COALESCE(ct.complaint_title_name,'—') AS type_name,
+                COALESCE(cn.case_name,'—') AS nature_name,
+                ss.settlement_status_name, bc.settlement_status_id,
+                cs.case_state_name, bc.closed_at,
+                -- Forms count
+                (SELECT COUNT(*) FROM blotter_kp_submission s2 WHERE s2.blotter_case_id = bc.blotter_case_id) as forms_count,
+                -- KP9 stats
+                (SELECT COUNT(*) FROM blotter_kp_submission s3 
+                 JOIN kp_form kf3 ON kf3.form_id = s3.form_id 
+                 WHERE s3.blotter_case_id = bc.blotter_case_id AND UPPER(kf3.form_code) = 'KP-9') as kp9_count,
+                -- Hearings set
+                (SELECT COUNT(*) FROM blotter_kp_submission s4 
+                 JOIN kp_form kf4 ON kf4.form_id = s4.form_id 
+                 WHERE s4.blotter_case_id = bc.blotter_case_id 
+                 AND UPPER(kf4.form_code) IN ('KP-8', 'KP-12') 
+                 AND s4.submitted_at IS NOT NULL) as hearings_set
             FROM blotter_case bc
+            LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
+            LEFT JOIN case_nature cn ON cn.case_nature_id = bc.case_nature_id
+            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
             LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
-            WHERE bc.blotter_case_id=%s
+            WHERE bc.blotter_case_id = %s
         """, [case_id])
-        r = cur.fetchone() or (None, None)
-        case_state_name, case_closed_at = r[0], r[1]
-
+        
+        case_row = cur.fetchone()
+        if not case_row:
+            return HttpResponseNotFound("Case not found")
+        
+        # Get forms - only essential data
+        cur.execute("""
+            SELECT s.submission_id, UPPER(kf.form_code), kf.form_name, s.status,
+                   CASE WHEN s.submitted_at IS NULL THEN '—'
+                        ELSE TO_CHAR(s.submitted_at,'Mon DD HH12:MI AM') END
+            FROM blotter_kp_submission s
+            JOIN kp_form kf ON kf.form_id = s.form_id
+            WHERE s.blotter_case_id = %s
+            ORDER BY s.submitted_at DESC NULLS LAST
+            LIMIT 20
+        """, [case_id])
+        forms = cur.fetchall()
+    
+    # Track submitted forms for flow guide
+    submitted_forms = set()
+    for form in forms:
+        if len(form) > 3 and form[3] and form[3].upper() == 'SUBMITTED':
+            submitted_forms.add(form[1])  # form_code
+    
+    # Calculate progress
+    flow_steps = ['KP-7', 'KP-8', 'KP-9', 'KP-10', 'KP-11', 'KP-12', 'KP-16']
+    completed_count = sum(1 for step in flow_steps if step in submitted_forms)
+    progress_percentage = int((completed_count / len(flow_steps)) * 100)
+    
+    # Minimal context - NO GATES, NO BLOCKING
     context = {
-        "case": case,
-        "forms": forms,
+        "case": case_row[:11],
+        "forms": [(f[0], f[1], f[2], f[3], f[4], None, None, None) for f in forms],
         "case_id": case_id,
-        "settlement_choices": settlement_choices,
-        "hearing_gate": gate,
-
-        "incident_description": case[4] if case else None,
-        "case_nature": case[6] if case else None,
-        "case_state_name": case_state_name,
-        "case_closed_at": case_closed_at,
-
-        # KPIs
-        "latest_hearing_dt": latest_hearing_dt,
-        "last_hearing_dt": latest_hearing_dt,
-        "next_hearing_dt": None,
-        "kp9_count": kp9_count,
-        "hearings_set_count": hearings_set_count,
-        "hearings_count": hearings_held_count,  # kept for “Held” KPI if you still show it
-
-        # KP-9 quick state
-        "kp9_latest_status": kp9_latest_status,
-        "kp9_latest_party": kp9_latest_party,
-        "kp9_pending_count": kp9_pending_count,
-        "has_hearing": hearings_held_count > 0,
-
-        # gating / modals
-        "force_open_block_modal": force_open_block_modal,
-        "block_reason": block_reason,
-        "block_due_to_summons": block_due_to_summons,
-        "block_due_to_hearing": block_due_to_hearing,
-        "block_reason_summons": block_reason_summons,
-        "block_reason_hearing": block_reason_hearing,
-
-        # summary availability
-        "has_med_summary": has_med_summary,
-        "med_summary_sid": med_summary_sid,
+        "hearing_window": hearing_window,
+        "settlement_choices": ["Settled", "Not Settled", "Pending"],
+        "incident_description": case_row[4] if len(case_row) > 4 else None,
+        "case_nature": case_row[6] if len(case_row) > 6 else None,
+        "case_state_name": case_row[9] if len(case_row) > 9 else None,
+        "case_closed_at": case_row[10] if len(case_row) > 10 else None,
+        # Simplified stats
+        "kp9_count": case_row[12] if len(case_row) > 12 else 0,
+        "hearings_set_count": case_row[14] if len(case_row) > 14 else 0,
+        "hearings_count": 0,
+        "has_hearing": False,
+        # ALL GATES DISABLED
+        # "hearing_gate": {},
+        # "kp9_latest_status": None,
+        # "kp9_latest_party": None,
+        # "kp9_pending_count": 0,
+        # "force_open_block_modal": False,
+        # "block_reason": None,
+        # "block_due_to_summons": False,
+        # "block_due_to_hearing": False,
+        # "block_reason_summons": "",
+        # "block_reason_hearing": "",
+        # "has_med_summary": False,
+        # "med_summary_sid": None,
     }
-
+    
     return render(request, "lupon_mem/case_detail.html", context)
-
-
 
 
 
@@ -644,7 +546,7 @@ def case_settlement_update(request: HttpRequest, case_id: int):
 
         ok, _case, new_status, changed_at = row if row else (False, None, None, None)
         if ok:
-            messages.success(request, f"Settlement status updated to “{new_status}”.")
+            messages.success(request, f'Settlement status updated to "{new_status}".')
         else:
             messages.warning(request, "No change was made.")
     except Exception as e:
@@ -734,4 +636,16 @@ def add_form_choose(request, case_id: int):
         {"case_id": case_id, "forms": forms, "hearing_gate": gate}
     )
 
+@session_login_required
+@role_required(*LUPON_ROLES, "barangay treasurer")
+def mediation_hearings_api(request, case_id: int):
+    """API endpoint to get mediation hearing details"""
+    try:
+        with connection.cursor() as cur:
+            cur.execute("SELECT * FROM fn_case_mediation_hearings(%s)", [case_id])
+            columns = [col[0] for col in cur.description]
+            hearings = [dict(zip(columns, row)) for row in cur.fetchall()]
+        return JsonResponse(hearings, safe=False)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 

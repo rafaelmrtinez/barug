@@ -116,16 +116,35 @@ def _get_all_pdf_field_names(template_path: str) -> List[str]:
 def _fill_pdf_with_values(template_path: str, merged: Dict[str, str]) -> bytes:
     if PdfReader is None:
         raise RuntimeError("pypdf is not installed. Run: pip install pypdf")
+    
+    print(f"[PDF DEBUG] Reading template: {template_path}")
+    print(f"[PDF DEBUG] Template exists: {os.path.exists(template_path)}")
+    print(f"[PDF DEBUG] Values to fill: {len(merged)} fields")
+    
     reader = PdfReader(template_path)
     writer = PdfWriter()
     writer.clone_document_from_reader(reader)
+    
+    # Check if PDF has form fields
+    form_fields = reader.get_form_text_fields() if hasattr(reader, 'get_form_text_fields') else {}
+    print(f"[PDF DEBUG] Form fields found: {len(form_fields)}")
+    print(f"[PDF DEBUG] Form field names: {list(form_fields.keys())[:10]}")
+    
     if "/AcroForm" in writer._root_object:
         writer._root_object["/AcroForm"].update({NameObject("/NeedAppearances"): BooleanObject(True)})
-    for page in writer.pages:
+        print(f"[PDF DEBUG] AcroForm found and NeedAppearances set")
+    else:
+        print(f"[PDF DEBUG] No AcroForm found in PDF")
+    
+    for page_num, page in enumerate(writer.pages):
+        print(f"[PDF DEBUG] Updating page {page_num + 1}")
         writer.update_page_form_field_values(page, merged)
+    
     buf = io.BytesIO()
     writer.write(buf)
-    return buf.getvalue()
+    result = buf.getvalue()
+    print(f"[PDF DEBUG] Generated PDF size: {len(result)} bytes")
+    return result
 
 # ────────────────────────────────────────────────────────────
 # SECTION: Semantic → default field builder (per doc type)
@@ -165,7 +184,7 @@ def _fill_fields_for_line(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[
     doc_name = _safe_str(line.get("document_type_name")).lower()
 
     if "clearance" in doc_name:
-        return {
+        result = {
             "requestor_full_name": subject_full_name,
             "requestor_age": subject_age,
             "requestor_civil_status": subject_civil,
@@ -175,6 +194,8 @@ def _fill_fields_for_line(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[
             "barangay_issued": barangay, "city_mun_issued": city, "province_issued": province,
             "brgy_captain": captain, "totla_amnt": line_total, "or_number": or_no,
         }
+        print(f"[FILL_FIELDS DEBUG] Barangay clearance fields generated: {result}")
+        return result
 
     if "indigency" in doc_name or "indegency" in doc_name:
         return {

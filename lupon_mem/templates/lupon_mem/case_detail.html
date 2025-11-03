@@ -7,20 +7,10 @@
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
 <style>
   :root{
-    --brand-900:#3a1217;
-    --brand-800:#561c24;
-    --brand-700:#6d2932;
-    --brand-600:#7a3232;
-    --brand-100:#f3eaeb;
-    --brand-050:#fbf6f6;
-    --accent:#D4AF37;
-    --ink:#0f172a;
-    --muted:#64748b;
-    --line:#e5e7eb;
-    --soft:#fbf6f6;
-    --card:#ffffff;
+    --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932; --brand-600:#7a3232;
+    --brand-100:#f3eaeb; --brand-050:#fbf6f6; --accent:#D4AF37; --ink:#0f172a; --muted:#64748b;
+    --line:#e5e7eb; --soft:#fbf6f6; --card:#ffffff;
   }
-
   .page-wrap{ margin-top:12px; font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
 
   .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
@@ -30,122 +20,84 @@
   .btn-brand-subtle{ background:var(--brand-100); color:var(--brand-700); border-color:var(--brand-100); }
   .btn-brand-subtle:hover{ background:var(--brand-050); color:var(--brand-700); }
 
-  .form-control:focus, .form-select:focus, .form-check-input:focus{
-    border-color:var(--brand-700);
-    box-shadow:0 0 0 .25rem rgba(109,41,50,.25);
-    outline:none;
+  .form-control:focus,.form-select:focus,.form-check-input:focus{
+    border-color:var(--brand-700); box-shadow:0 0 0 .25rem rgba(109,41,50,.25); outline:none;
   }
   .form-check-input:checked{ background-color:var(--brand-700); border-color:var(--brand-700); }
 
-  .hero{
-    background:linear-gradient(180deg, var(--soft), #fff 70%);
-    border:1px solid var(--line);
-    border-radius:16px;
-    padding:18px 16px;
-  }
+  .hero{ background:linear-gradient(180deg, var(--soft), #fff 70%); border:1px solid var(--line);
+         border-radius:16px; padding:18px 16px; }
   .hero .case-no{font-size:.85rem;color:var(--muted);font-weight:700;letter-spacing:.02em}
   .hero .title{margin:2px 0 0;font-weight:800;color:var(--ink)}
-  .pill{
-    display:inline-flex;align-items:center;gap:.45rem;
-    padding:.35rem .7rem;border-radius:999px;font-weight:800;font-size:.75rem;
-    border:1px solid transparent;white-space:nowrap;
-  }
-  .pill-status{background:#fff;color:var(--brand-700);border-color:#eadfcd;box-shadow:0 1px 0 #f0e7d5}
-  .pill-kp9{background:#eef2ff;color:#1e3a8a;border-color:#c7d2fe}
+  .pill{ display:inline-flex; align-items:center; gap:.45rem; padding:.35rem .7rem; border-radius:999px;
+         font-weight:800; font-size:.75rem; border:1px solid transparent; white-space:nowrap; }
+  .pill-status{ background:#fff; color:var(--brand-700); border-color:#eadfcd; box-shadow:0 1px 0 #f0e7d5 }
 
-  .card-lite{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-  .card-head{
-    background:linear-gradient(180deg,#fffaf7, #fff);
-    border-bottom:1px solid var(--line);
-    padding:.7rem .9rem;font-weight:700;color:var(--brand-800);
-    display:flex;align-items:center;gap:.5rem
-  }
-  .card-body{padding:1rem}
+  .card-lite{ background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden }
+  .card-head{ background:linear-gradient(180deg,#fffaf7, #fff); border-bottom:1px solid var(--line);
+              padding:.7rem .9rem; font-weight:700; color:var(--brand-800); display:flex; align-items:center; gap:.5rem }
+  .card-body{ padding:1rem }
 
-  .kpi{display:flex;align-items:center;justify-content:space-between}
-  .kpi .value{font-size:1.4rem;font-weight:900;color:var(--ink)}
-  .kpi .hint{font-size:.8rem;color:var(--muted)}
-
-  .label{color:var(--muted);font-size:.85rem;font-weight:700}
-  .value{color:var(--ink);font-weight:800}
-
-  .table-wrap{border:1px solid var(--line);border-radius:12px;overflow:hidden}
-  .table thead th{
-    background:#fafafa;border-bottom:1px solid var(--line)!important;
-    font-size:.78rem;text-transform:uppercase;letter-spacing:.03em;color:#334155
-  }
-  .table tbody tr:hover{background:#fffafa}
-  .code-chip{
-    display:inline-flex;align-items:center;gap:.35rem;
-    font-family:ui-monospace,Menlo,Consolas,monospace;
-    font-size:.78rem;padding:.22rem .46rem;border-radius:.5rem;background:#f7f5f2;border:1px solid #eee
-  }
-  .pill-submitted{background:#eaf7ee;color:#0f5132;border:1px solid #bfe6cc}
-  .pill-pending{background:#eef2f7;color:#0f172a;border:1px solid #d5dce7}
+  .table-wrap{ border:1px solid var(--line); border-radius:12px; overflow:hidden }
+  .table thead th{ background:#fafafa; border-bottom:1px solid var(--line)!important; font-size:.78rem;
+                   text-transform:uppercase; letter-spacing:.03em; color:#334155 }
+  .table tbody tr:hover{ background:#fffafa }
+  .code-chip{ display:inline-flex; align-items:center; gap:.35rem; font-family:ui-monospace,Menlo,Consolas,monospace;
+              font-size:.78rem; padding:.22rem .46rem; border-radius:.5rem; background:#f7f5f2; border:1px solid #eee }
+  .pill-submitted{ background:#eaf7ee; color:#0f5132; border:1px solid #bfe6cc }
+  .pill-pending{ background:#eef2f7; color:#0f172a; border:1px solid #d5dce7 }
 
   .toolbar{ background:#fff; border:1px solid var(--line); border-radius:1rem; padding:.75rem; gap:.5rem; }
   .searchbox{ position:relative; flex:1; min-width:260px; }
   .searchbox .bi{ position:absolute; left:.8rem; top:50%; transform:translateY(-50%); opacity:.7; color:var(--brand-700); }
   .searchbox input{ padding-left:2.35rem!important; padding-right:2rem!important; }
-  .searchbox .clear-btn{
-    position:absolute; right:.35rem; top:50%; transform:translateY(-50%);
-    border:none; background:transparent; width:28px; height:28px;
-    border-radius:50%; display:grid; place-items:center; color:#6b7280;
-  }
+  .searchbox .clear-btn{ position:absolute; right:.35rem; top:50%; transform:translateY(-50%);
+    border:none; background:transparent; width:28px; height:28px; border-radius:50%; display:grid; place-items:center; color:#6b7280; }
   .searchbox .clear-btn:hover{ background:#f3f4f6; color:#374151; }
 
   .forms-count{ color:var(--muted); font-size:.85rem; }
-
   .helper-note{ font-size:.85rem; color:#334155; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:.5rem .75rem; }
   .helper-note strong{ color:#6d2932; }
 
   .sticky-add{ position:sticky; bottom:10px; z-index:9; display:flex; justify-content:flex-end }
 
   /* ===== Lupon Flow Viewer ===== */
-  .flow-toolbar{
-    display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin-bottom:.75rem;
-  }
-  .flow-chip{
-    border:1px solid var(--line); background:#fff; color:#000;
-    border-radius:999px; padding:.35rem .8rem; font-weight:700; font-size:.85rem;
-  }
+  .flow-toolbar{ display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin-bottom:.75rem; }
+  .flow-chip{ border:1px solid var(--line); background:#fff; color:#000; border-radius:999px; padding:.35rem .8rem; font-weight:700; font-size:.85rem; }
   .flow-chip.active{ background:var(--brand-700); color:#fff; border-color:var(--brand-700); }
   .flow-legend{ font-size:.8rem; color:#64748b; }
 
   .flow-list{ list-style:none; margin:0; padding:0 0 0 .25rem; }
   .flow-step{ display:flex; gap:.8rem; position:relative; padding:.4rem 0 .4rem .1rem; }
-  .flow-step::before{
-    content:""; position:absolute; left:6px; top:0; bottom:0; width:2px; background:#e5e7eb;
-  }
-  .flow-dot{
-    width:14px; height:14px; border-radius:50%; flex:0 0 14px; margin-top:.2rem;
-    border:2px solid #cbd5e1; background:#fff;
-  }
+  .flow-step::before{ content:""; position:absolute; left:6px; top:0; bottom:0; width:2px; background:#e5e7eb; }
+  .flow-dot{ width:14px; height:14px; border-radius:50%; flex:0 0 14px; margin-top:.2rem; border:2px solid #cbd5e1; background:#fff; }
   .flow-step .content{ flex:1; }
   .flow-step .title{ font-weight:800; color:#0f172a; }
   .flow-step .subtitle{ font-size:.85rem; color:#475569; }
-  .kp{
-    display:inline-flex; align-items:center; gap:.25rem; font-weight:800; font-size:.75rem;
-    background:#fffaf0; color:#92400e; border:1px solid #f2ddbd; border-radius:6px; padding:.15rem .4rem;
-  }
+  .kp{ display:inline-flex; align-items:center; gap:.25rem; font-weight:800; font-size:.75rem; background:#fffaf0; color:#92400e; border:1px solid #f2ddbd; border-radius:6px; padding:.15rem .4rem; }
   .branch{ display:inline-block; font-size:.75rem; font-weight:800; border:1px dashed #cbd5e1; color:#334155; border-radius:6px; padding:.1rem .4rem; margin-left:.35rem; }
   .note{ font-size:.82rem; color:#6b7280; margin-top:.15rem; }
   .step-actions{ margin-top:.35rem; display:flex; gap:.35rem; flex-wrap:wrap; }
   .step-actions .btn{ --bs-btn-padding-y:.2rem; --bs-btn-padding-x:.5rem; --bs-btn-font-size:.8rem; }
 
-  /* NEW: time guards badges */
-  .deadline-pill{
-    display:inline-flex; gap:.35rem; align-items:center; font-weight:800; font-size:.75rem;
-    border-radius:999px; padding:.25rem .6rem; border:1px solid #e2e8f0; background:#f8fafc; color:#0f172a;
-  }
+  .deadline-pill{ display:inline-flex; gap:.35rem; align-items:center; font-weight:800; font-size:.75rem; border-radius:999px; padding:.25rem .6rem; border:1px solid #e2e8f0; background:#f8fafc; color:#0f172a; }
   .deadline-pill.danger{ background:#fff1f2; border-color:#fecdd3; color:#b91c1c; }
   .deadline-pill.warn{ background:#fffbeb; border-color:#fde68a; color:#92400e; }
+
+  /* Hearing Window Bar */
+  .hw-bar{ display:flex; gap:.5rem; align-items:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:.5rem .75rem; }
+  .hw-phase{ font-weight:800; font-size:.8rem; padding:.25rem .6rem; border-radius:999px; background:#eef2ff; border:1px solid #c7d2fe; color:#1e3a8a; }
+  .hw-phase.conc{ background:#fffaf0; border-color:#fde68a; color:#92400e; }
+  .hw-dot{ width:6px; height:6px; border-radius:999px; background:#94a3b8; }
+  .hw-kv{ font-size:.85rem; color:#334155; }
+  .hw-kv strong{ color:#0f172a; }
+  .hw-stat{ margin-left:auto; font-size:.85rem; color:#475569; }
   @media (max-width: 768px){ .sticky-add{ bottom:10px; } }
 </style>
-{% endblock %}
+{% endblock css %}
 
 {% block content %}
-<div class="container-fluid page-wrap">
+<div class="container-fluid page-wrap" style="margin-top:60px;">
 
   {% if messages %}
     <div class="mt-2">
@@ -179,25 +131,20 @@
               {% else %}{{ case_state_name|default:"—" }}{% endif %}
             </span>
           {% endwith %}
-<!-- 
-          <span class="pill pill-kp9" title="Summons Issued">
-            {% bs_icon 'envelope-open' %} KP-9: {{ kp9_count|default:0 }}
-          </span> -->
         </div>
 
-        <!-- NEW: time guard badges (date-conscious) -->
         <div class="mt-2 d-flex flex-wrap gap-2">
           {% if pb_first_meeting_at %}
-            <span class="deadline-pill" id="pbWindowPill" title="PB Mediation window (15 days from first PB meeting)">
+            <span class="deadline-pill" id="pbWindowPill">
               {% bs_icon 'calendar2-event' %} PB Window: <span id="pbDaysLeft">—</span>
             </span>
           {% endif %}
           {% if pangkat_constituted_at %}
-            <span class="deadline-pill" id="pangkatWindowPill" title="Pangkat conciliation: 15 days (extendable once up to 30)">
+            <span class="deadline-pill" id="pangkatWindowPill">
               {% bs_icon 'calendar-range' %} Pangkat Window: <span id="pangkatDaysLeft">—</span>
             </span>
             {% if pangkat_extended_until %}
-              <span class="deadline-pill warn" title="One-time extension recorded">
+              <span class="deadline-pill warn">
                 {% bs_icon 'arrow-repeat' %} Extended until {{ pangkat_extended_until }}
               </span>
             {% endif %}
@@ -216,17 +163,14 @@
           {% bs_icon 'envelope' extra_classes='me-1' %} Summons / Attendance
         </a>
 
-        <!-- Update Settlement Status button -->
         <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#updateSettlementModal">
           {% bs_icon 'hand-thumbs-up' extra_classes='me-1' %} Update Settlement
         </button>
 
-        <!-- Lupon Flow button -->
         <button class="btn btn-outline-brand" type="button" data-bs-toggle="offcanvas" data-bs-target="#luponFlowCanvas" aria-controls="luponFlowCanvas">
           {% bs_icon 'diagram-3' extra_classes='me-1' %} Lupon Flow
         </button>
 
-        {# Close / Reopen buttons #}
         {% if case_state_name|lower == "closed" %}
           <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#reopenCaseModal">
             {% bs_icon 'arrow-counterclockwise' extra_classes='me-1' %} Reopen
@@ -239,79 +183,6 @@
       </div>
     </div>
   </section>
-
-  <!-- ======= QUICK METRICS ======= -->
-  <!-- <div class="row g-3 mb-3 row-cols-1 row-cols-md-3">
-    <div class="col">
-      <div class="card-lite h-100">
-        <div class="card-head">{% bs_icon 'calendar2-check' %} Latest Hearing</div>
-        <div class="card-body kpi">
-          <div class="value">
-            {% if case.7 and case.7|upper == 'SETTLED' %}—{% else %}{{ latest_hearing_dt|default:"—" }}{% endif %}
-          </div>
-          <div class="hint">Based on latest notice</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col">
-      <div class="card-lite h-100">
-        <div class="card-head">{% bs_icon 'calendar-week' %} Hearings Set</div>
-        <div class="card-body kpi">
-          <div class="value">{{ hearings_set_count|default:0 }}</div>
-          <div class="hint">Total KP-8 / KP-12</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col">
-      <div class="card-lite h-100">
-        <div class="card-head">{% bs_icon 'calendar-week' %} Hearings Held</div>
-        <div class="card-body kpi">
-          <div class="value">{{ hearings_count|default:0 }}</div>
-          <div class="hint">Total completed sessions</div>
-        </div>
-      </div>
-    </div>
-  </div> -->
-
-  <!-- ======= CASE OVERVIEW ======= -->
-  <!-- <div class="card-lite mb-3">
-    <div class="card-head">{% bs_icon 'journal-check' %} Case Overview</div>
-    <div class="card-body">
-      <div class="row g-3">
-        <div class="col-12 col-lg-4">
-          <div class="label d-flex align-items-center">
-            {% bs_icon 'calendar3' extra_classes='me-2' %} Date Filed
-          </div>
-          <div class="value mt-1">{{ case.3 }}</div>
-        </div>
-        <div class="col-12 col-lg-4">
-          <div class="label d-flex align-items-center">
-            {% bs_icon 'app' extra_classes='me-2' %} Type
-          </div>
-          <div class="value mt-1">{{ case.5 }}</div>
-        </div>
-        <div class="col-12 col-lg-4">
-          <div class="label d-flex align-items-center">
-            {% bs_icon 'tag' extra_classes='me-2' %} Case Nature
-          </div>
-          <div class="value mt-1">{{ case_nature|default:case.6|default:"—" }}</div>
-        </div>
-      </div>
-
-      <hr class="my-3" style="border-color:var(--line)">
-
-      <div>
-        <div class="label d-flex align-items-center mb-1">
-          {% bs_icon 'journal-text' extra_classes='me-2' %} Incident Description
-        </div>
-        <div class="value" style="white-space:pre-wrap;">
-          {{ incident_description|default:case.4|default:"—" }}
-        </div>
-      </div>
-    </div>
-  </div> -->
 
   <!-- ======= ATTACHED FORMS ======= -->
   <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
@@ -331,41 +202,11 @@
     </div>
 
     <div class="ms-auto d-flex align-items-center gap-2">
-      {% if block_due_to_summons or block_due_to_hearing %}
-        <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#addFormBlockedModal">
-          {% bs_icon 'plus-circle' extra_classes='me-1' %} Add Form
-        </button>
-      {% else %}
-        <a class="btn btn-outline-brand" href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
-          {% bs_icon 'plus-circle' extra_classes='me-1' %} Add Form
-        </a>
-      {% endif %}
-
-      {% with status_txt=case.7|default:''|upper %}
-        {% if has_med_summary or status_txt == 'SETTLED' %}
-          {% if has_med_summary %}
-            <a class="btn btn-outline-brand" href="{% url 'lupon_mem:submission_pdf' med_summary_sid %}">
-              {% bs_icon 'file-earmark-text' extra_classes='me-1' %} View Summary
-            </a>
-          {% else %}
-            <a class="btn btn-outline-brand" href="{% url 'lupon_mem:generate_settlement_summary' case_id %}">
-              {% bs_icon 'file-earmark-plus' extra_classes='me-1' %} Create Summary
-            </a>
-          {% endif %}
-        {% endif %}
-      {% endwith %}
+      <a class="btn btn-outline-brand" href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
+        {% bs_icon 'plus-circle' extra_classes='me-1' %} Add Form
+      </a>
     </div>
   </div>
-
-  {% if block_due_to_hearing %}
-    <div class="helper-note d-inline-flex align-items-center gap-2 mb-2">
-      {% bs_icon 'info-circle' %}
-      <!-- A hearing is scheduled. You can still record <strong>Attendance</strong> for it: -->
-      <!-- <a class="btn btn-link p-0 ms-1" href="{% url 'lupon_mem:add_form_choose_static' case_id %}?allow_med_att=1&from=hearing">
-        {% bs_icon 'calendar-check' %} Add Med/Pangkat Attendance
-      </a> -->
-    </div>
-  {% endif %}
 
   <div class="table-wrap">
     <div class="table-responsive">
@@ -388,14 +229,7 @@
             <td class="fw-semibold">
               {{ f.2 }}
               {% if f.7 %}
-                <span class="badge rounded-pill bg-light text-dark border ms-2">
-                  {{ f.7 }}
-                </span>
-              {% endif %}
-              {% if f.5 %}
-                <span class="badge rounded-pill bg-light text-dark border ms-2" title="Who repudiated the settlement">
-                  Repudiated by: {{ f.5 }}{% if f.6 %} — {{ f.6 }}{% endif %}
-                </span>
+                <span class="badge rounded-pill bg-light text-dark border ms-2">{{ f.7 }}</span>
               {% endif %}
             </td>
             <td>
@@ -425,17 +259,9 @@
   </div>
 
   <div class="sticky-add d-md-none mt-3">
-    {% if block_due_to_summons or block_due_to_hearing %}
-      <button class="btn btn-outline-brand btn-lg rounded-pill"
-              data-bs-toggle="modal" data-bs-target="#addFormBlockedModal">
-        {% bs_icon 'plus-circle' extra_classes='me-1' %} Add Form
-      </button>
-    {% else %}
-      <a class="btn btn-outline-brand btn-lg rounded-pill"
-         href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
-        {% bs_icon 'plus-circle' extra_classes='me-1' %} Add Form
-      </a>
-    {% endif %}
+    <a class="btn btn-outline-brand btn-lg rounded-pill" href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
+      {% bs_icon 'plus-circle' extra_classes='me-1' %} Add Form
+    </a>
   </div>
 
 </div>
@@ -455,9 +281,6 @@
           There is a scheduled <strong>mediation/conciliation hearing</strong>.
           Please record the outcome (<strong>HELD → Settled / Not Settled</strong>) first.
         </p>
-        {% if block_reason_hearing %}
-          <div class="text-muted small">{{ block_reason_hearing }}</div>
-        {% endif %}
       </div>
       <div class="modal-footer" style="border-top:1px solid var(--line);">
         <a href="{% url 'lupon_mem:case_hearing_list' case_id %}" class="btn btn-brand">
@@ -469,171 +292,74 @@
   </div>
 </div>
 
-<!-- ======= BLOCKING MODAL (Add Form) ======= -->
-<div class="modal fade" id="addFormBlockedModal" tabindex="-1" aria-labelledby="addFormBlockedLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content" style="border-radius:14px;">
-      <div class="modal-header" style="border-bottom:1px solid var(--line);">
-        <h5 class="modal-title d-flex align-items-center gap-2" id="addFormBlockedLabel">
-          {% bs_icon 'exclamation-triangle' %} Action Required
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p class="mb-2">You can't attach a new KP form yet. Please complete the pending step(s):</p>
-
-        <ul class="mb-0">
-          {% if block_due_to_summons %}
-            <li class="mb-2">
-              <strong>Latest Summons (KP-9)</strong> — mark the attendance:
-              <em>ATTENDED</em> or <em>NO SHOW</em>.
-              {% if block_reason_summons %}
-                <div class="text-muted small">{{ block_reason_summons }}</div>
-              {% endif %}
-              <div class="mt-2">
-                <a href="{% url 'lupon_mem:summon_attendance' case_id %}" class="btn btn-brand btn-sm">
-                  {% bs_icon 'envelope' extra_classes='me-1' %} Go to Summons / Attendance
-                </a>
-              </div>
-            </li>
-          {% endif %}
-
-          {% if block_due_to_hearing %}
-            <li class="mb-2">
-              <strong>Mediation / Conciliation Hearing</strong> — mark outcome:
-              <em>Settled</em> or <em>Not Settled</em>.
-              {% if block_reason_hearing %}
-                <div class="text-muted small">{{ block_reason_hearing }}</div>
-              {% endif %}
-              <div class="mt-2 d-flex flex-wrap gap-2">
-                <a href="{% url 'lupon_mem:case_hearing_list' case_id %}" class="btn btn-outline-brand btn-sm">
-                  {% bs_icon 'calendar-week' extra_classes='me-1' %} Go to Hearings
-                </a>
-                <a href="{% url 'lupon_mem:add_form_choose_static' case_id %}?allow_med_att=1&from=hearing" class="btn btn-brand btn-sm">
-                  {% bs_icon 'calendar-check' extra_classes='me-1' %} Add Med/Pangkat Attendance
-                </a>
-              </div>
-            </li>
-          {% endif %}
-        </ul>
-      </div>
-      <div class="modal-footer" style="border-top:1px solid var(--line);">
-        <button type="button" class="btn btn-brand-subtle" data-bs-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ======= CLOSE CASE MODAL ======= -->
-<div class="modal fade" id="closeCaseModal" tabindex="-1" aria-labelledby="closeCaseLabel" aria-hidden="true" style="margin-top: 156px;">
-  <div class="modal-dialog">
-    <form method="post" action="{% url 'lupon_mem:case_close' case_id %}" class="modal-content">
-      {% csrf_token %}
-      <div class="modal-header">
-        <h5 class="modal-title" id="closeCaseLabel">{% bs_icon 'lock' %} Close Case</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p class="mb-2">This will mark the case as <strong>CLOSED</strong>.</p>
-        <div class="mb-3">
-          <label class="form-label">Close note (optional)</label>
-          <textarea name="close_note" class="form-control" rows="3" placeholder="Reason / note…"></textarea>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-brand" type="submit">{% bs_icon 'check2' extra_classes='me-1' %} Confirm Close</button>
-        <button class="btn btn-brand-subtle" type="button" data-bs-dismiss="modal">Cancel</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- ======= REOPEN CASE MODAL ======= -->
-<div class="modal fade" id="reopenCaseModal" tabindex="-1" aria-labelledby="reopenCaseLabel" aria-hidden="true" style="margin-top: 150px;">
-  <div class="modal-dialog">
-    <form method="post" action="{% url 'lupon_mem:case_reopen' case_id %}" class="modal-content">
-      {% csrf_token %}
-      <div class="modal-header">
-        <h5 class="modal-title" id="reopenCaseLabel">{% bs_icon 'arrow-counterclockwise' %} Reopen Case</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <p class="mb-2">This will set the case state to <strong>OPEN</strong> and clear any closing stamps.</p>
-        <div class="mb-3">
-          <label class="form-label">Reason (optional)</label>
-          <textarea name="reopen_reason" class="form-control" rows="3" placeholder="Why re-open?"></textarea>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-brand" type="submit">{% bs_icon 'check2' extra_classes='me-1' %} Confirm Reopen</button>
-        <button class="btn btn-brand-subtle" type="button" data-bs-dismiss="modal">Cancel</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- ======= UPDATE SETTLEMENT STATUS MODAL ======= -->
-<div class="modal fade" id="updateSettlementModal" tabindex="-1" aria-labelledby="updateSettlementLabel" aria-hidden="true" style="margin-top: 150px;">
-  <div class="modal-dialog">
-    <form method="post" action="{% url 'lupon_mem:update_settlement_status' case_id %}" class="modal-content">
-      {% csrf_token %}
-      <div class="modal-header">
-        <h5 class="modal-title" id="updateSettlementLabel">{% bs_icon 'hand-thumbs-up' %} Update Settlement Status</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-3">
-          <label class="form-label">Settlement Status</label>
-          <select name="settlement_status" class="form-select" required>
-            <option value="">Select status...</option>
-            <option value="SETTLED">SETTLED</option>
-            <option value="NOT SETTLED">NOT SETTLED</option>
-            <option value="PENDING">PENDING</option>
-          </select>
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Notes (optional)</label>
-          <textarea name="notes" class="form-control" rows="3" placeholder="Additional notes about the settlement status..."></textarea>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-brand" type="submit">{% bs_icon 'check2' extra_classes='me-1' %} Update Status</button>
-        <button class="btn btn-brand-subtle" type="button" data-bs-dismiss="modal">Cancel</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- ======= LUPON FLOW OFFCANVAS (DATE-CONSCIOUS) ======= -->
-<div class="offcanvas offcanvas-end" tabindex="-1" id="luponFlowCanvas" aria-labelledby="luponFlowCanvasLabel" style="width:min(720px, 100vw); margin-top: 150px;" >
+<!-- ======= LUPON FLOW OFFCANVAS ======= -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="luponFlowCanvas" aria-labelledby="luponFlowCanvasLabel" style="width:min(720px, 100vw); margin-top:150px;">
   <div class="offcanvas-header">
     <h5 class="offcanvas-title d-flex align-items-center gap-2" id="luponFlowCanvasLabel">
-      {% bs_icon 'diagram-3' %} Interactive Lupon Flow Guide
+      {% bs_icon 'diagram-3' %} Interactive Lupon Flow Guide (case_detail.html)
     </h5>
     <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
   </div>
   <div class="offcanvas-body">
 
-    <!-- STAGE CHIPS + live windows -->
+    <!-- Hearing Window Bar (Powered by fn_case_hearing_window) -->
+    {% if hearing_window %}
+      <div class="hw-bar mb-3" id="hearingWindowBar">
+        <span class="hw-phase {% if hearing_window.can_set_conciliation and not hearing_window.can_set_mediation %}conc{% endif %}">
+          {% if hearing_window.can_set_mediation and not hearing_window.can_set_conciliation %}
+            Mediation Window
+          {% elif hearing_window.can_set_conciliation %}
+            Conciliation Phase
+          {% else %}
+            Hearing Window
+          {% endif %}
+        </span>
+        <span class="hw-dot"></span>
+        <div class="hw-kv"><strong>{{ hearing_window.days_left }}</strong> days left</div>
+        <span class="hw-dot"></span>
+        <div class="hw-kv">Ends <strong>{{ hearing_window.window_end_date_text }} {{ hearing_window.window_end_time_text }}</strong></div>
+        <div class="hw-stat">Set: {{ hearing_window.mediation_hearings_set }} • Held: {{ hearing_window.mediation_hearings_held }}
+          {% if hearing_window.attendees %} • Attended: {{ hearing_window.attendees }}{% endif %}</div>
+      </div>
+    {% endif %}
+
+    <!-- Stage chips -->
     <div class="flow-toolbar">
-      <span id="chipPB" class="flow-chip">1: Mediation (PB)</span>
-      <span id="chipP1" class="flow-chip">2: Pangkat Conciliation #1</span>
-      <span id="chipP2" class="flow-chip">3: Pangkat Conciliation #2</span>
+      <span id="chipPB" class="flow-chip">1: PB Mediation (3 attempts max)</span>
+      <span id="chipP1" class="flow-chip">2: Pangkat Conciliation</span>
+      <span id="chipP2" class="flow-chip">3: Resolution/CFA</span>
       <div class="ms-auto d-flex align-items-center gap-2">
-        <span class="deadline-pill" id="pbChipPill" hidden>
-          {% bs_icon 'calendar2-event' %} PB: <span id="pbChipDays">—</span>
-        </span>
-        <span class="deadline-pill" id="pangkatChipPill" hidden>
-          {% bs_icon 'calendar-range' %} Pangkat: <span id="pangkatChipDays">—</span>
-        </span>
-        <button class="btn btn-brand btn-sm" onclick="resetFlow()" type="button">Start Over</button>
+        {% if pb_first_meeting_at %}
+          <span class="deadline-pill" id="pbChipPill">
+            {% bs_icon 'calendar2-event' %} PB: <span id="pbChipDays">—</span>
+          </span>
+        {% endif %}
+        {% if pangkat_constituted_at or pangkat_extended_until %}
+          <span class="deadline-pill" id="pangkatChipPill">
+            {% bs_icon 'calendar-range' %} Pangkat: <span id="pangkatChipDays">—</span>
+          </span>
+        {% endif %}
+        <div class="dropdown">
+          <button class="btn btn-outline-brand btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+            Quick Jump
+          </button>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="#" onclick="jumpToMediation(1)">1st Mediation</a></li>
+            <li><a class="dropdown-item" href="#" onclick="jumpToMediation(2)">2nd Mediation</a></li>
+            <li><a class="dropdown-item" href="#" onclick="jumpToMediation(3)">3rd Mediation</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="#" onclick="jumpToPangkat()">Pangkat</a></li>
+            <li><a class="dropdown-item" href="#" onclick="jumpToResolution()">Resolution/CFA</a></li>
+          </ul>
+        </div>
+        <button class="btn btn-brand btn-sm" onclick="resetFlow()" type="button">Reset</button>
         <button class="btn btn-outline-brand btn-sm" onclick="goBack()" type="button" id="backBtn" disabled>Back</button>
         <div class="text-muted small" id="stepCounter">Step 1</div>
       </div>
     </div>
 
     <div class="flow-legend mb-2">
-      Date-conscious guide. <strong>PB mediation:</strong> 15 days from the <em>first PB meeting</em>. Multiple KP-8/KP-9 allowed inside that window. <strong>Pangkat:</strong> convene ≤3 days from constitution; conciliate 15 days (one extension up to 30). Use KP-18/19 for no-shows; choose Arbitration (KP-14→KP-15) any time.
+      Date-conscious guide. <strong>PB mediation:</strong> 15 days from the <em>first PB meeting</em>. Up to 3 mediation attempts (KP-8/KP-9) allowed within that window. <strong>Pangkat:</strong> convene ≤3 days from constitution; conciliate 15 days (one extension up to 30). Use KP-7 through KP-25 as needed.
     </div>
 
     <div id="flowMount" class="card-lite">
@@ -645,7 +371,9 @@
     </div>
   </div>
 </div>
+{% endblock content %}
 
+{% block js %}
 <script>
   /* ===== Filters ===== */
   (function(){
@@ -662,37 +390,11 @@
         });
       }
       q.addEventListener('input', applyFilter);
-      clearBtn?.addEventListener('click', () => { q.value=''; q.focus(); applyFilter(); });
+      clearBtn && clearBtn.addEventListener('click', () => { q.value=''; q.focus(); applyFilter(); });
     }
   })();
 
-  /* ===== Block Modals ===== */
-  const BLOCK_SUMMONS = {{ block_due_to_summons|yesno:"true,false" }};
-  const BLOCK_HEARING = {{ block_due_to_hearing|yesno:"true,false" }};
-  const FORCE_OPEN     = {{ force_open_block_modal|yesno:"true,false" }};
-  const BLOCK_REASON   = "{{ block_reason|default_if_none:'' }}";
-
-  document.addEventListener('DOMContentLoaded', function(){
-    const haveBootstrap = window.bootstrap && window.bootstrap.Modal;
-    function showModalById(id){
-      const el = document.getElementById(id);
-      if (!el) return;
-      if (haveBootstrap) { window.bootstrap.Modal.getOrCreateInstance(el).show(); }
-      else { el.style.display = 'block'; }
-    }
-    if (FORCE_OPEN) {
-      if (BLOCK_REASON === 'hearing') { showModalById('hearingOutcomeModal'); return; }
-      if (BLOCK_REASON === 'summons') { showModalById('addFormBlockedModal'); return; }
-      if (BLOCK_SUMMONS || BLOCK_HEARING) { showModalById('addFormBlockedModal'); return; }
-    }
-    if (BLOCK_HEARING) { showModalById('hearingOutcomeModal'); return; }
-  });
-
-  /* ===== Date sources (server provides when available) =====
-     pb_first_meeting_at: ISO date of first PB meeting (starts 15-day PB window)
-     pangkat_constituted_at: ISO date when Pangkat constituted (convene ≤3 days; 15 days to conciliate)
-     pangkat_extended_until: ISO date for one-time extension upper bound (<= +15 days)
-  */
+  /* ===== Case date context for hero chips ===== */
   const PB_FIRST_MEET = "{{ pb_first_meeting_at|default_if_none:'' }}";
   const PANGKAT_CONS  = "{{ pangkat_constituted_at|default_if_none:'' }}";
   const PANGKAT_EXT   = "{{ pangkat_extended_until|default_if_none:'' }}";
@@ -707,32 +409,27 @@
   }
   function addDays(d, n){ const x = new Date(d); x.setDate(x.getDate()+n); return x; }
 
-  // Compute windows
   const pbFirst = parseISO(PB_FIRST_MEET);
   const pangkatCons = parseISO(PANGKAT_CONS);
   const pangkatExt = parseISO(PANGKAT_EXT);
 
-  const pbDeadline = pbFirst ? addDays(pbFirst, 15) : null;              // PB max period
+  const pbDeadline = pbFirst ? addDays(pbFirst, 15) : null;
   const pangkatBaseDeadline = pangkatCons ? addDays(pangkatCons, 15) : null;
-  const pangkatDeadline = pangkatExt ? new Date(pangkatExt) : pangkatBaseDeadline; // if extended, use extension date
+  const pangkatDeadline = pangkatExt ? new Date(pangkatExt) : pangkatBaseDeadline;
 
-  // Show badges
   function showWindowPills(){
-    // hero
     const pbPill = document.getElementById('pbDaysLeft');
     const pangkatPill = document.getElementById('pangkatDaysLeft');
     if(pbPill && pbDeadline) pbPill.textContent = fmtDaysLeft(pbDeadline);
     if(pangkatPill && pangkatDeadline) pangkatPill.textContent = fmtDaysLeft(pangkatDeadline);
 
-    // offcanvas chips
     const pbChip = document.getElementById('pbChipDays');
     const pkChip = document.getElementById('pangkatChipDays');
     const pbChipWrap = document.getElementById('pbChipPill');
     const pkChipWrap = document.getElementById('pangkatChipPill');
-    if(pbChip && pbDeadline){ pbChip.textContent = fmtDaysLeft(pbDeadline); pbChipWrap.hidden = false; }
-    if(pkChip && pangkatDeadline){ pkChip.textContent = fmtDaysLeft(pangkatDeadline); pkChipWrap.hidden = false; }
+    if(pbChip && pbDeadline){ pbChip.textContent = fmtDaysLeft(pbDeadline); pbChipWrap && (pbChipWrap.hidden = false); }
+    if(pkChip && pangkatDeadline){ pkChip.textContent = fmtDaysLeft(pangkatDeadline); pkChipWrap && (pkChipWrap.hidden = false); }
 
-    // pill severity
     const heroPb = document.getElementById('pbWindowPill');
     const heroPk = document.getElementById('pangkatWindowPill');
     if(heroPb && pbDeadline){
@@ -747,32 +444,86 @@
     }
   }
 
-  /* ===== Interactive Lupon Flow Engine (date-conscious, 3-hearing aware) ===== */
+  /* ===== Attached forms scanner ===== */
+  function collectAttached(){
+    const forms = [];
+    const table = document.getElementById('formsTable');
+    if (!table) return forms;
+    table.querySelectorAll('tbody tr .code-chip').forEach(chip=>{
+      const text = (chip.textContent || "").trim();
+      const m = text.match(/\bKP-\d+[AB]?\b/i);
+      if (m) forms.push(m[0].toUpperCase());
+    });
+    return forms;
+  }
+  let ATTACHED = collectAttached();
+  function haveForm(code){ 
+    const upperCode = String(code || "").toUpperCase();
+    return ATTACHED.includes(upperCode);
+  }
+  function countForms(code){
+    const upperCode = String(code || "").toUpperCase();
+    return ATTACHED.filter(f => f === upperCode).length;
+  }
 
-  // Hearing numbers: 1 = PB Mediation, 2 = Pangkat #1, 3 = Pangkat #2 (final).
-  let hearingNo = 1;
-  let hearingAttempt = 1; // Track PB mediation attempts (1st, 2nd, 3rd)
+  /* ===== Hearing status checker (optional API) ===== */
+  async function checkHearingStatus(){
+    try {
+      const response = await fetch('/lupon_mem/api/hearing-status/{{ case_id }}/', { credentials:'same-origin' });
+      if (!response.ok) throw new Error('net');
+      const data = await response.json();
+      return {
+        hearing_held: !!data.hearing_held,
+        current_step: data.current_step || 'start',
+        hearing_no:   data.hearing_no || 1,
+        hearing_attempt: data.hearing_attempt || 1,
+        outcome: data.outcome || null,
+        attendees: data.attendees || null
+      };
+    } catch (_e) {
+      return { hearing_held:false, current_step:'start', hearing_no:1, hearing_attempt:1, outcome:null, attendees:null };
+    }
+  }
+
+  /* ===== Check mediation hearings ===== */
+  async function checkMediationHearings(){
+    try {
+      const response = await fetch(`/lupon_mem/api/case-mediation-hearings/{{ case_id }}/`, { credentials:'same-origin' });
+      if (!response.ok) throw new Error('net');
+      const data = await response.json();
+      return data || [];
+    } catch (_e) {
+      return [];
+    }
+  }
+
+  /* ===== Get mediation hearing details ===== */
+  async function getMediationHearingDetails(){
+    try {
+      const response = await fetch(`/lupon_mem/api/mediation-hearings/{{ case_id }}/`, { credentials:'same-origin' });
+      if (!response.ok) throw new Error('net');
+      const data = await response.json();
+      return data || [];
+    } catch (_e) {
+      return [];
+    }
+  }
+  let HEARING_HELD = false;
+  let HEARING_STATUS = null;
+
+  /* ===== Stateful flow engine (complete) ===== */
+  let hearingNo = 1;       // 1=PB, 2=Pangkat#1, 3=Pangkat#2
+  let hearingAttempt = 1;  // PB retries (1..3)
   let currentStep = 'start';
   let stepHistory = [];
+  let mediationCount = 0;  // Track mediation attempts within window
 
-  // stage chips
   function highlightStage(){
     document.getElementById('chipPB').classList.toggle('active', hearingNo===1);
     document.getElementById('chipP1').classList.toggle('active', hearingNo===2);
     document.getElementById('chipP2').classList.toggle('active', hearingNo===3);
   }
 
-  // Guards
-  function guardPBWindow(){
-    if(!pbDeadline) return null;
-    const now = new Date();
-    return now <= pbDeadline ? null : "PB mediation window (15 days from first PB meeting) has lapsed. Please constitute the Pangkat (KP-10/11) and proceed to KP-12.";
-  }
-  function guardPangkatWindow(){
-    if(!pangkatDeadline) return null;
-    const now = new Date();
-    return now <= pangkatDeadline ? null : "Pangkat conciliation window has lapsed (15 days, or 30 if extended). Issue Certification to File Action (KP-20A/20B) or proceed per your LGU template.";
-  }
   function showGuard(msg){
     const banner = document.getElementById('guardBanner');
     if(!banner) return;
@@ -782,340 +533,327 @@
     banner.innerHTML = `{% bs_icon 'exclamation-triangle' %} <strong>Time Guard:</strong> ${msg}`;
   }
 
-  // Labels
   function hearingLabel(n){
     if(n === 1) {
       if(hearingAttempt === 1) return '1st Hearing — Mediation (PB)';
       if(hearingAttempt === 2) return '2nd Hearing — Mediation (PB)';
       if(hearingAttempt === 3) return '3rd Hearing — Mediation (PB)';
     }
-    if(n === 2) return '2nd Hearing — Pangkat Conciliation (1st)';
-    if(n === 3) return '3rd Hearing — Pangkat Conciliation (2nd)';
+    if(n === 2) return '1st Pangkat Conciliation';
+    if(n === 3) return '2nd Pangkat Conciliation';
     return '';
   }
 
-  function nextHearingFromCurrent() {
-    if (hearingNo === 1) return 'kp10';            // to Pangkat
-    if (hearingNo === 2) return 'kp12_second';     // Pangkat #2
-    return 'arbitration_or_cert';
-  }
-
+  // Complete Lupon Flow (KP-7 to KP-25) with proper 3 mediation windows
   const FLOW_STEPS = {
-    // Filing
     start: {
-      code: "KP-7", title: "Complaint Filed",
-      note: "Case initiated. Next: schedule the 1st PB mediation (KP-8/KP-9). First PB meeting starts the 15-day PB window.",
-      next: "kp8"
+      code: "KP-7", 
+      title: "Complaint Filed",
+      note: "Case initiated. Complainant files complaint form. Next: schedule the 1st PB mediation within 15 days.",
+      next: "kp8_first",
+      actions: ["Add KP-7", "View Timeline"]
     },
-    // PB notices
-    kp8: {
-      code: "KP-8", title: "Notice of Hearing (PB Mediation)",
-      note: "Set the PB mediation date (within the 15-day PB window). Then issue Summons (KP-9).",
-      next: "kp9_mediation"
+    
+    kp8_first: {
+      code: "KP-8", 
+      title: "Notice of Hearing (1st PB Mediation)",
+      note: "Schedule 1st mediation hearing within 15-day PB window. Must be followed by KP-9 summons.",
+      next: "kp9_first",
+      enter: () => { hearingNo = 1; hearingAttempt = 1; mediationCount = 1; }
     },
-    kp9_mediation: {
-      code: "KP-9", title: "Summons (1st Hearing — PB Mediation)",
-      note: "Summon parties for PB mediation. Re-issue KP-8/KP-9 for resets ONLY within the PB 15-day window.",
-      enter: () => { hearingNo = 1; },
-      guard: () => guardPBWindow(),
-      choices: [
-        { label: "Both attended → SETTLED (KP-16)", next: "kp16_mediation" },
-        { label: "Both attended → NOT SETTLED → Constitute Pangkat", next: "kp10" },
-        { label: "Both attended → AGREE TO ARBITRATION (KP-14)", next: "kp14_arbitration_agree" },
-        { label: "Respondent NO SHOW → If within 15 days, re-schedule (KP-8/9) or KP-19", next: "respondent_noshow_options" },
-        { label: "Complainant NO SHOW → If within 15 days, re-schedule (KP-8/9) or KP-18", next: "complainant_noshow_options" },
-        { label: "Both NO SHOW → Re-schedule or proceed per LGU policy", next: "both_noshow_options" }
+    
+    kp9_first: {
+      code: "KP-9", 
+      title: "Summons (1st Hearing — PB Mediation)",
+      note: "Issue summons to respondent for 1st mediation. After hearing, record outcome in Hearings page.",
+      branches: [
+        { label: "SETTLED", next: "kp16_settled" },
+        { label: "NOT SETTLED", next: "mediation_choice" },
+        { label: "NO SHOW", next: "kp19_first" }
       ]
     },
-    respondent_noshow_options: {
-      code: "—", title: "Respondent No-Show Options",
-      note: "Check if still within 15-day PB window and haven't exceeded 3 total hearings (including no-shows).",
-      guard: () => guardPBWindow(),
-      choices: [
-        { label: "Within 15 days & under 3 hearings → Re-schedule (KP-8 + KP-9)", next: "kp8_reschedule" },
-        { label: "After 15 days OR 3rd hearing → Issue KP-19", next: "kp19_notice_resp" }
+    
+    mediation_choice: {
+      code: "—", 
+      title: "Mediation Options (Within PB Window)",
+      note: "Case not settled in 1st mediation. Choose next action within the 15-day PB window.",
+      branches: [
+        { label: "Schedule 2nd Mediation", next: "kp8_second" },
+        { label: "Constitute Pangkat", next: "kp10" }
       ]
     },
-    complainant_noshow_options: {
-      code: "—", title: "Complainant No-Show Options",
-      note: "Check if still within 15-day PB window and haven't exceeded 3 total hearings (including no-shows).",
-      guard: () => guardPBWindow(),
-      choices: [
-        { label: "Within 15 days & under 3 hearings → Re-schedule (KP-8 + KP-9)", next: "kp8_reschedule" },
-        { label: "After 15 days OR 3rd hearing → Issue KP-18", next: "kp18_notice_comp" }
+    
+    kp8_second: {
+      code: "KP-8", 
+      title: "Notice of Hearing (2nd PB Mediation)",
+      note: "Schedule 2nd mediation hearing within remaining PB window time.",
+      next: "kp9_second",
+      enter: () => { hearingAttempt = 2; mediationCount = 2; }
+    },
+    
+    kp9_second: {
+      code: "KP-9", 
+      title: "Summons (2nd Hearing — PB Mediation)",
+      note: "Issue summons for 2nd mediation attempt. Record outcome after hearing.",
+      branches: [
+        { label: "SETTLED", next: "kp16_settled" },
+        { label: "NOT SETTLED", next: "mediation_choice_2" },
+        { label: "NO SHOW", next: "kp19_second" }
       ]
     },
-    both_noshow_options: {
-      code: "—", title: "Both Parties No-Show Options",
-      note: "Both parties failed to appear. Check window constraints for next steps.",
-      choices: [
-        { label: "Within window → Re-schedule", next: "kp8_reschedule" },
-        { label: "After window → Case Closed/Dismissed", next: "case_dismissed" }
+    
+    mediation_choice_2: {
+      code: "—", 
+      title: "Final Mediation Options",
+      note: "2nd mediation failed. Choose final action within PB window.",
+      branches: [
+        { label: "Schedule 3rd Mediation", next: "kp8_third" },
+        { label: "Constitute Pangkat", next: "kp10" }
       ]
     },
-    kp8_reschedule: {
-      code: "KP-8", title: "Re-schedule Notice of Hearing (2nd PB Mediation)",
-      note: "Re-issue KP-8 for 2nd hearing date within 15-day window. Must also issue KP-9 summons.",
-      next: "kp9_reschedule"
+    
+    kp8_third: {
+      code: "KP-8", 
+      title: "Notice of Hearing (3rd PB Mediation)",
+      note: "Final mediation attempt within PB window. Last chance before Pangkat.",
+      next: "kp9_third",
+      enter: () => { hearingAttempt = 3; mediationCount = 3; }
     },
-    kp9_reschedule: {
-      code: "KP-9", title: "Re-issued Summons (2nd PB Mediation)",
-      note: "Re-summon parties for 2nd PB mediation. Track total hearing count (max 3).",
-      enter: () => { hearingAttempt = 2; },
-      guard: () => guardPBWindow(),
-      choices: [
-        { label: "Both attended → SETTLED (KP-16)", next: "kp16_mediation" },
-        { label: "Both attended → NOT SETTLED → Constitute Pangkat", next: "kp10" },
-        { label: "Both attended → AGREE TO ARBITRATION (KP-14)", next: "kp14_arbitration_agree" },
-        { label: "Respondent NO SHOW again → Check options", next: "respondent_noshow_options" },
-        { label: "Complainant NO SHOW again → Check options", next: "complainant_noshow_options" },
-        { label: "Both NO SHOW → 3rd attempt or case closed", next: "both_noshow_2nd" }
+    
+    kp9_third: {
+      code: "KP-9", 
+      title: "Summons (3rd Hearing — PB Mediation)",
+      note: "Final mediation summons. If unsuccessful, must constitute Pangkat.",
+      branches: [
+        { label: "SETTLED", next: "kp16_settled" },
+        { label: "NOT SETTLED", next: "kp10" },
+        { label: "NO SHOW", next: "kp19_third" }
       ]
     },
-    both_noshow_2nd: {
-      code: "—", title: "Both No-Show (2nd Attempt) Options",
-      note: "Both parties failed to appear for 2nd mediation. Check if 3rd attempt is viable within window.",
-      choices: [
-        { label: "Within window → 3rd attempt", next: "kp8_3rd" },
-        { label: "After window → Case Closed/Dismissed", next: "case_dismissed" }
-      ]
+    
+    kp19_first: {
+      code: "KP-19", 
+      title: "Failure to Appear (1st Mediation)",
+      note: "Respondent failed to appear for 1st mediation. Issue failure to appear notice.",
+      next: "mediation_choice"
     },
-    kp8_3rd: {
-      code: "KP-8", title: "Re-schedule Notice of Hearing (3rd PB Mediation)",
-      note: "Final KP-8 for 3rd hearing date within 15-day window. Must also issue KP-9 summons.",
-      next: "kp9_3rd"
+    
+    kp19_second: {
+      code: "KP-19", 
+      title: "Failure to Appear (2nd Mediation)",
+      note: "Respondent failed to appear for 2nd mediation.",
+      next: "mediation_choice_2"
     },
-    kp9_3rd: {
-      code: "KP-9", title: "Re-issued Summons (3rd PB Mediation)",
-      note: "Final re-summon for 3rd PB mediation. This is the last attempt within PB window.",
-      enter: () => { hearingAttempt = 3; },
-      guard: () => guardPBWindow(),
-      choices: [
-        { label: "Both attended → SETTLED (KP-16)", next: "kp16_mediation" },
-        { label: "Both attended → NOT SETTLED → Constitute Pangkat", next: "kp10" },
-        { label: "Both attended → AGREE TO ARBITRATION (KP-14)", next: "kp14_arbitration_agree" },
-        { label: "Any NO SHOW → Case Closed/Dismissed", next: "case_dismissed" }
-      ]
+    
+    kp19_third: {
+      code: "KP-19", 
+      title: "Failure to Appear (3rd Mediation)",
+      note: "Respondent failed to appear for final mediation. Must constitute Pangkat.",
+      next: "kp10"
     },
-    // Settlement / Repudiation
-    kp16_mediation: {
-      code: "KP-16", title: "Amicable Settlement (Mediation)",
-      note: "Settlement reached in PB mediation. Observe 10-day KP-17 (repudiation) window.",
-      choices: [
-        { label: "No Repudiation → Final → Execution path", next: "kp23_execution_motion" },
-        { label: "Repudiated (KP-17) → Move to Pangkat", next: "kp17_repudiation" }
-      ]
-    },
-    kp17_repudiation: {
-      code: "KP-17", title: "Repudiation of Settlement",
-      note: "Settlement repudiated within the 10-day period. Proceed to Pangkat or (per LGU) issue proper certification.",
-      choices: [
-        { label: "Constitute Pangkat now", next: "kp10" },
-        { label: "Issue Certification (repudiated) — KP-20", next: "kp20_repudiated" }
-      ]
-    },
-    kp20_repudiated: {
-      code: "KP-20", title: "Certification — Settlement Repudiated",
-      note: "Issue certification per LGU KP-20 variant when a settlement is repudiated.",
-      next: "case_closed"
-    },
-
-    // Pangkat constitution
+    
     kp10: {
-      code: "KP-10", title: "Constitute Pangkat",
-      note: "Form the Pangkat. Remember: Pangkat must convene ≤ 3 days from constitution.",
-      next: "kp11"
+      code: "KP-10", 
+      title: "Notice for Constitution of Pangkat",
+      note: "PB mediation failed or window expired. Constitute Pangkat within 3 days. Select 3 members.",
+      next: "kp11",
+      enter: () => { hearingNo = 2; }
     },
+    
     kp11: {
-      code: "KP-11", title: "Notice to Chosen Pangkat Members",
-      note: "Notify Pangkat members. Now schedule Pangkat conciliation hearing #1 (KP-12) within 3 days from constitution.",
+      code: "KP-11", 
+      title: "Notice to Chosen Pangkat Member",
+      note: "Notify selected Pangkat members of their appointment. Pangkat has 15 days to conciliate (extendable to 30).",
       next: "kp12_first"
     },
+    
     kp12_first: {
-      code: "KP-12", title: "Notice of Hearing (2nd Hearing — Pangkat #1)",
-      note: "Set Pangkat #1. Pangkat window: 15 days from first convening (extendable once up to 30 with consent).",
-      next: "kp9_pangkat1"
+      code: "KP-12", 
+      title: "Notice of Hearing (1st Pangkat Conciliation)",
+      note: "Schedule 1st Pangkat conciliation hearing within 15-day window.",
+      next: "pangkat_hearing_1"
     },
-
-    // Pangkat #1
-    kp9_pangkat1: {
-      code: "KP-9", title: "Summons (2nd Hearing — 1st Pangkat)",
-      note: "Summon parties for Pangkat #1. Use KP-18/19 on no-shows. Resets must stay inside Pangkat window.",
-      enter: () => { hearingNo = 2; },
-      guard: () => guardPangkatWindow(),
-      choices: [
-        { label: "Both attended → SETTLED (KP-16)", next: "kp16_pangkat1" },
-        { label: "Both attended → NOT SETTLED → Schedule Pangkat #2", next: "kp12_second" },
-        { label: "Both attended → AGREE TO ARBITRATION (KP-14)", next: "kp14_arbitration_agree" },
-        { label: "Respondent NO SHOW → KP-19", next: "kp19_notice_resp" },
-        { label: "Complainant NO SHOW → KP-18", next: "kp18_notice_comp" },
-        { label: "Both NO SHOW → Re-schedule or proceed per LGU policy", next: "both_noshow_options" }
+    
+    pangkat_hearing_1: {
+      code: "—", 
+      title: "1st Pangkat Conciliation Hearing",
+      note: "Conduct 1st Pangkat conciliation. Record outcome in Hearings page.",
+      branches: [
+        { label: "SETTLED", next: "kp16_settled" },
+        { label: "NOT SETTLED", next: "pangkat_choice_1" },
+        { label: "NO SHOW", next: "kp19_pangkat_1" },
+        { label: "AGREE TO ARBITRATION", next: "kp14" }
       ]
     },
-    kp16_pangkat1: {
-      code: "KP-16", title: "Amicable Settlement (1st Pangkat)",
-      note: "Observe 10-day repudiation window.",
-      choices: [
-        { label: "No Repudiation → Final → Execution path", next: "kp23_execution_motion" },
-        { label: "Repudiated (KP-17) → Continue Pangkat", next: "kp12_second" }
+    
+    pangkat_choice_1: {
+      code: "—", 
+      title: "Pangkat Options (After 1st Hearing)",
+      note: "1st Pangkat hearing unsuccessful. Choose next action within 15-day window.",
+      branches: [
+        { label: "Schedule 2nd Conciliation", next: "kp12_second" },
+        { label: "Issue Certificate to File Action", next: "kp20" }
       ]
     },
-
-    // Pangkat #2 (final attempt)
+    
     kp12_second: {
-      code: "KP-12", title: "Notice of Hearing (3rd Hearing — 2nd Pangkat)",
-      note: "Set the final Pangkat hearing. Resets must remain within Pangkat window (15 or extended 30).",
-      next: "kp9_pangkat2"
+      code: "KP-12", 
+      title: "Notice of Hearing (2nd Pangkat Conciliation)",
+      note: "Schedule 2nd Pangkat conciliation within remaining window.",
+      next: "pangkat_hearing_2",
+      enter: () => { hearingNo = 3; }
     },
-    kp9_pangkat2: {
-      code: "KP-9", title: "Summons (3rd Hearing — 2nd Pangkat)",
-      note: "Final Pangkat attempt. If still unsettled or window lapses → Certification to File Action.",
-      enter: () => { hearingNo = 3; },
-      guard: () => guardPangkatWindow(),
-      choices: [
-        { label: "Both attended → SETTLED (KP-16)", next: "kp16_pangkat2" },
-        { label: "Both attended → NOT SETTLED → Choose next", next: "arbitration_or_cert" },
-        { label: "Both attended → AGREE TO ARBITRATION (KP-14)", next: "kp14_arbitration_agree" },
-        { label: "Respondent NO SHOW → KP-19", next: "kp19_notice_resp" },
-        { label: "Complainant NO SHOW → KP-18", next: "kp18_notice_comp" },
-        { label: "Both NO SHOW → Re-schedule or proceed per LGU policy", next: "both_noshow_options" }
+    
+    pangkat_hearing_2: {
+      code: "—", 
+      title: "2nd Pangkat Conciliation Hearing",
+      note: "Final Pangkat conciliation attempt. Record outcome.",
+      branches: [
+        { label: "SETTLED", next: "kp16_settled" },
+        { label: "NOT SETTLED", next: "kp20" },
+        { label: "NO SHOW", next: "kp19_pangkat_2" },
+        { label: "AGREE TO ARBITRATION", next: "kp14" }
       ]
     },
-    kp16_pangkat2: {
-      code: "KP-16", title: "Amicable Settlement (2nd Pangkat — Final)",
-      note: "Observe 10-day repudiation window.",
-      choices: [
-        { label: "No Repudiation → Final → Execution path", next: "kp23_execution_motion" },
-        { label: "Repudiated (KP-17) → Choose next", next: "arbitration_or_cert" }
-      ]
+    
+    kp19_pangkat_1: {
+      code: "KP-19", 
+      title: "Failure to Appear (1st Pangkat)",
+      note: "Party failed to appear for 1st Pangkat hearing.",
+      next: "pangkat_choice_1"
     },
-
-    // After 3 attempts or failed period
-    arbitration_or_cert: {
-      code: "—", title: "Unsettled after Pangkat — Choose Next Path",
-      note: "Either parties agree to Arbitration (KP-14→KP-15) or issue Certification to File Action (KP-20A/20B per LGU).",
-      choices: [
-        { label: "Agree to Arbitration (KP-14)", next: "kp14_arbitration_agree" },
-        { label: "Certification to File Action — KP-20A", next: "kp20_unsettled" }
-      ]
+    
+    kp19_pangkat_2: {
+      code: "KP-19", 
+      title: "Failure to Appear (2nd Pangkat)",
+      note: "Party failed to appear for 2nd Pangkat hearing. Issue Certificate to File Action.",
+      next: "kp20"
     },
-
-    // Arbitration path (available at any stage; added here for convenience)
-    kp14_arbitration_agree: {
-      code: "KP-14", title: "Agreement to Arbitrate",
-      note: "Written agreement by both parties. There’s a 5-day repudiation window; if none, issue award within the next 10 days.",
-      choices: [
-        { label: "Proceed to KP-15 Award", next: "kp15_award" }
-      ]
+    
+    kp14: {
+      code: "KP-14", 
+      title: "Agreement for Arbitration",
+      note: "Parties agreed to arbitration. Pangkat will decide the case.",
+      next: "kp15"
     },
-
-    kp15_award: {
-      code: "KP-15", title: "Arbitration Award",
-      note: "Award issued. There's a 5-day repudiation window; if none, proceed to execution.",
-      choices: [
-        { label: "No Repudiation → Proceed to Execution", next: "kp23_execution_motion" },
-        { label: "Repudiated → Issue Certification (KP-20)", next: "kp20_arbitration_repudiated" }
-      ]
-    },
-    kp20_arbitration_repudiated: {
-      code: "KP-20", title: "Certification — Arbitration Award Repudiated",
-      note: "Issue certification when arbitration award is repudiated within 5-day period.",
+    
+    kp15: {
+      code: "KP-15", 
+      title: "Arbitration Award",
+      note: "Pangkat renders arbitration decision. Case resolved through arbitration.",
       next: "case_closed"
     },
-
-    // Execution for final settlements/awards
-    kp23_execution_motion: {
-      code: "KP-23", title: "Motion for Execution",
-      note: "Settlement/award final; file motion for execution.",
-      next: "kp24_execution_hearing"
+    
+    kp16_settled: {
+      code: "KP-16", 
+      title: "Amicable Settlement",
+      note: "Case settled through mediation/conciliation. Parties sign settlement agreement.",
+      next: "case_closed"
     },
-    kp24_execution_hearing: {
-      code: "KP-24", title: "Notice of Hearing (re: Motion for Execution)",
-      note: "Set execution motion hearing.",
-      choices: [
-        { label: "Motion Granted → Issue Execution Notice", next: "kp25_execution_notice" },
-        { label: "Motion Denied → Case Closed", next: "case_closed" }
+    
+    kp20: {
+      code: "KP-20", 
+      title: "Certificate to File Action (CFA)",
+      note: "Barangay conciliation failed. Issue CFA allowing parties to file case in court.",
+      branches: [
+        { label: "Issue KP-20", next: "kp20_issued" },
+        { label: "Issue KP-20A (Complainant)", next: "kp20a" },
+        { label: "Issue KP-20B (Respondent)", next: "kp20b" }
       ]
     },
-    kp25_execution_notice: {
-      code: "KP-25", title: "Notice of Execution",
-      note: "Execution granted. Notify parties to comply.",
+    
+    kp20_issued: {
+      code: "KP-20", 
+      title: "Certificate to File Action Issued",
+      note: "CFA issued to both parties. Case may proceed to court.",
       next: "case_closed"
     },
-
-    // Failure to appear
-    kp19_notice_resp: {
-      code: "KP-19", title: "Notice of Failure to Appear (Respondent)",
-      note: "Respondent no-show recorded. If at PB and repeatedly absent, PB may issue KP-24; at Pangkat, proceed to KP-20A/20B as applicable.",
-      choices: [
-        { label: "Continue within window → Next hearing", onClick: () => goToStep(nextHearingFromCurrent()) },
-        { label: "Bar Counterclaim / Cert to File Action", next: "kp20_respondent_noshow" }
-      ]
-    },
-    kp18_notice_comp: {
-      code: "KP-18", title: "Notice of Failure to Appear (Complainant)",
-      note: "Complainant no-show recorded. Repeated unjustified absences may bar action.",
-      choices: [
-        { label: "Continue within window → Next hearing", onClick: () => goToStep(nextHearingFromCurrent()) },
-        { label: "Bar Action (Complainant) — KP-21", next: "kp21_bar_complainant" }
-      ]
-    },
-
-    // Bars / Certifications
-    kp21_bar_complainant: {
-      code: "KP-21", title: "Certification to Bar Action (Complainant)",
-      note: "Complainant repeatedly absent without justification.",
-      next: "case_dismissed"
-    },
-    kp20_unsettled: {
-      code: "KP-20A", title: "Certification — Unsettled after Pangkat",
-      note: "Issue CFA per LGU pack after failure to settle within Pangkat window.",
+    
+    kp20a: {
+      code: "KP-20A", 
+      title: "CFA for Complainant",
+      note: "Certificate issued specifically for complainant to file action in court.",
       next: "case_closed"
     },
-    kp20_respondent_noshow: {
-      code: "KP-20A", title: "Certification — Respondent No-Show",
-      note: "Issue CFA due to respondent’s willful failure to appear.",
+    
+    kp20b: {
+      code: "KP-20B", 
+      title: "CFA for Respondent",
+      note: "Certificate issued for respondent (counter-complaint or defense).",
       next: "case_closed"
     },
-
-    kp20_both_noshow: {
-      code: "KP-20", title: "Certification — Both Parties No-Show",
-      note: "Issue certification per LGU policy when both parties fail to appear.",
+    
+    kp17: {
+      code: "KP-17", 
+      title: "Repudiation of Settlement",
+      note: "Party repudiates previously signed settlement. May lead to CFA issuance.",
+      next: "kp20"
+    },
+    
+    kp18: {
+      code: "KP-18", 
+      title: "Notice of Hearing (Repudiation)",
+      note: "Hearing for repudiation of settlement agreement.",
+      next: "kp17"
+    },
+    
+    kp21: {
+      code: "KP-21", 
+      title: "Withdrawal of Complaint/Petition",
+      note: "Complainant withdraws the case. Case closed.",
       next: "case_closed"
     },
-
-    // Finals
+    
+    kp22: {
+      code: "KP-22", 
+      title: "Dismissal of Complaint/Petition",
+      note: "Case dismissed by Lupon. Case closed.",
+      next: "case_closed"
+    },
+    
+    kp23: {
+      code: "KP-23", 
+      title: "Motion for Execution of Settlement",
+      note: "Motion to enforce settlement agreement.",
+      next: "kp24"
+    },
+    
+    kp24: {
+      code: "KP-24", 
+      title: "Notice of Hearing (Motion for Execution)",
+      note: "Hearing on motion for execution of settlement.",
+      next: "kp25"
+    },
+    
+    kp25: {
+      code: "KP-25", 
+      title: "Notice of Execution",
+      note: "Final notice for execution of settlement agreement.",
+      next: "case_closed"
+    },
+    
     case_closed: {
-      code: "—", title: "Case Closed",
-      note: "Case concluded. Archive records.",
-      final: true
-    },
-    case_dismissed: {
-      code: "—", title: "Case Dismissed",
-      note: "Dismissed due to complainant’s failure to prosecute.",
+      code: "—", 
+      title: "Case Closed",
+      note: "Case has been resolved and closed. No further action required.",
       final: true
     }
   };
 
-  /* Renderer */
-  function renderCurrentStep() {
+  async function renderCurrentStep() {
     const mount = document.getElementById('flowList');
     const title = document.getElementById('flowTitle');
     const counter = document.getElementById('stepCounter');
     const backBtn = document.getElementById('backBtn');
 
     if (!mount || !FLOW_STEPS[currentStep]) return;
-
     const step = FLOW_STEPS[currentStep];
 
-    // stage chip highlight
+    // Refresh attached forms list
+    ATTACHED = collectAttached();
+    
     highlightStage();
 
-    // Guard messages (date-conscious)
-    const guardMsg = typeof step.guard === 'function' ? step.guard() : null;
-    showGuard(guardMsg);
-
-    // run on-enter once
     if (typeof step.enter === 'function' && !step.__entered) {
       step.__entered = true;
       step.enter();
@@ -1125,34 +863,40 @@
     counter.textContent = `Step ${stepHistory.length + 1}`;
     backBtn.disabled = stepHistory.length === 0;
 
-    mount.innerHTML = '';
+    // Check time constraints
+    let timeWarning = '';
+    if (currentStep.includes('kp8') || currentStep.includes('kp9')) {
+      if (pbDeadline) {
+        const daysLeft = Math.ceil((pbDeadline - new Date()) / (1000*60*60*24));
+        if (daysLeft <= 0) {
+          timeWarning = 'PB mediation window has expired. Must constitute Pangkat.';
+        } else if (daysLeft <= 3) {
+          timeWarning = `Only ${daysLeft} day${daysLeft===1?'':'s'} left in PB mediation window.`;
+        }
+      }
+    } else if (currentStep.includes('pangkat') || currentStep.includes('kp1')) {
+      if (pangkatDeadline) {
+        const daysLeft = Math.ceil((pangkatDeadline - new Date()) / (1000*60*60*24));
+        if (daysLeft <= 0) {
+          timeWarning = 'Pangkat conciliation window has expired. Must issue CFA.';
+        } else if (daysLeft <= 3) {
+          timeWarning = `Only ${daysLeft} day${daysLeft===1?'':'s'} left in Pangkat window.`;
+        }
+      }
+    }
+    showGuard(timeWarning);
 
+    mount.innerHTML = '';
     const li = document.createElement('li');
     li.className = 'flow-step';
-
-    let actionsHtml = '';
-
-    // Quick actions
-    if (step.code && step.code.startsWith('KP-')) {
-      actionsHtml += `<a href="{% url 'lupon_mem:add_form_choose_static' case_id %}" class="btn btn-outline-brand btn-sm">
-        {% bs_icon 'plus-circle' %} Add ${step.code}
-      </a>`;
-    }
-    if (/Hearing|Mediation|Pangkat|Arbitration/i.test(step.title)) {
-      actionsHtml += `<a href="{% url 'lupon_mem:case_hearing_list' case_id %}" class="btn btn-brand-subtle btn-sm">
-        {% bs_icon 'calendar-week' %} Hearings
-      </a>`;
-    }
-    if (/Summons/i.test(step.title)) {
-      actionsHtml += `<a href="{% url 'lupon_mem:summon_attendance' case_id %}" class="btn btn-brand-subtle btn-sm">
-        {% bs_icon 'envelope' %} Attendance
-      </a>`;
-    }
-
-    let hearingBadge = '';
-    if (/Summons|Hearing|Mediation|Pangkat/i.test(step.title)) {
-      hearingBadge = `<div class="subtitle mt-1"><span class="branch">${hearingLabel(hearingNo)}</span></div>`;
-    }
+    
+    // Show hearing badge for relevant steps
+    const hearingBadge = /Summons|Hearing|Mediation|Pangkat|Conciliation/i.test(step.title)
+      ? `<div class="subtitle mt-1"><span class="branch">${hearingLabel(hearingNo)}</span></div>` : '';
+    
+    // Show mediation count for PB steps
+    const mediationBadge = currentStep.includes('kp8') || currentStep.includes('kp9')
+      ? `<div class="subtitle mt-1"><span class="branch">Mediation ${mediationCount}/3 within PB Window</span></div>` : '';
 
     li.innerHTML = `
       <div class="flow-dot" style="background: var(--brand-700); border-color: var(--brand-700);"></div>
@@ -1162,76 +906,377 @@
           ${step.title}
         </div>
         ${hearingBadge}
-        <div class="note">${step.note}</div>
+        ${mediationBadge}
+        <div class="note">${step.note || ""}</div>
+        <div id="hearingOutcomeDisplay-${currentStep}" class="mt-2"></div>
         <div class="step-actions mt-2">
-          ${actionsHtml}
+          ${(() => {
+            if (!step.code || step.code === '—') return '';
+            
+            let hasRequiredForm = false;
+            if (currentStep === 'kp8_second') {
+              hasRequiredForm = countForms('KP-8') >= 2;
+            } else if (currentStep === 'kp8_third') {
+              hasRequiredForm = countForms('KP-8') >= 3;
+            } else if (currentStep === 'kp9_first') {
+              hasRequiredForm = countForms('KP-9') >= 1;   // <-- KP-9 counting
+            } else if (currentStep === 'kp9_second') {
+              hasRequiredForm = countForms('KP-9') >= 2;   // <-- KP-9 counting
+            } else if (currentStep === 'kp9_third') {
+              hasRequiredForm = countForms('KP-9') >= 3;   // <-- KP-9 counting
+            } else {
+              hasRequiredForm = haveForm(step.code);
+            }
+            
+            if (hasRequiredForm) {
+              return `<span class="badge bg-success">
+                {% bs_icon 'check-circle' %} ${step.code} Added
+              </span>`;
+            } else {
+              return `<button class="btn btn-outline-brand btn-sm" onclick="openFormBuilder('${step.code}')">
+                {% bs_icon 'plus-circle' %} Add ${step.code}
+              </button>`;
+            }
+          })()}
+
         </div>
       </div>
     `;
     mount.appendChild(li);
 
-    // Choices
-    if (step.choices) {
-      const choicesDiv = document.createElement('div');
-      choicesDiv.className = 'mt-3';
-      choicesDiv.innerHTML = '<div class="fw-bold mb-2">What happened?</div>';
+    // Handle branches (multiple options)
+    if (step.branches && step.branches.length > 0) {
+      let canShowBranches = true;
+      
+      // For KP-9 steps, require both KP-8 and KP-9 to be attached for specific attempt
+      if (currentStep.includes('kp9')) {
+        let requiredKp8Count = 1, requiredKp9Count = 1;
+        if (currentStep === 'kp9_second') { requiredKp8Count = 2; requiredKp9Count = 2; }
+        if (currentStep === 'kp9_third')  { requiredKp8Count = 3; requiredKp9Count = 3; }
+        canShowBranches = countForms('KP-8') >= requiredKp8Count && countForms('KP-9') >= requiredKp9Count;
+      }
+      // For KP-8 steps, check specific attempt count
+      else if (currentStep.includes('kp8')) {
+        let requiredCount = 1;
+        if (currentStep === 'kp8_second') requiredCount = 2;
+        if (currentStep === 'kp8_third')  requiredCount = 3;
+        canShowBranches = countForms('KP-8') >= requiredCount;
+      }
+      // For other steps with codes, require that form to be attached
+      else if (step.code && step.code !== '—') {
+        canShowBranches = haveForm(step.code);
+      }
+      
+      if (canShowBranches) {
+        const branchDiv = document.createElement('div');
+        branchDiv.className = 'mt-3';
+        
+        if (currentStep.includes('kp9')) {
+          // Check hearing status and display outcome panel
+          const mediationHearings = await getMediationHearingDetails();
+          const currentHearing = mediationHearings.find(h => h.hearing_no === hearingAttempt);
+          
+          const outcomeDisplay = document.getElementById(`hearingOutcomeDisplay-${currentStep}`);
+          if (outcomeDisplay && currentHearing) {
+            const isHeld = currentHearing.hearing_held;
+            const attendees = [];
+            if (currentHearing.complainant_attended === 'TRUE') attendees.push('Complainant');
+            if (currentHearing.respondent_attended === 'TRUE') attendees.push('Respondent');
+            
+            outcomeDisplay.innerHTML = `
+              <div class="alert ${isHeld ? 'alert-success' : 'alert-secondary'} mb-2">
+                <div class="fw-bold mb-2">Hearing Status: 
+                  <span class="badge ${isHeld ? 'bg-success' : 'bg-secondary'}">
+                    ${isHeld ? 'HELD' : 'NOT HELD'}
+                  </span>
+                </div>
+                ${isHeld && currentHearing.settlement_outcome ? `
+                  <div class="mb-2">
+                    <strong>Outcome:</strong> 
+                    <span class="badge ${currentHearing.settlement_outcome === 'SETTLED' ? 'bg-success' : 'bg-warning'} ms-1">
+                      ${currentHearing.settlement_outcome}
+                    </span>
+                  </div>
+                ` : ''}
+                ${isHeld && attendees.length > 0 ? `
+                  <div class="mb-1"><strong>Who attended:</strong></div>
+                  <div class="d-flex gap-1 flex-wrap">
+                    ${attendees.map(a => `<span class="badge bg-light text-dark border">${a}</span>`).join('')}
+                  </div>
+                ` : isHeld ? `
+                  <div class="mb-1"><strong>Who attended:</strong> <span class="text-muted">None</span></div>
+                ` : ''}
+              </div>
+            `;
+          }
+          
+          // If hearing is HELD, allow choosing the legal outcome directly (no attendance form)
+          if (currentHearing && currentHearing.hearing_held) {
+            branchDiv.innerHTML = `
+              <div class="fw-bold mb-2 text-muted">Choose Outcome:</div>
+            `;
+            const settledBtn = document.createElement('button');
+            settledBtn.className = 'btn btn-outline-brand btn-sm me-2 mb-2';
+            settledBtn.textContent = 'SETTLED';
+            settledBtn.onclick = () => goToStep('kp16_settled');
 
-      step.choices.forEach(choice => {
-        const btn = document.createElement('button');
-        btn.className = 'btn btn-outline-brand btn-sm me-2 mb-2';
-        btn.textContent = choice.label;
-        btn.onclick = () => {
-          if (choice.onClick) return choice.onClick();
-          return goToStep(choice.next);
-        };
-        choicesDiv.appendChild(btn);
-      });
+            const notSettledBtn = document.createElement('button');
+            notSettledBtn.className = 'btn btn-outline-brand btn-sm me-2 mb-2';
+            notSettledBtn.textContent = 'NOT SETTLED';
+            notSettledBtn.onclick = () => {
+              if (currentStep === 'kp9_first') goToStep('mediation_choice');
+              else if (currentStep === 'kp9_second') goToStep('mediation_choice_2');
+              else goToStep('kp10');
+            };
 
-      mount.appendChild(choicesDiv);
-    } else if (step.next && !step.final) {
-      const nextDiv = document.createElement('div');
-      nextDiv.className = 'mt-3';
-      const nextBtn = document.createElement('button');
-      nextBtn.className = 'btn btn-brand btn-sm';
-      nextBtn.textContent = 'Next Step';
-      nextBtn.onclick = () => goToStep(step.next);
-      nextDiv.appendChild(nextBtn);
-      mount.appendChild(nextDiv);
-    } else if (step.final) {
+            branchDiv.appendChild(settledBtn);
+            branchDiv.appendChild(notSettledBtn);
+          } else {
+            // Not held → prompt to record outcome (could be NO SHOW or moved)
+            branchDiv.innerHTML = `
+              <div class="fw-bold mb-2 text-muted">What happened?</div>
+              <div class="mb-2">
+                <a href="{% url 'lupon_mem:case_hearing_list' case_id %}" class="btn btn-brand btn-sm">
+                  {% bs_icon 'calendar-week' %} Record Outcome
+                </a>
+              </div>
+              <div class="text-muted small">
+                Record if hearing was held, not held, or parties didn't attend
+              </div>
+            `;
+          }
+        } else {
+          // Default branch buttons
+          branchDiv.innerHTML = '<div class="fw-bold mb-2 text-muted">What happened?</div>';
+          step.branches.forEach(branch => {
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-outline-brand btn-sm me-2 mb-2';
+            btn.textContent = branch.label;
+            btn.onclick = () => goToStep(branch.next);
+            branchDiv.appendChild(btn);
+          });
+        }
+        
+        mount.appendChild(branchDiv);
+      } else {
+        const requireDiv = document.createElement('div');
+        requireDiv.className = 'mt-3 alert alert-info';
+        if (currentStep.includes('kp9')) {
+          requireDiv.innerHTML = `
+            {% bs_icon 'info-circle' %} <strong>Required:</strong> 
+            For this attempt, attach both KP-8 and KP-9 (same attempt number) before recording the hearing outcome.
+          `;
+        } else {
+          requireDiv.innerHTML = `
+            {% bs_icon 'info-circle' %} <strong>Required:</strong> 
+            ${step.code} must be attached before proceeding.
+          `;
+        }
+        mount.appendChild(requireDiv);
+      }
+    }
+    // Handle single next step - only show if required forms are attached
+    else if (step.next && !step.final) {
+      let canProceed = true;
+      
+      // Check if current step form is required and attached (with counting)
+      if (step.code && step.code !== '—') {
+        if (currentStep === 'kp8_second')       canProceed = countForms('KP-8') >= 2;
+        else if (currentStep === 'kp8_third')   canProceed = countForms('KP-8') >= 3;
+        else if (currentStep === 'kp9_first')   canProceed = countForms('KP-9') >= 1; // KP-9 attempts
+        else if (currentStep === 'kp9_second')  canProceed = countForms('KP-9') >= 2; // KP-9 attempts
+        else if (currentStep === 'kp9_third')   canProceed = countForms('KP-9') >= 3; // KP-9 attempts
+        else                                    canProceed = haveForm(step.code);
+      }
+      
+      if (canProceed) {
+        const nextDiv = document.createElement('div');
+        nextDiv.className = 'mt-3';
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'btn btn-brand btn-sm';
+        nextBtn.textContent = step.next === 'case_closed' ? 'Close Case' : 'Next Step';
+        nextBtn.onclick = () => goToStep(step.next);
+        nextDiv.appendChild(nextBtn);
+        mount.appendChild(nextDiv);
+      } else {
+        const requireDiv = document.createElement('div');
+        requireDiv.className = 'mt-3 alert alert-info';
+        requireDiv.innerHTML = `
+          {% bs_icon 'info-circle' %} <strong>Required:</strong> 
+          ${step.code} must be attached before proceeding to the next step.
+        `;
+        mount.appendChild(requireDiv);
+      }
+    }
+    // Handle final step
+    else if (step.final) {
       const finalDiv = document.createElement('div');
       finalDiv.className = 'mt-3 alert alert-success';
-      finalDiv.innerHTML = '<strong>Process Complete!</strong> This case path is finished.';
+      finalDiv.innerHTML = `
+        {% bs_icon 'check-circle' %} <strong>Case Complete:</strong> 
+        This case has reached its conclusion through the Barangay Justice System.
+      `;
       mount.appendChild(finalDiv);
     }
   }
 
   function goToStep(stepId) {
-    if (FLOW_STEPS[stepId]) {
-      stepHistory.push(currentStep);
-      currentStep = stepId;
-      renderCurrentStep();
-    }
+    if (!FLOW_STEPS[stepId]) return;
+    stepHistory.push(currentStep);
+    currentStep = stepId;
+    renderCurrentStep();
   }
+  
   function goBack() {
     if (stepHistory.length > 0) {
       currentStep = stepHistory.pop();
       renderCurrentStep();
     }
   }
+  
   function resetFlow() {
     hearingNo = 1;
     hearingAttempt = 1;
+    mediationCount = 0;
     Object.values(FLOW_STEPS).forEach(s => { if (s.__entered) delete s.__entered; });
     currentStep = 'start';
     stepHistory = [];
+    showGuard('');
     renderCurrentStep();
   }
+  
+  // Smart step detection based on attached forms
+  function detectCurrentStep() {
+    if (haveForm('KP-25')) return 'kp25';
+    if (haveForm('KP-24')) return 'kp24';
+    if (haveForm('KP-23')) return 'kp23';
+    if (haveForm('KP-22')) return 'kp22';
+    if (haveForm('KP-21')) return 'kp21';
+    if (haveForm('KP-20B')) return 'kp20b';
+    if (haveForm('KP-20A')) return 'kp20a';
+    if (haveForm('KP-20')) return 'kp20_issued';
+    if (haveForm('KP-19')) {
+      if (haveForm('KP-12')) return 'kp19_pangkat_1';
+      return 'kp19_first';
+    }
+    if (haveForm('KP-18')) return 'kp18';
+    if (haveForm('KP-17')) return 'kp17';
+    if (haveForm('KP-16')) return 'kp16_settled';
+    if (haveForm('KP-15')) return 'kp15';
+    if (haveForm('KP-14')) return 'kp14';
+    if (haveForm('KP-12')) {
+      return 'kp12_second';
+    }
+    if (haveForm('KP-11')) return 'kp11';
+    if (haveForm('KP-10')) return 'kp10';
 
-  document.addEventListener('DOMContentLoaded', function(){
+    // Use paired counts to choose KP-9 step
+    if (haveForm('KP-9')) {
+      const kp8Count = countForms('KP-8');
+      const kp9Count = countForms('KP-9');
+      const paired = Math.min(kp8Count, kp9Count);
+      if (paired >= 3) return 'kp9_third';
+      if (paired >= 2) return 'kp9_second';
+      return 'kp9_first';
+    }
+    if (haveForm('KP-8')) {
+      const kp8Count = countForms('KP-8');
+      if (kp8Count >= 3) return 'kp8_third';
+      if (kp8Count >= 2) return 'kp8_second';
+      return 'kp8_first';
+    }
+    if (haveForm('KP-7')) return 'kp8_first';
+    return 'start';
+  }
+  
+  // Quick navigation functions
+  function jumpToMediation(attempt) {
+    hearingAttempt = attempt;
+    mediationCount = attempt;
+    if (attempt === 1) goToStep('kp8_first');
+    else if (attempt === 2) goToStep('kp8_second');
+    else if (attempt === 3) goToStep('kp8_third');
+  }
+  
+  function jumpToPangkat() {
+    hearingNo = 2;
+    goToStep('kp10');
+  }
+  
+  function jumpToResolution() {
+    goToStep('kp20');
+  }
+
+  // Form mapping for direct access (MED-ATT removed)
+  const FORM_MAP = {
+    'KP-1': 1, 'KP-2': 2, 'KP-3': 3, 'KP-4': 4, 'KP-5': 5, 'KP-6': 6,
+    'KP-7': 7, 'KP-8': 8, 'KP-9': 9, 'KP-10': 10, 'KP-11': 11, 'KP-12': 12,
+    'KP-13': 13, 'KP-14': 14, 'KP-15': 15, 'KP-16': 16, 'KP-17': 17, 'KP-18': 18,
+    'KP-19': 19, 'KP-20': 20, 'KP-20A': 21, 'KP-20B': 22, 'KP-21': 23, 'KP-22': 24,
+    'KP-23': 25, 'KP-24': 26, 'KP-25': 27, 'KP-26': 28
+  };
+
+  // Direct form builder function
+  function openFormBuilder(formCode) {
+    const formId = FORM_MAP[formCode];
+    if (formId) {
+      window.location.href = `/lupon_mem/cases/{{ case_id }}/forms/${formId}/build/`;
+    } else {
+      window.location.href = `{% url 'lupon_mem:add_form_choose_static' case_id %}`;
+    }
+  }
+
+  function recordOutcome() {
+    window.location.href = `/lupon_mem/cases/{{ case_id }}/hearings/`;
+  }
+
+  // Init
+  document.addEventListener('DOMContentLoaded', async function(){
     showWindowPills();
-    // refresh countdowns every minute
     setInterval(showWindowPills, 60000);
+
+    const canvasEl = document.getElementById('luponFlowCanvas');
+    if (canvasEl && window.bootstrap?.Offcanvas) {
+      canvasEl.addEventListener('shown.bs.offcanvas', async () => {
+        // Try to get hearing status from API
+        HEARING_STATUS = await checkHearingStatus();
+        HEARING_HELD = HEARING_STATUS.hearing_held;
+        
+        // Use API data if available, otherwise detect from forms
+        if (HEARING_STATUS.current_step && HEARING_STATUS.current_step !== 'start') {
+          currentStep = HEARING_STATUS.current_step;
+          hearingNo = HEARING_STATUS.hearing_no;
+          hearingAttempt = HEARING_STATUS.hearing_attempt;
+        } else {
+          // Smart detection based on attached forms
+          const detectedStep = detectCurrentStep();
+          if (detectedStep !== 'start') {
+            currentStep = detectedStep;
+            // Set appropriate hearing context based on detected step
+            if (currentStep.includes('kp8') || currentStep.includes('kp9')) {
+              hearingNo = 1;
+              if (currentStep.includes('second')) {
+                hearingAttempt = 2;
+                mediationCount = 2;
+              } else if (currentStep.includes('third')) {
+                hearingAttempt = 3;
+                mediationCount = 3;
+              } else {
+                hearingAttempt = 1;
+                mediationCount = 1;
+              }
+            } else if (currentStep.includes('kp1') || currentStep.includes('pangkat')) {
+              hearingNo = 2;
+            }
+          }
+        }
+        
+        renderCurrentStep();
+      });
+    }
+    
+    // Initial render
     renderCurrentStep();
   });
 </script>
-{% endblock %}
+{% endblock js %}

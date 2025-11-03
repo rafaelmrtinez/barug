@@ -1,0 +1,36 @@
+<!-- Add this pagination snippet to your report_list.html template -->
+<!-- Place this at the bottom of your reports table -->
+
+{% if reports.has_other_pages %}
+<nav aria-label="Reports pagination">
+    <ul class="pagination justify-content-center">
+        {% if reports.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1{% if q %}&q={{ q }}{% endif %}{% if f_payment %}&payment={{ f_payment }}{% endif %}{% if f_blotter %}&blotter_status={{ f_blotter }}{% endif %}{% if f_date_from %}&date_from={{ f_date_from }}{% endif %}{% if f_date_to %}&date_to={{ f_date_to }}{% endif %}">&laquo; First</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ reports.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if f_payment %}&payment={{ f_payment }}{% endif %}{% if f_blotter %}&blotter_status={{ f_blotter }}{% endif %}{% if f_date_from %}&date_from={{ f_date_from }}{% endif %}{% if f_date_to %}&date_to={{ f_date_to }}{% endif %}">Previous</a>
+            </li>
+        {% endif %}
+
+        <li class="page-item active">
+            <span class="page-link">
+                Page {{ reports.number }} of {{ reports.paginator.num_pages }}
+            </span>
+        </li>
+
+        {% if reports.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ reports.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if f_payment %}&payment={{ f_payment }}{% endif %}{% if f_blotter %}&blotter_status={{ f_blotter }}{% endif %}{% if f_date_from %}&date_from={{ f_date_from }}{% endif %}{% if f_date_to %}&date_to={{ f_date_to }}{% endif %}">Next</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ reports.paginator.num_pages }}{% if q %}&q={{ q }}{% endif %}{% if f_payment %}&payment={{ f_payment }}{% endif %}{% if f_blotter %}&blotter_status={{ f_blotter }}{% endif %}{% if f_date_from %}&date_from={{ f_date_from }}{% endif %}{% if f_date_to %}&date_to={{ f_date_to }}{% endif %}">Last &raquo;</a>
+            </li>
+        {% endif %}
+    </ul>
+</nav>
+
+<div class="text-center text-muted">
+    Showing {{ reports.start_index }} to {{ reports.end_index }} of {{ reports.paginator.count }} reports
+</div>
+{% endif %}
