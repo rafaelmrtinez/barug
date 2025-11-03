@@ -26,6 +26,15 @@
   .or-badge{ background:var(--accent); color:#000; font-weight:800; border-radius:6px; padding:2px 6px; }
 </style>
 
+{% if messages %}
+  <div class="container mt-3">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags|default:'info' }} mb-2">{{ message }}</div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+
 <div class="container py-3" style="margin-top: 40px;">
   <div class="d-flex align-items-center justify-content-between mb-2">
     <a class="btn btn-outline-secondary btn-sm" href="{% url 'treasurer:business_renewal' %}">
@@ -76,29 +85,168 @@
       <div class="card card-soft sticky-aside">
         <div class="card-body">
           <div class="d-flex align-items-center justify-content-between mb-2">
-            <div class="section-title mb-0"><span class="dot"></span> Payment</div>
+            <div class="section-title mb-0"><span class="dot"></span> Take Payment</div>
             <span class="status-chip {{ status_ui.cls }}">{{ status_ui.label }}</span>
           </div>
 
-          <div class="small text-muted mb-1">Official Receipt Number:</div>
-          {% if renewal.or_number %}
+          <div class="small-muted mb-1">Official Receipt Number:</div>
+          {% if payments.latest_or_number %}
             <div class="mb-3 or-highlight">
               <div class="d-flex align-items-center justify-content-between">
-                <div class="fw-semibold"><span class="or-badge me-2">OR</span> {{ renewal.or_number }}</div>
-                {% if renewal.paid_on %}<i class="bi bi-check-circle-fill text-success"></i>{% endif %}
+                <div class="fw-semibold"><span class="or-badge me-2">OR</span> {{ payments.latest_or_number }}</div>
+                <i class="bi bi-check-circle-fill text-success"></i>
               </div>
-              <div class="small text-muted">
-                {% if renewal.paid_on %}{{ renewal.paid_on|date:"M d, Y, P" }}{% else %}Unpaid{% endif %}
-              </div>
+              <div class="small text-muted">{{ payments.latest_or_time|date:"M d, Y, P" }}</div>
             </div>
           {% else %}
             <div class="mb-3 text-muted">None yet</div>
           {% endif %}
 
-          <div class="small text-muted">
-            Created: {% if renewal.created_at %}{{ renewal.created_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}
-            {% if renewal.updated_at %}<br>Updated: {{ renewal.updated_at|date:"Y-m-d H:i" }}{% endif %}
+          <div class="small-muted mb-1">Created:</div>
+          <div class="small-muted mb-3">{% if renewal.created_at %}{{ renewal.created_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}{% if renewal.updated_at %}<br>Updated: {{ renewal.updated_at|date:"Y-m-d H:i" }}{% endif %}</div>
+
+          {% comment %}
+          <!-- DEBUG: Visibility inspector (for renewal) -->
+          <div class="alert alert-secondary small" style="border-style:dashed; display:none;">
+            <div class="fw-bold mb-1">DEBUG — Button visibility</div>
+            <ul class="mb-0 ps-3">
+              <li>has_or: {% if payments.latest_or_number %}yes{% else %}no{% endif %}</li>
+              <li>is_zero: {% if renewal.total_quote_f|floatformat:2 == "0.00" %}yes{% else %}no{% endif %}</li>
+              <li>is_walkin (staff-added): {% if renewal.requested_by_staff_id or renewal.request_added_by_id or renewal.added_by_id or renewal.request_added_by or renewal.added_by %}yes{% else %}no{% endif %}</li>
+              <li>status_upper: {{ renewal.status|upper }}</li>
+            </ul>
           </div>
+          {% endcomment %}
+
+          {# ONLINE: Confirm & Post OR — only when STATUS_CHANGED to PAID by SYSTEM exists #}
+          {% if renewal.total_quote_f|floatformat:2 != "0.00" and not renewal.requested_by_staff_id and not renewal.request_added_by_id and not renewal.added_by_id and not renewal.request_added_by and not renewal.added_by %}
+            {% if renewal.status|upper == "PAID" or renewal.status|upper == "FOR_TREASURER_REVIEW" %}
+              <div class="mb-4" id="confirm-or-section" style="display:none;">
+                <div class="alert alert-info mb-3 border-0" style="background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%); border-left: 4px solid #2196f3 !important;">
+                  <div class="d-flex align-items-center gap-2 mb-1">
+                    <i class="bi bi-check-circle-fill text-primary"></i>
+                    <strong>Confirm &amp; Post OR</strong>
+                  </div>
+                  <div class="small text-muted">Use for online payments when payment is confirmed by system.</div>
+                </div>
+                <form method="post" action="{% url 'treasurer:confirm_post_or' renewal.renewal_request_id %}">
+                  {% csrf_token %}
+                  <div class="mb-2">
+                    <label class="form-label">OR Payment Method</label>
+
+                    <!-- Always submit 2 -->
+                    <input type="hidden" name="payment_method_id" value="2">
+
+                    <!-- Read-only display (not editable) -->
+                    <div class="form-control-plaintext py-2 px-3 bg-light rounded border">
+                      {% for m in methods %}
+                        {% if m.payment_method_id == 2 %}
+                          {{ m.method_name|default:"PAYMENT METHOD #2" }}
+                        {% endif %}
+                      {% endfor %}
+                    </div>
+
+                    <div class="form-text">Amount: ₱{{ renewal.total_quote_f|floatformat:2 }}</div>
+                  </div>
+
+                  <button type="button" class="btn btn-primary w-100 py-2 js-confirm" style="background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%); border: none; font-weight: 600; box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);" data-confirm-title="Confirm &amp; Post OR" data-confirm-message="This will confirm the online payment and generate an Official Receipt. Do you want to proceed?">
+                    <i class="bi bi-receipt me-2"></i>Confirm &amp; Post OR → Move to Printing
+                  </button>
+                </form>
+
+              </div>
+            {% endif %}
+          {% endif %}
+
+          {# WAIVED: Issue Waived OR — only when ₱0.00 and no OR #}
+          {% if not payments.latest_or_number and renewal.total_quote_f|floatformat:2 == "0.00" %}
+            <hr class="my-3">
+            <div class="mb-4">
+              <div class="alert alert-success mb-3 border-0" style="background: linear-gradient(135deg, #e8f5e8 0%, #f1f8e9 100%); border-left: 4px solid #4caf50 !important;">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <i class="bi bi-gift-fill text-success"></i>
+                  <strong>Issue Waived OR</strong>
+                </div>
+                <div class="small text-muted">Use when fee is fully waived (₱0.00).</div>
+              </div>
+              {% if waived_method_id %}
+                <form method="post" action="{% url 'treasurer:business_renewal_take_payment' renewal.renewal_request_id %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="payment_method_id" value="{{ waived_method_id }}">
+                  <input type="hidden" name="amount_paid" value="0">
+                  <button type="button" class="btn btn-success w-100 py-2 js-confirm" style="background: linear-gradient(135deg, #388e3c 0%, #66bb6a 100%); border: none; font-weight: 600; box-shadow: 0 4px 12px rgba(56, 142, 60, 0.3);" data-confirm-title="Issue Waived OR" data-confirm-message="This will issue a waived Official Receipt for ₱0.00. Do you want to proceed?">
+                    <i class="bi bi-gift me-2"></i>Issue Waived OR (₱0.00)
+                  </button>
+                </form>
+              {% else %}
+                <div class="alert alert-warning">
+                  Payment method <strong>WAIVED</strong> not found. Add it in the database.
+                </div>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          {# WALK-IN: Accept Payment & Post OR — staff added, not ₱0.00, no OR #}
+          {% if not payments.latest_or_number and renewal.total_quote_f|floatformat:2 != "0.00" %}
+            {% if renewal.requested_by_staff_id or renewal.request_added_by_id or renewal.added_by_id or renewal.request_added_by or renewal.added_by %}
+              <hr class="my-3">
+              <div>
+                <div class="alert alert-warning mb-3 border-0" style="background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%); border-left: 4px solid #ff9800 !important;">
+                  <div class="d-flex align-items-center gap-2 mb-1">
+                    <i class="bi bi-cash-coin text-warning"></i>
+                    <strong>Accept Payment &amp; Post OR</strong>
+                  </div>
+                  <div class="small text-muted">Use for cash/in-person payments.</div>
+                </div>
+                <form method="post" action="{% url 'treasurer:business_renewal_take_payment' renewal.renewal_request_id %}">
+                  {% csrf_token %}
+                  <div class="mb-2">
+                    <label class="form-label">Payment Method</label>
+                    <input class="form-control" value="CASH" readonly style="background-color: #f8f9fa;">
+                    {% for m in methods %}
+                      {% if m.method_name|upper == 'CASH' %}
+                        <input type="hidden" name="payment_method_id" value="{{ m.payment_method_id }}">
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Amount Paid (₱)</label>
+                    <input class="form-control" name="amount_paid" type="number" step="0.01" value="{{ renewal.total_quote_f|floatformat:2 }}" readonly style="background-color: #f8f9fa;">
+                    <div class="form-text">Amount due: ₱{{ renewal.total_quote_f|floatformat:2 }}</div>
+                  </div>
+                  <button type="button" class="btn w-100 py-2 js-confirm" style="background: #dc3545; color: #fff; border: none; font-weight: 600; box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);" data-confirm-title="Accept Cash Payment" data-confirm-message="This will accept a cash payment of ₱{{ renewal.total_quote_f|floatformat:2 }} and generate an Official Receipt. Do you want to proceed?">
+                    <i class="bi bi-cash-coin me-2"></i>Accept Payment &amp; Post OR
+                  </button>
+                </form>
+              </div>
+            {% endif %}
+          {% endif %}
+
+          {# FALLBACK: show Accept Payment if not online-eligible and not walk-in #}
+          {% if not payments.latest_or_number and renewal.total_quote_f|floatformat:2 != "0.00" and not renewal.requested_by_staff_id and not renewal.request_added_by_id and not renewal.added_by_id and not renewal.request_added_by and not renewal.added_by %}
+            <div id="fallback-section">
+              <hr class="my-3">
+              <div>
+                <form method="post" action="{% url 'treasurer:business_renewal_take_payment' renewal.renewal_request_id %}">
+                  {% csrf_token %}
+                  <select class="form-select" name="payment_method_id" required disabled>
+                    {% for m in methods %}
+                      <option value="{{ m.payment_method_id }}" {% if m.payment_method_id == 1 %}selected{% endif %}>{{ m.method_name }}</option>
+                    {% endfor %}
+                  </select>
+
+                  <div class="mb-3">
+                    <label class="form-label">Amount Paid (₱)</label>
+                    <input class="form-control" name="amount_paid" type="number" step="0.01" value="{{ renewal.total_quote_f|floatformat:2 }}" readonly style="background-color: #f8f9fa;">
+                    <div class="form-text">Amount due: ₱{{ renewal.total_quote_f|floatformat:2 }}</div>
+                  </div>
+                  <button type="button" class="btn w-100 py-2 js-confirm" style="background: #4f0202; color: #fff; border: none; font-weight: 600; box-shadow: 0 4px 12px rgba(97, 97, 97, 0.3);" data-confirm-title="Manual Payment Entry" data-confirm-message="This will manually process a payment of ₱{{ renewal.total_quote_f|floatformat:2 }} and generate an Official Receipt. Do you want to proceed?">
+                    <i class="bi bi-credit-card me-2"></i>Accept Payment &amp; Post OR
+                  </button>
+                </form>
+              </div>
+            </div>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -156,4 +304,92 @@
 
   </div>
 </div>
+
+  <!-- Confirmation Modal (copied/adapted from detail.html) -->
+  <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="border-radius: 16px; border: none; box-shadow: 0 20px 40px rgba(58, 18, 23, 0.15);">
+        <div class="modal-header" style="background: var(--brand); color: white; border-radius: 16px 16px 0 0; border: none; padding: 20px 24px;">
+          <div class="d-flex align-items-center gap-3">
+            <div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center;">
+              <i class="bi bi-exclamation-triangle" style="font-size: 18px;"></i>
+            </div>
+            <h5 class="modal-title mb-0" id="confirmModalTitle" style="font-weight: 700;">Confirm Action</h5>
+          </div>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" style="padding: 24px;">
+          <p id="confirmModalMessage" style="margin: 0; font-size: 16px; line-height: 1.5; color: var(--ink);">Are you sure you want to proceed with this action?</p>
+        </div>
+        <div class="modal-footer" style="border: none; padding: 0 24px 24px; gap: 12px;">
+          <button type="button" class="btn" data-bs-dismiss="modal" style="background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; font-weight: 600; padding: 10px 20px; border-radius: 8px;">Cancel</button>
+          <button type="submit" class="btn" id="confirmModalProceed" style="background: var(--brand); color: white; border: none; font-weight: 600; padding: 10px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(86, 28, 36, 0.3);">Proceed</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Confirmation modal functions (small helper used by Accept Payment button)
+    // Attach to window so inline `onclick="showConfirmModal(...)"` calls work
+    window.currentForm = null;
+    window.showConfirmModal = function(button, title, message) {
+      window.currentForm = button.closest('form');
+      document.getElementById('confirmModalTitle').textContent = title;
+      document.getElementById('confirmModalMessage').textContent = message;
+      const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+      modal.show();
+    };
+
+    document.getElementById('confirmModalProceed')?.addEventListener('click', function() {
+      if (window.currentForm) {
+        // If the form contains a disabled select for payment_method_id, disabled fields
+        // are not submitted by browsers. Inject a hidden input with the selected value
+        // so the server receives the payment_method_id (mirrors detail.html behavior).
+        try {
+          const sel = window.currentForm.querySelector('select[name="payment_method_id"][disabled]');
+          if (sel) {
+            const val = (sel.options && sel.selectedIndex >= 0) ? sel.options[sel.selectedIndex].value : sel.value;
+            if (val) {
+              let hid = window.currentForm.querySelector('input._injected_payment_method[name="payment_method_id"]');
+              if (!hid) {
+                hid = document.createElement('input');
+                hid.type = 'hidden';
+                hid.name = 'payment_method_id';
+                hid.className = '_injected_payment_method';
+                window.currentForm.appendChild(hid);
+              }
+              hid.value = val;
+            }
+          }
+        } catch (e) {
+          // ignore and continue to submit
+          console.error('Inject payment method hidden input failed', e);
+        }
+
+        window.currentForm.submit();
+      }
+      const inst = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
+      if (inst) inst.hide();
+    });
+
+    // Delegated handler: open confirm modal for buttons with .js-confirm
+    document.addEventListener('click', function(e) {
+      const btn = e.target.closest && e.target.closest('.js-confirm');
+      if (!btn) return;
+      e.preventDefault();
+      const title = btn.getAttribute('data-confirm-title') || btn.dataset.confirmTitle || 'Confirm Action';
+      const message = btn.getAttribute('data-confirm-message') || btn.dataset.confirmMessage || 'Are you sure?';
+      if (typeof window.showConfirmModal === 'function') {
+        window.showConfirmModal(btn, title, message);
+      } else {
+        // fallback: replicate modal behavior
+        window.currentForm = btn.closest('form');
+        document.getElementById('confirmModalTitle').textContent = title;
+        document.getElementById('confirmModalMessage').textContent = message;
+        const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+        modal.show();
+      }
+    });
+  </script>
 {% endblock %}

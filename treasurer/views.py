@@ -1224,11 +1224,65 @@ def business_renewal_detail(request: HttpRequest, renewal_request_id: int):
     except Exception:
         biz = {}
 
-    return render(request, "treasurer/business_renewal_details.html", {
+    # Payment methods (and WAIVED id) - mirror behavior from detail view
+    try:
+        payment_methods = list_payment_methods()
+    except Exception:
+        payment_methods = []
+
+    waived_method_id = next(
+        (m.get("payment_method_id") for m in (payment_methods or [])
+         if (m.get("method_name") or "").strip().upper() == "WAIVED"),
+        None
+    )
+
+    # Expose a payments-like dict to the template (uses renewal fields when available)
+    payments = {
+        "latest_or_number": r.get("or_number") or "",
+        "latest_or_time": r.get("paid_on"),
+        "total_paid": r.get("amount_paid") or None,
+    }
+
+    # Status and paid flags (mirroring detail view logic)
+    def _to_f(x):
+        try:
+            return float(x)
+        except Exception:
+            return 0.0
+
+    amount_due = _to_f(r.get("total_quote_f") or r.get("total_quote"))
+    total_paid = _to_f(payments.get("total_paid"))
+    latest_or = payments.get("latest_or_number") or ""
+    status = (status_name or "").upper()
+
+    is_paid_no_or = ((status == "PAID") or (total_paid >= amount_due)) and (latest_or == "")
+    is_paid = bool(latest_or) or (status == "PAID") or is_paid_no_or
+
+    # Attach status name to renewal for template checks
+    r["status"] = status_name
+
+    context = {
         "renewal": r,
         "status_ui": status_ui,
         "biz": biz,
-    })
+        "payment_methods": payment_methods,
+        "waived_method_id": waived_method_id,
+        "payments": payments,
+        # expose as 'methods' so template code copied from detail.html still works
+        "methods": payment_methods,
+        "timeline": [],
+        "is_paid_no_or": is_paid_no_or,
+        "is_paid": is_paid,
+        "paid_method_label": None,
+        "doc_request_id": None,
+        "refunds_all": [],
+        "refunds_pending": [],
+        "latest_pending_refund": None,
+        "has_pending_refund": False,
+        "last_completed_refund": None,
+    }
+
+    return render(request, "treasurer/business_renewal_details.html", context)
 
 
 @session_login_required
@@ -1306,6 +1360,55 @@ def confirm_post_or(request: HttpRequest, doc_request_id: int):
 
     messages.info(request, "Request moved to FOR_PRINTING.")
     return redirect("treasurer:detail", doc_request_id=doc_request_id)
+
+
+# ========= BUSINESS RENEWAL: TAKE PAYMENT =========
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_POST
+def business_renewal_take_payment(request: HttpRequest, renewal_request_id: int):
+    """Accept a payment for a renewal request and call the renewal RPC.
+
+    This mirrors the behavior of `take_payment` for regular requests but
+    invokes the `treasurer_accept_renewal_payment` RPC via the service layer.
+    """
+    staff_id = _staff_id(request) or 0
+    try:
+        method_id = int(request.POST.get("payment_method_id", "0") or 0)
+    except Exception:
+        method_id = 0
+    try:
+        amount_paid = float(request.POST.get("amount_paid", "0") or 0)
+    except Exception:
+        amount_paid = 0.0
+
+    or_number = (request.POST.get("or_number") or None)
+    paid_on = (request.POST.get("paid_on") or None)
+
+    if staff_id <= 0 or amount_paid < 0 or method_id <= 0:
+        messages.error(request, "Enter a valid amount, method, and ensure your staff session is active.")
+        return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)
+
+    try:
+        from .services.payments_service import accept_renewal_payment
+
+        clearance_id = accept_renewal_payment(
+            renewal_request_id=int(renewal_request_id),
+            method_id=method_id,
+            amount_paid=amount_paid,
+            staff_id=staff_id,
+            or_number=or_number,
+            paid_on=paid_on,
+        )
+    except Exception as e:
+        messages.error(request, f"Payment failed: {escape(str(getattr(e, 'message', e)))}")
+        return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)
+
+    # Provide a success toast; details are already written by the RPC
+    messages.success(request, f"Payment posted (clearance id {clearance_id}).")
+
+    # Optionally attempt to mark printing or any other post-payment actions if needed
+    return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)
 
 
 # ========= REFUND COMPLETE =========
