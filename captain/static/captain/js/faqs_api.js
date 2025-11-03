@@ -149,6 +149,19 @@
 						}
 						if (previewBtn) previewBtn.disabled = true;
 					}
+
+					// Ensure the selected file is removed (safe extra step in success branch)
+					try {
+						if (fileInput) {
+							fileInput.value = '';
+							fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+						}
+						if (_previewContainer) {
+							_previewContainer.innerHTML = '';
+							_previewContainer.style.display = 'none';
+						}
+						if (previewBtn) previewBtn.disabled = true;
+					} catch (_e) { console.debug('Failed to clear file input after successful upload', _e); }
 				} catch (_e) {
 					console.debug('Failed to reset paginator after upload', _e);
 				}
