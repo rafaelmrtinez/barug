@@ -1971,21 +1971,23 @@ def _find_duplicate_owner(*, email: str | None, mobile: str | None,
             cur.execute("""
                 SELECT p.person_id
                 FROM person p
-                CROSS JOIN LATERAL regexp_replace(coalesce(p.mobile_num,''), '\\D+', '', 'g') AS p_digits
+                CROSS JOIN LATERAL (
+                    SELECT regexp_replace(coalesce(p.mobile_num,''), '\\D+', '', 'g') AS p_digits
+                ) d
                 WHERE right(
                         CASE
-                          WHEN p_digits LIKE '63%' THEN substr(p_digits, 3)
-                          WHEN p_digits LIKE '0%'  THEN substr(p_digits, 2)
-                          ELSE p_digits
+                        WHEN d.p_digits LIKE '63%%' THEN substr(d.p_digits, 3)
+                        WHEN d.p_digits LIKE '0%%'  THEN substr(d.p_digits, 2)
+                        ELSE d.p_digits
                         END,
-                        GREATEST(10, LEAST(length(
+                        LEAST(GREATEST(length(
                             CASE
-                              WHEN p_digits LIKE '63%' THEN substr(p_digits, 3)
-                              WHEN p_digits LIKE '0%'  THEN substr(p_digits, 2)
-                              ELSE p_digits
+                            WHEN d.p_digits LIKE '63%%' THEN substr(d.p_digits, 3)
+                            WHEN d.p_digits LIKE '0%%'  THEN substr(d.p_digits, 2)
+                            ELSE d.p_digits
                             END
-                        ), 11))
-                      ) = %s
+                        ), 10), 11)
+                    ) = %s
                 ORDER BY p.person_id DESC
                 LIMIT 1
             """, [m_norm])

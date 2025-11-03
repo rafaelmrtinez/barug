@@ -426,7 +426,6 @@
 </div>
 
 <script>
-// Controls the Search/Create tabs on the non-resident owner page.
 (function () {
   const btnSearch  = document.getElementById('search-tab');
   const btnCreate  = document.getElementById('create-tab');
@@ -435,44 +434,39 @@
   const pageRoot   = document.getElementById('ownerPage');
 
   function applyButtonStyle(btn, isActive) {
-    btn.classList.toggle('btn-fill-up', isActive); // filled
-    btn.classList.toggle('btn-search',  !isActive); // outlined
+    btn.classList.toggle('btn-fill-up', isActive);
+    btn.classList.toggle('btn-search',  !isActive);
   }
-
   function setActiveTab(which) {
     const isSearch = which === 'search';
-
-    // panes
     paneSearch.classList.toggle('show',   isSearch);
     paneSearch.classList.toggle('active', isSearch);
     paneCreate.classList.toggle('show',   !isSearch);
     paneCreate.classList.toggle('active', !isSearch);
-
-    // buttons
     applyButtonStyle(btnSearch,  isSearch);
     applyButtonStyle(btnCreate, !isSearch);
-
-    // a11y
     btnSearch.setAttribute('aria-pressed',  String(isSearch));
     btnCreate.setAttribute('aria-pressed',  String(!isSearch));
   }
 
-  // Click handlers
   btnSearch?.addEventListener('click', (e) => { e.preventDefault(); setActiveTab('search'); });
   btnCreate?.addEventListener('click', (e) => { e.preventDefault(); setActiveTab('create'); });
 
-  // -------- Initial tab decision --------
-  // Prefer Search if a result is selected OR if there is a search term.
+  // --- New: respect ?tab=... if provided ---
+  const params = new URLSearchParams(window.location.search);
+  const tabParam = (params.get('tab') || '').toLowerCase(); // 'search' | 'create' | ''
   const hasSelected   = (pageRoot?.dataset.hasSelected || 'false') === 'true';
   const initialSearch = (pageRoot?.dataset.initialSearch || '').trim();
 
-  if (hasSelected || initialSearch) {
+  if (tabParam === 'search' || tabParam === 'create') {
+    setActiveTab(tabParam);
+  } else if (hasSelected || initialSearch) {
     setActiveTab('search');
   } else {
     setActiveTab('create');
   }
 })();
-
 </script>
+
 
 {% endblock %}
