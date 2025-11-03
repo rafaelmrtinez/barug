@@ -17,6 +17,93 @@ def accept_payment(doc_request_id: int, method_id: int, amount_paid: float, staf
         raise RuntimeError(getattr(res.error, "message", "Payment failed"))
     return int(res.data)
 
+
+def accept_renewal_payment(
+    renewal_request_id: int,
+    method_id: int,
+    amount_paid: float,  # kept for signature compatibility; not sent (RPC computes due)
+    staff_id: int,
+    or_number: str | None = None,
+    paid_on: str | None = None,
+    rpc_name: str = "treasurer_accept_renewal_payment",
+) -> int:
+    """
+    Calls the renewal payment RPC. The SQL signature is:
+        (p_renewal_request_id int,
+         p_payment_method_id int,
+         p_received_by_staff_id int,
+         p_paid_on date/timestamptz default null,
+         p_or_number text default null)
+
+    Notes:
+    - We *always* include all five params. None is allowed for the optional ones.
+    - RPC returns either an int or an object/list containing 'clearance_rec_id'.
+    """
+
+    # Normalize paid_on to ISO if a datetime/date object is passed
+    try:
+        from datetime import date, datetime
+        if isinstance(paid_on, (datetime, date)):
+            paid_on = paid_on.isoformat()
+    except Exception:
+        pass
+
+    payload = {
+        "p_renewal_request_id": int(renewal_request_id),
+        "p_payment_method_id": int(method_id),
+        "p_received_by_staff_id": int(staff_id),
+        "p_paid_on": paid_on,       # may be None; SQL has default
+        "p_or_number": or_number,   # may be None; SQL has default
+    }
+
+    res = supabase.rpc(rpc_name, payload).execute()
+
+    # Bubble up clear errors with context
+    if getattr(res, "error", None):
+        msg = getattr(res.error, "message", str(res.error))
+        raise RuntimeError(f"Renewal payment failed (RPC {rpc_name}): {msg}")
+
+    # The RPC may return one of:
+    #  - an int (clearance id)
+    #  - a dict with 'clearance_rec_id'
+    #  - a 1-row list with that dict
+    data = getattr(res, "data", None)
+
+    def _to_int(x):
+        try:
+            return int(x)
+        except Exception:
+            return None
+
+    if isinstance(data, int):
+        cid = _to_int(data)
+        if cid is not None:
+            return cid
+
+    if isinstance(data, str):
+        cid = _to_int(data)
+        if cid is not None:
+            return cid
+
+    if isinstance(data, dict):
+        cid = _to_int(data.get("clearance_rec_id"))
+        if cid is not None:
+            return cid
+
+    if isinstance(data, list) and data:
+        first = data[0]
+        if isinstance(first, dict):
+            cid = _to_int(first.get("clearance_rec_id"))
+            if cid is not None:
+                return cid
+        else:
+            cid = _to_int(first)
+            if cid is not None:
+                return cid
+
+    # If we reach here, the RPC returned an unexpected shape
+    raise RuntimeError(f"Renewal payment RPC ({rpc_name}) returned unexpected payload: {data!r}")
+
 def mark_for_printing(doc_request_id: int, staff_id: int, reason: str | None = None) -> None:
     res = supabase.rpc("mark_request_for_printing", {
         "p_doc_request_id": doc_request_id,
