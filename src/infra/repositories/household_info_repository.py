@@ -1,7 +1,8 @@
 from src.infra.contracts.connection_adapter import IConnectionAdapter
+from src.domain.contracts.household_info_repository import IHouseholdInfoRepository
 
 
-class HouseholdInfoRepository:
+class HouseholdInfoRepository(IHouseholdInfoRepository):
 
     def __init__(self, ctx: IConnectionAdapter):
         self._ctx = ctx

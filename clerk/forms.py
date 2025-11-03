@@ -1,29 +1,126 @@
 from django import forms
 from decimal import Decimal
 
-BUSINESS_TYPE_CHOICES = [
-    ("", "— Select Business Type —"),
-    (1,  "AGRICULTURE / AGRIBUSINESS"),
-    (2,  "EDUCATION & TRAINING"),
-    (3,  "FINANCIAL SERVICES"),
-    (4,  "FOOD & BEVERAGE"),
-    (5,  "HEALTH & WELLNESS"),
-    (6,  "MANUFACTURING / PRODUCTION"),
-    (7,  "REAL ESTATE & LEASING"),
-    (8,  "SERVICES"),
-    (9,  "TOURISM, TRAVEL & ENTERTAINMENT"),
-    (10, "TRADING / RETAIL"),
-    (11, "OTHERS"),
+CIVIL_STATUS_CHOICES = [
+    ("", "— Select Civil Status —"),
+    (1, "SINGLE"),
+    (2, "MARRIED"),
+    (3, "WIDOWED"),
+    (4, "SEPARATED"),
+    (5, "DIVORCED"),
+]
+
+NATIONALITY_CHOICES = [
+    ("", "— Select Nationality —"),
+    (1, "AMERICAN"),
+    (2, "AUSTRALIAN"),
+    (3, "BRAZILIAN"),
+    (4, "BRITISH"),
+    (5, "CANADIAN"),
+    (6, "CHINESE"),
+    (7, "FILIPINO"),
+    (8, "FRENCH"),
+    (9, "GERMAN"),
+    (10, "INDIAN"),
+    (11, "INDONESIAN"),
+    (12, "ITALIAN"),
+    (13, "JAPANESE"),
+    (14, "KOREAN"),
+    (15, "MALAYSIAN"),
+    (16, "RUSSIAN"),
+    (17, "SAUDI"),
+    (18, "SPANISH"),
+    (19, "THAI"),
+    (20, "VIETNAMESE"),
+    (21, "OTHERS"),
+]
+
+RELIGION_CHOICES = [
+    ("", "— Select Religion —"),
+    (1, "AGNOSTIC"),
+    (2, "BORN AGAIN"),
+    (3, "BUDDHIST"),
+    (4, "CHRISTIAN"),
+    (5, "EVANGELICAL"),
+    (6, "HINDU"),
+    (7, "IGLESIA NI CRISTO"),
+    (8, "ISLAM"),
+    (9, "JEHOVAH'S WITNESS"),
+    (10, "ORTHODOX"),
+    (11, "PROTESTANT"),
+    (12, "ROMAN CATHOLIC"),
+    (13, "SEVENTH-DAY ADVENTIST"),
+    (14, "OTHERS"),
+]
+
+VALID_ID_TYPE_CHOICES = [
+    ("", "— Select ID Type —"),
+    (1,  "PHILIPPINE PASSPORT"),
+    (2,  "PHILIPPINE NATIONAL ID"),
+    (3,  "SSS/UMID CARD"),
+    (4,  "GSIS ECARD"),
+    (5,  "PRC ID"),
+    (6,  "DRIVER'S LICENSE"),
+    (7,  "PHILHEALTH ID"),
+    (8,  "VOTER'S ID"),
+    (9,  "POSTAL ID"),
+    (10, "SENIOR CITIZEN ID"),
+    (11, "PWD ID"),
+    (12, "OWWA ID"),
+    (13, "IBP ID"),
+    (14, "TIN ID"),
+    (15, "SCHOOL ID"),
+    (16, "EPHIL ID"),
+]
+
+BUSINESS_CATEGORY_CHOICES = [
+    ("", "— Select category —"),
+    (40, "Bakeries, Pastry Shop"),
+    (39, "Cellphones and Gadget Stores"),
+    (27, "Commercial Stalls for Rent"),
+    (38, "Computer Shops"),
+    (45, "Dry Goods"),
+    (36, "Educational Institutions (Private)"),
+    (25, "Financial Institutions (Lending Companies)"),
+    (31, "Firearms Stores"),
+    (43, "Fitness Gyms"),
+    (32, "Furniture Shops, Appliance Store"),
+    (28, "Gasoline Stations"),
+    (42, "General Merchandise"),
+    (4,  "Groceries Store"),
+    (34, "Hotels, Apartments"),
+    (29, "Motorcycle and other Vehicle Dealers"),
+    (33, "Motorcycle/Bicycle Supplies Stores"),
+    (49, "Night Market"),
+    (35, "Restaurants, Canteens"),
+    (47, "Sari-Sari Store"),
+    (48, "Special Permit"),
+    (30, "Specialization Clinics such as Dental Clinics, ENT, Pedia Clinics"),
+    (46, "Tailoring Services"),
+    (37, "Vehicle Services, Auto Repair Shop"),
+    (26, "Videoke Bars"),
+    (44, "Water Refilling Stations"),
 ]
 
 OWNERSHIP_TYPE_CHOICES = [
-    ("", "— Select Ownership Type —"),
+    ("", "— All ownerships —"),
     (1, "SOLE PROPRIETORSHIP"),
     (2, "PARTNERSHIP"),
     (3, "CORPORATION"),
     (4, "COOPERATIVE"),
     (5, "ONE PERSON CORPORATION"),
     (6, "OTHERS"),
+]
+
+BUSINESS_STATUS_CHOICES = [
+    ("", "— All statuses —"),
+    (1, "ACTIVE"),
+    (2, "INACTIVE"),
+    (3, "SUSPENDED"),
+    (4, "REVOKED"),
+    (5, "CLOSED"),
+    (6, "EXPIRED"),
+    (7, "PENDING"),
 ]
 
 OPERATING_DAY_CHOICES = [
@@ -87,17 +184,17 @@ class BusinessFilters(forms.Form):
         label= 'Search',
         required= False,
     )
-    b_type = forms.ChoiceField(
-        choices= [],
+    b_category = forms.ChoiceField(
+        choices= BUSINESS_CATEGORY_CHOICES,
         widget=forms.Select(attrs={
-            'id' : 'b_type',
+            'id' : 'b_category',
             'class' : 'form-select',
         }),
         label= 'Business Type',
         required= False,
     )
     ownership_type = forms.ChoiceField(
-        choices= [],
+        choices= OWNERSHIP_TYPE_CHOICES,
         widget=forms.Select(attrs={
             'id' : 'ownership_type',
             'class' : 'form-select',
@@ -106,12 +203,32 @@ class BusinessFilters(forms.Form):
         required= False,
     )
     status = forms.ChoiceField(
-        choices= [],
+        choices= BUSINESS_STATUS_CHOICES,
         widget=forms.Select(attrs={
             'id' : 'status',
             'class' : 'form-select',
         }),
         label= 'Status',
+        required= False,
+    )
+
+class RenewalFilters(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search',
+        }),
+        label= 'Search',
+        required= False,
+    )
+    clearance_state = forms.ChoiceField(
+        choices= BUSINESS_CATEGORY_CHOICES,
+        widget=forms.Select(attrs={
+            'id' : 'clearance_state',
+            'class' : 'form-select',
+        }),
+        label= 'Clearance State',
         required= False,
     )
 
@@ -121,7 +238,7 @@ class SearchBusinessOwner(forms.Form):
             'id' : 'search',
             'class' : 'form-control', 
             'placeholder' : 'Search',
-            'name': 'q'
+            "autocomplete": "off",
     }),
         label= 'Search by Resident ID or Full Name',
         required= True,
@@ -129,7 +246,8 @@ class SearchBusinessOwner(forms.Form):
 
 class SelectOwnerForm(forms.Form):
     owner_person_id = forms.IntegerField(widget=forms.HiddenInput())
-
+    search = forms.CharField(required=False, widget=forms.HiddenInput)
+    
 class BusinessOwnerInfo(forms.Form):
     # PERSONAL INFORMATION
     last_name = forms.CharField(
@@ -170,7 +288,7 @@ class BusinessOwnerInfo(forms.Form):
         required= True,
     )
     sex = forms.ChoiceField(
-        choices= [('male', 'Male'), ('female', 'Female')],
+        choices= [(1, 'Male'), (2, 'Female')],
         widget=forms.RadioSelect(attrs={
             'id' : 'sex',
             'class' : 'form-check-input',
@@ -189,7 +307,7 @@ class BusinessOwnerInfo(forms.Form):
         required= True,
     )
     civil_status = forms.ChoiceField(
-        choices= [], 
+        choices= CIVIL_STATUS_CHOICES, 
         widget=forms.Select(attrs={
             'id' : 'civil_status',
             'class' : 'form-select',
@@ -198,7 +316,7 @@ class BusinessOwnerInfo(forms.Form):
         required= True,
     )
     nationality = forms.ChoiceField(
-        choices= [], 
+        choices= NATIONALITY_CHOICES, 
         widget=forms.Select(attrs={
             'id' : 'nationality',
             'class' : 'form-select',
@@ -207,7 +325,7 @@ class BusinessOwnerInfo(forms.Form):
         required= True,
     )
     religion = forms.ChoiceField(
-        choices= [], 
+        choices= RELIGION_CHOICES, 
         widget=forms.Select(attrs={
             'id' : 'religion',
             'class' : 'form-select',
@@ -215,18 +333,18 @@ class BusinessOwnerInfo(forms.Form):
         label= 'Religion',
         required= True,
     )
-    home_address = forms.CharField(
-        widget=forms.TextInput(attrs={
-            'id' : 'home_address',
-            'class' : 'form-control',
-            'placeholder' : 'Home Address',
-            'readonly' : 'readonly',
-            'data-bs-toggle' : 'modal',
-            'data-bs-target' : '#address_modal',
-    }),
-        label= 'Home Address',
-        required= True
-    )
+    # home_address = forms.CharField(
+    #     widget=forms.TextInput(attrs={
+    #         'id' : 'home_address',
+    #         'class' : 'form-control',
+    #         'placeholder' : 'Home Address',
+    #         'readonly' : 'readonly',
+    #         'data-bs-toggle' : 'modal',
+    #         'data-bs-target' : '#address_modal',
+    # }),
+    #     label= 'Home Address',
+    #     required= True
+    # )
     street = forms.CharField(
         widget=forms.TextInput(attrs={
             'id' : 'street',
@@ -250,7 +368,6 @@ class BusinessOwnerInfo(forms.Form):
             'id' : 'barangay',
             'class' : 'form-control',
             'placeholder' : 'Barangay',
-            'readonly' : 'readonly',
     }),
         label= 'Barangay',
         required= True,
@@ -260,7 +377,6 @@ class BusinessOwnerInfo(forms.Form):
             'id' : 'city',
             'class' : 'form-control',
             'placeholder' : 'City',
-            'readonly' : 'readonly',
     }),
         label= 'City',
         required= True,
@@ -283,6 +399,56 @@ class BusinessOwnerInfo(forms.Form):
         label= 'Mobile Number',
         required= True,
     )
+    # SUPPORTING DOCUMENTS
+    # type_of_id = forms.ChoiceField(
+    #     choices= VALID_ID_TYPE_CHOICES, 
+    #     widget=forms.Select(attrs={
+    #         'id' : 'type_of_id',
+    #         'class' : 'form-select',
+    # }),
+    #     label= 'valid ID Type',
+    #     required= True,
+    # )
+    # front_id = forms.ImageField(
+    #     widget=forms.ClearableFileInput(attrs={
+    #         'id' : 'front_id',
+    #         'class' : 'form-control',
+    # }),
+    #     label= 'Front of the ID',
+    #     required= True, 
+    # )
+    # back_id = forms.ImageField(
+    #     widget=forms.ClearableFileInput(attrs={
+    #         'id' : 'back_id',
+    #         'class' : 'form-control',
+    # }),
+    #     label= 'Back of the ID',
+    #     required= True, 
+    # )
+
+class MultiFileInput(forms.ClearableFileInput):
+    # 🔑 This is what enables <input multiple>
+    allow_multiple_selected = True
+
+class MultiFileField(forms.FileField):
+    widget = MultiFileInput
+
+    def clean(self, data, initial=None):
+        """
+        Return a list of cleaned UploadedFile objects.
+        """
+        if not data and self.required:
+            raise forms.ValidationError(self.error_messages['required'], code='required')
+
+        # Normalize to a list
+        files = data if isinstance(data, (list, tuple)) else ([data] if data else [])
+        cleaned = []
+        for f in files:
+            if f:  # skip Nones
+                cleaned.append(super().clean(f, initial))
+        if self.required and not cleaned:
+            raise forms.ValidationError(self.error_messages['required'], code='required')
+        return cleaned
 
 class BusinessDetails(forms.Form):
     b_name = forms.CharField(
@@ -294,18 +460,11 @@ class BusinessDetails(forms.Form):
         label= 'Business Name',
         required= True,
     )
-    b_type = forms.ChoiceField(
-        choices= BUSINESS_TYPE_CHOICES, 
-        widget=forms.Select(attrs={
-            'id' : 'b_type',
-            'class' : 'form-select',
-    }),
-        label= 'Business Type',
-        required= True,
-    )
     b_nature = forms.CharField( 
         widget=forms.TextInput(attrs={
             'id' : 'b_nature',
+            'class' : 'form-control',
+            'placeholder' : 'Nature of Business (e.g., Sari-Sari Store, Eatery, etc.)',
             'class' : 'form-control',
             'placeholder' : 'Nature of Business (e.g., Sari-Sari Store, Eatery, etc.)',
     }),
@@ -319,6 +478,15 @@ class BusinessDetails(forms.Form):
             'class' : 'form-select',
     }),
         label= 'Ownership Type',
+        required= True,
+    )
+    b_category = forms.ChoiceField(
+        choices= BUSINESS_CATEGORY_CHOICES, 
+        widget=forms.Select(attrs={
+            'id' : 'b_category',
+            'class' : 'form-select',
+    }),
+        label= 'Business Category',
         required= True,
     )
     b_address = forms.CharField(
@@ -370,6 +538,19 @@ class BusinessDetails(forms.Form):
     }),
         label= 'City',
         required= True,
+    )
+    # Hidden fields filled by the map script
+    latitude = forms.DecimalField(
+        required=False,
+        max_digits=10,
+        decimal_places=7,
+        widget=forms.HiddenInput(attrs={'id': 'latitude'}),
+    )
+    longitude = forms.DecimalField(
+        required=False,
+        max_digits=10,
+        decimal_places=7,
+        widget=forms.HiddenInput(attrs={'id': 'longitude'}),
     )
     # Hidden fields filled by the map script
     latitude = forms.DecimalField(
@@ -467,7 +648,7 @@ class BusinessDetails(forms.Form):
     opt_days_start = forms.ChoiceField(
         choices= OPERATING_DAY_CHOICES, 
         widget=forms.Select(attrs={
-            'id' : 'opt_days',
+            'id' : 'opt_days_start',
             'class' : 'form-select',
     }),
         label= 'Operating Days',
@@ -476,7 +657,7 @@ class BusinessDetails(forms.Form):
     opt_days_end = forms.ChoiceField(
         choices= OPERATING_DAY_CHOICES, 
         widget=forms.Select(attrs={
-            'id' : 'opt_days',
+            'id' : 'opt_days_end',
             'class' : 'form-select',
     }),
         label= 'Operating Days',
@@ -502,44 +683,22 @@ class BusinessDetails(forms.Form):
         label= 'Operating Hours - End',
         required= True,
     )
-    prev_clearance = forms.ChoiceField(
-        choices= [('yes', 'Yes'), ('no', 'No')],
-        widget=forms.RadioSelect(attrs={
-            'id' : 'prev_clearance',
-            'class' : 'form-check-input',
-    }),
-        label= 'Has previous Barangay Clearance?',
-        required= True,
-    )
-    proof = forms.FileField(
-        widget=forms.ClearableFileInput(attrs={
-            'id' : 'proof',
-            'class' : 'form-control',
+    # prev_clearance = forms.ChoiceField(
+    #     choices= [('yes', 'Yes'), ('no', 'No')],
+    #     widget=forms.RadioSelect(attrs={
+    #         'id' : 'prev_clearance',
+    #         'class' : 'form-check-input',
+    # }),
+    #     label= 'Has previous Barangay Clearance?',
+    #     required= True,
+    # )
+    proof = MultiFileField(
+        label='Proof of Business (lease, photos, permit, etc.)',
+        required=True,
+        widget=MultiFileInput(attrs={
+            'id': 'proof',
+            'class': 'form-control',
             'accept': 'image/*,application/pdf',
+            'multiple': True,
         }),
-        label= 'Proof of Business (lease, photos, permit, etc.)',
-        required= True, 
     )
-
-
-def clean(self):
-        cleaned = super().clean()
-
-        # Validate day range (1..7 and start <= end)
-        try:
-            d_start = int(cleaned.get('opt_days_start') or 0)
-            d_end = int(cleaned.get('opt_days_end') or 0)
-            if not (1 <= d_start <= 7 and 1 <= d_end <= 7 and d_start <= d_end):
-                self.add_error('opt_days_start', 'Start must be 1–7 and ≤ end.')
-                self.add_error('opt_days_end', '')
-        except (TypeError, ValueError):
-            self.add_error('opt_days_start', 'Invalid day range.')
-
-        # Validate hour range
-        t_start = cleaned.get('opt_start')
-        t_end = cleaned.get('opt_end')
-        if t_start and t_end and not (t_start < t_end):
-            self.add_error('opt_start', 'Start time must be before end time.')
-            self.add_error('opt_end', '')
-
-        return cleaned

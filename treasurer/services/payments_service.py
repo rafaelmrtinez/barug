@@ -25,3 +25,22 @@ def mark_for_printing(doc_request_id: int, staff_id: int, reason: str | None = N
     }).execute()
     if getattr(res, "error", None):
         raise RuntimeError(getattr(res.error, "message", "Mark for printing failed"))
+
+# treasurer/services/payments_service.py
+def confirm_and_post_or(doc_request_id: int, staff_id: int, or_number: str | None = None, payment_method_id: int = 5) -> int:
+    """
+    Calls treasurer_confirm_and_post_or RPC:
+      - re/uses OR if exists, else inserts
+      - logs PAYMENT_ACCEPTED
+      - sets status → PAID (if needed) → FOR_PRINTING
+    Returns the OR ID.
+    """
+    res = supabase.rpc("treasurer_confirm_and_post_or", {
+        "p_doc_request_id": int(doc_request_id),
+        "p_staff_id": int(staff_id),
+        "p_or_number": or_number,          # can be None → auto-generate
+        "p_payment_method_id": int(payment_method_id),  # default 5 = Online GCash
+    }).execute()
+    if getattr(res, "error", None):
+        raise RuntimeError(getattr(res.error, "message", "Confirm & Post OR failed"))
+    return int(res.data)

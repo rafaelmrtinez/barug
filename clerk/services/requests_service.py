@@ -97,3 +97,39 @@ def release_request(
 ) -> Optional[str]:
     """Marks the request RELEASED."""
     return _set_status(doc_request_id, "RELEASED", staff_id, reason)
+
+
+# ─────────────────────────────────── New helper ───────────────────────────────────
+
+def decline_and_request_refund(
+    doc_request_id: int,
+    staff_id: int,
+    reason: Optional[str] = None,
+    refund_amount: Optional[float] = None,  # None → let SQL compute default policy
+) -> tuple[Optional[str], Optional[int]]:
+    """
+    Clerk declines a paid request and creates a refund ticket.
+    RPC: clerk_decline_and_request_refund(p_doc_request_id, p_clerk_staff_id, p_reason, p_refund_amount)
+    Returns (error_message_or_None, payment_refund_id_or_None)
+    """
+    payload = {
+        "p_doc_request_id": doc_request_id,
+        "p_clerk_staff_id": int(staff_id),
+        "p_reason": reason,
+        "p_refund_amount": refund_amount,  # None → SQL DEFAULT NULL
+    }
+    res = supabase.rpc("clerk_decline_and_request_refund", payload).execute()
+    if getattr(res, "error", None):
+        return res.error.message, None
+
+    rid = None
+    data = res.data
+    if isinstance(data, int):
+        rid = data
+    elif isinstance(data, list) and data:
+        first = data[0]
+        rid = first if isinstance(first, int) else (first.get("payment_refund_id") if isinstance(first, dict) else None)
+    elif isinstance(data, dict):
+        rid = data.get("payment_refund_id") or data.get("id")
+
+    return None, rid

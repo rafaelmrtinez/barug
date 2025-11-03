@@ -1,0 +1,258 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+  <link rel="stylesheet" href="{% static 'css/button.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="margin-top:40px;">
+  <div class="row g-4">
+
+    <!-- Business Owner Details -->
+    <div class="col-12">
+      <div class="card shadow-sm rounded-3">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="card-title d-flex align-items-center gap-2 mb-0">
+              <i class="bi bi-person-fill text-primary"></i>
+              <span>Business Owner Details</span>
+            </h5>
+            {% with res_name=owner.residency_name|default:"NON-RESIDENT"|upper %}
+              {% if res_name == "NON-RESIDENT" %}
+                {% url 'clerk:business_owner_nonres' as owner_edit_url %}
+              {% else %}
+                {% url 'clerk:business_owner_resident' as owner_edit_url %}
+              {% endif %}
+
+              <div class="d-flex gap-2">
+                <a class="btn btn-sm btn-submit" href="{{ owner_edit_url }}">Edit Owner</a>
+              </div>
+            {% endwith %}
+          </div>
+
+          <div class="mt-4">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <h5 class="card-title mb-1 text-uppercase">{{ owner_disp.full_name|upper }}</h5>
+                  {% if owner_disp.person_code %}
+                    <div class="small text-muted text-uppercase">{{ owner_disp.person_code|upper }}</div>
+                  {% endif %}
+                </div>
+                {% with res_name=owner_disp.residency_name|default:"NON-RESIDENT" %}
+                  <span class="badge" style="background-color: var(--bs-danger-text-emphasis);">
+                    {{ res_name|upper }}
+                  </span>
+                {% endwith %}
+              </div>
+
+              <hr class="my-3">
+
+              <div class="row g-3">
+                <div class="col-12 col-md-6">
+                  <div class="small text-muted">Sex</div>
+                  <div class="fw-semibold mb-0 text-uppercase">{{ owner_disp.sex_name|upper }}</div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="small text-muted">Date of Birth</div>
+                  <div class="fw-semibold mb-0 text-uppercase">{{ owner_disp.dob|date:"F j, Y" }}</div>
+                </div>
+
+                <div class="col-12 col-md-6">
+                  <div class="small text-muted">Address</div>
+                  <div class="fw-semibold mb-0 text-uppercase">{{ owner_disp.address_display|upper }}</div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="small text-muted">Civil Status</div>
+                  <div class="fw-semibold mb-0 text-uppercase">{{ owner_disp.civil_status_name|upper }}</div>
+                </div>
+
+                <div class="col-12 col-md-6">
+                  <div class="small text-muted">Nationality</div>
+                  <div class="fw-semibold mb-0 text-uppercase">{{ owner_disp.nationality_name|upper }}</div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="small text-muted">Religion</div>
+                  <div class="fw-semibold mb-0 text-uppercase">{{ owner_disp.religion_name|upper }}</div>
+                </div>
+
+                <div class="col-12 col-md-6">
+                  <div class="small text-muted">Mobile</div>
+                  <div class="fw-semibold mb-0">{{ owner_disp.mobile|upper }}</div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="small text-muted">Email</div>
+                  <div class="fw-semibold mb-0">{{ owner_disp.email }}</div>
+                </div>
+
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Business Details -->
+    <div class="col-12">
+      <div class="card shadow-sm rounded-3">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="card-title d-flex align-items-center gap-2 mb-0">
+              <i class="bi bi-briefcase-fill text-success"></i>
+              <span>Business Details</span>
+            </h5>
+            <div class="d-flex gap-2">
+              <a class="btn btn-sm btn-submit" href="{% url 'clerk:business_details' %}">Edit Business</a>
+            </div>
+          </div>
+
+          <div class="row mt-3 g-3">
+            <div class="col-md-6">
+              <small class="text-muted">Business Name</small>
+              <p class="fw-semibold mb-0 text-uppercase">{{ biz_disp.b_name|upper }}</p>
+            </div>
+
+            <div class="col-md-6">
+              <small class="text-muted">Nature of Business</small>
+              <p class="fw-semibold mb-0 text-uppercase">{{ biz_disp.b_nature|upper }}</p>
+            </div>
+
+            <div class="col-md-6">
+              <small class="text-muted">Ownership Type</small>
+              <p class="fw-semibold mb-0 text-uppercase">{{ biz_disp.ownership_type_name|upper }}</p>
+            </div>
+
+            <div class="col-12">
+              <small class="text-muted">Business Address</small>
+              <p class="fw-semibold mb-1 text-uppercase">{{ biz_disp.address_display|upper }}</p>
+            </div>
+
+            <input type="hidden" name="latitude"  value="{{ business.latitude }}">
+            <input type="hidden" name="longitude" value="{{ business.longitude }}">
+
+            <div class="col-12">
+              <small class="text-muted">Description</small>
+              <p class="fw-semibold mb-0 text-uppercase">{{ biz_disp.b_desc|upper }}</p>
+            </div>
+
+            <div class="col-md-6">
+              <small class="text-muted">Date Established</small>
+              <p class="fw-semibold mb-0 text-uppercase">{{ biz_disp.date_est|date:"F j, Y" }}</p>
+            </div>
+            <div class="col-md-6">
+              <small class="text-muted">DTI/SEC Registration No.</small>
+              <p class="fw-semibold mb-0 text-uppercase">{{ biz_disp.dti|upper }}</p>
+            </div>
+
+            <div class="col-md-6">
+              <small class="text-muted">Capital Invested</small>
+              <p class="fw-semibold mb-0 text-uppercase">{{ biz_disp.capital_display|upper }}</p>
+            </div>
+            <div class="col-md-6">
+              <small class="text-muted">Previous Year Gross Sales</small>
+              <p class="fw-semibold mb-0 text-uppercase">{{ biz_disp.prevgross_display|upper }}</p>
+            </div>
+
+            <div class="col-md-6">
+              <small class="text-muted">Monthly Gross Income Estimate</small>
+              <p class="fw-semibold mb-0 text-uppercase">{{ biz_disp.inc_est|upper }}</p>
+            </div>
+
+            <div class="col-md-6">
+              <small class="text-muted d-block">Operating Days</small>
+              <p class="fw-semibold mb-0 mt-1 text-uppercase">
+                {% if biz_disp.opt_days_start_name and biz_disp.opt_days_end_name %}
+                  {{ biz_disp.opt_days_start_name|upper }} — {{ biz_disp.opt_days_end_name|upper }}
+                {% else %}
+                  —
+                {% endif %}
+              </p>
+            </div>
+
+            <div class="col-md-6">
+              <small class="text-muted d-block">Operating Hours</small>
+              <p class="fw-semibold mb-0 mt-1 text-uppercase">
+                {% if biz_disp.opt_start and biz_disp.opt_end %}
+                  {{ biz_disp.opt_start|upper }} — {{ biz_disp.opt_end|upper }}
+                {% else %}
+                  —
+                {% endif %}
+              </p>
+            </div>
+
+            <div class="col-md-6">
+              <small class="text-muted">Business Category</small>
+              <p class="fw-semibold mb-0 text-uppercase">{{ biz_disp.b_category_name|upper }}</p>
+            </div>
+
+            <div class="col-md-6">
+              <small class="text-muted">No. of Employees</small>
+              <p class="fw-semibold mb-0 text-uppercase">{{ biz_disp.employees_display|upper }}</p>
+            </div>
+
+            <div class="col-md-6">
+              <small class="text-muted">Proof of Business</small>
+              <p class="fw-semibold mb-0">
+                {{ biz_disp.proof_name }}
+                {% if biz_disp.proof_name and biz_disp.proof_name != "—" %}
+                  <a href="#" class="ms-2 small text-decoration-none"
+                     style="color: var(--bs-danger-text-emphasis);"
+                     data-bs-toggle="modal" data-bs-target="#proofPreviewModal">VIEW</a>
+                {% endif %}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OUTSIDE THE CARD: right-aligned Add Business CTA -->
+    <div class="col-12">
+      <form method="post" action="" enctype="multipart/form-data" class="d-flex justify-content-end">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="confirm_add">
+        <button type="submit" class="btn btn-submit">
+          <i class="bi bi-plus-circle me-2"></i>
+          Add Business
+        </button>
+      </form>
+    </div>
+
+  </div>
+</div>
+
+<!-- Proof Preview Modal -->
+<div class="modal fade" id="proofPreviewModal" tabindex="-1" aria-labelledby="proofPreviewLabel" aria-hidden="true">
+  <div class="modal-dialog modal-md modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="proofPreviewLabel">Proof of Business</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        {# ✅ NEW: show actual uploaded previews saved from the previous step #}
+        {% if proof_urls %}
+          <div class="row g-3">
+            {% for u in proof_urls %}
+              <div class="col-12">
+                <img src="{{ u }}" class="img-fluid rounded border" alt="Proof of Business {{ forloop.counter }}">
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-muted small">
+            Preview requires an accessible file URL. Stored filename:
+            <strong>{{ biz_disp.proof_name }}</strong>.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,590 @@
+{# templates/lupon_mem/hearing_list.html #}
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<style>
+  /* ───────── Base (maroon) ───────── */
+  :root{
+    --brand-900:#3a1217;
+    --brand-800:#561c24;
+    --brand-700:#6d2932;
+    --brand-100:#f3eaeb;
+    --brand-050:#fbf6f6;
+
+    /* Sto. Niño seal flat colors (no gradients) */
+    --sn-gold:#ffd100;
+    --sn-gold-2:#ffe34d;
+    --sn-gold-3:#fff3a6;
+    --sn-red:#c62828;
+    --sn-red-2:#e53935;
+    --sn-gold-border:#ffc400;
+    --sn-ring: rgba(198,40,40,.25);
+
+    /* soft danger for "Not held" */
+    --danger-bg:#fde2e1;
+    --danger-bd:#f5c2c7;
+    --danger-fg:#842029;
+  }
+
+  /* Title row */
+  .page-head{ gap:.75rem; }
+  .page-head h4{ display:flex; align-items:center; gap:.5rem; margin:0; }
+
+  /* ===== TODAY CARD (flat Sto. Niño theme) ===== */
+  .today-card{
+    border:1px solid black;
+    border-radius:1rem;
+    background:var(--sn-gold-3);     /* flat pale gold */
+    box-shadow:0 3px 16px rgba(0,0,0,.05);
+  }
+  .today-card .card-header{
+    background: orange;              /* flat soft gold */
+    border-bottom:1px solid var(--sn-gold-border);
+    border-top-left-radius:1rem; border-top-right-radius:1rem;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .today-card .card-header .fw-semibold{ display:flex; align-items:center; gap:.5rem; color:#241b00; }
+  .today-card .card-header .bi{ color:var(--sn-red); }
+  .today-date{ color:#241b00; font-weight:800; }
+  .today-badge{ background:#fff; color:#241b00; border:1px solid var(--sn-gold-border); }
+
+  .today-slide{ min-height:92px; padding:.25rem; }
+  .today-empty{ color:#6b6b6b; }
+
+  .today-item{
+    display:flex; align-items:center; gap:1rem;
+    padding:.9rem; border-radius:.9rem;
+    background:#fff;
+    border:1px solid var(--sn-gold-border);
+  }
+  .today-item .case-chip{
+    background:#fff; border:1px dashed var(--sn-gold-border);
+    color:#111;
+  }
+  .today-item .label{ font-weight:700; color:#1c1c1c; }
+  .today-item .title{ color:#6f6f6f; font-size:.9rem; }
+  .today-item .time{ color:#241b00; font-size:.95rem; font-weight:700; }
+
+  .today-controls{ display:flex; align-items:center; justify-content:space-between; margin-top:.6rem; }
+  .today-dots{ display:flex; gap:.35rem; align-items:center; }
+  .today-dot{ width:8px; height:8px; border-radius:50%; background:rgba(198,40,40,.25); border:1px solid rgba(198,40,40,.45); }
+  .today-dot.active{ background:var(--sn-red); border-color:var(--sn-red); }
+
+  .btn-outline-accent{
+    color:var(--sn-red); border-color:var(--sn-red); background:#fff;
+  }
+  .btn-outline-accent:hover{
+    color:#fff; background:var(--sn-red); border-color:var(--sn-red-2);
+    box-shadow:0 0 0 .2rem var(--sn-ring);
+  }
+
+  /* Filter bar */
+  .filterbar{
+    display:flex; gap:.5rem; align-items:center; flex-wrap:wrap;
+    margin:.75rem 0;
+  }
+  .filter-pill{
+    display:inline-flex; gap:.35rem; align-items:center;
+    padding:.35rem .7rem; border-radius:999px; font-weight:600; font-size:.85rem;
+    border:1px solid #e5e7eb; background:#fff; color:#333; cursor:pointer;
+    user-select:none;
+  }
+  .filter-pill .bi{ opacity:.75; }
+  .filter-pill.active{ border-color:var(--sn-red); color:var(--sn-red); background:#fff; }
+
+  /* Case chip (general) */
+  .case-chip{
+    display:inline-block; padding:.25rem .5rem; border-radius:.5rem;
+    background:#fff; border:1px solid #e5e7eb; color:#111; font-weight:600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Status pills (3-way) */
+  .status-pill{
+    display:inline-flex; align-items:center; gap:.4rem;
+    padding:.3rem .6rem; border-radius:999px; font-size:.85rem; font-weight:700;
+    border:1px solid transparent; white-space:nowrap;
+  }
+  .status-held{ background:#eaf7ed; color:#0f5132; border-color:#ccead5; }      /* Held */
+  .status-upcoming{ background:#fff6cc; color:#6b4100; border-color:#ffe08a; } /* To be held */
+  .status-missed{ background:var(--danger-bg); color:var(--danger-fg); border-color:var(--danger-bd); } /* Not held */
+
+  /* Buttons (maroon) */
+  .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); background:#fff; }
+  .btn-outline-brand:hover{ background:var(--brand-700); color:#fff; }
+
+  /* Table polish + equal spacing */
+  .table-eq{ table-layout: fixed; width: 100%; }
+  .table thead th{ border-bottom-width:2px; vertical-align:middle; font-weight:700; }
+  .table tbody tr:hover{ background:#fcfcfd; }
+  .text-nowrap{ white-space:nowrap; }
+
+  /* Schedule/Held On */
+  .date-brand{ color:var(--brand-700); font-weight:600; }
+  .time-muted{ color:#6c757d; font-size:.9rem; }
+
+  /* Cards for mobile */
+  .hearing-card{ border:1px solid var(--bs-border-color,#e5e7eb); border-radius:1rem; padding:1rem; background:#fff; }
+  .hearing-card + .hearing-card{ margin-top:.75rem; }
+  .hc-row{ display:flex; align-items:center; gap:.5rem; }
+  .hc-meta{ color:#6c757d; font-size:.9rem; }
+  .hc-divider{ height:1px; background:#eee; margin:.75rem 0; }
+
+  /* Pagination */
+  .pager-wrap{ display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-top:1rem; flex-wrap:wrap; }
+  .pagination{ margin:0; }
+  .page-size{ display:flex; align-items:center; gap:.5rem; }
+  .soft-badge{ background:var(--brand-050); border:1px solid rgba(109,41,50,.18); color:var(--brand-700); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center page-head mb-3">
+    <h4>
+      {% bs_icon 'calendar-week' %} Hearing Schedules
+    </h4>
+    {% if items %}
+      <span class="badge soft-badge">{{ items|length }} total</span>
+    {% endif %}
+  </div>
+
+  <!-- TODAY’S SCHEDULE (flat Sto. Niño themed carousel) -->
+  <div class="today-card card mb-3">
+    <div class="card-header">
+      <div class="fw-semibold">
+        {% bs_icon 'clock-history' %} Today’s Schedule
+        <span class="today-date" id="todayDateLabel"></span>
+      </div>
+      <span class="badge today-badge" id="todayCount">0</span>
+    </div>
+    <div class="card-body">
+      <div id="todaySlide" class="today-slide">
+        <div class="today-empty">No hearings scheduled today.</div>
+      </div>
+      <div id="todayControls" class="today-controls" style="display:none;">
+        <div id="todayDots" class="today-dots"></div>
+        <div class="btn-group">
+          <button id="todayPrev" type="button" class="btn btn-outline-accent btn-sm" aria-label="Previous">‹</button>
+          <button id="todayNext" type="button" class="btn btn-outline-accent btn-sm" aria-label="Next">›</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="filterbar">
+    <span class="text-muted small me-1">Filter:</span>
+    <button type="button" class="filter-pill active" data-filter="all">
+      {% bs_icon 'funnel' extra_classes='me-1' %} All
+    </button>
+    <button type="button" class="filter-pill" data-filter="upcoming">
+      {% bs_icon 'hourglass-split' extra_classes='me-1' %} To be held
+    </button>
+    <button type="button" class="filter-pill" data-filter="held">
+      {% bs_icon 'check-circle' extra_classes='me-1' %} Held
+    </button>
+    <button type="button" class="filter-pill" data-filter="missed">
+      {% bs_icon 'x-circle' extra_classes='me-1' %} Not held
+    </button>
+  </div>
+
+  <!-- Desktop / large screens: table -->
+  <div class="table-responsive d-none d-lg-block">
+    <table class="table table-eq align-middle">
+      <colgroup>
+        <col style="width:12%"><col style="width:36%"><col style="width:18%"><col style="width:10%"><col style="width:18%"><col style="width:6%">
+      </colgroup>
+      <thead class="table-light">
+        <tr>
+          <th>Case No.</th>
+          <th>Case</th>
+          <th>Schedule</th>
+          <th>Status</th>
+          <th>Held On</th>
+          <th class="text-end">Action</th>
+        </tr>
+      </thead>
+      <tbody id="hearing-tbody">
+        {% for it in items %}
+        <tr class="hearing-row">
+          <td class="text-nowrap"><span class="case-chip">{{ it.case_num }}</span></td>
+          <td>
+            <div class="fw-semibold text-truncate">
+              {{ it.case_type }}{% if it.case_type and it.case_nature %} — {% endif %}{{ it.case_nature }}
+            </div>
+            {% if it.case_title %}<div class="text-muted small text-truncate case-title">{{ it.case_title }}</div>{% endif %}
+          </td>
+          <td class="text-nowrap">
+            <div class="date-brand js-date" data-date="{{ it.hearing_date|default:'' }}">{{ it.hearing_date|default:"—" }}</div>
+            <div class="time-muted js-time" data-time="{{ it.hearing_time|default:'' }}">{{ it.hearing_time|default:"—" }}</div>
+          </td>
+          <td class="text-nowrap">
+            {% if it.hearing_held %}
+              <span class="status-pill status-held js-status-pill">{% bs_icon 'check-circle' extra_classes='me-1' %} Held</span>
+            {% else %}
+              <span class="status-pill status-upcoming js-status-pill">{% bs_icon 'hourglass-split' extra_classes='me-1' %} To be held</span>
+            {% endif %}
+          </td>
+          <td class="text-nowrap">
+            {% if it.hearing_held %}
+              <div class="date-brand js-held-date" data-dt="{{ it.held_at_fmt|default:it.held_at|default:'' }}"></div>
+              <div class="time-muted js-held-time" data-dt="{{ it.held_at_fmt|default:it.held_at|default:'' }}"></div>
+            {% else %}
+              <div>—</div><div class="time-muted">—</div>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <a class="btn btn-outline-brand btn-sm view-link" href="{% url 'lupon_mem:case_hearing_schedule' it.case_id %}?sid={{ it.submission_id }}">
+              {% bs_icon 'eye' extra_classes='me-1' %} View
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center py-5 text-muted">No hearings found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Mobile / small screens: cards -->
+  <div id="hearing-cards" class="d-lg-none">
+    {% for it in items %}
+    <div class="hearing-card hearing-card-item">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="hc-row">
+            <span class="case-chip">{{ it.case_num }}</span>
+            {% if it.hearing_held %}
+              <span class="status-pill status-held js-status-pill">{% bs_icon 'check-circle' %} Held</span>
+            {% else %}
+              <span class="status-pill status-upcoming js-status-pill">{% bs_icon 'hourglass-split' %} To be held</span>
+            {% endif %}
+          </div>
+          <div class="fw-semibold mt-2 text-truncate">
+            {{ it.case_type }}{% if it.case_type and it.case_nature %} — {% endif %}{{ it.case_nature }}
+          </div>
+          {% if it.case_title %}<div class="hc-meta text-truncate case-title">{{ it.case_title }}</div>{% endif %}
+        </div>
+        <a class="btn btn-outline-brand btn-sm view-link" href="{% url 'lupon_mem:case_hearing_schedule' it.case_id %}?sid={{ it.submission_id }}">
+          {% bs_icon 'eye' extra_classes='me-1' %} View
+        </a>
+      </div>
+      <div class="hc-divider"></div>
+      <div class="row g-2">
+        <div class="col-12">
+          <div class="hc-meta">Schedule</div>
+          <div class="date-brand js-date" data-date="{{ it.hearing_date|default:'' }}">{{ it.hearing_date|default:"—" }}</div>
+          <div class="time-muted js-time" data-time="{{ it.hearing_time|default:'' }}">{{ it.hearing_time|default:"—" }}</div>
+        </div>
+        <div class="col-12">
+          <div class="hc-meta">Held On</div>
+          {% if it.hearing_held %}
+            <div class="date-brand js-held-date" data-dt="{{ it.held_at_fmt|default:it.held_at|default:'' }}"></div>
+            <div class="time-muted js-held-time" data-dt="{{ it.held_at_fmt|default:it.held_at|default:'' }}"></div>
+          {% else %}
+            <div>—</div><div class="time-muted">—</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% empty %}
+      <div class="text-center text-muted py-5">No hearings found.</div>
+    {% endfor %}
+  </div>
+
+  <!-- Frontend Pagination -->
+  <div class="pager-wrap">
+    <div class="page-size">
+      <label for="pageSize" class="form-label m-0">Rows per page:</label>
+      <select id="pageSize" class="form-select form-select-sm" style="width:auto;">
+        <option value="10" selected>10</option>
+        <option value="20">20</option>
+        <option value="50">50</option>
+      </select>
+    </div>
+    <nav><ul id="hearing-pagination" class="pagination pagination-sm mb-0"></ul></nav>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+  (function(){
+    /* ---------- Date/Time helpers ---------- */
+    function formatDateLong(raw){
+      if(!raw) return '—';
+      let d = new Date(raw);
+      if(!isNaN(d)) return d.toLocaleDateString(undefined,{month:'long',day:'2-digit',year:'numeric'});
+      const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(raw).trim());
+      if(m){ d=new Date(+m[1],+m[2]-1,+m[3]); return d.toLocaleDateString(undefined,{month:'long',day:'2-digit',year:'numeric'}); }
+      const m2=/^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(String(raw).trim());
+      if(m2){ d=new Date(+m2[1],+m2[2]-1,+m2[3]); return d.toLocaleDateString(undefined,{month:'long',day:'2-digit',year:'numeric'}); }
+      const parts=String(raw).split(','); if(parts.length>=2) return (parts[0]+', '+parts[1]).trim();
+      return raw;
+    }
+    function formatTime12h(raw){
+      if(!raw) return '—';
+      const s=String(raw).trim();
+      let m=/^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(s);
+      if(m){ let h=+m[1],min=m[2],ampm=(h>=12)?'pm':'am'; h=(h%12)||12; return `${h}:${min} ${ampm}`; }
+      const iso=new Date(s);
+      if(!isNaN(iso)){ let h=iso.getHours(),min=String(iso.getMinutes()).padStart(2,'0'),ampm=(h>=12)?'pm':'am'; h=(h%12)||12; return `${h}:${min} ${ampm}`; }
+      m=/(\d{1,2}):(\d{2})\s*([ap])\.?m\.?/i.exec(s);
+      if(m) return `${parseInt(m[1],10)}:${m[2]} ${m[3].toLowerCase()}m`;
+      return s;
+    }
+    function splitHumanDT(s){
+      if(!s) return {date:'—',time:'—'};
+      const t=String(s).trim(), d=new Date(t);
+      if(!isNaN(d)) return {date:d.toLocaleDateString(undefined,{month:'long',day:'2-digit',year:'numeric'}), time:formatTime12h(d)};
+      const m1=/^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(t);
+      if(m1){ const date=new Date(+m1[1],+m1[2]-1,+m1[3]); return {date:formatDateLong(date), time:formatTime12h(`${m1[4]}:${m1[5]}`)}; }
+      const parts=t.split(','); if(parts.length>=2){ const datePart=(parts[0]+', '+parts[1]).trim(); const rest=parts.slice(2).join(',').trim(); const tm=/(\d{1,2}):(\d{2})\s*([ap])\.?m\.?/i.exec(rest); const timePart=tm?`${parseInt(tm[1],10)}:${tm[2]} ${tm[3].toLowerCase()}m`:'—'; return {date:datePart,time:timePart}; }
+      const tm2=/(\d{1,2}):(\d{2})\s*([ap])\.?m\.?/i.exec(t); const time=tm2?`${parseInt(tm2[1],10)}:${tm2[2]} ${tm2[3].toLowerCase()}m`:'—'; const date=tm2?t.replace(tm2[0],'').replace(/,\s*$/,'').trim():t; return {date:date||'—',time};
+    }
+
+    function applyDateTime(){
+      document.querySelectorAll('.js-date').forEach(el=>{ el.textContent = formatDateLong(el.getAttribute('data-date')||''); });
+      document.querySelectorAll('.js-time').forEach(el=>{ el.textContent = formatTime12h(el.getAttribute('data-time')||''); });
+      document.querySelectorAll('.js-held-date').forEach(el=>{ el.textContent = splitHumanDT(el.getAttribute('data-dt')||'').date; });
+      document.querySelectorAll('.js-held-time').forEach(el=>{ el.textContent = splitHumanDT(el.getAttribute('data-dt')||'').time; });
+    }
+
+    /* ---------- Chronological sort ---------- */
+    function ymdFromDate(raw){
+      const d = new Date(raw);
+      if(!isNaN(d)) return [d.getFullYear(), d.getMonth()+1, d.getDate()];
+      const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(raw||'').trim());
+      if(m) return [+m[1], +m[2], +m[3]];
+      return null;
+    }
+    function buildDateTime(rawDate, rawTime){
+      const ymd = ymdFromDate(rawDate);
+      if(!ymd) return new Date(NaN);
+      let h=0, mi=0;
+      if(rawTime){
+        const s=String(rawTime).trim();
+        let m=/^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(s);
+        if(m){ h=+m[1]; mi=+m[2]; }
+        else{
+          m=/(\d{1,2}):(\d{2})\s*([ap])\.?m\.?/i.exec(s);
+          if(m){ h=+m[1]%12; if(m[3].toLowerCase()==='p') h+=12; mi=+m[2]; }
+        }
+      }
+      return new Date(ymd[0], ymd[1]-1, ymd[2], h, mi, 0);
+    }
+    function sortChronologically(){
+      const tbody = document.getElementById('hearing-tbody');
+      const rows = Array.from(tbody.querySelectorAll('tr.hearing-row'));
+      rows.sort((a,b)=>{
+        const aD = (a.querySelector('.js-date')||{}).getAttribute?.('data-date')||'';
+        const aT = (a.querySelector('.js-time')||{}).getAttribute?.('data-time')||'';
+        const bD = (b.querySelector('.js-date')||{}).getAttribute?.('data-date')||'';
+        const bT = (b.querySelector('.js-time')||{}).getAttribute?.('data-time')||'';
+        return buildDateTime(aD,aT) - buildDateTime(bD,bT);
+      });
+      rows.forEach(r=> tbody.appendChild(r));
+
+      // Mobile cards
+      const cardsWrap = document.getElementById('hearing-cards');
+      const cards = Array.from(cardsWrap.querySelectorAll('.hearing-card-item'));
+      cards.sort((a,b)=>{
+        const aD = (a.querySelector('.js-date')||{}).getAttribute?.('data-date')||'';
+        const aT = (a.querySelector('.js-time')||{}).getAttribute?.('data-time')||'';
+        const bD = (b.querySelector('.js-date')||{}).getAttribute?.('data-date')||'';
+        const bT = (b.querySelector('.js-time')||{}).getAttribute?.('data-time')||'';
+        return buildDateTime(aD,aT) - buildDateTime(bD,bT);
+      });
+      cards.forEach(c=> cardsWrap.appendChild(c));
+    }
+
+    /* ---------- Status labeling + filter ---------- */
+    function updateStatusLabels(){
+      const now = new Date();
+      document.querySelectorAll('tr.hearing-row, .hearing-card-item').forEach(row=>{
+        const isHeld = row.querySelector('.js-held-date') !== null && row.querySelector('.js-held-date')?.textContent?.trim() !== '';
+        const pill = row.querySelector('.js-status-pill');
+        const dEl = row.querySelector('.js-date');
+        const tEl = row.querySelector('.js-time');
+        const rawD = dEl ? dEl.getAttribute('data-date') : '';
+        const rawT = tEl ? (tEl.getAttribute('data-time') || tEl.textContent) : '';
+        const when = buildDateTime(rawD, rawT);
+
+        let status = 'upcoming';
+        if (isHeld) status = 'held';
+        else if (!isNaN(when) && when.getTime() < now.getTime()) status = 'missed';
+
+        row.setAttribute('data-status', status);
+
+        if(!pill) return;
+        if(status === 'held'){
+          pill.classList.remove('status-upcoming','status-missed'); pill.classList.add('status-held');
+          pill.innerHTML = `{% bs_icon 'check-circle' extra_classes='me-1' %} Held`;
+        }else if(status === 'missed'){
+          pill.classList.remove('status-upcoming','status-held'); pill.classList.add('status-missed');
+          pill.innerHTML = `{% bs_icon 'x-circle' extra_classes='me-1' %} Not held`;
+        }else{
+          pill.classList.remove('status-held','status-missed'); pill.classList.add('status-upcoming');
+          pill.innerHTML = `{% bs_icon 'hourglass-split' extra_classes='me-1' %} To be held`;
+        }
+      });
+    }
+
+    // Filter handling
+    const pills = Array.from(document.querySelectorAll('.filter-pill'));
+    pills.forEach(p=>{
+      p.addEventListener('click', ()=>{
+        pills.forEach(x=>x.classList.remove('active'));
+        p.classList.add('active');
+        applyFilter(p.getAttribute('data-filter') || 'all');
+      });
+    });
+    function applyFilter(kind){
+      const allRows = Array.from(document.querySelectorAll('tr.hearing-row'));
+      const allCards = Array.from(document.querySelectorAll('.hearing-card-item'));
+      const show = (el)=>{
+        const st = el.getAttribute('data-status') || '';
+        const visible = (kind==='all') || (st===kind);
+        el.setAttribute('data-visible', visible ? '1' : '0');
+      };
+      allRows.forEach(show); allCards.forEach(show);
+      showPage(1); // re-paginate based on new visibility
+    }
+
+    /* ---------- Today card carousel (now shows status pill) ---------- */
+    function pad2(n){ return String(n).padStart(2,'0'); }
+    function todayYMD(){ const now=new Date(); return `${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}`; }
+    function buildTodayCarousel(){
+      const todayY=todayYMD();
+      document.getElementById('todayDateLabel').textContent = new Date().toLocaleDateString(undefined,{month:'long',day:'2-digit',year:'numeric'});
+      const countEl=document.getElementById('todayCount'), slide=document.getElementById('todaySlide'),
+            controls=document.getElementById('todayControls'), dotsWrap=document.getElementById('todayDots'),
+            btnPrev=document.getElementById('todayPrev'), btnNext=document.getElementById('todayNext');
+
+      const rows=[...document.querySelectorAll('#hearing-tbody tr.hearing-row')];
+      const items=[];
+      rows.forEach(r=>{
+        const dateEl=r.querySelector('.js-date'); if(!dateEl) return;
+        const rawDate=(dateEl.getAttribute('data-date')||'').trim(); if(!rawDate) return;
+        let ymd=rawDate;
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(rawDate)){ const d=new Date(rawDate); if(!isNaN(d)) ymd=`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+        if(ymd!==todayY) return;
+
+        items.push({
+          caseNum: (r.querySelector('.case-chip')||{}).textContent?.trim()||'',
+          caseLabel: (r.querySelector('td:nth-child(2) .fw-semibold')||{}).textContent?.trim()||'Hearing',
+          caseTitle: (r.querySelector('td:nth-child(2) .case-title')||{}).textContent?.trim()||'',
+          timeRaw: (r.querySelector('.js-time')||{}).getAttribute?.('data-time')||'',
+          href: (r.querySelector('.view-link')||{}).getAttribute?.('href')||'#',
+          status: r.getAttribute('data-status') || 'upcoming'  // NEW
+        });
+      });
+
+      // earliest time first
+      items.sort((a,b)=> (a.timeRaw||'').localeCompare(b.timeRaw||''));
+      countEl.textContent=String(items.length);
+      dotsWrap.innerHTML=''; slide.innerHTML='';
+      controls.style.display = items.length>1 ? '' : 'none';
+
+      if(items.length===0){ slide.innerHTML='<div class="today-empty">No hearings scheduled today.</div>'; return; }
+
+      items.forEach((_,i)=>{ const d=document.createElement('span'); d.className='today-dot'; d.dataset.idx=i; d.onclick=()=>show(i); dotsWrap.appendChild(d); });
+
+      function pillFor(kind){
+        const span=document.createElement('span');
+        span.className='status-pill ' + (kind==='held' ? 'status-held' : kind==='missed' ? 'status-missed' : 'status-upcoming');
+        if(kind==='held'){ span.innerHTML=`{% bs_icon 'check-circle' extra_classes='me-1' %} Held`; }
+        else if(kind==='missed'){ span.innerHTML=`{% bs_icon 'x-circle' extra_classes='me-1' %} Not held`; }
+        else{ span.innerHTML=`{% bs_icon 'hourglass-split' extra_classes='me-1' %} To be held`; }
+        return span;
+      }
+
+      function render(it){
+        const wrap=document.createElement('div'); wrap.className='today-item';
+
+        const chip=document.createElement('span'); chip.className='case-chip'; chip.textContent=it.caseNum;
+
+        const info=document.createElement('div'); info.style.flex='1 1 auto';
+        const label=document.createElement('div'); label.className='label text-truncate'; label.textContent=it.caseLabel;
+        const title=document.createElement('div'); title.className='title text-truncate'; if(it.caseTitle) title.textContent=it.caseTitle;
+        const time=document.createElement('div'); time.className='time'; time.textContent=formatTime12h(it.timeRaw);
+        info.appendChild(label); if(it.caseTitle) info.appendChild(title); info.appendChild(time);
+
+        const right=document.createElement('div'); right.style.display='flex'; right.style.alignItems='center'; right.style.gap='.5rem';
+        const pill = pillFor(it.status);
+        const a=document.createElement('a'); a.className='btn btn-outline-accent btn-sm'; a.href=it.href; a.textContent='View';
+        right.appendChild(pill); right.appendChild(a);
+
+        wrap.appendChild(chip); wrap.appendChild(info); wrap.appendChild(right);
+        return wrap;
+      }
+
+      let cur=0;
+      function show(i){
+        cur=Math.max(0,Math.min(i,items.length-1));
+        slide.innerHTML=''; slide.appendChild(render(items[cur]));
+        [...dotsWrap.children].forEach((dot,idx)=> dot.classList.toggle('active', idx===cur));
+      }
+      btnPrev.onclick=()=>show(cur-1);
+      btnNext.onclick=()=>show(cur+1);
+      show(0);
+    }
+
+    /* ---------- Pagination (respects filter) ---------- */
+    const tableRows=[...document.querySelectorAll('#hearing-tbody tr.hearing-row')];
+    const cards=[...document.querySelectorAll('#hearing-cards .hearing-card-item')];
+    const pager=document.getElementById('hearing-pagination');
+    const pageSizeSel=document.getElementById('pageSize');
+    let currentPage=1;
+    const pageSize=()=>parseInt(pageSizeSel.value,10)||10;
+    const visibleElements=list=>list.filter(el => (el.getAttribute('data-visible')||'1')==='1');
+
+    function showPage(page){
+      const visRows = visibleElements(tableRows);
+      const visCards = visibleElements(cards);
+      const total = Math.max(visRows.length, visCards.length);
+      const totalPages = Math.max(1, Math.ceil(total / pageSize()));
+      currentPage = Math.min(Math.max(page,1), totalPages);
+      const start=(currentPage-1)*pageSize(), end=start+pageSize();
+
+      tableRows.forEach(el=> el.style.display='none');
+      cards.forEach(el=> el.style.display='none');
+
+      visRows.forEach((el,idx)=>{ if(idx>=start && idx<end) el.style.display=''; });
+      visCards.forEach((el,idx)=>{ if(idx>=start && idx<end) el.style.display=''; });
+
+      renderPager(totalPages);
+    }
+    function renderPager(totalPages){
+      const pagerEl=pager; if(!pagerEl) return; pagerEl.innerHTML='';
+      const addBtn=(label,page,disabled=false,active=false)=>{
+        const li=document.createElement('li'); li.className=`page-item ${disabled?'disabled':''} ${active?'active':''}`;
+        const a=document.createElement('a'); a.className='page-link'; a.href='#'; a.textContent=label;
+        if(!disabled){ a.onclick=(e)=>{e.preventDefault(); showPage(page);} }
+        li.appendChild(a); pagerEl.appendChild(li);
+      };
+      addBtn('Prev', currentPage-1, currentPage===1);
+      const windowSize=5; let s=Math.max(1,currentPage-Math.floor(windowSize/2)); let e=Math.min(totalPages,s+windowSize-1); s=Math.max(1,Math.min(s,totalPages-windowSize+1));
+      for(let p=s;p<=e;p++) addBtn(String(p), p, false, p===currentPage);
+      addBtn('Next', currentPage+1, currentPage===totalPages);
+    }
+    if(pageSizeSel) pageSizeSel.addEventListener('change', ()=>showPage(1));
+
+    /* ---------- INIT ---------- */
+    applyDateTime();
+    sortChronologically();
+    updateStatusLabels();   // sets data-status per row/card
+    buildTodayCarousel();   // reads data-status to show pill
+    // default filter = all
+    document.querySelectorAll('tr.hearing-row, .hearing-card-item').forEach(el=> el.setAttribute('data-visible','1'));
+    showPage(1);
+  })();
+</script>
+{% endblock %}

@@ -32,5 +32,9 @@ urlpatterns = [
 
     path("api/staff/search/", views.staff_search_api, name="staff_search_api"),
     path("api/staff/filter/", views.staff_filter_api, name="staff_filter_api"),
+    
+    path("child-visit/", views.child_visit_http, name="child_visit"),
+    path("child-basic-info/<int:q>/", views.child_basic_info_http, name="child_basic_info"),
+    path("anc-care/", views.anc_care_http, name="anc_care"),
 ]
  

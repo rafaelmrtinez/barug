@@ -1,4 +1,3 @@
-# lupon_pres/views.py
 from __future__ import annotations
 
 import os
@@ -50,174 +49,15 @@ WZ_KEY = "lpres_nonres_wizard"
 
 # App/role for guard
 LUPON_PRES_ROLE = "Barangay Lupon President"
+#need back-end for proper assignment
+user_fullname = 'lname, fname mname suffix'
+user_role = 'Barangay Lupon President'
 
-# Demo identity (replace with session-context if you wire it later)
-user_fullname = "lname, fname mname suffix"
-user_role = LUPON_PRES_ROLE
-user_role_template = user_role.lower().replace(" ", "_")
+LUPON_PRES_ROLE = "Barangay Lupon President"
+user_role_template = user_role.lower().replace(' ', '_')
 
-# Buckets
-BUCKET_FINAL = getattr(settings, "SUPABASE_ID_UPLOADS_BUCKET", "id-uploads")
-BUCKET_STAFF_PROOF = getattr(settings, "SUPABASE_STAFF_PROOF_BUCKET", "staff-proof")
-
-
-def _wiz_get(request) -> Dict[str, Any]:
-    return request.session.get(WZ_KEY, {}) or {}
-
-def _wiz_set(request, key: str, value: Any) -> None:
-    data = _wiz_get(request)
-    data[key] = value
-    request.session[WZ_KEY] = data
-    request.session.modified = True
-
-def _wiz_clear(request) -> None:
-    if WZ_KEY in request.session:
-        del request.session[WZ_KEY]
-        request.session.modified = True
-
-def _parse_hhmm(s: Optional[str]) -> Optional[dtime]:
-    s = (s or "").strip()
-    try:
-        return datetime.strptime(s, "%H:%M").time()
-    except Exception:
-        return None
-
-def _label_from_choices(choices, value):
-    s = str(value) if value is not None else ""
-    for k, v in choices:
-        if str(k) == s:
-            return v
-    return None
-
-def _make_signed_url(bucket: str, path: str, expire_seconds: int = 1800) -> str | None:
-    if not path:
-        return None
-    try:
-        res = supabase.storage.from_(bucket).create_signed_url(path, expire_seconds)
-        return (res.get("signedURL") or res.get("signed_url")) if isinstance(res, dict) else None
-    except Exception:
-        return None
-
-def _same_file(a, b) -> bool:
-    if not a or not b:
-        return False
-    try:
-        return (getattr(a, "size", None) == getattr(b, "size", None)) and (
-            getattr(a, "name", "") == getattr(b, "name", "")
-        )
-    except Exception:
-        return False
-
-# Image preprocessing (autorotate + compress)
-def _pil_autorotate_and_jpeg(file_obj, *, max_w=2200, max_h=2200, quality=85) -> BytesIO:
-    try:
-        from PIL import Image, ImageOps
-        file_obj.seek(0)
-        img = Image.open(file_obj)
-        img = ImageOps.exif_transpose(img)
-        img.thumbnail((max_w, max_h))
-        buf = BytesIO()
-        if img.mode not in ("RGB", "L"):
-            img = img.convert("RGB")
-        img.save(buf, format="JPEG", quality=85, optimize=True)
-        buf.seek(0)
-        return buf
-    except Exception:
-        try:
-            file_obj.seek(0)
-        except Exception:
-            pass
-        return file_obj
-
-def _prep_image_for_upload(file_obj, *, max_w=2200, max_h=2200):
-    """Return (buf, mime, ext). Keep PNG if has alpha, else JPEG."""
-    try:
-        from PIL import Image, ImageOps
-        file_obj.seek(0)
-        img = Image.open(file_obj)
-        img = ImageOps.exif_transpose(img)
-        img.thumbnail((max_w, max_h))
-        has_alpha = (img.mode in ("RGBA", "LA")) or ("transparency" in img.info)
-        if has_alpha:
-            if img.mode not in ("RGBA", "LA"):
-                img = img.convert("RGBA")
-            buf = BytesIO()
-            img.save(buf, format="PNG", optimize=True)
-            buf.seek(0)
-            return buf, "image/png", "png"
-        else:
-            if img.mode not in ("RGB", "L"):
-                img = img.convert("RGB")
-            buf = BytesIO()
-            img.save(buf, format="JPEG", quality=85, optimize=True)
-            buf.seek(0)
-            return buf, "image/jpeg", "jpg"
-    except Exception:
-        try:
-            file_obj.seek(0)
-        except Exception:
-            pass
-        return file_obj, getattr(file_obj, "content_type", "application/octet-stream"), "jpg"
-
-def _bytes_to_data_url(b: bytes, mime: str = "image/jpeg") -> str:
-    return f"data:{mime};base64,{base64.b64encode(b).decode('ascii')}"
-
-# Retry upload wrapper (same semantics you use elsewhere)
-import time as _time
-def _upload_to_storage_retry(
-    data,
-    *,
-    path: str,
-    bucket: str,
-    content_type: str = "application/octet-stream",
-    make_public: bool = False,
-    upsert: bool = True,
-    reset_metadata: bool = True,
-    max_retries: int = 3,
-    base_sleep: float = 0.6,
-):
-    last_err = None
-    for attempt in range(max_retries + 1):
-        try:
-            return upload_to_storage(
-                data,
-                path=path,
-                bucket=bucket,
-                upsert=upsert,
-                make_public=make_public,
-                reset_metadata=reset_metadata,
-                content_type=content_type,
-            )
-        except Exception as e:
-            msg = str(e)
-            transient = (
-                "ReadError" in msg
-                or "TransportError" in msg
-                or "A non-blocking socket operation could not be completed immediately" in msg
-                or "WinError 10035" in msg
-            )
-            if attempt < max_retries and transient:
-                sleep_s = base_sleep * (2 ** attempt)
-                logger.warning(
-                    "Upload transient error (%s). Retrying in %.2fs [%d/%d]…",
-                    msg, sleep_s, attempt + 1, max_retries
-                )
-                _time.sleep(sleep_s)
-                continue
-            last_err = e
-            break
-    raise last_err
-
-
-# ───────────────────────────────────────────────────────────────────────────────
-# Views
-# ───────────────────────────────────────────────────────────────────────────────
-
-@session_login_required
-@role_required(LUPON_PRES_ROLE)
-@nocache
-def staff_selection(request: HttpRequest) -> HttpResponse:
-    # Landing selector (Resident vs Non-Resident)
+# Create your views here.
+def staff_selection(request):
     return render(request, "members/staff_selection.html", {
         "user_fullname": user_fullname,
         "user_role": user_role,

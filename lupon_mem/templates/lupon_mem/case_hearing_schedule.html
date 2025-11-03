@@ -1,0 +1,377 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid px-4 my-4">
+
+  <style>
+    :root{
+      --brand:#6d2932; --brand-700:#5a222a; --accent:#D4AF37;
+      --ink:#212529; --muted:#6c757d; --ring:rgba(109,41,50,.18);
+      --soft:#faf9f8; --card:#ffffff;
+    }
+    .page-title{ color:var(--brand); font-weight:800; letter-spacing:.02em; }
+    .summary{
+      background: radial-gradient(1200px 1200px at 0% 0%, rgba(212,175,55,.08), transparent 40%), var(--card);
+      border:1px solid rgba(109,41,50,.12); box-shadow:0 10px 28px rgba(0,0,0,.05);
+      border-radius:1rem; padding:1rem 1.25rem;
+    }
+    .summary .cell{ border-right:1px dashed rgba(109,41,50,.15); }
+    .summary .cell:last-child{ border-right:0; }
+    .k-label{ font-size:.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; display:flex; align-items:center; gap:.5rem; margin-bottom:.2rem; }
+    .k-value{ font-weight:700; color:var(--ink); min-height:1.5rem; }
+    .k-note{ font-size:.8rem; color:var(--muted); }
+    .k-pill{ display:inline-flex; align-items:center; gap:.4rem; padding:.42rem .7rem; border-radius:999px; background:#fff; color:var(--brand); border:1px solid rgba(109,41,50,.25); font-weight:700; font-size:.82rem; }
+    .k-pill.soft{ background:rgba(212,175,55,.08); color:#7a6427; border-color:rgba(212,175,55,.35); }
+    .card-soft{ border:1px solid rgba(109,41,50,.12); border-radius:1rem; background:var(--card); box-shadow:0 10px 28px rgba(0,0,0,.05); }
+    .card-soft .card-header{ background:#fff; border-bottom:1px dashed rgba(109,41,50,.15); padding:.85rem 1rem; }
+    .section-title{ font-weight:800; color:var(--brand); text-transform:uppercase; letter-spacing:.04em; margin:0; }
+    .toolbar{ display:flex; flex-wrap:wrap; align-items:center; gap:.5rem .6rem; }
+    .btn-brand{ background:var(--brand); color:#fff; border:1px solid var(--brand); }
+    .btn-brand:hover{ background:var(--brand-700); border-color:var(--brand-700); color:#fff; }
+    .btn-outline-brand{ color:var(--brand); border-color:var(--brand); background:#fff; }
+    .btn-outline-brand:hover{ background:var(--brand); color:#fff; }
+    .btn-ghost{ background:#fff; color:#0d6efd; border:1px dashed rgba(13,110,253,.35); }
+    .btn-ghost:hover{ border-style:solid; }
+    .doc-card .card-body{ padding:1rem 1rem; }
+    @media (min-width:768px){ .doc-card .card-body{ padding:1.25rem 1.5rem; } }
+    .doc-grid{ margin-left:.125rem; margin-right:.125rem; }
+    .doc-grid .tile{ border:1px solid rgba(33,37,41,.08); border-radius:.9rem; padding:.6rem; background:#fff; height:100%; transition:transform .08s ease, box-shadow .08s ease, border-color .08s ease; }
+    .doc-grid .tile:hover{ transform:translateY(-2px); border-color:var(--ring); box-shadow:0 10px 26px rgba(109,41,50,.10); }
+    .doc-grid .caption{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .actions-card{ border-color: rgba(109,41,50,.25); }
+    .actions-card .card-header{
+      background: linear-gradient(0deg,#fff,#fff), radial-gradient(900px 900px at 0% 0%, rgba(212,175,55,.10), transparent 45%);
+      border-bottom:1px dashed rgba(109,41,50,.25);
+    }
+    .actions-card .card-body{ padding:1rem 1rem; }
+    @media (min-width:768px){ .actions-card .card-body{ padding:1.25rem 1.5rem; } }
+    .fieldset{ background:linear-gradient(0deg, rgba(109,41,50,.03), rgba(109,41,50,.03)); border:1px dashed rgba(109,41,50,.35); border-radius:.85rem; padding:1rem; }
+    @media (max-width:576px){
+      .summary .cell{ border-right:0; border-bottom:1px dashed rgba(109,41,50,.15); padding-bottom:.75rem; margin-bottom:.75rem; }
+      .summary .cell:last-child{ border-bottom:0; margin-bottom:0; padding-bottom:0; }
+      .k-value{ font-size:.95rem; }
+      .actions-card .btn-brand{ width:100%; }
+    }
+    .form-row{ display:flex; flex-wrap:wrap; align-items:center; gap:.6rem .75rem; }
+    .form-select:focus, .form-control:focus{ border-color:var(--brand); box-shadow:0 0 0 .25rem var(--ring); }
+    .form-check-input:checked{ background-color:var(--brand); border-color:var(--brand); }
+    .divider-soft{ height:1px; background:linear-gradient(90deg, rgba(109,41,50,.20), transparent); margin:1rem 0; }
+    .disabled-soft{ pointer-events:none; opacity:.55; }
+  </style>
+
+  <div class="d-flex align-items-center justify-content-between">
+    <h2 class="page-title mb-2">Hearing Schedule</h2>
+    <div class="text-muted small">Template: <code>case_hearing_schedule.html</code></div>
+  </div>
+
+  <!-- Flags surfaced from the view -->
+  <div id="caseFlags" data-has-kp16="{{ has_kp16|yesno:'1,0' }}" hidden></div>
+
+  <div class="summary mb-2">
+    <div class="row g-3 align-items-center">
+      <div class="col-12 col-xl-3 col-lg-4 cell">
+        <div class="k-label"><i class="bi bi-file-earmark-text"></i> Source</div>
+        <div class="k-value">
+          {% if hearing_source == "KP-8" %}
+            <span class="k-pill"><i class="bi bi-people"></i> KP-8 — Mediation</span>
+          {% elif hearing_source == "KP-12" %}
+            <span class="k-pill soft"><i class="bi bi-handshake"></i> KP-12 — Conciliation</span>
+          {% else %}—{% endif %}
+        </div>
+      </div>
+
+      <div class="col-12 col-xl-3 col-lg-4 cell">
+        <div class="k-label"><i class="bi bi-calendar2-event"></i> Date &amp; Time</div>
+        <div id="hearing-dt" class="k-value"
+             data-date="{{ hearing_date|default_if_none:'' }}"
+             data-time="{{ hearing_time|default_if_none:'' }}">
+          {% if hearing_date %}{{ hearing_date }}{% endif %}{% if hearing_time %} {{ hearing_time }}{% endif %}
+        </div>
+        {% if hearing_label %}
+          <div class="k-note mt-1">{{ hearing_label }}</div>
+        {% endif %}
+      </div>
+
+      <div class="col-12 col-xl-4 col-lg-4 cell">
+        <div class="k-label"><i class="bi bi-person-lines-fill"></i> Parties</div>
+        <div class="k-value text-truncate" title="{{ complainants|join:', ' }} vs {{ respondents|join:', ' }}">
+          {{ complainants|join:", " }} <span class="text-muted">vs</span> {{ respondents|join:", " }}
+        </div>
+      </div>
+
+      <div class="col-12 col-xl-2 col-lg-12">
+        <div class="k-label"><i class="bi bi-flag"></i> Status</div>
+        <div class="k-value">
+          {% if hearing_held %}
+            Held
+            {% if held_at_fmt %}<span class="k-note d-block mt-1">{{ held_at_fmt }}</span>{% endif %}
+          {% else %}
+            Not Held
+            {% if dev_mode and picked_submission_id %}
+              <span class="k-note d-block mt-1">
+                <a class="text-decoration-none" href="{% url 'lupon_mem:mark_hearing_held_dev' case_id %}?sid={{ picked_submission_id }}">Dev: Mark Held</a>
+              </span>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- DEBUG chips -->
+    <div class="mt-2 d-flex gap-2 flex-wrap">
+      <div id="attSummaryPill"></div>
+      <div id="kp16Pill"></div>
+    </div>
+
+    <!-- for JS -->
+    <div id="attData" data-att-count="{{ med_attendance_count|default_if_none:'0' }}" hidden></div>
+  </div>
+
+{% if hearing_source == "KP-8" and not hearing_held %}
+    <div class="card-soft mb-4 actions-card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h6 class="section-title">Mediation Actions</h6>
+        {% if dev_mode %}<span class="badge text-bg-secondary">Dev mode</span>{% endif %}
+      </div>
+      <div class="card-body">
+
+        <div id="attSuccessBanner" class="alert alert-success" role="alert">
+          <i class="bi bi-bug me-1"></i>
+          <strong>[DEBUG]</strong> <span class="msg">
+            {% if med_attendance_count|default:0 > 0 %}
+              {{ med_attendance_ord_label }}
+            {% else %}
+              Banner would be hidden until at least one attendance exists (count: 0).
+            {% endif %}
+          </span>
+        </div>
+
+        <div class="toolbar">
+          {% if med_attendance_count|default:0 > 0 %}
+            <button class="btn btn-outline-brand disabled-soft" disabled
+                    title="Mediation attendance is already attached for this hearing.">
+              <i class="bi bi-person-check me-1"></i> Mediation Attendance Attached
+            </button>
+          {% else %}
+            <a class="btn btn-outline-brand"
+               href="{% url 'lupon_mem:open_mediation_attendance' case_id %}?code=MED-ATT-2025&from=hearing&sid={{ picked_submission_id }}">
+              <i class="bi bi-person-check me-1"></i> Add Mediation Attendance
+            </a>
+          {% endif %}
+          <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#uploadDocsModal">
+            <i class="bi bi-images me-1"></i> Add Documentation Photos
+          </button>
+        </div>
+
+        <div class="divider-soft"></div>
+
+        <div class="fieldset">
+          <form id="medHeldForm" class="form-row"
+                method="post" action="{% url 'lupon_mem:mediation_complete' case_id %}">
+            {% csrf_token %}
+            {% if picked_submission_id %}
+              <input type="hidden" name="submission_id" value="{{ picked_submission_id }}">
+            {% endif %}
+
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="cmpAtt" name="compl_attended" value="1" checked>
+              <label class="form-check-label" for="cmpAtt">Complainant attended</label>
+            </div>
+
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="rspAtt" name="resp_attended" value="1" checked>
+              <label class="form-check-label" for="rspAtt">Respondent attended</label>
+            </div>
+
+            <select id="medOutcome" name="settlement" required class="form-select w-auto">
+              <option value="">Outcome…</option>
+              <option value="PENDING">Pending / Not Settled</option>
+              <option value="SETTLED">Settled</option>
+            </select>
+
+            <input type="text" name="remarks" class="form-control w-auto" placeholder="Remarks (optional)">
+
+            <button class="btn btn-brand">
+              <i class="bi bi-check2-circle me-1"></i> Mark Mediation as Held
+            </button>
+          </form>
+        </div>
+
+        <div class="mt-3">
+          <!-- include sid so the server knows which hearing -->
+          <a id="settleBtn" class="btn btn-ghost" href="{% url 'lupon_mem:open_kp16_from_hearing' case_id %}?sid={{ picked_submission_id }}">
+            <i class="bi bi-journal-check me-1"></i> Record Settlement (KP-16)
+          </a>
+          <div id="settleGuardNote" class="form-text text-muted d-none">
+            Add at least one mediation attendance to enable settlement.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="uploadDocsModal" tabindex="-1" aria-hidden="true" style="margin-top: 150;">
+      <div class="modal-dialog">
+        <form class="modal-content" method="post"
+              action="{% url 'lupon_mem:hearing_media_upload' case_id %}"
+              enctype="multipart/form-data">
+          <div class="modal-header">
+            <h5 class="modal-title" style="color:var(--brand)"><i class="bi bi-images me-1"></i> Add Documentation Photos</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            {% csrf_token %}
+            <input type="hidden" name="submission_id" value="{{ picked_submission_id }}">
+            <input type="file" name="photos[]" accept="image/*" multiple class="form-control" required>
+            <div class="form-text mt-2">You can select multiple images.</div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-brand">Upload</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if mediation_photos %}
+    <div class="card-soft mb-4 doc-card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h6 class="section-title mb-0">Documentation Photos</h6>
+        {% if hearing_held %}<span class="badge text-bg-success">HELD</span>{% endif %}
+      </div>
+      <div class="card-body">
+        <div class="row g-3 doc-grid">
+          {% for p in mediation_photos %}
+            <div class="col-6 col-md-4 col-lg-3 col-xl-2">
+              <a class="tile d-block text-decoration-none" href="{{ p.display_url }}" target="_blank" rel="noopener" title="Open image in new tab">
+                <div class="ratio ratio-4x3">
+                  <img src="{{ p.display_url }}" alt="documentation" class="w-100 h-100 rounded" style="object-fit:cover;">
+                </div>
+                <div class="small text-muted mt-1 caption">{{ p.caption|default:" " }}</div>
+              </a>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  {% elif hearing_held %}
+    <div class="alert alert-light border text-muted">No documentation photos were uploaded for this hearing.</div>
+  {% endif %}
+
+  {% if not hearing_source %}
+    <div class="alert alert-info card-soft p-3 mb-0">
+      No KP-8/KP-12 notice found yet. Issue a notice before marking a hearing held.
+    </div>
+  {% endif %}
+</div>
+
+<script>
+(function(){
+  // date/time prettifier
+  const node = document.getElementById('hearing-dt');
+  if (node){
+    const ds = (node.getAttribute('data-date') || '').trim();
+    const ts = (node.getAttribute('data-time') || '').trim();
+    if (ds){
+      try{
+        let [Y,M,D] = ds.split('-').map(Number);
+        let [h,m] = ts ? ts.split(':').map(Number) : [0,0];
+        const dt = new Date(Y,(M||1)-1,D||1,h||0,m||0,0,0);
+        const dateStr = dt.toLocaleDateString(undefined, { month:'long', day:'numeric', year:'numeric' });
+        const timeStr = ts ? dt.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' }) : '';
+        node.textContent = timeStr ? `${dateStr} ${timeStr}` : dateStr;
+      }catch(e){}
+    }
+  }
+
+  function ordinal(n){
+    n = Number(n)||0; const s=["th","st","nd","rd"], v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]);
+  }
+
+  const attData  = document.getElementById('attData');
+  const attCount = parseInt((attData?.getAttribute('data-att-count')||'0').trim(),10) || 0;
+
+  // Attendance DEBUG pill
+  const attPillHost = document.getElementById('attSummaryPill');
+  if (attPillHost){
+    attPillHost.innerHTML = attCount > 0
+      ? `<span class="k-pill soft"><i class="bi bi-bug"></i> [DEBUG] ${ordinal(attCount)} Mediation Attendance attached (this hearing)</span>`
+      : `<span class="k-pill soft"><i class="bi bi-bug"></i> [DEBUG] No Mediation Attendance yet (this hearing)</span>`;
+  }
+
+  const successBanner = document.getElementById('attSuccessBanner');
+  if (successBanner){
+    const msg = successBanner.querySelector('.msg');
+    msg.textContent = attCount > 0
+      ? `${ordinal(attCount)} mediation attendance successfully attached.`
+      : `Banner would be hidden until at least one attendance exists (count: 0).`;
+  }
+
+  // KP-16 DEBUG pill
+  const flags   = document.getElementById('caseFlags');
+  const hasKP16 = (flags?.dataset.hasKp16 === '1');
+  const kp16PillHost = document.getElementById('kp16Pill');
+  if (kp16PillHost){
+    kp16PillHost.innerHTML = hasKP16
+      ? `<span class="k-pill"><i class="bi bi-journal-check"></i> [DEBUG] KP-16 on file</span>`
+      : `<span class="k-pill soft"><i class="bi bi-journal-x"></i> [DEBUG] No KP-16 yet</span>`;
+  }
+
+  // enable/disable KP-16 button based on attendance
+  const settleBtn = document.getElementById('settleBtn');
+  const settleGuardNote = document.getElementById('settleGuardNote');
+  if (settleBtn){
+    if (attCount > 0){
+      settleBtn.classList.remove('disabled-soft');
+      settleGuardNote?.classList.add('d-none');
+    } else {
+      settleBtn.classList.add('disabled-soft');
+      settleGuardNote?.classList.remove('d-none');
+      settleBtn.addEventListener('click', function(ev){
+        ev.preventDefault();
+        alert('Please add at least one Mediation Attendance before proceeding to settlement.');
+      }, { once:true });
+    }
+  }
+
+  // Guard submit:
+  // - PENDING: allow even if no attendance; if zero attendance, send att_slot_only=1 to consume the slot as "no-show".
+  // - SETTLED: require >=1 attendance AND KP-16 on file.
+  const form = document.getElementById('medHeldForm');
+  const outcomeSel = document.getElementById('medOutcome');
+
+  if (form) {
+    form.addEventListener('submit', function(ev){
+      const outcome = (outcomeSel?.value || '').toUpperCase();
+
+      if (outcome === 'SETTLED') {
+        if (attCount <= 0) {
+          ev.preventDefault();
+          alert('Please add Mediation Attendance first before marking the mediation as SETTLED.');
+          return false;
+        }
+        if (!hasKP16) {
+          ev.preventDefault();
+          alert('Please complete the Amicable Settlement (KP-16) before finalizing as SETTLED.');
+          window.location.href = "{% url 'lupon_mem:open_kp16_from_hearing' case_id %}?sid={{ picked_submission_id }}";
+          return false;
+        }
+        // ok to submit when SETTLED (+attendance +KP16)
+        return true;
+      }
+
+      // outcome is PENDING / NOT SETTLED
+      // If there is no attendance yet, we still allow submission and tell the backend
+      // to increment/consume the attendance slot as a no-show so next will be "2nd".
+      if (attCount <= 0) {
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'att_slot_only';
+        hidden.value = '1'; // backend: treat as consumed slot without actual attendees
+        form.appendChild(hidden);
+      }
+      // proceed
+      return true;
+    }, false);
+  }
+})();
+</script>
+{% endblock %}

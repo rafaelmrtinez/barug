@@ -6,11 +6,15 @@
 {% block css %}
 <style>
   :root{
-    --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932; --brand-600:#7a323b;
+    --brand-980:#230a0d; --brand-950:#2b0d11; --brand-900:#3a1217; --brand-850:#4a181f;
+    --brand-800:#561c24; --brand-750:#62222a; --brand-700:#6d2932; --brand-600:#7a323b;
     --brand-100:#f3eaeb; --brand-050:#fbf6f6; --accent:#f2c94c;
-    --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --card:#fff; --wash:#fafafa;
+    --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --card:#ffffff; --wash:#faf9fb;
   }
-  .container-xxl,.container{ max-width: 1280px; }
+
+  body { background: var(--wash); }
+  .container-xxl, .container, .container-fluid { max-width: 1680px; }
+  .page-pad { padding-inline: clamp(12px, 3vw, 28px); }
 
   .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
   .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
@@ -23,163 +27,199 @@
     outline:none;
   }
   .form-check-input:checked{ background-color:var(--brand-700); border-color:var(--brand-700); }
+  .form-control[readonly], .form-select[disabled]{ background:#fafafa; cursor:not-allowed; color:#334155; }
+  .upper{ text-transform: uppercase; }
 
-  /* Hero */
   .hero{
-    background: radial-gradient(130% 160% at 0% 0%, var(--brand-700) 0%, var(--brand-900) 70%);
-    color:#fff; border-radius:16px; padding:18px 22px; box-shadow:0 10px 24px rgba(0,0,0,.18);
+    background:
+      radial-gradient(140% 180% at 0% 0%, var(--brand-700) 0%, var(--brand-900) 65%),
+      linear-gradient(0deg, rgba(255,255,255,.06), rgba(255,255,255,.06));
+    color:#fff; border-radius:22px; padding:20px 24px; box-shadow:0 16px 36px rgba(0,0,0,.16);
   }
-  .hero .brand-icon{
-    width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-    background:rgba(255,255,255,.08); position:relative;
+  .brand-icon{
+    width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,.08); position:relative; border:1px solid rgba(255,255,255,.15);
   }
-  .hero .brand-icon::after{ content:""; position:absolute; inset:8px; border-radius:50%; background:rgba(242,201,76,.18); }
+  .brand-icon::after{ content:""; position:absolute; inset:8px; border-radius:12px; background:rgba(242,201,76,.18); }
   .code-badge{
     font-family: ui-monospace, Menlo, Consolas, "Liberation Mono", monospace;
     font-weight:700; background:#fff; color:var(--brand-800);
-    border-radius:.5rem; padding:.25rem .5rem; border:1px solid rgba(0,0,0,.08);
+    border-radius:.6rem; padding:.3rem .65rem; border:1px solid rgba(0,0,0,.08);
   }
-  .subtle{ color:rgba(255,255,255,.82); }
+  .subtle{ color:rgba(255,255,255,.88); }
 
-  .card-soft{ border:0; border-radius:14px; background:var(--card); box-shadow:0 8px 20px rgba(16,24,40,.06); }
-  .section-title{ font-weight:800; color:var(--ink); display:flex; align-items:center; gap:.5rem; }
+  .card-soft{ border:0; border-radius:18px; background:var(--card); box-shadow:0 12px 28px rgba(16,24,40,.07); }
+  .section-title{ font-weight:800; color:var(--ink); display:flex; align-items:center; gap:.6rem; }
   .section-title .dot{ width:10px;height:10px;border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px rgba(242,201,76,.25); }
-  .small-muted{ color:var(--muted); }
-  .divider{ height:1px; background:var(--line); margin:.5rem 0 1rem; }
+  .section-sub{ color:var(--muted); font-size:.92rem; }
+  .divider{ height:1px; background:var(--line); margin:.6rem 0 1.2rem; }
 
-  .input-money .input-group-text{ background:#fff; border-right:0; }
-  .input-money input{ border-left:0; }
+  .sticky-col{ position: sticky; top: 84px; }
 
-  .switch-grid{ display:grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap:.5rem; }
-  @media (max-width: 992px){ .switch-grid{ grid-template-columns: repeat(3, minmax(0,1fr)); } }
-  @media (max-width: 576px){ .switch-grid{ grid-template-columns: repeat(2, minmax(0,1fr)); } }
+  .switch-grid{ display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:.6rem; }
+  @media (max-width: 1200px){ .switch-grid{ grid-template-columns: repeat(2, minmax(0,1fr)); } }
 
-  .table thead th{ border-bottom-width:2px; white-space:nowrap; }
-  .table tbody tr:hover{ background:#fffaf0; }
-  .json-input{ font-family: ui-monospace, Menlo, Consolas, "Liberation Mono", monospace; }
-
-  .chip{
-    display:inline-flex; align-items:center; gap:.35rem; padding:.25rem .5rem; border-radius:999px;
-    background:#fff3d1; color:#8a6b00; font-size:.78rem; border:1px solid #ffe5a3;
+  .preview{
+    display:flex; align-items:center; gap:.6rem; flex-wrap:wrap;
+    padding:.9rem 1rem; border-radius:14px; background:var(--brand-050);
+    border:1px solid rgba(109,41,50,.16);
+  }
+  .badge-chip{
+    display:inline-flex; align-items:center; gap:.35rem; padding:.3rem .6rem;
+    border-radius:999px; font-weight:600; border:1px solid rgba(16,24,40,.08); background:#fff;
   }
 
-  .actionbar{
-    position: sticky; bottom: 0; z-index: 100;
-    background:#fff; border:1px solid var(--line); border-radius:12px; padding:.6rem .75rem;
-    box-shadow:0 10px 20px rgba(0,0,0,.04);
+  .compare-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:1rem; }
+  @media (max-width: 992px){ .compare-grid{ grid-template-columns: 1fr; } }
+
+  .kv{ display:grid; grid-template-columns: 160px 1fr; gap:.35rem .75rem; align-items:start; }
+  .kv dt{ color:var(--muted); font-weight:600; }
+  .kv dd{ margin:0; color:var(--ink); }
+
+  .pill-on{ background:#e8f5e9; color:#166534; border:1px solid #bbf7d0; }
+  .pill-off{ background:#fff1f2; color:#9f1239; border:1px solid #fecdd3; }
+
+  /* ===== MODAL TWEAKS ===== */
+  :root{
+    --barug-deep: var(--brand-900, #3a1217);
+    --barug-deeper: var(--brand-800, #561c24);
+    --barug-tint: var(--brand-050, #fbf6f6);
+    --barug-line-strong: #E0E3E7;
+    --barug-ink: #111827;
+    --barug-border: var(--brand-800, #561c24);
   }
-  .hint{ font-size:.82rem; color:var(--muted); }
-  .callout{ border-left:4px solid var(--brand-700); background:var(--brand-050); padding:.75rem .9rem; border-radius:8px; }
+  #barugModal{ overflow: visible !important; }
+  #barugModal .modal-dialog{ margin-top:200px !important; margin-bottom:auto !important; max-width:640px; }
+  #barugModal .modal-content{
+    position:relative; overflow:visible !important; border:2px solid var(--barug-line-strong);
+    border-radius:16px; background:#fff; box-shadow:0 18px 50px rgba(16,24,40,.18);
+  }
+  #barugModal .modal-content::before{
+    content:"!"; width:66px;height:66px;border-radius:50%;
+    display:grid;place-items:center; position:absolute; left:50%; top:0; transform:translate(-50%,-50%);
+    background: radial-gradient(120% 120% at 50% 40%, var(--barug-deep), var(--barug-deeper) 85%);
+    color:#fff; font-size:1.22rem; font-weight:800; border:6px solid #fff; box-shadow:0 6px 18px rgba(0,0,0,.2);
+  }
+  #barugModal .modal-header{ border:0; background:#fff; text-align:center; padding:2.2rem 1.25rem .8rem; }
+  #barugModal .modal-title{ margin:0; font-size:1.36rem; font-weight:800; color:var(--barug-ink); }
+  #barugModal .modal-body{ color:var(--barug-ink); padding:.6rem 1.25rem .95rem; font-size:.985rem; }
+  #barugModal .modal-body li::marker{ color: var(--barug-deep); }
+  #barugModal .modal-footer{
+    border-top:1px solid var(--barug-line-strong); background:#fff; padding:.9rem 1.25rem 1.2rem;
+    display:flex; justify-content:center; gap:12px;
+  }
+  #barugModal [data-role="primary"], #barugModal [data-role="secondary"]{
+    border-radius:10px; padding:.7rem 1.05rem; line-height:1; font-weight:700; font-size:.97rem;
+  }
+  #barugModal [data-role="secondary"]{ background:#fff; color:var(--barug-deep); border:2px solid var(--barug-deep); }
+  #barugModal [data-role="secondary"]:hover{ background: var(--barug-tint); }
+  #barugModal [data-role="primary"]{ background: var(--barug-deep); color:#fff; border:2px solid var(--barug-deep); }
+  #barugModal [data-role="primary"]:hover{ background: var(--brand-800); border-color: var(--brand-800); }
+
+    #logsModal .modal-dialog{
+    margin-top:200px !important; /* push the modal down */
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container py-3">
+<div class="page-pad py-3">
 
-  <!-- Hero -->
+  <!-- Header / Hero -->
   <div class="hero mb-3 d-flex align-items-center gap-3">
-    <div class="brand-icon"><i class="bi bi-pencil-square fs-4" aria-hidden="true"></i></div>
+    <div class="brand-icon"><i class="bi bi-cash-coin fs-4" aria-hidden="true"></i></div>
     <div class="me-auto">
       <div class="d-flex align-items-center gap-2 flex-wrap">
-        <div class="fw-bold fs-5">Edit Fee</div>
-        <span class="code-badge">{{ fee_code }}</span>
+        <div class="fw-bold fs-4">Treasurer · Edit Fee</div>
+        {% if fee_code %}<span class="code-badge">{{ fee_code }}</span>{% endif %}
       </div>
-      <div class="subtle small">Update details, default purposes, exemptions, and audit notes</div>
+      <div class="subtle small">Tune pricing, exemptions, and status. Document name and type are fixed.</div>
     </div>
     <a class="btn btn-outline-brand" href="{% url 'treasurer:fees' %}">{% bs_icon 'arrow-left' extra_classes='me-1' %} Back to Fees</a>
   </div>
 
-  <form method="post">
+  <form method="post" id="feeForm" novalidate>
     {% csrf_token %}
 
     <div class="row g-3">
-      <!-- Main -->
-      <div class="col-lg-8">
+      <!-- LEFT -->
+      <div class="col-xl-8 col-lg-7">
+
+        <!-- Public Display Preview (live) -->
         <div class="card card-soft">
           <div class="card-body">
-            <div class="section-title mb-1"><span class="dot"></span> Basics</div>
+            <div class="section-title mb-1"><span class="dot"></span> Public Display Preview</div>
+            <div class="section-sub mb-2">How it will look on lists and receipts (updates as you edit).</div>
             <div class="divider"></div>
 
-            <div class="row g-3">
-              <div class="col-md-8">
-                <label class="form-label">Fee Name</label>
-                <input class="form-control" name="fee_name" value="{{ fee.name }}" placeholder="e.g., Barangay Business Clearance – Sari-Sari Store">
-                <div class="hint mt-1">Tip: Use “Main – Subcategory” so it splits nicely in listings.</div>
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label">Unit</label>
-                <select class="form-select" name="unit">
-                  {% with u=fee.unit|default:'per_doc' %}
-                    {% for opt in units %}
-                      <option value="{{ opt }}" {% if opt == u %}selected{% endif %}>{{ opt }}</option>
-                    {% endfor %}
-                  {% endwith %}
-                </select>
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label">Current Amount</label>
-                <div class="input-group input-money">
-                  <span class="input-group-text">₱</span>
-                  <input class="form-control" name="current_amount" type="number" step="0.01" value="{{ fee.current_amount }}" id="amtNow">
-                </div>
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label">Max Amount</label>
-                <div class="input-group input-money">
-                  <span class="input-group-text">₱</span>
-                  <input class="form-control" name="max_amount" type="number" step="0.01" value="{{ fee.max_amount }}">
-                </div>
-              </div>
-
-              <div class="col-md-4">
-                <label class="form-label">Document Type</label>
-                <select class="form-select" name="doc_type_name">
-                  <option value="">(keep as is)</option>
-                  {% for t in doc_types %}
-                    <option value="{{ t.document_type_name }}" {% if t.document_type_name == fee.request_document_type_name %}selected{% endif %}>
-                      {{ t.document_type_name }}
-                    </option>
-                  {% endfor %}
-                </select>
-              </div>
-            </div>
-
-            <div class="callout mt-3">
-              {% bs_icon 'info-circle' extra_classes='me-1' %}
-              Changes here affect new transactions immediately. Keep a short audit reason below.
+            <div class="preview">
+              <div class="fw-bold upper">{{ fee.name }}</div>
+              <span class="badge-chip">{% bs_icon 'file-earmark-text' %} {{ fee.request_document_type_name|default:"—" }}</span>
+              <span class="badge-chip">₱<span id="amtInline">{{ fee.current_amount|floatformat:2 }}</span></span>
+              <span id="chipSenior" class="badge-chip" style="display:{% if fee.exempt_senior %}inline-flex{% else %}none{% endif %}">{% bs_icon 'person' %} SENIOR</span>
+              <span id="chipPwd" class="badge-chip" style="display:{% if fee.exempt_pwd %}inline-flex{% else %}none{% endif %}">{% bs_icon 'universal-access' %} PWD</span>
+              <span id="chipStudent" class="badge-chip" style="display:{% if fee.exempt_student %}inline-flex{% else %}none{% endif %}">{% bs_icon 'mortarboard' %} STUDENT</span>
+              <span id="chipNone" class="badge-chip" style="display:{% if fee.exempt_senior or fee.exempt_pwd or fee.exempt_student %}none{% else %}inline-flex{% endif %}">{% bs_icon 'ban' %} NO EXEMPTIONS</span>
             </div>
           </div>
         </div>
 
-        <!-- Exemptions -->
+        <!-- Compare: Current vs Your Edits -->
         <div class="card card-soft mt-3">
           <div class="card-body">
-            <div class="section-title mb-1"><span class="dot"></span> Exemptions & Status</div>
+            <div class="section-title mb-1"><span class="dot"></span> Compare</div>
+            <div class="section-sub mb-2">See current values versus your pending edits before saving.</div>
             <div class="divider"></div>
 
-            <div class="switch-grid">
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" name="ex_ftj" id="ex_ftj" {% if fee.exempt_ftj %}checked{% endif %}>
-                <label class="form-check-label" for="ex_ftj">FTJ</label>
+            <div class="compare-grid">
+              <!-- Current (server state) -->
+              <div>
+                <div class="fw-semibold mb-2">Current</div>
+                <dl class="kv">
+                  <dt>Amount</dt>
+                  <dd>₱{{ fee.current_amount|floatformat:2 }}</dd>
+
+                  <dt>Status</dt>
+                  <dd>
+                    {% if fee.is_active %}
+                      <span class="badge-chip pill-on">{% bs_icon 'check-circle' %} ACTIVE</span>
+                    {% else %}
+                      <span class="badge-chip pill-off">{% bs_icon 'slash-circle' %} INACTIVE</span>
+                    {% endif %}
+                  </dd>
+
+                  <dt>Exemptions</dt>
+                  <dd>
+                    {% if fee.exempt_senior %}<span class="badge-chip">SENIOR</span>{% endif %}
+                    {% if fee.exempt_pwd %}<span class="badge-chip">PWD</span>{% endif %}
+                    {% if fee.exempt_student %}<span class="badge-chip">STUDENT</span>{% endif %}
+                    {% if not fee.exempt_senior and not fee.exempt_pwd and not fee.exempt_student %}
+                      <span class="text-muted">None</span>
+                    {% endif %}
+                  </dd>
+                </dl>
               </div>
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" name="ex_senior" id="ex_senior" {% if fee.exempt_senior %}checked{% endif %}>
-                <label class="form-check-label" for="ex_senior">Senior</label>
-              </div>
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" name="ex_pwd" id="ex_pwd" {% if fee.exempt_pwd %}checked{% endif %}>
-                <label class="form-check-label" for="ex_pwd">PWD</label>
-              </div>
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" name="ex_indigent" id="ex_indigent" {% if fee.exempt_indigent %}checked{% endif %}>
-                <label class="form-check-label" for="ex_indigent">Indigent</label>
-              </div>
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" name="ex_student" id="ex_student" {% if fee.exempt_student %}checked{% endif %}>
-                <label class="form-check-label" for="ex_student">Student</label>
+
+              <!-- Edits (live preview of inputs) -->
+              <div>
+                <div class="fw-semibold mb-2">Your Edits (Live)</div>
+                <dl class="kv">
+                  <dt>Amount</dt>
+                  <dd>₱<span id="edAmount">{{ fee.current_amount|floatformat:2 }}</span></dd>
+
+                  <dt>Status</dt>
+                  <dd><span id="edStatus" class="badge-chip {% if fee.is_active %}pill-on{% else %}pill-off{% endif %}">
+                    {% if fee.is_active %}{% bs_icon 'check-circle' %} ACTIVE{% else %}{% bs_icon 'slash-circle' %} INACTIVE{% endif %}
+                  </span></dd>
+
+                  <dt>Exemptions</dt>
+                  <dd>
+                    <span id="edExSenior" class="badge-chip" style="display:{% if fee.exempt_senior %}inline-flex{% else %}none{% endif %}">SENIOR</span>
+                    <span id="edExPwd" class="badge-chip" style="display:{% if fee.exempt_pwd %}inline-flex{% else %}none{% endif %}">PWD</span>
+                    <span id="edExStudent" class="badge-chip" style="display:{% if fee.exempt_student %}inline-flex{% else %}none{% endif %}">STUDENT</span>
+                    <span id="edExNone" class="text-muted" style="display:{% if fee.exempt_senior or fee.exempt_pwd or fee.exempt_student %}none{% else %}inline{% endif %};">None</span>
+                  </dd>
+                </dl>
               </div>
             </div>
 
@@ -189,205 +229,288 @@
             </div>
           </div>
         </div>
-
-        <!-- Purposes -->
-        <div class="card card-soft mt-3">
+        
+        <!-- Change History (show only 2 here) -->
+        <div class="card card-soft mt-3" style="margin-top: 250px;">
           <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center">
-              <div class="section-title mb-0"><span class="dot"></span> Purposes</div>
-              <button class="btn btn-sm btn-outline-brand" type="button" id="addRow">
-                {% bs_icon 'plus' extra_classes='me-1' %} Add Purpose
-              </button>
+            <div class="d-flex align-items-center justify-content-between">
+              <div class="section-title mb-1"><span class="dot"></span> Change History</div>
+              {% if fee_timeline and fee_timeline|length > 2 %}
+                <button type="button" class="btn btn-outline-brand btn-sm" data-bs-toggle="modal" data-bs-target="#logsModal">
+                  {% bs_icon 'list-ul' extra_classes='me-1' %} View all change logs
+                </button>
+              {% endif %}
             </div>
+            <div class="section-sub mb-2">Latest updates on this fee. Amount edits, status and flags appear here.</div>
             <div class="divider"></div>
 
-            <div class="table-responsive">
-              <table class="table align-middle" id="purpTbl">
-                <thead class="table-light">
-                  <tr>
-                    <th style="min-width:160px;">Purpose Code</th>
-                    <th>Label</th>
-                    <th style="min-width:200px;">Doc Type (override)</th>
-                    <th style="min-width:240px;">Default Details (JSON)</th>
-                    <th style="min-width:120px;">Offense No</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for p in purposes %}
-                    <tr>
-                      <td><input class="form-control" name="purp_{{ forloop.counter }}_code" value="{{ p.purpose_code }}"></td>
-                      <td><input class="form-control" name="purp_{{ forloop.counter }}_label" value="{{ p.purpose_label }}"></td>
-                      <td>
-                        <select class="form-select" name="purp_{{ forloop.counter }}_dtype">
-                          <option value=""></option>
-                          {% for t in doc_types %}
-                            <option value="{{ t.document_type_name }}" {% if t.document_type_name == p.request_document_type_name %}selected{% endif %}>
-                              {{ t.document_type_name }}
-                            </option>
-                          {% endfor %}
-                        </select>
-                      </td>
-                      <td><input class="form-control json-input" name="purp_{{ forloop.counter }}_details" value='{{ p.default_details|default:"{}" }}' placeholder='{"key":"value"}'></td>
-                      <td><input class="form-control" name="purp_{{ forloop.counter }}_offense" value="{{ p.default_offense_no }}" placeholder="1..3"></td>
-                      <td class="text-end"><button class="btn btn-sm btn-outline-danger remove-row" type="button">{% bs_icon 'x' %}</button></td>
-                    </tr>
-                  {% empty %}
-                    <tr class="empty-row">
-                      <td colspan="6" class="text-center small-muted">No purposes yet. Click “Add Purpose”.</td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
+            {% if fee_timeline and fee_timeline|length > 0 %}
+              <ul class="list-unstyled m-0">
+                {% for ev in fee_timeline|slice:":2" %}
+                  <li class="d-flex align-items-start gap-2 py-2">
+                    <div class="mt-1" style="width:20px;">
+                      {% if ev.event == "FEE_UPDATED" %}
+                        {% bs_icon 'pencil-square' %}
+                      {% else %}
+                        {% bs_icon 'clock-history' %}
+                      {% endif %}
+                    </div>
+                    <div class="flex-grow-1">
+                      <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span class="fw-semibold">{{ ev.event_display }}</span>
+                        <span class="text-muted small">• {{ ev.occur_fmt }}</span>
+                        {% if ev.actor %}<span class="badge-chip">{{ ev.actor }}</span>{% endif %}
+                      </div>
 
-            <div class="hint mt-2">JSON is optional. Invalid JSON will be ignored on save.</div>
+                      {% if ev.summary %}
+                        <div class="small mt-1">{{ ev.summary }}</div>
+                      {% elif ev.generic_change %}
+                        <div class="small mt-1">{{ ev.generic_change }}</div>
+                      {% endif %}
+
+                      {% if ev.reason %}
+                        <div class="small text-muted">Reason: {{ ev.reason }}</div>
+                      {% endif %}
+                    </div>
+                  </li>
+                  {% if not forloop.last %}<hr class="my-1">{% endif %}
+                {% endfor %}
+              </ul>
+            {% else %}
+              <div class="text-muted">No changes logged yet.</div>
+            {% endif %}
           </div>
         </div>
 
-        <!-- Surcharges -->
-        <div class="card card-soft mt-3">
+      </div>
+
+      <!-- RIGHT -->
+      <div class="col-xl-4 col-lg-5">
+        <div class="card card-soft sticky-col">
           <div class="card-body">
-            <div class="section-title mb-1"><span class="dot"></span> Surcharge Ladder</div>
+            <div class="section-title mb-1"><span class="dot"></span> Pricing & Controls</div>
             <div class="divider"></div>
 
-            <div class="row g-3">
-              <div class="col-md-4">
-                <label class="form-label">1st Offense</label>
-                <div class="input-group">
-                  <input class="form-control" name="surcharge_1"
-                         value="{% for s in surcharges %}{% if s.offense_no == 1 %}{{ s.percent }}{% endif %}{% endfor %}">
-                  <span class="input-group-text">%</span>
-                </div>
+            <!-- Amount -->
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Current Amount <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <span class="input-group-text">₱</span>
+                <input class="form-control" name="current_amount" id="amtNow" type="number" step="0.01" min="0"
+                       value="{{ fee.current_amount }}" required>
               </div>
-              <div class="col-md-4">
-                <label class="form-label">2nd Offense</label>
-                <div class="input-group">
-                  <input class="form-control" name="surcharge_2"
-                         value="{% for s in surcharges %}{% if s.offense_no == 2 %}{{ s.percent }}{% endif %}{% endfor %}">
-                  <span class="input-group-text">%</span>
-                </div>
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">3rd Offense</label>
-                <div class="input-group">
-                  <input class="form-control" name="surcharge_3"
-                         value="{% for s in surcharges %}{% if s.offense_no == 3 %}{{ s.percent }}{% endif %}{% endfor %}">
-                  <span class="input-group-text">%</span>
-                </div>
-              </div>
+              <div class="small text-muted mt-1">Live preview: <span class="fw-bold">₱<span id="amtPreview">{{ fee.current_amount|floatformat:2 }}</span></span></div>
             </div>
-          </div>
-        </div>
 
-        <!-- Audit -->
-        <div class="card card-soft mt-3">
-          <div class="card-body">
-            <label class="form-label">Reason / Note (audit)</label>
-            <input class="form-control" name="reason" placeholder="Why this change?">
-            <div class="hint mt-1">Example: “Align with Ordinance 2025-12”</div>
-          </div>
-        </div>
+            <!-- Status -->
+            <div class="mb-3">
+              <div class="small text-uppercase fw-semibold text-muted mb-1">Status</div>
+              <input type="hidden" name="is_active" value="0">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="is_active" name="is_active" value="1"
+                       {% if fee.is_active %}checked{% endif %}>
+                <label class="form-check-label" for="is_active">Active</label>
+              </div>
+              <div class="form-text">Turn OFF to temporarily disable this fee.</div>
+            </div>
 
-        <!-- Sticky actionbar -->
-        <div class="actionbar mt-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
-          <div class="small-muted">Current amount preview: <span class="fw-bold">₱<span id="amtPreview">{{ fee.current_amount|floatformat:2 }}</span></span></div>
-          <div class="d-flex gap-2">
-            <button class="btn btn-brand">{% bs_icon 'save' extra_classes='me-1' %} Save</button>
-            <a class="btn btn-outline-brand" href="{% url 'treasurer:fees' %}">{% bs_icon 'x-circle' extra_classes='me-1' %} Cancel</a>
+            <!-- Exemptions -->
+            <div class="mb-3">
+              <div class="small text-uppercase fw-semibold text-muted mb-1">Exemptions</div>
+              <input type="hidden" name="ex_senior" value="0">
+              <input type="hidden" name="ex_pwd" value="0">
+              <input type="hidden" name="ex_student" value="0">
+              <div class="switch-grid">
+                <label class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" name="ex_senior" id="ex_senior" value="1" {% if fee.exempt_senior %}checked{% endif %}>
+                  <span class="form-check-label">Senior</span>
+                </label>
+                <label class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" name="ex_pwd" id="ex_pwd" value="1" {% if fee.exempt_pwd %}checked{% endif %}>
+                  <span class="form-check-label">PWD</span>
+                </label>
+                <label class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" name="ex_student" id="ex_student" value="1" {% if fee.exempt_student %}checked{% endif %}>
+                  <span class="form-check-label">Student</span>
+                </label>
+              </div>
+              <div class="form-text">These flags inform cashier logic and UI labels.</div>
+            </div>
+
+            <!-- Reason -->
+            <div class="mb-2">
+              <label class="form-label fw-semibold">Reason / Audit Note</label>
+              <input class="form-control" name="reason" id="reason" placeholder="Short note, e.g., Align with Tax Ordinance 2025-12">
+              <div class="form-text">Appears in the audit trail for accountability.</div>
+            </div>
+
+            <!-- Actions -->
+            <div class="d-flex gap-2 mt-3">
+              <button id="btnSave" class="btn btn-brand flex-grow-1" type="button">{% bs_icon 'save' extra_classes='me-1' %} Save Changes</button>
+              <a class="btn btn-outline-brand" href="{% url 'treasurer:fees' %}">{% bs_icon 'x-circle' extra_classes='me-1' %} Cancel</a>
+            </div>
           </div>
         </div>
       </div>
+    </div> <!-- /row -->
+  </form>
+</div>
 
-      <!-- Sidebar -->
-      <div class="col-lg-4">
-        <div class="card card-soft">
-          <div class="card-body">
-            <div class="section-title mb-1"><span class="dot"></span> Current Snapshot</div>
-            <div class="divider"></div>
+{# ===== Full Change Logs Modal ===== #}
+<div class="modal fade" id="logsModal" tabindex="-1" aria-labelledby="logsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="logsModalLabel">{% bs_icon 'list-ul' extra_classes='me-2' %}All Change Logs</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        {% if fee_timeline and fee_timeline|length > 0 %}
+          <ul class="list-unstyled m-0">
+            {% for ev in fee_timeline %}
+              <li class="d-flex align-items-start gap-2 py-2">
+                <div class="mt-1" style="width:20px;">
+                  {% if ev.event == "FEE_UPDATED" %}
+                    {% bs_icon 'pencil-square' %}
+                  {% else %}
+                    {% bs_icon 'clock-history' %}
+                  {% endif %}
+                </div>
+                <div class="flex-grow-1">
+                  <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="fw-semibold">{{ ev.event_display }}</span>
+                    <span class="text-muted small">• {{ ev.occur_fmt }}</span>
+                    {% if ev.actor %}<span class="badge-chip">{{ ev.actor }}</span>{% endif %}
+                  </div>
 
-            <div class="mb-2"><span class="small-muted">Name</span><div class="fw-semibold">{{ fee.name }}</div></div>
-            <div class="mb-2"><span class="small-muted">Document Type</span><div>{{ fee.request_document_type_name|default:"—" }}</div></div>
-            <div class="mb-2"><span class="small-muted">Amount</span><div class="fw-semibold">₱{{ fee.current_amount|floatformat:2 }}</div></div>
-            <div class="mb-2"><span class="small-muted">Unit</span><div><span class="chip">{{ fee.unit|default:"per_doc" }}</span></div></div>
+                  {% if ev.summary %}
+                    <div class="small mt-1">{{ ev.summary }}</div>
+                  {% elif ev.generic_change %}
+                    <div class="small mt-1">{{ ev.generic_change }}</div>
+                  {% endif %}
 
-            <div class="mt-3 small-muted">Shortcuts</div>
-            <ul class="small mt-1 mb-0">
-              <li><kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>S</kbd> to save</li>
-              <li>“Add Purpose” to create a new purpose row</li>
-            </ul>
-          </div>
-        </div>
+                  {% if ev.reason %}
+                    <div class="small text-muted">Reason: {{ ev.reason }}</div>
+                  {% endif %}
+                </div>
+              </li>
+              {% if not forloop.last %}<hr class="my-1">{% endif %}
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="text-muted">No changes logged yet.</div>
+        {% endif %}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-brand" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
-  </form>
+  </div>
 </div>
 {% endblock %}
 
 {% block js %}
 <script>
-  // Live ₱ preview
+  // Peso format helper
+  function peso(n){
+    if(n === "" || isNaN(n)) return "0.00";
+    return Number(n).toLocaleString(undefined, { minimumFractionDigits:2, maximumFractionDigits:2 });
+  }
+
   (function(){
-    const input = document.getElementById('amtNow');
-    const out   = document.getElementById('amtPreview');
-    if(!input || !out) return;
-    const fmt = n => {
-      if(isNaN(n)) return '0.00';
-      return Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
-    };
-    input.addEventListener('input', () => out.textContent = fmt(input.value || 0));
-  })();
+    const form = document.getElementById('feeForm');
+    const btnSave = document.getElementById('btnSave');
 
-  // Purposes: add/remove rows
-  (function(){
-    const tbl = document.getElementById('purpTbl').querySelector('tbody');
-    const addBtn = document.getElementById('addRow');
+    const amt = document.getElementById('amtNow');
+    const outRight = document.getElementById('amtPreview');
+    const outInline = document.getElementById('amtInline');
+    const edAmount = document.getElementById('edAmount');
 
-    function rowCount(){ return tbl.querySelectorAll('tr:not(.empty-row)').length; }
+    const swActive = document.getElementById('is_active');
+    const edStatus = document.getElementById('edStatus');
 
-    function makeRow(idx){
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><input class="form-control" name="purp_${idx}_code" placeholder="e.g., EMPLOYMENT"></td>
-        <td><input class="form-control" name="purp_${idx}_label" placeholder="e.g., Employment"></td>
-        <td>
-          <select class="form-select" name="purp_${idx}_dtype">
-            <option value=""></option>
-            {% for t in doc_types %}<option value="{{ t.document_type_name }}">{{ t.document_type_name }}</option>{% endfor %}
-          </select>
-        </td>
-        <td><input class="form-control json-input" name="purp_${idx}_details" placeholder='{"key":"value"}'></td>
-        <td><input class="form-control" name="purp_${idx}_offense" placeholder="1..3"></td>
-        <td class="text-end"><button class="btn btn-sm btn-outline-danger remove-row" type="button">{% bs_icon 'x' %}</button></td>
-      `;
-      return tr;
+    const exSenior = document.getElementById('ex_senior');
+    const exPwd    = document.getElementById('ex_pwd');
+    const exStud   = document.getElementById('ex_student');
+
+    const chipSenior  = document.getElementById('chipSenior');
+    const chipPwd     = document.getElementById('chipPwd');
+    const chipStudent = document.getElementById('chipStudent');
+    const chipNone    = document.getElementById('chipNone');
+
+    const edExSenior  = document.getElementById('edExSenior');
+    const edExPwd     = document.getElementById('edExPwd');
+    const edExStud    = document.getElementById('edExStudent');
+    const edExNone    = document.getElementById('edExNone');
+
+    function syncAmount(){
+      const v = peso(amt.value);
+      if (outRight) outRight.textContent = v;
+      if (outInline) outInline.textContent = v;
+      if (edAmount) edAmount.textContent = v;
     }
+    amt?.addEventListener('input', () => { if (amt.value !== "" && Number(amt.value) < 0) amt.value = 0; syncAmount(); });
+    syncAmount();
 
-    addBtn?.addEventListener('click', () => {
-      const empty = tbl.querySelector('.empty-row'); if (empty) empty.remove();
-      const idx = rowCount() + 1;
-      tbl.appendChild(makeRow(idx));
-      tbl.lastElementChild.scrollIntoView({behavior:'smooth', block:'nearest'});
-    });
-
-    tbl.addEventListener('click', e => {
-      const btn = e.target.closest('.remove-row'); if (!btn) return;
-      const tr = btn.closest('tr'); tr.remove();
-      if (!rowCount()) {
-        const er = document.createElement('tr');
-        er.className='empty-row';
-        er.innerHTML = '<td colspan="6" class="text-center small-muted">No purposes yet. Click “Add Purpose”.</td>';
-        tbl.appendChild(er);
+    function syncStatus(){
+      if (!edStatus || !swActive) return;
+      edStatus.classList.remove('pill-on','pill-off');
+      if (swActive.checked){
+        edStatus.classList.add('pill-on');
+        edStatus.innerHTML = `{% bs_icon 'check-circle' %} ACTIVE`;
+      } else {
+        edStatus.classList.add('pill-off');
+        edStatus.innerHTML = `{% bs_icon 'slash-circle' %} INACTIVE`;
       }
-    });
-  })();
+    }
+    swActive?.addEventListener('change', syncStatus);
+    syncStatus();
 
-  // Save shortcut
-  (function(){
+    function toggle(el, show){ if (el) el.style.display = show ? 'inline-flex' : 'none'; }
+    function syncExemptions(){
+      const s = !!exSenior?.checked, p = !!exPwd?.checked, t = !!exStud?.checked;
+      toggle(chipSenior, s); toggle(chipPwd, p); toggle(chipStudent, t);
+      toggle(edExSenior, s); toggle(edExPwd, p); toggle(edExStud, t);
+      const none = !s && !p && !t;
+      if (edExNone) edExNone.style.display = none ? 'inline' : 'none';
+      toggle(chipNone, none);
+    }
+    exSenior?.addEventListener('change', syncExemptions);
+    exPwd?.addEventListener('change', syncExemptions);
+    exStud?.addEventListener('change', syncExemptions);
+    syncExemptions();
+
+    // Save confirmation using the global modal
+    btnSave?.addEventListener('click', async function(){
+      const s = swActive?.checked ? 'ACTIVE' : 'INACTIVE';
+      const ex = [
+        exSenior?.checked ? 'Senior' : null,
+        exPwd?.checked ? 'PWD' : null,
+        exStud?.checked ? 'Student' : null
+      ].filter(Boolean);
+      const exLabel = ex.length ? ex.join(', ') : 'None';
+      const html = `
+        <div class="mb-2">These updates take <b>effect immediately</b> for all <b>new transactions</b>.</div>
+        <ul class="mb-2">
+          <li><b>Amount:</b> ₱${peso(amt.value)}</li>
+          <li><b>Status:</b> ${s}</li>
+          <li><b>Exemptions:</b> ${exLabel}</li>
+        </ul>
+        <div class="small text-muted">Existing/issued OR historical records remain unchanged.</div>
+      `;
+
+      const yes = await BarugModal.confirm('barugModal', {
+        title: 'Apply changes?',
+        bodyHtml: html
+      });
+      if(yes){ form?.submit(); }
+    });
+
+    // Quick Save (Ctrl/Cmd+S)
     document.addEventListener('keydown', function(e){
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){
         e.preventDefault();
-        const form = document.querySelector('form'); if (form) form.submit();
+        btnSave?.click();
       }
     });
   })();

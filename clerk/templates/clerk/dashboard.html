@@ -117,7 +117,7 @@
 <div class="dashboard theme-barug container-fluid py-4" style="margin-top:0px;">
 
   <!-- Page Header -->
-  <div class="row g-3 align-items-center mb-3">
+  <div class="row g-3 align-items-center mb-3" style="margin-top: 40px;">
     <div class="col-12 col-xl-8">
       <div class="card header-card shadow-sm">
         <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
@@ -130,10 +130,10 @@
             <a href="{% url 'clerk:identity_verification' %}" class="btn btn-outline-brand">
               {% bs_icon 'shield-check' %}<span class="ms-1">Verify IDs</span>
             </a>
-            <a href="" class="btn btn-brand">
+            <a href="{% url 'clerk:walkin_new' %}" class="btn btn-brand">
               {% bs_icon 'file-earmark-text' %}<span class="ms-1">Doc Requests</span>
             </a>
-            <a href="{% url 'clerk:business_owner_resident' %}" class="btn btn-brand-subtle">
+            <a href="{% url 'clerk:business_owner' %}" class="btn btn-brand-subtle">
               {% bs_icon 'buildings' %}<span class="ms-1">New Business</span>
             </a>
           </div>
@@ -273,6 +273,7 @@
             </div>
           {% empty %}{% endfor %}</div>
         </div>
+        </div>
       </div>
     </div>
     <div class="col-12 col-xl-6">
@@ -321,6 +322,10 @@
                 </tr>
               {% empty %}{% endfor %}</tbody>
             </table>
+          </div>
+        </div>
+      </div>
+    </div>
           </div>
         </div>
       </div>

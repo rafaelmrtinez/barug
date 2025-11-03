@@ -1,88 +1,109 @@
 {% extends "base.html" %}
-{% block css %}
-<style>
-  :root { --brand:#7a1212; --brand-700:#4a0a0a; --accent:#f2c94c; --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --card:#fff; --wash:#fafafa; }
 
-  /* Hero (treasurer-like) */
-  .hero{ background:radial-gradient(120% 140% at 0% 0%,var(--brand) 0%,var(--brand-700) 70%); color:#fff; border-radius:16px; padding:18px 20px; box-shadow:0 12px 28px rgba(0,0,0,.15); }
-  .hero .brand-icon{ width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.08); box-shadow:0 0 0 3px rgba(122,18,18,.15); position:relative; }
-  .hero .brand-icon::after{ content:""; position:absolute; inset:8px; border-radius:50%; background:rgba(242,201,76,.18); }
-  .hero .brand-icon i.bi{ color:#fff; position:relative; z-index:1; }
-  .hero .chip{ border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.08); color:#f3f4f6; border-radius:999px; padding:6px 12px; font-size:.82rem; width:110px; text-align:center; font-weight:700; }
+{% block content %}
+<style>
+  :root{
+    --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932; --brand-600:#7a323b;
+    --accent:#f2c94c; --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --card:#ffffff; --wash:#fbf6f6;
+  }
+
+  body{ background:linear-gradient(160deg, var(--wash), #fff 30%) }
+
+  /* Page container (same feel as Treasurer) */
+  .container-fluid.page{
+    padding-left: clamp(16px, 4vw, 40px);
+    padding-right: clamp(16px, 4vw, 40px);
+    max-width: 1700px;
+  }
+  .row-tight{ row-gap: 1rem; }
+
+  /* Hero */
+  .hero{
+    background: radial-gradient(120% 140% at 0% 0%, var(--brand-700) 0%, var(--brand-900) 70%);
+    color:#fff; border-radius:18px; padding:18px 20px;
+    box-shadow:0 14px 32px rgba(58,18,23,.25), inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+  .hero .brand-icon{
+    width:56px; height:56px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(255,255,255,.08); box-shadow:0 0 0 3px rgba(122,18,18,.15);
+    position:relative; flex:0 0 56px;
+  }
+  .hero .brand-icon::after{ content:""; position:absolute; inset:8px; border-radius:50%; background:rgba(242,201,76,.18) }
+  .hero .brand-icon i{ position:relative; z-index:1; transform: translateY(2px) }
+  .hero .chip{
+    border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.10); color:#fff;
+    border-radius:999px; padding:6px 12px; font-size:.82rem; text-transform:uppercase; letter-spacing:.08em; font-weight:800
+  }
 
   /* Cards / sections */
-  .card-soft{ border:0; border-radius:14px; box-shadow:0 10px 24px rgba(16,24,40,.06); background:#fff; }
-  .section-title{ font-weight:800; color:var(--ink); display:flex; align-items:center; gap:.5rem; }
-  .section-title .dot{ width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px rgba(242,201,76,.25); }
-  .small-muted{ color:var(--muted); }
+  .card-soft{ border:1px solid #f1e8ea; background:#fff; border-radius:16px; box-shadow:0 12px 28px rgba(16,24,40,.06) }
+  .section-title{ font-weight:800; color:var(--ink); display:flex; align-items:center; gap:.6rem }
+  .section-title .dot{ width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px rgba(242,201,76,.25) }
+  .small-muted{ color:var(--muted) }
 
-  .kv{ list-style:none; padding:0; margin:0; }
-  .kv li{ display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px dashed var(--line); }
-  .kv li:last-child{ border-bottom:0; }
-  .kv .label{ color:var(--muted); min-width:130px; }
-  .kv .value{ font-weight:700; color:var(--ink); }
+  .kv{ list-style:none; padding:0; margin:0 }
+  .kv li{ display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px dashed var(--line) }
+  .kv li:last-child{ border-bottom:0 }
+  .kv .label{ color:var(--muted); min-width:140px }
+  .kv .value{ font-weight:700; color:var(--ink) }
 
-  .table thead th{ white-space:nowrap; }
-  .table tbody tr:hover{ background:#fff8eb; }
+  .table thead th{ white-space:nowrap }
+  .table tbody tr:hover{ background:#fff8eb }
 
-  .amount-row{ display:flex; justify-content:space-between; align-items:center; margin-top:.25rem; padding-top:.75rem; border-top:1px solid var(--line); }
+  .amount-row{ display:flex; justify-content:space-between; align-items:center; margin-top:.25rem; padding-top:.75rem; border-top:1px solid var(--line) }
 
-  /* Authorization media */
-  .media-grid{ display:flex; flex-wrap:wrap; gap:14px; }
-  .media-thumb{ width:160px; height:240px; object-fit:cover; border-radius:12px; border:1px solid var(--line); background:var(--wash); cursor:zoom-in; transition:transform .15s, box-shadow .15s; }
-  .media-thumb:hover{ transform:translateY(-2px); box-shadow:0 8px 18px rgba(0,0,0,.12); }
-  .pdf-pill{ width:160px; height:240px; border-radius:12px; border:1px dashed var(--line); background:#fff7e6; color:#7a1212; font-weight:800; display:flex; align-items:center; justify-content:center; text-decoration:none; }
+  /* Media */
+  .media-grid{ display:flex; flex-wrap:wrap; gap:14px }
+  .media-thumb{ width:180px; height:240px; object-fit:cover; border-radius:12px; border:1px solid var(--line); background:#fff; cursor:zoom-in; transition:transform .15s, box-shadow .15s }
+  .media-thumb:hover{ transform:translateY(-2px); box-shadow:0 8px 18px rgba(0,0,0,.12) }
+  .pdf-pill{ width:180px; height:240px; border-radius:12px; border:1px dashed var(--line); background:#fff7e6; color:var(--brand-800); font-weight:800; display:flex; align-items:center; justify-content:center; text-decoration:none }
 
-  .sticky-aside{ position:sticky; top:84px; }
-  .status-chip{ border-radius:999px; padding:4px 10px; font-size:.8rem; background:#fff1; }
+  .sticky-aside{ position:sticky; top:78px }
+  .status-chip{ border-radius:999px; padding:4px 10px; font-size:.8rem; background:#fff1; border:1px solid rgba(255,255,255,.25) }
   .or-badge{ background:#fff3cd; color:#7a5a00; border:1px solid #ffe69c; border-radius:10px; padding:6px 10px; font-weight:700 }
 
   /* Timeline */
-  .timeline{position:relative;margin-left:6px;padding-left:64px}
-  .timeline:before{ content:"";position:absolute;left:30px;top:0;bottom:0;width:3px;background:linear-gradient(180deg,#e9eef5,#e2e8f0);border-radius:3px; }
-  .tl-item{ position:relative;margin-bottom:14px;border-radius:14px;padding:12px 14px;background:#fff;border:1px solid #eef2f7;box-shadow:0 6px 16px rgba(16,24,40,.04) }
-  .tl-item:last-child{margin-bottom:0}
-  .tl-dot{ position:absolute;left:-45px;top:23px;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:#fff;border:3px solid #fff;box-shadow:0 2px 8px rgba(2,6,23,.15) }
-  .tl-dot.primary{background:#6366f1}
-  .tl-dot.info{background:#0ea5e9}
-  .tl-dot.success{background:#10b981}
-  .tl-dot.warn{background:#f59e0b}
-  .tl-dot.muted{background:#94a3b8}
-  .tl-head{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
-  .tl-title{font-weight:800;color:#0f172a;letter-spacing:.02em}
-  .tl-when{margin-left:auto;color:#64748b;font-size:.82rem;white-space:nowrap}
-  .pill{border-radius:999px;padding:.15rem .55rem;font-size:.72rem;border:1px solid transparent}
+  .timeline{ position:relative; margin-left:6px; padding-left:64px; --line-x:30px; --dot-size:32px }
+  .timeline:before{ content:""; position:absolute; left:var(--line-x); top:0; bottom:0; width:3px; background:linear-gradient(180deg,#e9eef5,#e2e8f0); border-radius:3px }
+  .tl-item{ position:relative; margin-bottom:14px; border-radius:14px; padding:12px 14px; background:#fff; border:1px solid #eef2f7; box-shadow:0 6px 16px rgba(16,24,40,.04) }
+  .tl-item:last-child{ margin-bottom:0 }
+  .tl-dot{ position:absolute; left:-50px; top:20px; width:var(--dot-size); height:var(--dot-size); border-radius:50%; display:grid; place-items:center; color:#fff; border:3px solid #fff; box-shadow:0 2px 8px rgba(2,6,23,.15) }
+  .tl-dot.primary{background:#6366f1}.tl-dot.info{background:#0ea5e9}.tl-dot.success{background:#10b981}.tl-dot.warn{background:#f59e0b}.tl-dot.muted{background:#94a3b8}
+  .tl-head{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap }
+  .tl-title{ font-weight:800; color:#0f172a; letter-spacing:.02em }
+  .tl-when{ margin-left:auto; color:#64748b; font-size:.82rem; white-space:nowrap }
+  .pill{ border-radius:999px; padding:.15rem .55rem; font-size:.72rem; border:1px solid transparent }
   .pill.gray{background:#f1f5f9;color:#334155;border-color:#e2e8f0}
   .pill.blue{background:#eef2ff;color:#3730a3;border-color:#c7d2fe}
   .pill.amber{background:#fff7ed;color:#9a3412;border-color:#fed7aa}
   .pill.green{background:#ecfdf5;color:#065f46;border-color:#a7f3d0}
-  .tl-meta{color:#475569;font-size:.86rem;margin-top:2px}
-  .tl-body{color:#334155;font-size:.9rem;margin-top:6px}
-  .help-text{font-size:.85rem;color:#64748b}
+  .tl-meta{ color:#475569; font-size:.86rem; margin-top:2px }
+  .tl-body{ color:#334155; font-size:.9rem; margin-top:6px }
+  .help-text{ font-size:.85rem; color:#64748b }
 </style>
-{% endblock %}
 
-{% block content %}
-<div class="container py-3">
+<div class="container-fluid page py-3">
 
+  {% with status=header.status|upper %}
   <!-- Hero -->
   <div class="hero mb-3 d-flex align-items-center gap-3">
-    <div class="brand-icon"><i class="bi bi-printer fs-3" aria-hidden="true"></i></div>
+    <div class="brand-icon"><i class="bi bi-printer fs-4" aria-hidden="true"></i></div>
     <div class="me-auto">
-      <div class="fw-bold">{{ header.request_code }}</div>
+      <div class="fw-bold fs-5">{{ header.request_code }}</div>
       <div class="text-white-50 small">{{ header.created_fmt }}</div>
     </div>
     <div class="d-flex flex-column align-items-end gap-2">
       <span class="chip">{{ status_ui.label }}</span>
-      {% if header.status != "RELEASED" and header.or_number %}
+      <!-- {% if status != "RELEASED" and header.or_number %}
         <span class="or-badge">OR: {{ header.or_number }}</span>
-      {% endif %}
+      {% endif %} -->
     </div>
   </div>
 
-  <div class="row g-3">
+  <div class="row row-tight">
     <!-- LEFT -->
-    <div class="col-lg-8">
+    <div class="col-12 col-lg-8 col-xxl-9">
 
       <!-- Items -->
       <div class="card card-soft mb-3">
@@ -95,73 +116,74 @@
           </div>
 
           {% if lines %}
-            <div class="table-responsive">
-              <table class="table table-sm align-middle">
-                <thead class="table-light">
-                  <tr>
-                    <th>Document</th>
-                    <th>Purpose</th>
-                    <th class="text-center">Qty</th>
-                    <th class="text-end">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for l in lines %}
-                  <tr>
-                    <td>{{ l.document_type_name|default:"—" }}</td>
-                    <td>
-                      {% if l.purpose_display %}{{ l.purpose_display }}
-                      {% elif l.purpose_label %}{{ l.purpose_label }}
-                      {% else %}&mdash;{% endif %}
-                    </td>
-                    <td class="text-center">{{ l.quantity }}</td>
-                    <td class="text-end fw-bold">
-                      ₱{{ l.line_total|floatformat:2 }}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th style="min-width:260px">Document</th>
+                  <th>Purpose</th>
+                  <th class="text-center">Qty</th>
+                  <th class="text-end">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for l in lines %}
+                <tr>
+                  <td class="fw-semibold">{{ l.document_type_name|default:"—" }}</td>
+                  <td>
+                    {% if l.purpose_display %}{{ l.purpose_display }}
+                    {% elif l.purpose_label %}{{ l.purpose_label }}
+                    {% else %}&mdash;{% endif %}
+                  </td>
+                  <td class="text-center">{{ l.quantity }}</td>
+                  <td class="text-end fw-bold">
+                    ₱{{ l.line_total|floatformat:2 }}
+                    {% if l.is_exempt %}
+                      <span class="badge text-bg-success ms-2">Exempt</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% if l.reason_chips or l.is_exempt %}
+                <tr class="table-borderless">
+                  <td colspan="4">
+                    <div class="d-flex flex-wrap gap-2">
+                      {% for tag in l.reason_chips %}
+                        <span class="badge rounded-pill bg-success-subtle text-success-emphasis">{{ tag }}</span>
+                      {% endfor %}
                       {% if l.is_exempt %}
-                        <span class="badge text-bg-success ms-2">Exempt</span>
+                        <span class="badge rounded-pill bg-success-subtle text-success-emphasis">Full waiver applied</span>
                       {% endif %}
-                    </td>
-                  </tr>
-                  {% if l.reason_chips or l.is_exempt %}
-                  <tr class="table-borderless">
-                    <td colspan="4">
-                      <div class="d-flex flex-wrap gap-2">
-                        {% for tag in l.reason_chips %}
-                          <span class="badge rounded-pill bg-success-subtle text-success-emphasis">{{ tag }}</span>
-                        {% endfor %}
-                        {% if l.is_exempt %}
-                          <span class="badge rounded-pill bg-success-subtle text-success-emphasis">Full waiver applied</span>
-                        {% endif %}
-                      </div>
-                    </td>
-                  </tr>
-                  {% endif %}
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
+                    </div>
+                  </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
           {% else %}
             <div class="text-muted">No items.</div>
           {% endif %}
 
+          <!-- Amount Due (uses was_marked_paid) -->
           <div class="amount-row">
             <div class="small-muted">Amount Due</div>
-            {% with total_paid=payments.total_paid|default:0 amount_due=header.amount_due|default:0 status=header.status|upper %}
-              {% if status == 'FOR_TREASURER_REVIEW' %}
-                <div class="fs-6 fw-bold text-warning">FOR TREASURER REVIEW</div>
-              {% elif status == 'FOR_PRINTING' and amount_due|floatformat:2 == "0.00" %}
+            {% with amount_due=header.amount_due|default:0 %}
+              {% if amount_due == 0 %}
                 <div class="fs-5 fw-bold text-success">WAIVED</div>
-              {% elif amount_due|floatformat:2 == "0.00" %}
-                <div class="fs-5 fw-bold text-success">WAIVED</div>
-              {% elif total_paid|floatformat:2 >= amount_due|floatformat:2 %}
-                <div class="fs-5 fw-bold text-success">PAID</div>
+              {% elif was_marked_paid %}
+                {% if header.or_number %}
+                  <div class="fs-6 fw-bold text-success">
+                    PAID <span class="small text-muted">({{ header.or_number }})</span>
+                  </div>
+                {% else %}
+                  <div class="fs-6 fw-bold text-success">PAID — awaiting OR number</div>
+                {% endif %}
               {% else %}
-                <div class="fs-5 fw-bold text-danger">₱{{ amount_due|floatformat:2 }}</div>
+                <div class="fs-6 fw-bold text-warning">For Treasurer Payment</div>
               {% endif %}
             {% endwith %}
           </div>
-
-
 
         </div>
       </div>
@@ -173,7 +195,7 @@
 
           <div class="row g-4">
             <!-- Requested by -->
-            <div class="col-12 col-md-6">
+            <div class="col-12 {% if header.on_behalf_full_name or header.on_behalf_of_person_id or header.on_behalf_id %}col-md-6{% else %}col-md-12{% endif %}">
               <div class="small-muted mb-2">Requested by</div>
               <ul class="kv">
                 <li><span class="label">Name</span>
@@ -196,11 +218,9 @@
             </div>
 
             <!-- Requested for -->
+            {% if header.on_behalf_full_name or header.on_behalf_of_person_id or header.on_behalf_id %}
             <div class="col-12 col-md-6">
-              <div class="small-muted mb-2">
-                Requested For{% if not header.on_behalf_full_name and not header.on_behalf_of_person_id and not header.on_behalf_id %}
-                  <span class="text-muted">(self)</span>{% endif %}
-              </div>
+              <div class="small-muted mb-2">Requested For</div>
               <ul class="kv">
                 <li><span class="label">Name</span>
                     <span class="value">{% firstof header.on_behalf_full_name header.on_behalf_of header.subject_full_name "—" %}</span></li>
@@ -215,16 +235,18 @@
                 {% endif %}
               </ul>
             </div>
+            {% endif %}
           </div>
 
-          {# Authorization Letter — uses auth_links only #}
           {% if auth_links %}
             <hr class="my-3">
             <div class="section-title mb-2"><span class="dot"></span> Authorization Letter</div>
             <div class="media-grid">
               {% for a in auth_links %}
                 {% if a.is_pdf %}
-                  <a class="pdf-pill" href="{{ a.url }}" target="_blank" rel="noopener" title="Open {{ a.name }}">PDF<br>{{ a.name }}</a>
+                  <a class="pdf-pill" href="{{ a.url }}" target="_blank" rel="noopener" title="Open {{ a.name }}">
+                    PDF<br>{{ a.name }}
+                  </a>
                 {% else %}
                   <img src="{{ a.url }}" alt="{{ a.name }}" class="media-thumb"
                        data-bs-toggle="modal" data-bs-target="#authLightbox" data-src="{{ a.url }}">
@@ -242,7 +264,7 @@
       </div>
 
       <!-- Timeline -->
-      <div class="card card-soft">
+      <div class="card card-soft mb-3">
         <div class="card-body">
           <div class="section-title mb-2"><span class="dot"></span> Timeline</div>
           {% if timeline %}
@@ -269,11 +291,11 @@
 
                     {% if act == 'STATUS_CHANGED' %}
                       {% if e.from_status %}
-                        <span class="pill blue">From: {{ e.from_status }}</span>
+                        <span class="pill blue">{{ e.from_status }}</span>
                         <i class="bi bi-arrow-right-short text-muted"></i>
                       {% endif %}
                       {% if e.to_status %}
-                        <span class="pill amber">To: {{ e.to_status }}</span>
+                        <span class="pill amber">{{ e.to_status }}</span>
                       {% endif %}
                     {% endif %}
 
@@ -288,13 +310,10 @@
                         <span class="pill gray">{{ e.details.payment_method }}</span>
                       {% endif %}
                     {% endif %}
-                    <!-- Ensure occurred_at is always shown -->
                     <div class="tl-when">{{ e.occur_fmt }}</div>
-
                   </div>
 
                   <div class="tl-meta">{{ e.display_actor }}</div>
-
 
                   {% if e.reason %}
                     <div class="tl-body">Reason: {{ e.reason }}</div>
@@ -310,170 +329,117 @@
       </div>
     </div>
 
-  <!-- RIGHT: Clerk Actions -->
-  <div class="col-lg-4">
-    <div class="card card-soft sticky-aside">
-      <div class="card-body">
-        <div class="d-flex align-items-center justify-content-between mb-2">
-          <div class="section-title mb-0"><span class="dot"></span> Actions</div>
-          <span class="status-chip {{ status_ui.cls }}">{{ status_ui.label }}</span>
-        </div>
-
-        {% with total_paid=payments.total_paid|default:0 amount_due=header.amount_due|default:0 %}
-          {# Quick status chips #}
-          <div class="d-flex gap-2 mb-3">
-            {% if amount_due|floatformat:2 == "0.00" %}
-              <span class="badge rounded-pill text-bg-success"><i class="bi bi-patch-check-fill me-1"></i> Waived</span>
-            {% elif total_paid|floatformat:2 >= amount_due|floatformat:2 %}
-              <span class="badge rounded-pill text-bg-success"><i class="bi bi-cash-coin me-1"></i> Paid</span>
-            {% else %}
-              <span class="badge rounded-pill text-bg-warning"><i class="bi bi-exclamation-triangle-fill me-1"></i> Unpaid</span>
-            {% endif %}
+    <!-- RIGHT: Clerk Actions -->
+    <div class="col-12 col-lg-4 col-xxl-3">
+      <div class="card card-soft sticky-aside">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="section-title mb-0"><span class="dot"></span> Actions</div>
+            <span class="status-chip {{ status_ui.cls }}">{{ status_ui.label }}</span>
           </div>
 
-          {% if header.status == 'FOR CLERK REVIEW' %}
-            {% if amount_due|floatformat:2 == "0.00" %}
-              <div class="alert alert-success py-2 mb-3">
-                <strong>Waived.</strong> No payment required. Reasons are shown under each item.
-              </div>
-              <div class="d-grid gap-2 mb-2">
-                <form method="post" action="{% url 'clerk:confirm_request' header.doc_request_id %}"
-                      onsubmit="return confirm('Confirm request and send to PRINTING?');">
-                  {% csrf_token %}
-                  <button class="btn btn-primary w-100">
-                    <i class="bi bi-printer me-1"></i> Confirm &amp; Send to Printing
-                  </button>
-                </form>
-                {# NEW ACTION: Confirm & Forward to Treasurer #}
-                <form method="post" action="{% url 'clerk:confirm_forward_treasurer' header.doc_request_id %}"
-                      onsubmit="return confirm('Confirm and forward this waived request to the Treasurer?');">
-                  {% csrf_token %}
-                  <button class="btn btn-outline-warning w-100">
-                    <i class="bi bi-send-check me-1"></i> Confirm &amp; Forward to Treasurer
-                  </button>
-                </form>
-              </div>
+          {% with amount_due=header.amount_due|default:0 %}
+            <!-- Quick status chips -->
+            <div class="d-flex gap-2 mb-3">
+              <!-- {% if status == 'FOR_TREASURER_REVIEW' %}
+                <span class="badge rounded-pill text-bg-warning">
+                  <i class="bi bi-hourglass-split me-1"></i> For Treasurer Review
+                </span>
+              {% elif amount_due == 0 %}
+                <span class="badge rounded-pill text-bg-success">
+                  <i class="bi bi-patch-check-fill me-1"></i> Waived
+                </span>
+              {% elif was_marked_paid or header.or_number %}
+                <span class="badge rounded-pill text-bg-success">
+                  <i class="bi bi-cash-coin me-1"></i> Paid
+                </span>
+              {% else %}
+                <span class="badge rounded-pill text-bg-warning">
+                  <i class="bi bi-exclamation-triangle-fill me-1"></i> Unpaid
+                </span>
+              {% endif %} -->
+            </div>
 
-            {% elif total_paid|floatformat:2 >= amount_due|floatformat:2 %}
-              <div class="alert alert-success py-2 mb-3">
-                <strong>Paid.</strong> Total paid ₱{{ total_paid|floatformat:2 }}.
-              </div>
-              <div class="d-grid gap-2 mb-2">
-                <form method="post" action="{% url 'clerk:confirm_request' header.doc_request_id %}"
-                      onsubmit="return confirm('Confirm request and send to PRINTING?');">
-                  {% csrf_token %}
-                  <button class="btn btn-primary w-100">
-                    <i class="bi bi-printer me-1"></i> Confirm &amp; Send to Printing
-                  </button>
-                </form>
-                {# NEW ACTION: Confirm & Forward to Treasurer (optional even if paid) #}
-                <form method="post" action="{% url 'clerk:confirm_forward_treasurer' header.doc_request_id %}"
-                      onsubmit="return confirm('Confirm and forward this request to the Treasurer?');">
-                  {% csrf_token %}
-                  <button class="btn btn-outline-warning w-100">
-                    <i class="bi bi-send-check me-1"></i> Confirm &amp; Forward to Treasurer
-                  </button>
-                </form>
-              </div>
-
-            {% else %}
-              <div class="alert alert-warning py-2 mb-3">
-                <div class="d-flex justify-content-between">
-                  <span><strong>Unpaid.</strong></span>
-                  <span>Paid: ₱{{ total_paid|floatformat:2 }} / ₱{{ amount_due|floatformat:2 }}</span>
+            {% if status == 'FOR CLERK REVIEW' or status == 'FOR_CLERK_REVIEW' %}
+              {% if amount_due == 0 or was_marked_paid %}
+                <div class="d-grid gap-2 mb-2">
+                  <form method="post" action="{% url 'clerk:confirm_forward_treasurer' header.doc_request_id %}"
+                        onsubmit="return confirm('Confirm and forward this request to the Treasurer?');">
+                    {% csrf_token %}
+                    <button class="btn btn-warning w-100" style="color:#fff;">
+                      <i class="bi bi-send-check me-1"></i> Confirm &amp; Forward to Treasurer
+                    </button>
+                  </form>
                 </div>
-                <div class="help-text">Forward to the Treasurer for payment collection.</div>
-              </div>
-              <div class="d-grid gap-2 mb-2">
-                {# NEW ACTION: Confirm & Forward to Treasurer (primary when unpaid) #}
-                <form method="post" action="{% url 'clerk:confirm_forward_treasurer' header.doc_request_id %}"
-                      onsubmit="return confirm('Confirm and forward this request to the Treasurer?');">
-                  {% csrf_token %}
-                  <button class="btn btn-warning w-100" style="color:#fff;">
-                    <i class="bi bi-send-check me-1"></i> Confirm &amp; Forward to Treasurer
-                  </button>
-                </form>
-              </div>
+              {% else %}
+                <div class="alert alert-warning py-2 mb-3">
+                  <div class="d-flex justify-content-between">
+                    <span><strong>Unpaid.</strong></span>
+                    <span>Amount Due: ₱{{ amount_due|floatformat:2 }}</span>
+                  </div>
+                  <div class="help-text">Forward to the Treasurer for payment collection.</div>
+                </div>
+                <div class="d-grid gap-2 mb-2">
+                  <form method="post" action="{% url 'clerk:confirm_forward_treasurer' header.doc_request_id %}"
+                        onsubmit="return confirm('Confirm and forward this request to the Treasurer?');">
+                    {% csrf_token %}
+                    <button class="btn btn-warning w-100" style="color:#fff;">
+                      <i class="bi bi-send-check me-1"></i> Confirm &amp; Forward to Treasurer
+                    </button>
+                  </form>
+                </div>
+              {% endif %}
+              <hr class="my-3">
             {% endif %}
+          {% endwith %}
+
+          <!-- Print / Ready / Release -->
+          {% if status == 'FOR_PRINTING' %}
+            <form method="post" action="{% url 'clerk:mark_ready_for_pickup' header.doc_request_id %}" class="mb-2">
+              {% csrf_token %}
+              <button type="button" class="btn btn-primary w-100 mb-2"
+                      data-bs-toggle="modal" data-bs-target="#confirmPrintModal">
+                <i class="bi bi-printer me-1"></i> Download &amp; Print
+              </button>
+              <button class="btn btn-outline-primary w-100">
+                <i class="bi bi-check2-square me-1"></i> Mark Ready for Pickup
+              </button>
+            </form>
+          {% elif status == 'READY_FOR_PICKUP' %}
+            <form method="post" action="{% url 'clerk:mark_released' header.doc_request_id %}" class="mb-2"
+                  onsubmit="return confirm('Mark this request as RELEASED?');">
+              {% csrf_token %}
+              <button class="btn btn-success w-100"><i class="bi bi-box-arrow-up-right me-1"></i> Mark Released</button>
+            </form>
+          {% endif %}
+
+          {% if status != 'FOR_PRINTING' and status != 'READY_FOR_PICKUP' and status != 'RELEASED' %}
             <hr class="my-3">
+
+            <!-- Decline -->
+            <form method="post" action="{% url 'clerk:decline' header.doc_request_id %}"
+                  onsubmit="return confirm('Decline this request? If payment was collected, a refund ticket will be created.');">
+              {% csrf_token %}
+              <div class="mb-2">
+                <label class="form-label">Decline Reason</label>
+                <input class="form-control" name="reason" placeholder="Optional reason">
+                <div class="form-text">If any payment was collected, this will also create a refund ticket.</div>
+              </div>
+              <button class="btn btn-outline-danger w-100"><i class="bi bi-x-circle me-1"></i> Decline</button>
+            </form>
           {% endif %}
-        {% endwith %}
 
-        {# Secondary workflow buttons #}
-        <form method="post" action="{% url 'clerk:mark_ready_for_pickup' header.doc_request_id %}" class="mb-2">
-          {% csrf_token %}
-          {# Download & Print trigger — only when already FOR_PRINTING #}
-{% if header.status == 'FOR_PRINTING' %}
-  <button type="button"
-          class="btn btn-primary w-100 mb-2"
-          data-bs-toggle="modal"
-          data-bs-target="#confirmPrintModal">
-    <i class="bi bi-printer me-1"></i> Download &amp; Print
-  </button>
-{% else %}
-  <button type="button"
-          class="btn btn-primary w-100 mb-2"
-          disabled
-          data-bs-toggle="tooltip"
-          title="Becomes available after you Confirm (status: FOR_PRINTING)">
-    <i class="bi bi-printer me-1"></i> Download &amp; Print
-  </button>
-{% endif %}
-
-          {% if header.status == 'FOR_PRINTING' %}
-            <button class="btn btn-outline-primary w-100">
-              <i class="bi bi-check2-square me-1"></i> Mark Ready for Pickup
-            </button>
-          {% else %}
-            <button class="btn btn-outline-primary w-100" disabled
-                    data-bs-toggle="tooltip" title="Can only mark Ready for Pickup when status is FOR_PRINTING">
-              <i class="bi bi-check2-square me-1"></i> Mark Ready for Pickup
-            </button>
+          {% if header.or_number %}
+            <div class="alert alert-warning mt-3 mb-0">
+              <div class="fw-bold">Official Receipt</div>
+              <div>{{ header.or_number }}</div>
+            </div>
           {% endif %}
-        </form>
-
-        <form method="post" action="{% url 'clerk:mark_released' header.doc_request_id %}" class="mb-2"
-              onsubmit="return confirm('Mark this request as RELEASED?');">
-          {% csrf_token %}
-          {% if header.status == 'READY_FOR_PICKUP' %}
-            <button class="btn btn-success w-100"><i class="bi bi-box-arrow-up-right me-1"></i> Mark Released</button>
-          {% else %}
-            <button class="btn btn-success w-100" disabled
-                    data-bs-toggle="tooltip" title="Request must be READY_FOR_PICKUP before it can be released">
-              <i class="bi bi-box-arrow-up-right me-1"></i> Mark Released
-            </button>
-            {% if header.status == 'RELEASED' %}
-              <div class="small text-muted mt-1">Already Released</div>
-            {% else %}
-              <div class="small text-muted mt-1">Status must be <strong>READY FOR PICKUP</strong> to release.</div>
-            {% endif %}
-          {% endif %}
-        </form>
-
-        <hr class="my-3">
-
-        <form method="post" action="{% url 'clerk:decline' header.doc_request_id %}"
-              onsubmit="return confirm('Decline this request? This cannot be undone.');">
-          {% csrf_token %}
-          <div class="mb-2">
-            <label class="form-label">Decline Reason</label>
-            <input class="form-control" name="reason" placeholder="Optional reason">
-          </div>
-          <button class="btn btn-outline-danger w-100"><i class="bi bi-x-circle me-1"></i> Decline</button>
-        </form>
-
-        {% if header.or_number %}
-          <div class="alert alert-warning mt-3 mb-0">
-            <div class="fw-bold">Official Receipt</div>
-            <div>{{ header.or_number }}</div>
-          </div>
-        {% endif %}
+        </div>
       </div>
     </div>
   </div>
-
-
-  </div>
+  {% endwith %}
 </div>
 
 <!-- Confirm & Download Modal -->
@@ -501,7 +467,7 @@
           <div class="table-responsive">
             <table class="table align-middle">
               <thead class="table-light">
-                <tr><th>Document</th><th>Purpose</th><th class="text-end">Total</th></tr>
+                <tr><th>Document</th><th>Purpose</th><th class="text-center">Qty</th><th class="text-end">Total</th></tr>
               </thead>
               <tbody>
                 {% for l in lines %}
@@ -539,7 +505,7 @@
 
               <tfoot>
                 <tr>
-                  <td colspan="2" class="text-end fw-semibold">Grand Total</td>
+                  <td colspan="3" class="text-end fw-semibold">Grand Total</td>
                   <td class="text-end fw-bold">₱{{ header.amount_due|floatformat:2 }}</td>
                 </tr>
               </tfoot>
@@ -594,7 +560,7 @@
     if (t.matches('.media-thumb')){
       const src = t.getAttribute('data-src') || t.getAttribute('src');
       const img = document.getElementById('authLightboxImg');
-      if (img && src) img.src = src;
+      if (img) img.src = src;
     }
   });
 </script>

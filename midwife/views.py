@@ -1,17 +1,39 @@
 # midwife/views.py
 from __future__ import annotations
 
+import json
+from datetime import date
+import json
+
 import os
 os.environ.setdefault("HTTPX_DISABLE_HTTP2", "1")
 
 from datetime import date, datetime, time as dtime
 from typing import Any, Dict, List, Optional, Tuple
 
+from django.views.decorators.http import require_http_methods
+from dependency_injector.wiring import inject, Provide
+
+from django.views.decorators.csrf import csrf_protect
+
+from django.views.decorators.http import require_http_methods
+from dependency_injector.wiring import inject, Provide
+
+from django.views.decorators.csrf import csrf_protect
+
 import io
 import base64
 import logging
 import re
 import time as _time
+import io
+import base64
+import logging
+import re
+import time as _time
+
+from django.conf import settings
+from django.contrib import messages
 
 from django.conf import settings
 from django.contrib import messages
@@ -31,6 +53,29 @@ from django.urls import reverse
 
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
+from barug.error_messages import SOMETHING_WENT_WRONG
+from barug.utility.json_utility import JSONCustomUtility
+from midwife.utility.anc_view_utility import ANCViewUtility
+from midwife.utility.immunitization_view_utility import ImmunizationViewUtility
+from src.app.bootstrap.app_containers import AppContainer
+from src.app.contracts.antenatal_service import IAntenatalCareService
+from src.app.contracts.child_services import IChildService
+from src.app.exceptions.person_not_found import PersonNotFoundException
+from src.app.exceptions.prescription_exception import PrescriptionException
+from src.app.transfer_objects.request.anc_labolatory_results_request import ANCLaboratoryResultsRequest
+from src.app.transfer_objects.request.antenatal_care_request import AntenatalCareRequest
+from src.app.transfer_objects.request.breast_feeding_type_request import BreastFeedingCheckRequest
+from src.app.transfer_objects.request.child_immunization_request import ChildImmunizationRequest
+from src.app.transfer_objects.request.child_iron_supplement_request import ChildIronSupplementRequest
+from src.app.transfer_objects.request.child_monitoring_request import ChildMonitoringRequest
+from src.app.transfer_objects.request.child_screening_request import ChildScreeningRequest
+from src.app.transfer_objects.request.child_visit_request import ChildVisitRequest
+from src.app.transfer_objects.request.child_vitamins_request import ChildVitaminsRequest
+from src.app.transfer_objects.request.init_chilld_immunization_request import InitialChildImmunizationRequest
+from src.app.transfer_objects.request.tetanus_toxoid_request import TetanusToxoidRequest
+from src.domain.contracts.maternal_service import IMaternalService
+from src.infra.exceptions.anc_visit_exception import ANCVisitException
+from src.infra.exceptions.child_visit_exception import ChildVisitException
 
 from .forms import (
     SearchActiveScheduleFilter,
@@ -70,8 +115,14 @@ from common.db_errors import _pg_err_tuple
 
 logger = logging.getLogger(__name__)
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # -------------------- Role / UI globals (unchanged) --------------------
 ROLE_MIDWIFE = ("MIDWIFE", "Midwife", "midwife")
+# This was added to allow extended roles to access/re-use features such as resident search
+FEATURE_ACCESS = ("MIDWIFE", "Midwife", "midwife", "Barangay Health Worker", "Super Admin")
 user_fullname = "laname fname mname suffix"
 user_role = "MIDWIFE"
 user_role_template = user_role.lower().replace(" ", "_")
@@ -259,7 +310,7 @@ def _demo_maternal_payload(record_id: int) -> Dict[str, Any]:
 
 # -------------------- AJAX endpoints --------------------
 @session_login_required
-@role_required(*ROLE_MIDWIFE)
+@role_required(*FEATURE_ACCESS)
 @nocache
 def ajax_person_details(request: HttpRequest):
     try:
@@ -303,7 +354,7 @@ def ajax_person_details(request: HttpRequest):
 
 
 @session_login_required
-@role_required(*ROLE_MIDWIFE)
+@role_required(*FEATURE_ACCESS)
 @nocache
 def ajax_resident_search(request: HttpRequest) -> JsonResponse:
     q = (request.GET.get("q") or "").strip()
@@ -313,7 +364,7 @@ def ajax_resident_search(request: HttpRequest) -> JsonResponse:
 
 
 @session_login_required
-@role_required(*ROLE_MIDWIFE)
+@role_required(*FEATURE_ACCESS)
 @nocache
 def ajax_person_card(request: HttpRequest) -> JsonResponse:
     try:
@@ -378,7 +429,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     auth = request.session.get("auth")
     return render(
         request,
-        "midwife/dashboard.html",
+        "midwife_dashboard.html",
         {
             "page_path": "Midwife/Dashboard",
             "page_title": "Dashboard",
@@ -653,6 +704,131 @@ def child_new(request: HttpRequest) -> HttpResponse:
             "page_title": "New Child Health Record",
         },
     )
+    
+@require_http_methods(["POST"])
+@session_login_required
+@role_required(*ROLE_MIDWIFE)
+@nocache
+@inject
+def child_visit_http(request: HttpRequest, service: IMaternalService = Provide[AppContainer.maternal_service]) -> JsonResponse:
+    
+    if request.content_type != "application/json":
+        return JsonResponse({"error": "Unsupported Media Type"}, status=415)
+    
+    try:
+        data = json.loads(request.body)
+        immunization_data = json.loads(data.get("p_child_immunizations", None))
+        monitoring_data = json.loads(data.get("child_monitoring", None))
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    breast_feeding_checks = [BreastFeedingCheckRequest(**i) for i in data.get("p_bf_checks", [])]
+    child_screening = ChildScreeningRequest(**data.get("screening", {}))
+    iron_supplements = ChildIronSupplementRequest(**data.get("iron_supplements", {}))
+    vitamins = [ChildVitaminsRequest(**i) for i in data.get("vitamins", [])]
+    initial_immunization = ImmunizationViewUtility.parse_immunization_payload(immunization_data)
+    monitoring = ChildMonitoringRequest(
+        check_date=monitoring_data[0].get("date", None),
+        age=monitoring_data[0].get("age", None),
+        wt=monitoring_data[0].get("wt", None),
+        temp=monitoring_data[0].get("temp", None),
+        ht=monitoring_data[0].get("ht", None),
+        findings=monitoring_data[0].get("findings", None),
+        notes=monitoring_data[0].get("notes", None),
+    )
+    
+    initial_data = ChildVisitRequest(
+        p_child_id=data.get("p_child_id", None),
+        p_child_record_id=None,
+        p_assessed_by_id=request.session.get("auth", None).get("staff_id", None),
+        p_visit_date=data.get("p_visit_date", None),
+        p_feeding_type_id=data.get("p_feeding_type_id", None),
+        p_referred_nbs_date=data.get("p_referred_nbs_date", None),
+        p_child_immunizations=None,
+        p_bf_checks=breast_feeding_checks,
+        p_monitoring_logs=monitoring,
+        p_screening=child_screening,
+        p_iron_supplements=iron_supplements,
+        p_vitamin_a=vitamins,
+    )
+    
+    try:
+        res = service.execute_child_visit(initial_data, initial_immunization)
+        
+        if not res:
+            return JsonResponse({"error": "Failed to create child visit"}, status=500)
+
+        return JsonResponse({"message": "Child visit created successfully", "child_visit_id": res}, status=201)        
+    except (PersonNotFoundException, PrescriptionException, ChildVisitException) as e:
+        return JsonResponse({"error": str(e)}, status=500)
+    except Exception:
+        return JsonResponse({"error": SOMETHING_WENT_WRONG}, status=500)
+    
+
+@csrf_protect
+@require_http_methods(["GET"])
+@session_login_required
+@role_required(*ROLE_MIDWIFE)
+@nocache
+@inject
+def child_basic_info_http(
+    request: HttpRequest, 
+    q: int, 
+    service: IChildService = Provide[AppContainer.child_service]) -> JsonResponse:
+    try:
+        res = service.execute_get_child_basic_info(q)
+        return JsonResponse({"message": res.__dict__}, status=200)
+    except Exception as e:
+        return JsonResponse({"error": "Something went wrong, unable to retrieve child basic information"}, status=400)
+
+@require_http_methods(["POST"])
+@session_login_required
+@role_required(*ROLE_MIDWIFE)
+@csrf_protect
+@nocache
+@inject
+def anc_care_http(request: HttpRequest, service: IAntenatalCareService = Provide[AppContainer.antenatal_care_service]) -> JsonResponse:
+    
+    if request.content_type != "application/json":
+        return JsonResponse({"error": "Unsupported Media Type"}, status=415)
+    
+    try:
+        data = json.loads(request.body)
+        
+        raw_lab_results = data.get("p_lab_results")
+        raw_tt_vacc = data.get("p_tt_vaccines")
+
+        if isinstance(raw_lab_results, str):
+            raw_lab_results = json.loads(raw_lab_results)
+
+        if isinstance(raw_tt_vacc, str):
+            raw_tt_vacc = json.loads(raw_tt_vacc)
+
+        data = JSONCustomUtility.clean_empty_strings(data)
+        
+        staff_id = request.session.get("auth", None).get("staff_id", None)
+        
+        init_data = AntenatalCareRequest(**data, p_assessed_by_id=staff_id)
+        tt_vaccines = ANCViewUtility.tt_vaccines_obj_converter(raw_tt_vacc)
+        lab_results = ANCViewUtility.laboratory_results_obj_converter(raw_lab_results)
+
+        res = service.execute(init_data, lab_results, tt_vaccines)
+        
+        if not res:
+            return JsonResponse({"error": "Failed to process ANC Care"}, status=500)
+
+        return JsonResponse({"message": "ANC Care RPC endpoint placeholder"}, status=200)
+
+    except json.JSONDecodeError:
+        logger.error("View (anc_care_http) encountered an exception", exc_info=True)
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    except ANCVisitException as e:
+        logger.error("View (anc_care_http) encountered an exception", exc_info=True)
+        return JsonResponse({"error": str(e)}, status=400)
+    except Exception as e:
+        logger.critical("View (anc_care_http) encountered an exception", exc_info=True)
+        return JsonResponse({"error": "Unexpected error encountered. Please try again."}, status=500)
+
 
 
 # ================================ ACCOUNT MANAGEMENT ==============================

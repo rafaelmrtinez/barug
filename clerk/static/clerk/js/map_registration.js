@@ -1,180 +1,255 @@
 function fill_b_address() {
-    const street = document.getElementById('street').value.trim();
-    const purokSitio = document.getElementById('purok_sitio').value.trim();
-    const barangay = document.getElementById('barangay').value.trim();
-    const city = document.getElementById('city').value.trim();
-
-    // Filter out empty values, then join with comma
-    const parts = [street, purokSitio, barangay, city].filter(part => part !== '');
-    const fullAddress = parts.join(', ');
-
-    document.getElementById('b_address').value = fullAddress;
+  const street = document.getElementById('street').value.trim();
+  const purokSitio = document.getElementById('purok_sitio').value.trim();
+  const barangay = document.getElementById('barangay').value.trim();
+  const city = document.getElementById('city').value.trim();
+  const parts = [street, purokSitio, barangay, city].filter(Boolean);
+  document.getElementById('b_address').value = parts.join(', ');
 }
 
 document.addEventListener("DOMContentLoaded", function () {
-    const mapboxToken = 'pk.eyJ1IjoicmFwaGJlbGwiLCJhIjoiY21jNHN6ODhtMDRteDJpcHdocXJpaTFpaiJ9.tkV7UFKy4yBlAtkZNYOS4A';
-    mapboxgl.accessToken = mapboxToken;
+  const mapboxToken = 'pk.eyJ1IjoicmFwaGJlbGwiLCJhIjoiY21jNHN6ODhtMDRteDJpcHdocXJpaTFpaiJ9.tkV7UFKy4yBlAtkZNYOS4A';
+  mapboxgl.accessToken = mapboxToken;
 
-    const defaultCoordinates = [123.9028, 10.2951];
+  const defaultCoordinates = [123.9028, 10.2951];
 
-    const stoNinoBoundary = {
-      type: "Feature",
-      geometry: {
-        type: "Polygon",
-        coordinates: [[
-          [123.90212, 10.29731],
-          [123.90201, 10.29786],
-          [123.90058, 10.29764],
-          [123.89806, 10.29617],
-          [123.89771, 10.29501],
-          [123.89805, 10.29378],
-          [123.89904, 10.29427],
-          [123.89994, 10.29420],
-          [123.89934, 10.29213],
-          [123.89938, 10.29193],
-          [123.90009, 10.29210],
-          [123.90065, 10.28980],
-          [123.90212, 10.29069],
-          [123.90181, 10.29169],
-          [123.90195, 10.29180],
-          [123.90196, 10.29194],
-          [123.90334, 10.29488],
-          [123.90359, 10.29580],
-          [123.90382, 10.29723],
-          [123.90379, 10.29753],
-          [123.90213, 10.29724],
-          [123.90212, 10.29731]
-        ]]
-      },
-      "properties" : {
-        "name" : "Barangay Sto. Niño"
-      }
-    };
+  // Barangay Sto. Niño boundary (lng, lat)
+  const stoNinoBoundary = {
+    type: "Feature",
+    geometry: {
+      type: "Polygon",
+      coordinates: [[
+        [123.90212, 10.29731],[123.90201, 10.29786],[123.90058, 10.29764],
+        [123.89806, 10.29617],[123.89771, 10.29501],[123.89805, 10.29378],
+        [123.89904, 10.29427],[123.89994, 10.29420],[123.89934, 10.29213],
+        [123.89938, 10.29193],[123.90009, 10.29210],[123.90065, 10.28980],
+        [123.90212, 10.29069],[123.90181, 10.29169],[123.90195, 10.29180],
+        [123.90196, 10.29194],[123.90334, 10.29488],[123.90359, 10.29580],
+        [123.90382, 10.29723],[123.90379, 10.29753],[123.90213, 10.29724],
+        [123.90212, 10.29731]
+      ]]
+    },
+    properties: { name: "Barangay Sto. Niño" }
+  };
 
-    const map = new mapboxgl.Map({
-      container: 'map',
-      style: 'mapbox://styles/mapbox/streets-v11',
-      center: defaultCoordinates,
-      zoom: 18,
-      pitch: 0,
-      bearing: 0,
-    });
+  // Build 4 clipped sub-polys strictly inside the barangay
+  function buildPurokQuads(boundary) {
+    if (typeof turf === 'undefined') {
+      console.warn('Turf.js is required.');
+      return { type: 'FeatureCollection', features: [] };
+    }
+    const [minX, minY, maxX, maxY] = turf.bbox(boundary);
+    const midX = (minX + maxX) / 2;
+    const midY = (minY + maxY) / 2;
 
-    const marker = new mapboxgl.Marker({ color: '#800000', draggable: true })
-        .setLngLat(defaultCoordinates)
-        .addTo(map);
+    const rect = (x1, y1, x2, y2) => turf.polygon([[
+      [x1, y1], [x2, y1], [x2, y2], [x1, y2], [x1, y1]
+    ]]);
 
-    let currentLngLat = { lng: defaultCoordinates[0], lat: defaultCoordinates[1] };
+    const quads = [
+      { code: 'S01', name: 'KANIPAAN',    poly: rect(minX, midY, midX, maxY) }, // NW
+      { code: 'S02', name: 'PAMPANGO',    poly: rect(midX,  midY, maxX, maxY) }, // NE
+      { code: 'S03', name: 'LUTAW-LUTAW', poly: rect(minX,  minY, midX,  midY) }, // SW
+      { code: 'S04', name: 'MAUCO',       poly: rect(midX,  minY, maxX,  midY) }, // SE
+    ];
 
-    map.on('load', () => {
-      boundary_layers();
-      getAddressFromCoordinates(currentLngLat.lng, currentLngLat.lat);
-    });
-
-    function boundary_layers() {
-      if(!map.getSource('sto-nino-BG')) {
-        map.addSource('sto-nino-BG', {
-            type: 'geojson',
-            data: stoNinoBoundary
-        });
-      }
-      if(!map.getLayer('sto-nino-outline')) {
-        map.addLayer({
-          id: 'sto-nino-outline',
-          type: 'line',
-          source: 'sto-nino-BG',
-          paint: { 'line-color': '#000000', 'line-width': 2 }
-        });
-      }
-      if(!map.getLayer('sto-nino-fill')) {
-        map.addLayer({
-          id: 'sto-nino-fill',
-          type: 'fill',
-          source: 'sto-nino-BG',
-          paint: { 'fill-color': '#000000', 'fill-opacity': 0.1 }
-        });
-      }
-      if (!document.querySelector('.mapboxgl-ctrl-group')) {
-        map.addControl(new mapboxgl.NavigationControl(
-          {showCompass: false}
-        ));
+    const features = [];
+    for (const q of quads) {
+      const clipped = turf.intersect(q.poly, boundary);
+      if (clipped) {
+        features.push({ type: 'Feature', properties: { code: q.code, name: q.name }, geometry: clipped.geometry });
+      } else {
+        const c = turf.centroid(boundary).geometry.coordinates;
+        const tiny = rect(c[0]-1e-6, c[1]-1e-6, c[0]+1e-6, c[1]+1e-6);
+        const tinyClip = turf.intersect(tiny, boundary);
+        if (tinyClip) features.push({ type: 'Feature', properties: { code: q.code, name: q.name }, geometry: tinyClip.geometry });
       }
     }
+    return { type: 'FeatureCollection', features };
+  }
 
-    marker.on('dragend', () => {
-        const lngLat = marker.getLngLat();
-        attemptUpdate({ lng: lngLat.lng, lat: lngLat.lat });
-    });
+  function whichPurok(fc, lng, lat) {
+    if (!fc || !fc.features) return null;
+    const pt = turf.point([lng, lat]);
+    for (const f of fc.features) {
+      if (turf.booleanPointInPolygon(pt, f)) return f.properties;
+    }
+    return null;
+  }
 
-    map.on('click', (e) => {
-        attemptUpdate({ lng: e.lngLat.lng, lat: e.lngLat.lat });
-    });
+  const map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/streets-v11',
+    center: defaultCoordinates,
+    zoom: 15,
+    attributionControl: false 
+  });
 
-    document.getElementById('style-selector').addEventListener('change', function (e) {
-      const style = `mapbox://styles/${e.target.value}`;
-      map.setStyle(style);
-      map.on('style.load', () => {
-      boundary_layers();
+  map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
+
+  const marker = new mapboxgl.Marker({ color: '#800000', draggable: true })
+    .setLngLat(defaultCoordinates)
+    .addTo(map);
+
+  let currentLngLat = { lng: defaultCoordinates[0], lat: defaultCoordinates[1] };
+  let purokFc = null;
+
+  map.on('load', () => {
+    purokFc = buildPurokQuads(stoNinoBoundary);
+    addLayers();
+    setLatLngFields(currentLngLat);
+    getAddressFromCoordinates(currentLngLat.lng, currentLngLat.lat);
+  });
+
+  function addLayers() {
+    if (!map.getSource('sto-nino-BG')) {
+      map.addSource('sto-nino-BG', { type: 'geojson', data: stoNinoBoundary });
+    }
+    if (!map.getLayer('sto-nino-outline')) {
+      map.addLayer({ id: 'sto-nino-outline', type: 'line', source: 'sto-nino-BG', paint: { 'line-color': '#000', 'line-width': 2 } });
+    }
+    if (!map.getLayer('sto-nino-fill')) {
+      map.addLayer({ id: 'sto-nino-fill', type: 'fill', source: 'sto-nino-BG', paint: { 'fill-color': '#000', 'fill-opacity': 0.08 } });
+    }
+
+    if (purokFc && !map.getSource('puroks')) {
+      map.addSource('puroks', { type: 'geojson', data: purokFc });
+    }
+
+    // === Colored fill per sitio (UPDATED) ===
+    if (!map.getLayer('purok-fill')) {
+      map.addLayer({
+        id: 'purok-fill',
+        type: 'fill',
+        source: 'puroks',
+        paint: {
+          'fill-color': [
+            'match',
+            ['get', 'name'],
+            'KANIPAAN',    '#7B1E22',
+            'PAMPANGO',    '#D4AF37',
+            'LUTAW-LUTAW', '#4f46e5',
+            'MAUCO',       '#16a34a',
+            '#999'
+          ],
+          'fill-opacity': 0.28
+        }
       });
-    });
+    }
 
-    function getAddressFromCoordinates(lng, lat) {
-        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxgl.accessToken}`;
+    if (!map.getLayer('purok-outline')) {
+      map.addLayer({ id: 'purok-outline', type: 'line', source: 'puroks', paint: { 'line-color': '#333', 'line-width': 1.2 } });
+    }
+    if (!map.getLayer('purok-labels')) {
+      map.addLayer({
+        id: 'purok-labels',
+        type: 'symbol',
+        source: 'puroks',
+        layout: { 'text-field': ['get', 'name'], 'text-size': 12, 'text-offset': [0, 0.6], 'text-anchor': 'top' },
+        paint: { 'text-halo-color': '#fff', 'text-halo-width': 1 }
+      });
+    }
 
-        fetch(url)
-            .then(response => response.json())
-            .then(data => {
-                if (data.features.length > 0) {
-                    const place = data.features[0];
-                    const context = place.context || [];
+    if (!document.querySelector('.mapboxgl-ctrl-group')) {
+      map.addControl(new mapboxgl.NavigationControl({ showCompass: false }));
+    }
+  }
 
-                    let street = place.text || '';
-                    let purok = '';
-                    let barangay = '';
-                    let city = '';
+  marker.on('dragend', () => {
+    const lngLat = marker.getLngLat();
+    attemptUpdate({ lng: lngLat.lng, lat: lngLat.lat });
+  });
 
-                    context.forEach(item => {
-                        if (item.id.includes('neighborhood')) purok = item.text;
-                        if (item.id.includes('place')) city = item.text;
-                        if (item.id.includes('locality')) barangay = item.text;
-                        if (item.id.includes('address')) street = item.text;
-                    });
+  map.on('click', (e) => {
+    attemptUpdate({ lng: e.lngLat.lng, lat: e.lngLat.lat });
+  });
 
-                    barangay = 'Sto. Niño';
+  // document.getElementById('style-selector')?.addEventListener('change', function (e) {
+  //   const style = `mapbox://styles/${e.target.value}`;
+  //   map.setStyle(style);
+  //   map.on('style.load', () => {
+  //     if (!map.getSource('sto-nino-BG')) map.addSource('sto-nino-BG', { type: 'geojson', data: stoNinoBoundary });
+  //     if (!map.getSource('puroks')) map.addSource('puroks', { type: 'geojson', data: purokFc });
+  //     addLayers();
+  //   });
+  // });
 
-                    const streetInput = document.getElementById('street');
-                    const purokInput = document.getElementById('purok_sitio');
-                    const barangayInput = document.getElementById('barangay');
-                    const cityInput = document.getElementById('city');
+  function setPurokInput(props) {
+    const purokInput = document.getElementById('purok_sitio');
+    if (purokInput) purokInput.value = (props && props.name) ? props.name : (purokInput.value || '');
+  }
 
-                    if (streetInput) streetInput.value = street;
-                    if (purokInput) purokInput.value = purok;
-                    if (barangayInput) barangayInput.value = barangay;
-                    if (cityInput) cityInput.value = city;
+  function getAddressFromCoordinates(lng, lat) {
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxgl.accessToken}`;
+    fetch(url)
+      .then(r => r.json())
+      .then(data => {
+        if (!data.features?.length) return;
 
-                    console.log('Filled address:', { street, purok, barangay, city });
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching address:', error);
-            });
+        const place = data.features[0];
+        const context = place.context || [];
+        let street = place.text || '';
+        let purok = '';
+        let barangay = '';
+        let city = '';
+
+        context.forEach(item => {
+          if (item.id.includes('neighborhood')) purok = item.text;
+          if (item.id.includes('place')) city = item.text;
+          if (item.id.includes('locality')) barangay = item.text;
+          if (item.id.includes('address')) street = item.text;
+        });
+
+        barangay = 'Sto. Niño';
+
+        const hit = whichPurok(purokFc, lng, lat);
+        if (hit?.name) purok = hit.name;
+
+        const streetInput = document.getElementById('street');
+        const purokInput = document.getElementById('purok_sitio');
+        const barangayInput = document.getElementById('barangay');
+        const cityInput = document.getElementById('city');
+
+        if (streetInput) streetInput.value = street;
+        if (purokInput) purokInput.value = purok;
+        if (barangayInput) barangayInput.value = barangay;
+        if (cityInput) cityInput.value = city;
+
+        if (document.getElementById('b_address')) fill_b_address();
+      })
+      .catch(err => console.error('Error fetching address:', err));
+  }
+
+  function setLatLngFields({ lng, lat }) {
+    const latEl = document.querySelector('#latitude, #id_latitude, [name="latitude"]');
+    const lngEl = document.querySelector('#longitude, #id_longitude, [name="longitude"]');
+    if (latEl) latEl.value = Number(lat).toFixed(6);
+    if (lngEl) lngEl.value = Number(lng).toFixed(6);
+    window.getPinnedCoords = () => ({ lng: Number(lng), lat: Number(lat) });
   }
 
   function attemptUpdate(coords) {
-      const point = turf.point([coords.lng, coords.lat]);
-      const inside = turf.booleanPointInPolygon(point, stoNinoBoundary);
+    if (typeof turf === 'undefined') {
+      console.warn('Turf is required for boundary checks.');
+      return;
+    }
+    const point = turf.point([coords.lng, coords.lat]);
+    const inside = turf.booleanPointInPolygon(point, stoNinoBoundary);
 
-      if (inside) {
-        marker.setLngLat([coords.lng, coords.lat]);
-        currentLngLat = coords;
-        getAddressFromCoordinates(coords.lng, coords.lat);
-      } else {
-        new mapboxgl.Popup()
-          .setLngLat([coords.lng, coords.lat])
-          .setHTML(`<strong>Invalid:</strong><br>Select only within Sto. Niño boundary.`)
-          .addTo(map);
-        console.warn('Clicked outside Sto. Niño:', coords);
-      }
+    if (inside) {
+      marker.setLngLat([coords.lng, coords.lat]);
+      currentLngLat = coords;
+      setLatLngFields(coords);
+
+      const hit = whichPurok(purokFc, coords.lng, coords.lat);
+      setPurokInput(hit);
+
+      getAddressFromCoordinates(coords.lng, coords.lat);
+    } else {
+      new mapboxgl.Popup()
+        .setLngLat([coords.lng, coords.lat])
+        .setHTML(`<strong>Invalid:</strong><br>Select only within Sto. Niño boundary.`)
+        .addTo(map);
+    }
   }
-
 });

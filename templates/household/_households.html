@@ -1,0 +1,29 @@
+{# templates/household/_households.html #}
+{% for h in cards %}
+  <div class="biz-card">
+    <div class="biz-grid">
+      <div>
+        <p class="biz-title">
+          {{ h.household_num }}
+        </p>
+        <div class="biz-sub">{{ h.household_address }}</div>
+      </div>
+
+      <div class="biz-meta">
+        <span class="badge badge-status">{{ h.household_head|title }}</span>
+        <span><span class="meta-label">House Type:</span> <span class="meta-val">{{ h.house_type_name|title }}</span></span>
+        <span><span class="meta-label">House Ownership:</span> <span class="meta-val">{{ h.household_ownership_name|title }}</span></span>
+      </div>
+
+      <div class="card-actions">
+        <button type="button"
+                class="btn btn-outline-brand js-locate-hh"
+                data-hid="{{ h.household_id }}"{% if h.lat and h.lng %} data-lat="{{ h.lat }}" data-lng="{{ h.lng }}"{% endif %}>
+          {% load bootstrap_icons %}{% bs_icon 'geo-alt' %} Locate on map
+        </button>
+      </div>
+    </div>
+  </div>
+{% empty %}
+  <div class="text-center text-muted py-3">No households found.</div>
+{% endfor %}
