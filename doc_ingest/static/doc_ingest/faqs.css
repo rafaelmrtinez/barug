@@ -1,0 +1,24 @@
+:root{
+  --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932; --brand-600:#7a3232;
+  --gold:#d4af37; --ink:#0f172a; --muted:#667085; --line:#e5e7eb; --bg:#fbf6f6; --card:#ffffff; --cap:#f6f7f9;
+}
+body { background: var(--bg); }
+.page-cap { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+.page-cap h1 { font-size:1.375rem; font-weight:700; color:var(--brand-800); margin:0; }
+.page-cap .subtitle { color:var(--muted); font-size:.95rem; }
+
+.cardx { background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,.03); }
+.cardx .cap { padding:12px 14px; border-bottom:1px solid var(--line); background:var(--cap); border-top-left-radius:12px; border-top-right-radius:12px; }
+.cardx .cap h2 { font-size:1rem; font-weight:700; color:#0f172a; margin:0; }
+.cardx .body { padding:14px; }
+
+.faq-list { display:grid; gap:10px; }
+.faq-item { padding:14px; border-radius:10px; border:1px solid var(--line); background:#fff; }
+.faq-item .q { font-weight:700; color:var(--brand-700); margin-bottom:6px; }
+.faq-item .a { color:#111827; }
+
+@media (min-width: 992px) { .faq-grid { display:grid; grid-template-columns: 1fr 380px; gap:18px; } }
+
+.empty { border:1px dashed var(--line); border-radius:12px; padding:16px; color:var(--muted); text-align:center; }
+
+.pagination a, .pagination button { text-decoration:none; }

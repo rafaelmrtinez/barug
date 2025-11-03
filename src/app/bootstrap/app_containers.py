@@ -25,6 +25,7 @@ from src.app.services.maternal_postpartum_service import MaternalPostpartumServi
 from src.app.services.maternal_status_service import MaternalRecordStatusService
 from src.app.services.laboratory_service import LaboratoryService
 from src.app.services.image_download_service import ImageDownloadService
+from src.app.services.faq_ingestion_service import FAQIngestionService
 
 
 from src.app.contracts.business_service_contract import (
@@ -168,4 +169,10 @@ class AppContainer(containers.DeclarativeContainer):
     business_renewal_request_service: providers.Factory[IBusinessRenewalRequestService] = providers.Factory(
         BusinessRenewalRequestService,
         repo=infra.business_renewal_request
+    )
+
+    # FAQ ingestion service
+    faq_ingestion_service = providers.Factory(
+        FAQIngestionService,
+        repository=infra.faq_ingestion_repository,
     )

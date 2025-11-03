@@ -47,6 +47,11 @@
         <button class="btn" type="button" data-bs-toggle="modal" data-bs-target="#accountSettingsModal" aria-label="Open account settings">
           {% bs_icon 'person-fill' color='white' size='1.3em' %}
         </button>
+
+        <!-- FAQ nav link (moved here so it appears after person/account settings) -->
+        <a href="{% url 'doc_ingest:faq_page' %}" class="ms-2 text-white text-decoration-none d-inline-flex align-items-center" title="FAQs" aria-label="View FAQs">
+          {% bs_icon 'question-circle-fill' color='white' size='1.1em' %}
+        </a>
       </div>
 
       <div class="user text-end">
