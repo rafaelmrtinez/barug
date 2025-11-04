@@ -18,6 +18,7 @@ import logging
 import traceback
 import uuid
 from datetime import datetime, date, time
+from urllib.parse import quote as urlquote
 
 from decimal import Decimal
 from django.forms import Form
@@ -2533,14 +2534,7 @@ def business_owner_nonresident(
 
                 dup_name = (getattr(selected, "full_name", None) or "Existing Person").strip() or "Existing Person"
 
-                # >>> print to server console instead of using messages/alerts <<<
-                print(
-                    f"[dup-check] Possible duplicate found: {dup_name} (ID #{dup_person_id}). "
-                    "Use the Search tab to select the existing record.",
-                    flush=True,
-                )
-
-                # Preload search results so the clerk can pick quickly (optional)
+                # Optional: preload results (same as before) so the Search tab is ready if user proceeds
                 try:
                     preload_term = dup_name
                     preload_rows = resident_owner_service.execute(search=preload_term, only_nonresident=True)
@@ -2549,18 +2543,36 @@ def business_owner_nonresident(
                 except Exception as _e:
                     print(f"[dup-check] preload search failed: {getattr(_e, 'args', _e)}", flush=True)
 
-                # Re-render the same page (stay on create tab w/ filled form)
+                # Build a target URL that lands on Search tab with the prefilled term
+                target_url = (
+                    reverse("clerk:business_owner_nonres")
+                    + f"?tab=search&search={urlquote(preload_term if 'preload_term' in locals() else (search or ''))}"
+                )
+
+                # Re-render the SAME page (stay on Create tab) but with a flag to show the modal.
                 return render(
                     request,
                     "business/business_owner_nonres.html",
                     {
                         "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
                         "page_title": "Business Owner Information",
+
+                        # Search tab context (preloaded results so the tab is ready)
                         "search_form": search_form,
                         "search": (preload_term if 'preload_term' in locals() else search),
                         "results": results_payload,
                         "selected": None,
+
+                        # Create tab context (keep the filled form)
                         "form": create_form,
+
+                        # 🔔 NEW: modal flags + payload
+                        "open_dup_modal": True,
+                        "dup_modal": {
+                            "name": dup_name,
+                            "person_id": dup_person_id,
+                            "target_url": target_url,
+                        },
                     },
                 )
 
@@ -2654,7 +2666,10 @@ def ajax_nonresident_owner_search(
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
-def business_details(request: HttpRequest):
+def business_details(
+    request: HttpRequest,
+    business_service: IBusinessService = Provide[AppContainer.business_service],
+):
     user_role = _auth_role_name(request)
 
     owner = request.session.get("bizreg_owner")
@@ -2668,7 +2683,6 @@ def business_details(request: HttpRequest):
         if form.is_valid():
             cd = form.cleaned_data
 
-            # Build a JSON-serializable payload for session
             payload: Dict[str, Any] = {
                 # strings → strip safely
                 "b_name": _sstrip(cd.get("b_name")) or "",
@@ -2700,11 +2714,15 @@ def business_details(request: HttpRequest):
                 "latitude": _to_float_or_none(cd.get("latitude")),
                 "longitude": _to_float_or_none(cd.get("longitude")),
 
-                # address modal fields (strings)
+                # address modal fields
                 "street": _sstrip(cd.get("street")) or "",
-                "purok_sitio": _sstrip(cd.get("purok_sitio")) or "",
                 "barangay": _sstrip(cd.get("barangay")) or "",
                 "city": _sstrip(cd.get("city")) or "",
+
+                # ✅ NEW: use ID for purok/sitio
+                "purok_sitio_id": _to_int_or_none(cd.get("purok_sitio_id")),
+                # (Optional) keep display label if your UI shows it in a review card
+                "purok_sitio": _sstrip(cd.get("purok_sitio")) or "",
             }
 
             proof_pairs = []
@@ -2714,15 +2732,82 @@ def business_details(request: HttpRequest):
                     info = _save_temp_upload(up, "bizproof")  # stores under tmp/bizproof/...
                     if info and info.get("path"):
                         proof_pairs.append(info)
-            
+
             if proof_pairs:
-                # human label; keep for the details card
                 payload["proof_name"] = ", ".join(p["name"] for p in proof_pairs)
-                # ✅ store temp info for preview/submit later
                 payload["proof_tmp_pairs"] = proof_pairs
 
-            payload = _json_safe(payload)
+            # If user chose to continue despite duplicate warning, skip duplicate check
+            is_ignore = (request.POST.get("action") or "").lower() == "ignore_duplicate"
 
+            dup_biz_id: Optional[int] = None
+            if not is_ignore:
+                try:
+                    owner = request.session.get("bizreg_owner") or {}
+                    owner_person_id = _to_int_or_none(owner.get("owner_person_id") or owner.get("person_id"))
+
+                    if owner_person_id:
+                        # ✅ Use the repository/service (ID-based) instead of inline SQL
+                        dup_biz_id = business_service.check_business_duplicate(
+                            owner_person_id=owner_person_id,
+                            business_name=payload["b_name"],
+                            city=payload["city"],
+                            barangay=payload["barangay"],
+                            street=payload["street"],
+                            purok_sitio_id=payload.get("purok_sitio_id"),
+                            b_category_id=payload.get("b_category"),
+                        )
+                except Exception as e:
+                    print("[dup-check] business duplicate check failed:", e, flush=True)
+                    # Non-fatal: continue as if no duplicate
+
+            if dup_biz_id:
+                # 🚫 Do NOT redirect yet — render the same page and open a modal.
+                form = BusinessDetails(initial=cd)
+
+                addr_parts = [
+                    payload.get("street") or "",
+                    (payload.get("purok_sitio") or ""),  # label for display only
+                    payload.get("barangay") or "",
+                    payload.get("city") or "",
+                ]
+                addr_line = _join_addr(addr_parts)
+                maps = fetch_display_maps_from_forms()
+                b_category_id = payload.get("b_category")
+                b_category_label = (maps.get("business_category", {}) or {}).get(b_category_id) or "—"
+
+                owner_ctx = request.session.get("bizreg_owner") or {}
+
+                return render(
+                    request,
+                    "business/business_details.html",
+                    {
+                        "page_path": f"{_auth_role_name(request)} / Business Records / Add Business / Business Information",
+                        "page_title": "Business Information",
+                        "form": form,
+                        "owner": owner_ctx,
+
+                        # Modal flags + data
+                        "open_dup_modal": True,
+                        "dup_modal": {
+                            "business_id": dup_biz_id,
+                            "business_name": payload["b_name"],
+                            "business_category": b_category_label,
+                            "address_line": addr_line,
+                            "view_url": reverse("clerk:business_information", kwargs={"b_id": dup_biz_id}),
+                        },
+
+                        # Keep map/proof previews working on the page render
+                        "proof_urls": [
+                            (default_storage.url(p["path"]) if p.get("path") else None)
+                            for p in (payload.get("proof_tmp_pairs") or [])
+                            if p.get("path")
+                        ],
+                    },
+                )
+
+            # ✅ Either no duplicate, or user clicked "Continue anyway"
+            payload = _json_safe(payload)
             request.session["bizreg_business"] = payload
             request.session.set_expiry(1800)  # 30 minutes
 
@@ -2730,6 +2815,7 @@ def business_details(request: HttpRequest):
             return redirect("clerk:business_information_review")
         else:
             messages.error(request, "Please correct the errors below.")
+
     else:
         saved = request.session.get("bizreg_business") or {}
 
@@ -3052,25 +3138,45 @@ def business_information(
     status_upper = (business_dict.get("business_status") or "").strip().upper()
 
     renewal_href = reverse("clerk:create_renewal_request", kwargs={"b_id": b_id})
+    closure_href = reverse("clerk:initiate_business_closure", kwargs={"b_id": b_id})
     doc_req_href = reverse("clerk:walkin_new")
 
+    try:
+        _gt = grand_total if isinstance(grand_total, Decimal) else Decimal(str(grand_total or 0))
+    except Exception:
+        _gt = Decimal("0")
+    has_dues = (_gt > 0)
+
+    # Defaults
+    show_summary_cta = False
+    summary_cta_href = None
+    summary_cta_label = None
+    cta_mode = "link"
+
     if status_upper == "ACTIVE":
-        show_summary_cta = False
-        summary_cta_href = None
-        summary_cta_label = None
+        if has_dues:
+            # NEW: even if ACTIVE, show Renew/Pay action when there are dues
+            show_summary_cta = True
+            # summary_cta_href = renewal_href
+            cta_mode = "selector"
+            summary_cta_label = "Create Renewal Request"
+        else:
+            show_summary_cta = False
     elif status_upper == "PENDING":
         show_summary_cta = True
+        cta_mode = "link"
         summary_cta_href = doc_req_href
         summary_cta_label = "Proceed to Document Request"
     elif status_upper == "EXPIRED":
         show_summary_cta = True
-        summary_cta_href = renewal_href
+        # summary_cta_href = renewal_href
+        cta_mode = "selector"
         summary_cta_label = "Create Renewal Request"
     else:
         # Fallback: show renewal CTA for other non-active statuses
         show_summary_cta = True
-        summary_cta_href = renewal_href
-        summary_cta_label = "Create Renewal Request"
+        cta_mode = "selector"
+        summary_cta_label = "Continue"
 
     return render(
         request,
@@ -3090,6 +3196,9 @@ def business_information(
             "show_summary_cta": show_summary_cta,
             "summary_cta_href": summary_cta_href,
             "summary_cta_label": summary_cta_label,
+            "renewal_href": renewal_href,
+            "closure_href": closure_href,
+            "cta_mode": cta_mode,
         },
     )
 
@@ -3339,6 +3448,68 @@ def create_renewal_request(
         "surch_sum": surch_sum, 
         "header_status": header_status,      
         "clearance_year": clearance_year,
+    })
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@inject
+def initiate_business_closure(
+    request: HttpRequest,
+    b_id: int,
+    business_info: IBusinessInfoService = Provide[AppContainer.owner_business_service],
+    renewal_quote_svc: IBusinessRenewalQuoteService = Provide[AppContainer.business_renewal_quote_service],
+):
+    user_role = _auth_role_name(request)
+
+    # Reuse the same DTO pattern used elsewhere
+    dto = business_info.execute_by_business_id(b_id)
+
+    def _compose_owner_full_name(data: dict) -> str | None:
+        last   = (data.get("last_name") or "").strip()
+        first  = (data.get("first_name") or "").strip()
+        middle = (data.get("middle_name") or "").strip()
+        suffix = (data.get("suffix") or "").strip()
+        parts = []
+        if last:   parts.append(last.upper())
+        if first:  parts.append((", " if parts else "") + first.title())
+        if middle: parts.append(" " + middle[:1].upper() + ".")
+        if suffix: parts.append(" " + suffix.upper())
+        return "".join(parts) or None
+
+    owner = dict(dto.owner or {})
+    owner["owner_full_name"] = _compose_owner_full_name(owner)
+
+    business = dto.business or {}
+    header_status = ((business.get("business_status") or "").strip().upper())
+
+    # NEW: compute outstanding dues (reusing renewal quote)
+    current_year = date.today().year
+    grand_total, quote_rows, paid_rows = renewal_quote_svc.execute(business_id=b_id, year=current_year)
+
+    def _to_decimal(x):
+        if x is None:
+            return Decimal("0")
+        return x if isinstance(x, Decimal) else Decimal(str(x))
+
+    quote_rows = quote_rows or []
+    base_sum  = sum(_to_decimal(getattr(r, "base_fee", 0))   for r in quote_rows)
+    surch_sum = sum(_to_decimal(getattr(r, "surcharge", 0))  for r in quote_rows)
+    has_dues  = (_to_decimal(grand_total) > 0)
+
+    return render(request, "business/initiate_business_closure.html", {
+        'page_path'    : f'{user_role} / Business Closure : {b_id:06d}',
+        'page_title'   : f'Business Closure : {b_id:06d}',
+        'business'     : business,
+        'owner'        : owner,
+        'header_status': header_status,
+
+        # NEW context for dues display
+        'grand_total'  : grand_total,
+        'quote_rows'   : quote_rows,
+        'base_sum'     : base_sum,
+        'surch_sum'    : surch_sum,
+        'has_dues'     : has_dues,
+        'clearance_year': current_year,  # optional for display/consistency
     })
 
 def renewal_request(request, b_id):

@@ -427,6 +427,34 @@ class BusinessRepository(IBusinessRepository):
             # If your class supports kwargs, you could do: QueryExecutionException(str(e), code="E_DB")
             raise QueryExecutionException(f"fetch_business_pins failed: {e}", "E_DB")
 
+    def find_duplicate_business(
+        self,
+        *,
+        owner_person_id: int,
+        business_name: str,
+        city: str,
+        barangay: str,
+        street: str,
+        purok_sitio_id: int | None,
+        b_category_id: int | None,
+    ) -> int | None:
+        try:
+            sql = "SELECT public.find_duplicate_business_by_owner_name_addr_id(%s,%s,%s,%s,%s,%s,%s)"
+            with connection.cursor() as cur:
+                cur.execute(sql, [
+                    int(owner_person_id),
+                    business_name,
+                    city,
+                    barangay,
+                    street,
+                    purok_sitio_id,
+                    b_category_id,
+                ])
+                row = cur.fetchone()
+                return int(row[0]) if row and row[0] is not None else None
+        except Exception as e:
+            raise QueryExecutionException(f"find_duplicate_business failed: {e}", "E_DB")
+
 class ResidentOwnerRepository(IResidentOwnerRepository):
     def __init__(self, ctx: IConnectionAdapter):
         self._ctx = ctx

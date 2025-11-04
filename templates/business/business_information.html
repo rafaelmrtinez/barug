@@ -88,9 +88,15 @@
         </div>
       </div>
       {% if show_summary_cta %}
-      <div class="col-md-4 text-md-end">
-        <a href="{{ summary_cta_href }}" class="btn btn-outline-brand">{{ summary_cta_label }}</a>
-      </div>
+        <div class="col-md-4 text-md-end">
+          {% if cta_mode == "selector" %}
+            <button type="button" class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#renewOrCloseModal">
+              {{ summary_cta_label }}
+            </button>
+          {% else %}
+            <a href="{{ summary_cta_href }}" class="btn btn-outline-brand">{{ summary_cta_label }}</a>
+          {% endif %}
+        </div>
       {% endif %}
     </div>
   </div>
@@ -402,6 +408,33 @@
     </div>
   </div>
   {% endif %}
+
+  <!-- Renew or Close Selector Modal -->
+  <div class="modal fade" id="renewOrCloseModal" tabindex="-1" aria-labelledby="renewOrCloseModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h6 id="renewOrCloseModalLabel" class="modal-title">Choose Action</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="list-group">
+            <a href="{{ renewal_href }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+              <i class="bi bi-arrow-repeat"></i> Renew Business
+            </a>
+            <a href="{{ closure_href }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+              <i class="bi bi-x-octagon"></i> Request Closure
+            </a>
+          </div>
+          <p class="small text-muted mt-3 mb-0">
+            If you continue with <b>Renew</b>, we’ll create a renewal request. If you choose <b>Closure</b>, we’ll start the closure flow.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>

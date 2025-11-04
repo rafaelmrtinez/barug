@@ -67,6 +67,29 @@ class BusinessService(IBusinessService):
         
         return self._business_repo.fetch_business_list()
     
+    def check_business_duplicate(
+        self,
+        *,
+        owner_person_id: int,
+        business_name: str,
+        city: str,
+        barangay: str,
+        street: str,
+        purok_sitio_id: Optional[int],
+        b_category_id: Optional[int],
+    ) -> Optional[int]:
+        if not owner_person_id or not (business_name and city and barangay and street):
+            return None
+        return self._business_repo.find_duplicate_business(
+            owner_person_id=owner_person_id,
+            business_name=business_name,
+            city=city,
+            barangay=barangay,
+            street=street,
+            purok_sitio_id=purok_sitio_id,
+            b_category_id=b_category_id,
+        )
+
 class ResidentOwnerService(IResidentOwnerService):
     def __init__(
         self,

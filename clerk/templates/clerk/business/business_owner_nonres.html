@@ -412,17 +412,52 @@
         </div>
       </div>
     </div>
-    <!-- /CREATE PANE -->
+  </div>
 
-  </div> <!-- /tab-content -->
+  {% if open_dup_modal %}
+    <div class="modal fade" id="dupModal" tabindex="-1" aria-labelledby="dupModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+          <div class="modal-header" style="border-bottom:1px solid var(--bs-border-color);">
+            <h5 class="modal-title" id="dupModalLabel">Possible Duplicate Found</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
 
+          <div class="modal-body">
+            <p class="mb-2">
+              We found an existing person that matches the details you entered:
+            </p>
+            <div class="p-3 rounded-3" style="background:var(--bs-light); border:1px dashed var(--bs-border-color);">
+              <div class="fw-semibold">{{ dup_modal.name|default:"Existing Person" }}</div>
+              <div class="text-muted small">ID #{{ dup_modal.person_id }}</div>
+            </div>
+            <p class="mt-3 mb-0 small text-muted">
+              To avoid duplicate records, use the Search tab to link this existing person as the owner.
+            </p>
+          </div>
+
+          <div class="modal-footer" style="border-top:1px solid var(--bs-border-color);">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Stay on this form</button>
+            <button type="button" id="dupModalGo" class="btn btn-primary">
+              Go to Search
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <div id="dupMeta"
+     data-open="{% if open_dup_modal %}1{% else %}0{% endif %}"
+     data-target="{% if dup_modal and dup_modal.target_url %}{{ dup_modal.target_url }}{% endif %}">
+  </div>
 </div>
 
 <div id="ownerPage"
      data-search-url="{% url 'clerk:ajax_nonresident_owner_search' %}"
      data-continue-base="{% url 'clerk:business_details' %}"
      data-has-selected="{{ selected|yesno:'true,false' }}"
-     data-initial-search="{{ search|default_if_none:'' }}">
+     data-initial-search="{% if open_dup_modal %}{% else %}{{ search|default_if_none:'' }}{% endif %}">
 </div>
 
 <script>
@@ -432,6 +467,7 @@
   const paneSearch = document.getElementById('search-pane');
   const paneCreate = document.getElementById('create-pane');
   const pageRoot   = document.getElementById('ownerPage');
+  const dupOpen    = (document.getElementById('dupMeta')?.dataset.open === '1'); // ← NEW
 
   function applyButtonStyle(btn, isActive) {
     btn.classList.toggle('btn-fill-up', isActive);
@@ -452,7 +488,13 @@
   btnSearch?.addEventListener('click', (e) => { e.preventDefault(); setActiveTab('search'); });
   btnCreate?.addEventListener('click', (e) => { e.preventDefault(); setActiveTab('create'); });
 
-  // --- New: respect ?tab=... if provided ---
+  // --- Decide initial tab ---
+  if (dupOpen) {
+    // If we’re about to show the duplicate modal, ALWAYS start on the Create tab.
+    setActiveTab('create');
+    return;
+  }
+
   const params = new URLSearchParams(window.location.search);
   const tabParam = (params.get('tab') || '').toLowerCase(); // 'search' | 'create' | ''
   const hasSelected   = (pageRoot?.dataset.hasSelected || 'false') === 'true';
@@ -468,5 +510,68 @@
 })();
 </script>
 
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const meta = document.getElementById('dupMeta');
+  const shouldOpen = meta && meta.dataset.open === '1';
+  const targetURL  = (meta && meta.dataset.target) ? meta.dataset.target : '';
+
+  if (!shouldOpen) return;
+
+  const modalEl = document.getElementById('dupModal');
+  if (!modalEl) return;
+
+  const hasBS = !!(window.bootstrap && bootstrap.Modal);
+  let modalInstance = null;
+
+  // --- Show the modal (no redirects here) ---
+  if (hasBS) {
+    modalInstance = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
+    modalInstance.show();
+  } else {
+    // Pure JS fallback (no Bootstrap)
+    modalEl.classList.add('show');
+    modalEl.style.display = 'block';
+    modalEl.removeAttribute('aria-hidden');
+    modalEl.setAttribute('aria-modal', 'true');
+    document.body.classList.add('modal-open');
+    if (!document.getElementById('dupBackdrop')) {
+      const backdrop = document.createElement('div');
+      backdrop.id = 'dupBackdrop';
+      backdrop.className = 'modal-backdrop fade show';
+      document.body.appendChild(backdrop);
+    }
+  }
+
+  // --- Buttons ---
+  const goBtn   = document.getElementById('dupModalGo');             // Go to Search
+  const stayBtn = modalEl.querySelector('[data-bs-dismiss="modal"]'); // Stay on this form
+
+  if (goBtn) {
+    goBtn.addEventListener('click', function () {
+      // Optional: hide modal before navigating (looks cleaner)
+      if (hasBS && modalInstance) modalInstance.hide();
+      // Redirect only when the user chooses it
+      const url = targetURL || (window.location.pathname + '?tab=search');
+      window.location.href = url;
+    });
+  }
+
+  // Make "Stay on this form" work even without Bootstrap
+  if (stayBtn && !hasBS) {
+    stayBtn.addEventListener('click', function () {
+      modalEl.classList.remove('show');
+      modalEl.style.display = 'none';
+      modalEl.setAttribute('aria-hidden', 'true');
+      modalEl.removeAttribute('aria-modal');
+      document.body.classList.remove('modal-open');
+      const bd = document.getElementById('dupBackdrop');
+      if (bd) bd.remove();
+      // We intentionally do nothing else—user stays on the Create tab.
+    });
+  }
+});
+</script>
 
 {% endblock %}

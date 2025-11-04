@@ -51,6 +51,20 @@ class IBusinessRepository(ABC):
     ) -> list[Dict[str, Any]]:
         pass
 
+    @abstractmethod
+    def find_duplicate_business(
+        self,
+        *,
+        owner_person_id: int,
+        business_name: str,
+        city: str,
+        barangay: str,
+        street: str,
+        purok_sitio_id: Optional[int],
+        b_category_id: Optional[int],
+    ) -> Optional[int]:
+        pass
+
 class IResidentOwnerRepository(ABC):
 
     @abstractmethod
