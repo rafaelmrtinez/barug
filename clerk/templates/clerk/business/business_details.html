@@ -173,6 +173,7 @@
                 <div class="form-floating mb-3">
                   {{ form.dti }}
                   <label for="{{ form.dti.id_for_label }}">DTI/SEC Registration Number</label>
+                  <small class="text-muted">Required only for Sole Proprietorship.</small>
                 </div>
               </div>
               <div class="col-lg-4 col-md-6 col-sm-12">
@@ -401,7 +402,58 @@
       </div>
     </div>
 
-  </div> <!-- /container -->
+  </div>
+
+{% if open_dup_modal %}
+<div class="modal fade" id="dupBizModal" tabindex="-1" aria-labelledby="dupBizLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:14px">
+      <div class="modal-header">
+        <h5 class="modal-title" id="dupBizLabel">Possible Duplicate Found</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <p class="mb-2">
+          We found an existing business that matches the same <strong>name</strong>, <strong>category</strong>, <strong>owner</strong>, and <strong>location</strong>.
+        </p>
+        <ul class="list-unstyled small mb-0">
+          <li><strong>Business:</strong> {{ dup_modal.business_name }}</li>
+          <li><strong>Category:</strong> {{ dup_modal.business_category }}</li>
+          <li><strong>Address:</strong> {{ dup_modal.address_line }}</li>
+          <li><strong>Existing ID:</strong> {{ dup_modal.business_id|default:"—" }}</li>
+        </ul>
+      </div>
+
+      <div class="modal-footer">
+        <!-- A) View existing (redirect) -->
+        <a class="btn btn-outline-primary" href="{{ dup_modal.view_url }}">
+          View Existing
+        </a>
+
+        <!-- B) Continue anyway (optional) posts back and proceeds to review -->
+        <form method="post" class="d-inline">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="ignore_duplicate">
+          <!-- carry forward the unsaved payload -->
+          <input type="hidden" name="unsaved_payload_json" value='{{ unsaved_payload|json_script:"dupPayload" }}'>
+          <button type="submit" class="btn btn-primary">Continue Anyway</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  var el = document.getElementById('dupBizModal');
+  if (!el) return;
+  var modal = new bootstrap.Modal(el, {backdrop:'static', keyboard:false});
+  modal.show();
+});
+</script>
+{% endif %}
+
 </div>
 
 <script>
