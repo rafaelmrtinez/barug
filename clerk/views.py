@@ -3365,31 +3365,49 @@ def create_renewal_request(
             raw_q = request.POST.get("period_quarter")
             period_quarter = None
             if period_type == "QUARTERLY" and raw_q:
-                if raw_q.strip().upper().startswith("Q") and raw_q.strip()[1:].isdigit():
-                    period_quarter = int(raw_q.strip()[1:])
-                elif raw_q.isdigit():
-                    period_quarter = int(raw_q)
+                s = raw_q.strip().upper()
+                if s.startswith("Q") and s[1:].isdigit():
+                    period_quarter = int(s[1:])
+                elif s.isdigit():
+                    period_quarter = int(s)
 
             cmd = CreateRenewalRequestCmd(
                 business_id=business_id,
                 period_type=period_type,
                 period_year=period_year,
-                period_quarter=period_quarter,
+                period_quarter=period_quarter,        # None for ANNUAL
                 created_by_user_id=_auth_staff_id(request),
             )
 
-            new_id = svc.request_renewal(cmd)
+            # NEW: create for ALL unpaid years up to period_year
+            new_ids = svc.request_unpaid(cmd)  # returns List[int]
 
-            messages.success(
-                request,
-                f"Renewal Request #{new_id} created for {period_type} {period_year} "
-                f"(status: FOR_TREASURER_REVIEW)."
-            )
-            # Redirect back to business info (or to a renewal-request detail page if you have one)
+            if new_ids:
+                ids_str = ", ".join(str(i) for i in new_ids)
+                messages.success(
+                    request,
+                    f"Created {len(new_ids)} renewal request(s) for unpaid years up to {period_type} {period_year}: [{ids_str}] "
+                    f"(status: FOR_TREASURER_REVIEW)."
+                )
+            else:
+                messages.info(
+                    request,
+                    f"No unpaid {period_type} items found up to {period_year}. Nothing to create."
+                )
+
+            print(f"[create_renewal_request] Redirecting to business_information(b_id={business_id})", flush=True)
             return redirect("clerk:business_information", b_id=business_id)
 
         except Exception as e:
-            messages.error(request, f"Create renewal request failed: {e}")
+            try:
+                post_dump = json.dumps({k: v for k, v in request.POST.items()}, default=str)
+            except Exception:
+                post_dump = str(dict(request.POST))
+            print("\n[create_renewal_request][ERROR]:", repr(e), flush=True)
+            print("[create_renewal_request][POST]:", post_dump, flush=True)
+            traceback.print_exc()
+            # user-facing message
+            messages.error(request, f"Create renewal requests failed: {e}")
             return redirect("clerk:business_information", b_id=b_id)
 
     person_id = request.GET.get("owner")
@@ -3398,7 +3416,7 @@ def create_renewal_request(
     dto = (
         business_info.execute(person_id=person_id, business_id=b_id)
         if person_id is not None
-        else business_info.execute_by_business_id(b_id)  # see helper below
+        else business_info.execute_by_business_id(b_id)
     )
 
     def _compose_owner_full_name(data: dict) -> str | None:
@@ -3409,22 +3427,22 @@ def create_renewal_request(
 
         parts = []
         if last:
-            parts.append(last.upper())                   # LAST
+            parts.append(last.upper())
         if first:
-            parts.append((", " if parts else "") + first.title())  # , First
+            parts.append((", " if parts else "") + first.title())
         if middle:
-            parts.append(" " + middle[:1].upper() + ".")           #  M.
+            parts.append(" " + middle[:1].upper() + ".")
         if suffix:
-            parts.append(" " + suffix.upper())                     #  JR / III, etc.
+            parts.append(" " + suffix.upper())
         return "".join(parts) or None
-    
+
     owner = dict(dto.owner or {})
     owner["owner_full_name"] = _compose_owner_full_name(owner)
 
     current_year = date.today().year
 
     grand_total, quote_rows, paid_rows = renewal_quote_svc.execute(business_id=b_id, year=current_year)
-    
+
     def to_decimal(x):
         if x is None:
             return Decimal("0")
@@ -3445,8 +3463,8 @@ def create_renewal_request(
         "quote_rows": quote_rows,
         "paid_rows": paid_rows,
         "base_sum": base_sum,
-        "surch_sum": surch_sum, 
-        "header_status": header_status,      
+        "surch_sum": surch_sum,
+        "header_status": header_status,
         "clearance_year": clearance_year,
     })
 

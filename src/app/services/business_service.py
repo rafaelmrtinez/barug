@@ -372,3 +372,10 @@ class BusinessRenewalRequestService(IBusinessRenewalRequestService):
         if cmd.period_type == "ANNUAL":
             object.__setattr__(cmd, "period_quarter", None)  # force None
         return self._repo.request_renewal(cmd)
+    
+    def request_unpaid(self, cmd: CreateRenewalRequestCmd) -> List[int]:
+        if cmd.period_type not in ("ANNUAL","QUARTERLY"):
+            raise ValueError("period_type must be ANNUAL or QUARTERLY")
+        if cmd.period_type == "ANNUAL":
+            object.__setattr__(cmd, "period_quarter", None)
+        return self._repo.request_unpaid(cmd)

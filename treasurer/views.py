@@ -1363,53 +1363,87 @@ def confirm_post_or(request: HttpRequest, doc_request_id: int):
 
 
 # ========= BUSINESS RENEWAL: TAKE PAYMENT =========
+
 @session_login_required
 @role_required(TREASURER_ROLE)
 @require_POST
 def business_renewal_take_payment(request: HttpRequest, renewal_request_id: int):
-    """Accept a payment for a renewal request and call the renewal RPC.
-
-    This mirrors the behavior of `take_payment` for regular requests but
-    invokes the `treasurer_accept_renewal_payment` RPC via the service layer.
-    """
     staff_id = _staff_id(request) or 0
     try:
         method_id = int(request.POST.get("payment_method_id", "0") or 0)
     except Exception:
         method_id = 0
+    # amount is ignored by RPC; allow 0, block negatives
     try:
         amount_paid = float(request.POST.get("amount_paid", "0") or 0)
     except Exception:
         amount_paid = 0.0
 
     or_number = (request.POST.get("or_number") or None)
-    paid_on = (request.POST.get("paid_on") or None)
+    paid_on   = (request.POST.get("paid_on") or None)
 
-    if staff_id <= 0 or amount_paid < 0 or method_id <= 0:
-        messages.error(request, "Enter a valid amount, method, and ensure your staff session is active.")
+    if staff_id <= 0 or method_id <= 0 or amount_paid < 0:
+        messages.error(request, "Select a payment method and ensure your staff session is active.")
         return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)
 
     try:
         from .services.payments_service import accept_renewal_payment
-
         clearance_id = accept_renewal_payment(
             renewal_request_id=int(renewal_request_id),
             method_id=method_id,
-            amount_paid=amount_paid,
+            amount_paid=amount_paid,  # kept for signature; RPC ignores
             staff_id=staff_id,
             or_number=or_number,
             paid_on=paid_on,
+            # rpc_name can be overridden here if you renamed the SQL fn
         )
     except Exception as e:
         messages.error(request, f"Payment failed: {escape(str(getattr(e, 'message', e)))}")
         return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)
 
-    # Provide a success toast; details are already written by the RPC
     messages.success(request, f"Payment posted (clearance id {clearance_id}).")
-
-    # Optionally attempt to mark printing or any other post-payment actions if needed
     return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)
 
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_POST
+def business_renewal_take_payment_all(request: HttpRequest, business_id: int):
+    staff_id = _staff_id(request) or 0
+    try:
+        method_id = int(request.POST.get("payment_method_id", "0") or 0)
+    except Exception:
+        method_id = 0
+
+    period_type = (request.POST.get("period_type") or "ANNUAL").upper()
+    try:
+        period_year = int(request.POST.get("period_year"))
+    except Exception:
+        from datetime import date
+        period_year = date.today().year
+
+    paid_on = (request.POST.get("paid_on") or None)
+
+    if staff_id <= 0 or method_id <= 0:
+        messages.error(request, "Select a payment method and ensure your staff session is active.")
+        return redirect("treasurer:business_renewal_detail", b_id=business_id)
+
+    try:
+        from .services.payments_service import accept_all_unpaid_payments
+        summary = accept_all_unpaid_payments(
+            business_id=business_id,
+            period_type=period_type,
+            period_year=period_year,
+            method_id=method_id,
+            staff_id=staff_id,
+            paid_on=paid_on,
+        )
+        cnt   = (summary or {}).get("processed_count", 0)
+        total = (summary or {}).get("sum_quoted_total", "0")
+        messages.success(request, f"Accepted payments for {cnt} unpaid year(s). Total due: {total}.")
+    except Exception as e:
+        messages.error(request, f"Bulk payment failed: {escape(str(getattr(e, 'message', e)))}")
+
+    return redirect("treasurer:business_renewal_detail", b_id=business_id)
 
 # ========= REFUND COMPLETE =========
 @session_login_required

@@ -109,3 +109,7 @@ class IBusinessRenewalRequestService(ABC):
     @abstractmethod
     def request_renewal(self, cmd: CreateRenewalRequestCmd) -> int:
         pass
+    
+    @abstractmethod
+    def request_unpaid(self, cmd: CreateRenewalRequestCmd) -> list[int]:
+        pass

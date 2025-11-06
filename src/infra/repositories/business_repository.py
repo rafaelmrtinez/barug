@@ -819,3 +819,45 @@ class BusinessRenewalRequestRepository(IBusinessRenewalRequestRepository):
             return int(rows[0]["id"])
         except Exception as e:
             raise QueryExecutionException(f"create_renewal_request failed: {e}", "E_DB") from e
+        
+    def request_unpaid(self, cmd: CreateRenewalRequestCmd) -> List[int]:
+        """
+        Calls:
+          create_renewal_requests_for_unpaid_h(
+            p_business_id int,
+            p_period_type text,
+            p_period_year int,
+            p_created_by_user_id int,
+            p_period_quarter int DEFAULT NULL
+          ) RETURNS int[]
+        """
+        try:
+            sql = "SELECT public.create_renewal_requests_for_unpaid_h(%s,%s,%s,%s,%s) AS ids"
+            rows = self._ctx.execute_query_to_dict(sql, [
+                cmd.business_id,
+                cmd.period_type,
+                cmd.period_year,
+                cmd.created_by_user_id,     # note: order matches SQL!
+                cmd.period_quarter,         # None for ANNUAL
+            ]) or []
+
+            raw = rows[0].get("ids") if rows else None
+            # Depending on adapter, int[] may come as Python list, tuple, or a string like '{1,2,3}'
+            if raw is None:
+                return []
+            if isinstance(raw, (list, tuple)):
+                return [int(x) for x in raw]
+            if isinstance(raw, str):
+                s = raw.strip()
+                if s.startswith("{") and s.endswith("}"):
+                    s = s[1:-1].strip()
+                    return [int(x) for x in s.split(",") if x.strip() != ""]
+                # fallback: single id as string?
+                return [int(raw)]
+            # fallback: single int?
+            try:
+                return [int(raw)]
+            except Exception:
+                return []
+        except Exception as e:
+            raise QueryExecutionException(f"create_renewal_requests_for_unpaid_h failed: {e}", "E_DB") from e
