@@ -214,9 +214,74 @@ def submit_form(request: HttpRequest):
             log.exception("submit_form upsert answers failed (submission_id=%s)", submission_id)
             return JsonResponse({"ok": False, "error": "Failed to save answers before rendering."}, status=500)
 
+    # ---------- Ensure processed_by audit fields are present ----------
+    try:
+        auth = request.session.get("auth") or {}
+        staff_id_raw = auth.get("staff_id")
+        if staff_id_raw:
+            staff_id = int(staff_id_raw)
+            with transaction.atomic():
+                with connection.cursor() as cur:
+                    # Fetch staff display info
+                    cur.execute("""
+                        SELECT
+                          TRIM(
+                              COALESCE(p.first_name,'') || ' ' ||
+                              COALESCE(p.middle_name,'') || ' ' ||
+                              COALESCE(p.last_name,'')  || ' ' ||
+                              COALESCE(p.suffix,'')
+                          ) AS full_name,
+                          COALESCE(r.role_name,'') AS role_name
+                        FROM staff s
+                        JOIN person p ON p.person_id = s.person_id
+                        LEFT JOIN rolee r ON r.role_id = s.role_id
+                        WHERE s.staff_id = %s
+                        LIMIT 1
+                    """, [staff_id])
+                    row = cur.fetchone() or ("", "")
+                    full_name = (row[0] or "").strip()
+                    role_name = (row[1] or "").strip()
+
+                    tz_name = getattr(settings, "TIME_ZONE", None)
+                    try:
+                        now = _dt.now(ZoneInfo(tz_name)) if tz_name else _dt.now()
+                    except Exception:
+                        now = _dt.now()
+                    values_map = {
+                        "processed_by_staff_id": str(staff_id),
+                        "processed_by_staff_name": full_name,
+                        "processed_by_staff": full_name,  # alias support
+                        "processed_by_staff_position": role_name,
+                        "processed_on_date": now.date().isoformat(),
+                        "processed_on_time": now.strftime("%I:%M %p").lstrip("0").lower(),
+                    }
+
+                    cur.execute(
+                        "SELECT field_code, field_id FROM kp_field WHERE field_code IN %s",
+                        [tuple(values_map.keys())]
+                    )
+                    code_to_id = {fc: fid for fc, fid in cur.fetchall()}
+
+                    import json as _json
+                    for code, val in values_map.items():
+                        fid = code_to_id.get(code)
+                        if not fid:
+                            continue
+                        cur.execute(
+                            """
+                            INSERT INTO blotter_kp_answer (submission_id, field_id, value_json)
+                            VALUES (%s, %s, %s)
+                            ON CONFLICT (submission_id, field_id)
+                            DO UPDATE SET value_json = EXCLUDED.value_json
+                            """,
+                            [submission_id, int(fid), _json.dumps(val)]
+                        )
+    except Exception:
+        log.exception("submit_form failed to persist processed_by answers (submission_id=%s)", submission_id)
+        # Non-fatal; continue
+
     # ---------- Render PDF ----------
     try:
-        # Uses your per-form handlers internally
         from lupon_mem.services.form_renderer import render_final_pdf
         pdf_bytes, filename = render_final_pdf(submission_id=submission_id)
     except ValidationError as e:
@@ -282,19 +347,15 @@ def submit_form(request: HttpRequest):
     # ---------- Universal: let the specific handler persist its computed answers ----------
     try:
         if form_code and form_id_of_submission:
-            # Rebuild the exact name→value map used to render the PDF (so persisted values match the PDF)
             from lupon_mem.services.forms import get_handler
             handler = get_handler(form_code)
-            # Many handlers expose build_name_value_map(form_id, submission_id)
             out_map = {}
             try:
                 out_map = handler.build_name_value_map(form_id_of_submission, submission_id) or {}
             except Exception:
-                # If a specific handler doesn’t implement it, fall back to generic answers mapping
                 from lupon_mem.services.form_shared import answers_to_names_strict
                 out_map = answers_to_names_strict(form_id_of_submission, submission_id)
 
-            # Give the handler a chance to persist its auto-computed values
             if hasattr(handler, "persist_computed"):
                 handler.persist_computed(
                     form_id=form_id_of_submission,
@@ -304,7 +365,6 @@ def submit_form(request: HttpRequest):
                 )
     except Exception:
         log.exception("persist_computed hook failed (submission_id=%s)", submission_id)
-        # Non-fatal; continue
 
     # ---------- KP-23: record who filed (party/person) ----------
     try:
@@ -347,7 +407,6 @@ def submit_form(request: HttpRequest):
                 log.exception("submit_form KP-23 meta insert failed (submission_id=%s)", submission_id)
                 return JsonResponse({"ok": False, "error": "Failed to record KP-23 filer."}, status=500)
 
-            # Optional: also save a display string to a TEXT field if present (kp23_filed_by)
             try:
                 filed_by_text = f"{party_raw.title()} — person_id #{party_person_id}"
                 if form_id_of_submission:
@@ -432,9 +491,6 @@ def submit_form(request: HttpRequest):
         "storage_url": storage_url,
         "extra_files": extra_files,
     })
-
-
-
 
 # --- lightweight staff suggest for officer picker (KP-9 offcr_name) ---
 @session_login_required

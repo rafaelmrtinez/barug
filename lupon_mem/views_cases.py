@@ -7,7 +7,7 @@ from datetime import datetime
 import os
 import uuid
 
-from typing import Dict
+from typing import Dict, Set
 from datetime import date as _date
 from django.db import connection
 
@@ -321,6 +321,17 @@ from lupon_mem.services.hearings_window import get_hearing_window
 @role_required(*LUPON_ROLES, "barangay treasurer")
 def case_detail(request: HttpRequest, case_id: int):
     
+    forms_per_page = 5
+    forms_page_raw = request.GET.get("forms_page") or "1"
+    try:
+        requested_page = max(int(forms_page_raw), 1)
+    except ValueError:
+        requested_page = 1
+    total_forms = 0
+    total_pages = 1
+    page = requested_page
+    submitted_form_codes: Set[str] = set()
+    
     hearing_window = get_hearing_window(case_id)
     # Ultra-fast single query with minimal processing
     with connection.cursor() as cur:
@@ -356,24 +367,78 @@ def case_detail(request: HttpRequest, case_id: int):
         if not case_row:
             return HttpResponseNotFound("Case not found")
         
+        total_forms = int(case_row[11] or 0)
+        total_pages = max((total_forms + forms_per_page - 1) // forms_per_page, 1)
+        page = max(1, min(requested_page, total_pages))
+        offset = (page - 1) * forms_per_page
+        start_rank = offset + 1
+        end_rank = offset + forms_per_page
+        
         # Get forms - only essential data
         cur.execute("""
-            SELECT s.submission_id, UPPER(kf.form_code), kf.form_name, s.status,
-                   CASE WHEN s.submitted_at IS NULL THEN '—'
-                        ELSE TO_CHAR(s.submitted_at,'Mon DD HH12:MI AM') END
+            WITH ordered AS (
+                SELECT s.submission_id,
+                       s.form_id,
+                       s.status,
+                       s.submitted_at,
+                       ROW_NUMBER() OVER (ORDER BY s.submission_id DESC) AS rn
+                  FROM blotter_kp_submission s
+                 WHERE s.blotter_case_id = %s
+            )
+            SELECT
+                o.submission_id,
+                UPPER(kf.form_code) AS form_code,
+                kf.form_name,
+                o.status,
+                COALESCE(a.processed_by_name, '') AS processed_by_name,
+                COALESCE(a.processed_on_date, '') AS processed_on_date,
+                COALESCE(a.processed_on_time, '') AS processed_on_time
+            FROM ordered o
+            JOIN kp_form kf ON kf.form_id = o.form_id
+            LEFT JOIN LATERAL (
+                SELECT
+                    MAX(CASE WHEN b.field_id = 1120 THEN b.value_json #>> '{}' END) AS processed_by_name,
+                    MAX(CASE WHEN b.field_id = 1121 THEN b.value_json #>> '{}' END) AS processed_on_date,
+                    MAX(CASE WHEN b.field_id = 1122 THEN b.value_json #>> '{}' END) AS processed_on_time
+                FROM blotter_kp_answer b
+                WHERE b.submission_id = o.submission_id
+                  AND b.field_id IN (1120, 1121, 1122)
+            ) a ON TRUE
+            WHERE o.rn BETWEEN %s AND %s
+            ORDER BY o.submission_id DESC
+        """, [case_id, start_rank, end_rank])
+        forms = cur.fetchall()
+        
+        cur.execute("""
+            SELECT DISTINCT UPPER(kf.form_code)
             FROM blotter_kp_submission s
             JOIN kp_form kf ON kf.form_id = s.form_id
             WHERE s.blotter_case_id = %s
-            ORDER BY s.submitted_at DESC NULLS LAST
-            LIMIT 20
+              AND UPPER(s.status) = 'SUBMITTED'
         """, [case_id])
-        forms = cur.fetchall()
+        submitted_form_codes = {row[0] for row in cur.fetchall()}
+    
+    start_page = max(1, page - 2)
+    end_page = min(total_pages, page + 2)
+    forms_page_numbers = list(range(start_page, end_page + 1))
+    base_params = request.GET.copy()
+    if 'forms_page' in base_params:
+        base_params.pop('forms_page')
+
+    def _build_forms_page_url(num: int) -> str:
+        params = base_params.copy()
+        params['forms_page'] = num
+        return f"?{params.urlencode()}"
+
+    forms_prev_url = _build_forms_page_url(page - 1) if page > 1 else ""
+    forms_next_url = _build_forms_page_url(page + 1) if page < total_pages else ""
+    forms_page_links = [
+        {"number": p, "url": _build_forms_page_url(p), "active": p == page}
+        for p in forms_page_numbers
+    ]
     
     # Track submitted forms for flow guide
-    submitted_forms = set()
-    for form in forms:
-        if len(form) > 3 and form[3] and form[3].upper() == 'SUBMITTED':
-            submitted_forms.add(form[1])  # form_code
+    submitted_forms = submitted_form_codes
     
     # Calculate progress
     flow_steps = ['KP-7', 'KP-8', 'KP-9', 'KP-10', 'KP-11', 'KP-12', 'KP-16']
@@ -383,7 +448,27 @@ def case_detail(request: HttpRequest, case_id: int):
     # Minimal context - NO GATES, NO BLOCKING
     context = {
         "case": case_row[:11],
-        "forms": [(f[0], f[1], f[2], f[3], f[4], None, None, None) for f in forms],
+        "forms": [
+            (
+                f[0],
+                f[1],
+                f[2],
+                f[3],
+                f[4] or None,
+                f[5] or None,
+                f[6] or None,
+            )
+            for f in forms
+        ],
+        "forms_total": total_forms,
+        "forms_per_page": forms_per_page,
+        "forms_total_pages": total_pages,
+        "forms_page": page,
+        "forms_has_prev": page > 1,
+        "forms_has_next": page < total_pages,
+        "forms_prev_url": forms_prev_url,
+        "forms_next_url": forms_next_url,
+        "forms_page_links": forms_page_links,
         "case_id": case_id,
         "hearing_window": hearing_window,
         "settlement_choices": ["Settled", "Not Settled", "Pending"],
@@ -648,4 +733,3 @@ def mediation_hearings_api(request, case_id: int):
         return JsonResponse(hearings, safe=False)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-

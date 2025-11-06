@@ -452,6 +452,77 @@ def _autogen_settled_summary(case_id: int, kp16_submission_id: int):
                     DO UPDATE SET value_json=EXCLUDED.value_json
                 """, [med_sid, field_id, _json.dumps(val)])
 
+            # propagate 'processed_by' meta and printable fields from the KP-16 submission (if available)
+            try:
+                # 1) Who processed KP-16?
+                cur.execute(
+                    "SELECT processed_by_id FROM blotter_kp_submission WHERE submission_id=%s",
+                    [kp16_submission_id]
+                )
+                row_proc = cur.fetchone()
+                kp16_proc_id = int(row_proc[0]) if row_proc and row_proc[0] is not None else None
+
+                if kp16_proc_id:
+                    # 2) Set MEDx processed_by_id (trigger fills processed_at/name/position)
+                    cur.execute(
+                        "UPDATE blotter_kp_submission SET processed_by_id=%s WHERE submission_id=%s",
+                        [kp16_proc_id, med_sid]
+                    )
+
+                    # 3) Read cached values from MEDx submission
+                    cur.execute(
+                        """
+                        SELECT processed_at, COALESCE(processed_by_name,''), COALESCE(processed_by_position,'')
+                          FROM blotter_kp_submission
+                         WHERE submission_id=%s
+                        """,
+                        [med_sid]
+                    )
+                    proc_at, proc_name, proc_pos = cur.fetchone() if cur.rowcount else (None, '', '')
+
+                    # 4) Upsert printable fields if present on the form
+                    cur.execute(
+                        "SELECT field_code, field_id FROM kp_field WHERE field_code IN %s",
+                        [("processed_by_staff_id", "processed_by_staff_name", "processed_by_staff_position", "processed_on_date", "processed_on_time")]
+                    )
+                    code_to_id = {fc: fid for fc, fid in cur.fetchall()}
+
+                    def _iso(d):
+                        try:
+                            return d.date().isoformat()
+                        except Exception:
+                            return None
+
+                    def _hm(t):
+                        try:
+                            return t.strftime('%H:%M')
+                        except Exception:
+                            return None
+
+                    values_map = {
+                        'processed_by_staff_id': str(kp16_proc_id),
+                        'processed_by_staff_name': proc_name,
+                        'processed_by_staff_position': proc_pos,
+                        'processed_on_date': _iso(proc_at),
+                        'processed_on_time': _hm(proc_at),
+                    }
+                    for code, val in values_map.items():
+                        fid = code_to_id.get(code)
+                        if not fid:
+                            continue
+                        cur.execute(
+                            """
+                            INSERT INTO blotter_kp_answer (submission_id, field_id, value_json)
+                            VALUES (%s, %s, %s)
+                            ON CONFLICT (submission_id, field_id)
+                            DO UPDATE SET value_json = EXCLUDED.value_json
+                            """,
+                            [med_sid, int(fid), _json.dumps(val)]
+                        )
+            except Exception:
+                # Non-fatal; continue with submission
+                pass
+
             # mark submitted
             cur.execute("UPDATE blotter_kp_submission SET status='SUBMITTED', submitted_at=now() WHERE submission_id=%s",
                         [med_sid])
@@ -1631,7 +1702,7 @@ def incident_heatmap(request: HttpRequest):
     case_type_filter = request.GET.get('case_type', 'all')
     settlement_filter = request.GET.get('settlement', 'all')
 
-    # Build time filter condition
+    # Build time filter condition (reports)
     time_conditions = {
         '1_month': "AND br.date_time_reported >= CURRENT_DATE - INTERVAL '1 month'",
         '3_months': "AND br.date_time_reported >= CURRENT_DATE - INTERVAL '3 months'",
@@ -1640,6 +1711,16 @@ def incident_heatmap(request: HttpRequest):
         'all': ""
     }
     time_condition = time_conditions.get(time_filter, time_conditions['1_year'])
+
+    # Build time filter condition (cases)
+    case_time_conditions = {
+        '1_month': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '1 month'",
+        '3_months': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '3 months'",
+        '6_months': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '6 months'",
+        '1_year': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '1 year'",
+        'all': ""
+    }
+    case_time_condition = case_time_conditions.get(time_filter, case_time_conditions['1_year'])
 
     # Build case type filter (parameterized)
     case_type_condition = ""
@@ -1727,6 +1808,7 @@ def incident_heatmap(request: HttpRequest):
                 WHERE a.latitude IS NOT NULL 
                   AND a.longitude IS NOT NULL
                   AND bc.date_filed >= CURRENT_DATE - INTERVAL '2 years'
+                  {case_time_condition}
                   {case_type_condition}
                   {settlement_condition}
             )
@@ -1739,7 +1821,7 @@ def incident_heatmap(request: HttpRequest):
 
         # ---------- 2) Stats by incident type ----------
         # FIX: remove EXTRACT(... from integer). Just average the integer day-difference.
-        sql_stats = """
+        sql_stats = f"""
             WITH stats_data AS (
                 SELECT 
                     COALESCE(ct.complaint_title_name, 'General Complaint') as incident_type,
@@ -1765,6 +1847,7 @@ def incident_heatmap(request: HttpRequest):
                 LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
                 LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
                 WHERE bc.date_filed >= CURRENT_DATE - INTERVAL '2 years'
+                {case_time_condition}
                 GROUP BY ct.complaint_title_name
                 
                 UNION ALL
@@ -1778,7 +1861,8 @@ def incident_heatmap(request: HttpRequest):
                     NULL as avg_resolution_days
                 FROM blotter_report br
                 LEFT JOIN addresss a ON a.address_id = br.incident_address_id
-                WHERE br.date_time_reported >= CURRENT_DATE - INTERVAL '1 year'
+                WHERE 1=1
+                {time_condition}
             )
             SELECT incident_type, total_count, settled_count, closed_count, mapped_count, avg_resolution_days
             FROM stats_data
@@ -1787,6 +1871,15 @@ def incident_heatmap(request: HttpRequest):
         """
         cur.execute(sql_stats)
         incident_stats = cur.fetchall()
+
+        # ---------- 2b) Summary counts for headers ----------
+        # Total blotter reports (apply selected time filter)
+        cur.execute(f"SELECT COUNT(*) FROM blotter_report br WHERE 1=1 {time_condition}")
+        blotter_reports_count = cur.fetchone()[0]
+
+        # Total blotter cases (base window 2 years + selected time filter)
+        cur.execute(f"SELECT COUNT(*) FROM blotter_case bc WHERE bc.date_filed >= CURRENT_DATE - INTERVAL '2 years' {case_time_condition}")
+        blotter_cases_count = cur.fetchone()[0]
 
         # ---------- 3) Street-level stats ----------
         sql_streets = """
@@ -1884,6 +1977,8 @@ def incident_heatmap(request: HttpRequest):
         "incident_data": incident_data,
         "incident_stats": json.dumps(stats_data),  # For JavaScript charts
         "street_stats": street_data,
+        "blotter_reports_count": blotter_reports_count,
+        "blotter_cases_count": blotter_cases_count,
         "case_types": case_types,
         "time_filter": time_filter,
         "case_type_filter": case_type_filter,

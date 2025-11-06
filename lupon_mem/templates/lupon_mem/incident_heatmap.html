@@ -172,28 +172,40 @@
 
     <!-- Statistics Cards -->
     <div class="row mb-4">
-        <div class="col-md-3">
+        <div class="col-6 col-md-3 col-lg-2">
             <div class="stats-card text-center">
                 <div class="stats-number" id="totalIncidents">{{ incident_data|length }}</div>
                 <div class="stats-label">Total Incidents</div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-6 col-md-3 col-lg-2">
             <div class="stats-card text-center">
                 <div class="stats-number" id="mappedIncidents">0</div>
                 <div class="stats-label">Mapped Incidents</div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-6 col-md-3 col-lg-2">
             <div class="stats-card text-center">
                 <div class="stats-number" id="settledCount">0</div>
                 <div class="stats-label">Settled Cases</div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-6 col-md-3 col-lg-2">
             <div class="stats-card text-center">
                 <div class="stats-number" id="settlementRate">0%</div>
                 <div class="stats-label">Settlement Rate</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3 col-lg-2">
+            <div class="stats-card text-center">
+                <div class="stats-number" id="blotterReports">{{ blotter_reports_count }}</div>
+                <div class="stats-label">Blotter Reports</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3 col-lg-2">
+            <div class="stats-card text-center">
+                <div class="stats-number" id="blotterCases">{{ blotter_cases_count }}</div>
+                <div class="stats-label">Blotter Cases</div>
             </div>
         </div>
     </div>
@@ -467,13 +479,14 @@ function initializeMap() {
             visibility: 'none'
         },
         paint: {
+            // Weight heatmap by severity levels
             'heatmap-weight': [
-                'interpolate',
-                ['linear'],
+                'match',
                 ['get', 'severity'],
                 'Low', 0.5,
                 'Medium', 1,
-                'High', 2
+                'High', 2,
+                1
             ],
             'heatmap-intensity': [
                 'interpolate',
@@ -563,9 +576,10 @@ function updateStatistics() {
         incident.lat !== 0 && incident.lng !== 0
     );
     
-    const settledCount = incidentData.filter(incident => 
-        incident.settlement_status && incident.settlement_status.toLowerCase().includes('settled')
-    ).length;
+    const settledCount = incidentData.filter(incident => {
+        const s = (incident.settlement_status || '').trim().toLowerCase();
+        return s === 'settled';
+    }).length;
     
     const settlementRate = incidentData.length > 0 ? 
         Math.round((settledCount / incidentData.length) * 100) : 0;
@@ -610,7 +624,7 @@ function initializeCharts() {
         }
     });
     
-    // Monthly Trend Chart (simplified for demo)
+    // Monthly Trend Chart (last 12 months)
     const trendCtx = document.getElementById('trendChart').getContext('2d');
     const monthlyData = generateMonthlyTrend();
     
@@ -648,17 +662,23 @@ function initializeCharts() {
 }
 
 function generateMonthlyTrend() {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    const data = incidentData.reduce((acc, incident) => {
-        const month = new Date(incident.date).getMonth();
-        acc[month] = (acc[month] || 0) + 1;
-        return acc;
-    }, {});
-    
-    return {
-        labels: months,
-        data: months.map((_, i) => data[i] || 0)
-    };
+    const now = new Date();
+    const months = [];
+    const counts = new Array(12).fill(0);
+    for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push(d.toLocaleString('en', { month: 'short' }));
+    }
+    incidentData.forEach(incident => {
+        if (!incident.date) return;
+        const d = new Date(incident.date);
+        if (isNaN(d)) return;
+        const diffMonths = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+        if (diffMonths >= 0 && diffMonths < 12) {
+            counts[11 - diffMonths] += 1;
+        }
+    });
+    return { labels: months, data: counts };
 }
 
 // Event Listeners
@@ -734,7 +754,7 @@ function buildStreetView() {
             };
         }
         streetCounts[key].count++;
-        if (incident.settlement_status && incident.settlement_status.toLowerCase().includes('settled')) {
+        if ((incident.settlement_status || '').trim().toLowerCase() === 'settled') {
             streetCounts[key].settled++;
         }
     });

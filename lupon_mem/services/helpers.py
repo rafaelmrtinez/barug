@@ -69,13 +69,27 @@ def latest_submission_for_codes(case_id: int, codes: List[str]):
         """, [case_id, codes_up])
         return cur.fetchone()  # (submission_id, code, submitted_at) or None
 
+
 def create_and_submit_form_from_prefill(
     case_id: int,
     form_code: str,
-    prefill: Dict[str, object] | None = None
+    prefill: Dict[str, object] | None = None,
+    staff_id: int | None = None,   # NEW: used to auto-fill "Processed By"
 ) -> Optional[int]:
+    """
+    Creates a DRAFT submission for the given case & form_code, writes answers from `prefill`,
+    auto-fills internal audit fields (Processed By/Date/Time) when present in the form,
+    then SUBMITS the draft. Returns submission_id or None if form not found/active.
+
+    Auto-filled (when these field_ids exist in the form):
+      - 1120: "Processed By (Staff)"  -> staff full name (or "SYSTEM")
+      - 1121: "Processed On (Date)"   -> YYYY-MM-DD
+      - 1122: "Processed On (Time)"   -> HH:MM
+    """
     form_code_up = (form_code or "").strip().upper()
+
     with connection.cursor() as cur:
+        # 1) Resolve form_id
         cur.execute(
             "SELECT form_id FROM kp_form WHERE UPPER(form_code)=%s AND is_active IS TRUE LIMIT 1",
             [form_code_up],
@@ -85,14 +99,14 @@ def create_and_submit_form_from_prefill(
             return None
         form_id = int(r[0])
 
-        # draft submission
+        # 2) Create a DRAFT submission
         cur.execute("""
             INSERT INTO blotter_kp_submission(blotter_case_id, form_id, status)
             VALUES (%s,%s,'DRAFT') RETURNING submission_id
         """, [case_id, form_id])
         sid = int(cur.fetchone()[0])
 
-        # write answers based on field_code
+        # 3) Get the fields present in this form (so we only write what exists)
         cur.execute("""
             SELECT f.field_id, LOWER(f.field_code) AS code
             FROM kp_form_field kff
@@ -100,23 +114,75 @@ def create_and_submit_form_from_prefill(
             WHERE kff.form_id=%s
         """, [form_id])
         fields = cur.fetchall()
+        fields_by_id = {int(fid): (fid, code) for fid, code in fields}  # for quick membership test
 
+        # 4) Write answers from `prefill` by matching field_code (lowercased)
         pmap = prefill or {}
-        for field_id, code in fields:
-            code = (code or "").lower()
-            if code not in pmap:
-                continue
-            val = pmap[code]
-            if val in (None, "", []):
-                continue
-            cur.execute("""
-                INSERT INTO blotter_kp_answer (submission_id, field_id, value_json)
-                VALUES (%s,%s,%s)
-                ON CONFLICT (submission_id, field_id)
-                DO UPDATE SET value_json=EXCLUDED.value_json
-            """, [sid, int(field_id), _json.dumps(val)])
+        # Build a reverse map: code -> field_id(s)
+        code_to_ids: Dict[str, List[int]] = {}
+        for fid, code in fields:
+            lc = (code or "").lower()
+            if lc not in code_to_ids:
+                code_to_ids[lc] = []
+            code_to_ids[lc].append(int(fid))
 
-        # submit
+        for code, value in pmap.items():
+            lc = (code or "").lower()
+            if lc not in code_to_ids:
+                continue
+            if value in (None, "", []):
+                continue
+            for target_field_id in code_to_ids[lc]:
+                cur.execute("""
+                    INSERT INTO blotter_kp_answer (submission_id, field_id, value_json)
+                    VALUES (%s,%s,%s)
+                    ON CONFLICT (submission_id, field_id)
+                    DO UPDATE SET value_json=EXCLUDED.value_json
+                """, [sid, int(target_field_id), _json.dumps(value)])
+
+        # 5) Auto-fill internal audit fields if they exist in this form
+        #    1120: Processed By (Staff) | 1121: Date | 1122: Time
+        from datetime import datetime as _dt
+        _now = _dt.now()
+        _processed_date = _now.strftime("%Y-%m-%d")
+        _processed_time = _now.strftime("%H:%M")
+
+        actor_name = "SYSTEM"
+        if staff_id:
+            try:
+                cur.execute("""
+                    SELECT TRIM(
+                             COALESCE(p.first_name,'') || ' ' ||
+                             COALESCE(p.middle_name,'') || ' ' ||
+                             COALESCE(p.last_name,'')  || ' ' ||
+                             COALESCE(p.suffix,'')
+                           ) AS name
+                    FROM staff s
+                    JOIN person p ON p.person_id = s.person_id
+                    WHERE s.staff_id = %s
+                """, [staff_id])
+                rr = cur.fetchone()
+                if rr and (rr[0] or "").strip():
+                    actor_name = rr[0].strip()
+            except Exception:
+                # keep "SYSTEM" if anything goes wrong
+                pass
+
+        autofills = (
+            (1120, actor_name),
+            (1121, _processed_date),
+            (1122, _processed_time),
+        )
+        for sys_field_id, sys_val in autofills:
+            if sys_field_id in fields_by_id:
+                cur.execute("""
+                    INSERT INTO blotter_kp_answer (submission_id, field_id, value_json)
+                    VALUES (%s,%s,%s)
+                    ON CONFLICT (submission_id, field_id)
+                    DO UPDATE SET value_json=EXCLUDED.value_json
+                """, [sid, int(sys_field_id), _json.dumps(sys_val)])
+
+        # 6) Submit the draft
         cur.execute(
             "UPDATE blotter_kp_submission SET status='SUBMITTED', submitted_at=now() WHERE submission_id=%s",
             [sid],
