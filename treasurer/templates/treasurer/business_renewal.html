@@ -1,4 +1,3 @@
-{# templates/treasurer/business_renewal.html #}
 {% extends 'base.html' %}
 {% load static %}
 {% load bootstrap_icons %}
@@ -52,6 +51,14 @@
   .table tbody tr:hover{ background:#fcfcfd; }
   .table td, .table th{ vertical-align:middle; white-space:normal; word-break:break-word; }
 
+  /* group header row */
+  .group-row td{
+    background:var(--brand-050);
+    border-top:2px solid rgba(109,41,50,.15);
+    font-weight:600;
+    color:#3b3032;
+  }
+
   .page-pagination .pagination .page-item.active .page-link{
     background: var(--brand-700);
     border-color: var(--brand-700);
@@ -59,6 +66,22 @@
     font-weight: 700;
     box-shadow: 0 0 0 3px rgba(109,41,50,.20);
   }
+
+  /* Request code pill */
+  .reqcode{
+    display:inline-flex;align-items:center;gap:.45rem;padding:.22rem .55rem;
+    border-radius:.5rem;border:1px solid #e5e7eb;background:#fff;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;
+    font-size:.86rem;white-space:nowrap;line-height:1;
+  }
+  .reqcode .prefix{
+    padding:.12rem .4rem;border-radius:.35rem;font-weight:700;
+    font-size:.72rem;letter-spacing:.03em;background:var(--brand-700);color:#fff;
+  }
+  .reqcode .num{letter-spacing:.02em;color:#1f2937;}
+
+  /* keep the first column from squishing */
+  .table th:first-child,.table td:first-child{white-space:nowrap;}
 </style>
 {% endblock %}
 
@@ -98,8 +121,8 @@
           <table class="table align-middle">
             <thead>
               <tr>
-                <th>Request Code</th>
-                <th>Business ID</th>
+                <th style="width:1%">Request Code</th>
+                <th style="width:1%">Business ID</th>
                 <th>Period</th>
                 <th class="text-end">Base</th>
                 <th class="text-end">Surcharge</th>
@@ -113,23 +136,57 @@
             <tbody>
               {% if rows %}
                 {% for r in rows %}
-                  <tr>
-                    <td><span class="code-badge">{{ r.request_code }}</span></td>
-                    <td>{{ r.business_id }}</td>
-                    <td>{{ r.period_type }} — {{ r.period_label }}</td>
-                    <td class="text-end">{% if r.base_fee_quote_f is not None %}₱{{ r.base_fee_quote_f|floatformat:2 }}{% else %}—{% endif %}</td>
-                    <td class="text-end">{% if r.surcharge_quote_f is not None %}₱{{ r.surcharge_quote_f|floatformat:2 }}{% else %}—{% endif %}</td>
-                    <td class="text-end">{% if r.total_quote_f is not None %}₱{{ r.total_quote_f|floatformat:2 }}{% else %}—{% endif %}</td>
-                    <td>{{ r.or_number|default:"—" }}</td>
-                    <td>{% if r.paid_on %}{{ r.paid_on|date:"Y-m-d H:i" }}{% else %}—{% endif %}</td>
-                    <td><span class="{{ r.status_ui.cls }}">{{ r.status_ui.label }}</span></td>
-                    <td class="text-end">
-                      <a class="btn btn-sm btn-outline-brand"
-                         href="{% url 'treasurer:business_renewal_detail' r.renewal_request_id %}">
-                        {% bs_icon 'eye' extra_classes='me-1' %} View
-                      </a>
-                    </td>
-                  </tr>
+                  {% if r.is_group_header %}
+                    <tr class="group-row">
+                      <td colspan="9" class="text-center">
+                        <span class="me-2">Business <span class="code-badge">{{ r.business_id|stringformat:"06d" }}</span></span>
+                        <span class="text-muted small">Created @ {{ r.created_at_sec|default:"" }}</span>
+                      </td>
+                      <td class="text-end">
+                        {# SAFE header button: use header_request_id if present #}
+                        {% if r.header_request_id %}
+                          <a class="btn btn-sm btn-outline-brand"
+                             href="{% url 'treasurer:business_renewal_group' r.business_id %}">
+                            {% bs_icon 'eye' extra_classes='me-1' %} View
+                          </a>
+                        {% else %}
+                          <span class="text-muted small">No item to view</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% else %}
+                    <tr>
+                      <td title="{{ r.request_code }}">
+                        {% with rc=r.request_code %}
+                          {% if rc|slice:":4" == "RNR-" %}
+                            {% with num=rc|slice:"4:" %}
+                              <span class="reqcode"><span class="prefix">RNR</span><span class="num">{{ num }}</span></span>
+                            {% endwith %}
+                          {% else %}
+                            <span class="reqcode"><span class="num">{{ rc }}</span></span>
+                          {% endif %}
+                        {% endwith %}
+                      </td>
+                      <td>{{ r.business_id }}</td>
+                      <td>{{ r.period_label }}</td>
+                      <td class="text-end">{% if r.base_fee_quote_f is not None %}₱{{ r.base_fee_quote_f|floatformat:2 }}{% else %}—{% endif %}</td>
+                      <td class="text-end">{% if r.surcharge_quote_f is not None %}₱{{ r.surcharge_quote_f|floatformat:2 }}{% else %}—{% endif %}</td>
+                      <td class="text-end">{% if r.total_quote_f is not None %}₱{{ r.total_quote_f|floatformat:2 }}{% else %}—{% endif %}</td>
+                      <td>{{ r.or_number|default:"—" }}</td>
+                      <td>{{ r.paid_on_disp|default:"—" }}</td>
+                      <td><span class="{{ r.status_ui.cls }}">{{ r.status_ui.label }}</span></td>
+                      <td class="text-end">
+                        {% if r.renewal_request_id %}
+                          <a class="btn btn-sm btn-outline-brand"
+                             href="{% url 'treasurer:business_renewal_detail' r.renewal_request_id %}">
+                            {% bs_icon 'eye' extra_classes='me-1' %} View
+                          </a>
+                        {% else %}
+                          <span class="text-muted small">No item</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endif %}
                 {% endfor %}
               {% else %}
                 <tr><td colspan="10" class="text-center">No matching renewals.</td></tr>
@@ -151,8 +208,12 @@
     <nav aria-label="Renewals pagination">
       <ul class="pagination pagination-sm mb-0">
         {% if page_obj.has_previous %}
-          <li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}{% for t in period_types %}&period_type={{ t }}{% endfor %}{% for f in paid_filters %}&paid={{ f }}{% endfor %}{% if year %}&year={{ year }}{% endif %}&per_page={{ per_page }}&page=1" aria-label="First">«</a></li>
-          <li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}{% for t in period_types %}&period_type={{ t }}{% endfor %}{% for f in paid_filters %}&paid={{ f }}{% endfor %}{% if year %}&year={{ year }}{% endif %}&per_page={{ per_page }}&page={{ page_obj.previous_page_number }}" aria-label="Previous">‹</a></li>
+          <li class="page-item"><a class="page-link"
+             href="?q={{ q|urlencode }}{% for t in period_types %}&period_type={{ t }}{% endfor %}{% for f in paid_filters %}&paid={{ f }}{% endfor %}{% if year %}&year={{ year }}{% endif %}&per_page={{ per_page }}&page=1"
+             aria-label="First">«</a></li>
+          <li class="page-item"><a class="page-link"
+             href="?q={{ q|urlencode }}{% for t in period_types %}&period_type={{ t }}{% endfor %}{% for f in paid_filters %}&paid={{ f }}{% endfor %}{% if year %}&year={{ year }}{% endif %}&per_page={{ per_page }}&page={{ page_obj.previous_page_number }}"
+             aria-label="Previous">‹</a></li>
         {% else %}
           <li class="page-item disabled"><span class="page-link">«</span></li>
           <li class="page-item disabled"><span class="page-link">‹</span></li>
@@ -161,7 +222,8 @@
         {% for num in page_numbers %}
           {% if num %}
             <li class="page-item {% if page_obj.number == num %}active{% endif %}">
-              <a class="page-link" href="?q={{ q|urlencode }}{% for t in period_types %}&period_type={{ t }}{% endfor %}{% for f in paid_filters %}&paid={{ f }}{% endfor %}{% if year %}&year={{ year }}{% endif %}&per_page={{ per_page }}&page={{ num }}">{{ num }}</a>
+              <a class="page-link"
+                 href="?q={{ q|urlencode }}{% for t in period_types %}&period_type={{ t }}{% endfor %}{% for f in paid_filters %}&paid={{ f }}{% endfor %}{% if year %}&year={{ year }}{% endif %}&per_page={{ per_page }}&page={{ num }}">{{ num }}</a>
             </li>
           {% else %}
             <li class="page-item disabled"><span class="page-link">…</span></li>
@@ -169,8 +231,12 @@
         {% endfor %}
 
         {% if page_obj.has_next %}
-          <li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}{% for t in period_types %}&period_type={{ t }}{% endfor %}{% for f in paid_filters %}&paid={{ f }}{% endfor %}{% if year %}&year={{ year }}{% endif %}&per_page={{ per_page }}&page={{ page_obj.next_page_number }}" aria-label="Next">›</a></li>
-          <li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}{% for t in period_types %}&period_type={{ t }}{% endfor %}{% for f in paid_filters %}&paid={{ f }}{% endfor %}{% if year %}&year={{ year }}{% endif %}&per_page={{ per_page }}&page={{ paginator.num_pages }}" aria-label="Last">»</a></li>
+          <li class="page-item"><a class="page-link"
+             href="?q={{ q|urlencode }}{% for t in period_types %}&period_type={{ t }}{% endfor %}{% for f in paid_filters %}&paid={{ f }}{% endfor %}{% if year %}&year={{ year }}{% endif %}&per_page={{ per_page }}&page={{ page_obj.next_page_number }}"
+             aria-label="Next">›</a></li>
+          <li class="page-item"><a class="page-link"
+             href="?q={{ q|urlencode }}{% for t in period_types %}&period_type={{ t }}{% endfor %}{% for f in paid_filters %}&paid={{ f }}{% endfor %}{% if year %}&year={{ year }}{% endif %}&per_page={{ per_page }}&page={{ paginator.num_pages }}"
+             aria-label="Last">»</a></li>
         {% else %}
           <li class="page-item disabled"><span class="page-link">›</span></li>
           <li class="page-item disabled"><span class="page-link">»</span></li>
@@ -286,7 +352,6 @@
       year: (getQS().get('year') || '').trim()
     };
 
-    // chips
     const chips=document.getElementById('activeChips'); chips.innerHTML='';
     let count=0;
 
