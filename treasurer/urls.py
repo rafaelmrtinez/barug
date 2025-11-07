@@ -44,4 +44,9 @@ urlpatterns = [
     path("business/renewal/<int:renewal_request_id>/recalc/", views.business_renewal_recalc, name="business_renewal_recalc"),
     path("business/renewal/<int:renewal_request_id>/pay/", views.business_renewal_take_payment, name="business_renewal_take_payment"),
     path("treasurer/business/<int:business_id>/renewal/pay-all/", views.business_renewal_take_payment_all, name="business_renewal_take_payment_all"),
+    path("closure/", views.closure_list, name="closure_list"),
+    path("closure/<int:closure_payment_request_id>/", views.closure_detail, name="closure_detail"),
+    path("closure/<int:business_id>/group/", views.closure_group, name="closure_group"),
+    path("closure/<int:closure_payment_request_id>/take-payment/", views.closure_take_payment, name="closure_take_payment"),
+    path("closure/<int:business_id>/take-payment-all/", views.closure_take_payment_all, name="closure_take_payment_all"),
 ]
