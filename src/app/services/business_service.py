@@ -28,14 +28,16 @@ from src.app.contracts.business_service_contract import (
     IBusinessInfoService,
     IBusinessRenewalService,
     IBusinessRenewalQuoteService,
-    IBusinessRenewalRequestService
+    IBusinessRenewalRequestService,
+    IBusinessClosurePaymentRequestService,
 )
 from src.domain.contracts.business_repository_contract import (
     IBusinessRepository,
     IResidentOwnerRepository,
     IBusinessRenewalRepository,
     IBusinessRenewalQuoteRepository,
-    IBusinessRenewalRequestRepository
+    IBusinessRenewalRequestRepository,
+    IBusinessClosurePaymentRequestRepository,
 )
 from src.infra.repositories.business_repository import (
     OwnerBusinessInformationRepository,
@@ -379,3 +381,22 @@ class BusinessRenewalRequestService(IBusinessRenewalRequestService):
         if cmd.period_type == "ANNUAL":
             object.__setattr__(cmd, "period_quarter", None)
         return self._repo.request_unpaid(cmd)
+
+class BusinessClosurePaymentRequestService(IBusinessClosurePaymentRequestService):
+    def __init__(self, repo: IBusinessClosurePaymentRequestRepository):
+        self._repo = repo
+
+    def request_payment(self, cmd: CreateRenewalRequestCmd) -> int:
+        if cmd.period_type not in ("ANNUAL","QUARTERLY"):
+            raise ValueError("period_type must be ANNUAL or QUARTERLY")
+        if cmd.period_type == "ANNUAL":
+            object.__setattr__(cmd, "period_quarter", None)
+        return self._repo.request_payment(cmd)
+
+    def request_unpaid(self, cmd: CreateRenewalRequestCmd) -> list[int]:
+        if cmd.period_type not in ("ANNUAL","QUARTERLY"):
+            raise ValueError("period_type must be ANNUAL or QUARTERLY")
+        if cmd.period_type == "ANNUAL":
+            object.__setattr__(cmd, "period_quarter", None)
+        return self._repo.request_unpaid(cmd)
+

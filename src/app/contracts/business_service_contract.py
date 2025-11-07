@@ -113,3 +113,12 @@ class IBusinessRenewalRequestService(ABC):
     @abstractmethod
     def request_unpaid(self, cmd: CreateRenewalRequestCmd) -> list[int]:
         pass
+    
+class IBusinessClosurePaymentRequestService(ABC):
+    @abstractmethod
+    def request_payment(self, cmd: CreateRenewalRequestCmd) -> int:
+        pass
+    @abstractmethod
+    def request_unpaid(self, cmd: CreateRenewalRequestCmd) -> list[int]:
+        pass
+

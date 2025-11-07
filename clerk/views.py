@@ -102,6 +102,7 @@ from src.app.contracts.business_service_contract import (
     IBusinessRenewalService,
     IBusinessRenewalQuoteService,
     IBusinessRenewalRequestService,
+    IBusinessClosurePaymentRequestService,
 )
 from src.domain.contracts.business_repository_contract import IBusinessRepository
 from src.app.transfer_objects.commands.business_cmd import (
@@ -3528,6 +3529,112 @@ def initiate_business_closure(
         'surch_sum'    : surch_sum,
         'has_dues'     : has_dues,
         'clearance_year': current_year,  # optional for display/consistency
+    })
+
+# clerk/views.py  (add)
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+@inject
+def create_closure_payment_request(
+    request: HttpRequest,
+    b_id: int,
+    business_info: IBusinessInfoService = Provide[AppContainer.owner_business_service],
+    renewal_quote_svc: IBusinessRenewalQuoteService = Provide[AppContainer.business_renewal_quote_service],
+    svc: IBusinessClosurePaymentRequestService = Provide[AppContainer.business_closure_payment_request_service],
+) -> HttpResponse:
+    user_role = _auth_role_name(request)
+
+    if request.method == "POST":
+        try:
+            business_id   = int(request.POST.get("business_id") or b_id)
+            period_type   = (request.POST.get("period_type") or "ANNUAL").upper()
+            period_year   = int(request.POST.get("period_year") or date.today().year)
+
+            raw_q = request.POST.get("period_quarter")
+            period_quarter = None
+            if period_type == "QUARTERLY" and raw_q:
+                s = raw_q.strip().upper()
+                if s.startswith("Q") and s[1:].isdigit(): period_quarter = int(s[1:])
+                elif s.isdigit(): period_quarter = int(s)
+
+            cmd = CreateRenewalRequestCmd(
+                business_id=business_id,
+                period_type=period_type,
+                period_year=period_year,
+                period_quarter=period_quarter,
+                created_by_user_id=_auth_staff_id(request),
+            )
+
+            # Create per-unpaid-year requests (closure-payment flavor)
+            new_ids = svc.request_unpaid(cmd)  # returns List[int]
+
+            if new_ids:
+                ids_str = ", ".join(str(i) for i in new_ids)
+                messages.success(
+                    request,
+                    f"Created {len(new_ids)} closure payment request(s) up to {period_type} {period_year}: [{ids_str}] "
+                    f"(status: FOR_TREASURER_REVIEW)."
+                )
+            else:
+                messages.info(request, "No unpaid items found. Nothing to create.")
+
+            return redirect("clerk:initiate_business_closure", b_id=business_id)
+        except Exception as e:
+            try:
+                post_dump = json.dumps({k: v for k, v in request.POST.items()}, default=str)
+            except Exception:
+                post_dump = str(dict(request.POST))
+            print("\n[create_closure_payment_request][ERROR]:", repr(e), flush=True)
+            print("[create_closure_payment_request][POST]:", post_dump, flush=True)
+            traceback.print_exc()
+            messages.error(request, f"Create closure payment request failed: {e}")
+            return redirect("clerk:initiate_business_closure", b_id=b_id)
+
+    # GET — load summary UI
+    dto = business_info.execute_by_business_id(b_id)
+
+    def _compose_owner_full_name(data: dict) -> str | None:
+        last = (data.get("last_name") or "").strip()
+        first = (data.get("first_name") or "").strip()
+        middle = (data.get("middle_name") or "").strip()
+        suffix = (data.get("suffix") or "").strip()
+        parts = []
+        if last: parts.append(last.upper())
+        if first: parts.append((", " if parts else "") + first.title())
+        if middle: parts.append(" " + middle[:1].upper() + ".")
+        if suffix: parts.append(" " + suffix.upper())
+        return "".join(parts) or None
+
+    owner = dict(dto.owner or {})
+    owner["owner_full_name"] = _compose_owner_full_name(owner)
+
+    current_year = date.today().year
+    grand_total, quote_rows, paid_rows = renewal_quote_svc.execute(business_id=b_id, year=current_year)
+
+    def to_dec(x):
+        if x is None: return Decimal("0")
+        return x if isinstance(x, Decimal) else Decimal(str(x))
+
+    quote_rows = quote_rows or []
+    base_sum  = sum(to_dec(getattr(r, "base_fee", 0))  for r in quote_rows)
+    surch_sum = sum(to_dec(getattr(r, "surcharge", 0)) for r in quote_rows)
+
+    header_status = ((dict(dto.business or {}).get("business_status") or "").strip().upper())
+    clearance_year = current_year
+
+    return render(request, "business/create_closure_payment_request.html", {
+        'page_path' : f'{user_role} / Closure Payment Request',
+        'page_title': 'Closure Payment Request',
+        "owner": owner,
+        "business": dto.business,
+        "grand_total": grand_total,
+        "quote_rows": quote_rows,
+        "paid_rows": paid_rows,
+        "base_sum": base_sum,
+        "surch_sum": surch_sum,
+        "header_status": header_status,
+        "clearance_year": clearance_year,
     })
 
 def renewal_request(request, b_id):

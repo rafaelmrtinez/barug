@@ -51,6 +51,7 @@ urlpatterns = [
     path("business/create_renewal_request/<int:b_id>/", views.create_renewal_request, name="create_renewal_request"),
     path("business/renewal_request/", views.renewal_request, name="renewal_request"),
     path("business/initiate_business_closure/<int:b_id>/", views.initiate_business_closure, name="initiate_business_closure"),
+    path("business/<int:b_id>/closure/payment/", views.create_closure_payment_request, name="create_closure_payment_request"),
 
     # OCR
     path('upload-id/', web_views.upload_valid_id_files, name='upload_id_files'),
