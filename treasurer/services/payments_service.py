@@ -17,7 +17,7 @@ def accept_payment(doc_request_id: int, method_id: int, amount_paid: float, staf
         raise RuntimeError(getattr(res.error, "message", "Payment failed"))
     return int(res.data)
 
-
+# BUSINESS RENEWAL
 def accept_renewal_payment(
     renewal_request_id: int,
     method_id: int,

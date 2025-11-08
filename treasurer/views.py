@@ -1686,7 +1686,7 @@ def business_renewal_take_payment_all(request: HttpRequest, business_id: int):
     except Exception as e:
         messages.error(request, f"Bulk payment failed: {escape(str(getattr(e, 'message', e)))}")
 
-    return redirect("treasurer:business_renewal_detail", b_id=business_id)
+    return redirect("treasurer:business_renewal_group", business_id=business_id)
 
 # ========= CLOSURE =========
 STATUS_ID_MAP = {8: "FOR_TREASURER_REVIEW", 9: "PAID"} 
