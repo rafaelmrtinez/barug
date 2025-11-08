@@ -64,9 +64,9 @@ def _role_home(role_name: str) -> str:
     if is_admin:            return "staff_admin:dashboard"     # << NEW
     if is_super_admin:      return "metrics:health_check"
 
-    # NEW: targets for Lupon roles (adjust if your URL namespaces differ)
+    # NEW: targets for Lupon roles (separate apps)
     if is_lupon_member:     return "lupon_mem:dashboard"
-    if is_lupon_president:  return "lupon_president:dashboard"
+    if is_lupon_president:  return "lupon_pres:dashboard"
 
     logger.debug("Role not matched in _role_home; role=%s -> resident fallback", role)
     return "resident:dashboard"

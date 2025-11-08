@@ -1,0 +1,506 @@
+{% extends "base.html" %} 
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<style>
+/* ───────── Barangay Theme ───────── */
+.dashboard{
+  --primary:#7a1212;
+  --primary-dark:#5a0e0e;
+  --primary-light:#b96969;
+  --secondary:#64748b;
+  --success:#10b981;
+  --warning:#f59e0b;
+  --danger:#ef4444;
+  --info:#06b6d4;
+  
+  --bg-primary:#ffffff;
+  --bg-secondary:#faf8f8;
+  --bg-tertiary:#f5f1f1;
+  --text-primary:#2d1b1b;
+  --text-secondary:#64748b;
+  --text-muted:#94a3b8;
+  
+  --border:#e8d5d5;
+  --border-light:#f1e8e8;
+  --shadow:0 2px 4px rgba(122, 18, 18, 0.1);
+  --shadow-lg:0 8px 25px rgba(122, 18, 18, 0.15);
+  --radius:0.75rem;
+  --radius-sm:0.5rem;
+}
+
+/* ───────── Base Styles ───────── */
+.dashboard{
+  background:var(--bg-secondary);
+  min-height:100vh;
+}
+
+.dashboard .card{
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  background:var(--bg-primary);
+  box-shadow:var(--shadow);
+  transition:all 0.2s ease;
+}
+
+.dashboard .card:hover{
+  box-shadow:var(--shadow-lg);
+}
+
+/* ───────── Header ───────── */
+.hero-section{
+  background:linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color:white;
+  padding:3rem 0;
+  margin-bottom:2rem;
+  border-radius:0 0 var(--radius) var(--radius);
+}
+
+.hero-content h1{
+  font-size:2.5rem;
+  font-weight:700;
+  margin-bottom:0.5rem;
+}
+
+.hero-subtitle{
+  font-size:1.1rem;
+  opacity:0.9;
+  margin-bottom:2rem;
+}
+
+/* ───────── Stats Cards ───────── */
+.stat-card{
+  padding:1.5rem;
+  border-radius:var(--radius);
+  background:var(--bg-primary);
+  border:1px solid var(--border);
+  transition:all 0.2s ease;
+}
+
+.stat-card:hover{
+  transform:translateY(-2px);
+  box-shadow:var(--shadow-lg);
+}
+
+.stat-icon{
+  width:3rem;
+  height:3rem;
+  border-radius:var(--radius-sm);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:1.25rem;
+  margin-bottom:1rem;
+}
+
+.stat-icon.primary{ background:rgba(99, 102, 241, 0.1); color:var(--primary); }
+.stat-icon.success{ background:rgba(16, 185, 129, 0.1); color:var(--success); }
+.stat-icon.warning{ background:rgba(245, 158, 11, 0.1); color:var(--warning); }
+.stat-icon.info{ background:rgba(6, 182, 212, 0.1); color:var(--info); }
+
+.stat-value{
+  font-size:2rem;
+  font-weight:700;
+  color:var(--text-primary);
+  margin-bottom:0.25rem;
+}
+
+.stat-label{
+  font-size:0.875rem;
+  color:var(--text-secondary);
+  font-weight:500;
+}
+
+.stat-change{
+  font-size:0.75rem;
+  font-weight:600;
+  margin-top:0.5rem;
+}
+
+.stat-change.positive{ color:var(--success); }
+.stat-change.negative{ color:var(--danger); }
+
+/* ───────── Action Buttons ───────── */
+.action-btn{
+  padding:0.75rem 1.5rem;
+  border-radius:var(--radius-sm);
+  font-weight:500;
+  text-decoration:none;
+  transition:all 0.2s ease;
+  display:inline-flex;
+  align-items:center;
+  gap:0.5rem;
+}
+
+.action-btn.primary{
+  background:var(--primary);
+  color:white;
+  border:1px solid var(--primary);
+}
+
+.action-btn.primary:hover{
+  background:var(--primary-dark);
+  color:white;
+  transform:translateY(-1px);
+}
+
+.action-btn.secondary{
+  background:transparent;
+  color:var(--primary);
+  border:1px solid var(--primary);
+}
+
+.action-btn.secondary:hover{
+  background:var(--primary);
+  color:white;
+}
+
+/* ───────── Content Cards ───────── */
+.content-card{
+  background:var(--bg-primary);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  overflow:hidden;
+}
+
+.content-header{
+  padding:1.25rem 1.5rem;
+  border-bottom:1px solid var(--border);
+  background:var(--bg-tertiary);
+}
+
+.content-title{
+  font-size:1.125rem;
+  font-weight:600;
+  color:var(--text-primary);
+  margin:0;
+}
+
+.content-body{
+  padding:1.5rem;
+}
+
+/* ───────── Lists ───────── */
+.item-list{
+  list-style:none;
+  padding:0;
+  margin:0;
+}
+
+.item-list li{
+  padding:1rem 0;
+  border-bottom:1px solid var(--border-light);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.item-list li:last-child{
+  border-bottom:none;
+}
+
+.item-title{
+  font-weight:500;
+  color:var(--text-primary);
+  margin-bottom:0.25rem;
+}
+
+.item-subtitle{
+  font-size:0.875rem;
+  color:var(--text-muted);
+}
+
+/* ───────── Status Badges ───────── */
+.status-badge{
+  padding:0.25rem 0.75rem;
+  border-radius:9999px;
+  font-size:0.75rem;
+  font-weight:500;
+  text-transform:uppercase;
+  letter-spacing:0.025em;
+}
+
+.status-badge.open{ background:rgba(245, 158, 11, 0.1); color:var(--warning); }
+.status-badge.settled{ background:rgba(16, 185, 129, 0.1); color:var(--success); }
+.status-badge.pending{ background:rgba(99, 102, 241, 0.1); color:var(--primary); }
+.status-badge.closed{ background:rgba(239, 68, 68, 0.1); color:var(--danger); }
+.status-badge.high{ background:rgba(239, 68, 68, 0.1); color:var(--danger); }
+.status-badge.medium{ background:rgba(245, 158, 11, 0.1); color:var(--warning); }
+.status-badge.low{ background:rgba(16, 185, 129, 0.1); color:var(--success); }
+.status-badge.conference{ background:rgba(6, 182, 212, 0.1); color:var(--info); }
+
+/* ───────── Tables ───────── */
+.data-table{
+  width:100%;
+  border-collapse:collapse;
+}
+
+.data-table th{
+  padding:0.75rem 1rem;
+  text-align:left;
+  font-weight:600;
+  color:var(--text-secondary);
+  border-bottom:1px solid var(--border);
+  background:var(--bg-tertiary);
+}
+
+.data-table td{
+  padding:1rem;
+  border-bottom:1px solid var(--border-light);
+}
+
+.data-table tr:hover{
+  background:var(--bg-secondary);
+}
+
+/* ───────── Responsive ───────── */
+@media (max-width: 768px) {
+  .hero-content h1{ font-size:2rem; }
+  .stat-card{ padding:1rem; }
+  .content-body{ padding:1rem; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+  <!-- Hero Section -->
+  <div class="hero-section">
+    <div class="container">
+      <div class="hero-content text-center">
+        <h1>Lupon Tagapamayapa</h1>
+        <p class="hero-subtitle">Case Management & Mediation Dashboard</p>
+        <div class="d-flex justify-content-center gap-3 flex-wrap">
+          <a href="{% url 'lupon_pres:case_new' %}" class="action-btn primary">
+            {% bs_icon 'plus-circle' %} New Case
+          </a>
+          <a href="{% url 'lupon_pres:case_list' %}" class="action-btn secondary">
+            {% bs_icon 'folder' %} View Cases
+          </a>
+          <a href="{% url 'lupon_pres:hearing_list' %}" class="action-btn secondary">
+            {% bs_icon 'calendar-event' %} Hearings
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container-fluid px-4">
+
+    <!-- Stats Cards -->
+    <div class="row g-4 mb-5">
+      <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+          <div class="stat-icon primary">
+            {% bs_icon 'folder' %}
+          </div>
+          <div class="stat-value">{{ kpis.active_cases|default:"12" }}</div>
+          <div class="stat-label">Active Cases</div>
+          <div class="stat-change positive">
+            {% bs_icon 'arrow-up' %} {{ kpis.cases_delta|default:"+2" }} this week
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+          <div class="stat-icon warning">
+            {% bs_icon 'calendar-event' %}
+          </div>
+          <div class="stat-value">{{ kpis.scheduled_hearings|default:"5" }}</div>
+          <div class="stat-label">Scheduled Hearings</div>
+          <div class="stat-change positive">
+            {% bs_icon 'clock' %} {{ kpis.upcoming_hearings|default:"1" }} today
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+          <div class="stat-icon success">
+            <!-- {% bs_icon 'handshake' %} -->
+          </div>
+          <div class="stat-value">{{ kpis.settled_cases|default:"31" }}</div>
+          <div class="stat-label">Settled Cases</div>
+          <div class="stat-change positive">
+            {{ kpis.settlement_rate|default:"82%" }} success rate
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-3 col-md-6">
+        <div class="stat-card">
+          <div class="stat-icon info">
+            {% bs_icon 'clock-history' %}
+          </div>
+          <div class="stat-value">{{ kpis.pending_actions|default:"3" }}</div>
+          <div class="stat-label">Pending Actions</div>
+          <div class="stat-change negative">
+            {{ kpis.overdue_actions|default:"1" }} overdue
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="row g-4">
+      <!-- Recent Cases -->
+      <div class="col-lg-8">
+        <div class="content-card">
+          <div class="content-header d-flex justify-content-between align-items-center">
+            <h3 class="content-title">Recent Cases</h3>
+            <a href="{% url 'lupon_pres:case_list' %}" class="action-btn secondary">View All</a>
+          </div>
+          <div class="content-body p-0">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Case Number</th>
+                  <th>Parties</th>
+                  <th>Status</th>
+                  <th>Date Filed</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="casesTableBody">
+                {% for case in recent_cases %}
+                <tr>
+                  <td>
+                    <div class="item-title">{{ case.case_number }}</div>
+                    <div class="item-subtitle">{{ case.nature_of_dispute }}</div>
+                  </td>
+                  <td>{{ case.complainant }} vs {{ case.respondent }}</td>
+                  <td><span class="status-badge {{ case.status|lower }}">{{ case.status }}</span></td>
+                  <td>{{ case.date_filed }}</td>
+                  <td><a href="{% url 'lupon_pres:case_detail' case.id %}" class="action-btn secondary">View</a></td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td>
+                    <div class="item-title">BLTR-2024-089</div>
+                    <div class="item-subtitle">Boundary Dispute</div>
+                  </td>
+                  <td>Juan Dela Cruz vs Maria Santos</td>
+                  <td><span class="status-badge pending">Mediation</span></td>
+                  <td>Nov 18, 2024</td>
+                  <td><a href="#" class="action-btn secondary">View</a></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="item-title">BLTR-2024-088</div>
+                    <div class="item-subtitle">Noise Disturbance</div>
+                  </td>
+                  <td>Pedro Reyes vs Rico Velasco</td>
+                  <td><span class="status-badge settled">Settled</span></td>
+                  <td>Nov 15, 2024</td>
+                  <td><a href="#" class="action-btn secondary">View</a></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div class="item-title">BLTR-2024-087</div>
+                    <div class="item-subtitle">Unpaid Debt</div>
+                  </td>
+                  <td>Ana Garcia vs Roberto Cruz</td>
+                  <td><span class="status-badge open">Hearing</span></td>
+                  <td>Nov 12, 2024</td>
+                  <td><a href="#" class="action-btn secondary">View</a></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="col-lg-4">
+        <!-- Today's Schedule -->
+        <div class="content-card mb-4">
+          <div class="content-header">
+            <h3 class="content-title">Today's Schedule</h3>
+          </div>
+          <div class="content-body">
+            <ul class="item-list" id="todaySchedule">
+              {% for hearing in todays_hearings %}
+              <li>
+                <div>
+                  <div class="item-title">{{ hearing.case_title }}</div>
+                  <div class="item-subtitle">{{ hearing.time }} — {{ hearing.venue }}</div>
+                </div>
+                <span class="status-badge {{ hearing.type|lower }}">{{ hearing.type }}</span>
+              </li>
+              {% empty %}
+              <li>
+                <div>
+                  <div class="item-title">BLTR-2024-089 Mediation</div>
+                  <div class="item-subtitle">9:00 AM — Barangay Hall</div>
+                </div>
+                <span class="status-badge pending">Mediation</span>
+              </li>
+              <li>
+                <div>
+                  <div class="item-title">BLTR-2024-087 Hearing</div>
+                  <div class="item-subtitle">2:00 PM — Conference Room</div>
+                </div>
+                <span class="status-badge open">Hearing</span>
+              </li>
+              <li>
+                <div>
+                  <div class="item-title">Settlement Conference</div>
+                  <div class="item-subtitle">4:00 PM — Lupon Office</div>
+                </div>
+                <span class="status-badge conference">Conference</span>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+
+        <!-- Priority Cases -->
+        <div class="content-card">
+          <div class="content-header">
+            <h3 class="content-title">Priority Cases</h3>
+          </div>
+          <div class="content-body">
+            <ul class="item-list" id="urgentCases">
+              {% for case in urgent_cases %}
+              <li>
+                <div>
+                  <div class="item-title">{{ case.title }}</div>
+                  <div class="item-subtitle">{{ case.complainant }} vs {{ case.respondent }}</div>
+                </div>
+                <span class="status-badge {{ case.priority|lower }}">{{ case.priority }}</span>
+              </li>
+              {% empty %}
+              <li>
+                <div>
+                  <div class="item-title">BLTR-2024-089</div>
+                  <div class="item-subtitle">Boundary Dispute - Escalating</div>
+                </div>
+                <span class="status-badge high">High</span>
+              </li>
+              <li>
+                <div>
+                  <div class="item-title">BLTR-2024-087</div>
+                  <div class="item-subtitle">Debt Collection - ₱15,000</div>
+                </div>
+                <span class="status-badge medium">Medium</span>
+              </li>
+              <li>
+                <div>
+                  <div class="item-title">BLTR-2024-086</div>
+                  <div class="item-subtitle">Minor Property Damage</div>
+                </div>
+                <span class="status-badge low">Low</span>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}{% endblock %}

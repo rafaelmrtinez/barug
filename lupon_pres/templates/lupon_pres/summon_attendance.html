@@ -1,0 +1,150 @@
+{# templates/lupon_mem/summon_attendance.html #}
+{% extends "base.html" %}
+{% load bootstrap_icons %}
+
+{% block content %}
+<div class="container-fluid pt-3">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">
+      {% bs_icon 'envelope' extra_classes='me-2' %}
+      Summons (KP-9) — Attendance
+    </h4>
+    <div>
+      <a href="{% url 'lupon_mem:case_detail' case_id %}" class="btn btn-outline-secondary btn-sm">
+        {% bs_icon 'arrow-left' extra_classes='me-1' %} Back to Case
+      </a>
+    </div>
+  </div>
+
+  {# ---- Case header ---- #}
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-2">
+          <label class="form-label small text-muted mb-0">Case No.</label>
+          <div class="fw-semibold">{{ case_num }}</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted mb-0">Case</label>
+          <div class="fw-semibold">
+            {{ case_type|default:"" }}{% if case_type and case_title %} — {% endif %}{{ case_title|default:"" }}
+          </div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small text-muted mb-0">Title</label>
+          <div class="fw-semibold">{{ case_caption|default:case_title }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ---- Table ---- #}
+  <div class="card">
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th style="width:110px;">Summons #</th>
+              <th style="width:160px;">Served Date</th>
+              <th style="width:100px;">Time</th>
+              <th>Served To</th>
+              <th>Officer’s Return</th>
+              <th style="width:140px;">Status</th>
+              <th style="width:190px;">Who didn’t show</th>
+              <th style="width:420px;">Set Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for it in items %}
+            <tr>
+              <td class="text-muted">#{{ it.submission_id }}</td>
+              <td>{{ it.served_date|default:"—" }}</td>
+              <td>{{ it.served_time|default:"—" }}</td>
+              <td>{{ it.served_to|default:"—" }}</td>
+              <td class="text-truncate" style="max-width: 320px;">{{ it.officer_return|default:"—" }}</td>
+              <td>
+                {% if it.status == 'ATTENDED' %}
+                  <span class="badge rounded-pill bg-success">{% bs_icon 'check-circle' extra_classes='me-1' %} ATTENDED</span>
+                  {% if it.marked_at %}<div class="small text-muted mt-1">{{ it.marked_at }}</div>{% endif %}
+                {% elif it.status == 'NO SHOW' %}
+                  <span class="badge rounded-pill bg-danger">{% bs_icon 'exclamation-octagon' extra_classes='me-1' %} NO SHOW</span>
+                  {% if it.marked_at %}<div class="small text-muted mt-1">{{ it.marked_at }}</div>{% endif %}
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+
+              {# who didn't show (read view) #}
+              <td>
+                {% if it.status == 'NO SHOW' and it.no_show_party %}
+                  <span class="badge rounded-pill bg-danger">{{ it.no_show_party }}</span>
+                {% elif it.status == 'ATTENDED' %}
+                  <span class="text-muted">—</span>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+
+              {# set status form #}
+              <td>
+                <form class="row gx-2 gy-2 align-items-center js-row-form" method="post"
+                      action="{% url 'lupon_mem:summon_set_status' it.submission_id %}">
+                  {% csrf_token %}
+                  <div class="col-auto">
+                    <select name="status" class="form-select form-select-sm js-status">
+                      <option value="ATTENDED" {% if it.status == 'ATTENDED' %}selected{% endif %}>Attended</option>
+                      <option value="NO SHOW"  {% if it.status == 'NO SHOW'  %}selected{% endif %}>No Show</option>
+                    </select>
+                  </div>
+                  <div class="col-auto">
+                    <select name="no_show_party" class="form-select form-select-sm js-party"
+                            {% if it.status != 'NO SHOW' %}disabled{% endif %}>
+                      <option value="" {% if not it.no_show_party %}selected{% endif %}>Select party…</option>
+                      <option value="COMPLAINANT" {% if it.no_show_party == 'COMPLAINANT' %}selected{% endif %}>Complainant</option>
+                      <option value="RESPONDENT"  {% if it.no_show_party == 'RESPONDENT'  %}selected{% endif %}>Respondent</option>
+                      <option value="BOTH"        {% if it.no_show_party == 'BOTH'        %}selected{% endif %}>Both</option>
+                    </select>
+                  </div>
+                  <div class="col">
+                    <input name="remarks" class="form-control form-control-sm" placeholder="Remarks (optional)"
+                           value="{{ it.remarks }}">
+                  </div>
+                  <div class="col-auto">
+                    <button class="btn btn-primary btn-sm">
+                      {% bs_icon 'check2-circle' extra_classes='me-1' %} Save
+                    </button>
+                  </div>
+                </form>
+
+                {# per-row script to toggle the party select #}
+                <script>
+                  (function (row) {
+                    const statusSel = row.querySelector('.js-status');
+                    const partySel  = row.querySelector('.js-party');
+                    if (!statusSel || !partySel) return;
+                    function toggle() {
+                      const isNoShow = statusSel.value === 'NO SHOW';
+                      partySel.disabled = !isNoShow;
+                      if (!isNoShow) { partySel.value = ""; }
+                    }
+                    statusSel.addEventListener('change', toggle);
+                    toggle();
+                  })(document.currentScript.closest('tr'));
+                </script>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="8" class="text-center py-5 text-muted">No KP-9 summons found for this case.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
