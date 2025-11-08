@@ -97,6 +97,15 @@
             <a href="{{ summary_cta_href }}" class="btn btn-outline-brand">{{ summary_cta_label }}</a>
           {% endif %}
         </div>
+        <div class="col-md-4 text-md-end">
+          {% if cta_mode == "selector" %}
+            <button type="button" class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#renewOrCloseModal">
+              {{ summary_cta_label }}
+            </button>
+          {% else %}
+            <a href="{{ summary_cta_href }}" class="btn btn-outline-brand">{{ summary_cta_label }}</a>
+          {% endif %}
+        </div>
       {% endif %}
     </div>
   </div>
