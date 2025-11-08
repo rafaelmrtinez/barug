@@ -3637,6 +3637,68 @@ def create_closure_payment_request(
         "clearance_year": clearance_year,
     })
 
+@session_login_required
+@role_required(CLERK_ROLE)
+@inject
+def initiate_business_closure(
+    request: HttpRequest,
+    b_id: int,
+    business_info: IBusinessInfoService = Provide[AppContainer.owner_business_service],
+    renewal_quote_svc: IBusinessRenewalQuoteService = Provide[AppContainer.business_renewal_quote_service],
+):
+    user_role = _auth_role_name(request)
+
+    # Reuse the same DTO pattern used elsewhere
+    dto = business_info.execute_by_business_id(b_id)
+
+    def _compose_owner_full_name(data: dict) -> str | None:
+        last   = (data.get("last_name") or "").strip()
+        first  = (data.get("first_name") or "").strip()
+        middle = (data.get("middle_name") or "").strip()
+        suffix = (data.get("suffix") or "").strip()
+        parts = []
+        if last:   parts.append(last.upper())
+        if first:  parts.append((", " if parts else "") + first.title())
+        if middle: parts.append(" " + middle[:1].upper() + ".")
+        if suffix: parts.append(" " + suffix.upper())
+        return "".join(parts) or None
+
+    owner = dict(dto.owner or {})
+    owner["owner_full_name"] = _compose_owner_full_name(owner)
+
+    business = dto.business or {}
+    header_status = ((business.get("business_status") or "").strip().upper())
+
+    # NEW: compute outstanding dues (reusing renewal quote)
+    current_year = date.today().year
+    grand_total, quote_rows, paid_rows = renewal_quote_svc.execute(business_id=b_id, year=current_year)
+
+    def _to_decimal(x):
+        if x is None:
+            return Decimal("0")
+        return x if isinstance(x, Decimal) else Decimal(str(x))
+
+    quote_rows = quote_rows or []
+    base_sum  = sum(_to_decimal(getattr(r, "base_fee", 0))   for r in quote_rows)
+    surch_sum = sum(_to_decimal(getattr(r, "surcharge", 0))  for r in quote_rows)
+    has_dues  = (_to_decimal(grand_total) > 0)
+
+    return render(request, "business/initiate_business_closure.html", {
+        'page_path'    : f'{user_role} / Business Closure : {b_id:06d}',
+        'page_title'   : f'Business Closure : {b_id:06d}',
+        'business'     : business,
+        'owner'        : owner,
+        'header_status': header_status,
+
+        # NEW context for dues display
+        'grand_total'  : grand_total,
+        'quote_rows'   : quote_rows,
+        'base_sum'     : base_sum,
+        'surch_sum'    : surch_sum,
+        'has_dues'     : has_dues,
+        'clearance_year': current_year,  # optional for display/consistency
+    })
+
 def renewal_request(request, b_id):
     user_role = _auth_role_name(request)
 
