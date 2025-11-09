@@ -117,9 +117,9 @@ OWNERSHIP_TYPE_CHOICES = [
 BUSINESS_STATUS_CHOICES = [
     ("", "— All statuses —"),
     (1, "ACTIVE"),
-    (2, "INACTIVE"),
-    (3, "SUSPENDED"),
-    (4, "REVOKED"),
+    # (2, "INACTIVE"),
+    # (3, "SUSPENDED"),
+    # (4, "REVOKED"),
     (5, "CLOSED"),
     (6, "EXPIRED"),
     (7, "PENDING"),

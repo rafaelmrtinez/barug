@@ -56,6 +56,9 @@ from src.app.contracts.household_service_contract import (
 from src.app.services.household_service import (
     HouseholdService
 )
+from src.app.services.dashboards_service import (
+    ClerkDashboardService,
+)
 
 
 class AppContainer(containers.DeclarativeContainer):
@@ -182,4 +185,10 @@ class AppContainer(containers.DeclarativeContainer):
     faq_ingestion_service = providers.Factory(
         FAQIngestionService,
         repository=infra.faq_ingestion_repository,
+    )
+
+    # Dashboard Services can be added here in the app container as needed
+    clerk_dashboard_service: providers.Factory[ClerkDashboardService] = providers.Factory(
+        ClerkDashboardService,
+        dashboard_repo=infra.clerk_dashboard_repository,
     )
