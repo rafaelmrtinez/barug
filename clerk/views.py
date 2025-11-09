@@ -1154,6 +1154,7 @@ def dashboard(request: HttpRequest):
 def review_approve(request: HttpRequest):
     """List of ID verification requests."""
     profile = getattr(request, "person_profile", None)
+
 def review_approve(request: HttpRequest):
     """List of ID verification requests."""
     profile = getattr(request, "person_profile", None)
@@ -3197,6 +3198,57 @@ def renewal_request(request, b_id):
         'page_title' : f'Renewal Request : {b_id}',
     })
 
+# ID RELATED RPC CALL
+def _rpc_approve_person_by_clerk(request: HttpRequest, person_id: int, status_id: int, remarks: str | None):
+    auth = request.session.get("auth") or {}
+    staff_id = auth.get("staff_id") or _staff_id(request)
+    if not staff_id:
+        raise Http404("Staff not found in session.")
+    payload = {"p_clerk_staff_id": staff_id, "p_person_id": person_id, "p_status_id": status_id, "p_remarks": remarks}
+    try:
+        return supabase.rpc("approve_person_by_clerk", payload).execute()
+    except APIError as e:
+        try:
+            msg = e.message.get("message")
+        except Exception:
+            msg = str(e)
+        raise APIError({"message": msg or "Update failed."})
 
-def decision_request():
-    pass
+
+# ==================     CLERK - ID DECISION REQUESTS     ==================      
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_POST
+def approve_request(request: HttpRequest, req_id: int):
+    try:
+        _rpc_approve_person_by_clerk(request, req_id, STATUS_APPROVED, None)
+        messages.success(request, "Request approved.")
+    except APIError as e:
+        try:
+            messages.warning(request, e.message.get("message"))
+        except Exception:
+            messages.warning(request, "This request cannot be approved.")
+    return redirect("clerk:person_details", req_id=req_id)
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_POST
+def decision_request(request: HttpRequest, req_id: int):
+    action = (request.POST.get("action") or "").lower()
+    remarks = (request.POST.get("remarks") or "").strip()
+    if action not in ("reject","decline"):
+        messages.error(request, "Invalid action.")
+        return redirect("clerk:person_details", req_id=req_id)
+    if not remarks:
+        messages.error(request, "Remarks are required.")
+        return redirect("clerk:person_details", req_id=req_id)
+    status_id = STATUS_REJECTED if action == "reject" else STATUS_DECLINE
+    try:
+        _rpc_approve_person_by_clerk(request, req_id, status_id, remarks)
+        messages.success(request, f"Request marked as {'Rejected' if status_id==STATUS_REJECTED else 'Declined'}.")
+    except APIError as e:
+        try:
+            messages.warning(request, e.message.get("message"))
+        except Exception:
+            messages.warning(request, "This request cannot be updated right now.")
+    return redirect("clerk:person_details", req_id=req_id)
