@@ -15,6 +15,9 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
+
+ABSTRACT_EMAIL_KEY = os.getenv("ABSTRACT_EMAIL_KEY", "")
+
 INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY")
 PAYMENTS_DEV_BYPASS = os.getenv("PAYMENTS_DEV_BYPASS", "false").lower() in ("1","true","yes")
 PAYMONGO_SECRET_KEY    = os.getenv("PAYMONGO_SECRET_KEY")

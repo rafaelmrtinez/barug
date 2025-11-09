@@ -216,7 +216,7 @@
             <th style="width:120px;">{% bs_icon 'hash' extra_classes='me-1' %} Code</th>
             <th>{% bs_icon 'file-earmark-text' extra_classes='me-1' %} Form</th>
             <th style="width:260px;">{% bs_icon 'check2-circle' extra_classes='me-1' %} Status</th>
-            <th style="width:230px;">{% bs_icon 'person-check' extra_classes='me-1' %} Processed By</th>
+            <th style="width:220px;">{% bs_icon 'person-check' extra_classes='me-1' %} Processed By</th>
             <th class="text-end" style="width:90px;">{% bs_icon 'file-earmark-pdf' extra_classes='me-1' %} PDF</th>
           </tr>
         </thead>
@@ -228,9 +228,6 @@
             </td>
             <td class="fw-semibold">
               {{ f.2 }}
-              {% if f.7 %}
-                <span class="badge rounded-pill bg-light text-dark border ms-2">{{ f.7 }}</span>
-              {% endif %}
             </td>
             <td>
               {% if f.3 and f.3|upper == 'SUBMITTED' %}
@@ -242,8 +239,8 @@
             <td class="text-muted">
               {% if f.4 %}
                 <div>{{ f.4 }}</div>
-                {% if f.5 %}
-                  <div class="small text-muted">{{ f.5 }}</div>
+                {% if f.5 or f.6 %}
+                  <div class="small">{{ f.5|default:"" }}{% if f.5 and f.6 %}&nbsp;{% endif %}{{ f.6|default:"" }}</div>
                 {% endif %}
               {% else %}
                 —
@@ -266,6 +263,32 @@
       </table>
     </div>
   </div>
+
+  {% if forms_total_pages > 1 %}
+  <nav aria-label="KP forms pagination" class="mt-3">
+    <ul class="pagination pagination-sm justify-content-end mb-0">
+      <li class="page-item{% if not forms_has_prev %} disabled{% endif %}">
+        {% if forms_has_prev %}
+          <a class="page-link" href="{{ forms_prev_url }}" tabindex="-1" aria-label="Previous">Previous</a>
+        {% else %}
+          <span class="page-link" tabindex="-1" aria-disabled="true">Previous</span>
+        {% endif %}
+      </li>
+      {% for item in forms_page_links %}
+        <li class="page-item{% if item.active %} active{% endif %}">
+          <a class="page-link" href="{{ item.url }}">{{ item.number }}</a>
+        </li>
+      {% endfor %}
+      <li class="page-item{% if not forms_has_next %} disabled{% endif %}">
+        {% if forms_has_next %}
+          <a class="page-link" href="{{ forms_next_url }}" aria-label="Next">Next</a>
+        {% else %}
+          <span class="page-link" aria-disabled="true">Next</span>
+        {% endif %}
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
 
   <div class="sticky-add d-md-none mt-3">
     <a class="btn btn-outline-brand btn-lg rounded-pill" href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
@@ -384,139 +407,120 @@
 
 {% block js %}
 <script>
-  /* ===== Filters ===== */
-  (function(){
+  /* ===== Fast Filters (Optimized) ===== */
+  document.addEventListener('DOMContentLoaded', function() {
     const q = document.getElementById('formsSearch');
     const clearBtn = document.getElementById('clearSearch');
     const table = document.getElementById('formsTable');
     if(q && table){
-      const rows = Array.from(table.querySelectorAll('tbody tr'));
-      function applyFilter(){
+      let rows;
+      const getRows = () => rows || (rows = Array.from(table.querySelectorAll('tbody tr')));
+      const applyFilter = () => {
         const needle = q.value.trim().toLowerCase();
-        rows.forEach(tr=>{
-          const text = tr.innerText.toLowerCase();
-          tr.style.display = needle && !text.includes(needle) ? 'none' : '';
+        if(!needle) {
+          getRows().forEach(tr => tr.style.display = '');
+          return;
+        }
+        getRows().forEach(tr => {
+          tr.style.display = tr.textContent.toLowerCase().includes(needle) ? '' : 'none';
         });
-      }
-      q.addEventListener('input', applyFilter);
-      clearBtn && clearBtn.addEventListener('click', () => { q.value=''; q.focus(); applyFilter(); });
-    }
-  })();
-
-  /* ===== Case date context for hero chips ===== */
-  const PB_FIRST_MEET = "{{ pb_first_meeting_at|default_if_none:'' }}";
-  const PANGKAT_CONS  = "{{ pangkat_constituted_at|default_if_none:'' }}";
-  const PANGKAT_EXT   = "{{ pangkat_extended_until|default_if_none:'' }}";
-
-  function parseISO(s){ return s ? new Date(s) : null; }
-  function fmtDaysLeft(until){
-    if(!until) return "—";
-    const now = new Date();
-    const diffMs = (new Date(until)) - now;
-    const d = Math.ceil(diffMs / (1000*60*60*24));
-    return d >= 0 ? `${d} day${d===1?'':'s'} left` : `${Math.abs(d)} day${Math.abs(d)===1?'':'s'} over`;
-  }
-  function addDays(d, n){ const x = new Date(d); x.setDate(x.getDate()+n); return x; }
-
-  const pbFirst = parseISO(PB_FIRST_MEET);
-  const pangkatCons = parseISO(PANGKAT_CONS);
-  const pangkatExt = parseISO(PANGKAT_EXT);
-
-  const pbDeadline = pbFirst ? addDays(pbFirst, 15) : null;
-  const pangkatBaseDeadline = pangkatCons ? addDays(pangkatCons, 15) : null;
-  const pangkatDeadline = pangkatExt ? new Date(pangkatExt) : pangkatBaseDeadline;
-
-  function showWindowPills(){
-    const pbPill = document.getElementById('pbDaysLeft');
-    const pangkatPill = document.getElementById('pangkatDaysLeft');
-    if(pbPill && pbDeadline) pbPill.textContent = fmtDaysLeft(pbDeadline);
-    if(pangkatPill && pangkatDeadline) pangkatPill.textContent = fmtDaysLeft(pangkatDeadline);
-
-    const pbChip = document.getElementById('pbChipDays');
-    const pkChip = document.getElementById('pangkatChipDays');
-    const pbChipWrap = document.getElementById('pbChipPill');
-    const pkChipWrap = document.getElementById('pangkatChipPill');
-    if(pbChip && pbDeadline){ pbChip.textContent = fmtDaysLeft(pbDeadline); pbChipWrap && (pbChipWrap.hidden = false); }
-    if(pkChip && pangkatDeadline){ pkChip.textContent = fmtDaysLeft(pangkatDeadline); pkChipWrap && (pkChipWrap.hidden = false); }
-
-    const heroPb = document.getElementById('pbWindowPill');
-    const heroPk = document.getElementById('pangkatWindowPill');
-    if(heroPb && pbDeadline){
-      const days = Math.ceil((pbDeadline - new Date())/(1000*60*60*24));
-      heroPb.classList.toggle('danger', days < 0);
-      heroPb.classList.toggle('warn', days >=0 && days <= 3);
-    }
-    if(heroPk && pangkatDeadline){
-      const days = Math.ceil((pangkatDeadline - new Date())/(1000*60*60*24));
-      heroPk.classList.toggle('danger', days < 0);
-      heroPk.classList.toggle('warn', days >=0 && days <= 3);
-    }
-  }
-
-  /* ===== Attached forms scanner ===== */
-  function collectAttached(){
-    const forms = [];
-    const table = document.getElementById('formsTable');
-    if (!table) return forms;
-    table.querySelectorAll('tbody tr .code-chip').forEach(chip=>{
-      const text = (chip.textContent || "").trim();
-      const m = text.match(/\bKP-\d+[AB]?\b/i);
-      if (m) forms.push(m[0].toUpperCase());
-    });
-    return forms;
-  }
-  let ATTACHED = collectAttached();
-  function haveForm(code){ 
-    const upperCode = String(code || "").toUpperCase();
-    return ATTACHED.includes(upperCode);
-  }
-  function countForms(code){
-    const upperCode = String(code || "").toUpperCase();
-    return ATTACHED.filter(f => f === upperCode).length;
-  }
-
-  /* ===== Hearing status checker (optional API) ===== */
-  async function checkHearingStatus(){
-    try {
-      const response = await fetch('/lupon_mem/api/hearing-status/{{ case_id }}/', { credentials:'same-origin' });
-      if (!response.ok) throw new Error('net');
-      const data = await response.json();
-      return {
-        hearing_held: !!data.hearing_held,
-        current_step: data.current_step || 'start',
-        hearing_no:   data.hearing_no || 1,
-        hearing_attempt: data.hearing_attempt || 1,
-        outcome: data.outcome || null,
-        attendees: data.attendees || null
       };
-    } catch (_e) {
-      return { hearing_held:false, current_step:'start', hearing_no:1, hearing_attempt:1, outcome:null, attendees:null };
+      let timeout;
+      q.addEventListener('input', () => {
+        clearTimeout(timeout);
+        timeout = setTimeout(applyFilter, 100);
+      });
+      clearBtn?.addEventListener('click', () => { q.value=''; applyFilter(); });
     }
+  });
+
+  /* ===== Lazy Load Date Calculations ===== */
+  let dateCalcsLoaded = false;
+  function loadDateCalculations() {
+    if(dateCalcsLoaded) return;
+    dateCalcsLoaded = true;
+    
+    const PB_FIRST_MEET = "{{ pb_first_meeting_at|default_if_none:'' }}";
+    const PANGKAT_CONS = "{{ pangkat_constituted_at|default_if_none:'' }}";
+    const PANGKAT_EXT = "{{ pangkat_extended_until|default_if_none:'' }}";
+    
+    const parseISO = s => s ? new Date(s) : null;
+    const fmtDaysLeft = until => {
+      if(!until) return "—";
+      const d = Math.ceil((new Date(until) - new Date()) / 86400000);
+      return d >= 0 ? `${d} day${d===1?'':'s'} left` : `${Math.abs(d)} day${Math.abs(d)===1?'':'s'} over`;
+    };
+    const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
+    
+    const pbFirst = parseISO(PB_FIRST_MEET);
+    const pangkatCons = parseISO(PANGKAT_CONS);
+    const pangkatExt = parseISO(PANGKAT_EXT);
+    
+    const pbDeadline = pbFirst ? addDays(pbFirst, 15) : null;
+    const pangkatDeadline = pangkatExt ? new Date(pangkatExt) : (pangkatCons ? addDays(pangkatCons, 15) : null);
+    
+    // Update pills
+    ['pbDaysLeft', 'pbChipDays'].forEach(id => {
+      const el = document.getElementById(id);
+      if(el && pbDeadline) el.textContent = fmtDaysLeft(pbDeadline);
+    });
+    ['pangkatDaysLeft', 'pangkatChipDays'].forEach(id => {
+      const el = document.getElementById(id);
+      if(el && pangkatDeadline) el.textContent = fmtDaysLeft(pangkatDeadline);
+    });
+    
+    // Update danger/warn classes
+    const updatePill = (id, deadline) => {
+      const el = document.getElementById(id);
+      if(el && deadline) {
+        const days = Math.ceil((deadline - new Date()) / 86400000);
+        el.classList.toggle('danger', days < 0);
+        el.classList.toggle('warn', days >= 0 && days <= 3);
+      }
+    };
+    updatePill('pbWindowPill', pbDeadline);
+    updatePill('pangkatWindowPill', pangkatDeadline);
+    
+    window.pbDeadline = pbDeadline;
+    window.pangkatDeadline = pangkatDeadline;
   }
 
-  /* ===== Check mediation hearings ===== */
-  async function checkMediationHearings(){
-    try {
-      const response = await fetch(`/lupon_mem/api/case-mediation-hearings/{{ case_id }}/`, { credentials:'same-origin' });
-      if (!response.ok) throw new Error('net');
-      const data = await response.json();
-      return data || [];
-    } catch (_e) {
-      return [];
+  /* ===== Lazy Forms Scanner ===== */
+  let ATTACHED = null;
+  function getAttached() {
+    if(ATTACHED) return ATTACHED;
+    ATTACHED = [];
+    const table = document.getElementById('formsTable');
+    if(table) {
+      table.querySelectorAll('tbody tr .code-chip').forEach(chip => {
+        const m = chip.textContent?.match(/\bKP-\d+[AB]?\b/i);
+        if(m) ATTACHED.push(m[0].toUpperCase());
+      });
     }
+    return ATTACHED;
   }
+  const haveForm = code => getAttached().includes(String(code || "").toUpperCase());
+  const countForms = code => getAttached().filter(f => f === String(code || "").toUpperCase()).length;
 
-  /* ===== Get mediation hearing details ===== */
-  async function getMediationHearingDetails(){
+  /* ===== Lazy API Calls ===== */
+  let apiCache = {};
+  const fetchAPI = async (endpoint) => {
+    if(apiCache[endpoint]) return apiCache[endpoint];
     try {
-      const response = await fetch(`/lupon_mem/api/mediation-hearings/{{ case_id }}/`, { credentials:'same-origin' });
-      if (!response.ok) throw new Error('net');
+      const response = await fetch(endpoint, { credentials: 'same-origin' });
+      if(!response.ok) throw new Error('net');
       const data = await response.json();
-      return data || [];
-    } catch (_e) {
-      return [];
+      apiCache[endpoint] = data;
+      return data;
+    } catch {
+      return null;
     }
-  }
+  };
+  
+  const checkHearingStatus = () => fetchAPI('/lupon_mem/api/hearing-status/{{ case_id }}/');
+  const checkMediationHearings = () => fetchAPI('/lupon_mem/api/case-mediation-hearings/{{ case_id }}/');
+  const getMediationHearingDetails = () => fetchAPI('/lupon_mem/api/mediation-hearings/{{ case_id }}/');
+  
   let HEARING_HELD = false;
   let HEARING_STATUS = null;
 
@@ -578,8 +582,7 @@
       branches: [
         { label: "SETTLED", next: "kp16_settled" },
         { label: "NOT SETTLED", next: "mediation_choice" },
-        { label: "NO SHOW", next: "kp19_first" },
-        { label: "ARBITRATION", next: "kp14" }
+        { label: "NO SHOW", next: "kp19_first" }
       ]
     },
     
@@ -608,8 +611,7 @@
       branches: [
         { label: "SETTLED", next: "kp16_settled" },
         { label: "NOT SETTLED", next: "mediation_choice_2" },
-        { label: "NO SHOW", next: "kp19_second" },
-        { label: "ARBITRATION", next: "kp14" }
+        { label: "NO SHOW", next: "kp19_second" }
       ]
     },
     
@@ -638,8 +640,7 @@
       branches: [
         { label: "SETTLED", next: "kp16_settled" },
         { label: "NOT SETTLED", next: "kp10" },
-        { label: "NO SHOW", next: "kp19_third" },
-        { label: "ARBITRATION", next: "kp14" }
+        { label: "NO SHOW", next: "kp19_third" }
       ]
     },
     
@@ -753,10 +754,7 @@
       code: "KP-15", 
       title: "Arbitration Award",
       note: "Pangkat renders arbitration decision. Case resolved through arbitration.",
-      branches: [
-        { label: "Award Accepted", next: "case_closed" },
-        { label: "Award Repudiated", next: "kp17" }
-      ]
+      next: "case_closed"
     },
     
     kp16_settled: {
@@ -1044,14 +1042,8 @@
               else goToStep('kp10');
             };
 
-            const arbitrationBtn = document.createElement('button');
-            arbitrationBtn.className = 'btn btn-outline-brand btn-sm me-2 mb-2';
-            arbitrationBtn.textContent = 'ARBITRATION';
-            arbitrationBtn.onclick = () => goToStep('kp14');
-
             branchDiv.appendChild(settledBtn);
             branchDiv.appendChild(notSettledBtn);
-            branchDiv.appendChild(arbitrationBtn);
           } else {
             // Not held → prompt to record outcome (could be NO SHOW or moved)
             branchDiv.innerHTML = `

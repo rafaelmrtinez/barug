@@ -97,11 +97,12 @@ def submission_pdf(request: HttpRequest, submission_id: int):
         return HttpResponse("Failed to generate PDF.", status=500)
 
     resp = HttpResponse(pdf_bytes, content_type="application/pdf")
-    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+    resp["Content-Disposition"] = f'inline; filename="{filename}"'
+    resp["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    resp["Pragma"] = "no-cache"
+    resp["Expires"] = "0"
+    resp["X-Frame-Options"] = "SAMEORIGIN"
     return resp
-
-
-
 
 # --- preview image (PNG) ---
 @session_login_required
