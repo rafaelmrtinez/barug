@@ -58,6 +58,7 @@ from src.app.services.household_service import (
 )
 from src.app.services.dashboards_service import (
     ClerkDashboardService,
+    TreasurerDashboardService,
 )
 
 
@@ -191,4 +192,9 @@ class AppContainer(containers.DeclarativeContainer):
     clerk_dashboard_service: providers.Factory[ClerkDashboardService] = providers.Factory(
         ClerkDashboardService,
         dashboard_repo=infra.clerk_dashboard_repository,
+    )
+
+    treasurer_dashboard_service: providers.Factory[TreasurerDashboardService] = providers.Factory(
+        TreasurerDashboardService,
+        dashboard_repo=infra.treasurer_dashboard_repository,
     )

@@ -1139,6 +1139,7 @@ STATUS_DECLINE  = 7
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
+@inject
 def dashboard(
     request: HttpRequest,
     clerk_dashboard_service=Provide[AppContainer.clerk_dashboard_service],
@@ -1156,12 +1157,13 @@ def dashboard(
         "new_residents_month": None,
     }
 
+    dashboard_json = None
+
     try:
-        payload = clerk_dashboard_service.get_dashboard_kpis() or {}
+        payload = clerk_dashboard_service.get_dashboard_content() or {}
         kpis = payload.get("kpis", kpis)
         dashboard_json = payload.get("dashboard_json")
     except Exception as exc:
-        # log exception in your logger; keep UI usable
         print("Error fetching clerk dashboard KPIs:", exc)
 
     return render(request, "clerk/dashboard.html", {

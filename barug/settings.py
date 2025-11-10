@@ -82,6 +82,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django_bootstrap5",
     "django_bootstrap_icons",
+    'django.contrib.humanize',
     "authentication",
     "event_logs",
     "resident",

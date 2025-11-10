@@ -36,8 +36,7 @@ class ClerkDashboardRepository:
             JOIN public.request_status rs
             ON dr.request_status_id = rs.request_status_id
             WHERE UPPER(rs.request_status_name) = 'FOR CLERK REVIEW'
-            AND dr.created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Manila')
-            AND dr.created_at < (date_trunc('day', now() AT TIME ZONE 'Asia/Manila') + INTERVAL '1 day');
+            AND dr.created_at::date = CURRENT_DATE;
         """
         try:
             result = self._ctx.execute_query(query)
@@ -99,7 +98,7 @@ class ClerkDashboardRepository:
             SELECT COUNT(*) AS kpi_active_biz
             FROM public.business b
             JOIN public.business_status s
-              ON b.business_status_id = s.business_status_id
+            ON b.business_status_id = s.business_status_id
             WHERE UPPER(s.business_status_name) = 'ACTIVE';
         """
         try:
@@ -120,8 +119,8 @@ class ClerkDashboardRepository:
         query = """
             SELECT COUNT(*) 
             FROM business b
-            WHERE b.created_at >= date_trunc('week', CURRENT_DATE - INTERVAL '1 week')
-            AND b.created_at < date_trunc('week', CURRENT_DATE);
+            WHERE b.created_at >= date_trunc('week', now())
+            AND b.created_at < date_trunc('week', now()) + INTERVAL '7 days';
         """
         try:
             result = self._ctx.execute_query(query)
@@ -142,7 +141,7 @@ class ClerkDashboardRepository:
             SELECT COUNT(*) AS kpi_total_residents
             FROM public.person p
             JOIN public.residential_status r
-              ON p.residential_status_id = r.residential_status_id
+            ON p.residential_status_id = r.residential_status_id
             WHERE UPPER(r.residential_status_name) = 'RESIDENT';
         """
         try:
@@ -161,13 +160,13 @@ class ClerkDashboardRepository:
         
     def fetch_kpi_sub_total_residents(self) -> int:
         query = """
-            SELECT COUNT(*) AS kpi_total_residents
+            SELECT COUNT(*) AS kpi_sub_total_residents_this_month
             FROM public.person p
             JOIN public.residential_status r
-              ON p.residential_status_id = r.residential_status_id
+            ON p.residential_status_id = r.residential_status_id
             WHERE UPPER(r.residential_status_name) = 'RESIDENT'
-			AND p.date_added >= date_trunc('month', CURRENT_DATE - INTERVAL '1 month')
-            AND p.date_added < date_trunc('month', CURRENT_DATE);
+            AND p.date_added >= date_trunc('month', now())
+            AND p.date_added < date_trunc('month', now()) + INTERVAL '1 month';
         """
         try:
             result = self._ctx.execute_query(query)
@@ -265,3 +264,348 @@ class ClerkDashboardRepository:
             return {"labels": labels, "data": data}
         except Exception as e:
             raise QueryExecutionException(f"Error fetching requests trend: {e}", code="REQS_TREND")
+
+class TreasurerDashboardRepository:
+    def __init__(self, ctx: IConnectionAdapter):
+        self._ctx = ctx
+
+    def fetch_kpi_pending_payments(self) -> int:
+        query = """
+            SELECT
+            (SELECT COUNT(*)
+            FROM public.doc_request_hdr dr
+            JOIN public.request_status rs ON dr.request_status_id = rs.request_status_id
+            WHERE rs.request_status_name = 'FOR_TREASURER_REVIEW') AS doc_request_count,
+
+            (SELECT COUNT(*)
+            FROM public.renewal_request rr
+            JOIN public.request_status rs ON rr.request_status_id = rs.request_status_id
+            WHERE rs.request_status_name = 'FOR_TREASURER_REVIEW') AS renewal_request_count,
+
+            (SELECT COUNT(*)
+            FROM public.closure_payment_request cp
+            JOIN public.request_status rs ON cp.request_status_id = rs.request_status_id
+            WHERE rs.request_status_name = 'FOR_TREASURER_REVIEW') AS closure_request_count,
+
+            (SELECT COUNT(*)
+            FROM public.blotter_case_payment bp
+            JOIN public.payment_status ps ON bp.payment_status_id = ps.payment_status_id
+            WHERE ps.payment_status_name = 'UNPAID') AS unpaid_blotter_payment_count,
+
+            -- Sum of all
+            (
+            (SELECT COUNT(*) FROM public.doc_request_hdr dr
+            JOIN public.request_status rs ON dr.request_status_id = rs.request_status_id
+            WHERE rs.request_status_name = 'FOR_TREASURER_REVIEW')
+            +
+            (SELECT COUNT(*) FROM public.renewal_request rr
+            JOIN public.request_status rs ON rr.request_status_id = rs.request_status_id
+            WHERE rs.request_status_name = 'FOR_TREASURER_REVIEW')
+            +
+            (SELECT COUNT(*) FROM public.closure_payment_request cp
+            JOIN public.request_status rs ON cp.request_status_id = rs.request_status_id
+            WHERE rs.request_status_name = 'FOR_TREASURER_REVIEW')
+            +
+            (SELECT COUNT(*) FROM public.blotter_case_payment bp
+            JOIN public.payment_status ps ON bp.payment_status_id = ps.payment_status_id
+            WHERE ps.payment_status_name = 'UNPAID')
+            ) AS total_count;
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('pending_payments') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI pending payments: {str(e)}",
+                code="KPI_PENDING_PAYMENTS"
+            )
+
+    def fetch_kpi_sub_pending_payments(self) -> int:
+        query = """
+            WITH
+                doc_today AS (
+                    SELECT COUNT(*) AS cnt
+                    FROM public.doc_request_hdr dr
+                    JOIN public.request_status rs ON dr.request_status_id = rs.request_status_id
+                    WHERE rs.request_status_name = 'FOR_TREASURER_REVIEW'
+                    AND dr.created_at::date = current_date
+                ),
+                renewal_today AS (
+                    SELECT COUNT(*) AS cnt
+                    FROM public.renewal_request rr
+                    JOIN public.request_status rs ON rr.request_status_id = rs.request_status_id
+                    WHERE rs.request_status_name = 'FOR_TREASURER_REVIEW'
+                    AND rr.created_at::date = current_date
+                ),
+                closure_today AS (
+                    SELECT COUNT(*) AS cnt
+                    FROM public.closure_payment_request cp
+                    JOIN public.request_status rs ON cp.request_status_id = rs.request_status_id
+                    WHERE rs.request_status_name = 'FOR_TREASURER_REVIEW'
+                    AND cp.created_at::date = current_date
+                ),
+                blotter_today AS (
+                    SELECT COUNT(*) AS cnt
+                    FROM public.blotter_case_payment bp
+                    JOIN public.payment_status ps ON bp.payment_status_id = ps.payment_status_id
+                    WHERE ps.payment_status_name = 'UNPAID'
+                    AND bp.date_of_payment::date = current_date
+                )
+            SELECT
+                (SELECT cnt FROM doc_today) AS doc_request_today_count,
+                (SELECT cnt FROM renewal_today) AS renewal_request_today_count,
+                (SELECT cnt FROM closure_today) AS closure_request_today_count,
+                (SELECT cnt FROM blotter_today) AS unpaid_blotter_payment_today_count,
+                (
+                    (SELECT cnt FROM doc_today)
+                + (SELECT cnt FROM renewal_today)
+                + (SELECT cnt FROM closure_today)
+                + (SELECT cnt FROM blotter_today)
+                ) AS total_today_count;
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('sub_pending_payments') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI sub pending payments: {str(e)}",
+                code="KPI_SUB_PENDING_PAYMENTS"
+            )
+
+    def fetch_kpi_official_receipts_issued_this_week(self) -> int:
+        query = """
+            SELECT COUNT(*) AS or_count_week
+            FROM public.official_receipt
+            WHERE issued_at >= date_trunc('week', now())
+            AND issued_at < date_trunc('week', now()) + INTERVAL '7 days';
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('or_issued_this_week') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI official receipts issued this week: {str(e)}",
+                code="KPI_OR_ISSUED_THIS_WEEK"
+            )
+    
+    def fetch_kpi_sub_official_receipts_issued_this_week(self) -> int:
+        query = """
+            SELECT COUNT(*) AS or_count_today
+            FROM public.official_receipt
+            WHERE issued_at::date = current_date;
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('or_issued_today') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI official receipts issued today: {str(e)}",
+                code="KPI_SUB_OR_ISSUED_TODAY"
+            )
+
+    def fetch_kpi_collections_this_week(self) -> int:
+        query = """
+            SELECT SUM(amount_paid) AS total_amount_collected_week
+            FROM public.official_receipt
+            WHERE issued_at >= date_trunc('week', now())
+            AND issued_at < date_trunc('week', now()) + INTERVAL '7 days';
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return float(row.get('collections_this_week') or 0)
+            return float(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI collections this week: {str(e)}",
+                code="KPI_COLLECTIONS_THIS_WEEK"
+            )
+
+    def fetch_kpi_sub_collections_this_week(self) -> int:
+        query = """
+            SELECT SUM(amount_paid) AS total_amount_collected_today
+            FROM public.official_receipt
+            WHERE issued_at::date = current_date;
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return float(row.get('collections_this_month') or 0)
+            return float(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI collections this month: {str(e)}",
+                code="KPI_COLLECTIONS_THIS_WEEK"
+            )
+
+    def fetch_kpi_collections_this_year(self) -> int:
+        query = """
+            SELECT SUM(amount_paid) AS total_amount_collected_year
+            FROM public.official_receipt
+            WHERE issued_at >= date_trunc('year', now())
+            AND issued_at < date_trunc('year', now()) + INTERVAL '1 year';
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return float(row.get('collections_this_year') or 0)
+            return float(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI collections this year: {str(e)}",
+                code="KPI_COLLECTIONS_THIS_YEAR"
+            )
+
+    def fetch_kpi_sub_collections_this_year(self) -> int:
+        query = """
+            SELECT SUM(amount_paid) AS total_amount_collected_month
+            FROM public.official_receipt
+            WHERE issued_at >= date_trunc('month', now())
+            AND issued_at < date_trunc('month', now()) + INTERVAL '1 month';
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return float(row.get('collections_this_year') or 0)
+            return float(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI collections this year: {str(e)}",
+                code="KPI_SUB_COLLECTIONS_THIS_YEAR"
+            )
+
+    def fetch_collections_trend_last_7_days(self) -> dict:
+        """
+        Returns: {"labels": ["Mon","Tue",...], "data": [123.45, ...]}
+        Uses Asia/Manila timezone and returns SUM(amount_paid) per day for the last 7 calendar days (oldest first).
+        """
+        query = """
+            SELECT
+              to_char(d.day, 'Dy') AS label,
+              COALESCE(t.total_amount, 0) AS total_amount_collected
+            FROM (
+              SELECT (date_trunc('day', now() AT TIME ZONE 'Asia/Manila')::date - (s.i * INTERVAL '1 day'))::date AS day
+              FROM generate_series(6, 0, -1) AS s(i)
+            ) d
+            LEFT JOIN (
+              SELECT
+                (issued_at AT TIME ZONE 'Asia/Manila')::date AS day,
+                SUM(amount_paid) AS total_amount
+              FROM public.official_receipt
+              WHERE issued_at >= (date_trunc('day', now() AT TIME ZONE 'Asia/Manila')::date - INTERVAL '6 days')
+                AND issued_at <  (date_trunc('day', now() AT TIME ZONE 'Asia/Manila')::date + INTERVAL '1 day')
+              GROUP BY (issued_at AT TIME ZONE 'Asia/Manila')::date
+            ) t ON t.day = d.day
+            ORDER BY d.day;
+        """
+        try:
+            rows = self._ctx.execute_query(query)
+            # normalize to {"labels": [...], "data": [...]}
+            if not rows:
+                return {"labels": [], "data": []}
+
+            labels = []
+            data = []
+            for r in rows:
+                if isinstance(r, dict):
+                    labels.append(r.get("label"))
+                    # ensure numeric
+                    val = r.get("total_amount_collected")
+                else:
+                    # tuple-like (label, value)
+                    labels.append(r[0])
+                    val = r[1]
+                # safe cast to float
+                try:
+                    data.append(float(val or 0))
+                except Exception:
+                    data.append(0.0)
+
+            return {"labels": labels, "data": data}
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch collection trend : {str(e)}",
+                code="COLLECTIONS_TREND"
+            )
+
+    def fetch_collections_per_month(self) -> dict:
+        """
+        Returns: {"labels": ["Jan","Feb",...], "data": [1234.56, ...]}
+        Sum of collections per month for the current year (Jan..Dec).
+        """
+        query = """
+            SELECT
+              to_char(m.first_day, 'Mon') AS month_label,
+              COALESCE(t.total_amount, 0) AS total_amount_collected
+            FROM (
+              SELECT (date_trunc('year', now()) + (n * INTERVAL '1 month'))::date AS first_day
+              FROM generate_series(0, 11) AS gs(n)
+            ) m
+            LEFT JOIN (
+              SELECT
+                date_trunc('month', issued_at AT TIME ZONE 'Asia/Manila')::date AS first_day,
+                SUM(amount_paid) AS total_amount
+              FROM public.official_receipt
+              WHERE issued_at >= date_trunc('year', now())
+                AND issued_at <  date_trunc('year', now()) + INTERVAL '1 year'
+              GROUP BY date_trunc('month', issued_at AT TIME ZONE 'Asia/Manila')::date
+            ) t ON t.first_day = m.first_day
+            ORDER BY m.first_day;
+        """
+        try:
+            rows = self._ctx.execute_query(query)
+            if not rows:
+                return {"labels": [], "data": []}
+
+            labels = []
+            data = []
+            for r in rows:
+                if isinstance(r, dict):
+                    labels.append(r.get("month_label"))
+                    val = r.get("total_amount_collected")
+                else:
+                    labels.append(r[0])
+                    val = r[1]
+                try:
+                    data.append(float(val or 0))
+                except Exception:
+                    data.append(0.0)
+
+            return {"labels": labels, "data": data}
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch collections per month: {str(e)}",
+                code="COLLECTIONS_PER_MONTH"
+            )
