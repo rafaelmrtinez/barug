@@ -35,6 +35,7 @@ from src.app.contracts.business_service_contract import (
     IBusinessRenewalService,
     IBusinessRenewalQuoteService,
     IBusinessRenewalRequestService,
+    IBusinessClosurePaymentRequestService,
 )
 from src.domain.contracts.household_repository_contract import (
     IHouseholdRepository
@@ -47,6 +48,7 @@ from src.app.services.business_service import (
     BusinessRenewalService,
     BusinessRenewalQuoteService,
     BusinessRenewalRequestService,
+    BusinessClosurePaymentRequestService,
 )
 from src.app.contracts.household_service_contract import (
     IHouseholdService
@@ -169,6 +171,11 @@ class AppContainer(containers.DeclarativeContainer):
     business_renewal_request_service: providers.Factory[IBusinessRenewalRequestService] = providers.Factory(
         BusinessRenewalRequestService,
         repo=infra.business_renewal_request
+    )
+
+    business_closure_payment_request_service: providers.Factory[IBusinessClosurePaymentRequestService] = providers.Factory(
+        BusinessClosurePaymentRequestService,
+        repo=infra.business_closure_payment_request,
     )
 
     # FAQ ingestion service

@@ -1,4 +1,5 @@
 from django import forms
+from django.core.exceptions import ValidationError
 
 
 HOUSE_OWNERSHIP_CHOICES = [
@@ -578,5 +579,71 @@ class HouseholdFilters(forms.Form):
             'class' : 'form-select',
         }),
         label= 'House Ownership',
+        required= False,
+    )
+
+class AnnouncementDraftForm(forms.Form):
+    title = forms.CharField(
+        widget=forms.TextInput(attrs={
+            "id": "title",
+            "class": "form-control",
+            "placeholder": "Announcement Title",
+        }),
+        label="Announcement Title",
+        required= True,
+        max_length=200,
+    )
+
+    body = forms.CharField(
+        widget=forms.Textarea(attrs={
+            "class": "form-control",
+            "rows": 8,
+            "placeholder": "Write the announcement body here…",
+        }),
+        label="Body",
+        required=True,
+    )
+
+    publish_at = forms.DateTimeField(
+        widget=forms.DateTimeInput(attrs={
+            "class": "form-control",
+            "type": "datetime-local",
+        }),
+        label="Publish at",
+        required=True,
+        input_formats=["%Y-%m-%dT%H:%M"],
+        help_text="Optional. Leave empty to keep as draft."
+    )
+
+    expire_at = forms.DateTimeField(
+        widget=forms.DateTimeInput(attrs={
+            "class": "form-control",
+            "type": "datetime-local",
+        }),
+        label="Expire at",
+        required=True,
+        input_formats=["%Y-%m-%dT%H:%M"],
+        help_text="Optional. If set, must be after Publish at."
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        publish_at = cleaned.get("publish_at")
+        expire_at = cleaned.get("expire_at")
+
+        # If both are set, ensure ordering is valid
+        if publish_at and expire_at and expire_at <= publish_at:
+            raise ValidationError({"expire_at": "Expire at must be after Publish at."})
+
+        return cleaned
+    
+class DraftListSearch(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search',
+        }),
+        label= 'Search',
         required= False,
     )

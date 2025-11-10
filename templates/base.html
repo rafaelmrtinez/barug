@@ -51,5 +51,16 @@
 
     {# keep your existing JS block last #}
     {% block js %}{% endblock %}
+
+    {% if messages %}
+  <div class="container mt-2">
+    {% for message in messages %}
+      <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %} mb-2" role="alert">
+        {{ message }}
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
 </body>
 </html>
