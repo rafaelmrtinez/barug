@@ -1,0 +1,497 @@
+{% extends "base.html" %}
+{% load static %}
+{% load bootstrap_icons %}
+{% load humanize %}
+
+{% block css %}
+<style>
+/* ───────── Theme (BARUG maroon) ───────── */
+.dashboard.theme-barug{
+  --brand-900:#3a1217;
+  --brand-800:#561c24;
+  --brand-700:#6d2932;  /* primary */
+  --brand-600:#6d2932;
+  --brand-500:#561c24;
+  --brand-400:#c7b7a3;
+  --brand-300:#e8d8c4;  /* area fill */
+  --brand-200:#f3ece3;
+  --brand-100:#fbf7f4;
+
+  --neutral-800:#1f2937;
+  --neutral-600:#4b5563;
+  --neutral-500:#6b7280; /* axis text */
+  --neutral-400:#9ca3af;
+  --neutral-300:#d1d5db; /* grid */
+  --neutral-200:#e5e7eb;
+  --neutral-100:#f3f4f6;
+
+  --surface:#ffffff;
+  --surface-muted:#faf9f7;
+  --border:#ece7e1;
+  --shadow:0 8px 24px rgba(15,23,42,.06);
+}
+
+/* ───────── Base / perf ───────── */
+.dashboard .card{ border-radius:16px; border:1px solid var(--border); }
+.dashboard .shadow-sm{ box-shadow:var(--shadow)!important; }
+.dashboard .btn,.dashboard .form-select,.dashboard .form-control{ border-radius:12px; }
+.header-card,.kpi{ content-visibility:auto; contain-intrinsic-size:300px 400px; }
+.section.chart-section{ content-visibility:visible; }
+
+/* Header */
+.header-card{ background:linear-gradient(135deg,var(--brand-100),#fff); }
+.eyebrow{ letter-spacing:.12em; font-size:.72rem; color:var(--brand-700); }
+
+/* Buttons */
+.btn-brand{ background:var(--brand-700); color:#fff; border:1px solid var(--brand-700); }
+.btn-brand:hover{ background:var(--brand-800); color:#fff; }
+.btn-outline-brand{ color:var(--brand-700); border:1px solid var(--brand-700); background:transparent; }
+.btn-outline-brand:hover{ background:var(--brand-100); color:var(--brand-800); }
+.btn-brand-subtle{ background:var(--brand-300); color:var(--brand-800); border:1px solid var(--brand-300); }
+.btn-brand-subtle:hover{ background:var(--brand-200); }
+
+/* KPI */
+.kpi .kpi-icon{
+  width:48px;height:48px;border-radius:14px;display:grid;place-items:center;
+  background:var(--brand-300); color:var(--brand-700);
+}
+.kpi .kpi-label{ font-size:.82rem; color:var(--neutral-600); font-weight:600; }
+.kpi .kpi-value{ font-size:2rem; font-weight:800; line-height:1; }
+.kpi .kpi-sub{ font-size:.8rem; font-weight:700; }
+.kpi .kpi-pill{ background:var(--brand-200); color:var(--brand-800); border:1px solid var(--brand-300); }
+
+/* Sections */
+.section .card-header{ background:var(--surface-muted); border-bottom:1px solid var(--border); padding:.85rem 1rem; }
+
+/* Charts */
+.chart-wrap{ position:relative; height:clamp(320px, 40vh, 520px); }
+.chart-wrap canvas{ width:100% !important; height:100% !important; display:block; }
+.legend-inline{ display:flex; gap:1rem; flex-wrap:wrap; }
+.legend-inline .legend-dot{
+  width:.9rem;height:.9rem;border-radius:50%;display:inline-block;margin-right:.35rem;
+  background:var(--dot,var(--brand-600));
+}
+.legend-inline .legend-label{ margin-right:.75rem; font-size:.9rem; color:var(--neutral-600); }
+
+.hidden{ display:none!important; }
+
+/* Motion */
+.lift-on-hover{ transition:transform .18s ease, box-shadow .18s ease; }
+.lift-on-hover:hover{ transform:translateY(-2px); box-shadow:0 10px 28px rgba(15,23,42,.08); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard theme-barug container-fluid py-4" style="margin-top:40">
+
+  <!-- Page Header -->
+  <div class="row g-3 align-items-center mb-3">
+    <div class="col-12">
+      <div class="card header-card shadow-sm">
+        <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+          <div>
+            <div class="eyebrow text-uppercase">Barangay Captain</div>
+            <h1 class="h4 mb-0 fw-bold">Overview</h1>
+            <div class="text-muted small mt-1">{{ today|default:"" }}</div>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <a href="" class="btn btn-outline-brand">
+              {% bs_icon 'exclamation-octagon' %}<span class="ms-1">Lupon Cases</span>
+            </a>
+            <a href="" class="btn btn-brand">
+              {% bs_icon 'calendar-event' %}<span class="ms-1">Staff</span>
+            </a>
+            <a href="" class="btn btn-brand-subtle">
+              {% bs_icon 'megaphone' %}<span class="ms-1">RCD</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="row g-3 row-cols-1 row-cols-md-2 row-cols-xl-4">
+    <div class="col">
+      <div class="card kpi shadow-sm h-100 lift-on-hover">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="kpi-icon">{% bs_icon 'file-text' size='1.2em' %}</div>
+          <div class="flex-grow-1">
+            <div class="kpi-label">Open Lupon Cases</div>
+            <div class="kpi-value" id="kpiOpenCases">{{ kpis.open_cases|default_if_none:"-" }}</div>
+            <div class="kpi-sub" id="kpiOpenCasesDelta" title="Open lupon cases added this week.">+{{ kpis.open_cases_delta|default_if_none:"-" }} this week</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card kpi shadow-sm h-100 lift-on-hover">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="kpi-icon">{% bs_icon 'people' size='1.2em' %}</div>
+          <div class="flex-grow-1">
+            <div class="kpi-label">Registered Residents</div>
+            <div class="kpi-value">{{ kpis.residents_total|default_if_none:"-" }}</div>
+            <span class="kpi-sub" title="Registered residents added this month.">+{{ kpis.new_residents_month|default_if_none:"-" }} this month</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card kpi shadow-sm h-100 lift-on-hover">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="kpi-icon">{% bs_icon 'cash' size='1.2em' %}</div>
+          <div class="flex-grow-1">
+            <div class="kpi-label">Collections This Week</div>
+            <div class="kpi-value" id="kpiCollectionsMonth">{{ kpis.collections_this_week|default_if_none:"-"|floatformat:2|intcomma }}</div>
+            <span class="kpi-sub" id="kpiCollectionsMonthDelta" title="Collections today.">+{{ kpis.collections_this_week_delta|default_if_none:"-"|floatformat:2|intcomma }} today</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card kpi shadow-sm h-100 lift-on-hover">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="kpi-icon">{% bs_icon 'cash-stack' size='1.2em' %}</div>
+          <div class="flex-grow-1">
+            <div class="kpi-label">Collections This Year</div>
+            <div class="kpi-value" id="kpiCollectionsYear">{{ kpis.collections_this_year|default_if_none:"-"|floatformat:2|intcomma }}</div>
+            <span class="kpi-sub" id="kpiCollectionsYearDelta" title="Collections this month.">+{{ kpis.collections_this_year_delta|default_if_none:"-"|floatformat:2|intcomma }} this month</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="row g-3 mt-1">
+    <div class="col-6">
+      <div class="card section chart-section shadow-sm h-100">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <h5 class="mb-0">Cases — Last 7 Days</h5>
+        </div>
+        <div class="card-body">
+          <div class="chart-wrap">
+            <canvas id="casesTrend"></canvas>
+            <div class="skeleton chart-skel-cases"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-6">
+      <div class="card section chart-section shadow-sm h-100">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <h5 class="mb-0">Collections — Per Month</h5>
+          <span class="small text-muted">Current Year</span>
+        </div>
+        <div class="card-body">
+          <div class="chart-wrap">
+            <canvas id="collectionsPerMonth"></canvas>
+            <div class="skeleton chart-skel-status"></div>
+          </div>
+          <div class="legend-inline mt-3" id="collectionsLegend"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if dashboard_json %}
+    {{ dashboard_json|json_script:"captain-dash-data" }}
+  {% endif %}
+
+<script>
+(function(){
+  const css = getComputedStyle(document.documentElement);
+  const pick = k => (css.getPropertyValue(k)||'').trim();
+  const BRAND700 = pick('--brand-700') || '#6d2932';
+  const BRAND500 = pick('--brand-500') || '#561c24';
+  const BRAND300 = pick('--brand-300') || '#e8d8c4';
+  const NEU300 = pick('--neutral-300') || '#d1d5db';
+  const NEU500 = pick('--neutral-500') || '#6b7280';
+  const hide = sel => document.querySelector(sel)?.classList.add('hidden');
+  const show = sel => document.querySelector(sel)?.classList.remove('hidden');
+
+  const dashEl = document.getElementById('captain-dash-data');
+  const initialDash = dashEl ? JSON.parse(dashEl.textContent) : null;
+
+  function fmt(v){ return Math.round((v || 0) * 100) / 100; }
+
+  function niceNum(range, round){
+    const exp = Math.floor(Math.log10(range || 1));
+    const f = range / Math.pow(10, exp);
+    let nf;
+    if (round){
+      if (f < 1.5) nf = 1; else if (f < 3) nf = 2; else if (f < 7) nf = 5; else nf = 10;
+    } else {
+      if (f <= 1) nf = 1; else if (f <= 2) nf = 2; else if (f <= 5) nf = 5; else nf = 10;
+    }
+    return nf * Math.pow(10, exp);
+  }
+
+  function niceScale(min, max, tickCount=5){
+    let range = niceNum(max-min, false);
+    const step = niceNum(range/(tickCount-1), true);
+    const niceMin = Math.floor(min/step)*step;
+    const niceMax = Math.ceil(max/step)*step;
+    const ticks = [];
+    for (let v = niceMin; v <= niceMax + 1e-9; v += step) ticks.push(v);
+    return {niceMin,niceMax,step,ticks};
+  }
+
+  function drawNoData(ctx, W, H, title = 'No data', subtitle = '') {
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    ctx.font = '600 14px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif';
+    ctx.fillStyle = NEU500;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(title, W / 2, H / 2 - (subtitle ? 8 : 0));
+    if (subtitle) {
+      ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif';
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillText(subtitle, W / 2, H / 2 + 12);
+    }
+    ctx.restore();
+  }
+
+  // re-usable drawLine/drawBar from Treasurer with id adjustments
+  function drawLine(canvas, labels, series){
+    if(!canvas) return;
+    const dpr = devicePixelRatio||1;
+    canvas.width = canvas.clientWidth*dpr;
+    canvas.height = canvas.clientHeight*dpr;
+    const ctx = canvas.getContext('2d'); ctx.scale(dpr,dpr);
+
+    const m = {l:48,r:18,t:18,b:32};
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    const x0 = m.l, x1 = W-m.r, y0 = H-m.b, y1 = m.t;
+
+    const data = series.slice();
+    const minV = Math.min(...data, 0);
+    const maxV = Math.max(...data, 1);
+    const pad = (maxV-minV)*0.1 || 1;
+    const scale = niceScale(Math.max(minV-pad, 0), maxV+pad, 5);
+    const range = scale.niceMax - scale.niceMin;
+
+    const allZero = data.every(v => v === 0);
+    if (allZero) {
+      drawNoData(ctx, W, H, 'No cases', 'No data for the selected period');
+      return;
+    }
+
+    function render(){
+      ctx.clearRect(0,0,W,H);
+
+      ctx.font='12px system-ui, sans-serif';
+      ctx.textAlign='right'; ctx.textBaseline='middle'; ctx.fillStyle=NEU500; ctx.strokeStyle=NEU300;
+      scale.ticks.forEach(t=>{
+        const y = y0 - ((t-scale.niceMin)/range)*(y0-y1);
+        ctx.globalAlpha=0.6; ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x1,y); ctx.setLineDash([3,3]); ctx.stroke();
+        ctx.setLineDash([]); ctx.globalAlpha=1; ctx.fillText(fmt(t), x0-8, y);
+      });
+
+      ctx.textAlign='center'; ctx.textBaseline='top';
+      labels.forEach((lbl,i)=>{
+        const x = x0 + (x1-x0)*(i/(Math.max(labels.length-1,1)));
+        ctx.fillText(lbl, x, y0+8);
+      });
+
+      const pts = data.map((v,i)=>({
+        x: x0 + (x1-x0)*(i/(Math.max(labels.length-1,1))),
+        y: y0 - ((v - scale.niceMin)/range)*(y0-y1),
+        v
+      }));
+
+      const grad = ctx.createLinearGradient(0,y1,0,y0);
+      grad.addColorStop(0, BRAND300);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.moveTo(x0,y0);
+      pts.forEach(p=>ctx.lineTo(p.x,p.y));
+      ctx.lineTo(x1,y0); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
+
+      ctx.strokeStyle=BRAND700; ctx.lineWidth=2;
+      ctx.beginPath();
+      pts.forEach((p,i)=>{
+        if(i===0) ctx.moveTo(p.x,p.y);
+        else {
+          const prev = pts[i-1];
+          const cx = (prev.x+p.x)/2;
+          ctx.quadraticCurveTo(prev.x,prev.y,cx,p.y);
+        }
+      });
+      ctx.stroke();
+
+      const avg = data.reduce((a,b)=>a+b,0)/Math.max(data.length,1);
+      const yAvg = y0 - ((avg-scale.niceMin)/range)*(y0-y1);
+      ctx.save(); ctx.setLineDash([6,6]); ctx.strokeStyle=BRAND500; ctx.lineWidth=1.2;
+      ctx.beginPath(); ctx.moveTo(x0,yAvg); ctx.lineTo(x1,yAvg); ctx.stroke(); ctx.restore();
+
+      ctx.fillStyle=BRAND700;
+      pts.forEach(p=>{ ctx.beginPath(); ctx.arc(p.x,p.y,2.5,0,Math.PI*2); ctx.fill(); });
+
+      return pts;
+    }
+
+    const pts = render();
+
+    canvas.onmousemove = e=>{
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const closest = pts.reduce((prev,p)=>{
+        return Math.abs(p.x-mouseX) < Math.abs(prev.x-mouseX) ? p : prev;
+      }, pts[0]);
+
+      render();
+
+      ctx.font='10px sans-serif';
+      ctx.textAlign='center';
+      ctx.textBaseline='bottom';
+      ctx.fillStyle='black';
+      ctx.fillText(closest.v, closest.x, closest.y - 6);
+    };
+
+    canvas.onmouseleave = ()=> render();
+  }
+
+  function drawBar(canvas, labels, series){
+    if(!canvas) return;
+    const dpr = devicePixelRatio||1;
+    canvas.width = canvas.clientWidth*dpr;
+    canvas.height = canvas.clientHeight*dpr;
+    const ctx = canvas.getContext('2d'); ctx.scale(dpr,dpr);
+
+    const m = {l:44,r:18,t:28,b:44};
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    const x0 = m.l, x1 = W-m.r, y0 = H-m.b, y1 = m.t;
+    const n = Math.max(labels.length,1);
+    const data = series.slice();
+    const maxV = Math.max(...data,0);
+    const scale = niceScale(0,maxV||1,5);
+    const range = scale.niceMax - scale.niceMin;
+
+    const allZero = data.every(v => v === 0);
+    if (allZero) {
+      drawNoData(ctx, W, H, 'No registrations', 'No data for the selected period');
+      return;
+    }
+
+    ctx.clearRect(0,0,W,H);
+    ctx.font='12px system-ui, sans-serif'; ctx.textAlign='right'; ctx.textBaseline='middle'; ctx.fillStyle=NEU500; ctx.strokeStyle=NEU300;
+    scale.ticks.forEach(t=>{
+      const y = y0 - ((t-scale.niceMin)/range)*(y0-y1);
+      ctx.globalAlpha=0.6; ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x1,y); ctx.setLineDash([3,3]); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha=1; ctx.fillText(fmt(t), x0-8, y);
+    });
+
+    ctx.textAlign='center'; ctx.textBaseline='top';
+    const barSpace = (x1-x0)/n;
+    const barWidth = Math.max(12, barSpace*0.6);
+    labels.forEach((lbl,i)=>{
+      const cx = x0+barSpace*(i+0.5);
+      ctx.fillText(lbl,cx,y0+8);
+    });
+
+    const palette = [BRAND700, BRAND500, BRAND300, NEU300];
+    for(let i=0;i<n;i++){
+      const v=data[i]||0;
+      const cx=x0+barSpace*(i+0.5);
+      const h=(v/scale.niceMax)*(y0-y1);
+      ctx.fillStyle=palette[i%palette.length];
+      ctx.fillRect(cx-barWidth/2, y0-h, barWidth, h);
+    }
+
+    canvas.onmousemove = e => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const barSpace = (x1 - x0) / n;
+      const barWidth = Math.max(12, barSpace * 0.6);
+
+      const hoveredIndex = data.findIndex((v, i) => {
+        const cx = x0 + barSpace * (i + 0.5);
+        const h = (v / scale.niceMax) * (y0 - y1);
+        return mouseX >= cx - barWidth/2 && mouseX <= cx + barWidth/2 && mouseY >= y0 - h && mouseY <= y0;
+      });
+
+      drawBar(canvas, labels, series);
+
+      if(hoveredIndex !== -1){
+        const v = data[hoveredIndex];
+        const cx = x0 + barSpace * (hoveredIndex + 0.5);
+        const h = (v / scale.niceMax) * (y0 - y1);
+
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillStyle = 'black';
+        ctx.fillText(v, cx, y0 - h - 4);
+      }
+    };
+
+    canvas.onmouseleave = () => drawBar(canvas, labels, series);
+  }
+
+  function isNonEmptyObject(o){ return o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).length > 0; }
+
+  function renderKPIs(k){
+    if(!isNonEmptyObject(k)) return;
+    try{
+      if(k.pending_approvals!=null) document.getElementById('kpiPendingApprovals').textContent = fmt(k.pending_approvals);
+      if(k.pending_approvals_delta!=null) document.getElementById('kpiPendingApprovalsDelta').textContent = `+${fmt(k.pending_approvals_delta)} today`;
+      if(k.open_cases!=null) document.getElementById('kpiOpenCases').textContent = fmt(k.open_cases);
+      if(k.open_cases_delta!=null) document.getElementById('kpiOpenCasesDelta').textContent = `+${fmt(k.open_cases_delta)} this week`;
+      if(k.meetings_this_week!=null) document.getElementById('kpiMeetingsWeek').textContent = fmt(k.meetings_this_week);
+      if(k.meetings_this_week_delta!=null) document.getElementById('kpiMeetingsWeekDelta').textContent = `+${fmt(k.meetings_this_week_delta)} today`;
+      if(k.announcements_active!=null) document.getElementById('kpiAnnouncements').textContent = fmt(k.announcements_active);
+      if(k.announcements_updated_ago!=null) document.getElementById('kpiAnnouncementsDelta').textContent = `Updated ${k.announcements_updated_ago}`;
+    }catch(e){ console.warn('renderKPIs error', e); }
+  }
+
+  function renderCharts(dashJson){
+    const lineCanvas = document.getElementById('casesTrend');
+    const barCanvas = document.getElementById('registrationsPerMonth');
+    show('.chart-skel-cases'); show('.chart-skel-reg');
+    requestAnimationFrame(()=>{
+      const trend = dashJson?.casesTrend || { labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], data:[0,0,0,0,0,0,0] };
+      drawLine(lineCanvas, trend.labels, trend.data);
+      const perMonth = dashJson?.registrationsPerMonth || { labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], data:[0,0,0,0,0,0,0,0,0,0,0,0] };
+      drawBar(barCanvas, perMonth.labels, perMonth.data);
+      hide('.chart-skel-cases'); hide('.chart-skel-reg');
+    });
+  }
+
+  function renderAll(payload){
+    if(!payload) return;
+    if(isNonEmptyObject(payload.kpis)) renderKPIs(payload.kpis);
+    const dashJson = payload.dashboard_json || payload;
+    renderCharts(dashJson);
+  }
+
+  async function fetchAndRender(){
+    try{
+      const url = new URL("", window.location.origin);
+      show('.chart-skel-cases'); show('.chart-skel-reg');
+      const res = await fetch(url.toString(), { headers:{'X-Requested-With':'fetch'} });
+      const data = await res.json();
+      const payload = (data && (data.kpis || data.dashboard_json)) ? { kpis:data.kpis||{}, dashboard_json:data.dashboard_json||(data.kpis?{}:data) } : { kpis:{}, dashboard_json:{} };
+      renderAll(payload);
+    }catch(e){ console.error(e); } finally{ hide('.chart-skel-cases'); hide('.chart-skel-reg'); }
+  }
+
+  if(initialDash){
+    const top = initialDash.dashboard_json ? { kpis:initialDash.kpis||{}, dashboard_json:initialDash.dashboard_json||{} } : { kpis:initialDash.kpis||{}, dashboard_json:initialDash||{} };
+    renderAll(top);
+  } else { renderCharts({}); }
+
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') fetchAndRender(); });
+
+})();
+</script>
+</div>
+{% endblock %}

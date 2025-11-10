@@ -117,12 +117,13 @@ def _to_int_or_none(val) -> Optional[int]:
 @session_login_required
 @role_required(CAPTAIN_ROLE)
 def dashboard(request):
-    return render(request, "captain_dashboard.html", {
+    return render(request, "captain/dashboard.html", {
         'user_fullname' : user_fullname,
         'user_role' : user_role,
         'page_path' : f'{user_role} / Dashboard',
         'page_title' : 'Dashboard',
         'user_role_template' : user_role_template,
+        'today': datetime.now().strftime("%B %d, %Y"),
     })
 
 def _smart_redirect(request, url_name, *args, **kwargs):

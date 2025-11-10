@@ -509,20 +509,6 @@
 
     function isNonEmptyObject(o){ return o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).length > 0; }
 
-    function renderKPIs(k){
-      if(!isNonEmptyObject(k)) return;
-      try{
-        if(k.pending_payments!=null) document.getElementById('kpiPendingPayments').textContent = fmt(k.pending_payments);
-        if(k.pending_payments_delta!=null) document.getElementById('kpiPendingPaymentsDelta').textContent = `+${fmt(k.pending_payments_delta)} today`;
-        if(k.or_issued_this_week!=null) document.getElementById('kpiORIssued').textContent = fmt(k.or_issued_this_week);
-        if(k.or_issued_this_week_delta!=null) document.getElementById('kpiORIssuedDelta').textContent = `+${fmt(k.or_issued_this_week_delta)} today`;
-        if(k.collections_this_week!=null) document.getElementById('kpiCollectionsMonth').textContent = Number(k.collections_this_week).toLocaleString();
-        if(k.collections_this_week_delta!=null) document.getElementById('kpiCollectionsMonthDelta').textContent = `+${Number(k.collections_this_week_delta).toLocaleString()} today`;
-        if(k.collections_this_year!=null) document.getElementById('kpiCollectionsYear').textContent = Number(k.collections_this_year).toLocaleString();
-        if(k.collections_this_year_delta!=null) document.getElementById('kpiCollectionsYearDelta').textContent = `+${Number(k.collections_this_year_delta).toLocaleString()} this month`;
-      }catch(e){ console.warn('renderKPIs error', e); }
-    }
-
     function renderCharts(dashJson){
       const lineCanvas = document.getElementById('collectionsTrend');
       const barCanvas = document.getElementById('collectionsPerMonth');
@@ -538,7 +524,6 @@
 
     function renderAll(payload){
       if(!payload) return;
-      if(isNonEmptyObject(payload.kpis)) renderKPIs(payload.kpis);
       const dashJson = payload.dashboard_json || payload;
       renderCharts(dashJson);
     }

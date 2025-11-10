@@ -247,12 +247,13 @@ def _to_int_or_none(val) -> Optional[int]:
         return None
     
 def dashboard(request):
-    return render(request, "secretary_dashboard.html", {
+    return render(request, "secretary/dashboard.html", {
         'user_fullname' : user_fullname,
         'user_role' : user_role,
         'page_path' : f'{user_role} / Dashboard',
         'page_title' : 'Dashboard',
         'user_role_template' : user_role_template,
+        'today': datetime.now().strftime("%B %d, %Y"),
     })
 
 @session_login_required
