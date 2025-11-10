@@ -609,3 +609,108 @@ class TreasurerDashboardRepository:
                 f"Error executing query to fetch collections per month: {str(e)}",
                 code="COLLECTIONS_PER_MONTH"
             )
+
+class CaptainDashboardRepository:
+    def __init__(self, ctx: IConnectionAdapter):
+        self._ctx = ctx
+        self._clerk_repo = ClerkDashboardRepository(ctx)
+        self._treasurer_repo = TreasurerDashboardRepository(ctx)
+
+    def fetch_kpi_ongoing_cases(self) -> int:
+        query = """
+            SELECT COUNT(*) AS ongoing_cases
+            FROM public.blotter_case bc
+            JOIN public.settlement_status ss
+            ON bc.settlement_status_id = ss.settlement_status_id
+            WHERE ss.settlement_status_name = 'ONGOING';
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('ongoing_cases') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI ongoing cases: {str(e)}",
+                code="KPI_ONGOING_CASES"
+            )
+        
+    def fetch_kpi_sub_ongoing_cases(self) -> int:
+        query = """
+            SELECT COUNT(*) AS open_cases
+            FROM public.blotter_case bc
+            JOIN public.case_state cs
+            ON bc.case_state_id = cs.case_state_id
+            WHERE cs.case_state_name = 'OPEN';
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('ongoing_cases_sub') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI ongoing cases sub: {str(e)}",
+                code="KPI_SUB_ONGOING_CASES"
+            )
+
+    # Residents KPIs (from Clerk repo)
+    def fetch_kpi_total_residents(self) -> int:
+        return self._clerk_repo.fetch_kpi_total_residents()
+
+    def fetch_kpi_sub_total_residents(self) -> int:
+        return self._clerk_repo.fetch_kpi_sub_total_residents()
+
+    # Collections KPIs (from Treasurer repo)
+    def fetch_kpi_collections_this_week(self) -> float:
+        return self._treasurer_repo.fetch_kpi_collections_this_week()
+
+    def fetch_kpi_sub_collections_this_week(self) -> float:
+        return self._treasurer_repo.fetch_kpi_sub_collections_this_week()
+
+    def fetch_kpi_collections_this_year(self) -> float:
+        return self._treasurer_repo.fetch_kpi_collections_this_year()
+
+    def fetch_kpi_sub_collections_this_year(self) -> float:
+        return self._treasurer_repo.fetch_kpi_sub_collections_this_year()
+
+    def fetch_case_nature_counts(self) -> dict:
+        query = """
+            SELECT 
+                cn.case_name,
+                COUNT(bc.blotter_case_id) AS case_count
+            FROM public.case_nature cn
+            LEFT JOIN public.blotter_case bc
+                ON bc.case_nature_id = cn.case_nature_id
+            GROUP BY cn.case_name
+            ORDER BY case_count DESC;
+        """
+        try:
+            rows = self._ctx.execute_query(query)
+            if not rows:
+                return {}
+            result = {}
+            for r in rows:
+                if isinstance(r, dict):
+                    nature = r.get("case_name")
+                    cnt = int(r.get("case_count") or 0)
+                else:
+                    nature = r[0]
+                    cnt = int(r[1] or 0)
+                result[nature] = cnt
+            return result
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch case nature counts: {str(e)}",
+                code="CASE_NATURE_COUNTS"
+            )
+
+    # Collections per month chart (from Treasurer repo)
+    def fetch_collections_per_month(self) -> dict:
+        return self._treasurer_repo.fetch_collections_per_month()

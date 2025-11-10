@@ -257,26 +257,8 @@
 <script>
   (function(){
     const dashEl = document.getElementById('dash-data');
-    const initial = dashEl ? JSON.parse(dashEl.textContent) : null;
-    if (initial) ChartUtils.renderDashboardFromJSON(initial);
-    else {
-      // If you prefer static initial state or auto-fetch, call fetchAndRender (see live example above)
-      ChartUtils.renderDashboardFromJSON({});
-    }
-
-    // If you want the filters + refresh to fetch:
-    document.getElementById('rangeSel')?.addEventListener('change', function(){
-      document.getElementById('refreshBtn')?.click();
-    });
-    document.getElementById('refreshBtn')?.addEventListener('click', async ()=>{
-      const url = new URL("{% url 'treasurer:dashboard_api' %}", window.location.origin);
-      url.searchParams.set('range', document.getElementById('rangeSel')?.value || '7d');
-      try{
-        const res = await fetch(url.toString(), { headers:{ 'X-Requested-With':'fetch' }});
-        const data = await res.json();
-        ChartUtils.renderDashboardFromJSON(data);
-      }catch(e){ console.error(e); }
-    });
+    const parsed = dashEl ? JSON.parse(dashEl.textContent) : null;
+    ChartUtils.renderDashboardFromJSON(parsed || {});
   })();
 </script>
 

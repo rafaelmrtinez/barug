@@ -167,3 +167,103 @@ class TreasurerDashboardService:
             "kpis": kpis,
             "dashboard_json": dashboard_json
         }
+    
+class CaptainDashboardService:
+    def __init__(self, dashboard_repo):
+        self.repo = dashboard_repo
+
+    def _normalize_rows_to_labels_data(self, rows, label_col='month_label', value_col='total_amount_collected'):
+        """
+        Minimal normalizer similar to TreasurerDashboardService._normalize_rows_to_labels_data.
+        Accepts repo returns of several shapes and returns {"labels": [...], "data": [...]}.
+        """
+        if rows is None:
+            return {"labels": [], "data": []}
+
+        if isinstance(rows, dict) and 'labels' in rows and 'data' in rows:
+            return {"labels": list(rows['labels']), "data": [float(v or 0) for v in rows['data']]}
+
+        # If rows is a single dict/tuple -> wrap
+        if isinstance(rows, (dict, tuple)):
+            rows = [rows]
+
+        labels = []
+        data = []
+        try:
+            for r in rows:
+                if isinstance(r, dict):
+                    lbl = r.get(label_col)
+                    val = r.get(value_col)
+                else:
+                    # tuple-like: (label, value)
+                    try:
+                        lbl = r[0]
+                        val = r[1]
+                    except Exception:
+                        continue
+                labels.append(lbl)
+                try:
+                    data.append(float(val or 0))
+                except Exception:
+                    data.append(0.0)
+        except Exception:
+            return {"labels": [], "data": []}
+
+        return {"labels": labels, "data": data}
+
+    def get_dashboard_content(self) -> dict:
+        ongoing_cases = self.repo.fetch_kpi_ongoing_cases()
+        open_cases = self.repo.fetch_kpi_sub_ongoing_cases()
+
+        # Residents KPIs
+        total_residents = self.repo.fetch_kpi_total_residents()
+        new_residents_month = self.repo.fetch_kpi_sub_total_residents()
+
+        # Collections KPIs
+        collections_week = self.repo.fetch_kpi_collections_this_week()
+        collections_week_delta = self.repo.fetch_kpi_sub_collections_this_week()
+        collections_year = self.repo.fetch_kpi_collections_this_year()
+        collections_year_delta = self.repo.fetch_kpi_sub_collections_this_year()
+
+        kpis = {
+            "ongoing_cases": ongoing_cases,
+            "open_cases": open_cases,
+            "residents_total": total_residents,
+            "new_residents_month": new_residents_month,
+            "collections_this_week": collections_week,
+            "collections_this_week_delta": collections_week_delta,
+            "collections_this_year": collections_year,
+            "collections_this_year_delta": collections_year_delta,
+        }
+
+        # Collections per month chart (current year)
+        collections_per_month_raw = self.repo.fetch_collections_per_month()
+        collections_per_month = self._normalize_rows_to_labels_data(
+            collections_per_month_raw,
+            label_col='month_label',
+            value_col='total_amount_collected'
+        )
+
+        raw_case_nature_counts = self.repo.fetch_case_nature_counts()
+        case_nature = self._normalize_rows_to_labels_data(
+            [{"case_name": k, "case_count": v} for k, v in raw_case_nature_counts.items()],
+            label_col='case_name',
+            value_col='case_count'
+        )
+
+        dashboard_json = {
+            "collectionsPerMonth": {
+                "labels": collections_per_month.get("labels", []),
+                "data": collections_per_month.get("data", [])
+            },
+            "casesNature": {
+                "labels": case_nature.get("labels", []),
+                "data": case_nature.get("data", [])
+            }
+        }
+
+        return {
+            "kpis": kpis, 
+            "dashboard_json": dashboard_json
+        }
+    
