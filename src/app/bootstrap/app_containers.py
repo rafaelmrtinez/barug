@@ -63,10 +63,6 @@ from src.app.services.household_service import (
 class AppContainer(containers.DeclarativeContainer):
     """Application container for dependency injection."""
 
-    # wiring_config = containers.WiringConfiguration(
-    #     modules=["clerk.views.business"]   # 👈 THIS matches your file path
-    # )
-    
     config = providers.Configuration()
 
     infra = providers.DependenciesContainer()
