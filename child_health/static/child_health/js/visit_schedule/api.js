@@ -84,6 +84,8 @@
             }).then(async (resp) => {
                 if (resp.ok) {
                     showSuccess('Visit scheduled successfully (dummy).');
+                    // clear inputs
+                    form.reset();
                     try { const bm = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl); bm.hide(); } catch (e) { console.warn(e); }
                 } else {
                     let msg = 'Failed to schedule visit.';

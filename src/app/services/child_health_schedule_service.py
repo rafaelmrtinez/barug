@@ -9,11 +9,13 @@ import logging
 
 from src.app.transfer_objects.request.visit_schedule_request import VisitScheduleRequest
 from src.infra.repositories.child_health_record_repository import ChildHealthRecordRepository
+from src.app.contracts.child_health_schedule_service import IChildHealthScheduleService
+from child_health.utilities.text_normalizer import TextNormalizer
 
 logger = logging.getLogger(__name__)
 
 
-class ChildHealthScheduleService:
+class ChildHealthScheduleService(IChildHealthScheduleService):
     """Orchestrates creating visit schedules for child health records.
 
     The service is intentionally thin: it maps the DTO to repository
@@ -30,10 +32,11 @@ class ChildHealthScheduleService:
         the repository will be called with that text as the visit purpose.
         Returns repository result or None.
         """
-        # sanitize/normalize inputs minimally
-        purpose = (dto.visit_purpose or '').strip()
-        if purpose.lower() == 'other' and dto.visit_purpose_other:
-            purpose = dto.visit_purpose_other.strip()
+        # sanitize/normalize inputs using the TextNormalizer utility
+        purpose = TextNormalizer.normalize_text(dto.visit_purpose or '')
+        if purpose == 'other' and dto.visit_purpose_other:
+            # when user specified 'other', prefer the provided free-text
+            purpose = TextNormalizer.normalize_text(dto.visit_purpose_other)
 
         notes = (dto.visit_notes or '').strip() if dto.visit_notes is not None else None
 

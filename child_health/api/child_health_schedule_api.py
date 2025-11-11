@@ -9,8 +9,9 @@ from django.views.decorators.csrf import csrf_protect as csrf_required
 
 from authentication.guards import session_login_required, role_required
 from dependency_injector.wiring import inject, Provide
-from barug import containers as app
+from src.app.bootstrap.app_containers import AppContainer
 
+from src.app.contracts.child_health_schedule_service import IChildHealthScheduleService
 from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.exceptions.child_health_record_exception import ChildHealthRecordException
 from src.infra.repositories.child_health_record_repository import ChildHealthRecordRepository
@@ -39,19 +40,24 @@ class ChildHealthScheduleAPI(View):
     The created_by (staff_id) is derived from session: request.session.get('auth', {}).get('staff_id')
     """
 
-    def post(self, request: HttpRequest, *args, **kwargs):
-        # resolve repository provider (try DI container first, fall back to direct construction)
-        try:
-            if hasattr(app, 'infra') and hasattr(app.infra, 'child_health_record_repository'):
-                try:
-                    repo = app.infra.child_health_record_repository()
-                except Exception:
-                    repo = ChildHealthRecordRepository(ConnectionAdapter())
-            else:
-                repo = ChildHealthRecordRepository(ConnectionAdapter())
-        except Exception:
-            logger.exception('Error resolving child_health_record_repository provider')
-            return JsonResponse({'success': False, 'message': 'Unexpected server error.'}, status=500)
+    @inject
+    def post(self, request: HttpRequest, service: IChildHealthScheduleService = Provide[AppContainer.child_health_schedule_service], *args, **kwargs):
+        """Create a child visit schedule.
+
+        The repository is injected by the application container. If DI is not
+        configured at runtime the provider will raise and we will surface a
+        500 error the same way other API endpoints do.
+        """
+        # service is provided by DI container via the `service` parameter
+        repo = ChildHealthRecordRepository(ConnectionAdapter())
+
+        if service is None:
+            # fallback: construct repository + service directly
+            try:
+                service = ChildHealthScheduleService(repo)
+            except Exception:
+                logger.exception('Error resolving child_health_schedule_service provider')
+                return JsonResponse({'success': False, 'message': 'Unexpected server error.'}, status=500)
 
         try:
             payload = json.loads(request.body or '{}')
