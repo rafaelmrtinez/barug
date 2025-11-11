@@ -268,6 +268,27 @@ class ChildHealthRecordRepository(IChildHealthRecordRepository):
                 raise ChildHealthRecordException(e.message) from e
             raise e
 
+    def add_child_visit_schedule(self, p_child_record_id, p_schedule_date, p_schedule_time, p_created_by_id, p_visit_purpose, p_notes):
+        """Insert a child visit schedule row via stored procedure.
+
+        Expected params correspond to DB function add_child_visit_schedule(
+        child_record_id INT, schedule_date DATE, schedule_time TIME,
+        created_by_id INT, visit_purpose TEXT, notes TEXT)
+        """
+        sql = """SELECT * FROM add_child_visit_schedule(%s, %s, %s, %s, %s, %s);"""
+        params = [p_child_record_id, p_schedule_date, p_schedule_time, p_created_by_id, p_visit_purpose, p_notes]
+        print(f"add_child_visit_schedule params: {params}")
+        try:
+            result = self.ctx.execute_query(sql, params)
+            if not result:
+                return None
+            return result
+        except QueryExecutionException as e:
+            logger.error(f"Error inserting child visit schedule: {e}")
+            if ChildHealthRecordException.is_child_health_record_exception(e.code):
+                raise ChildHealthRecordException(e.message) from e
+            raise e
+
     def fetch_child_details_bf_display_by_chr_id(self, chr_id: int) -> dict | None:
         # Return up to 5 breastfeeding check rows for the child_record_id.
         # The caller expects up to 5 visit-associated check dates, ordered

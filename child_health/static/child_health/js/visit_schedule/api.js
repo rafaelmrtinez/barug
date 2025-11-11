@@ -6,7 +6,7 @@
 (function () {
     'use strict';
 
-    const DUMMY_URL = '/dummy/visit_schedule'; // replace with real URL when ready
+    const DUMMY_URL = '/child-health/api/v1/chr/schedule/'; // replace with real URL when ready
 
     function getCookie(name) {
         const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
