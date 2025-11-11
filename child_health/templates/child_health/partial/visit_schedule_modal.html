@@ -1,0 +1,50 @@
+{% load bootstrap_icons %}
+<div class="modal fade" id="visitScheduleModal" tabindex="-1" aria-labelledby="visitScheduleModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="visitScheduleForm" class="needs-validation" novalidate>
+        <div class="modal-header">
+          <h5 class="modal-title" id="visitScheduleModalLabel">Schedule Visit</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="child_record_id" id="visit_child_record_id" value="">
+
+          <div class="mb-3">
+            <label for="schedule_date" class="form-label">Schedule date</label>
+            <input type="date" class="form-control" id="schedule_date" name="schedule_date" required>
+            <div class="invalid-feedback">Please provide a valid date.</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="schedule_time" class="form-label">Schedule time</label>
+            <input type="time" class="form-control" id="schedule_time" name="schedule_time" required>
+            <div class="invalid-feedback">Please provide a valid time.</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="visit_purpose" class="form-label">Visit purpose</label>
+            <select id="visit_purpose" name="visit_purpose" class="form-select" required>
+              <option value="">Select purpose</option>
+              <option value="routine_check">Routine check</option>
+              <option value="immunization">Immunization</option>
+              <option value="follow_up">Follow up</option>
+              <option value="other">Other</option>
+            </select>
+            <div class="invalid-feedback">Please select a purpose.</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="visit_notes" class="form-label">Notes</label>
+            <textarea id="visit_notes" name="visit_notes" class="form-control" rows="3" maxlength="1000" placeholder="Optional notes (max 1000 chars)"></textarea>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-brand" id="visitScheduleSubmit">Save schedule</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

@@ -76,12 +76,17 @@
                                                             {% bs_icon 'folder2-open' extra_classes='me-1' %}Open
                                                         </a>
                                                     </li>
-                                                {% elif request.session.auth.role_name == "barangay health worker" %}
-                                                    <li>
-                                                        <button class="dropdown-item btn-generate-child-summary" data-child-id="{{ record.child_record_id }}" type="button">
-                                                            {% bs_icon 'file-earmark-pdf' extra_classes='me-1' %}Generate Child Health Report Summary
-                                                        </button>
-                                                    </li>
+                                                                        {% elif request.session.auth.role_name == "barangay health worker" %}
+                                                                            <li>
+                                                                                <button class="dropdown-item btn-generate-child-summary" data-child-id="{{ record.child_record_id }}" type="button">
+                                                                                    {% bs_icon 'file-earmark-pdf' extra_classes='me-1' %}Generate Child Health Report Summary
+                                                                                </button>
+                                                                            </li>
+                                                                            <li>
+                                                                                <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#visitScheduleModal" data-child-id="{{ record.child_record_id }}">
+                                                                                    {% bs_icon 'calendar3' extra_classes='me-1' %}Schedule Visit
+                                                                                </a>
+                                                                            </li>
                                                 {% else %}
                                                     <!-- Default for other roles: show Open -->
                                                     <li>
@@ -152,5 +157,10 @@
                 <script defer src="{% static 'maternal/js/mhr_toast.js' %}"></script>
                 <!-- Child report script -->
                 <script src="{% static 'child_health/js/generate_child_summary.js' %}"></script>
+                <!-- Visit schedule script -->
+                <script defer src="{% static 'child_health/js/visit_schedule.js' %}"></script>
+
+                {# Include modal partial for scheduling visits #}
+                {% include 'child_health/partial/visit_schedule_modal.html' %}
 
 {% endblock %}
