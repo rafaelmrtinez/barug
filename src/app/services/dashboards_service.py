@@ -266,4 +266,94 @@ class CaptainDashboardService:
             "kpis": kpis, 
             "dashboard_json": dashboard_json
         }
-    
+
+class SecretaryDashboardService:
+    def __init__(self, dashboard_repo):
+        self.repo = dashboard_repo
+
+    def _normalize_rows_to_labels_data(self, rows, label_col='month_label', value_col='total_amount_collected'):
+        if rows is None:
+            return {"labels": [], "data": []}
+
+        if isinstance(rows, dict) and 'labels' in rows and 'data' in rows:
+            return {"labels": list(rows['labels']), "data": [float(v or 0) for v in rows['data']]}
+
+        # If rows is a single dict/tuple -> wrap
+        if isinstance(rows, (dict, tuple)):
+            rows = [rows]
+
+        labels = []
+        data = []
+        try:
+            for r in rows:
+                if isinstance(r, dict):
+                    lbl = r.get(label_col)
+                    val = r.get(value_col)
+                else:
+                    # tuple-like: (label, value)
+                    try:
+                        lbl = r[0]
+                        val = r[1]
+                    except Exception:
+                        continue
+                labels.append(lbl)
+                try:
+                    data.append(float(val or 0))
+                except Exception:
+                    data.append(0.0)
+        except Exception:
+            return {"labels": [], "data": []}
+
+        return {"labels": labels, "data": data}
+
+
+    def get_dashboard_content(self) -> dict:
+        ongoing_cases = self.repo.fetch_kpi_ongoing_cases()
+        open_cases = self.repo.fetch_kpi_sub_ongoing_cases()
+
+        active_businesses = self.repo.fetch_kpi_active_biz()
+        new_businesses_week = self.repo.fetch_kpi_sub_active_biz()
+
+        demographic_households = self.repo.fetch_kpi_demographics()
+        demographic_families = self.repo.fetch_kpi_sub_demographics()
+
+        total_residents = self.repo.fetch_kpi_total_residents()
+        new_residents_month = self.repo.fetch_kpi_sub_total_residents()
+
+        kpis = {
+            "ongoing_cases": ongoing_cases,
+            "open_cases": open_cases,
+            "active_businesses": active_businesses,
+            "new_businesses_week": new_businesses_week,
+            "household_total": demographic_households,
+            "families_total": demographic_families,
+            "residents_total": total_residents,
+            "new_residents_month": new_residents_month,
+        }
+
+        raw_case_nature_counts = self.repo.fetch_case_nature_counts()
+        case_nature = self._normalize_rows_to_labels_data(
+            [{"case_name": k, "case_count": v} for k, v in raw_case_nature_counts.items()],
+            label_col='case_name',
+            value_col='case_count'
+        )
+
+        biz_status_counts = self.repo.fetch_biz_status_counts() 
+        status_labels = ["ACTIVE", "PENDING", "CLOSED", "EXPIRED"]
+        status_data = [biz_status_counts.get(s, 0) for s in status_labels]
+
+        dashboard_json = {
+            "casesNature": {
+                "labels": case_nature.get("labels", []),
+                "data": case_nature.get("data", [])
+            },
+            "statusBreakdown": {
+                "labels": status_labels,
+                "data": status_data
+            },
+        }
+
+        return {
+            "kpis": kpis,
+            "dashboard_json": dashboard_json,
+        }

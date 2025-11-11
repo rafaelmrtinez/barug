@@ -58,6 +58,7 @@ from src.infra.repositories.dashboards_repository import (
     ClerkDashboardRepository,
     TreasurerDashboardRepository,
     CaptainDashboardRepository,
+    SecretaryDashboardRepository,
 )
 
 
@@ -210,5 +211,10 @@ class InfraContainer(containers.DeclarativeContainer):
 
     captain_dashboard_repository: providers.Factory[CaptainDashboardRepository] = providers.Factory(
         CaptainDashboardRepository,
+        ctx=context,
+    )
+
+    secretary_dashboard_repository: providers.Factory[SecretaryDashboardRepository] = providers.Factory(
+        SecretaryDashboardRepository,
         ctx=context,
     )

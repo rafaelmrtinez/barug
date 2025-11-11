@@ -714,3 +714,73 @@ class CaptainDashboardRepository:
     # Collections per month chart (from Treasurer repo)
     def fetch_collections_per_month(self) -> dict:
         return self._treasurer_repo.fetch_collections_per_month()
+
+class SecretaryDashboardRepository:
+    def __init__(self, ctx: IConnectionAdapter):
+        self._ctx = ctx
+        self._captain_repo = CaptainDashboardRepository(ctx)
+        self._clerk_repo = ClerkDashboardRepository(ctx)
+
+    def fetch_kpi_ongoing_cases(self) -> int:
+        return self._captain_repo.fetch_kpi_ongoing_cases()
+    
+    def fetch_kpi_sub_ongoing_cases(self) -> int:
+        return self._captain_repo.fetch_kpi_sub_ongoing_cases()
+    
+    def fetch_kpi_active_biz(self) -> int:
+        return self._clerk_repo.fetch_kpi_active_biz()
+    
+    def fetch_kpi_sub_active_biz(self) -> int:
+        return self._clerk_repo.fetch_kpi_sub_active_biz()
+
+    def fetch_kpi_demographics(self) -> int:
+        query = """
+            SELECT COUNT(*) AS active_household_count
+            FROM public.household_info
+            WHERE COALESCE(is_active, FALSE) = TRUE;
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('kpi_demographics') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI demographics: {str(e)}",
+                code="KPI_DEMOGRAPHICS"
+            )
+
+    def fetch_kpi_sub_demographics(self) -> int:
+        query = """
+            SELECT COUNT(*) AS active_family_count
+            FROM public.family_unit
+            WHERE COALESCE(is_active, FALSE) = TRUE;
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('kpi__sub_demographics') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI SUB demographics: {str(e)}",
+                code="KPI__SUB_DEMOGRAPHICS"
+            )
+    
+    def fetch_kpi_total_residents(self) -> int:
+        return self._clerk_repo.fetch_kpi_total_residents()
+    
+    def fetch_kpi_sub_total_residents(self) -> int:
+        return self._clerk_repo.fetch_kpi_sub_total_residents()
+    
+    def fetch_case_nature_counts(self) -> dict:
+        return self._captain_repo.fetch_case_nature_counts()
+    
+    def fetch_biz_status_counts(self) -> dict:
+        return self._clerk_repo.fetch_biz_status_counts()
