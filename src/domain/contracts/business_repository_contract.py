@@ -129,3 +129,19 @@ class IBusinessRenewalRequestRepository(ABC):
     def request_renewal(self, cmd: CreateRenewalRequestCmd) -> int:
         """Calls public.create_renewal_request(...) and returns renewal_request_id."""
         pass
+    
+    @abstractmethod
+    def request_unpaid(self, cmd: CreateRenewalRequestCmd) -> list[int]:
+        """Calls public.create_renewal_requests_for_unpaid_h(...) and returns a list of renewal_request_id."""
+        pass
+
+class IBusinessClosurePaymentRequestRepository(ABC):
+    @abstractmethod
+    def request_payment(self, cmd: CreateRenewalRequestCmd) -> int:
+        """Calls public.create_closure_payment_request_h(...)"""
+        pass
+
+    @abstractmethod
+    def request_unpaid(self, cmd: CreateRenewalRequestCmd) -> list[int]:
+        """Calls public.create_closure_payment_requests_for_unpaid_h(...)"""
+        pass

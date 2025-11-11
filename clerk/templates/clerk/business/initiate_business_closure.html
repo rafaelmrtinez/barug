@@ -116,9 +116,9 @@
       </div>
       {% if has_dues %}
         <div class="mt-2 mt-md-0">
-          <a href=""
-             class="btn btn-outline-brand">
-            Create Renewal Request to Pay Dues
+          <a href="{% url 'clerk:create_closure_payment_request' b_id=business.business_id %}"
+            class="btn btn-outline-brand">
+            Create Payment Request for Closure
           </a>
         </div>
       {% endif %}

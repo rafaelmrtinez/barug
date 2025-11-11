@@ -37,4 +37,8 @@ urlpatterns = [
 
     path("api/staff/search/", views.staff_search_api, name="staff_search_api"),
     path("api/staff/filter/", views.staff_filter_api, name="staff_filter_api"),
+
+    # ANNOUNCEMENT
+    path("announcement/create_draft/", views.annoucement_draf, name="announcement_draft"),
+    path("announcement/draft_list/", views.announcement_draft_list, name="announcement_draft_list"),
 ]
