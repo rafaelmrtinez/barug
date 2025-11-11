@@ -26,6 +26,13 @@
                     </div>
                 </form>
 
+                {% comment %} Show total matches when a query is present {% endcomment %}
+                {% if request.GET.q %}
+                    <div class="align-self-center ms-3">
+                        <small class="text-muted">{{ total_matches|default:"0" }} matches</small>
+                    </div>
+                {% endif %}
+
                 {% if request.session.auth.role_name == "barangay health worker" %}
                     <button type="button"
                             class="btn btn-brand d-flex align-items-center justify-content-center px-3"
@@ -90,7 +97,13 @@
                             {% endfor %}
                         {% else %}
                             <tr>
-                                <td colspan="6" class="text-center text-muted">No records found.</td>
+                                <td colspan="6" class="text-center text-muted">
+                                    {% if request.GET.q %}
+                                        No results for "{{ request.GET.q }}" ({{ total_matches|default:0 }} matches).
+                                    {% else %}
+                                        No records found.
+                                    {% endif %}
+                                </td>
                             </tr>
                         {% endif %}
                     </tbody>

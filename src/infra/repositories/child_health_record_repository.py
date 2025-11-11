@@ -412,6 +412,85 @@ class ChildHealthRecordRepository(IChildHealthRecordRepository):
         """
         return self.ctx.execute_query_to_dict(sql, [])
 
+    def count_basic_chr_record_search(self, q: str) -> int:
+        """Return the total count of child records matching the search query.
+
+        Matches against child full name, mother name, father name, or family number.
+        Uses ILIKE for case-insensitive partial matching.
+        """
+        pattern = f"%{q}%"
+        sql = """
+            SELECT COUNT(1) AS total
+            FROM child_health_record AS c
+            LEFT JOIN person pc ON pc.person_id = c.person_id
+            LEFT JOIN person pm ON pm.person_id = c.mother_id
+            LEFT JOIN person pf ON pf.person_id = c.father_id
+            LEFT JOIN family_unit fu ON fu.family_id = c.family_id
+            LEFT JOIN addresss a ON a.address_id = pc.address_id
+            LEFT JOIN purok_sitio ps ON ps.purok_sitio_id = a.purok_sitio_id
+            WHERE (
+                (pc.first_name || ' ' || COALESCE(SUBSTRING(pc.middle_name FROM 1 FOR 1) || '. ', '') || pc.last_name) ILIKE %s
+                OR (pm.first_name || ' ' || COALESCE(SUBSTRING(pm.middle_name FROM 1 FOR 1) || '. ', '') || pm.last_name) ILIKE %s
+                OR (pf.first_name || ' ' || COALESCE(SUBSTRING(pf.middle_name FROM 1 FOR 1) || '. ', '') || pf.last_name) ILIKE %s
+                OR (COALESCE(fu.family_num::text, '')) ILIKE %s
+                OR (TRIM(BOTH ', ' FROM CONCAT_WS(', ', NULLIF(a.street, ''), NULLIF(ps.purok_sitio_name, ''), NULLIF(a.barangay, ''), NULLIF(a.city, '')))) ILIKE %s
+                OR (COALESCE(fu.ufc_num::text, '')) ILIKE %s
+            );
+        """
+        params = [pattern, pattern, pattern, pattern, pattern, pattern]
+        result = self.ctx.execute_query_to_dict(sql, params)
+        if not result:
+            return 0
+        try:
+            return int(result[0].get('total') or 0)
+        except Exception:
+            return 0
+
+    def fetch_basic_chr_record_search(self, q: str, limit: int, offset: int):
+        """Return a page (list) of matching child records using limit/offset.
+
+        Reuses the same selected columns as fetch_all_basic_chr_record but adds
+        a WHERE clause for search and applies ORDER BY, LIMIT and OFFSET.
+        """
+        pattern = f"%{q}%"
+        sql = """
+            SELECT
+                c.child_record_id,
+                c.person_id                                  AS child_id,
+                (pc.first_name
+                    || ' ' || COALESCE(SUBSTRING(pc.middle_name FROM 1 FOR 1) || '. ', '')
+                    || pc.last_name)                          AS child_full_name,
+                c.mother_id,
+                (pm.first_name
+                    || ' ' || COALESCE(SUBSTRING(pm.middle_name FROM 1 FOR 1) || '. ', '')
+                    || pm.last_name)                          AS mother_full_name,
+                c.father_id,
+                (pf.first_name
+                    || ' ' || COALESCE(SUBSTRING(pf.middle_name FROM 1 FOR 1) || '. ', '')
+                    || pf.last_name)                          AS father_full_name,
+                fu.family_num,
+                c.created_at                                 AS record_created_at
+            FROM child_health_record AS c
+            LEFT JOIN person       AS pc ON pc.person_id = c.person_id
+            LEFT JOIN person       AS pm ON pm.person_id = c.mother_id
+            LEFT JOIN person       AS pf ON pf.person_id = c.father_id
+            LEFT JOIN family_unit  AS fu ON fu.family_id = c.family_id
+            LEFT JOIN addresss a ON a.address_id = pc.address_id
+            LEFT JOIN purok_sitio ps ON ps.purok_sitio_id = a.purok_sitio_id
+            WHERE (
+                (pc.first_name || ' ' || COALESCE(SUBSTRING(pc.middle_name FROM 1 FOR 1) || '. ', '') || pc.last_name) ILIKE %s
+                OR (pm.first_name || ' ' || COALESCE(SUBSTRING(pm.middle_name FROM 1 FOR 1) || '. ', '') || pm.last_name) ILIKE %s
+                OR (pf.first_name || ' ' || COALESCE(SUBSTRING(pf.middle_name FROM 1 FOR 1) || '. ', '') || pf.last_name) ILIKE %s
+                OR (COALESCE(fu.family_num::text, '')) ILIKE %s
+                OR (TRIM(BOTH ', ' FROM CONCAT_WS(', ', NULLIF(a.street, ''), NULLIF(ps.purok_sitio_name, ''), NULLIF(a.barangay, ''), NULLIF(a.city, '')))) ILIKE %s
+                OR (COALESCE(fu.ufc_num::text, '')) ILIKE %s
+            )
+            ORDER BY c.created_at DESC, c.child_record_id DESC
+            LIMIT %s OFFSET %s;
+        """
+        params = [pattern, pattern, pattern, pattern, pattern, pattern, limit, offset]
+        return self.ctx.execute_query_to_dict(sql, params) or []
+
     def insert_chr_record(self, p_staff_id, p_person_id, p_birth_order, p_delivery_place_type_id):
         try:
             sql = """SELECT * FROM create_child_health_record(%s, %s, %s, %s);"""
