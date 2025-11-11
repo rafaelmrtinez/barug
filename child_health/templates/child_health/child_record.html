@@ -153,14 +153,15 @@
         </div>
     </div>
 </div>
-                <!-- Toast utility (used by generator) -->
-                <script defer src="{% static 'maternal/js/mhr_toast.js' %}"></script>
-                <!-- Child report script -->
-                <script src="{% static 'child_health/js/generate_child_summary.js' %}"></script>
-                <!-- Visit schedule script -->
-                <script defer src="{% static 'child_health/js/visit_schedule.js' %}"></script>
+<!-- Toast utility (used by generator) -->
+<script defer src="{% static 'maternal/js/mhr_toast.js' %}"></script>
+<!-- Child report script -->
+<script src="{% static 'child_health/js/generate_child_summary.js' %}"></script>
+<!-- Visit schedule scripts (UI + API) -->
+<script defer src="{% static 'child_health/js/visit_schedule/ui.js' %}"></script>
+<script defer src="{% static 'child_health/js/visit_schedule/api.js' %}"></script>
 
-                {# Include modal partial for scheduling visits #}
-                {% include 'child_health/partial/visit_schedule_modal.html' %}
+{# Include modal partial for scheduling visits #}
+{% include 'child_health/partial/visit_schedule_modal.html' %}
 
 {% endblock %}
