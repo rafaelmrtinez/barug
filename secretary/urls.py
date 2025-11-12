@@ -43,7 +43,7 @@ urlpatterns = [
 
     # APIs: staff
     path("api/staff/search/", views.staff_search_api, name="staff_search_api"),
-    path("api/staff/filter/", views.staff_filter_api, name="staff_filter_api"),
+    # path("api/staff/filter/", views.staff_filter_api, name="staff_filter_api"),
 
     # ANNOUNCEMENT
     path("announcement/create_draft/", views.annoucement_draf, name="announcement_draft"),
