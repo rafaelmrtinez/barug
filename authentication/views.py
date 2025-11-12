@@ -9,8 +9,9 @@ from django.core.cache import cache
 from django.db import DatabaseError
 from django.urls import reverse
 
-from .forms import LoginForm, ForgotPasswordForm, NewPasswordForm
+from .forms import LoginForm, ForgotPasswordForm, NewPasswordForm, ChangePasswordForm, VerificationCodeForm
 from .db import call_staff_login
+
 
 logger = logging.getLogger(__name__)  # << use module logger
 
@@ -59,7 +60,7 @@ def _role_home(role_name: str) -> str:
     if is_bhw:              return "bhw:dashboard"
     if is_midwife:          return "midwife:dashboard"
     if is_treas:            return "treasurer:queue"
-    if is_secy:             return "secretary:staff_selection"
+    if is_secy:             return "secretary:dashboard"
     if is_nurse:            return "nurse:dashboard"
     if is_admin:            return "staff_admin:dashboard"     # << NEW
     if is_super_admin:      return "metrics:health_check"
@@ -284,3 +285,441 @@ def unauthorized(request):
         },
         status=403,
     )
+
+
+
+@staff_login_required
+def account_settings(request):
+    from .models import Authentication
+    import os
+    from django.conf import settings
+    from supabase import create_client
+    from django.db import DatabaseError, OperationalError, IntegrityError
+    from common.flash import flash_success, flash_system_error, flash_db_error
+    
+    auth = request.session.get("auth", {})
+    staff_id = auth.get('staff_id')
+    
+    if not staff_id:
+        messages.error(request, "Staff ID not found in session.", extra_tags="auth")
+        return redirect("authentication:login")
+    
+    # Handle sending verification code
+    if request.method == 'POST' and request.POST.get('form_type') == 'send_code':
+        import secrets
+        import string
+        from common.send_email import send_email
+        from django.http import JsonResponse
+        
+        try:
+            # Verify current password first
+            current_password = request.POST.get('current_password', '').strip()
+            if not current_password:
+                return JsonResponse({'success': False, 'error': 'Current password is required'})
+            
+            # Check if current password is correct
+            is_valid = Authentication.check_staff_current_password(staff_id, current_password)
+            if not is_valid:
+                return JsonResponse({'success': False, 'error': 'Current password is incorrect'})
+            
+            # Generate 6-digit code
+            code = ''.join(secrets.choice(string.digits) for _ in range(6))
+            
+            # Store code in session with expiry
+            from django.utils import timezone as tz
+            request.session['verification_code'] = code
+            request.session['verification_code_expiry'] = (tz.now() + tz.timedelta(minutes=5)).isoformat()
+            
+            # Get user email
+            profile = Authentication.get_staff_profile_by_id(staff_id)
+            email = profile.get('email_address')
+            
+            if not email:
+                return JsonResponse({'success': False, 'error': 'No email address found'})
+            
+            # Send email
+            subject = 'Password Change Verification Code'
+            body_text = f'Your verification code is: {code}\n\nThis code will expire in 5 minutes.'
+            body_html = f'''
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Password Change Verification</h2>
+                <p>Your verification code is:</p>
+                <div style="background: #f8f9fa; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+                    <h1 style="color: #dc3545; font-size: 32px; margin: 0; letter-spacing: 8px;">{code}</h1>
+                </div>
+                <p style="color: #666;">This code will expire in 5 minutes.</p>
+                <p style="color: #666;">If you did not request this code, please ignore this email.</p>
+            </div>
+            '''
+            
+            resp = send_email(
+                subject=subject,
+                to=[email],
+                body_text=body_text,
+                body_html=body_html,
+                from_name="Barangay Sto. Niño",
+                fail_silently=False
+            )
+            
+            if getattr(resp, 'ok', False):
+                return JsonResponse({'success': True})
+            else:
+                return JsonResponse({'success': False, 'error': 'Failed to send verification email. Please check your email address or try again later.'})
+                
+        except Exception as e:
+            logger.error(f"Error sending verification code: {str(e)}", exc_info=True)
+            return JsonResponse({'success': False, 'error': 'Failed to send verification email. Please check your email address or try again later.'})
+    
+    # Handle resend verification code
+    if request.method == 'POST' and request.POST.get('form_type') == 'resend_code':
+        import secrets
+        import string
+        from common.send_email import send_email
+        from django.http import JsonResponse
+        
+        try:
+            # Generate new 6-digit code
+            code = ''.join(secrets.choice(string.digits) for _ in range(6))
+            
+            # Store code in session with expiry
+            from django.utils import timezone as tz
+            request.session['verification_code'] = code
+            request.session['verification_code_expiry'] = (tz.now() + tz.timedelta(minutes=5)).isoformat()
+            
+            # Get user email
+            profile = Authentication.get_staff_profile_by_id(staff_id)
+            email = profile.get('email_address')
+            
+            if not email:
+                return JsonResponse({'success': False, 'error': 'No email address found'})
+            
+            # Send email
+            subject = 'Password Change Verification Code'
+            body_text = f'Your verification code is: {code}\n\nThis code will expire in 5 minutes.'
+            body_html = f'''
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Password Change Verification</h2>
+                <p>Your verification code is:</p>
+                <div style="background: #f8f9fa; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+                    <h1 style="color: #dc3545; font-size: 32px; margin: 0; letter-spacing: 8px;">{code}</h1>
+                </div>
+                <p style="color: #666;">This code will expire in 5 minutes.</p>
+                <p style="color: #666;">If you did not request this code, please ignore this email.</p>
+            </div>
+            '''
+            
+            resp = send_email(
+                subject=subject,
+                to=[email],
+                body_text=body_text,
+                body_html=body_html,
+                from_name="Barangay Sto. Niño",
+                fail_silently=False
+            )
+            
+            if getattr(resp, 'ok', False):
+                return JsonResponse({'success': True})
+            else:
+                return JsonResponse({'success': False, 'error': 'Failed to resend verification email. Please try again later.'})
+                
+        except Exception as e:
+            logger.error(f"Error resending verification code: {str(e)}", exc_info=True)
+            return JsonResponse({'success': False, 'error': 'Failed to resend verification email. Please try again later.'})
+    
+    # Handle code verification and password change
+    if request.method == 'POST' and request.POST.get('form_type') == 'verify_change_password':
+        from django.http import JsonResponse
+        from datetime import datetime
+        
+        try:
+            code = request.POST.get('code', '').strip()
+            current_password = request.POST.get('current_password', '').strip()
+            new_password = request.POST.get('new_password', '').strip()
+            confirm_password = request.POST.get('confirm_password', '').strip()
+            
+            # Rate limit verification attempts
+            verify_key = f"verify_attempts:{staff_id}"
+            attempts = cache.get(verify_key, 0)
+            if attempts >= 3:
+                return JsonResponse({'success': False, 'error': 'Too many verification attempts. Please request a new code.'})
+            
+            # Increment attempt counter
+            cache.set(verify_key, attempts + 1, 300)  # 5 minutes
+            
+            print(f"SERVER DEBUG: new='{new_password}', confirm='{confirm_password}', match={new_password == confirm_password}")
+            
+            # Debug logging
+            logger.debug(f"Password change attempt - new_password length: {len(new_password)}, confirm_password length: {len(confirm_password)}, match: {new_password == confirm_password}")
+            
+            # Verify code
+            stored_code = request.session.get('verification_code')
+            expiry_str = request.session.get('verification_code_expiry')
+            
+            if not stored_code or not expiry_str:
+                return JsonResponse({'success': False, 'error': 'No verification code found. Please request a new code.'})
+            
+            # Check expiry
+            from django.utils import timezone as tz
+            try:
+                expiry_time = datetime.fromisoformat(expiry_str.replace('Z', '+00:00'))
+                if not expiry_time.tzinfo:
+                    expiry_time = tz.make_aware(expiry_time)
+            except ValueError:
+                expiry_time = tz.now() - tz.timedelta(minutes=1)  # Force expired
+            
+            if tz.now() > expiry_time:
+                # Clear expired code from session
+                request.session.pop('verification_code', None)
+                request.session.pop('verification_code_expiry', None)
+                return JsonResponse({'success': False, 'error': 'Verification code has expired. Please request a new code.'})
+            
+            # Check code match
+            if code != stored_code:
+                return JsonResponse({'success': False, 'error': 'Invalid verification code. Please try again.'})
+            
+            # TOCTOU protection: Re-verify current password right before changing
+            if not Authentication.check_staff_current_password(staff_id, current_password):
+                return JsonResponse({'success': False, 'error': 'Current password verification failed. Please try again.'})
+            
+            # Change password
+            success = Authentication.change_staff_password(staff_id, new_password, confirm_password)
+            
+            if success:
+                # Clear verification code from session and rate limit counter
+                request.session.pop('verification_code', None)
+                request.session.pop('verification_code_expiry', None)
+                cache.delete(verify_key)  # Clear verification attempts
+                
+                # Send password change notification email
+                try:
+                    profile = Authentication.get_staff_profile_by_id(staff_id)
+                    email = profile.get('email_address')
+                    user_name = f"{profile.get('first_name', '')} {profile.get('last_name', '')}".strip()
+                    
+                    if email:
+                        from common.send_email import send_email
+                        from django.utils import timezone
+                        import pytz
+                        
+                        # Get Philippines timezone
+                        ph_tz = pytz.timezone('Asia/Manila')
+                        ph_time = timezone.now().astimezone(ph_tz)
+                        
+                        subject = 'Password Changed Successfully'
+                        body_text = f'Hello {user_name},\n\nYour password has been successfully changed on {ph_time.strftime("%B %d, %Y at %I:%M %p")}.\n\nIf you did not make this change, please contact your administrator immediately.\n\nBest regards,\nBarangay Sto. Niño'
+                        body_html = f'''
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                            <h2 style="color: #333;">Password Changed Successfully</h2>
+                            <p>Hello {user_name},</p>
+                            <p>Your password has been successfully changed on <strong>{ph_time.strftime("%B %d, %Y at %I:%M %p")}</strong>.</p>
+                            <div style="background: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #28a745;">
+                                <p style="margin: 0; color: #155724;"><strong>Security Notice:</strong> If you did not make this change, please contact your administrator immediately.</p>
+                            </div>
+                            <p>Best regards,<br>Barangay Sto. Niño</p>
+                        </div>
+                        '''
+                        
+                        send_email(
+                            subject=subject,
+                            to=[email],
+                            body_text=body_text,
+                            body_html=body_html,
+                            from_name="Barangay Sto. Niño",
+                            fail_silently=True
+                        )
+                except Exception as e:
+                    logger.error(f"Failed to send password change notification: {str(e)}", exc_info=True)
+                
+                return JsonResponse({'success': True, 'message': 'Password changed successfully!'})
+            else:
+                return JsonResponse({'success': False, 'error': 'Failed to change password.'})
+                
+        except (DatabaseError, OperationalError, IntegrityError) as e:
+            from common.flash import _extract_psycopg_diag
+            logger.error(f"Database error changing password: {str(e)}", exc_info=True)
+            pgcode, primary = _extract_psycopg_diag(e)
+            error_msg = primary if primary else 'Database error occurred while changing password. Please try again.'
+            return JsonResponse({'success': False, 'error': error_msg})
+        except Exception as e:
+            logger.error(f"Error changing password: {str(e)}", exc_info=True)
+            return JsonResponse({'success': False, 'error': 'An error occurred while changing password. Please try again.'})
+    
+    # Handle clearing verification code
+    if request.method == 'POST' and request.POST.get('form_type') == 'clear_code':
+        from django.http import JsonResponse
+        
+        try:
+            # Clear verification code from session
+            request.session.pop('verification_code', None)
+            request.session.pop('verification_code_expiry', None)
+            return JsonResponse({'success': True})
+        except Exception:
+            return JsonResponse({'success': False})
+    
+    # Handle profile photo upload
+    if request.method == 'POST' and 'staff_img' in request.FILES:
+        from django.http import JsonResponse
+        
+        try:
+            profile = Authentication.get_staff_profile_by_id(staff_id)
+            if not profile:
+                return JsonResponse({'success': False, 'error': 'Profile not found'})
+            
+            uploaded_file = request.FILES['staff_img']
+            
+            # Generate folder key from personal data
+            import re
+            from datetime import datetime as _dt
+            from io import BytesIO
+            
+            def _prep_image_for_upload(file_obj, *, max_w=2200, max_h=2200):
+                try:
+                    from PIL import Image, ImageOps
+                    file_obj.seek(0)
+                    img = Image.open(file_obj)
+                    img = ImageOps.exif_transpose(img)
+                    img.thumbnail((max_w, max_h))
+                    has_alpha = (img.mode in ("RGBA", "LA")) or ("transparency" in img.info)
+                    if has_alpha:
+                        if img.mode not in ("RGBA", "LA"):
+                            img = img.convert("RGBA")
+                        buf = BytesIO()
+                        img.save(buf, format="PNG", optimize=True)
+                        buf.seek(0)
+                        return buf, "image/png", "png"
+                    else:
+                        if img.mode not in ("RGB", "L"):
+                            img = img.convert("RGB")
+                        buf = BytesIO()
+                        img.save(buf, format="JPEG", quality=85, optimize=True)
+                        buf.seek(0)
+                        return buf, "image/jpeg", "jpg"
+                except Exception:
+                    try:
+                        file_obj.seek(0)
+                    except Exception:
+                        pass
+                    return file_obj, getattr(file_obj, "content_type", "application/octet-stream"), "jpg"
+            
+            def _key_from_personal(personal: dict) -> str:
+                last  = (personal.get("last_name")   or "").strip()
+                first = (personal.get("first_name")  or "").strip()
+                mid   = (personal.get("middle_name") or "").strip()
+                initials = (last[:1] + first[:1] + mid[:1]).lower()
+                b = personal.get("birth_date")
+                b_dt = None
+                if isinstance(b, str) and b:
+                    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"):
+                        try:
+                            b_dt = _dt.strptime(b, fmt).date()
+                            break
+                        except Exception:
+                            pass
+                b_str = b_dt.strftime("%m%d%Y") if b_dt else ""
+                mobile_raw = (personal.get("mobile_number") or "").strip()
+                mobile_digits = re.sub(r"\D+", "", mobile_raw)
+                last8 = mobile_digits[-8:] if mobile_digits else ""
+                return f"{initials}{b_str}{last8}"
+            
+            # Process image and get proper format
+            buf, mime, ext = _prep_image_for_upload(uploaded_file)
+            folder_key = _key_from_personal(profile)
+            
+            # Create Supabase client
+            supabase = create_client(
+                settings.SUPABASE_URL,
+                settings.SUPABASE_SERVICE_ROLE_KEY
+            )
+            
+            # Upload to Supabase Storage with proper extension
+            file_path = f"{folder_key}/profile_picture.{ext}"
+            
+            # Upload file (will replace if exists)
+            file_data = buf.read() if hasattr(buf, 'read') else buf
+            if hasattr(buf, 'seek'):
+                buf.seek(0)  # Reset buffer position
+            
+            upload_result = supabase.storage.from_("staff-profile-picture").upload(
+                file_path,
+                file_data,
+                file_options={"content-type": mime, "upsert": "true"}
+            )
+            
+            # Get public URL
+            public_url = supabase.storage.from_("staff-profile-picture").get_public_url(file_path)
+            
+            # Extract the actual URL from the response
+            if hasattr(public_url, 'get'):
+                public_url = public_url.get('publicUrl') or public_url.get('publicURL') or str(public_url)
+            elif hasattr(public_url, 'publicUrl'):
+                public_url = public_url.publicUrl
+            else:
+                public_url = str(public_url)
+            
+            # Update database
+            Authentication.set_staff_photo(staff_id, public_url)
+            
+            return JsonResponse({
+                'success': True, 
+                'message': 'Profile photo updated successfully!',
+                'new_image_url': public_url
+            })
+            
+        except (DatabaseError, OperationalError, IntegrityError) as e:
+            logger.error(f"Database error during profile photo upload: {str(e)}", exc_info=True)
+            return JsonResponse({'success': False, 'error': 'Database error occurred while updating profile photo'})
+        except Exception as e:
+            logger.error(f"Profile photo upload failed: {str(e)}", exc_info=True)
+            return JsonResponse({'success': False, 'error': 'Failed to update profile photo'})
+    
+    # Get profile from database
+    try:
+        profile = Authentication.get_staff_profile_by_id(staff_id)
+        if not profile:
+            flash_system_error(request, "Profile not found.")
+            return redirect("authentication:login")
+    except (DatabaseError, OperationalError, IntegrityError) as e:
+        logger.error(f"Database error loading profile: {str(e)}", exc_info=True)
+        flash_db_error(request, e)
+        return redirect("authentication:login")
+    except Exception as e:
+        logger.error(f"Error loading profile: {str(e)}", exc_info=True)
+        flash_system_error(request, "Failed to load profile data", exc=e)
+        return redirect("authentication:login")
+    
+    # Format name: First Middle_Initial Last Suffix
+    first = (profile.get('first_name') or '').strip().title()
+    middle = (profile.get('middle_name') or '').strip()
+    last = (profile.get('last_name') or '').strip().title()
+    suffix = (profile.get('suffix') or '').strip().title()
+    
+    name_parts = [first]
+    if middle:
+        name_parts.append(f"{middle[0].upper()}.")
+    if last:
+        name_parts.append(last)
+    if suffix:
+        name_parts.append(suffix)
+    
+    user_fullname = ' '.join(name_parts)
+    role_title = (profile.get('role') or '').title()
+    
+    # Security status based on actual data
+    account_status = (profile.get('account_status') or '').lower()
+    is_account_active = account_status == 'active'
+    is_secure_pass = profile.get('is_secure_pass', False)
+    
+    return render(request, "account_settings.html", {
+        'user_fullname': user_fullname,
+        'user_role': role_title,
+        'staff_id': staff_id,
+        'staff_code': profile.get('staff_code'),
+        'page_path': f"{role_title} / Account Settings",
+        'page_title': 'Account Settings',
+        'user_role_template': role_title.lower().replace(' ', '_'),
+        'profile': profile,
+        'is_account_active': is_account_active,
+        'is_secure_pass': is_secure_pass,
+        'change_password_form': ChangePasswordForm(),
+        'verification_code_form': VerificationCodeForm(),
+    })  

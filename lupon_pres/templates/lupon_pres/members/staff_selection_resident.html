@@ -100,10 +100,11 @@
                   <div class="kv-item">
                     <span class="kv-key">Home Address</span>
                     <span class="kv-val">
-                      {{ res_details.street_name|default:""|title }},
-                      {{ res_details.purok_sitio_name|default:""|title }},
-                      {{ res_details.barangay_name|default:""|title }},
-                      {{ res_details.city_name|default:""|title }}
+                      {% if res_details.address_parts %}
+                        {{ res_details.address_parts|join:", "|title }}
+                      {% else %}
+                        <span class="text-muted"></span>
+                      {% endif %}
                     </span>
                   </div>
                   <div class="kv-item"><span class="kv-key">Email Address</span><span class="kv-val">{{ res_details.email|default:"" }}</span></div>
@@ -184,7 +185,7 @@
       </div>
 
       <!-- ONLY SHOW THIS PART AFTER SELECTING A RESIDENT-->
-      <form id="controlsForm2" method="post" action="{% url 'lupon_pres:staff_selection_resident' %}" novalidate>
+      <form id="controlsForm2" method="post" action="{% url 'lupon_pres:staff_selection_resident' %}" enctype="multipart/form-data" novalidate>
         {% csrf_token %}
         <input type="hidden" name="pid" id="pid" value="{{ res_details.person_id|default_if_none:'' }}">
 

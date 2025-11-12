@@ -17,6 +17,7 @@ from django.urls import reverse
 
 from django.conf import settings
 from django.core.paginator import Paginator
+from django.contrib import messages
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, HttpResponsePermanentRedirect, HttpResponseBadRequest
 from django.template.loader import render_to_string
 from django.http import JsonResponse
@@ -79,13 +80,30 @@ logger = logging.getLogger(__name__)
 ROLE_BHW = 9
 ROLE_LUPON = 8
 WZ_KEY = "staff_nonres_wizard"
+STAFF_FILTER_SESSION_KEY = "secretary_staff_filters"
 
 SECRETARY_ROLE = "Barangay Secretary"
 
-# Demo identity (kept as-is)
-user_fullname = "lname, fname mname suffix"
-user_role = "Barangay Secretary"
-user_role_template = user_role.lower().replace(" ", "_")
+def get_user_info(request):
+    """Get user info from session - call this in each view"""
+    auth = request.session.get('auth', {})
+    first_name = (auth.get('first_name', '') or '').strip().title()
+    middle_name = (auth.get('middle_name', '') or '').strip().title()
+    last_name = (auth.get('last_name', '') or '').strip().title()
+    suffix = (auth.get('suffix', '') or '').strip().upper()
+    
+    # Format: "Last Name, First Name Middle Initial Suffix"
+    name_parts = [first_name]
+    if middle_name:
+        name_parts.append(middle_name[0] + '.')  # Middle initial with period
+    if suffix:
+        name_parts.append(suffix)
+    
+    user_fullname = f"{last_name}, {' '.join(name_parts)}"
+    user_role = auth.get('role_name', 'Staff').title()
+    user_role_template = user_role.lower().replace(' ', '_')
+    
+    return user_fullname, user_role, user_role_template
 
 BUCKET_FINAL = getattr(settings, "SUPABASE_ID_UPLOADS_BUCKET", "id-uploads")
 BUCKET_STAFF_PROOF = getattr(settings, "SUPABASE_STAFF_PROOF_BUCKET", "staff-proof")
@@ -247,6 +265,7 @@ def _to_int_or_none(val) -> Optional[int]:
         return None
     
 def dashboard(request):
+    user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "secretary_dashboard.html", {
         'user_fullname' : user_fullname,
         'user_role' : user_role,
@@ -259,6 +278,7 @@ def dashboard(request):
 @role_required(SECRETARY_ROLE)
 @nocache
 def staff_selection(request: HttpRequest) -> HttpResponse:
+    user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "staff/staff_selection.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
@@ -310,8 +330,18 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
     role_str = (request.POST.get("role") or "").strip()
     role_id = int(role_str) if role_str.isdigit() else None
 
+    proof_file = None
+    if hasattr(request, "FILES"):
+        proof_file = (
+            request.FILES.get("proof")
+            or request.FILES.get("proof_file")
+            or None
+        )
+
     proof_url = (request.POST.get("proof") or "").strip() or None
-    proof_file = request.FILES.get("proof_file") if hasattr(request, "FILES") else None
+    if proof_url and not proof_url.startswith(("http://", "https://", "data:")):
+        logger.warning("Ignoring non-URL, non-data proof value: %r", proof_url)
+        proof_url = None
 
     auth = request.session.get("auth") or {}
     staff_id = auth.get("staff_id")
@@ -427,17 +457,26 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
             final_base = f"staff_acc_req_proof/{pid}"
 
         uploaded_proof_url = None
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         if proof_file:
             try:
                 buf, mime, ext = _prep_image_for_upload(proof_file)
+                proof_rel_path = f"{final_base}/staff-app-proof-{role_id}-{timestamp}.{ext}"
                 res_up = _upload_to_storage_retry(
                     buf,
-                    path=f"{final_base}/staff-app-proof.{ext}",
+                    path=proof_rel_path,
                     bucket=BUCKET_FOR_PROOF,
                     content_type=mime,
                     make_public=True,
                 )
-                uploaded_proof_url = res_up.get("public_url") or res_up.get("signed_url")
+                uploaded_proof_url = (
+                    (res_up.get("public_url") if isinstance(res_up, dict) else None)
+                    or (res_up.get("signed_url") if isinstance(res_up, dict) else None)
+                )
+                if not uploaded_proof_url:
+                    logger.error("Proof upload returned no usable URL for %s", proof_rel_path)
+                    flash_system_error(request, "Proof upload did not return a usable URL.")
+                    return redirect(request.META.get("HTTP_REFERER") or request.path)
             except (DatabaseError, OperationalError, IntegrityError) as e:
                 flash_db_error(request, e)
                 return redirect(request.META.get("HTTP_REFERER") or request.path)
@@ -452,16 +491,29 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
                 _mime_hint, b64 = m.groups()
                 raw = io.BytesIO(base64.b64decode(b64))
                 buf, mime, ext = _prep_image_for_upload(raw)
+                proof_rel_path = f"{final_base}/staff-app-proof-{role_id}-{timestamp}.{ext}"
                 res_up = _upload_to_storage_retry(
                     buf,
-                    path=f"{final_base}/staff-app-proof.{ext}",
+                    path=proof_rel_path,
                     bucket=BUCKET_FOR_PROOF,
                     content_type=mime,
                     make_public=True,
                 )
-                uploaded_proof_url = res_up.get("public_url") or res_up.get("signed_url")
+                uploaded_proof_url = (
+                    (res_up.get("public_url") if isinstance(res_up, dict) else None)
+                    or (res_up.get("signed_url") if isinstance(res_up, dict) else None)
+                )
+                if not uploaded_proof_url:
+                    logger.error("Proof upload returned no usable URL for %s", proof_rel_path)
+                    flash_system_error(request, "Proof upload did not return a usable URL.")
+                    return redirect(request.META.get("HTTP_REFERER") or request.path)
             else:
                 uploaded_proof_url = proof_url
+
+        if uploaded_proof_url and not uploaded_proof_url.startswith(("http://", "https://")):
+            logger.error("Refusing to store non-URL proof value: %r", uploaded_proof_url)
+            flash_system_error(request, "Proof upload failed to produce a valid URL.")
+            return redirect(request.META.get("HTTP_REFERER") or request.path)
 
         try:
             result = Secretary.insert_res_staff_account_request(
@@ -539,6 +591,7 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
     role_form = ChooseRole()
     sched_form = Schedule()
     proof_form = ResidentProfileform()
+    user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "staff/staff_selection_resident.html", {
         "user_fullname": user_fullname,
         "user_role": user_role,
@@ -633,6 +686,7 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
             flash_warning(request, "Please correct the errors below.")
             # fall-through to re-render with form errors
 
+    user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "staff/staff_selection_nonresident.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
@@ -742,6 +796,7 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
         return redirect("secretary:staff_selection_non-resident_role_review")
 
     # GET
+    user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "staff/supporting_docs.html", {
         "user_fullname": user_fullname,
         "user_role": user_role,
@@ -807,6 +862,22 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
     personal = wiz.get("personal") or {}
     docs = wiz.get("docs") or {}
 
+    # Prepare a shallow copy for template-safe enrichment (e.g., parsed dates).
+    personal_view = dict(personal) if isinstance(personal, dict) else {}
+
+    b_raw = personal_view.get("birthdate")
+    birthdate_obj: Optional[date] = None
+    if isinstance(b_raw, date):
+        birthdate_obj = b_raw
+    elif isinstance(b_raw, str) and b_raw.strip():
+        for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"):
+            try:
+                birthdate_obj = datetime.strptime(b_raw, fmt).date()
+                break
+            except ValueError:
+                continue
+    personal_view["birthdate_obj"] = birthdate_obj
+
     if request.method == "GET":
         if not personal:
             logger.error("Wizard ✗ Missing personal info in session")
@@ -817,6 +888,7 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
             flash_warning(request, "Supporting documents are missing. Please complete Step 2.")
             return redirect("secretary:staff_selection_non-resident_docs")
 
+        user_fullname, user_role, user_role_template = get_user_info(request)
         return render(
             request,
             "staff/role.html",
@@ -828,7 +900,7 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
                 "user_role_template": user_role_template,
                 "role_form": role_form,
                 "sched_form": sched_form,
-                "personal": personal,
+                "personal": personal_view,
                 "docs": docs,
             },
         )
@@ -928,6 +1000,7 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
         flash_system_error(request, "Images could not be decoded from session.", exc=e)
         return redirect("secretary:staff_selection_non-resident_docs")
 
+    proof_url = None
     try:
         f_buf, f_mime, f_ext = _prep_image_for_upload(io.BytesIO(b_front))
         b_buf, b_mime, b_ext = _prep_image_for_upload(io.BytesIO(b_back))
@@ -958,13 +1031,23 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
         up_proof = None
         if b_proof is not None:
             p_buf, p_mime, p_ext = _prep_image_for_upload(io.BytesIO(b_proof))
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            proof_rel_path = f"{proof_final_base}/staff-app-proof-{role_id}-{timestamp}.{p_ext}"
             up_proof = _upload_to_storage_retry(
                 p_buf,
-                path=f"{proof_final_base}/staff-app-proof.{p_ext}",
+                path=proof_rel_path,
                 bucket=BUCKET_STAFF_PROOF,
                 content_type=p_mime,
                 make_public=True,
             )
+            proof_url = (
+                (up_proof.get("public_url") if isinstance(up_proof, dict) else None)
+                or (up_proof.get("signed_url") if isinstance(up_proof, dict) else None)
+            )
+            if not proof_url:
+                logger.error("Non-resident proof upload returned no usable URL: %s", proof_rel_path)
+                flash_system_error(request, "Proof upload did not return a usable URL. Please try again.")
+                return redirect(request.path)
     except Exception as e:
         logger.error("Step3 ✗ Upload failed: %s", e)
         flash_system_error(request, "Final upload failed.", exc=e)
@@ -973,7 +1056,11 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
     front_url = up_front.get("public_url") or up_front.get("signed_url")
     back_url  = up_back.get("public_url") or up_back.get("signed_url")
     self_url  = up_selfie.get("public_url") or up_selfie.get("signed_url")
-    proof_url = up_proof.get("public_url") or up_proof.get("signed_url") if up_proof else None
+
+    if proof_url and not proof_url.startswith(("http://", "https://")):
+        logger.error("Refusing to store non-URL proof value: %r", proof_url)
+        flash_system_error(request, "Proof upload failed to produce a valid URL.")
+        return redirect(request.path)
 
     try:
         req_id = Secretary.insert_nonres_staff_account_request(
@@ -1045,46 +1132,138 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
 @role_required(SECRETARY_ROLE)
 @nocache
 def staff_list(request):
+    filters = request.session.get(STAFF_FILTER_SESSION_KEY, {}) or {}
+    role_raw = (filters.get("role") or "").strip()
+    acc_raw = (filters.get("account_stat") or "").strip()
+    search_term = (filters.get("q") or "").strip()
 
+    updated = False
+    should_redirect = False
+
+    if "clear_filters" in request.GET:
+        role_raw = ""
+        acc_raw = ""
+        search_term = ""
+        updated = True
+        should_redirect = True
+
+    remove_target = (request.GET.get("remove_filter") or "").strip()
+    if remove_target:
+        if remove_target == "role":
+            role_raw = ""
+        elif remove_target == "account_stat":
+            acc_raw = ""
+        elif remove_target == "search":
+            search_term = ""
+        updated = True
+        should_redirect = True
+
+    if "role" in request.GET:
+        role_raw = (request.GET.get("role") or "").strip()
+        updated = True
+    if "account_stat" in request.GET:
+        acc_raw = (request.GET.get("account_stat") or "").strip()
+        updated = True
+    if "q" in request.GET:
+        search_term = (request.GET.get("q") or "").strip()
+        updated = True
+
+    if updated:
+        request.session[STAFF_FILTER_SESSION_KEY] = {
+            "role": role_raw,
+            "account_stat": acc_raw,
+            "q": search_term,
+        }
+        request.session.modified = True
+
+    if should_redirect:
+        return redirect(request.path)
+
+    role_id = int(role_raw) if role_raw.isdigit() else None
+    acc_id = int(acc_raw) if acc_raw.isdigit() else None
+
+    rows: List[Dict[str, Any]] = []
     try:
-        rows = Secretary.get_all_staff_info_summary() or []
+        if role_id is not None or acc_id is not None:
+            rows = Secretary.filter_staff_by_role_and_account(role_id, acc_id) or []
+            if search_term:
+                s = search_term.lower()
+                rows = [r for r in rows if s in (r.get("full_name") or "").lower()]
+        elif search_term:
+            rows = Secretary.search_staff_by_name(search_term) or []
+        else:
+            rows = Secretary.get_all_staff_info_summary() or []
     except Exception as e:
         logger.exception("Failed to load staff summaries: %s", e)
         rows = []
 
-    from django.core.paginator import Paginator
     try:
         per_page = int(request.GET.get("per_page") or 10)
         if per_page <= 0:
             per_page = 10
-    except ValueError:
+    except (TypeError, ValueError):
         per_page = 10
 
     try:
         page_number = int(request.GET.get("page") or 1)
-    except ValueError:
+    except (TypeError, ValueError):
         page_number = 1
 
-    form = StaffFilters()
+    form_initial = {
+        "role": role_raw,
+        "account_stat": acc_raw,
+        "search": search_term,
+    }
+    form = StaffFilters(initial=form_initial)
+
     paginator = Paginator(rows, per_page)
     page_obj = paginator.get_page(page_number)
 
-    # Session/user display info
-    auth = request.session.get("auth") or {}
-    _user_fullname = auth.get("full_name") or user_fullname
-    _user_role = auth.get("role_name") or user_role
-    _user_role_template = (_user_role or "").lower().replace(" ", "_")
+    role_choices = {str(k): v for k, v in form.fields["role"].choices}
+    acc_choices = {str(k): v for k, v in form.fields["account_stat"].choices}
+
+    active_filters: List[Dict[str, str]] = []
+    if role_raw:
+        label = role_choices.get(role_raw) or f"Role {role_raw}"
+        active_filters.append({
+            "label": label,
+            "remove_url": f"{request.path}?remove_filter=role",
+        })
+    if acc_raw:
+        label = acc_choices.get(acc_raw) or f"Status {acc_raw}"
+        active_filters.append({
+            "label": label,
+            "remove_url": f"{request.path}?remove_filter=account_stat",
+        })
+    if search_term:
+        active_filters.append({
+            "label": f"Search: \"{search_term}\"",
+            "remove_url": f"{request.path}?remove_filter=search",
+        })
+
+    clear_filters_url = f"{request.path}?clear_filters=1"
+
+    user_fullname, user_role, user_role_template = get_user_info(request)
+
+    current_filters = {
+        "role": role_raw,
+        "account_stat": acc_raw,
+        "q": search_term,
+    }
 
     return render(request, "staff/staff_list.html", {
-        "user_fullname": _user_fullname,
-        "user_role": _user_role,
-        "page_path": f"{_user_role} / Staff List",
+        "user_fullname": user_fullname,
+        "user_role": user_role,
+        "page_path": f"{user_role} / Staff List",
         "page_title": "Staff List",
-        "user_role_template": _user_role_template,
+        "user_role_template": user_role_template,
         "form": form,
         "page_obj": page_obj,
         "total_count": paginator.count,
         "per_page": per_page,
+        "active_filters": active_filters,
+        "clear_filters_url": clear_filters_url,
+        "current_filters": current_filters,
     })
 
 
@@ -1093,39 +1272,55 @@ def staff_list(request):
 @nocache
 @require_GET
 def staff_search_api(request):
-    q = (request.GET.get("q") or "").strip()
+    raw_query = (request.GET.get("q") or "").strip()
+
+    filters = request.session.get(STAFF_FILTER_SESSION_KEY, {}) or {}
+    role_raw = (filters.get("role") or "").strip()
+    acc_raw = (filters.get("account_stat") or "").strip()
+
+    role_id = int(role_raw) if role_raw.isdigit() else None
+    acc_id = int(acc_raw) if acc_raw.isdigit() else None
+
     try:
-        if q:
-            results = Secretary.search_staff_by_name(q)[:50]
+        if role_id is not None or acc_id is not None:
+            rows = Secretary.filter_staff_by_role_and_account(role_id, acc_id) or []
         else:
-           
-            results = Secretary.get_all_staff_info_summary()
-        return JsonResponse({"results": results})
+            rows = Secretary.get_all_staff_info_summary() or []
+
+        if raw_query:
+            q_lower = raw_query.lower()
+            rows = [r for r in rows if q_lower in (r.get("full_name") or "").lower()]
+
+        filters["q"] = raw_query
+        request.session[STAFF_FILTER_SESSION_KEY] = filters
+        request.session.modified = True
+
+        return JsonResponse({"results": rows[:50]})
     except Exception as e:
         logger.exception("staff_search_api error: %s", e)
         return JsonResponse({"results": [], "error": "Search failed"}, status=500)
 
     
-@session_login_required
-@role_required(SECRETARY_ROLE)
-@nocache
-@require_GET
-def staff_filter_api(request):
-    role_raw = (request.GET.get("role_id") or "").strip()
-    acc_raw  = (request.GET.get("account_status_id") or "").strip()
+# @session_login_required
+# @role_required(SECRETARY_ROLE)
+# @nocache
+# @require_GET
+# def staff_filter_api(request):
+#     role_raw = (request.GET.get("role_id") or "").strip()
+#     acc_raw  = (request.GET.get("account_status_id") or "").strip()
 
-    role_id = int(role_raw) if role_raw.isdigit() else None
-    acc_id  = int(acc_raw)  if acc_raw.isdigit()  else None
+#     role_id = int(role_raw) if role_raw.isdigit() else None
+#     acc_id  = int(acc_raw)  if acc_raw.isdigit()  else None
 
-    try:
-        if role_id is None and acc_id is None:
-            rows = Secretary.get_all_staff_info_summary()
-        else:
-            rows = Secretary.filter_staff_by_role_and_account(role_id, acc_id)
-        return JsonResponse({"results": rows})
-    except Exception as e:
-        logger.exception("staff_filter_api error: %s", e)
-        return JsonResponse({"results": [], "error": "Filter failed"}, status=500)
+#     try:
+#         if role_id is None and acc_id is None:
+#             rows = Secretary.get_all_staff_info_summary()
+#         else:
+#             rows = Secretary.filter_staff_by_role_and_account(role_id, acc_id)
+#         return JsonResponse({"results": rows})
+#     except Exception as e:
+#         logger.exception("staff_filter_api error: %s", e)
+#         return JsonResponse({"results": [], "error": "Filter failed"}, status=500)
 
 
 
@@ -1151,6 +1346,7 @@ def staff_dets(request, staff_code: str):
             {"src": _img(p.get("selfie_img_path")),         "label": "Selfie w/ ID"},
         ]
 
+    user_fullname, user_role, user_role_template = get_user_info(request)
     ctx = {
         "user_fullname": user_fullname,
         "user_role": user_role,
@@ -1187,6 +1383,7 @@ def residents_list(request: HttpRequest) -> HttpResponse:
     paginator = Paginator(range(total), page_size)  # fake range to drive page controls
     page_obj = paginator.get_page(page)
 
+    user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "secretary/residents_list.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
@@ -1214,6 +1411,7 @@ def resident_profile(request: HttpRequest, person_id: int) -> HttpResponse:
         messages.error(request, f"Failed to open profile: {e}")
         return redirect("secretary:residents_list")
 
+    user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "secretary/resident_profile.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
@@ -1234,6 +1432,7 @@ def resident_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "resident/resident_list.html", {
         'user_fullname' : user_fullname,
         'user_role': user_role,
@@ -1251,6 +1450,7 @@ def resident_map_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
+    user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "resident/resident_map_list.html", {
         'user_fullname' : user_fullname,
         'user_role': user_role,

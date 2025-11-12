@@ -4,92 +4,337 @@
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
 <link rel="stylesheet" href="{% static 'css/submission_dets.css' %}">
 {% endblock %}
 
 {% block content %}
-<div class="container pt-5 px-0" style="margin-top:40px; margin-bottom:20px;">
+<div class="container-fluid" style="margin-top: 60px; padding-top: 1rem; padding-bottom: 0.5rem;">
   <div class="row justify-content-center">
-    <div class="col-12">
-      <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
-        <h4><strong>{{ heading_full_name|default:"" }}</strong></h4>
-        {% if role %}
-          <span class="badge bg-primary">{{ role }}</span>
-        {% endif %}
+    <div class="col-12 col-xl-9">
+      <!-- Back Button -->
+      <div class="mb-3">
+        <a href="{% url 'captain:staff_list' %}" class="btn btn-reset px-3 py-2">
+          {% bs_icon 'arrow-left' size='1.2em' %}
+        </a>
       </div>
-
-      <div class="divider"></div>
-
-      <h4><strong>{{ profile.full_name|default:"—" }}</strong></h4>
-
-      <div class="row g-4">
-        <!-- Personal Information -->
-        <div class="col-md-6">
-          <div class="section-title mb-2">Personal Information</div>
-          <div class="kv">
-            <div class="kv-item"><span class="kv-key">Last Name</span><span class="kv-val">{{ profile.last_name|default:"—" }}</span></div>
-            <div class="kv-item"><span class="kv-key">First Name</span><span class="kv-val">{{ profile.first_name|default:"—" }}</span></div>
-            <div class="kv-item"><span class="kv-key">Middle Name</span><span class="kv-val">{{ profile.middle_name|default:"—" }}</span></div> 
-            <div class="kv-item"><span class="kv-key">Suffix</span><span class="kv-val">{{ profile.suffix|default:"—" }}</span></div>
-            <div class="kv-item"><span class="kv-key">Sex</span><span class="kv-val">{{ profile.sex|default:"—" }}</span></div>
-            <div class="kv-item"><span class="kv-key">Date of Birth</span><span class="kv-val">{{ profile.date_of_birth|date:"F d, Y"|default:"—" }}</span></div>
-            <div class="kv-item"><span class="kv-key">Civil Status</span><span class="kv-val">{{ profile.civil_status|default:"—" }}</span></div>
-            <div class="kv-item"><span class="kv-key">Nationality</span><span class="kv-val">{{ profile.nationality|default:"—" }}</span></div>
-            <div class="kv-item"><span class="kv-key">Religion</span><span class="kv-val">{{ profile.religion|default:"—" }}</span></div>
-            <div class="kv-item"><span class="kv-key">Home Address</span><span class="kv-val">{{ profile.home_address|default:"—" }}</span></div>
-            <div class="kv-item"><span class="kv-key">Email Address</span><span class="kv-val">{{ profile.email_address|default:"—" }}</span></div>
-            <div class="kv-item"><span class="kv-key">Mobile Number</span><span class="kv-val">{{ profile.mobile_number|default:"—" }}</span></div>
-          </div>
-        </div>
-
-        <!-- Staff Information -->
-        <div class="col-md-6">
-          <div class="section-title mb-2">Staff Information</div>
-          <div class="kv">
-            <div class="kv-item"><span class="kv-key">Role</span><span class="kv-val">{{ profile.role|default:"—" }}</span></div>
-            <div class="kv-item"><span class="kv-key">Assigned Purok / Sitio</span><span class="kv-val">{{ profile.assigned_purok|default:"—" }}</span></div>
-            <div class="kv-item"><span class="kv-key">Schedule</span><span class="kv-val">{{ profile.schedule|default:"—" }}</span></div>
-          </div>
-
-          <div class="section-title mb-2 pt-4">Supporting Documents</div>
-          <div class="kv">
-            <div class="kv-item"><span class="kv-key">ID Type</span><span class="kv-val">{{ profile.id_type_name|default:"—" }}</span></div>
-
-            <div class="doc-carousel carousel slide" id="docCarousel" data-bs-ride="false" aria-label="Supporting documents">
-              <div class="carousel-inner">
-                {% for s in doc_slides %}
-                  <div class="carousel-item {% if forloop.first %}active{% endif %}">
-                    <div class="img-wrap">
-                      <img src="{{ s.src }}" class="doc-img" alt="{{ s.label }}">
-                    </div>
-                    <small class="text-muted d-block text-center mt-2">{{ s.label }}</small>
-                  </div>
-                {% endfor %}
+      
+      <!-- Header Card -->
+      <div class="card border-0 shadow-sm mb-3" style="border-radius: 14px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center">
+            <div class="me-3" style="width: 70px; height: 70px;">
+              {% if profile.staff_img %}
+                <img src="{{ profile.staff_img }}" alt="{{ profile.first_name }} {{ profile.last_name }}" class="rounded-circle shadow-sm" style="width: 100%; height: 100%; object-fit: cover;">
+              {% else %}
+                <div class="d-flex align-items-center justify-content-center text-white rounded-circle shadow-sm" style="width: 100%; height: 100%; font-size: 24px; font-weight: 600; background: var(--bs-danger-text-emphasis);">
+                  {{ profile.first_name|first|upper }}{{ profile.last_name|first|upper }}
+                </div>
+              {% endif %}
+            </div>
+            <div class="flex-grow-1">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <h4 class="mb-0 fw-bold text-dark">
+                  {{ profile.first_name|default:""|title }}
+                  {% with m=profile.middle_name|default_if_none:'' %}
+                    {% if m %} {{ m|slice:":1"|upper }}.{% endif %}
+                  {% endwith %}
+                  {{ profile.last_name|default:""|title }}
+                  {{ profile.suffix|default:""|upper }}
+                </h4>
+                {% with s=profile.account_status|default:"" %}
+                  <span class="badge px-2 py-1 rounded-pill
+                    {% if s|lower == 'active' %} bg-success text-white
+                    {% elif s|lower == 'pending' %} bg-warning text-dark
+                    {% elif s|lower == 'inactive' %} bg-secondary text-white
+                    {% elif s|lower == 'deactivated' %} bg-danger text-white
+                    {% else %} bg-light text-dark
+                    {% endif %}
+                  " style="font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">{{ s|default:"Unknown" }}</span>
+                {% endwith %}
               </div>
-              <button class="carousel-control-prev doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="prev" aria-label="Previous">
-                <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
-              </button>
-              <button class="carousel-control-next doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="next" aria-label="Next">
-                <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
-              </button>
-            </div>
-
-            <div class="kv-item mt-3">
-              <span class="kv-key">Proof of Employment</span>
-              <span class="kv-val">
-                {% if profile.proof_of_employment_path %}
-                  <a href="{{ profile.proof_of_employment_path }}" target="_blank" rel="noopener">Open</a>
-                {% else %}—{% endif %}
-              </span>
+              <div class="mb-2">
+                <span class="text-muted fw-medium">{{ profile.staff_code|default:"No Code" }}</span>
+              </div>
+              <p class="text-muted mb-0 fw-medium">{{ profile.role|default:"No Role Assigned" }}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="divider"></div>
+      <!-- Information Cards Grid -->
+      <div class="row g-3 mb-3">
+        <!-- Personal Information -->
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm h-100" style="border-radius: 14px;">
+            <div class="card-body p-3">
+              <div class="d-flex align-items-center mb-3">
+                {% bs_icon 'person-fill' color='var(--bs-danger-text-emphasis)' size='1.3em' %}
+                <h6 class="mb-0 ms-2 fw-bold text-dark">Personal Information</h6>
+              </div>
+              
+              <!-- Address Card -->
+              <div class="mb-3 p-3 rounded-3" style="background: #f8f9fa;">
+                <div class="d-flex align-items-start">
+                  <div class="me-3 mt-1">
+                    {% bs_icon 'geo-alt-fill' color='#6c757d' %}
+                  </div>
+                  <div class="flex-grow-1">
+                    <div class="text-muted fw-medium mb-1" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Home Address</div>
+                    {% if profile.home_address %}
+                      <div class="text-dark fw-medium">{{ profile.home_address }}</div>
+                    {% else %}
+                      <div class="text-muted fw-medium">Not Provided</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Personal Details Grid -->
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-2">
+                      {% bs_icon 'person-badge' color='#6c757d' size='1.1em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Gender</span>
+                    </div>
+                    {% if profile.sex %}
+                      <div class="text-dark fw-bold">{{ profile.sex }}</div>
+                    {% else %}
+                      <div class="text-muted fw-bold">Not Provided</div>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-2">
+                      {% bs_icon 'calendar-fill' color='#6c757d' size='1.1em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Birth Date</span>
+                    </div>
+                    {% if profile.date_of_birth %}
+                      <div class="text-dark fw-bold">{{ profile.date_of_birth|date:"M d, Y" }}</div>
+                    {% else %}
+                      <div class="text-muted fw-bold">Not Provided</div>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-2">
+                      {% bs_icon 'heart-fill' color='#6c757d' size='1.1em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Civil Status</span>
+                    </div>
+                    {% if profile.civil_status %}
+                      <div class="text-dark fw-bold">{{ profile.civil_status }}</div>
+                    {% else %}
+                      <div class="text-muted fw-bold">Not Provided</div>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-2">
+                      {% bs_icon 'flag-fill' color='#6c757d' size='1.1em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Nationality</span>
+                    </div>
+                    {% if profile.nationality %}
+                      <div class="text-dark fw-bold">{{ profile.nationality }}</div>
+                    {% else %}
+                      <div class="text-muted fw-bold">Not Provided</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Contact Info -->
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-2">
+                      {% bs_icon 'envelope-fill' color='#6c757d' size='1.1em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Email</span>
+                    </div>
+                    <div class="text-dark fw-bold">
+                      {% if profile.email_address %}
+                        <a href="mailto:{{ profile.email_address }}" class="text-decoration-none">{{ profile.email_address }}</a>
+                      {% else %}
+                        <div class="text-muted fw-semibold">
+                          Not Provided
+                        </div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-2">
+                      {% bs_icon 'telephone-fill' color='#6c757d' size='1.1em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Mobile</span>
+                    </div>
+                    {% if profile.mobile_number %}
+                      <div class="text-dark fw-bold">
+                        {{ profile.mobile_number }}
+                      </div>
+                    {% else %}
+                      <div class="text-muted fw-semibold">
+                        Not Provided
+                      </div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
-      <div class="mt-auto button-container justify-content-end mb-2">
-        <button type="button" class="btn btn-reset" onclick="history.back()">Close</button>
+        <!-- Staff Information & Documents -->
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm h-100" style="border-radius: 14px;">
+            <div class="card-body p-3">
+              <div class="d-flex align-items-center mb-3">
+                {% bs_icon 'briefcase-fill' color='var(--bs-danger-text-emphasis)' size='1.3em' %}
+                <h6 class="mb-0 ms-2 fw-bold text-dark">Staff Information</h6>
+              </div>
+              
+              <!-- Staff Details -->
+              <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                  <div class="p-2 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-1">
+                      {% bs_icon 'calendar-check' color='#6c757d' size='0.9em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Account Started</span>
+                    </div>
+                    {% if profile.date_started %}
+                      <div class="text-dark fw-bold" style="font-size: 0.875rem;">{{ profile.date_started|date:"M d, Y" }}</div>
+                    {% else %}
+                      <div class="text-muted fw-bold" style="font-size: 0.875rem;">Not Provided</div>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="p-2 rounded-3 h-100" style="background: #f8f9fa;">
+                    <div class="d-flex align-items-center mb-1">
+                      {% bs_icon 'calendar-x' color='#6c757d' size='0.9em' %}
+                      <span class="text-muted fw-medium ms-2" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Account Ended</span>
+                    </div>
+                    {% if profile.date_end %}
+                      <div class="text-dark fw-bold" style="font-size: .875rem;">
+                        {{ profile.date_end|date:"M d, Y" }}
+                      </div>
+                    {% else %}
+                      <div class="text-muted fw-semibold" style="font-size: .875rem;">
+                        Currently Assigned
+                      </div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+              
+              {% if profile.role == 'Barangay Health Worker' %}
+                <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
+                  <div class="d-flex align-items-start">
+                    <div class="me-2 mt-1">
+                      {% bs_icon 'geo-fill' color='#6c757d' size='0.9em' %}
+                    </div>
+                    <div class="flex-grow-1">
+                      <div class="text-muted fw-medium mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Assigned Purok/Sitio</div>
+                      <div class="{% if profile.assigned_purok %}text-dark fw-bold{% else %}text-muted{% endif %}" style="white-space:pre-line; font-size: 0.9rem;">{{ profile.assigned_purok|default:"Not Yet Assigned" }}</div>
+                    </div>
+                  </div>
+                </div>
+              {% elif profile.assigned_purok %}
+                <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
+                  <div class="d-flex align-items-start">
+                    <div class="me-2 mt-1">
+                      {% bs_icon 'geo-fill' color='#6c757d' size='0.9em' %}
+                    </div>
+                    <div class="flex-grow-1">
+                      <div class="text-muted fw-medium mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Assigned Purok/Sitio</div>
+                      <div class="text-dark fw-bold" style="white-space:pre-line; font-size: 0.9rem;">{{ profile.assigned_purok }}</div>
+                    </div>
+                  </div>
+                </div>
+              {% endif %}
+              
+              {% if profile.role == 'Barangay Lupon Member' %}
+                <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
+                  <div class="d-flex align-items-start">
+                    <div class="me-2 mt-1">
+                      {% bs_icon 'clock-fill' color='#6c757d' size='0.9em' %}
+                    </div>
+                    <div class="flex-grow-1">
+                      <div class="text-muted fw-medium mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Schedule</div>
+                      <div class="{% if profile.schedule %}text-dark fw-bold{% else %}text-muted{% endif %}" style="white-space:pre-line; font-size: 0.9rem;">{{ profile.schedule|default:"Not Yet Assigned" }}</div>
+                    </div>
+                  </div>
+                </div>
+              {% elif profile.schedule %}
+                <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
+                  <div class="d-flex align-items-start">
+                    <div class="me-2 mt-1">
+                      {% bs_icon 'clock-fill' color='#6c757d' size='0.9em' %}
+                    </div>
+                    <div class="flex-grow-1">
+                      <div class="text-muted fw-medium mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Schedule</div>
+                      <div class="text-dark fw-bold" style="white-space:pre-line; font-size: 0.9rem;">{{ profile.schedule }}</div>
+                    </div>
+                  </div>
+                </div>
+              {% endif %}
+              
+              <!-- Documents Section -->
+              <div class="d-flex align-items-center mb-3">
+                {% bs_icon 'file-earmark-text-fill' color='var(--bs-danger-text-emphasis)' size='1.1em' %}
+                <h6 class="mb-0 ms-2 fw-bold text-dark" style="font-size: 0.95rem;">Supporting Documents</h6>
+              </div>
+              
+              <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
+                <div class="text-muted fw-medium mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">ID Type</div>
+                {% if profile.id_type_name %}
+                  <div class="text-dark fw-bold" style="font-size: 0.9rem;">{{ profile.id_type_name|upper }}</div>
+                {% else %}
+                  <div class="text-muted fw-bold" style="font-size: 0.9rem;">Not Provided</div>
+                {% endif %}
+              </div>
+              
+              {% if doc_slides %}
+                <div class="doc-carousel carousel slide mb-3" id="docCarousel" data-bs-ride="false" aria-label="Supporting documents">
+                  <div class="carousel-inner">
+                    {% for s in doc_slides %}
+                      <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                        <div class="img-wrap">
+                          <img src="{{ s.src }}" class="doc-img" alt="{{ s.label }}">
+                        </div>
+                        <small class="text-muted d-block text-center mt-2 fw-medium">{{ s.label }}</small>
+                      </div>
+                    {% endfor %}
+                  </div>
+                  <button class="carousel-control-prev doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="prev" aria-label="Previous">
+                    <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
+                  </button>
+                  <button class="carousel-control-next doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="next" aria-label="Next">
+                    <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
+                  </button>
+                </div>
+              {% endif %}
+              
+              <div class="p-2 rounded-3" style="background: #f8f9fa;">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div class="text-muted fw-medium" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Proof of Employment</div>
+                  {% if profile.proof_of_employment_path %}
+                    <div class="text-dark fw-bold" style="font-size: 0.9rem;">
+                      <a href="{{ profile.proof_of_employment_path }}" target="_blank" rel="noopener" class="text-decoration-none">Open</a>
+                    </div>
+                  {% else %}
+                    <div class="text-dark fw-bold" style="font-size: 0.9rem;">
+                      <span class="text-muted">Not Provided</span>
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
