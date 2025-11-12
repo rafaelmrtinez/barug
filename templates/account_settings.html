@@ -1,0 +1,1855 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<style>
+  .settings-nav {
+    background: var(--bs-danger-text-emphasis);
+    border-radius: 20px;
+    padding: 2rem;
+    color: white;
+    box-shadow: 0 4px 15px rgba(139, 21, 56, 0.15);
+  }
+  .settings-nav .nav-link {
+    color: rgba(255,255,255,0.85);
+    border: none;
+    border-radius: 15px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.75rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+  }
+  .settings-nav .nav-link:hover {
+    background: rgba(255,255,255,0.15);
+    color: white;
+    transform: translateX(5px);
+  }
+  .settings-nav .nav-link.active {
+    background: rgba(255,255,255,0.25);
+    color: white;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(255,255,255,0.1);
+  }
+  .settings-card {
+    border: none;
+    border-radius: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    background: rgba(255,255,255,0.95);
+  }
+  .settings-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+  }
+  .profile-avatar {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 5px solid rgba(255,255,255,0.3);
+    box-shadow: 0 8px 25px rgba(139, 21, 56, 0.2);
+  }
+  .stat-card {
+    background: var(--bs-danger-text-emphasis);
+    border-radius: 20px;
+    color: white;
+    padding: 2rem;
+    text-align: center;
+    box-shadow: 0 6px 20px rgba(139, 21, 56, 0.2);
+  }
+  .security-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1.25rem;
+    border-radius: 50px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    backdrop-filter: blur(10px);
+  }
+  .security-verified {
+    background: var(--bs-success);
+    color: white;
+    box-shadow: 0 2px 8px rgba(25, 135, 84, 0.15);
+  }
+  .security-pending {
+    background: var(--bs-warning);
+    color: var(--bs-dark);
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.15);
+  }
+  .info-card {
+    background: #f8f9fa;
+    border-radius: 15px;
+    padding: 1.5rem;
+    border: 1px solid rgba(139, 21, 56, 0.1);
+    transition: all 0.3s ease;
+  }
+  .info-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(139, 21, 56, 0.08);
+  }
+  .btn-primary {
+    background: var(--bs-danger-text-emphasis);
+    border: none;
+    border-radius: 12px;
+    padding: 0.75rem 2rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(139, 21, 56, 0.2);
+  }
+  .form-control {
+    border-radius: 12px;
+    border: 2px solid #e9ecef;
+    padding: 0.75rem 1rem;
+    transition: all 0.3s ease;
+  }
+  .form-control:focus {
+    border-color: var(--bs-danger-text-emphasis);
+    box-shadow: 0 0 0 0.2rem rgba(139, 21, 56, 0.15);
+  }
+
+  /* Crop modal tweaks (smaller, tidy stage) */
+  #cropModal .modal-dialog {
+    max-width: 680px;
+    width: 92vw;
+  }
+  #cropModal #cropBox {
+    height: 360px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #cropModal #cropImage {
+    max-width: 100%;
+    max-height: 100%;
+    display: block;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+
+<div class="container-fluid" style="margin-top: 40px; padding: 2rem 0;">
+  <div class="row justify-content-center">
+    <div class="col-12 col-xl-10">
+      
+      <!-- Header -->
+      <div class="mb-4">
+        <h2 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
+          {% bs_icon 'gear-fill' color='var(--bs-danger-text-emphasis)' size='1.5em' %} Account Settings
+        </h2>
+        <p class="text-muted mb-0">Manage your profile, security, and preferences</p>
+      </div>
+
+      <div class="row g-4">
+        <!-- Sidebar Navigation -->
+        <div class="col-lg-3">
+          <div class="settings-nav h-100">
+            <div class="text-center mb-3">
+              {% if profile.staff_img %}
+                <img src="{{ profile.staff_img }}" alt="Profile" class="profile-avatar mb-3 mx-auto">
+              {% else %}
+                <div class="d-flex align-items-center justify-content-center text-white profile-avatar mb-3 mx-auto" style="background: var(--bs-danger-text-emphasis); font-size: 48px; font-weight: 600;">
+                  {{ profile.first_name|first|upper }}{{ profile.last_name|first|upper }}
+                </div>
+              {% endif %}
+              <h5 class="mb-1">{{ user_fullname|default:"User" }}</h5>
+              <small class="opacity-75">{{ staff_code|default:"—" }} - {{ user_role|default:"—" }}</small>
+            </div>
+            
+            <nav class="nav flex-column">
+              <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#overview">
+                {% bs_icon 'house-fill' %} Overview
+              </button>
+              <button class="nav-link" data-bs-toggle="tab" data-bs-target="#profile">
+                {% bs_icon 'person-fill' %} Profile
+              </button>
+              <button class="nav-link" data-bs-toggle="tab" data-bs-target="#security">
+                {% bs_icon 'shield-lock-fill' %} Security
+              </button>
+              <button class="nav-link" data-bs-toggle="tab" data-bs-target="#activity">
+                {% bs_icon 'clock-history' %} Activity Log
+              </button>
+            </nav>
+          </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-lg-9">
+          <div class="tab-content">
+            
+            <!-- Overview Tab -->
+            <div class="tab-pane fade show active" id="overview">
+              <div class="row g-4">
+                <div class="col-md-9">
+                  <div class="stat-card">
+                    <h3 class="mb-3">Welcome, {{ user_fullname|default:"User" }}!</h3>
+                    <p class="mb-0 opacity-75">Manage your account settings, view your profile and staff information, and check your security settings.</p>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="settings-card card h-100">
+                    <div class="card-body p-3">
+                      <h6 class="card-title d-flex align-items-center gap-2 mb-3" style="font-size: 0.9rem;">
+                        {% bs_icon 'activity' size='1em' %} Account Status
+                      </h6>
+                      <div class="d-flex flex-column gap-2">
+                        {% if is_account_active %}
+                          <div class="badge d-flex align-items-center gap-1 py-2" style="background: #198754; color: white; font-size: 0.75rem;">
+                            {% bs_icon 'check-circle-fill' size='0.8em' %} Account Active
+                          </div>
+                        {% else %}
+                          <div class="badge d-flex align-items-center gap-1 py-2" style="background: #fd7e14; color: white; font-size: 0.75rem;">
+                            {% bs_icon 'exclamation-circle-fill' size='0.8em' %} Account Inactive
+                          </div>
+                        {% endif %}
+                        {% if is_secure_pass %}
+                          <div class="badge d-flex align-items-center gap-1 py-2" style="background: var(--bs-danger-text-emphasis); color: white; font-size: 0.75rem;">
+                            {% bs_icon 'shield-fill' size='0.8em' %} Password Secure
+                          </div>
+                        {% else %}
+                          <div class="badge d-flex align-items-center gap-1 py-2" style="background: #fd7e14; color: white; font-size: 0.75rem;">
+                            {% bs_icon 'exclamation-triangle-fill' size='0.8em' %} Password Needs Update
+                          </div>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                
+                <div class="col-12">
+                  <div class="settings-card card">
+                    <div class="card-body">
+                      <h6 class="card-title d-flex align-items-center gap-2 mb-3">
+                        {% bs_icon 'info-circle-fill' %} Personal Information
+                      </h6>
+                      <div class="row g-3">
+                        <div class="col-md-4">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'envelope-fill' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Email</small>
+                            </div>
+                            <div class="fw-bold text-dark">{{ profile.email_address|default:"Not set" }}</div>
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'telephone-fill' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Phone</small>
+                            </div>
+                            <div class="fw-bold text-dark">{{ profile.mobile_number|default:"Not set" }}</div>
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'geo-alt-fill' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Address</small>
+                            </div>
+                            <div class="fw-bold text-dark">{{ profile.home_address|default:"Not set"|truncatechars:25 }}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="col-12">
+                  <div class="settings-card card">
+                    <div class="card-body">
+                      <h6 class="card-title d-flex align-items-center gap-2 mb-4">
+                        {% bs_icon 'card-text' %} Valid ID
+                      </h6>
+                      
+                      <!-- ID Type -->
+                      <div class="mb-4">
+                        {% if profile.id_type_name %}
+                          <div class="fw-bold text-dark fs-7">{{ profile.id_type_name|upper }}</div>
+                        {% else %}
+                          <div class="text-muted fs-7">Not Provided</div>
+                        {% endif %}
+                      </div>
+                      
+                      <!-- ID Images -->
+                      <div class="row g-4">
+                        <div class="col-md-6 text-center">
+                          <div class="d-flex align-items-center justify-content-center gap-2 mb-3">
+                            {% bs_icon 'image' color='var(--bs-danger-text-emphasis)' %}
+                            <h6 class="mb-0 text-muted fw-semibold">ID Front</h6>
+                          </div>
+                          {% if profile.valid_id_front_img_path %}
+                            <img src="{{ profile.valid_id_front_img_path }}" alt="ID Front" class="img-fluid rounded shadow" style="max-height: 250px; width: auto; cursor: pointer; border: 2px solid #e9ecef;" onclick="window.open(this.src, '_blank')">
+                          {% else %}
+                            <div class="d-flex align-items-center justify-content-center bg-light rounded" style="height: 200px; border: 2px dashed #dee2e6;">
+                              <div class="text-muted fs-7">Not Provided</div>
+                            </div>
+                          {% endif %}
+                        </div>
+                        <div class="col-md-6 text-center">
+                          <div class="d-flex align-items-center justify-content-center gap-2 mb-3">
+                            {% bs_icon 'image' color='var(--bs-danger-text-emphasis)' %}
+                            <h6 class="mb-0 text-muted fw-semibold">ID Back</h6>
+                          </div>
+                          {% if profile.valid_id_back_img_path %}
+                            <img src="{{ profile.valid_id_back_img_path }}" alt="ID Back" class="img-fluid rounded shadow" style="max-height: 250px; width: auto; cursor: pointer; border: 2px solid #e9ecef;" onclick="window.open(this.src, '_blank')">
+                          {% else %}
+                            <div class="d-flex align-items-center justify-content-center bg-light rounded" style="height: 200px; border: 2px dashed #dee2e6;">
+                              <div class="text-muted fs-7">Not Provided</div>
+                            </div>
+                          {% endif %}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Profile Tab -->
+            <div class="tab-pane fade" id="profile">
+              <div class="row g-4">
+                <!-- Profile Photo & Basic Info -->
+                <div class="col-12">
+                  <div class="settings-card card">
+                    <div class="card-body text-center">
+                      <div class="position-relative d-inline-block mb-3">
+                        {% if profile.staff_img %}
+                          <img src="{{ profile.staff_img }}" alt="Profile" class="profile-avatar" id="profilePreview">
+                        {% else %}
+                          <div class="d-flex align-items-center justify-content-center text-white profile-avatar" id="profilePreview" style="background: var(--bs-danger-text-emphasis); font-size: 48px; font-weight: 600;">
+                            {{ profile.first_name|first|upper }}{{ profile.last_name|first|upper }}
+                          </div>
+                        {% endif %}
+                        <button type="button" class="btn position-absolute" id="uploadBtn" style="bottom: 0; right: 0; border-radius: 50%; width: 40px; height: 40px; padding: 0; background: #fff; border: 2px solid var(--bs-danger-text-emphasis); color: var(--bs-danger-text-emphasis); box-shadow: 0 2px 8px rgba(0,0,0,0.15);" onclick="document.getElementById('profilePhoto').click()">
+                          <span id="cameraIcon">{% bs_icon 'camera-fill' %}</span>
+                          <span id="loadingSpinner" class="d-none">
+                            <div class="spinner-border spinner-border-sm" role="status" style="width: 16px; height: 16px;">
+                              <span class="visually-hidden">Loading...</span>
+                            </div>
+                          </span>
+                        </button>
+                      </div>
+                      <form method="post" enctype="multipart/form-data" id="profilePhotoForm" style="display: none;">
+                        {% csrf_token %}
+                        <input type="file" id="profilePhoto" name="staff_img" accept="image/*" onchange="previewAndSubmit(this)">
+                      </form>
+                      <h4 class="fw-bold mb-1">{{ user_fullname|default:"User" }}</h4>
+                      <p class="text-muted mb-0">{{ user_role|default:"—" }}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Personal Information -->
+                <div class="col-12">
+                  <div class="settings-card card">
+                    <div class="card-body">
+                      <h6 class="card-title d-flex align-items-center gap-2 mb-4">
+                        {% bs_icon 'person-fill' %} Personal Information
+                      </h6>
+                      <div class="row g-3">
+                        <div class="col-md-3">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'person-badge' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">First Name</small>
+                            </div>
+                            <div class="fw-bold text-dark">{{ profile.first_name|default:"—" }}</div>
+                          </div>
+                        </div>
+                        <div class="col-md-3">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'person-badge' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Middle Name</small>
+                            </div>
+                            <div class="fw-bold text-dark">{{ profile.middle_name|default:"—" }}</div>
+                          </div>
+                        </div>
+                        <div class="col-md-3">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'person-badge' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Last Name</small>
+                            </div>
+                            <div class="fw-bold text-dark">{{ profile.last_name|default:"—" }}</div>
+                          </div>
+                        </div>
+                        <div class="col-md-3">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'person-badge' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Suffix</small>
+                            </div>
+                            <div class="fw-bold text-dark">{{ profile.suffix|default:"—" }}</div>
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'gender-ambiguous' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Sex</small>
+                            </div>
+                            {% if profile.sex %}
+                              <div class="fw-bold text-dark">{{ profile.sex }}</div>
+                            {% else %}
+                              <div class="text-muted">Not Provided</div>
+                            {% endif %}
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'calendar-date' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Birth Date</small>
+                            </div>
+                            {% if profile.birth_date %}
+                              <div class="fw-bold text-dark">{{ profile.birth_date|date:"M d, Y" }}</div>
+                            {% else %}
+                              <div class="text-muted">Not Provided</div>
+                            {% endif %}
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'heart' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Civil Status</small>
+                            </div>
+                            {% if profile.civil_status %}
+                              <div class="fw-bold text-dark">{{ profile.civil_status }}</div>
+                            {% else %}
+                              <div class="text-muted">Not Provided</div>
+                            {% endif %}
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'flag' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Nationality</small>
+                            </div>
+                            {% if profile.nationality %}
+                              <div class="fw-bold text-dark">{{ profile.nationality }}</div>
+                            {% else %}
+                              <div class="text-muted">Not Provided</div>
+                            {% endif %}
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'star-fill' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Religion</small>
+                            </div>
+                            {% if profile.religion %}
+                              <div class="fw-bold text-dark">{{ profile.religion }}</div>
+                            {% else %}
+                              <div class="text-muted">Not Provided</div>
+                            {% endif %}
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'envelope-fill' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Email Address</small>
+                            </div>
+                            {% if profile.email_address %}
+                              <div class="fw-bold text-dark">{{ profile.email_address }}</div>
+                            {% else %}
+                              <div class="text-muted">Not Provided</div>
+                            {% endif %}
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'telephone-fill' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Mobile Number</small>
+                            </div>
+                            {% if profile.mobile_number %}
+                              <div class="fw-bold text-dark">{{ profile.mobile_number }}</div>
+                            {% else %}
+                              <div class="text-muted">Not Provided</div>
+                            {% endif %}
+                          </div>
+                        </div>
+                        <div class="col-md-8">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'geo-alt-fill' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Home Address</small>
+                            </div>
+                            {% if profile.home_address %}
+                              <div class="fw-bold text-dark">{{ profile.home_address }}</div>
+                            {% else %}
+                              <div class="text-muted">Not Provided</div>
+                            {% endif %}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Staff Information -->
+                <div class="col-12">
+                  <div class="settings-card card">
+                    <div class="card-body">
+                      <h6 class="card-title d-flex align-items-center gap-2 mb-4">
+                        {% bs_icon 'briefcase-fill' %} Staff Information
+                      </h6>
+                      <div class="row g-3">
+                        <div class="col-md-4">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'person-workspace' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Position</small>
+                            </div>
+                            <div class="fw-bold text-dark">{{ profile.role|default:"—" }}</div>
+                          </div>
+                        </div>
+                        {% if profile.role == 'Barangay Health Worker' %}
+                        <div class="col-md-8">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'house-door' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Assigned Purok/Sitio</small>
+                            </div>
+                            {% if profile.assigned_purok %}
+                              <div class="fw-bold text-dark">{{ profile.assigned_purok }}</div>
+                            {% else %}
+                              <div class="text-muted">Not Yet Assigned</div>
+                            {% endif %}
+                          </div>
+                        </div>
+                        {% elif profile.role == 'Barangay Lupon Member' %}
+                        <div class="col-md-8">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'clock' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Assigned Schedule</small>
+                            </div>
+                            {% if profile.schedule %}
+                              <div class="fw-bold text-dark">{{ profile.schedule }}</div>
+                            {% else %}
+                              <div class="text-muted">Not Yet Assigned</div>
+                            {% endif %}
+                          </div>
+                        </div>
+                        {% elif profile.assigned_purok %}
+                        <div class="col-md-8">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'house-door' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Assigned Purok/Sitio</small>
+                            </div>
+                            <div class="fw-bold text-dark">{{ profile.assigned_purok }}</div>
+                          </div>
+                        </div>
+                        {% elif profile.schedule %}
+                        <div class="col-md-8">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'clock' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Assigned Schedule</small>
+                            </div>
+                            <div class="fw-bold text-dark">{{ profile.schedule }}</div>
+                          </div>
+                        </div>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Valid ID -->
+                <div class="col-12">
+                  <div class="settings-card card">
+                    <div class="card-body">
+                      <h6 class="card-title d-flex align-items-center gap-2 mb-4">
+                        {% bs_icon 'card-text' %} Valid ID
+                      </h6>
+                      
+                      <!-- ID Type -->
+                      <div class="mb-4">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                          {% bs_icon 'person-vcard' color='var(--bs-danger-text-emphasis)' %}
+                          <small class="text-muted fw-semibold">ID Type</small>
+                        </div>
+                        {% if profile.id_type_name %}
+                          <div class="fw-bold text-dark fs-7">{{ profile.id_type_name|upper }}</div>
+                        {% else %}
+                          <div class="text-muted fs-5">Not Provided</div>
+                        {% endif %}
+                      </div>
+                      
+                      <!-- ID Images -->
+                      <div class="row g-4">
+                        <div class="col-md-6 text-center">
+                          <div class="d-flex align-items-center justify-content-center gap-2 mb-3">
+                            {% bs_icon 'image' color='var(--bs-danger-text-emphasis)' %}
+                            <h6 class="mb-0 text-muted fw-semibold">ID Front</h6>
+                          </div>
+                          {% if profile.valid_id_front_img_path %}
+                            <img src="{{ profile.valid_id_front_img_path }}" alt="ID Front" class="img-fluid rounded shadow" style="max-height: 250px; width: auto; cursor: pointer; border: 2px solid #e9ecef;" onclick="window.open(this.src, '_blank')">
+                          {% else %}
+                            <div class="d-flex align-items-center justify-content-center bg-light rounded" style="height: 200px; border: 2px dashed #dee2e6;">
+                              <div class="text-muted fs-7">Not Provided</div>
+                            </div>
+                          {% endif %}
+                        </div>
+                        <div class="col-md-6 text-center">
+                          <div class="d-flex align-items-center justify-content-center gap-2 mb-3">
+                            {% bs_icon 'image' color='var(--bs-danger-text-emphasis)' %}
+                            <h6 class="mb-0 text-muted fw-semibold">ID Back</h6>
+                          </div>
+                          {% if profile.valid_id_back_img_path %}
+                            <img src="{{ profile.valid_id_back_img_path }}" alt="ID Back" class="img-fluid rounded shadow" style="max-height: 250px; width: auto; cursor: pointer; border: 2px solid #e9ecef;" onclick="window.open(this.src, '_blank')">
+                          {% else %}
+                            <div class="d-flex align-items-center justify-content-center bg-light rounded" style="height: 200px; border: 2px dashed #dee2e6;">
+                              <div class="text-muted fs-7">Not Provided</div>
+                            </div>
+                          {% endif %}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Security Tab -->
+            <div class="tab-pane fade" id="security">
+              <div class="row g-4">
+                <!-- Account Information -->
+                <div class="col-12">
+                  <div class="settings-card card">
+                    <div class="card-body">
+                      <h6 class="card-title d-flex align-items-center gap-2 mb-4">
+                        {% bs_icon 'person-circle' %} Account Information
+                      </h6>
+                      <div class="row g-3">
+                        <div class="col-md-4">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'person-fill' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Username</small>
+                            </div>
+                            <div class="fw-bold text-dark">{{ profile.username|default:"—" }}</div>
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'envelope-fill' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Email</small>
+                            </div>
+                            {% if profile.email_address %}
+                              <div class="fw-bold text-dark">{{ profile.email_address }}</div>
+                            {% else %}
+                              <div class="text-muted">Not Provided</div>
+                            {% endif %}
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'shield-check' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Account Status</small>
+                            </div>
+                            <div class="fw-bold text-dark">{{ profile.account_status|title|default:"—" }}</div>
+                          </div>
+                        </div>
+                        <div class="col-md-6">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'calendar-check' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Account Start</small>
+                            </div>
+                            <div class="fw-bold text-dark">{{ profile.date_started|date:"M d, Y"|default:"—" }}</div>
+                          </div>
+                        </div>
+                        <div class="col-md-6">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'calendar-x' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Account End</small>
+                            </div>
+                            <div class="fw-bold text-dark">{{ profile.date_ended|date:"M d, Y"|default:"-" }}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Change Password -->
+                <div class="col-12">
+                  <div class="settings-card card">
+                    <div class="card-body">
+                      <div class="d-flex align-items-center justify-content-between mb-4">
+                        <h6 class="card-title d-flex align-items-center gap-2 mb-0">
+                          {% bs_icon 'key-fill' %} Change Password
+                        </h6>
+                        <button type="button" class="btn btn-submit btn-sm" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+                          {% bs_icon 'pencil-square' %} Change Password
+                        </button>
+                      </div>
+                      <p class="text-muted mb-0">Update your password to keep your account secure.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <div class="settings-card card">
+                    <div class="card-body">
+                      <h5 class="card-title d-flex align-items-center gap-2 mb-4">
+                        {% bs_icon 'shield-check' %} Security Status
+                      </h5>
+                      
+                      <div class="row g-3">
+                        <div class="col-md-6">
+                          <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded-3">
+                            <div>
+                              <div class="fw-bold">Password Status</div>
+                              <small class="text-muted">Password security level</small>
+                            </div>
+                            {% if is_secure_pass %}
+                              <span class="security-badge security-verified">Secure</span>
+                            {% else %}
+                              <span class="security-badge security-pending">Needs Update</span>
+                            {% endif %}
+                          </div>
+                          {% if not is_secure_pass %}
+                            <div class="mt-2 p-3 bg-warning bg-opacity-10 border border-warning border-opacity-25 rounded-3">
+                              <small class="text-warning-emphasis fw-medium">
+                                {% bs_icon 'info-circle-fill' %} Kindly change your password at your earliest convenience to maintain account security.
+                              </small>
+                            </div>
+                          {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                          <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded-3">
+                            <div>
+                              <div class="fw-bold">Account Status</div>
+                              <small class="text-muted">Current account state</small>
+                            </div>
+                            {% if is_account_active %}
+                              <span class="security-badge security-verified">{{ profile.account_status|title }}</span>
+                            {% else %}
+                              <span class="security-badge security-pending">{{ profile.account_status|title }}</span>
+                            {% endif %}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Activity Log Tab -->
+            <div class="tab-pane fade" id="activity">
+              <div class="row g-4">
+                <!-- Access Log -->
+                <div class="col-12">
+                  <div class="settings-card card">
+                    <div class="card-body">
+                      <h6 class="card-title d-flex align-items-center gap-2 mb-4">
+                        {% bs_icon 'door-open' %} Access Log
+                      </h6>
+                      <div class="d-flex flex-column gap-3" style="max-height: 400px; overflow-y: auto;">
+                        {% for log in access_logs|slice:":10" %}
+                        <div class="d-flex align-items-center p-3 rounded-4" style="background: linear-gradient(135deg, {% if log.action == 'login' %}#e8f5e8, #f0f9f0{% else %}#f8f9fa, #e9ecef{% endif %}); border-left: 4px solid {% if log.action == 'login' %}#198754{% else %}#6c757d{% endif %};">
+                          <div class="me-3">
+                            <div class="d-flex align-items-center justify-content-center rounded-circle" style="width: 40px; height: 40px; background: {% if log.action == 'login' %}#198754{% else %}#6c757d{% endif %}; color: white;">
+                              {% if log.action == 'login' %}{% bs_icon 'box-arrow-in-right' %}{% else %}{% bs_icon 'box-arrow-right' %}{% endif %}
+                            </div>
+                          </div>
+                          <div class="flex-grow-1">
+                            <div class="fw-bold text-dark">{{ log.action|title }}</div>
+                            <small class="text-muted">{{ log.timestamp|date:"M d, Y - g:i A" }}</small>
+                          </div>
+                        </div>
+                        {% empty %}
+                        <div class="text-center text-muted py-4">No access logs available</div>
+                        {% endfor %}
+                      </div>
+                      {% if access_logs|length > 10 %}
+                      <div class="text-center mt-3">
+                        <small class="text-muted">Showing latest 10 of {{ access_logs|length }} entries</small>
+                      </div>
+                      {% endif %}
+
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Operations Log -->
+                <div class="col-12">
+                  <div class="settings-card card">
+                    <div class="card-body">
+                      <h6 class="card-title d-flex align-items-center gap-2 mb-4">
+                        {% bs_icon 'gear' %} Operation Log
+                      </h6>
+                      <div class="d-flex flex-column gap-3" style="max-height: 400px; overflow-y: auto;">
+                        {% for log in operation_logs|slice:":10" %}
+                        <div class="d-flex align-items-center p-3 rounded-4" style="background: linear-gradient(135deg, {% if log.type == 'profile' %}#e7f3ff, #f0f8ff{% else %}#fff3cd, #fef9e7{% endif %}); border-left: 4px solid {% if log.type == 'profile' %}#0d6efd{% else %}#ffc107{% endif %};">
+                          <div class="me-3">
+                            <div class="d-flex align-items-center justify-content-center rounded-circle" style="width: 40px; height: 40px; background: {% if log.type == 'profile' %}#0d6efd{% else %}#ffc107{% endif %}; color: {% if log.type == 'profile' %}white{% else %}#212529{% endif %};">
+                              {% if log.type == 'profile' %}{% bs_icon 'person-gear' %}{% else %}{% bs_icon 'shield-lock' %}{% endif %}
+                            </div>
+                          </div>
+                          <div class="flex-grow-1">
+                            <div class="fw-bold text-dark">{{ log.operation }}</div>
+                            <small class="text-muted">{{ log.timestamp|date:"M d, Y - g:i A" }} • {{ log.details }}</small>
+                          </div>
+                        </div>
+                        {% empty %}
+                        <div class="text-center text-muted py-4">No operation logs available</div>
+                        {% endfor %}
+                      </div>
+                      {% if operation_logs|length > 10 %}
+                      <div class="text-center mt-3">
+                        <small class="text-muted">Showing latest 10 of {{ operation_logs|length }} entries</small>
+                      </div>
+                      {% endif %}
+
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Change Password Modal -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1" aria-labelledby="changePasswordModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 500px;">
+    <div class="modal-content border-0 shadow-lg px-4" style="border-radius: 16px; overflow: hidden;">
+      <div class="modal-header border-0" style="color: rgb(20, 20, 20);">
+        <h5 class="modal-title" id="changePasswordModalLabel" style="margin-top: 8px;">Change Password</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" id="changePasswordForm">
+        {% csrf_token %}
+        <input type="hidden" name="form_type" value="password">
+        <div class="modal-body">
+          <!-- Validation Message -->
+          <div id="password-validation-message" class="alert alert-warning small mb-3" style="display: none;"></div>
+          
+          <div class="form-floating mb-3">
+            {{ change_password_form.current_password }}
+            <label for="{{ change_password_form.current_password.id_for_label }}">{{ change_password_form.current_password.label }}</label>
+            <button type="button"
+                    class="btn toggle-password position-absolute top-50 end-0 translate-middle-y me-3 p-0"
+                    data-target="{{ change_password_form.current_password.id_for_label }}"
+                    style="background: none; border: none; cursor: pointer;">
+                <small>Show</small>
+            </button>
+          </div>
+          
+          <div class="form-floating mb-3">
+            {{ change_password_form.new_password }}
+            <label for="{{ change_password_form.new_password.id_for_label }}">{{ change_password_form.new_password.label }}</label>
+            <button type="button"
+                    class="btn toggle-password position-absolute top-50 end-0 translate-middle-y me-3 p-0"
+                    data-target="{{ change_password_form.new_password.id_for_label }}"
+                    style="background: none; border: none; cursor: pointer;">
+                <small>Show</small>
+            </button>
+          </div>
+
+          <div class="form-floating mb-3">
+            {{ change_password_form.confirm_password }}
+            <label for="{{ change_password_form.confirm_password.id_for_label }}">{{ change_password_form.confirm_password.label }}</label>
+            <button type="button"
+                    class="btn toggle-password position-absolute top-50 end-0 translate-middle-y me-3 p-0"
+                    data-target="{{ change_password_form.confirm_password.id_for_label }}"
+                    style="background: none; border: none; cursor: pointer;">
+                <small>Show</small>
+            </button>
+          </div>
+          
+          <!-- Password Strength Indicator -->
+          <div class="d-flex align-items-center mb-3">
+            <small class="text-muted me-2">Strength:</small>
+            <div class="progress flex-grow-1 me-2" style="height: 8px; border-radius: 4px;">
+              <div id="modal-strength-bar" class="progress-bar" style="width: 0%; transition: all 0.3s; border-radius: 4px;"></div>
+            </div>
+            <small id="modal-strength-text" class="text-muted fw-medium" style="min-width: 60px;">Weak</small>
+          </div>
+          
+          <!-- Password Requirements Checklist -->
+          <div id="modal-password-requirements" class="mb-4">
+            <div class="row g-2 small">
+              <div class="col-12 col-sm-6">
+                <div id="modal-req-length" class="text-muted mb-1">
+                  <span class="me-2">✗</span>At least 8 characters
+                </div>
+                <div id="modal-req-upper" class="text-muted mb-1">
+                  <span class="me-2">✗</span>Uppercase letter (A-Z)
+                </div>
+                <div id="modal-req-lower" class="text-muted mb-1">
+                  <span class="me-2">✗</span>Lowercase letter (a-z)
+                </div>
+              </div>
+              <div class="col-12 col-sm-6">
+                <div id="modal-req-number" class="text-muted mb-1">
+                  <span class="me-2">✗</span>Number (0-9)
+                </div>
+                <div id="modal-req-special" class="text-muted mb-1">
+                  <span class="me-2">✗</span>Special character (@, #, $, etc.)
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-0 justify-content-between">
+          <button type="button" class="btn btn-reset" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-submit" id="proceed-btn">Proceed</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Email Verification Modal -->
+<div class="modal fade" id="emailVerificationModal" tabindex="-1" aria-labelledby="emailVerificationModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+    <div class="modal-content border-0 shadow-lg px-4" style="border-radius: 16px; overflow: hidden;">
+      <div class="modal-header border-0" style="color: rgb(20, 20, 20);">
+        <h5 class="modal-title" id="emailVerificationModalLabel" style="margin-top: 8px;">Email Verification</h5>
+      </div>
+      <div class="modal-body text-center">
+        <div class="mb-4">
+          <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width: 60px; height: 60px; background: var(--bs-danger-text-emphasis); color: white;">
+            {% bs_icon 'envelope-fill' size='1.5em' %}
+          </div>
+          <p class="text-muted mb-0">A code has been sent to your email:</p>
+          <p class="fw-bold text-dark mb-0" id="masked-email"></p>
+        </div>
+        
+        <div class="d-flex justify-content-center gap-2 mb-4">
+          <input type="text" class="form-control text-center code-input" id="id_code1" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="id_code2" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="id_code3" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="id_code4" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="id_code5" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="id_code6" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+        </div>
+        
+        <div class="mb-4">
+          <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
+            <small class="text-muted">Code expires in:</small>
+            <span id="expiry-timer" class="fw-bold text-danger">05:00</span>
+          </div>
+          <button type="button" id="resend-code" class="btn btn-link p-0 text-decoration-none" disabled>
+            <small>Resend code in <span id="resend-timer">60</span>s</small>
+          </button>
+        </div>
+        
+        <div id="verification-message" class="alert alert-warning small mb-3" style="display: none;"></div>
+      </div>
+      <div class="modal-footer border-0 justify-content-between">
+        <button type="button" class="btn btn-reset" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" id="verify-code" class="btn btn-submit">Verify Code</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  // In-memory password cache (more secure than sessionStorage)
+  let pwdCache = { current: null, next: null, confirm: null };
+  const clearPwdCache = () => { pwdCache.current = pwdCache.next = pwdCache.confirm = null; };
+  let verificationFlow = false;
+  let resendThrottle = false;
+  let verifyAttempts = 0;
+  const MAX_VERIFY_ATTEMPTS = 3;
+  
+
+  
+  // Password toggle functionality
+  function setupPasswordToggle(passwordId, toggleId) {
+    const pwd = document.getElementById(passwordId);
+    const toggleBtn = document.getElementById(toggleId);
+
+    if (pwd && toggleBtn) {
+      const eye = toggleBtn.querySelector('.icon-eye');
+      const eyeSlash = toggleBtn.querySelector('.icon-eye-slash');
+
+      toggleBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        const makeVisible = (pwd.type === 'password');
+        pwd.type = makeVisible ? 'text' : 'password';
+
+        if (makeVisible) {
+          eye.classList.add('d-none');
+          eyeSlash.classList.remove('d-none');
+          toggleBtn.setAttribute('aria-pressed', 'true');
+        } else {
+          eyeSlash.classList.add('d-none');
+          eye.classList.remove('d-none');
+          toggleBtn.setAttribute('aria-pressed', 'false');
+        }
+
+        pwd.focus();
+      });
+    }
+  }
+
+  // Setup modal password toggles using the same style as new_password.html
+  document.addEventListener('click', function(e) {
+    const button = e.target.closest('.toggle-password');
+    if (button) {
+      const targetId = button.getAttribute('data-target');
+      const passwordField = document.getElementById(targetId);
+      
+      if (passwordField) {
+        const isPassword = passwordField.type === 'password';
+        passwordField.type = isPassword ? 'text' : 'password';
+        button.querySelector('small').textContent = isPassword ? 'Hide' : 'Show';
+      }
+    }
+  });
+  
+  // Password strength validation for modal
+  const modalPasswordInput = document.getElementById('id_new_password');
+  const modalConfirmInput = document.getElementById('id_confirm_password');
+  const modalStrengthBar = document.getElementById('modal-strength-bar');
+  const modalStrengthText = document.getElementById('modal-strength-text');
+  const modalValidationMsg = document.getElementById('password-validation-message');
+  let modalHideTimeout;
+  
+  const modalRequirements = {
+    length: { element: document.getElementById('modal-req-length'), regex: /.{8,}/ },
+    upper: { element: document.getElementById('modal-req-upper'), regex: /[A-Z]/ },
+    lower: { element: document.getElementById('modal-req-lower'), regex: /[a-z]/ },
+    number: { element: document.getElementById('modal-req-number'), regex: /[0-9]/ },
+    special: { element: document.getElementById('modal-req-special'), regex: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/ }
+  };
+  
+  if (modalPasswordInput) {
+    modalPasswordInput.addEventListener('input', function() {
+      const password = this.value;
+      let score = 0;
+      
+      Object.keys(modalRequirements).forEach(key => {
+        const req = modalRequirements[key];
+        const met = req.regex.test(password);
+        
+        if (met) {
+          score++;
+          req.element.className = 'text-success mb-1';
+          req.element.querySelector('span').textContent = '✓';
+        } else {
+          req.element.className = 'text-muted mb-1';
+          req.element.querySelector('span').textContent = '✗';
+        }
+      });
+      
+      const percentage = (score / 5) * 100;
+      modalStrengthBar.style.width = percentage + '%';
+      
+      if (score === 0) {
+        modalStrengthBar.className = 'progress-bar bg-secondary';
+        modalStrengthText.textContent = 'Weak';
+        modalStrengthText.className = 'text-muted ms-2';
+      } else if (score <= 2) {
+        modalStrengthBar.className = 'progress-bar bg-danger';
+        modalStrengthText.textContent = 'Weak';
+        modalStrengthText.className = 'text-danger ms-2';
+      } else if (score <= 4) {
+        modalStrengthBar.className = 'progress-bar bg-warning';
+        modalStrengthText.textContent = 'Medium';
+        modalStrengthText.className = 'text-warning ms-2';
+      } else {
+        modalStrengthBar.className = 'progress-bar bg-success';
+        modalStrengthText.textContent = 'Strong';
+        modalStrengthText.className = 'text-success ms-2';
+      }
+    });
+  }
+  
+  // Form submission validation for modal
+  let emailAbortController = null;
+  const changePasswordForm = document.getElementById('changePasswordForm');
+  if (changePasswordForm) {
+    changePasswordForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const currentPassword = document.getElementById('id_current_password').value;
+      const newPassword = modalPasswordInput.value;
+      const confirmPassword = modalConfirmInput.value;
+      
+      let score = 0;
+      Object.keys(modalRequirements).forEach(key => {
+        if (modalRequirements[key].regex.test(newPassword)) score++;
+      });
+      
+      const isStrong = score === 5;
+      const hasConfirm = confirmPassword.length > 0;
+      const passwordsMatch = newPassword === confirmPassword;
+      const hasCurrent = currentPassword.length > 0;
+      
+      const passwordsAreSame = currentPassword === newPassword;
+      
+      if (!hasCurrent || !isStrong || !hasConfirm || !passwordsMatch || passwordsAreSame) {
+        clearTimeout(modalHideTimeout);
+        
+        if (!hasCurrent) {
+          modalValidationMsg.textContent = 'Please enter your current password';
+        } else if (passwordsAreSame) {
+          modalValidationMsg.textContent = 'New password must be different from current password';
+        } else if (!isStrong) {
+          modalValidationMsg.textContent = 'New password must meet all requirements above';
+        } else if (!hasConfirm) {
+          modalValidationMsg.textContent = 'Please confirm your new password';
+        } else if (!passwordsMatch) {
+          modalValidationMsg.textContent = 'Passwords do not match';
+        }
+        
+        modalValidationMsg.style.display = 'block';
+        modalHideTimeout = setTimeout(() => modalValidationMsg.style.display = 'none', 5000);
+        return;
+      }
+      
+      // Show loading state
+      const proceedBtn = document.getElementById('proceed-btn');
+      proceedBtn.disabled = true;
+      proceedBtn.textContent = 'Verifying password...';
+      
+      // Show modal loading overlay
+      const modalBody = document.querySelector('#changePasswordModal .modal-body');
+      const loadingOverlay = document.createElement('div');
+      loadingOverlay.id = 'modal-loading-overlay';
+      loadingOverlay.className = 'position-absolute w-100 h-100 d-flex align-items-center justify-content-center';
+      loadingOverlay.style.cssText = 'top: 0; left: 0; background: rgba(255,255,255,0.9); z-index: 1050; border-radius: 16px;';
+      loadingOverlay.innerHTML = `
+        <div class="text-center">
+          <div class="spinner-border text-danger mb-3" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <div class="fw-bold text-dark">Verifying password...</div>
+        </div>
+      `;
+      modalBody.style.position = 'relative';
+      modalBody.appendChild(loadingOverlay);
+      
+      // Send verification code via AJAX
+      emailAbortController = new AbortController();
+      const formData = new FormData();
+      formData.append('form_type', 'send_code');
+      formData.append('current_password', currentPassword);
+      formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+      
+      fetch(window.location.href, {
+        method: 'POST',
+        body: formData,
+        signal: emailAbortController.signal
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Update loading message to sending code
+          const overlay = document.getElementById('modal-loading-overlay');
+          if (overlay) {
+            overlay.innerHTML = `
+              <div class="text-center">
+                <div class="spinner-border text-danger mb-3" role="status" style="width: 3rem; height: 3rem;">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                <div class="fw-bold text-dark">Sending verification code to your email...</div>
+              </div>
+            `;
+          }
+          proceedBtn.textContent = 'Sending code...';
+          
+          // Simulate sending delay then proceed
+          setTimeout(() => {
+            // Reset button state and remove loading overlay
+            proceedBtn.disabled = false;
+            proceedBtn.textContent = 'Proceed';
+            const overlay = document.getElementById('modal-loading-overlay');
+            if (overlay) overlay.remove();
+          // Store password data in memory (more secure)
+          pwdCache.current = currentPassword;
+          pwdCache.next = newPassword;
+          pwdCache.confirm = confirmPassword;
+          
+          // Clear password fields from DOM immediately
+          document.getElementById('id_current_password').value = '';
+          document.getElementById('id_new_password').value = '';
+          document.getElementById('id_confirm_password').value = '';
+          
+          // Set masked email
+          const email = '{{ profile.email_address|default:"" }}';
+          if (email) {
+            const [localPart, domain] = email.split('@');
+            const maskedLocal = localPart.charAt(0) + '*'.repeat(Math.max(0, localPart.length - 2)) + localPart.slice(-1);
+            document.getElementById('masked-email').textContent = maskedLocal + '@' + domain;
+          }
+          
+          // Set verification flow flag and hide change password modal
+          verificationFlow = true;
+          const changePasswordModal = bootstrap.Modal.getInstance(document.getElementById('changePasswordModal'));
+          changePasswordModal.hide();
+          }, 1500);
+        } else {
+          // Reset button state and remove loading overlay
+          proceedBtn.disabled = false;
+          proceedBtn.textContent = 'Proceed';
+          const overlay = document.getElementById('modal-loading-overlay');
+          if (overlay) overlay.remove();
+          
+          // Show specific error message
+          clearTimeout(modalHideTimeout);
+          let errorMessage = 'Failed to send verification code';
+          if (data.error && data.error.includes('email')) {
+            errorMessage = 'Failed to send verification email. Please check your email address or try again later.';
+          } else if (data.error) {
+            errorMessage = data.error;
+          }
+          modalValidationMsg.textContent = errorMessage;
+          modalValidationMsg.style.display = 'block';
+          modalHideTimeout = setTimeout(() => modalValidationMsg.style.display = 'none', 5000);
+        }
+      })
+      .catch(error => {
+        // Reset button state and remove loading overlay
+        proceedBtn.disabled = false;
+        proceedBtn.textContent = 'Proceed';
+        const overlay = document.getElementById('modal-loading-overlay');
+        if (overlay) overlay.remove();
+        
+        // Show error message only if not aborted
+        if (error.name !== 'AbortError') {
+          clearTimeout(modalHideTimeout);
+          modalValidationMsg.textContent = 'Network error. Please try again.';
+          modalValidationMsg.style.display = 'block';
+          modalHideTimeout = setTimeout(() => modalValidationMsg.style.display = 'none', 3000);
+        }
+      });
+    });
+  }
+
+  // Staff image cropping and upload
+  let cropper;
+  
+
+  
+  window.previewAndSubmit = function(input) {
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file.');
+        input.value = ''; // Clear the input
+        return;
+      }
+      
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size must be less than 5MB.');
+        input.value = ''; // Clear the input
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        showCropModal(e.target.result);
+      };
+      reader.onerror = function() {
+        alert('Error reading file.');
+        input.value = ''; // Clear the input
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Smaller crop modal
+  function showCropModal(imageSrc) {
+    // Backdrop
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop fade show';
+    backdrop.id = 'cropBackdrop';
+    backdrop.style.cssText = 'z-index:1040;background-color:rgba(0,0,0,.5);';
+    document.body.appendChild(backdrop);
+
+    // lock scroll like Bootstrap
+    document.body.classList.add('modal-open');
+
+    // Modal container
+    const modal = document.createElement('div');
+    modal.className = 'modal fade show';
+    modal.id = 'cropModal';
+    modal.tabIndex = -1;
+    modal.style.cssText = 'display:block;z-index:1050;';
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content settings-card">
+          <div class="modal-header border-0">
+            <h6 class="modal-title d-flex align-items-center gap-2 mb-0">
+              <i class="bi bi-crop"></i> Crop Image
+            </h6>
+          </div>
+          <div class="modal-body p-3">
+            <div id="cropBox">
+              <img id="cropImage" src="${imageSrc}">
+            </div>
+          </div>
+          <div class="modal-footer border-0 d-flex justify-content-between">
+            <button type="button" class="btn btn-reset" id="cancelBtn" onclick="closeCropModal()">Cancel</button>
+            <div class="ms-auto">
+              <button type="button" class="btn btn-submit" id="addBtn" onclick="cropAndUpload()">
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    // Initialize Cropper after layout paints
+    setTimeout(() => {
+      const img = document.getElementById('cropImage');
+      cropper = new Cropper(img, {
+        aspectRatio: 1,
+        viewMode: 1,
+        autoCropArea: 0.9,
+        dragMode: 'move',
+        background: false,
+        responsive: true,
+        checkOrientation: false
+      });
+    }, 50);
+  }
+  
+  window.closeCropModal = function() {
+    if (cropper) {
+      cropper.destroy();
+      cropper = null;
+    }
+    const modal = document.getElementById('cropModal');
+    const backdrop = document.getElementById('cropBackdrop');
+    if (modal) modal.remove();
+    if (backdrop) backdrop.remove();
+    document.body.classList.remove('modal-open');
+    
+    // Clear file input to allow selecting the same file again
+    const fileInput = document.getElementById('profilePhoto');
+    if (fileInput) fileInput.value = '';
+  };
+  
+  window.cropAndUpload = function() {
+    if (!cropper) return;
+    
+    // Show loading state immediately and disable modal close
+    const addBtn = document.getElementById('addBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const modal = document.getElementById('cropModal');
+    const cropImage = document.getElementById('cropImage');
+    const modalBody = modal.querySelector('.modal-body');
+    
+    if (addBtn) addBtn.disabled = true;
+    if (cancelBtn) cancelBtn.classList.add('d-none');
+    if (modal) modal.setAttribute('data-bs-backdrop', 'static');
+    if (cropImage) cropImage.style.pointerEvents = 'none';
+    
+    // Disable cropper interaction
+    if (cropper) cropper.disable();
+    
+    // Show modal loading overlay
+    const loadingOverlay = document.createElement('div');
+    loadingOverlay.id = 'crop-loading-overlay';
+    loadingOverlay.className = 'position-absolute w-100 h-100 d-flex align-items-center justify-content-center';
+    loadingOverlay.style.cssText = 'top: 0; left: 0; background: rgba(255,255,255,0.9); z-index: 1050; border-radius: 16px;';
+    loadingOverlay.innerHTML = `
+      <div class="text-center">
+        <div class="spinner-border text-danger mb-3" role="status" style="width: 3rem; height: 3rem;">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <div class="fw-bold text-dark">Uploading image...</div>
+      </div>
+    `;
+    modalBody.style.position = 'relative';
+    modalBody.appendChild(loadingOverlay);
+    
+    const canvas = cropper.getCroppedCanvas({ width: 320, height: 320 });
+    canvas.toBlob(function(blob) {
+      const formData = new FormData();
+      formData.append('staff_img', blob, 'cropped_image.jpg');
+      formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+      
+      fetch(window.location.href, {
+        method: 'POST',
+        body: formData
+      }).then(response => response.json())
+      .then(data => {
+        if (data.success && data.new_image_url) {
+          // Update loading message to success
+          const overlay = document.getElementById('crop-loading-overlay');
+          if (overlay) {
+            overlay.innerHTML = `
+              <div class="text-center">
+                <div class="spinner-border text-success mb-3" role="status" style="width: 3rem; height: 3rem;">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                <div class="fw-bold text-dark">Photo updated successfully!</div>
+              </div>
+            `;
+          }
+          
+          // Update all profile images immediately
+          const timestamp = Date.now();
+          const newImageUrl = data.new_image_url + '?t=' + timestamp;
+          
+          // Update sidebar profile image
+          const sidebarImg = document.querySelector('.settings-nav img.profile-avatar');
+          if (sidebarImg) sidebarImg.src = newImageUrl;
+          
+          // Update profile tab image
+          const profileImg = document.getElementById('profilePreview');
+          if (profileImg && profileImg.tagName === 'IMG') {
+            profileImg.src = newImageUrl;
+          }
+          
+          // Update header profile image
+          const headerImg = document.querySelector('header img[alt="Profile"]');
+          if (headerImg) headerImg.src = newImageUrl;
+          
+          // Close modal after brief delay
+          setTimeout(() => {
+            closeCropModal();
+          }, 1500);
+        } else {
+          // Reset button state on error
+          const overlay = document.getElementById('crop-loading-overlay');
+          if (overlay) overlay.remove();
+          if (addBtn) addBtn.disabled = false;
+          if (cancelBtn) cancelBtn.classList.remove('d-none');
+          if (cropImage) cropImage.style.pointerEvents = 'auto';
+          if (cropper) cropper.enable();
+          alert('Failed to update profile photo');
+        }
+      }).catch(error => {
+        // Reset button state on error
+        const overlay = document.getElementById('crop-loading-overlay');
+        if (overlay) overlay.remove();
+        if (addBtn) addBtn.disabled = false;
+        if (cancelBtn) cancelBtn.classList.remove('d-none');
+        if (cropImage) cropImage.style.pointerEvents = 'auto';
+        if (cropper) cropper.enable();
+        alert('Error uploading photo: ' + error.message);
+      });
+    }, 'image/jpeg', 0.85);
+  };
+  
+  // Email verification modal functionality
+  let expiryTimer, resendTimer;
+  let expiryTime = 300; // 5 minutes
+  let resendTime = 60; // 1 minute
+  
+  function startExpiryTimer() {
+    const timerElement = document.getElementById('expiry-timer');
+    expiryTimer = setInterval(() => {
+      const minutes = Math.floor(expiryTime / 60);
+      const seconds = expiryTime % 60;
+      timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      
+      if (expiryTime <= 0) {
+        clearInterval(expiryTimer);
+        document.getElementById('verification-message').textContent = 'Code has expired. Please request a new code.';
+        document.getElementById('verification-message').style.display = 'block';
+        document.getElementById('verify-code').disabled = true;
+        
+        // Disable all code input fields
+        for (let i = 1; i <= 6; i++) {
+          document.getElementById(`id_code${i}`).disabled = true;
+        }
+      }
+      expiryTime--;
+    }, 1000);
+  }
+  
+  function startResendTimer() {
+    const resendBtn = document.getElementById('resend-code');
+    const timerElement = document.getElementById('resend-timer');
+    
+    resendTimer = setInterval(() => {
+      timerElement.textContent = resendTime;
+      
+      if (resendTime <= 0) {
+        clearInterval(resendTimer);
+        resendBtn.disabled = false;
+        resendBtn.innerHTML = '<small>Resend code</small>';
+      }
+      resendTime--;
+    }, 1000);
+  }
+  
+  // Code input navigation
+  document.addEventListener('input', function(e) {
+    if (e.target.id && e.target.id.startsWith('id_code')) {
+      const currentIndex = parseInt(e.target.id.replace('id_code', ''));
+      if (e.target.value && currentIndex < 6) {
+        document.getElementById(`id_code${currentIndex + 1}`)?.focus();
+      }
+    }
+  });
+  
+  document.addEventListener('keydown', function(e) {
+    if (e.target.id && e.target.id.startsWith('id_code') && e.key === 'Backspace' && !e.target.value) {
+      const currentIndex = parseInt(e.target.id.replace('id_code', ''));
+      if (currentIndex > 1) {
+        document.getElementById(`id_code${currentIndex - 1}`)?.focus();
+      }
+    }
+  });
+  
+  // Verify code button
+  document.getElementById('verify-code')?.addEventListener('click', function() {
+    const code = Array.from({length: 6}, (_, i) => document.getElementById(`id_code${i + 1}`).value).join('');
+    const verifyBtn = this;
+    const verificationMsg = document.getElementById('verification-message');
+    
+    // Rate limit verification attempts
+    if (verifyAttempts >= MAX_VERIFY_ATTEMPTS) {
+      verificationMsg.textContent = 'Too many attempts. Please request a new code.';
+      verificationMsg.className = 'alert alert-danger small mb-3';
+      verificationMsg.style.display = 'block';
+      setTimeout(() => verificationMsg.style.display = 'none', 5000);
+      return;
+    }
+    
+    if (code.length !== 6) {
+      verificationMsg.textContent = 'Please enter all 6 digits';
+      verificationMsg.className = 'alert alert-warning small mb-3';
+      verificationMsg.style.display = 'block';
+      setTimeout(() => verificationMsg.style.display = 'none', 5000);
+      return;
+    }
+    
+    verifyAttempts++;
+    
+    // Check if code is expired
+    if (expiryTime <= 0) {
+      verificationMsg.textContent = 'Code has expired. Please request a new code.';
+      verificationMsg.className = 'alert alert-danger small mb-3';
+      verificationMsg.style.display = 'block';
+      setTimeout(() => verificationMsg.style.display = 'none', 5000);
+      return;
+    }
+    
+    // Show loading state
+    verifyBtn.disabled = true;
+    verifyBtn.innerHTML = '<div class="spinner-border spinner-border-sm me-2" role="status" style="width: 16px; height: 16px;"></div>Verifying...';
+    
+    // Show modal loading overlay
+    const modalBody = document.querySelector('#emailVerificationModal .modal-body');
+    const loadingOverlay = document.createElement('div');
+    loadingOverlay.id = 'verify-loading-overlay';
+    loadingOverlay.className = 'position-absolute w-100 h-100 d-flex align-items-center justify-content-center';
+    loadingOverlay.style.cssText = 'top: 0; left: 0; background: rgba(255,255,255,0.9); z-index: 1050; border-radius: 16px;';
+    loadingOverlay.innerHTML = `
+      <div class="text-center">
+        <div class="spinner-border text-danger mb-3" role="status" style="width: 3rem; height: 3rem;">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <div class="fw-bold text-dark">Changing password...</div>
+      </div>
+    `;
+    modalBody.style.position = 'relative';
+    modalBody.appendChild(loadingOverlay);
+    
+    // Get password data from memory cache
+    const currentPassword = pwdCache.current;
+    const newPassword = pwdCache.next;
+    const confirmPassword = pwdCache.confirm;
+    
+    // console.log('Password cache contents:', { current: !!currentPassword, next: !!newPassword, confirm: !!confirmPassword });
+    
+    if (!newPassword || !confirmPassword) {
+      verifyBtn.disabled = false;
+      verifyBtn.innerHTML = 'Verify Code';
+      const overlay = document.getElementById('verify-loading-overlay');
+      if (overlay) overlay.remove();
+      
+      verificationMsg.textContent = 'Password data not found. Please try again.';
+      verificationMsg.className = 'alert alert-danger small mb-3';
+      verificationMsg.style.display = 'block';
+      setTimeout(() => verificationMsg.style.display = 'none', 5000);
+      return;
+    }
+    
+    const formData = new FormData();
+    formData.append('form_type', 'verify_change_password');
+    formData.append('code', code);
+    formData.append('current_password', currentPassword || '');
+    formData.append('new_password', newPassword || '');
+    formData.append('confirm_password', confirmPassword || '');
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    fetch(window.location.href, {
+      method: 'POST',
+      body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+      verifyBtn.disabled = false;
+      verifyBtn.innerHTML = 'Verify Code';
+      const overlay = document.getElementById('verify-loading-overlay');
+      if (overlay) overlay.remove();
+      
+      if (data.success) {
+        verificationMsg.textContent = data.message || 'Password changed successfully!';
+        verificationMsg.className = 'alert alert-success small mb-3';
+        verificationMsg.style.display = 'block';
+        
+        // Reset verification attempts on success
+        verifyAttempts = 0;
+        
+        // Clear password cache
+        clearPwdCache();
+        
+        // Close modal after 2 seconds and reload page
+        setTimeout(() => {
+          const emailModal = bootstrap.Modal.getInstance(document.getElementById('emailVerificationModal'));
+          emailModal.hide();
+          location.reload();
+        }, 2000);
+      } else {
+        verificationMsg.textContent = data.error || 'Verification failed';
+        verificationMsg.className = 'alert alert-danger small mb-3';
+        verificationMsg.style.display = 'block';
+        setTimeout(() => verificationMsg.style.display = 'none', 5000);
+        
+        // Clear all code inputs if invalid
+        if (data.error && data.error.includes('Invalid verification code')) {
+          for (let i = 1; i <= 6; i++) {
+            document.getElementById(`id_code${i}`).value = '';
+          }
+          document.getElementById('id_code1').focus();
+        }
+      }
+    })
+    .catch(error => {
+      verifyBtn.disabled = false;
+      verifyBtn.innerHTML = 'Verify Code';
+      const overlay = document.getElementById('verify-loading-overlay');
+      if (overlay) overlay.remove();
+      verificationMsg.textContent = 'Network error. Please try again.';
+      verificationMsg.className = 'alert alert-danger small mb-3';
+      verificationMsg.style.display = 'block';
+      setTimeout(() => verificationMsg.style.display = 'none', 5000);
+    });
+  });
+  
+  // Resend code button
+  document.getElementById('resend-code')?.addEventListener('click', function() {
+    if (!this.disabled && !resendThrottle) {
+      const resendBtn = this;
+      const verificationMsg = document.getElementById('verification-message');
+      
+      // Throttle resend requests
+      resendThrottle = true;
+      setTimeout(() => { resendThrottle = false; }, 5000);
+      
+      // Show loading state
+      resendBtn.innerHTML = '<small>Sending...</small>';
+      
+      const formData = new FormData();
+      formData.append('form_type', 'resend_code');
+      formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+      
+      fetch(window.location.href, {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Reset timers and UI
+          expiryTime = 300;
+          resendTime = 60;
+          resendBtn.disabled = true;
+          resendBtn.innerHTML = '<small>Resend code in <span id="resend-timer">60</span>s</small>';
+          document.getElementById('verify-code').disabled = false;
+          
+          // Enable all code input fields
+          for (let i = 1; i <= 6; i++) {
+            document.getElementById(`id_code${i}`).disabled = false;
+          }
+          
+          // Show success message
+          verificationMsg.textContent = 'Verification code sent successfully!';
+          verificationMsg.className = 'alert alert-success small mb-3';
+          verificationMsg.style.display = 'block';
+          setTimeout(() => verificationMsg.style.display = 'none', 5000);
+          
+          // Clear existing timers
+          clearInterval(expiryTimer);
+          clearInterval(resendTimer);
+          
+          // Start new timers
+          startExpiryTimer();
+          startResendTimer();
+        } else {
+          // Show error message
+          verificationMsg.textContent = data.error || 'Failed to resend code';
+          verificationMsg.className = 'alert alert-danger small mb-3';
+          verificationMsg.style.display = 'block';
+          setTimeout(() => verificationMsg.style.display = 'none', 5000);
+          
+          // Reset button
+          resendBtn.innerHTML = '<small>Resend code</small>';
+        }
+      })
+      .catch(error => {
+        // Show error message
+        verificationMsg.textContent = 'Network error. Please try again.';
+        verificationMsg.className = 'alert alert-danger small mb-3';
+        verificationMsg.style.display = 'block';
+        setTimeout(() => verificationMsg.style.display = 'none', 5000);
+        
+        // Reset button
+        resendBtn.innerHTML = '<small>Resend code</small>';
+      });
+    }
+  });
+  
+  // Initialize timers when modal is shown
+  document.getElementById('emailVerificationModal')?.addEventListener('shown.bs.modal', function() {
+    expiryTime = 300;
+    resendTime = 60;
+    document.getElementById('id_code1').focus();
+    startExpiryTimer();
+    startResendTimer();
+  });
+  
+  // Clean up timers when modal is hidden
+  document.getElementById('emailVerificationModal')?.addEventListener('hidden.bs.modal', function() {
+    clearInterval(expiryTimer);
+    clearInterval(resendTimer);
+    // Clear all code inputs
+    for (let i = 1; i <= 6; i++) {
+      document.getElementById(`id_code${i}`).value = '';
+    }
+    document.getElementById('verification-message').style.display = 'none';
+    
+    // Clear verification code from server
+    const formData = new FormData();
+    formData.append('form_type', 'clear_code');
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    fetch(window.location.href, { method: 'POST', body: formData }).catch(() => {});
+    
+    // End verification flow and clear password cache
+    verificationFlow = false;
+    clearPwdCache();
+    
+    // Clear change password modal fields too
+    document.getElementById('id_current_password').value = '';
+    document.getElementById('id_new_password').value = '';
+    document.getElementById('id_confirm_password').value = '';
+    document.getElementById('password-validation-message').style.display = 'none';
+    
+    // Reset password strength indicator
+    document.getElementById('modal-strength-bar').style.width = '0%';
+    document.getElementById('modal-strength-bar').className = 'progress-bar bg-secondary';
+    document.getElementById('modal-strength-text').textContent = 'Weak';
+    document.getElementById('modal-strength-text').className = 'text-muted ms-2';
+    
+    // Reset requirements checklist
+    Object.keys(modalRequirements).forEach(key => {
+      const req = modalRequirements[key];
+      req.element.className = 'text-muted mb-1';
+      req.element.querySelector('span').textContent = '✗';
+    });
+  });
+  
+  // Handle cancel button click to abort process
+  document.querySelector('#changePasswordModal .btn-reset')?.addEventListener('click', function() {
+    // Abort email sending if in progress
+    if (emailAbortController) {
+      emailAbortController.abort();
+      emailAbortController = null;
+    }
+    
+    // Reset button state
+    const proceedBtn = document.getElementById('proceed-btn');
+    if (proceedBtn) {
+      proceedBtn.disabled = false;
+      proceedBtn.textContent = 'Proceed';
+    }
+    
+    // Remove loading overlay if present
+    const overlay = document.getElementById('modal-loading-overlay');
+    if (overlay) overlay.remove();
+    
+    // Clear password cache
+    clearPwdCache();
+  });
+  
+  // Clear change password modal fields when cancelled
+  document.getElementById('changePasswordModal')?.addEventListener('hidden.bs.modal', function() {
+    // Abort email sending if in progress
+    if (emailAbortController) {
+      emailAbortController.abort();
+      emailAbortController = null;
+    }
+    
+    // If in verification flow, show email modal instead of clearing cache
+    if (verificationFlow) {
+      new bootstrap.Modal(document.getElementById('emailVerificationModal')).show();
+      return;
+    }
+    
+    // Clear password cache only if not in verification flow
+    clearPwdCache();
+    
+    document.getElementById('id_current_password').value = '';
+    document.getElementById('id_new_password').value = '';
+    document.getElementById('id_confirm_password').value = '';
+    document.getElementById('password-validation-message').style.display = 'none';
+    
+    // Reset password strength indicator
+    document.getElementById('modal-strength-bar').style.width = '0%';
+    document.getElementById('modal-strength-bar').className = 'progress-bar bg-secondary';
+    document.getElementById('modal-strength-text').textContent = 'Weak';
+    document.getElementById('modal-strength-text').className = 'text-muted ms-2';
+    
+    // Reset requirements checklist
+    Object.keys(modalRequirements).forEach(key => {
+      const req = modalRequirements[key];
+      req.element.className = 'text-muted mb-1';
+      req.element.querySelector('span').textContent = '✗';
+    });
+  });
+
+})();
+</script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
+{% endblock %}

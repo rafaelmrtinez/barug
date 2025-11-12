@@ -17,8 +17,24 @@
                 <li class="nav-item me-3">
                     <a class="nav-link" href="{% url 'clerk:business_list' %}">Business Records</a>
                 </li>
-                <li class="nav-item me-3">
-                    <a class="nav-link" href="">Activity Log</a>
+                <li class="nav-item dropdown me-3">
+                    <a class="nav-link dropdown-toggle" href="#" id="staffManagementDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        Staff Directory
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="staffManagementDropdown">
+                        <li><a class="dropdown-item" href="{% url 'staff_admin:staff_list' %}">Manage Staff Account</a></li>
+                        <li><a class="dropdown-item" href="{% url 'staff_admin:staff_account_requests_list' %}">Staff Account Requests</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item dropdown me-3">
+                    <a class="nav-link dropdown-toggle" href="#" id="activityLogDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        Activity Log
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="activityLogDropdown">
+                        <li><a class="dropdown-item" href="{% url 'event_logs:activity_log' %}">All Activity</a></li>
+                        <li><a class="dropdown-item" href="{% url 'event_logs:authentication_log' %}">Authentication Log</a></li>
+                        <li><a class="dropdown-item" href="{% url 'event_logs:user_reg_log' %}">User Registration Log</a></li>
+                    </ul>
                 </li>
             </ul>
         </div>

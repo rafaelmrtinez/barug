@@ -101,10 +101,10 @@
                   <div class="kv-item">
                     <span class="kv-key">Home Address</span>
                     <span class="kv-val">
-                      {{ res_details.street_name|default:""|title }},
-                      {{ res_details.purok_sitio_name|default:""|title }},
-                      {{ res_details.barangay_name|default:""|title }},
-                      {{ res_details.city_name|default:""|title }}
+                      {% if res_details.street_name %}{{ res_details.street_name|title }}{% if res_details.purok_sitio_name or res_details.barangay_name or res_details.city_name %}, {% endif %}{% endif %}
+                      {% if res_details.purok_sitio_name %}{{ res_details.purok_sitio_name|title }}{% if res_details.barangay_name or res_details.city_name %}, {% endif %}{% endif %}
+                      {% if res_details.barangay_name %}{{ res_details.barangay_name|title }}{% if res_details.city_name %}, {% endif %}{% endif %}
+                      {% if res_details.city_name %}{{ res_details.city_name|title }}{% endif %}
                     </span>
                   </div>
                   <div class="kv-item"><span class="kv-key">Email Address</span><span class="kv-val">{{ res_details.email|default:"" }}</span></div>
@@ -132,7 +132,7 @@
 
                 <div class="section-title mb-2 pt-4">Supporting Document</div>
                 <div class="kv">
-                  <div class="kv-item"><span class="kv-key">ID Type</span><span class="kv-val">{{ res_details.valid_id_type|default:"" }}</span></div>
+                  <div class="kv-item"><span class="kv-key">ID Type</span><span class="kv-val">{{ res_details.id_type_name|default:"Not Provided" }}</span></div>
 
                   {% if doc_images %}
                   <div class="doc-carousel carousel slide" id="staffDocCarousel" data-bs-ride="false" aria-label="Supporting documents">
@@ -187,7 +187,7 @@
       </div>
 
       <!-- ONLY SHOW THIS PART AFTER SELECTING A RESIDENT-->
-      <form id="controlsForm2" method="post" action="{% url 'secretary:staff_selection_resident' %}" novalidate>
+      <form id="controlsForm2" method="post" action="{% url 'secretary:staff_selection_resident' %}"  enctype="multipart/form-data" novalidate>
         {% csrf_token %}
         <input type="hidden" name="pid" id="pid" value="{{ res_details.person_id|default_if_none:'' }}">
 

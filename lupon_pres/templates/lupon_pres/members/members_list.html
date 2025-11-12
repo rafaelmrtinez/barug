@@ -26,14 +26,14 @@
           </div>
 
           {# preserve selected filters when searching #}
-          <input type="hidden" name="day" value="{{ request.GET.day|default:'' }}">
-          <input type="hidden" name="account_stat" value="{{ request.GET.account_stat|default:'' }}">
+          <input type="hidden" name="day" value="{{ current_filters.day|default:'' }}">
+          <input type="hidden" name="account_stat" value="{{ current_filters.account_stat|default:'' }}">
 
           <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
                   type="button" data-bs-toggle="offcanvas" data-bs-target="#filterPanel" aria-controls="filterPanel">
             {% bs_icon 'sliders' extra_classes='me-2' %} Filters
-            {% if request.GET.day or request.GET.account_stat %}
-              <span class="badge rounded-pill text-bg-light ms-2">•</span>
+            {% if active_filters %}
+              <span class="badge rounded-pill text-bg-light ms-2">{{ active_filters|length }}</span>
             {% endif %}
           </button>
 
@@ -44,28 +44,17 @@
 
         {% include 'partials/messages.html' %}
 
-        {# ─── Active filter chips (Day / Account Status) ─── #}
+        {# ─── Active filter chips ─── #}
         <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
-          {% if request.GET.day or request.GET.account_stat %}
+          {% if active_filters %}
             <span class="text-muted me-1">Active:</span>
-
-            {% if request.GET.day %}
-              <a class="filter-chip"
-                 href="?q={{ request.GET.q|urlencode }}{% if request.GET.account_stat %}&account_stat={{ request.GET.account_stat|urlencode }}{% endif %}">
-                Day: {{ request.GET.day }}
+            {% for filt in active_filters %}
+              <a class="filter-chip" href="{{ filt.remove_url }}">
+                {{ filt.label }}
                 <span class="x" aria-hidden="true">×</span>
               </a>
-            {% endif %}
-
-            {% if request.GET.account_stat %}
-              <a class="filter-chip"
-                 href="?q={{ request.GET.q|urlencode }}{% if request.GET.day %}&day={{ request.GET.day|urlencode }}{% endif %}">
-                Status: {{ request.GET.account_stat }}
-                <span class="x" aria-hidden="true">×</span>
-              </a>
-            {% endif %}
-
-            <a class="btn btn-sm btn-outline-brand ms-1" href="?q={{ request.GET.q|urlencode }}">
+            {% endfor %}
+            <a class="btn btn-sm btn-outline-brand ms-1" href="{{ clear_filters_url }}">
               {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
             </a>
           {% else %}
@@ -86,19 +75,26 @@
           <tbody id="staff-tbody">
             {% if page_obj.object_list %}
               {% for r in page_obj.object_list %}
-                {# data attributes to support client-side filtering #}
-                {% with sched_text=r.sched_labels|join:", "|default:"" %}
-                <tr class="table-row-height"
-                    data-days="{{ sched_text|upper }}"
-                    data-status="{{ r.account_status|default:'—'|upper }}">
+                <tr class="table-row-height">
                   <td>{{ r.full_name }}</td>
-                  <td>{{ r.role_name|default:"—" }}</td>
+                  <td>{{ r.role_name|default:"" }}</td>
                   <td>
                     {% if r.sched_labels %}
                       {{ r.sched_labels|join:"<br>"|safe }}
-                    {% else %}—{% endif %}
+                    {% else %}<span class="text-muted">Not Yet Assigned</span>{% endif %}
                   </td>
-                  <td>{{ r.account_status|default:"—" }}</td>
+                  <td>
+                    {% with s=r.account_status|default:"" %}
+                      <span class="badge
+                        {% if s|lower == 'active' %} bg-success
+                        {% elif s|lower == 'pending' %} bg-warning text-dark
+                        {% elif s|lower == 'inactive' %} bg-secondary
+                        {% elif s|lower == 'deactivated' %} bg-danger
+                        {% else %} bg-light text-dark
+                        {% endif %}
+                      ">{{ s|default:"—" }}</span>
+                    {% endwith %}
+                  </td>
                   <td>
                     <div class="d-flex gap-1">
                       <a class="btn btn-icon" href="{% url 'lupon_pres:mem_details' staff_code=r.staff_code %}">
@@ -107,7 +103,6 @@
                     </div>
                   </td>
                 </tr>
-                {% endwith %}
               {% endfor %}
             {% else %}
               <tr><td colspan="5" class="text-center">No records found</td></tr>
@@ -133,7 +128,7 @@
     </div>
 
     <div class="offcanvas-body">
-      <form method="get" id="filterForm">
+      <form method="get">
         <div>
           <label class="form-label">Day</label>
           {{ form.day }}
@@ -145,11 +140,11 @@
         </div>
 
         {# keep search term when applying filters #}
-        <input type="hidden" name="q" value="{{ request.GET.q|default:'' }}"/>
+        <input type="hidden" name="q" value="{{ current_filters.q|default:'' }}"/>
 
         <div class="offcanvas-footer">
           <div class="d-flex justify-content-between">
-            <a class="btn btn-outline-brand" id="filterClearBtn" href="#" type="button">Clear</a>
+            <a class="btn btn-outline-brand" href="{{ clear_filters_url }}">Clear</a>
             <button type="submit" class="btn btn-brand">Apply Filters</button>
           </div>
         </div>
@@ -159,110 +154,8 @@
 
 </div>
 
-<script>
-(function () {
-  const tbody = document.getElementById('staff-tbody');
-  const filterForm = document.getElementById('filterForm');
-  const clearBtn = document.getElementById('filterClearBtn');
-  const searchInput = document.querySelector('.searchbox input') || document.querySelector('input[name="search"]');
-  const pager = document.querySelector('.page-pagination');
-  if (!tbody) return;
+{% endblock %}
 
-  const originalTbodyHTML = tbody.innerHTML;
-  const originalPagerHTML = pager ? pager.innerHTML : null;
-
-  function normalize(s){ return (s||'').trim().toUpperCase(); }
-
-  function applyClientFilters(dayVal, statusVal) {
-    const rows = Array.from(tbody.querySelectorAll('tr.table-row-height'));
-    const d = normalize(dayVal);
-    const st = normalize(statusVal);
-
-    let shown = 0;
-    rows.forEach(tr => {
-      const days = tr.getAttribute('data-days') || '';
-      const status = tr.getAttribute('data-status') || '';
-      const matchDay = !d || (days.includes(d));     // simple contains (e.g., "MON", "TUE")
-      const matchStat = !st || (status === st);
-      const show = (matchDay && matchStat);
-      tr.style.display = show ? '' : 'none';
-      if (show) shown++;
-    });
-
-    // When we do client-side filtering, paginator UI becomes stale
-    if (pager) pager.innerHTML = '';
-    if (!shown) {
-      // If nothing matched, show a single empty row
-      tbody.querySelectorAll('tr').forEach(tr => tr.style.display = 'none');
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="5" class="text-center">No records found</td>`;
-      tbody.appendChild(tr);
-    }
-  }
-
-  // Submit = client-side filter
-  if (filterForm) {
-    filterForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const daySel = filterForm.querySelector('select[name="day"]');
-      const accSel = filterForm.querySelector('select[name="account_stat"]');
-      const dayVal = daySel && daySel.value ? daySel.value : '';
-      const accVal = accSel && accSel.value ? accSel.value : '';
-      if (searchInput) searchInput.value = '';
-      applyClientFilters(dayVal, accVal);
-      try {
-        const panel = document.getElementById('filterPanel');
-        if (panel) bootstrap.Offcanvas.getOrCreateInstance(panel).hide();
-      } catch {}
-    });
-  }
-
-  if (clearBtn) {
-    clearBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      const daySel = filterForm ? filterForm.querySelector('select[name="day"]') : null;
-      const accSel = filterForm ? filterForm.querySelector('select[name="account_stat"]') : null;
-      if (daySel) daySel.value = '';
-      if (accSel) accSel.value = '';
-      if (searchInput) searchInput.value = '';
-      tbody.innerHTML = originalTbodyHTML;
-      if (pager && originalPagerHTML !== null) pager.innerHTML = originalPagerHTML;
-      try {
-        const panel = document.getElementById('filterPanel');
-        if (panel) bootstrap.Offcanvas.getOrCreateInstance(panel).hide();
-      } catch {}
-    });
-  }
-
-  // Lightweight live search (client-side: filters rows by text)
-  let debounceTimer = null;
-  function doSearch(q) {
-    const needle = (q || '').trim().toLowerCase();
-    const rows = Array.from(tbody.querySelectorAll('tr.table-row-height'));
-    let shown = 0;
-    rows.forEach(tr => {
-      const txt = tr.textContent.toLowerCase();
-      const show = !needle || txt.includes(needle);
-      tr.style.display = show ? '' : 'none';
-      if (show) shown++;
-    });
-    if (pager) pager.innerHTML = '';
-    if (!shown) {
-      rows.forEach(tr => tr.style.display = 'none');
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="5" class="text-center">No records found</td>`;
-      tbody.appendChild(tr);
-    }
-  }
-
-  const searchEl = searchInput;
-  if (searchEl) {
-    searchEl.addEventListener('input', () => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => doSearch(searchEl.value), 250);
-    });
-  }
-})();
-</script>
-
+{% block js %}
+{{ block.super }}
 {% endblock %}

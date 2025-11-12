@@ -70,7 +70,9 @@ BUSINESS_STATUS_CHOICES = [
 ROLE_CHOICES = [
     (3,  "Barangay Captain"), (4,  "Barangay Secretary"),(5,  "Barangay Treasurer"), 
     (6,  "Barangay Clerk"), (7,  "Barangay Lupon President"), (8,  "Barangay Lupon Member"), 
-    (9,  "Barangay Health Worker"), (10, "Nurse"), (11, "Midwife"),
+    (9,  "Barangay Health Worker"), 
+    # (10, "Nurse"), 
+    (11, "Midwife"),
 ]
 
 PUROK_CHOICES = [

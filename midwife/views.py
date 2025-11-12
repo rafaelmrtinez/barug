@@ -87,6 +87,8 @@ from .forms import (
     ResidentProfileform,
     ChooseRole,
     StaffFilters,
+    StaffUpdateForm,
+    PUROK_CHOICES,
 )
 
 # Service helpers (unchanged)
@@ -129,10 +131,32 @@ user_role_template = user_role.lower().replace(" ", "_")
 
 ROLE_BHW = 9
 ROLE_LUPON = 8
+ROLE_BHW_NAME = "BARANGAY HEALTH WORKER"
+STAFF_FILTER_SESSION_KEY = "midwife_staff_filters"
 WZ_KEY = "staff_nonres_wizard"
 
 BUCKET_FINAL = getattr(settings, "SUPABASE_ID_UPLOADS_BUCKET", "id-uploads")
 BUCKET_STAFF_PROOF = getattr(settings, "SUPABASE_STAFF_PROOF_BUCKET", "staff-proof")
+
+
+def _is_bhw_row(row: Dict[str, Any]) -> bool:
+    if not isinstance(row, dict):
+        return False
+    role_id = row.get("role_id")
+    try:
+        if role_id is not None and int(role_id) == ROLE_BHW:
+            return True
+    except (TypeError, ValueError):
+        pass
+    role_name = (row.get("role_name") or "").strip().upper()
+    return role_name == ROLE_BHW_NAME
+
+
+def _filter_bhw_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not rows:
+        return []
+    return [r for r in rows if _is_bhw_row(r)]
+
 
 # -------------------- Small utilities (unchanged) --------------------
 def _age_from_birthdate_py(bd: Any):
@@ -1017,6 +1041,7 @@ def resident_suggest(request: HttpRequest) -> JsonResponse:
 @require_http_methods(["GET", "POST"])
 def staff_selection_resident(request: HttpRequest) -> HttpResponse:
     pid = (request.POST.get("pid") or "").strip()
+    # print("session", request.session.get("auth",{}).get("staff_id",{}))
 
     # role_str = (
     #     (request.POST.get("role") or "").strip()
@@ -1024,10 +1049,20 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
     # )
     role_id = ROLE_BHW
 
-    logger.error("staff_selection_resident ▶ pid=%s role_id=%s", pid, role_id)
+    logger.error("staff_selection_resident -> pid=%s role_id=%s", pid, role_id)
+
+    proof_file = None
+    if hasattr(request, "FILES"):
+        proof_file = (
+            request.FILES.get("proof")
+            or request.FILES.get("proof_file")
+            or None
+        )
 
     proof_url = (request.POST.get("proof") or "").strip() or None
-    proof_file = request.FILES.get("proof_file") if hasattr(request, "FILES") else None
+    if proof_url and not proof_url.startswith(("http://", "https://", "data:")):
+        logger.warning("Ignoring non-URL, non-data proof value: %r", proof_url)
+        proof_url = None
 
     auth = request.session.get("auth") or {}
     staff_id = auth.get("staff_id")
@@ -1044,8 +1079,15 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
     purok_ids = sorted(set(purok_ids))
 
     if request.method == "POST":
-        logger.debug("POST ▶ pid=%s role_id=%s staff_id=%s purok_ids=%s proof_url=%s file=%s",
-                     pid, role_id, staff_id, purok_ids, bool(proof_url), bool(proof_file))
+        logger.debug(
+            "POST -> pid=%s role_id=%s staff_id=%s purok_ids=%s proof_url=%s file=%s",
+            pid,
+            role_id,
+            staff_id,
+            purok_ids,
+            bool(proof_url),
+            bool(proof_file),
+        )
 
     if request.method == "POST" and pid:
         if not (pid or role_id or proof_file or proof_url or base_purok
@@ -1053,10 +1095,10 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
             flash_warning(request, "Please select a resident and fill out the form before submitting.")
             return redirect(request.META.get("HTTP_REFERER") or request.path)
 
-        if not staff_id:
-            logger.error("Validation ✗ Missing staff_id")
-            flash_warning(request, "Your session is missing staff credentials.")
-            return redirect(request.META.get("HTTP_REFERER") or request.path)
+        # if not staff_id:
+        #     logger.error("Validation ✗ Missing staff_id")
+        #     flash_warning(request, "Your session is missing staff credentials.")
+        #     return redirect(request.META.get("HTTP_REFERER") or request.path)
 
         if not role_id:
             logger.error("Validation ✗ No role selected.") 
@@ -1115,17 +1157,26 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
             final_base = f"staff_acc_req_proof/{pid}"
 
         uploaded_proof_url = None
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         if proof_file:
             try:
                 buf, mime, ext = _prep_image_for_upload(proof_file)
+                proof_rel_path = f"{final_base}/staff-app-proof-{role_id}-{timestamp}.{ext}"
                 res_up = _upload_to_storage_retry(
                     buf,
-                    path=f"{final_base}/staff-app-proof.{ext}",
+                    path=proof_rel_path,
                     bucket=BUCKET_FOR_PROOF,
                     content_type=mime,
                     make_public=True,
                 )
-                uploaded_proof_url = res_up.get("public_url") or res_up.get("signed_url")
+                uploaded_proof_url = (
+                    (res_up.get("public_url") if isinstance(res_up, dict) else None)
+                    or (res_up.get("signed_url") if isinstance(res_up, dict) else None)
+                )
+                if not uploaded_proof_url:
+                    logger.error("Proof upload returned no usable URL for %s", proof_rel_path)
+                    flash_system_error(request, "Proof upload did not return a usable URL.")
+                    return redirect(request.META.get("HTTP_REFERER") or request.path)
             except (DatabaseError, OperationalError, IntegrityError) as e:
                 flash_db_error(request, e)
                 return redirect(request.META.get("HTTP_REFERER") or request.path)
@@ -1140,16 +1191,29 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
                 _mime_hint, b64 = m.groups()
                 raw = io.BytesIO(base64.b64decode(b64))
                 buf, mime, ext = _prep_image_for_upload(raw)
+                proof_rel_path = f"{final_base}/staff-app-proof-{role_id}-{timestamp}.{ext}"
                 res_up = _upload_to_storage_retry(
                     buf,
-                    path=f"{final_base}/staff-app-proof.{ext}",
+                    path=proof_rel_path,
                     bucket=BUCKET_FOR_PROOF,
                     content_type=mime,
                     make_public=True,
                 )
-                uploaded_proof_url = res_up.get("public_url") or res_up.get("signed_url")
+                uploaded_proof_url = (
+                    (res_up.get("public_url") if isinstance(res_up, dict) else None)
+                    or (res_up.get("signed_url") if isinstance(res_up, dict) else None)
+                )
+                if not uploaded_proof_url:
+                    logger.error("Proof upload returned no usable URL for %s", proof_rel_path)
+                    flash_system_error(request, "Proof upload did not return a usable URL.")
+                    return redirect(request.META.get("HTTP_REFERER") or request.path)
             else:
                 uploaded_proof_url = proof_url
+
+        if uploaded_proof_url and not uploaded_proof_url.startswith(("http://", "https://")):
+            logger.error("Refusing to store non-URL proof value: %r", uploaded_proof_url)
+            flash_system_error(request, "Proof upload failed to produce a valid URL.")
+            return redirect(request.META.get("HTTP_REFERER") or request.path)
 
         # ===========================
         # Create staff request in DB
@@ -1190,6 +1254,13 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
             res_details = rows[0] if rows else None
 
         if res_details:
+
+            birth_display = _format_birthdate_display(
+                res_details.get("date_of_birth")
+            )
+            if birth_display:
+                res_details["birthdate_display"] = birth_display
+
             def _val(d, *keys):
                 for k in keys:
                     v = d.get(k)
@@ -1487,6 +1558,38 @@ def _upload_to_storage_retry(
             break
     raise last_err
 
+
+def _format_birthdate_display(*values: Any) -> str:
+    for raw in values:
+        if not raw:
+            continue
+
+        birth_dt: Optional[date] = None
+        if isinstance(raw, datetime):
+            birth_dt = raw.date()
+        elif isinstance(raw, date):
+            birth_dt = raw
+        else:
+            txt = str(raw).strip()
+            if not txt:
+                continue
+            try:
+                birth_dt = date.fromisoformat(txt[:10])
+            except Exception:
+                for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"):
+                    try:
+                        birth_dt = datetime.strptime(txt, fmt).date()
+                        break
+                    except Exception:
+                        continue
+            if birth_dt is None:
+                return txt
+
+        if birth_dt is not None:
+            return birth_dt.strftime("%B %d, %Y").replace(" 0", " ")
+
+    return ""
+
 @session_login_required
 @role_required(*ROLE_MIDWIFE)
 @nocache
@@ -1508,6 +1611,13 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
             flash_warning(request, "Supporting documents are missing. Please complete Step 2.")
             return redirect("midwife:staff_selection_non-resident_docs")
 
+        personal_display = dict(personal)
+        birth_display = _format_birthdate_display(
+            personal_display.get("date_of_birth"),
+        )
+        if birth_display:
+            personal_display["birthdate_display"] = birth_display
+
         return render(
             request,
             "acc_management/role.html",
@@ -1518,7 +1628,7 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
                 "page_title": "Account Verification",
                 "user_role_template": user_role_template,
                 "role_form": role_form,
-                "personal": personal,
+                "personal": personal_display,
                 "docs": docs,
             },
         )
@@ -1556,11 +1666,11 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
         return redirect("midwife:staff_selection_non-resident_docs")
 
     auth = request.session.get("auth") or {}
-    staff_id = auth.get("staff_id") or 1
-    if not staff_id:
-        logger.error("Validation ✗ Missing staff_id")
-        flash_warning(request, "Your session is missing staff credentials.")
-        return redirect(request.META.get("HTTP_REFERER") or request.path)
+    staff_id = auth.get("staff_id")
+    # if not staff_id:
+    #     logger.error("Validation ✗ Missing staff_id")
+    #     flash_warning(request, "Your session is missing staff credentials.")
+    #     return redirect(request.META.get("HTTP_REFERER") or request.path)
 
     # decode from session (front_b64/back_b64/selfie_b64), upload now
     front_b64 = docs.get("front_b64")
@@ -1614,16 +1724,26 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
             make_public=True,
         )
 
-        up_proof = None
+        proof_url = None
         if b_proof is not None:
             p_buf, p_mime, p_ext = _prep_image_for_upload(io.BytesIO(b_proof))
+            proof_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            proof_rel_path = f"{proof_final_base}/staff-app-proof-{role_id}-{proof_timestamp}.{p_ext}"
             up_proof = _upload_to_storage_retry(
                 p_buf,
-                path=f"{proof_final_base}/staff-app-proof.{p_ext}",
+                path=proof_rel_path,
                 bucket=BUCKET_STAFF_PROOF,
                 content_type=p_mime,
                 make_public=True,
             )
+            proof_url = (
+                (up_proof.get("public_url") if isinstance(up_proof, dict) else None)
+                or (up_proof.get("signed_url") if isinstance(up_proof, dict) else None)
+            )
+            if not proof_url:
+                logger.error("Non-resident proof upload returned no usable URL: %s", proof_rel_path)
+                flash_system_error(request, "Proof upload did not return a usable URL. Please try again.")
+                return redirect(request.path)
     except Exception as e:
         logger.error("Step3 ✗ Upload failed: %s", e)
         flash_system_error(request, "Final upload failed.", exc=e)
@@ -1632,7 +1752,10 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
     front_url = up_front.get("public_url") or up_front.get("signed_url")
     back_url  = up_back.get("public_url") or up_back.get("signed_url")
     self_url  = up_selfie.get("public_url") or up_selfie.get("signed_url")
-    proof_url = up_proof.get("public_url") or up_proof.get("signed_url") if up_proof else None
+    if proof_url and not proof_url.startswith(("http://", "https://")):
+        logger.error("Refusing to store non-URL proof value: %r", proof_url)
+        flash_system_error(request, "Proof upload failed to produce a valid URL.")
+        return redirect(request.path)
 
     try:
         req_id = Secretary.insert_nonres_staff_account_request(
@@ -1704,26 +1827,86 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
 @role_required(*ROLE_MIDWIFE)
 @nocache
 def staff_list(request):
+    filters = request.session.get(STAFF_FILTER_SESSION_KEY, {}) or {}
+    purok_raw = (filters.get("assigned_purok") or "").strip()
+    acc_raw = (filters.get("account_stat") or "").strip()
+    search_term = (filters.get("q") or "").strip()
+
+    updated = False
+    should_redirect = False
+
+    if "clear_filters" in request.GET:
+        purok_raw = ""
+        acc_raw = ""
+        search_term = ""
+        updated = True
+        should_redirect = True
+
+    remove_target = (request.GET.get("remove_filter") or "").strip()
+    if remove_target:
+        if remove_target == "assigned_purok":
+            purok_raw = ""
+        elif remove_target == "account_stat":
+            acc_raw = ""
+        elif remove_target == "search":
+            search_term = ""
+        updated = True
+        should_redirect = True
+
+    if "assigned_purok" in request.GET:
+        purok_raw = (request.GET.get("assigned_purok") or "").strip()
+        updated = True
+    if "account_stat" in request.GET:
+        acc_raw = (request.GET.get("account_stat") or "").strip()
+        updated = True
+    if "q" in request.GET:
+        search_term = (request.GET.get("q") or "").strip()
+        updated = True
+    if "search" in request.GET:
+        search_term = (request.GET.get("search") or "").strip()
+        updated = True
+
+    filters_state = {
+        "assigned_purok": purok_raw,
+        "account_stat": acc_raw,
+        "q": search_term,
+    }
+    if updated or STAFF_FILTER_SESSION_KEY not in request.session:
+        request.session[STAFF_FILTER_SESSION_KEY] = filters_state
+        request.session.modified = True
+
+    if should_redirect:
+        return redirect(request.path)
+
+    acc_id = int(acc_raw) if acc_raw.isdigit() else None
+    purok_id = int(purok_raw) if purok_raw.isdigit() else None
 
     try:
-        rows = Secretary.get_all_staff_info_summary() or []
+        if acc_id is not None:
+            base_rows = Secretary.filter_staff_by_role_and_account(ROLE_BHW, acc_id) or []
+        else:
+            base_rows = Secretary.get_all_staff_info_summary() or []
     except Exception as e:
         logger.exception("Failed to load staff summaries: %s", e)
-        rows = []
+        base_rows = []
 
-    ROLE_BHW_NAME = "BARANGAY HEALTH WORKER"
+    rows = _filter_bhw_rows(base_rows)
 
-    def _is_bhw(r):
-        rid = r.get("role_id")
-        if isinstance(rid, int):
-            return rid == ROLE_BHW
-        # Fallback: compare role_name (case-insensitive, strip)
-        rname = (r.get("role_name") or "").strip().upper()
-        return rname == ROLE_BHW_NAME
+    # Filter by assigned purok using purok_sitio_ids
+    if purok_id is not None:
+        filtered_rows = []
+        for r in rows:
+            purok_ids = r.get('purok_sitio_ids', [])
+            if isinstance(purok_ids, list) and purok_id in purok_ids:
+                filtered_rows.append(r)
+            elif purok_ids == purok_id:  # Handle single ID case
+                filtered_rows.append(r)
+        rows = filtered_rows
 
-    rows = [r for r in rows if _is_bhw(r)] 
+    if search_term:
+        term = search_term.lower()
+        rows = [r for r in rows if term in (r.get("full_name") or "").lower()]
 
-    # Pagination only
     from django.core.paginator import Paginator
     try:
         per_page = int(request.GET.get("per_page") or 10)
@@ -1737,17 +1920,48 @@ def staff_list(request):
     except ValueError:
         page_number = 1
 
-    form = StaffFilters()
     paginator = Paginator(rows, per_page)
     page_obj = paginator.get_page(page_number)
 
-    # Session/user display info
+    form_initial = {
+        "assigned_purok": purok_raw,
+        "account_stat": acc_raw,
+        "search": search_term,
+    }
+    form = StaffFilters(initial=form_initial)
+
+    purok_choices = {str(k): v for k, v in form.fields["assigned_purok"].choices}
+    acc_choices = {str(k): v for k, v in form.fields["account_stat"].choices}
+
+    active_filters = []
+    if purok_raw:
+        label = purok_choices.get(purok_raw) or f"Purok {purok_raw}"
+        active_filters.append({
+            "label": label,
+            "remove_url": f"{request.path}?remove_filter=assigned_purok",
+        })
+    if acc_raw:
+        label = acc_choices.get(acc_raw) or f"Status {acc_raw}"
+        active_filters.append({
+            "label": label,
+            "remove_url": f"{request.path}?remove_filter=account_stat",
+        })
+    if search_term:
+        active_filters.append({
+            "label": f"Search: \"{search_term}\"",
+            "remove_url": f"{request.path}?remove_filter=search",
+        })
+
+    clear_filters_url = f"{request.path}?clear_filters=1"
+
     auth = request.session.get("auth") or {}
     _user_fullname = auth.get("full_name") or user_fullname
     _user_role = auth.get("role_name") or user_role
     _user_role_template = (_user_role or "").lower().replace(" ", "_")
 
-    return render(request, "acc_management/staff_list.html", {
+    current_filters = filters_state
+
+    return render(request, "midwife/acc_management/staff_list.html", {
         "user_fullname": _user_fullname,
         "user_role": _user_role,
         "page_path": f"{_user_role} / Staff List",
@@ -1755,8 +1969,11 @@ def staff_list(request):
         "user_role_template": _user_role_template,
         "form": form,
         "page_obj": page_obj,
-        "total_count": paginator.count, 
+        "total_count": paginator.count,
         "per_page": per_page,
+        "active_filters": active_filters,
+        "clear_filters_url": clear_filters_url,
+        "current_filters": current_filters,
     })
 
 
@@ -1766,16 +1983,50 @@ def staff_list(request):
 @nocache
 @require_GET
 def staff_search_api(request):
-    q = (request.GET.get("q") or "").strip()
+    raw_query = (request.GET.get("q") or "").strip()
+
+    filters = request.session.get(STAFF_FILTER_SESSION_KEY, {}) or {}
+    purok_raw = (filters.get("assigned_purok") or "").strip()
+    acc_raw = (filters.get("account_stat") or "").strip()
+
+    purok_id = int(purok_raw) if purok_raw.isdigit() else None
+    acc_id = int(acc_raw) if acc_raw.isdigit() else None
+
     try:
-        if q:
-            results = Secretary.search_staff_by_name(q)[:50]
+        if acc_id is not None:
+            base_rows = Secretary.filter_staff_by_role_and_account(ROLE_BHW, acc_id) or []
         else:
-            results = Secretary.get_all_staff_info_summary()
-        return JsonResponse({"results": results})
+            base_rows = Secretary.get_all_staff_info_summary() or []
     except Exception as e:
         logger.exception("staff_search_api error: %s", e)
         return JsonResponse({"results": [], "error": "Search failed"}, status=500)
+
+    rows = _filter_bhw_rows(base_rows)
+
+    # Filter by assigned purok using purok_sitio_ids
+    if purok_id is not None:
+        filtered_rows = []
+        for r in rows:
+            purok_ids = r.get('purok_sitio_ids', [])
+            if isinstance(purok_ids, list) and purok_id in purok_ids:
+                filtered_rows.append(r)
+            elif purok_ids == purok_id:  # Handle single ID case
+                filtered_rows.append(r)
+        rows = filtered_rows
+
+    if raw_query:
+        q_lower = raw_query.lower()
+        rows = [r for r in rows if q_lower in (r.get("full_name") or "").lower()]
+
+    filters.update({
+        "assigned_purok": purok_raw,
+        "account_stat": acc_raw,
+        "q": raw_query,
+    })
+    request.session[STAFF_FILTER_SESSION_KEY] = filters
+    request.session.modified = True
+
+    return JsonResponse({"results": rows[:50]})
 
     
 @session_login_required
@@ -1783,17 +2034,31 @@ def staff_search_api(request):
 @nocache
 @require_GET
 def staff_filter_api(request):
-    role_raw = (request.GET.get("role_id") or "").strip()
+    purok_raw = (request.GET.get("assigned_purok_id") or "").strip()
     acc_raw  = (request.GET.get("account_status_id") or "").strip()
 
-    role_id = int(role_raw) if role_raw.isdigit() else None
+    purok_id = int(purok_raw) if purok_raw.isdigit() else None
     acc_id  = int(acc_raw)  if acc_raw.isdigit()  else None
 
     try:
-        if role_id is None and acc_id is None:
-            rows = Secretary.get_all_staff_info_summary()
+        if acc_id is not None:
+            base_rows = Secretary.filter_staff_by_role_and_account(ROLE_BHW, acc_id) or []
         else:
-            rows = Secretary.filter_staff_by_role_and_account(role_id, acc_id)
+            base_rows = Secretary.get_all_staff_info_summary() or []
+        
+        rows = _filter_bhw_rows(base_rows)
+        
+        # Filter by assigned purok using purok_sitio_ids
+        if purok_id is not None:
+            filtered_rows = []
+            for r in rows:
+                purok_ids = r.get('purok_sitio_ids', [])
+                if isinstance(purok_ids, list) and purok_id in purok_ids:
+                    filtered_rows.append(r)
+                elif purok_ids == purok_id:  # Handle single ID case
+                    filtered_rows.append(r)
+            rows = filtered_rows
+        
         return JsonResponse({"results": rows})
     except Exception as e:
         logger.exception("staff_filter_api error: %s", e)
@@ -1805,6 +2070,58 @@ def staff_filter_api(request):
 @role_required(*ROLE_MIDWIFE)
 @nocache
 def staff_dets(request, staff_code: str):
+    # Handle POST request for purok updates
+    if request.method == "POST":
+        auth = request.session.get("auth") or {}
+        updated_by_staff_id = auth.get("staff_id")
+        
+        # if not updated_by_staff_id:
+        #     flash_warning(request, "Your session is missing staff credentials.")
+        #     return redirect(request.path)
+        
+        try:
+            # Get current staff data
+            rows = Secretary.get_staff_profile_display(staff_code) if staff_code else []
+            current_staff = rows[0] if rows else None
+            
+            if not current_staff:
+                flash_warning(request, "Staff not found.")
+                return redirect("midwife:staff_list")
+            
+            staff_id = current_staff.get("staff_id")
+            if not staff_id:
+                flash_warning(request, "Staff ID not found.")
+                return redirect("midwife:staff_list")
+            
+            # Extract purok IDs from form
+            purok_ids = []
+            for purok_id in request.POST.getlist("purok_ids[]"):
+                if purok_id and purok_id.isdigit():
+                    purok_ids.append(int(purok_id))
+            
+            # Update purok assignments
+            from .models import Midwife
+            result = Midwife.update_staff_assigned_purok(
+                staff_id=staff_id,
+                updated_by_staff_id=updated_by_staff_id,
+                purok_ids=purok_ids if purok_ids else None
+            )
+            
+            added = result.get('purok_added_count', 0)
+            removed = result.get('purok_deactivated_count', 0)
+            if added > 0 or removed > 0:
+                flash_success(request, f"Purok assignments updated successfully. Added: {added}, Removed: {removed}")
+            else:
+                flash_warning(request, "No changes were made to purok assignments.")
+                
+        except (DatabaseError, OperationalError, IntegrityError) as e:
+            flash_db_error(request, e)
+        except Exception as e:
+            flash_system_error(request, "Failed to update purok assignments.", exc=e)
+        
+        return redirect(request.path)
+    
+    # GET request handling
     try:
         rows = Secretary.get_staff_profile_display(staff_code) if staff_code else []
     except Exception:
@@ -1823,6 +2140,26 @@ def staff_dets(request, staff_code: str):
             {"src": _img(p.get("selfie_img_path")),         "label": "Selfie w/ ID"},
         ]
 
+    # Initialize update form
+    update_form = StaffUpdateForm()
+    
+    # Process purok assignments for the modal - use assigned_purok_ids directly
+    purok_list = []
+    if p:
+        purok_ids = p.get('assigned_purok_ids', [])
+        if isinstance(purok_ids, list):
+            purok_list = [str(pid) for pid in purok_ids if pid]
+        elif purok_ids:
+            purok_list = [str(purok_ids)]
+        
+        # Fallback: try to parse from assigned_purok text if no IDs
+        if not purok_list and p.get('assigned_purok'):
+            purok_text = str(p.get('assigned_purok', '')).strip()
+            if purok_text:
+                purok_name_to_id = {label: str(value) for value, label in PUROK_CHOICES}
+                purok_names = [item.strip() for item in purok_text.replace('\n', ',').split(',') if item.strip()]
+                purok_list = [purok_name_to_id.get(name, '') for name in purok_names if purok_name_to_id.get(name)]
+    
     ctx = {
         "user_fullname": user_fullname,
         "user_role": user_role,
@@ -1831,5 +2168,7 @@ def staff_dets(request, staff_code: str):
         "user_role_template": user_role_template,
         "profile": p,
         "doc_slides": doc_slides,
+        "update_form": update_form,
+        "purok_list": purok_list,
     }
     return render(request, "acc_management/staff_dets.html", ctx)

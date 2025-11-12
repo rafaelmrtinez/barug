@@ -5,7 +5,6 @@
 {% block css %}
   <link rel="stylesheet" href="{% static 'css/button.css' %}">
   <link rel="stylesheet" href="{% static 'css/form.css' %}">
-  <!-- for .section-title, .kv, .doc-carousel, etc. -->
   <link rel="stylesheet" href="{% static 'css/submission_dets.css' %}">
 
   <script src="{% static 'js/schedule.js' %}"></script>
@@ -31,15 +30,36 @@
         Search for a resident in the barangay records and assign them as a staff account.
       </p>
 
-      <!-- Search (static mockup, not a form) -->
-      <div class="rounded-3 border bg-light p-3">
-        <label class="form-label small">Find Resident Record</label>
-        <div class="form-floating">
-          {{ form.search }}
-          <label for="{{ form.search.id_for_label }}">{{ form.search.label }}</label>
+      <!-- Form #1: search/select (POST to same view) -->
+      <form id="controlsForm1" method="post" action="{% url 'staff_admin:staff_selection_resident' %}">
+        {% csrf_token %}
+        <div class="rounded-3 border bg-light p-3">
+          <label class="form-label small">Find Resident Record</label>
+
+          <div class="form-floating mb-3 position-relative">
+            <input
+              type="text"
+              id="residentSearch"
+              name="residentSearch"
+              class="form-control form-control-sm"
+              placeholder="Enter Resident ID or Full Name"
+              autocomplete="off"
+            >
+            <label for="residentSearch">Enter Resident ID or Full Name</label>
+
+            <!-- dropdown -->
+            <div id="residentDropdown"
+                 class="list-group position-absolute w-100 shadow-sm d-none"
+                 style="top: 100%; left: 0; z-index: 1070; max-height: 250px; overflow:auto;">
+            </div>
+
+            <!-- the selected person id goes here (used by backend to fetch details) -->
+            <input type="hidden" name="person_id" id="person_id">
+          </div>
+
+          <div class="form-text">Enter the Resident ID or name, then review the resident details below.</div>
         </div>
-        <div class="form-text">Enter the Resident ID or name, then review the resident details below.</div>
-      </div>
+      </form>
 
       <!-- Selected Resident Details -->
       <div class="mt-4">
@@ -47,36 +67,46 @@
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-start">
               <div>
-                <h5 class="card-title mb-1">DELA CRUZ, JUAN S.</h5>
-                <div class="small text-muted">P07-R123</div>
+                <h5 class="card-title mb-1">
+                  {{ res_details.first_name|default:""|title }}
+                  {% with m=res_details.middle_name|default_if_none:'' %}
+                    {% if m %} {{ m|slice:":1"|upper }}.{% endif %}
+                  {% endwith %}
+                  {{ res_details.last_name|default:""|title }}
+                  {{ res_details.suffix|default:""|upper }}
+                </h5>
+                <div class="small text-muted">{{ res_details.person_code|default:"" }}</div>
               </div>
               <span class="badge" style="background-color: var(--bs-danger-text-emphasis);">RESIDENT</span>
             </div>
 
             <hr class="my-3">
 
-            <!-- Two columns aligned like your screenshot -->
             <div class="row g-4 align-items-start">
               <!-- Personal Information (left) -->
               <div class="col-12 col-md-6">
                 <div class="section-title mb-2">Personal Information</div>
                 <div class="kv kv-wrap">
-                  <div class="kv-item"><span class="kv-key">Last Name</span><span class="kv-val">Bellosillo</span></div>
-                  <div class="kv-item"><span class="kv-key">First Name</span><span class="kv-val">Raphael</span></div>
-                  <div class="kv-item"><span class="kv-key">Middle Name</span><span class="kv-val">Hernandez</span></div>
-                  <div class="kv-item"><span class="kv-key">Suffix</span><span class="kv-val">Jr.</span></div>
-                  <div class="kv-item"><span class="kv-key">Sex</span><span class="kv-val">Male</span></div>
-                  <div class="kv-item"><span class="kv-key">Date of Birth</span><span class="kv-val">March 14, 1995</span></div>
-                  <div class="kv-item"><span class="kv-key">Civil Status</span><span class="kv-val">Single</span></div>
-                  <div class="kv-item"><span class="kv-key">Nationality</span><span class="kv-val">Filipino</span></div>
-                  <div class="kv-item"><span class="kv-key">Religion</span><span class="kv-val">Roman Catholic</span></div>
-                  <div class="kv-item"><span class="kv-key">Home Address</span>
-                    <span class="kv-val">Purok 3, Sitio San Roque, Brgy Sto. Niño</span>
+                  <div class="kv-item"><span class="kv-key">Last Name</span><span class="kv-val">{{ res_details.last_name|default:""|title }}</span></div>
+                  <div class="kv-item"><span class="kv-key">First Name</span><span class="kv-val">{{ res_details.first_name|default:""|title }}</span></div>
+                  <div class="kv-item"><span class="kv-key">Middle Name</span><span class="kv-val">{{ res_details.middle_name|default:""|title }}</span></div>
+                  <div class="kv-item"><span class="kv-key">Suffix</span><span class="kv-val">{{ res_details.suffix|default:""|title }}</span></div>
+                  <div class="kv-item"><span class="kv-key">Sex</span><span class="kv-val">{{ res_details.sex|default:""|title }}</span></div>
+                  <div class="kv-item"><span class="kv-key">Date of Birth</span><span class="kv-val">{{ res_details.birthdate|default:""|title }}</span></div>
+                  <div class="kv-item"><span class="kv-key">Civil Status</span><span class="kv-val">{{ res_details.civil_status|default:""|title }}</span></div>
+                  <div class="kv-item"><span class="kv-key">Nationality</span><span class="kv-val">{{ res_details.nationality|default:""|title }}</span></div>
+                  <div class="kv-item"><span class="kv-key">Religion</span><span class="kv-val">{{ res_details.religion|default:""|title }}</span></div>
+                  <div class="kv-item">
+                    <span class="kv-key">Home Address</span>
+                    <span class="kv-val">
+                      {% if res_details.street_name %}{{ res_details.street_name|title }}{% if res_details.purok_sitio_name or res_details.barangay_name or res_details.city_name %}, {% endif %}{% endif %}
+                      {% if res_details.purok_sitio_name %}{{ res_details.purok_sitio_name|title }}{% if res_details.barangay_name or res_details.city_name %}, {% endif %}{% endif %}
+                      {% if res_details.barangay_name %}{{ res_details.barangay_name|title }}{% if res_details.city_name %}, {% endif %}{% endif %}
+                      {% if res_details.city_name %}{{ res_details.city_name|title }}{% endif %}
+                    </span>
                   </div>
-                  <div class="kv-item"><span class="kv-key">Email Address</span>
-                    <span class="kv-val">raphael.bellosillo@email.com</span>
-                  </div>
-                  <div class="kv-item"><span class="kv-key">Mobile Number</span><span class="kv-val">+63 912 345 6789</span></div>
+                  <div class="kv-item"><span class="kv-key">Email Address</span><span class="kv-val">{{ res_details.email|default:"" }}</span></div>
+                  <div class="kv-item"><span class="kv-key">Mobile Number</span><span class="kv-val">{{ res_details.mobile_num|default:"" }}</span></div>
                 </div>
               </div>
 
@@ -84,47 +114,49 @@
               <div class="col-12 col-md-6">
                 <div class="section-title mb-2">Socioeconomic Information</div>
                 <div class="kv">
-                  <div class="kv-item"><span class="kv-key">Educational Attainment</span><span class="kv-val">Undergraduate Studies</span></div>
-                  <div class="kv-item"><span class="kv-key">Employment Status</span><span class="kv-val">Employed</span></div>
-                  <div class="kv-item"><span class="kv-key">Occupation</span><span class="kv-val">Software Developer</span></div>
-                  <div class="kv-item"><span class="kv-key">Monthly Personal Income</span><span class="kv-val">₱35,000</span></div>
-                  <div class="kv-item"><span class="kv-key">Government Program</span><span class="kv-val">PhilHealth, SSS</span></div>
+                  <div class="kv-item"><span class="kv-key">Educational Attainment</span><span class="kv-val">{{ res_details.education|default:""|title }}</span></div>
+                  <div class="kv-item"><span class="kv-key">Employment Status</span><span class="kv-val">{{ res_details.employment_status|default:""|title }}</span></div>
+                  <div class="kv-item"><span class="kv-key">Occupation</span><span class="kv-val"> {{ res_details.occupation|default:""|title }}</span></div>
+                  <div class="kv-item"><span class="kv-key">Monthly Personal Income</span><span class="kv-val">{{ res_details.personal_monthly_income|default:"" }}</span></div>
+                  {% with gps=res_details.government_programs %}
+                    <div class="kv-item">
+                      <span class="kv-key">Government Program</span>
+                      <span class="kv-val">
+                        {% if gps and gps|length %}{{ gps|join:", "|title }}{% else %}{% endif %}
+                      </span>
+                    </div>
+                  {% endwith %}
                 </div>
 
                 <div class="section-title mb-2 pt-4">Supporting Document</div>
                 <div class="kv">
-                  <div class="kv-item"><span class="kv-key">ID Type</span><span class="kv-val">15 years</span></div>
+                  <div class="kv-item"><span class="kv-key">ID Type</span><span class="kv-val">{{ res_details.id_type_name|default:"" }}</span></div>
 
+                  {% if doc_images %}
                   <div class="doc-carousel carousel slide" id="staffDocCarousel" data-bs-ride="false" aria-label="Supporting documents">
                     <div class="carousel-inner">
-                      <div class="carousel-item active">
-                        <div class="img-wrap">
-                          <img src="{% static 'images/brgy-sto-nino.png' %}" class="doc-img" alt="Front of ID">
+                      {% for img in doc_images %}
+                        <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                          <div class="img-wrap">
+                            <img src="{{ img.src }}" class="doc-img" alt="{{ img.alt|default:img.label }}" loading="lazy">
+                          </div>
+                          <small class="text-muted d-block text-center mt-2">{{ img.label }}</small>
                         </div>
-                        <small class="text-muted d-block text-center mt-2">Front of ID</small>
-                      </div>
-                      <div class="carousel-item">
-                        <div class="img-wrap">
-                          <img src="{% static 'images/brgy-sto-nino.png' %}" class="doc-img" alt="Back of ID">
-                        </div>
-                        <small class="text-muted d-block text-center mt-2">Back of ID</small>
-                      </div>
-                      <div class="carousel-item">
-                        <div class="img-wrap">
-                          <img src="{% static 'images/brgy-sto-nino.png' %}" class="doc-img" alt="Selfie holding the ID">
-                        </div>
-                        <small class="text-muted d-block text-center mt-2">Selfie w/ ID</small>
-                      </div>
+                      {% endfor %}
                     </div>
 
-                    <!-- Controls outside the image bounds -->
-                    <button class="carousel-control-prev doc-control" type="button" data-bs-target="#staffDocCarousel" data-bs-slide="prev" aria-label="Previous">
-                      <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
-                    </button>
-                    <button class="carousel-control-next doc-control" type="button" data-bs-target="#staffDocCarousel" data-bs-slide="next" aria-label="Next">
-                      <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
-                    </button>
+                    {% if doc_images|length > 1 %}
+                      <button class="carousel-control-prev doc-control" type="button" data-bs-target="#staffDocCarousel" data-bs-slide="prev" aria-label="Previous">
+                        <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
+                      </button>
+                      <button class="carousel-control-next doc-control" type="button" data-bs-target="#staffDocCarousel" data-bs-slide="next" aria-label="Next">
+                        <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
+                      </button>
+                    {% endif %}
                   </div>
+                  {% endif %}
+
+
                 </div>
               </div>
             </div>
@@ -137,94 +169,504 @@
           <div class="d-flex align-items-center justify-content-between">
             <div class="small">
               <span class="text-muted">Selected Staff:</span>
-              <strong>DELA CRUZ, JUAN S. — P07-R123</strong>
+              <strong>
+                {{ res_details.person_code|default:"" }}
+                {{ res_details.first_name|default:"" }}
+                {% with m=res_details.middle_name|default_if_none:'' %}
+                  {% if m %} {{ m|slice:":1"|upper }}.{% endif %}
+                {% endwith %}
+                {{ res_details.last_name|default:"" }}
+                {{ res_details.suffix|default:"" }}
+              </strong>
             </div>
-            <a href="#" class="small text-decoration-none" style="color: var(--bs-danger-text-emphasis);">Change</a>
+            <a href="#" id="changeResident" class="small text-decoration-none" style="color: var(--bs-danger-text-emphasis);">Change</a>
           </div>
         </div>
       </div>
 
       <!-- ONLY SHOW THIS PART AFTER SELECTING A RESIDENT-->
-      <!-- Staff Role (static-style input, like the search) -->
-      <div class="rounded-3 border bg-light p-3 mt-4">
-        <div class="row g-3 align-items-end">
-          <!-- Role -->
-          <div class="col-12 col-md-6">
-            <label class="form-label small">Select Staff Role</label>
-            <div class="form-floating">
-              {{ role_form.role }}
-              <label for="{{ role_form.role.id_for_label }}">{{ role_form.role.label }}</label>
-            </div>
-            <div class="form-text">Choose the role to assign to this resident.</div>
-          </div>
+      <form id="controlsForm2" method="post" action="{% url 'staff_admin:staff_selection_resident' %}" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="pid" id="pid" value="{{ res_details.person_id|default_if_none:'' }}">
 
-          <!-- Purok/Sitio (shown only if BHW, add d-none to class if role is not BHW)  -->
-          <div class="col-12 col-md-6">
-            <label class="form-label small">Assign to Purok/Sitio</label>
-            <div class="form-floating">
-              {{ role_form.purok_sitio }}
-              <label for="{{ role_form.purok_sitio.id_for_label }}">{{ role_form.purok_sitio.label }}</label>
-            </div>
-            <div class="form-text">Required for Barangay Health Worker.</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="rounded-3 border bg-light p-3 mt-4">
-        <div class="d-flex justify-content-between align-items-center">
-          <h6 class="mb-0">Schedules for Selected Resident</h6>
-          <button type="button" class="btn btn-submit btn-sm" id="add-sched">+ Add schedule</button>
-        </div>
-
-        <div id="sched-list">
-          <!-- Row 0 (uses your existing Django form fields) -->
-          <div class="sched-row rounded-3 border bg-white p-3 mt-3" data-index="0">
-            <div class="row g-3 align-items-end">
-              <!-- Day -->
-              <div class="col-12 col-md-4">
-                <label class="form-label small">Day</label>
-                <div class="form-floating">
-                  {{ sched_form.day }}
-                  <label for="{{ sched_form.day.id_for_label }}">{{ sched_form.day.label }}</label>
-                </div>
-                <div class="form-text">Select the day for the schedule.</div>
+        <div class="rounded-3 border bg-light p-3 mt-4">
+          <div class="row g-3 align-items-end">
+            <!-- Role -->
+            <div class="col-12 col-md-6">
+              <label class="form-label small">Select Staff Role</label>
+              <div class="form-floating">
+                {{ role_form.role }}
+                <label for="{{ role_form.role.id_for_label }}">{{ role_form.role.label }}</label>
               </div>
-
-              <!-- Time Start -->
-              <div class="col-12 col-md-4">
-                <label class="form-label small">Time Start</label>
-                <div class="form-floating">
-                  {{ sched_form.time_start }}
-                  <label for="{{ sched_form.time_start.id_for_label }}">{{ sched_form.time_start.label }}</label>
-                </div>
-                <div class="form-text">Choose the start time.</div>
-              </div>
-
-              <!-- Time End -->
-              <div class="col-12 col-md-4">
-                <label class="form-label small">Time End</label>
-                <div class="form-floating">
-                  {{ sched_form.time_end }}
-                  <label for="{{ sched_form.time_end.id_for_label }}">{{ sched_form.time_end.label }}</label>
-                </div>
-                <div class="form-text">Choose the end time (after start).</div>
-              </div>
+              <div class="form-text">Choose the role to assign to this resident.</div>
             </div>
 
-            <div class="mt-2 d-flex justify-content-end">
-              <!-- Hidden for the first row so at least one remains -->
-              <button type="button" class="btn btn-reset btn-sm remove-sched d-none">Remove</button>
+            <div class="col-12 col-md-6">
+              <label class="form-label small">Proof of Employment</label>
+              <div class="form-floating">
+                  {{ proof_form.proof }}
+                  <label for="{{ proof_form.proof.id_for_label }}">{{ proof_form.proof.label }}</label>
+              </div>
+              <div class="form-text">Upload valid proof of staff employment.</div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="mt-3 button-container justify-content-end mb-2 d-flex gap-2">
-        <button type="button" class="btn btn-reset">Back</button>
-        <button type="button" class="btn btn-submit">Continue</button>
-      </div>
+       <!-- ★ ADDED: wrapper to control Purok visibility without touching inner markup -->
+        <div class="purok-section-wrapper">
+          <div id="purok-section" class="rounded-3 border bg-light p-3 mt-4">
+            <div class="d-flex justify-content-between align-items-center">
+              <h6 class="mb-0">Assign Purok/Sitio</h6>
+              <button type="button" class="btn btn-submit btn-sm" id="add-purok">+ Add purok</button>
+            </div>
+
+            <div id="purok-list">
+              <!-- Row 0 uses your existing Django field -->
+              <div class="purok-row rounded-3 border bg-white p-3 mt-3" data-index="0">
+                <div class="row g-3 align-items-end">
+                  <div class="col-12">
+                    <label class="form-label small">Primary Purok/Sitio</label>
+                    <div class="form-floating">
+                      {{ role_form.purok_sitio }}
+                      <label for="{{ role_form.purok_sitio.id_for_label }}">{{ role_form.purok_sitio.label }}</label>
+                    </div>
+                    <div class="form-text">Required for Barangay Health Worker.</div>
+                  </div>
+                </div>
+                <div class="mt-2 d-flex justify-content-end">
+                  <!-- Keep first row undeletable -->
+                  <button type="button" class="btn btn-reset btn-sm remove-purok d-none">Remove</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ★ ADDED: wrapper to control Schedule visibility without touching inner markup -->
+        <div id="sched-section"> <!-- ★ ADDED (open wrapper) -->
+          <div class="rounded-3 border bg-light p-3 mt-4">
+            <div class="d-flex justify-content-between align-items-center">
+              <h6 class="mb-0">Schedules for Selected Resident</h6>
+              <button type="button" class="btn btn-submit btn-sm" id="add-sched">+ Add schedule</button>
+            </div>
+
+            <div id="sched-list">
+              <!-- Row 0 (uses your existing Django form fields) -->
+              <div class="sched-row rounded-3 border bg-white p-3 mt-3" data-index="0">
+                <div class="row g-3 align-items-end">
+                  <!-- Day -->
+                  <div class="col-12 col-md-4">
+                    <label class="form-label small">Day</label>
+                    <div class="form-floating">
+                      {{ sched_form.day }}
+                      <label for="{{ sched_form.day.id_for_label }}">{{ sched_form.day.label }}</label>
+                    </div>
+                    <div class="form-text">Select the day for the schedule.</div>
+                  </div>
+
+                  <!-- Time Start -->
+                  <div class="col-12 col-md-4">
+                    <label class="form-label small">Time Start</label>
+                    <div class="form-floating">
+                      {{ sched_form.time_start }}
+                      <label for="{{ sched_form.time_start.id_for_label }}">{{ sched_form.time_start.label }}</label>
+                    </div>
+                    <div class="form-text">Choose the start time.</div>
+                  </div>
+
+                  <!-- Time End -->
+                  <div class="col-12 col-md-4">
+                    <label class="form-label small">Time End</label>
+                    <div class="form-floating">
+                      {{ sched_form.time_end }}
+                      <label for="{{ sched_form.time_end.id_for_label }}">{{ sched_form.time_end.label }}</label>
+                    </div>
+                    <div class="form-text">Choose the end time (after start).</div>
+                  </div>
+                </div>
+
+                <div class="mt-2 d-flex justify-content-end">
+                  <!-- Hidden for the first row so at least one remains -->
+                  <button type="button" class="btn btn-reset btn-sm remove-sched d-none">Remove</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div> <!-- ★ ADDED (close wrapper) -->
+
+        <div class="mt-3 button-container justify-content-end mb-2 d-flex gap-2">
+          <a type="button" class="btn btn-reset" href="{% url 'staff_admin:staff_selection' %}">Back</a>
+          <button type="submit" class="btn btn-submit" name="action" value="add">Add</button>
+        </div>
+
+      </form>
     </section>
   </div>
 </div>
-{% endblock %}
 
+  {% include 'partials/modal_messages.html' %}
+
+<script>
+(() => {
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Config / quick-refs (Django-driven IDs)
+  // ─────────────────────────────────────────────────────────────────────────────
+  const IDS = {
+    role: '{{ role_form.role.id_for_label }}',
+    purokPrimary: '{{ role_form.purok_sitio.id_for_label }}',
+    day: '{{ sched_form.day.id_for_label }}',
+    tStart: '{{ sched_form.time_start.id_for_label }}',
+    tEnd: '{{ sched_form.time_end.id_for_label }}',
+  };
+
+  const el = {
+    formSearch: document.getElementById('controlsForm1'),
+    formMain:   document.getElementById('controlsForm2'),
+    inputSearch:document.getElementById('residentSearch'),
+    dd:         document.getElementById('residentDropdown'),
+    pid:        document.getElementById('pid'),
+    personId:   document.getElementById('person_id'),
+    purokList:  document.getElementById('purok-list'),
+    addPurok:   document.getElementById('add-purok'),
+    purokWrap:  document.getElementById('purok-section'),
+    schedWrap:  document.getElementById('sched-section'),
+    role:       document.getElementById(IDS.role),
+    purokPrimary:document.getElementById(IDS.purokPrimary),
+    day:        document.getElementById(IDS.day),
+    tStart:     document.getElementById(IDS.tStart),
+    tEnd:       document.getElementById(IDS.tEnd),
+    changeBtn:  document.getElementById('changeResident')
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Utilities
+  // ─────────────────────────────────────────────────────────────────────────────
+  const val = (node) => node ? String(node.value || '').trim() : '';
+  const $el  = (html) => {
+    const t = document.createElement('template'); t.innerHTML = html.trim();
+    return t.content.firstElementChild;
+  };
+
+  const debounce = (fn, wait=250) => {
+    let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
+  };
+
+  // Flash container: reuse messages partial if present; else create a lightweight one.
+  const flashScope = document.querySelector('.flash-scope') || (() => {
+    const host = document.querySelector('.container.px-3.py-4') || document.body;
+    const c = $el('<div class="flash-scope container px-3 pt-3"></div>');
+    host.parentNode.insertBefore(c, host);
+    return c;
+  })();
+
+  // Uniform inline alert (same look as messages.html)
+  function showAlert(text, type='warning') {
+    if (!flashScope) return;
+    const escapeHtml = (s) => String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+    const cls = ['success','warning','danger','info'].includes(type) ? type : 'info';
+    const icon = { success:'check-circle-fill', warning:'exclamation-circle-fill', danger:'exclamation-triangle-fill', info:'info-circle-fill' }[cls];
+
+    const node = $el(`
+      <div class="alert alert-${cls} alert-dismissible fade show shadow-sm"
+           role="alert" style="display:flex;align-items:center;gap:.5rem;padding:.75rem 1rem;margin-bottom:.75rem;">
+        <span class="flash-icon" style="display:inline-flex;">
+          <i class="bi bi-${icon}" style="font-size:1.1em;"></i>
+        </span>
+        <span class="flash-text" style="line-height:1.25;">${escapeHtml(text)}</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"
+                style="margin-left:auto;position:static;align-self:center;"></button>
+      </div>
+    `);
+
+    flashScope.insertAdjacentElement('afterbegin', node);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    setTimeout(() => {
+      flashScope.querySelectorAll('.alert.fade.show')
+        .forEach(el => bootstrap.Alert.getOrCreateInstance(el).close());
+    }, 6000);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Resident autocomplete (if present on this page)
+  // ─────────────────────────────────────────────────────────────────────────────
+  const hideDD = () => el.dd?.classList.add('d-none');
+  const showDD = () => el.dd?.classList.remove('d-none');
+
+  function renderDD(items) {
+    if (!el.dd) return;
+    el.dd.innerHTML = '';
+    if (!items || !items.length) {
+      el.dd.appendChild($el(`<div class="list-group-item disabled text-muted">No resident(s) found</div>`));
+      showDD(); return;
+    }
+    items.forEach(it => {
+      const label = it.code ? `${it.code} — ${it.title || ''}` : (it.title || '');
+      const item = $el(`
+        <a href="#" class="list-group-item list-group-item-action">
+          <div class="fw-semibold">${label}</div>
+          <div class="small text-muted">${it.subtitle || ''}</div>
+        </a>
+      `);
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (el.inputSearch) el.inputSearch.value = label;
+        if (el.personId) el.personId.value = it.id || '';
+        if (el.pid) el.pid.value = it.id || '';
+        hideDD();
+        el.formSearch?.submit();
+      });
+      el.dd.appendChild(item);
+    });
+    showDD();
+  }
+
+  const doSearch = debounce(async (q) => {
+    const query = (q || '').trim();
+    if (!query) { renderDD([]); return; }
+    try {
+      const url = "{% url 'staff_admin:resident_suggest' %}?q=" + encodeURIComponent(query);
+      const resp = await fetch(url, { credentials: 'same-origin' });
+      if (!resp.ok) { renderDD([]); return; }
+      const data = await resp.json();
+      renderDD(data.results || []);
+    } catch { /* ignore */ }
+  });
+
+  if (el.inputSearch) {
+    el.inputSearch.addEventListener('input', (e) => doSearch(e.target.value));
+    el.inputSearch.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideDD(); });
+    document.addEventListener('click', (e) => { if (!el.dd?.contains(e.target) && e.target !== el.inputSearch) hideDD(); });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Role-based visibility
+  // ─────────────────────────────────────────────────────────────────────────────
+  function applyRoleVisibility() {
+    const v = el.role ? String(el.role.value) : '';
+    const isBHW   = v === '9';
+    const isLupon = v === '8';
+    if (el.purokWrap) el.purokWrap.classList.toggle('d-none', !isBHW);
+    if (el.schedWrap) el.schedWrap.classList.toggle('d-none', !isLupon);
+  }
+  if (el.role) { applyRoleVisibility(); el.role.addEventListener('change', applyRoleVisibility); }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Dynamic Purok rows
+  // ─────────────────────────────────────────────────────────────────────────────
+  function addPurokRow() {
+    if (!el.purokList || !el.purokPrimary) return;
+
+    const options = Array.from(el.purokPrimary.options)
+      .map(o => `<option value="${o.value}">${o.textContent}</option>`).join('');
+    const idx = el.purokList.children.length;
+
+    const row = $el(`
+      <div class="purok-row rounded-3 border bg-white p-3 mt-3" data-index="${idx}">
+        <div class="row g-3 align-items-end">
+          <div class="col-12">
+            <label class="form-label small">Additional Purok/Sitio</label>
+            <div class="form-floating">
+              <select class="form-select extra-purok" name="purok_sitio_ids[]" id="purok_sitio_extra_${idx}" aria-label="Additional Purok/Sitio">
+                <option value="">Select a Purok/Sitio</option>${options}
+              </select>
+              <label for="purok_sitio_extra_${idx}">Additional Purok/Sitio</label>
+            </div>
+            <div class="form-text">You may assign multiple puroks if needed.</div>
+          </div>
+        </div>
+        <div class="mt-2 d-flex justify-content-end">
+          <button type="button" class="btn btn-reset btn-sm remove-purok">Remove</button>
+        </div>
+      </div>
+    `);
+
+    row.querySelector('.remove-purok')?.addEventListener('click', () => row.remove());
+    el.purokList.appendChild(row);
+  }
+
+  el.addPurok?.addEventListener('click', addPurokRow);
+  el.purokList?.addEventListener('click', (e) => {
+    if (e.target && e.target.classList.contains('remove-purok')) {
+      e.target.closest('.purok-row')?.remove();
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Scroll-to-top after server redirect (submit)
+  // ─────────────────────────────────────────────────────────────────────────────
+  if (el.formMain) {
+    el.formMain.addEventListener('submit', () => {
+      sessionStorage.setItem('scrollTopOnLoad', '1');
+    });
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    if (sessionStorage.getItem('scrollTopOnLoad') === '1') {
+      sessionStorage.removeItem('scrollTopOnLoad');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Client-side validation (inline, uniform flash style)
+  // ─────────────────────────────────────────────────────────────────────────────
+  el.formMain?.addEventListener('submit', (e) => {
+    const role = val(el.role);
+
+    // Proof: either file or data-url/hidden text
+    const proofFile  = document.querySelector('input[type="file"][name="proof_file"], input[type="file"]#id_proof');
+    const hasProofFile = !!proofFile?.files?.length;
+    const proofDataEl  = document.querySelector('input[name="proof"], textarea[name="proof"], #id_proof');
+    const hasProofData = val(proofDataEl);
+
+    const something = val(el.pid) || role ||
+      hasProofFile || hasProofData ||
+      val(el.purokPrimary) || Array.from(document.querySelectorAll('#purok-list select.extra-purok')).some(s => val(s)) ||
+      val(el.day) || val(el.tStart) || val(el.tEnd);
+
+    if (!something) {
+      e.preventDefault();
+      showAlert('Please select a resident and fill out the form before submitting.');
+      return;
+    }
+    if (!val(el.pid)) {
+      e.preventDefault(); showAlert('Please select a resident first.'); return;
+    }
+    if (!role) {
+      e.preventDefault(); showAlert('Please choose a staff role.'); return;
+    }
+
+    // ---------------- BHW (role 9) checks: at least one purok + no duplicates
+    if (role === '9') {
+      // gather primary + extra puroks
+      const extraPurokEls = Array.from(document.querySelectorAll('#purok-list select.extra-purok, #purok-list select[name="purok_sitio_ids[]"]'));
+      const allPurokVals = []
+        .concat(val(el.purokPrimary) ? [val(el.purokPrimary)] : [])
+        .concat(extraPurokEls.map(s => val(s)).filter(Boolean));
+
+      if (allPurokVals.length === 0) {
+        e.preventDefault(); showAlert('BHW must be assigned to at least one Purok/Sitio.'); return;
+      }
+      const uniq = new Set(allPurokVals);
+      if (uniq.size !== allPurokVals.length) {
+        e.preventDefault(); showAlert('Duplicate Purok/Sitio selections are not allowed.', 'danger'); return;
+      }
+    }
+
+    // ---------------- Lupon (role 8) checks: at least one full schedule + 1 per day + start<end
+    if (role === '8') {
+      // include base row (no [] name) + dynamic rows (with [])
+      const dayEls   = Array.from(document.querySelectorAll('select[name="day"], select[name="day[]"]'));
+      const startEls = Array.from(document.querySelectorAll('input[name="time_start"], input[name="time_start[]"]'));
+      const endEls   = Array.from(document.querySelectorAll('input[name="time_end"], input[name="time_end[]"]'));
+
+      const len = Math.max(dayEls.length, startEls.length, endEls.length);
+      const entries = [];
+      for (let i = 0; i < len; i++) {
+        const d  = val(dayEls[i]);
+        const ts = val(startEls[i]);
+        const te = val(endEls[i]);
+        // if any of the three has a value, all must be present
+        if (d || ts || te) {
+          if (!(d && ts && te)) {
+            e.preventDefault(); showAlert('Please complete the schedule: day, time start, and time end are required.'); return;
+          }
+          entries.push({ d, ts, te });
+        }
+      }
+
+      if (entries.length === 0) {
+        e.preventDefault(); showAlert('Lupon Member must have at least one schedule.'); return;
+      }
+
+      // Only one schedule per day (disallow duplicates)
+      const days = entries.map(e => e.d);
+      if (new Set(days).size !== days.length) {
+        e.preventDefault(); showAlert('Only one schedule is allowed per day for each staff.', 'danger'); return;
+      }
+
+      // Ensure time_start < time_end
+      for (const { ts, te } of entries) {
+        if (ts >= te) {
+          e.preventDefault(); showAlert('Schedule end time must be after the start time.', 'danger'); return;
+        }
+      }
+    }
+
+    // ---------------- Proof required
+    if (!(hasProofFile || hasProofData)) {
+      e.preventDefault(); showAlert('Please attach a proof of employment.'); return;
+    }
+
+    // Happy path: let it submit; ensure server flashes are visible on load
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, { passive: false });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Optional: "Change" button to clear current selection (if present)
+  // ─────────────────────────────────────────────────────────────────────────────
+  if (el.changeBtn) {
+    el.changeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+
+      const qs  = (sel, root=document) => root.querySelector(sel);
+      const qsa = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+      const setVal = (node, v='') => { if (node) node.value = v; };
+
+      // Hidden ids & search box
+      setVal(qs('#pid'));
+      setVal(qs('#person_id'));
+      setVal(qs('#residentSearch'));
+      const dd = qs('#residentDropdown'); if (dd) { dd.innerHTML=''; dd.classList.add('d-none'); }
+
+      // Reset both forms (keeps CSRF intact)
+      qs('#controlsForm1')?.reset();
+      qs('#controlsForm2')?.reset();
+
+      // Clear displayed resident details block near the change button
+      const card = el.changeBtn.closest('.mt-4');
+      if (card) {
+        qsa('.card-title, .card .small.text-muted', card).forEach(n => n.textContent = '');
+        qsa('.kv .kv-val', card).forEach(v => v.textContent = '');
+        const summary = card.querySelector('.alert.alert-light strong');
+        if (summary) summary.textContent = '';
+      }
+
+      // Clear supporting docs carousel
+      const carouselInner = qs('#staffDocCarousel .carousel-inner');
+      if (carouselInner) carouselInner.innerHTML = '';
+
+      // Remove extra Purok rows (keep the first with data-index="0" if any)
+      qsa('#purok-list .purok-row').forEach(row => {
+        if (row.getAttribute('data-index') !== '0') row.remove();
+      });
+
+      // Clear selects / schedule (base row)
+      setVal(qs('#{{ role_form.role.id_for_label }}'));
+      setVal(qs('#{{ role_form.purok_sitio.id_for_label }}'));
+      setVal(qs('#{{ sched_form.day.id_for_label }}'));
+      setVal(qs('#{{ sched_form.time_start.id_for_label }}'));
+      setVal(qs('#{{ sched_form.time_end.id_for_label }}'));
+
+      // Clear proof (file or text)
+      const proofFile = qs('input[type="file"][name="proof_file"], input[type="file"]#id_proof');
+      if (proofFile) proofFile.value = '';
+      setVal(qs('input[name="proof"]'));
+      setVal(qs('textarea[name="proof"]'));
+      setVal(qs('#id_proof'));
+
+      // Hide role-specific sections
+      qs('#purok-section')?.classList.add('d-none');
+      qs('#sched-section')?.classList.add('d-none');
+
+      if (typeof showAlert === 'function') showAlert('Resident selection cleared.', 'info');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+})();
+</script>
+
+{% endblock %}
