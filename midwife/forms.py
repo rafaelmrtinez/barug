@@ -162,33 +162,16 @@ class StaffFilters(forms.Form):
         label='Search Staff',
         required= False,
     )
-    role = forms.ChoiceField(
-        choices=[],
+    assigned_purok = forms.ChoiceField(
+        choices=[(""  , "— Select Assigned Purok —")] + PUROK_CHOICES,
         widget=forms.Select(attrs={
-            "id": "role_filter",
-            "class": "form-select",
-            "name": "role",
+            'id': 'assigned_purok',
+            'class': 'form-select',
+            'name': 'assigned_purok',
         }),
-        label="Filter by Role",
+        label='Assigned Purok',
         required=False,
     )
-    # hidden twin so the value is submitted even when the select is disabled
-    role_locked = forms.CharField(widget=forms.HiddenInput(), required=False)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["role"].choices = ROLE_CHOICES
-        self.fields["role"].initial = "9"          # ← the value you want
-        self.fields["role"].disabled = True        # ← disable the dropdown
-        self.fields["role"].widget.attrs["disabled"] = "disabled"  # (adds HTML attr)
-        self.fields["role_locked"].initial = self.fields["role"].initial
-
-    def clean(self):
-        cd = super().clean()
-        # ensure cleaned_data['role'] is set even if the field is disabled
-        if self.fields["role"].disabled:
-            cd["role"] = self.fields["role"].initial or cd.get("role_locked")
-        return cd
     
     account_stat = forms.ChoiceField(
         choices=[("", "— Select Account Status —")] + STAFF_ACCOUNT_STATUS,
@@ -250,6 +233,16 @@ class ChooseRole(forms.Form):
         widget=forms.Select(attrs={"id": "purok_sitio", "class": "form-select"})
     )
 
+
+class StaffUpdateForm(forms.Form):
+    assigned_purok = forms.ChoiceField(
+        choices=[(""  , "— Select Purok/Sitio —")] + PUROK_CHOICES,
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+        }),
+        label='Assigned Purok',
+        required=False,
+    )
 
 class ResidentProfileform(forms.Form):
     res_code = forms.CharField(

@@ -21,6 +21,7 @@ urlpatterns = [
 
     path("staff_account_requests_list/", views.staff_account_requests_list, name="staff_account_requests_list"),
     path("staff_account_requests_list/pending_staff_details/<str:p_staff_acc_req_id>/", views.pending_staff_dets , name="pending_staff_details"),
+    path("api/staff_account_requests/search/", views.staff_account_requests_search_api, name="staff_account_requests_search_api"),
 
     # RESIDENT
     path("resident/resident_list/", views.resident_list , name="resident_list"),

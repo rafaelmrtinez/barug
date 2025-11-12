@@ -58,7 +58,85 @@ class NewPasswordForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Add Bootstrap invalid class if errors
-        for field in self.fields.values():
-            if self.errors.get(field.name):
+        for field_name, field in self.fields.items():
+            if self.errors.get(field_name):
                 existing_classes = field.widget.attrs.get("class", "")
                 field.widget.attrs["class"] = existing_classes + " is-invalid"
+
+# ---------------------------------------------------------------------------------------------------------
+
+class ChangePasswordForm(forms.Form):
+    current_password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter current password',
+        }),
+        label='Current Password',
+        required=True,
+    )
+    new_password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter new password',
+        }),
+        label='New Password',
+        required=True,
+    )
+    confirm_password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Confirm new password',
+        }),
+        label='Confirm Password',
+        required=True,
+    )
+
+class VerificationCodeForm(forms.Form):
+    code1 = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'class': 'form-control text-center',
+            'maxlength': '1',
+            'style': 'width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;'
+        }),
+        required=True,
+    )
+    code2 = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'class': 'form-control text-center',
+            'maxlength': '1',
+            'style': 'width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;'
+        }),
+        required=True,
+    )
+    code3 = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'class': 'form-control text-center',
+            'maxlength': '1',
+            'style': 'width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;'
+        }),
+        required=True,
+    )
+    code4 = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'class': 'form-control text-center',
+            'maxlength': '1',
+            'style': 'width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;'
+        }),
+        required=True,
+    )
+    code5 = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'class': 'form-control text-center',
+            'maxlength': '1',
+            'style': 'width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;'
+        }),
+        required=True,
+    )
+    code6 = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'class': 'form-control text-center',
+            'maxlength': '1',
+            'style': 'width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;'
+        }),
+        required=True,
+    )

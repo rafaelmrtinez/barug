@@ -61,7 +61,17 @@
                     <div class="kv-item"><span class="kv-key">Middle Name</span><span class="kv-val">{{ personal.middle_name|default:""|title }}</span></div>
                     <div class="kv-item"><span class="kv-key">Suffix</span><span class="kv-val">{{ personal.suffix|default:""|upper }}</span></div>
                     <div class="kv-item"><span class="kv-key">Sex</span><span class="kv-val">{{ personal.sex_label|default:""|title }}</span></div>
-                    <div class="kv-item"><span class="kv-key">Date of Birth</span><span class="kv-val">{{ personal.birthdate|date:"F j, Y"|default:"" }}</span></div>
+                    <div class="kv-item"><span class="kv-key">Date of Birth</span>
+                      <span class="kv-val">
+                        {% if personal.birthdate_display %}
+                          {{ personal.birthdate_display }}
+                        {% elif personal.birthdate %}
+                          {{ personal.birthdate }}
+                        {% else %}
+                          —
+                        {% endif %}
+                      </span>
+                    </div>
                     <div class="kv-item"><span class="kv-key">Civil Status</span><span class="kv-val">{{ personal.civil_status_label|default:""|title }}</span></div>
                     <div class="kv-item"><span class="kv-key">Nationality</span><span class="kv-val">{{ personal.nationality_label|default:""|title }}</span></div>
                     <div class="kv-item"><span class="kv-key">Religion</span><span class="kv-val">{{ personal.religion_label|default:""|title }}</span></div>

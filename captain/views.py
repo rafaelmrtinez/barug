@@ -74,27 +74,26 @@ from src.domain.contracts.household_repository_contract import (
 
 from .forms import (
     StaffFilters,
+    StaffAccountRequestFilters,
     BusinessFilters,
     HouseholdFilters,
 )
 
-CAPTAIN_ROLE = "Barangay Captain"
 
 ROLE_BHW = 9
 ROLE_LUPON = 8
 WZ_KEY = "staff_nonres_wizard"
 
+STAFF_FILTER_SESSION_KEY = "captain_staff_filters"
+STAFF_REQ_FILTER_SESSION_KEY = "captain_staff_req_filters"
+
 CAPTAIN_ROLE = "Barangay Captain"
 
 # Demo identity (display only; real values usually come from session)
-user_fullname = "lname, fname mname suffix"
 user_role = CAPTAIN_ROLE
-user_role_template = user_role.lower().replace(" ", "_")
 
 BUCKET_FINAL = getattr(settings, "SUPABASE_ID_UPLOADS_BUCKET", "id-uploads")
 BUCKET_STAFF_PROOF = getattr(settings, "SUPABASE_STAFF_PROOF_BUCKET", "staff-proof")
-
-CAPTAIN_ROLE = "Barangay Captain"
 
 
 user_fullname = 'lname fname mname suffix'
@@ -159,6 +158,39 @@ def _parse_hhmm(s: Optional[str]) -> Optional[dtime]:
         return datetime.strptime(s, "%H:%M").time()
     except Exception:
         return None
+
+
+def _format_birthdate_display(*values: Any) -> str:
+    for raw in values:
+        if not raw:
+            continue
+
+        birth_dt: Optional[date] = None
+        if isinstance(raw, datetime):
+            birth_dt = raw.date()
+        elif isinstance(raw, date):
+            birth_dt = raw
+        else:
+            txt = str(raw).strip()
+            if not txt:
+                continue
+            try:
+                birth_dt = date.fromisoformat(txt[:10])
+            except Exception:
+                for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"):
+                    try:
+                        birth_dt = datetime.strptime(txt, fmt).date()
+                        break
+                    except Exception:
+                        continue
+            if birth_dt is None:
+                return txt
+
+        if birth_dt is not None:
+            return birth_dt.strftime("%B %d, %Y")
+
+    return ""
+
 
 def _ct_from_name(name: str) -> str:
     n = (name or "").lower()
@@ -390,8 +422,22 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
     role_str = (request.POST.get("role") or "").strip()
     role_id = int(role_str) if role_str.isdigit() else None
 
+    proof_file = None
+    if hasattr(request, "FILES"):
+        proof_file = (
+            request.FILES.get("proof")
+            or request.FILES.get("proof_file")
+            or None
+        )
+
     proof_url = (request.POST.get("proof") or "").strip() or None
-    proof_file = request.FILES.get("proof_file") if hasattr(request, "FILES") else None
+    if proof_url and not (
+        proof_url.startswith("http://")
+        or proof_url.startswith("https://")
+        or proof_url.startswith("data:")
+    ):
+        logger.warning("Ignoring non-URL, non-data proof value: %r", proof_url)
+        proof_url = None
 
     auth = request.session.get("auth") or {}
     staff_id = auth.get("staff_id")
@@ -507,17 +553,26 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
             final_base = f"staff_acc_req_proof/{pid}"
 
         uploaded_proof_url = None
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         if proof_file:
             try:
                 buf, mime, ext = _prep_image_for_upload(proof_file)
+                proof_rel_path = f"{final_base}/staff-app-proof-{role_id}-{timestamp}.{ext}"
                 res_up = _upload_to_storage_retry(
                     buf,
-                    path=f"{final_base}/staff-app-proof.{ext}",
+                    path=proof_rel_path,
                     bucket=BUCKET_FOR_PROOF,
                     content_type=mime,
                     make_public=True,
                 )
-                uploaded_proof_url = res_up.get("public_url") or res_up.get("signed_url")
+                uploaded_proof_url = (
+                    (res_up.get("public_url") if isinstance(res_up, dict) else None)
+                    or (res_up.get("signed_url") if isinstance(res_up, dict) else None)
+                )
+                if not uploaded_proof_url:
+                    logger.error("Proof upload returned no usable URL for %s", proof_rel_path)
+                    flash_system_error(request, "Proof upload did not return a usable URL.")
+                    return redirect(request.META.get("HTTP_REFERER") or request.path)
             except (DatabaseError, OperationalError, IntegrityError) as e:
                 flash_db_error(request, e)
                 return redirect(request.META.get("HTTP_REFERER") or request.path)
@@ -531,16 +586,29 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
                 _mime_hint, b64 = m.groups()
                 raw = io.BytesIO(base64.b64decode(b64))
                 buf, mime, ext = _prep_image_for_upload(raw)
+                proof_rel_path = f"{final_base}/staff-app-proof-{role_id}-{timestamp}.{ext}"
                 res_up = _upload_to_storage_retry(
                     buf,
-                    path=f"{final_base}/staff-app-proof.{ext}",
+                    path=proof_rel_path,
                     bucket=BUCKET_FOR_PROOF,
                     content_type=mime,
                     make_public=True,
                 )
-                uploaded_proof_url = res_up.get("public_url") or res_up.get("signed_url")
+                uploaded_proof_url = (
+                    (res_up.get("public_url") if isinstance(res_up, dict) else None)
+                    or (res_up.get("signed_url") if isinstance(res_up, dict) else None)
+                )
+                if not uploaded_proof_url:
+                    logger.error("Proof upload returned no usable URL for %s", proof_rel_path)
+                    flash_system_error(request, "Proof upload did not return a usable URL.")
+                    return redirect(request.META.get("HTTP_REFERER") or request.path)
             else:
                 uploaded_proof_url = proof_url
+
+        if uploaded_proof_url and not uploaded_proof_url.startswith(("http://", "https://")):
+            logger.error("Refusing to store non-URL proof value: %r", uploaded_proof_url)
+            flash_system_error(request, "Proof upload failed to produce a valid URL.")
+            return redirect(request.META.get("HTTP_REFERER") or request.path)
 
         try:
             result = Secretary.insert_res_staff_account_request(
@@ -825,6 +893,14 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
             flash_warning(request, "Supporting documents are missing. Please complete Step 2.")
             return redirect("captain:staff_selection_non-resident_docs")
 
+        personal_display = dict(personal)
+        birth_display = _format_birthdate_display(
+            personal_display.get("birthdate"),
+            personal_display.get("date_of_birth"),
+        )
+        if birth_display:
+            personal_display["birthdate_display"] = birth_display
+
         return render(
             request,
             "role.html",
@@ -836,7 +912,7 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
                 "user_role_template": user_role_template,
                 "role_form": role_form,
                 "sched_form": sched_form,
-                "personal": personal,
+                "personal": personal_display,
                 "docs": docs,
             },
         )
@@ -964,15 +1040,26 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
         )
 
         up_proof = None
+        proof_url = None
         if b_proof is not None:
             p_buf, p_mime, p_ext = _prep_image_for_upload(io.BytesIO(b_proof))
+            proof_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            proof_rel_path = f"{proof_final_base}/staff-app-proof-{role_id}-{proof_timestamp}.{p_ext}"
             up_proof = _upload_to_storage_retry(
                 p_buf,
-                path=f"{proof_final_base}/staff-app-proof.{p_ext}",
+                path=proof_rel_path,
                 bucket=BUCKET_STAFF_PROOF,
                 content_type=p_mime,
                 make_public=True,
             )
+            proof_url = (
+                (up_proof.get("public_url") if isinstance(up_proof, dict) else None)
+                or (up_proof.get("signed_url") if isinstance(up_proof, dict) else None)
+            )
+            if not proof_url:
+                logger.error("Non-resident proof upload returned no usable URL: %s", proof_rel_path)
+                flash_system_error(request, "Proof upload did not return a usable URL.")
+                return redirect(request.path)
     except Exception as e:
         logger.error("Step3 ✗ Upload failed: %s", e)
         flash_system_error(request, "Final upload failed.", exc=e)
@@ -1052,10 +1139,71 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
 @role_required(CAPTAIN_ROLE)
 @nocache
 def staff_list(request: HttpRequest) -> HttpResponse:
-    # Pull rows from stored function
+    filters = request.session.get(STAFF_FILTER_SESSION_KEY, {}) or {}
+    role_raw = (filters.get("role") or "").strip()
+    acc_raw = (filters.get("account_stat") or "").strip()
+    search_term = (filters.get("q") or "").strip()
+
+    updated = False
+    should_redirect = False
+
+    if "clear_filters" in request.GET:
+        role_raw = ""
+        acc_raw = ""
+        search_term = ""
+        updated = True
+        should_redirect = True
+
+    remove_target = (request.GET.get("remove_filter") or "").strip()
+    if remove_target:
+        if remove_target == "role":
+            role_raw = ""
+        elif remove_target == "account_stat":
+            acc_raw = ""
+        elif remove_target == "search":
+            search_term = ""
+        updated = True
+        should_redirect = True
+
+    if "role" in request.GET:
+        role_raw = (request.GET.get("role") or "").strip()
+        updated = True
+    if "account_stat" in request.GET:
+        acc_raw = (request.GET.get("account_stat") or "").strip()
+        updated = True
+    if "q" in request.GET:
+        search_term = (request.GET.get("q") or "").strip()
+        updated = True
+    if "search" in request.GET:
+        search_term = (request.GET.get("search") or "").strip()
+        updated = True
+
+    filters_state = {
+        "role": role_raw,
+        "account_stat": acc_raw,
+        "q": search_term,
+    }
+    if updated or STAFF_FILTER_SESSION_KEY not in request.session:
+        request.session[STAFF_FILTER_SESSION_KEY] = filters_state
+        request.session.modified = True
+
+    if should_redirect:
+        return redirect(request.path)
+
+    role_id = int(role_raw) if role_raw.isdigit() else None
+    acc_id = int(acc_raw) if acc_raw.isdigit() else None
+
+    rows: List[Dict[str, Any]] = []
     try:
-        rows = Secretary.get_all_staff_info_summary() or []
-        # rows: [{staff_id, staff_code, full_name, role_name, residential_status}, ...]
+        if role_id is not None or acc_id is not None:
+            rows = Secretary.filter_staff_by_role_and_account(role_id, acc_id) or []
+            if search_term:
+                term = search_term.lower()
+                rows = [r for r in rows if term in (r.get("full_name") or "").lower()]
+        elif search_term:
+            rows = Secretary.search_staff_by_name(search_term) or []
+        else:
+            rows = Secretary.get_all_staff_info_summary() or []
     except Exception as e:
         logger.exception("Failed to load staff summaries: %s", e)
         rows = []
@@ -1072,15 +1220,46 @@ def staff_list(request: HttpRequest) -> HttpResponse:
     except ValueError:
         page_number = 1
 
-    form = StaffFilters()
+    form_initial = {
+        "role": role_raw,
+        "account_stat": acc_raw,
+        "search": search_term,
+    }
+    form = StaffFilters(initial=form_initial)
+
     paginator = Paginator(rows, per_page)
     page_obj = paginator.get_page(page_number)
 
-    # Session/user display info
+    role_choices = {str(k): v for k, v in form.fields["role"].choices}
+    acc_choices = {str(k): v for k, v in form.fields["account_stat"].choices}
+
+    active_filters: List[Dict[str, str]] = []
+    if role_raw:
+        label = role_choices.get(role_raw) or f"Role {role_raw}"
+        active_filters.append({
+            "label": label,
+            "remove_url": f"{request.path}?remove_filter=role",
+        })
+    if acc_raw:
+        label = acc_choices.get(acc_raw) or f"Status {acc_raw}"
+        active_filters.append({
+            "label": label,
+            "remove_url": f"{request.path}?remove_filter=account_stat",
+        })
+    if search_term:
+        active_filters.append({
+            "label": f"Search: \"{search_term}\"",
+            "remove_url": f"{request.path}?remove_filter=search",
+        })
+
+    clear_filters_url = f"{request.path}?clear_filters=1"
+
     auth = request.session.get("auth") or {}
     _user_fullname = auth.get("full_name") or user_fullname
     _user_role = auth.get("role_name") or user_role
     _user_role_template = (_user_role or "").lower().replace(" ", "_")
+
+    current_filters = filters_state
 
     return render(request, "staff_list.html", {
         "user_fullname": _user_fullname,
@@ -1092,6 +1271,9 @@ def staff_list(request: HttpRequest) -> HttpResponse:
         "page_obj": page_obj,
         "total_count": paginator.count,
         "per_page": per_page,
+        "active_filters": active_filters,
+        "clear_filters_url": clear_filters_url,
+        "current_filters": current_filters,
     })
 
 @session_login_required
@@ -1099,15 +1281,34 @@ def staff_list(request: HttpRequest) -> HttpResponse:
 @nocache
 @require_GET
 def staff_search_api(request):
-    q = (request.GET.get("q") or "").strip()
+    raw_query = (request.GET.get("q") or "").strip()
+
+    filters = request.session.get(STAFF_FILTER_SESSION_KEY, {}) or {}
+    role_raw = (filters.get("role") or "").strip()
+    acc_raw = (filters.get("account_stat") or "").strip()
+
+    role_id = int(role_raw) if role_raw.isdigit() else None
+    acc_id = int(acc_raw) if acc_raw.isdigit() else None
+
     try:
-        if q:
-            # returns: full_name, role_name, residential_status (no staff_id unless you added it)
-            results = Secretary.search_staff_by_name(q)[:50]
+        if role_id is not None or acc_id is not None:
+            rows = Secretary.filter_staff_by_role_and_account(role_id, acc_id) or []
         else:
-            # returns: staff_id, staff_code, full_name, role_name, residential_status
-            results = Secretary.get_all_staff_info_summary()
-        return JsonResponse({"results": results})
+            rows = Secretary.get_all_staff_info_summary() or []
+
+        if raw_query:
+            q_lower = raw_query.lower()
+            rows = [r for r in rows if q_lower in (r.get("full_name") or "").lower()]
+
+        filters.update({
+            "role": role_raw,
+            "account_stat": acc_raw,
+            "q": raw_query,
+        })
+        request.session[STAFF_FILTER_SESSION_KEY] = filters
+        request.session.modified = True
+
+        return JsonResponse({"results": rows[:50]})
     except Exception as e:
         logger.exception("staff_search_api error: %s", e)
         return JsonResponse({"results": [], "error": "Search failed"}, status=500)
@@ -1172,6 +1373,57 @@ def staff_dets(request, staff_code: str):
 @role_required(CAPTAIN_ROLE)
 @nocache
 def staff_account_requests_list(request: HttpRequest) -> HttpResponse:
+    filters = request.session.get(STAFF_REQ_FILTER_SESSION_KEY, {}) or {}
+    role_raw = (filters.get("role") or "").strip()
+    date_raw = (filters.get("date_submitted") or "").strip()
+    search_term = (filters.get("q") or "").strip()
+
+    updated = False
+    should_redirect = False
+
+    if "clear_filters" in request.GET:
+        role_raw = ""
+        date_raw = ""
+        search_term = ""
+        updated = True
+        should_redirect = True
+
+    remove_target = (request.GET.get("remove_filter") or "").strip()
+    if remove_target:
+        if remove_target == "role":
+            role_raw = ""
+        elif remove_target == "date_submitted":
+            date_raw = ""
+        elif remove_target == "search":
+            search_term = ""
+        updated = True
+        should_redirect = True
+
+    if "role" in request.GET:
+        role_raw = (request.GET.get("role") or "").strip()
+        updated = True
+    if "date_submitted" in request.GET:
+        date_raw = (request.GET.get("date_submitted") or "").strip()
+        updated = True
+    if "q" in request.GET:
+        search_term = (request.GET.get("q") or "").strip()
+        updated = True
+    if "search" in request.GET:
+        search_term = (request.GET.get("search") or "").strip()
+        updated = True
+
+    filters_state = {
+        "role": role_raw,
+        "date_submitted": date_raw,
+        "q": search_term,
+    }
+    if updated or STAFF_REQ_FILTER_SESSION_KEY not in request.session:
+        request.session[STAFF_REQ_FILTER_SESSION_KEY] = filters_state
+        request.session.modified = True
+
+    if should_redirect:
+        return redirect(request.path)
+
     try:
         staff_req = Captain.list_requests() or []
     except Exception:
@@ -1194,6 +1446,39 @@ def staff_account_requests_list(request: HttpRequest) -> HttpResponse:
         if sid == 29 or "WAITING FOR BARANGAY CAPTAIN" in name:
             filtered.append(r)
 
+    # Apply filters
+    if role_raw:
+        role_id = int(role_raw) if role_raw.isdigit() else None
+        if role_id:
+            filtered = [r for r in filtered if get(r, "role_id") == role_id]
+
+    if date_raw:
+        from datetime import datetime
+        try:
+            target_date = datetime.strptime(date_raw, "%Y-%m-%d").date()
+        except ValueError:
+            target_date = None
+        
+        if target_date:
+            date_filtered = []
+            for r in filtered:
+                pretty_date = get(r, "date_time_submitted_pretty")
+                
+                if pretty_date and isinstance(pretty_date, str):
+                    try:
+                        # Parse "October 12, 2025 9:06 A.M" format
+                        date_part = ' '.join(pretty_date.split()[:3])  # "October 12, 2025"
+                        parsed_date = datetime.strptime(date_part, "%B %d, %Y").date()
+                        if parsed_date == target_date:
+                            date_filtered.append(r)
+                    except (ValueError, IndexError):
+                        pass
+            filtered = date_filtered
+
+    if search_term:
+        search_lower = search_term.lower()
+        filtered = [r for r in filtered if search_lower in (get(r, "name") or "").lower()]
+
     try:
         per_page = int(request.GET.get("per_page") or 10)
         if per_page <= 0:
@@ -1201,8 +1486,45 @@ def staff_account_requests_list(request: HttpRequest) -> HttpResponse:
     except (TypeError, ValueError):
         per_page = 10
 
+    form_initial = {
+        "role": role_raw,
+        "date_submitted": date_raw,
+        "search": search_term,
+    }
+    form = StaffAccountRequestFilters(initial=form_initial)
+
     paginator = Paginator(filtered, per_page)
     page_obj = paginator.get_page(request.GET.get("page"))
+
+    role_choices = {str(k): v for k, v in form.fields["role"].choices}
+
+    active_filters = []
+    if role_raw:
+        label = role_choices.get(role_raw) or f"Role {role_raw}"
+        active_filters.append({
+            "label": label,
+            "remove_url": f"{request.path}?remove_filter=role",
+        })
+    if date_raw:
+        try:
+            from datetime import datetime
+            date_obj = datetime.strptime(date_raw, "%Y-%m-%d")
+            date_label = date_obj.strftime("%B %d, %Y")
+        except ValueError:
+            date_label = date_raw
+        active_filters.append({
+            "label": f"Date: {date_label}",
+            "remove_url": f"{request.path}?remove_filter=date_submitted",
+        })
+    if search_term:
+        active_filters.append({
+            "label": f"Search: \"{search_term}\"",
+            "remove_url": f"{request.path}?remove_filter=search",
+        })
+
+    clear_filters_url = f"{request.path}?clear_filters=1"
+
+    current_filters = filters_state
 
     return render(request, "staff_account_req.html", {
         "user_fullname": user_fullname,
@@ -1210,10 +1532,14 @@ def staff_account_requests_list(request: HttpRequest) -> HttpResponse:
         "page_path": f"{user_role} / Staff Account Requests",
         "page_title": "Staff Account Requests",
         "user_role_template": user_role_template,
+        "form": form,
         "page_obj": page_obj,
         "staff_req": page_obj.object_list,
         "total_count": paginator.count,
         "per_page": per_page,
+        "active_filters": active_filters,
+        "clear_filters_url": clear_filters_url,
+        "current_filters": current_filters,
     })
 
 
@@ -1260,51 +1586,52 @@ REQUEST_STATUS_REJECTED = 4
 @session_login_required
 @role_required(CAPTAIN_ROLE)
 @nocache
-@require_http_methods(["POST", "GET"])
+@require_http_methods(["POST"])
 def process_staff_request(request: HttpRequest) -> HttpResponse:
-
     auth = request.session.get("auth") or {}
     approver_id = auth.get("staff_id")
+    
+    if not approver_id:
+        flash_system_error(request, "Your session is missing staff credentials.")
+        return redirect(request.META.get("HTTP_REFERER") or "captain:staff_account_requests_list")
+    
     try:
         approver_id = int(approver_id)
     except (TypeError, ValueError):
-        flash_system_error(request, "Your session is missing staff credentials.")
-        return redirect(request.META.get("HTTP_REFERER") or request.path)
+        flash_system_error(request, "Invalid staff credentials.")
+        return redirect(request.META.get("HTTP_REFERER") or "captain:staff_account_requests_list")
 
-    # --- ID
+    # Get staff account request ID
     staff_acc_req_id_raw = (
-        request.POST.get("staff_acc_req_id")
-        or request.POST.get("id")
-        or request.GET.get("staff_acc_req_id")
-        or request.GET.get("id")
-        or getattr(getattr(request, "resolver_match", None), "kwargs", {}).get("staff_acc_req_id")
+        request.POST.get("staff_acc_req_id") or 
+        request.POST.get("id")
     )
+    
+    if not staff_acc_req_id_raw:
+        flash_warning(request, "Missing staff account request ID.")
+        return redirect(request.META.get("HTTP_REFERER") or "captain:staff_account_requests_list")
+    
     try:
         staff_acc_req_id = int(staff_acc_req_id_raw)
     except (TypeError, ValueError):
-        flash_system_error(request, "Invalid or missing staff account request ID.")
-        return redirect(request.META.get("HTTP_REFERER") or request.path)
+        flash_warning(request, "Invalid staff account request ID.")
+        return redirect(request.META.get("HTTP_REFERER") or "captain:staff_account_requests_list")
 
-    # --- Decision
+    # Get decision status
     status_raw = request.POST.get("p_request_status_id")
-    if status_raw is None:
-        action_type = (request.POST.get("action_type") or "").strip().upper()
-        if action_type == "APPROVE":
-            status_id = REQUEST_STATUS_APPROVED
-        elif action_type == "REJECT":
-            status_id = REQUEST_STATUS_REJECTED
-        else:
-            flash_warning(request, "Missing or invalid action. Choose Approve or Reject.")
-            return redirect(request.META.get("HTTP_REFERER") or request.path)
-    else:
-        try:
-            status_id = int(status_raw)
-        except (TypeError, ValueError):
-            flash_warning(request, "Invalid request status ID.")
-            return redirect(request.META.get("HTTP_REFERER") or request.path)
-        if status_id not in (REQUEST_STATUS_APPROVED, REQUEST_STATUS_REJECTED):
-            flash_warning(request, "Unsupported request status ID.")
-            return redirect(request.META.get("HTTP_REFERER") or request.path)
+    if not status_raw:
+        flash_warning(request, "Missing decision status.")
+        return redirect(request.META.get("HTTP_REFERER") or "captain:staff_account_requests_list")
+    
+    try:
+        status_id = int(status_raw)
+    except (TypeError, ValueError):
+        flash_warning(request, "Invalid decision status.")
+        return redirect(request.META.get("HTTP_REFERER") or "captain:staff_account_requests_list")
+    
+    if status_id not in (REQUEST_STATUS_APPROVED, REQUEST_STATUS_REJECTED):
+        flash_warning(request, "Invalid decision status.")
+        return redirect(request.META.get("HTTP_REFERER") or "captain:staff_account_requests_list")
 
     remarks = (request.POST.get("remarks") or "").strip() or None
     email_to = (request.POST.get("email") or "").strip()
@@ -1317,123 +1644,154 @@ def process_staff_request(request: HttpRequest) -> HttpResponse:
             p_remarks=remarks,
         )
 
-        # =========================
-        # REJECTED: email + flash
-        # =========================
         if status_id == REQUEST_STATUS_REJECTED:
+            # Send rejection email if email provided
             if email_to:
-                subj = "Staff Account Request Update"
-                reason = remarks or "No specific reason was provided."
-                body_txt = (
-                    "Good day!\n\n"
-                    "Your staff account creation request has been REJECTED.\n\n"
-                    f"Reason/Remarks:\n{reason}\n\n"
-                    "Please contact the authorized staff if you have any concern.\n\n"
-                    "Barangay Sto. Niño"
-                )
-                body_html = f"""
-                    <p>Good day!</p>
-                    <p>Your staff account creation request has been <strong>REJECTED</strong>.</p>
-                    <p><strong>Reason/Remarks:</strong><br>{reason}</p>
-                    <p>Please contact the authorized staff if you have any concern.</p>
-                    <p>Barangay Sto. Niño</p>
-                """.strip()
-                send_email(
-                    subject=subj,
-                    to=[email_to],
-                    body_text=body_txt,
-                    body_html=body_html,
-                    from_name="Barangay Sto. Niño",
-                    fail_silently=True,
-                )
+                try:
+                    reason = remarks or "No specific reason was provided."
+                    send_email.send_email(
+                        subject="Staff Account Request Rejected",
+                        to=[email_to],
+                        body_text=f"Good day!\n\nYour staff account creation request has been REJECTED.\n\nReason: {reason}\n\nPlease contact the authorized staff if you have any concern.\n\nBarangay Sto. Niño",
+                        body_html=f"<p>Good day!</p><p>Your staff account creation request has been <strong>REJECTED</strong>.</p><p><strong>Reason:</strong> {reason}</p><p>Please contact the authorized staff if you have any concern.</p><p>Barangay Sto. Niño</p>",
+                        from_name="Barangay Sto. Niño",
+                        fail_silently=True,
+                    )
+                except Exception as e:
+                    logger.warning("Failed to send rejection email: %s", e)
+            
             flash_success(request, "Staff account request rejected.")
-            return redirect(request.POST.get("next") or request.GET.get("next") or "captain:staff_account_requests_list")
-
-        # =========================
-        # APPROVED (two branches)
-        # =========================
-        if result_text == "TRUE":
-            # Captain step only: now waiting for Admin
-            flash_success(request, "Forwarded for Admin approval.")
-
-            if email_to:
-                subj = "Staff Account Request Update"
-                status_label = "WAITING FOR ADMIN'S APPROVAL"
-                body_txt = (
-                    "Good day!\n\n"
-                    "Your staff account request has been reviewed by the Barangay Captain.\n"
-                    f"Current Status: {status_label}\n\n"
-                    "You will receive another update after the Admin's final decision.\n\n"
-                    "Barangay Sto. Niño"
-                )
-                body_html = f"""
-                    <p>Good day!</p>
-                    <p>Your staff account request has been reviewed by the Barangay Captain.</p>
-                    <p><strong>Current Status:</strong> {status_label}</p>
-                    <p>You will receive another update after the Admin's final decision.</p>
-                    <p>Barangay Sto. Niño</p>
-                """.strip()
-                send_email(
-                    subject=subj,
-                    to=[email_to],
-                    body_text=body_txt,
-                    body_html=body_html,
-                    from_name="Barangay Sto. Niño",
-                    fail_silently=True,
-                )
-
-            return redirect(request.POST.get("next") or request.GET.get("next") or "captain:staff_account_requests_list")
-
-        # Admin final approval should return staff_code (we don't need it here just to email status)
-        if isinstance(result_text, str) and result_text.strip():
-            flash_success(request, f"Staff account approved. Staff Code: {result_text}")
-
-            if email_to:
-                subj = "Staff Account Request Update"
-                status_label = "APPROVED"
-                body_txt = (
-                    "Good day!\n\n"
-                    "Your staff account request has been APPROVED.\n"
-                    f"Current Status: {status_label}\n\n"
-                    "If you haven't received your credentials yet, please wait for the follow-up message "
-                    "with your username and temporary password, or contact the authorized staff.\n\n"
-                    "Barangay Sto. Niño"
-                )
-                body_html = f"""
-                    <p>Good day!</p>
-                    <p>Your staff account request has been <strong>APPROVED</strong>.</p>
-                    <p><strong>Current Status:</strong> {status_label}</p>
-                    <p>If you haven't received your credentials yet, please wait for the follow-up message with your username
-                    and temporary password, or contact the authorized staff.</p>
-                    <p>Barangay Sto. Niño</p>
-                """.strip()
-                send_email(
-                    subject=subj,
-                    to=[email_to],
-                    body_text=body_txt,
-                    body_html=body_html,
-                    from_name="Barangay Sto. Niño",
-                    fail_silently=True,
-                )
-        else:
-            flash_warning(
-                request,
-                "Request processed, but the system did not return a confirmation token. Please verify the status."
-            )
+        
+        elif status_id == REQUEST_STATUS_APPROVED:
+            if result_text == "TRUE":
+                # Captain approval - forwarded to admin
+                if email_to:
+                    try:
+                        send_email.send_email(
+                            subject="Staff Account Request Update",
+                            to=[email_to],
+                            body_text="Good day!\n\nYour staff account request has been reviewed by the Barangay Captain.\n\nCurrent Status: WAITING FOR ADMIN'S APPROVAL\n\nYou will receive another update after the Admin's final decision.\n\nBarangay Sto. Niño",
+                            body_html="<p>Good day!</p><p>Your staff account request has been reviewed by the Barangay Captain.</p><p><strong>Current Status:</strong> WAITING FOR ADMIN'S APPROVAL</p><p>You will receive another update after the Admin's final decision.</p><p>Barangay Sto. Niño</p>",
+                            from_name="Barangay Sto. Niño",
+                            fail_silently=True,
+                        )
+                    except Exception as e:
+                        logger.warning("Failed to send approval email: %s", e)
+                
+                flash_success(request, "Request approved and forwarded to Admin for final processing.")
+            
+            elif result_text and result_text.strip():
+                # Final approval with staff code
+                staff_code = result_text.strip()
+                flash_success(request, f"Staff account approved. Staff Code: {staff_code}")
+                
+                if email_to:
+                    try:
+                        send_email.send_email(
+                            subject="Staff Account Request Approved",
+                            to=[email_to],
+                            body_text="Good day!\n\nYour staff account request has been APPROVED.\n\nYou will receive your login credentials in a separate email shortly.\n\nBarangay Sto. Niño",
+                            body_html="<p>Good day!</p><p>Your staff account request has been <strong>APPROVED</strong>.</p><p>You will receive your login credentials in a separate email shortly.</p><p>Barangay Sto. Niño</p>",
+                            from_name="Barangay Sto. Niño",
+                            fail_silently=True,
+                        )
+                    except Exception as e:
+                        logger.warning("Failed to send final approval email: %s", e)
+            
+            else:
+                flash_warning(request, "Request processed but no confirmation received. Please verify the status.")
 
         logger.info(
-            "process_staff_request ✓ req_id=%s approver_id=%s status=%s result=%r",
+            "process_staff_request completed: req_id=%s approver_id=%s status=%s result=%s",
             staff_acc_req_id, approver_id, status_id, result_text
         )
 
     except DatabaseError as db_err:
-        logger.exception("DB error processing staff account request (req_id=%s)", staff_acc_req_id)
+        logger.exception("Database error processing staff request (req_id=%s)", staff_acc_req_id)
         flash_db_error(request, db_err)
     except Exception as ex:
-        logger.exception("Unexpected error processing staff account request (req_id=%s)", staff_acc_req_id)
+        logger.exception("Unexpected error processing staff request (req_id=%s)", staff_acc_req_id)
         flash_system_error(request, "Unable to process the request.", exc=ex)
+    
+    return redirect(request.META.get("HTTP_REFERER") or "captain:staff_account_requests_list")
 
-    return redirect(request.POST.get("next") or request.GET.get("next") or "captain:staff_account_requests_list")
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@nocache
+@require_GET
+def staff_account_requests_search_api(request):
+    raw_query = (request.GET.get("q") or "").strip()
+
+    filters = request.session.get(STAFF_REQ_FILTER_SESSION_KEY, {}) or {}
+    role_raw = (filters.get("role") or "").strip()
+    date_raw = (filters.get("date_submitted") or "").strip()
+
+    try:
+        staff_req = Captain.list_requests() or []
+    except Exception as e:
+        logger.exception("staff_account_requests_search_api error: %s", e)
+        return JsonResponse({"results": [], "error": "Search failed"}, status=500)
+
+    def get(row, key):
+        return row.get(key) if isinstance(row, dict) else getattr(row, key, None)
+
+    # Filter for captain requests only
+    filtered = []
+    for r in staff_req:
+        sid = get(r, "status_id") or get(r, "request_status_id")
+        name = (get(r, "status_name") or "").upper()
+        try:
+            sid = int(sid) if sid is not None else None
+        except (TypeError, ValueError):
+            sid = None
+        if sid == 29 or "WAITING FOR BARANGAY CAPTAIN" in name:
+            filtered.append(r)
+
+    # Apply role filter
+    if role_raw:
+        role_id = int(role_raw) if role_raw.isdigit() else None
+        if role_id:
+            filtered = [r for r in filtered if get(r, "role_id") == role_id]
+
+    # Apply date filter
+    if date_raw:
+        from datetime import datetime
+        try:
+            target_date = datetime.strptime(date_raw, "%Y-%m-%d").date()
+        except ValueError:
+            target_date = None
+        
+        if target_date:
+            date_filtered = []
+            for r in filtered:
+                pretty_date = get(r, "date_time_submitted_pretty")
+                
+                if pretty_date and isinstance(pretty_date, str):
+                    try:
+                        # Parse "October 12, 2025 9:06 A.M" format
+                        date_part = ' '.join(pretty_date.split()[:3])  # "October 12, 2025"
+                        parsed_date = datetime.strptime(date_part, "%B %d, %Y").date()
+                        if parsed_date == target_date:
+                            date_filtered.append(r)
+                    except (ValueError, IndexError):
+                        pass
+            filtered = date_filtered
+
+    # Apply search filter
+    if raw_query:
+        q_lower = raw_query.lower()
+        filtered = [r for r in filtered if q_lower in (get(r, "name") or "").lower()]
+
+    # Update session
+    filters.update({
+        "role": role_raw,
+        "date_submitted": date_raw,
+        "q": raw_query,
+    })
+    request.session[STAFF_REQ_FILTER_SESSION_KEY] = filters
+    request.session.modified = True
+
+    return JsonResponse({"results": filtered[:50]})
 
 # -------------------------------
 # RESIDENT
@@ -1876,12 +2234,3 @@ def api_business_pins(
         status=_to_int_or_none(request.GET.get("status")),
     )
     return JsonResponse(pins, safe=False)
-
-
-def staff_list(request):
-    pass
-    #     form = StaffFilters()
-    # list = []
-    # paginator = Paginator(list, 10)
-    # page_number = request.GET.get('page')
-    # page_obj = paginator.get_page(page_number)
