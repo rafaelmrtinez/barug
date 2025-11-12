@@ -357,3 +357,153 @@ class SecretaryDashboardService:
             "kpis": kpis,
             "dashboard_json": dashboard_json,
         }
+
+class LuponMemberDashboardService:
+    def __init__(self, dashboard_repo):
+        self.repo = dashboard_repo
+
+    def _normalize_rows_to_labels_data(self, rows, label_col='month_label', value_col='total_amount_collected'):
+        if rows is None:
+            return {"labels": [], "data": []}
+
+        if isinstance(rows, dict) and 'labels' in rows and 'data' in rows:
+            return {"labels": list(rows['labels']), "data": [float(v or 0) for v in rows['data']]}
+
+        # If rows is a single dict/tuple -> wrap
+        if isinstance(rows, (dict, tuple)):
+            rows = [rows]
+
+        labels = []
+        data = []
+        try:
+            for r in rows:
+                if isinstance(r, dict):
+                    lbl = r.get(label_col)
+                    val = r.get(value_col)
+                else:
+                    # tuple-like: (label, value)
+                    try:
+                        lbl = r[0]
+                        val = r[1]
+                    except Exception:
+                        continue
+                labels.append(lbl)
+                try:
+                    data.append(float(val or 0))
+                except Exception:
+                    data.append(0.0)
+        except Exception:
+            return {"labels": [], "data": []}
+
+        return {"labels": labels, "data": data}
+
+    def _rows_to_status_labels_and_counts(self, raw_rows):
+        """
+        Convert various shapes returned by the repo into ordered (labels, counts) lists
+        - Accepts:
+            * list of dicts: [{'settlement_status': 'SETTLED', 'case_count': 5}, ...]
+            * list of tuples: [('SETTLED', 5), ...]
+            * dict mapping: {'SETTLED': 5, ...}
+        - Preserves order for list-like inputs. For dict mapping, uses insertion order.
+        - Returns (labels_list, counts_list)
+        """
+        if raw_rows is None:
+            return [], []
+
+        # If mapping/dict: keys -> labels, values -> counts (preserve insertion order)
+        if isinstance(raw_rows, dict):
+            labels = []
+            counts = []
+            for k, v in raw_rows.items():
+                labels.append(str(k))
+                try:
+                    counts.append(int(v or 0))
+                except Exception:
+                    counts.append(0)
+            return labels, counts
+
+        # If single-row dict/tuple, wrap it
+        if isinstance(raw_rows, (dict, tuple)):
+            raw_rows = [raw_rows]
+
+        labels = []
+        counts = []
+        # List-like handling: preserve order
+        for r in raw_rows:
+            try:
+                if isinstance(r, dict):
+                    # prefer settlement_status column names commonly used
+                    key = r.get('settlement_status') or r.get('settlement_status_name') or r.get('status') \
+                          or next(iter(r.values()), None)
+                    # prefer case_count or count-ish keys
+                    val = r.get('case_count') or r.get('count') or r.get('case_count') or None
+                    if val is None:
+                        # try to pick the second value in the dict if present
+                        vals = list(r.values())
+                        val = vals[1] if len(vals) > 1 else vals[0] if vals else 0
+                else:
+                    # tuple-like / sequence
+                    key = r[0] if len(r) > 0 else None
+                    val = r[1] if len(r) > 1 else 0
+
+                if key is None:
+                    continue
+                labels.append(str(key))
+                try:
+                    counts.append(int(val or 0))
+                except Exception:
+                    counts.append(0)
+            except Exception:
+                # skip malformed row but continue processing remaining rows
+                continue
+
+        return labels, counts
+
+    def get_dashboard_content(self) -> dict:
+        ongoing_cases = self.repo.fetch_kpi_ongoing_cases()
+        open_cases = self.repo.fetch_kpi_sub_ongoing_cases()
+
+        total_case_settled = self.repo.fetch_kpi_total_cases_settled()
+        # total_case_settled_delta = self.repo.fetch_kpi_sub_total_cases_settled()
+
+        total_case_unsettled = self.repo.fetch_kpi_total_cases_unsettled()
+        # total_case_unsettled_delta = self.repo.fetch_kpi_sub_total_cases_unsettled()
+
+        settlement_rate = self.repo.fetch_kpi_settlement_rate()
+
+        kpis = {
+            "ongoing_cases": ongoing_cases,
+            "open_cases": open_cases,
+            "total_case_settled": total_case_settled,
+            # "total_case_settled_delta": total_case_settled_delta,
+            "total_case_unsettled": total_case_unsettled,
+            # "total_case_unsettled_delta": total_case_unsettled_delta,
+            "settlement_rate": settlement_rate,
+        }
+
+        raw_case_nature_counts = self.repo.fetch_case_nature_counts()
+        case_nature = self._normalize_rows_to_labels_data(
+            [{"case_name": k, "case_count": v} for k, v in raw_case_nature_counts.items()],
+            label_col='case_name',
+            value_col='case_count'
+        )
+
+        settlement_status_raw = self.repo.fetch_settlement_status_counts()
+        status_labels, status_data = self._rows_to_status_labels_and_counts(settlement_status_raw)
+
+        dashboard_json = {
+            "casesNature": {
+                "labels": case_nature.get("labels", []),
+                "data": case_nature.get("data", [])
+            },
+            "settlementStatus": {
+                "labels": status_labels,
+                "data": status_data
+            },
+        }
+
+        return {
+            "kpis": kpis,
+            "dashboard_json": dashboard_json,
+        }
+

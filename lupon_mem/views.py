@@ -52,6 +52,10 @@ from django.views.decorators.http import require_POST
 from lupon_mem.services.case_state import close_case, reopen_case
 
 
+from dependency_injector.wiring import inject, Provide
+from src.app.bootstrap.app_containers import AppContainer
+
+
 # caching / logging
 from django.core.cache import cache
 import time, logging
@@ -2215,22 +2219,51 @@ def preview_image(request: HttpRequest):
     return HttpResponse(img_bytes, content_type="image/png")
 
 
+def _auth_role_name(request: HttpRequest) -> str:
+    return (((request.session.get("auth") or {}).get("role_name")) or "Staff").title()
+
+
 # --- Dashboard ---
 @session_login_required
 @role_required(*LUPON_ROLES)
 @nocache
-def dashboard(request: HttpRequest):
-    auth = request.session.get("auth")
+@inject
+def dashboard(
+    request: HttpRequest,
+    lupon_mem_dashboard_service=Provide[AppContainer.lupon_mem_dashboard_service],
+):
+    user_role = _auth_role_name(request)
+
+    kpis = {
+        "ongoing_cases": 0,
+        "open_cases": None,
+        "total_case_settled": 0,
+        "total_case_settled_delta": None,
+        "total_case_unsettled": 0,
+        "total_case_unsettled_delta": None,
+        "settlement_rate": 0,
+    }
+
+    dashboard_json = None
+
+    try:
+        payload = lupon_mem_dashboard_service.get_dashboard_content() or {}
+        kpis = payload.get("kpis", kpis)
+        dashboard_json = payload.get("dashboard_json") 
+    except Exception as exc:
+        print("Error fetching lupon mem dashboard KPIs:", exc)
+
     return render(
         request,
         "lupon_mem/dashboard.html",
         {
-            "page_path": f"Barangay Lupon Member/Dashboard",
-            "page_title": "Dashboard",
-            "auth": auth,
+            'page_path' : f'{user_role} / Dashboard',
+            'page_title' : 'Dashboard',
+            'kpis': kpis,
+            'dashboard_json': dashboard_json,
+            'today': datetime.now().strftime("%B %d, %Y"),
         },
     )
-
 
 # Helpers reused by case_new/report flows
 def _fetch_lookups() -> Dict[str, List[Tuple[int, str]]]:

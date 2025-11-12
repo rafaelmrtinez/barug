@@ -293,7 +293,7 @@
 
         if (total === 0 || numeric.every(v => v === 0)){
           drawNoData(ctx, W, H, NEU500, opts.noDataTitle || 'No data', opts.noDataSubtitle || 'No records to show');
-          if (legendEl) legendEl.innerHTML = labels.map((t,i)=>`<span class="legend-dot" style="--dot:${colors[i%colors.length]}"></span><span class="legend-label" style="opacity:.6">${t}</span>`).join('');
+          if (legendEl) legendEl.innerHTML = labels.map((t,i)=>`<div class="legend-item"><span class="legend-dot" style="--dot:${colors[i%colors.length]}"></span><span class="legend-label" style="opacity:.6">${t}</span></div>`).join('');
           return { segments: [] , W, H, ctx };
         }
 
@@ -311,7 +311,7 @@
         ctx.beginPath(); ctx.arc(cx,cy,cut,0,Math.PI*2); ctx.fill();
         ctx.globalCompositeOperation = 'source-over';
 
-        if (legendEl) legendEl.innerHTML = labels.map((t,i)=>`<span class="legend-dot" style="--dot:${colors[i%colors.length]}"></span><span class="legend-label">${t}</span>`).join('');
+  if (legendEl) legendEl.innerHTML = labels.map((t,i)=>`<div class="legend-item"><span class="legend-dot" style="--dot:${colors[i%colors.length]}"></span><span class="legend-label">${t}</span></div>`).join('');
 
         return { segments, W, H, ctx, cx, cy, cut, R };
       }
@@ -511,7 +511,11 @@
       ChartUtils.renderDonut('statusBreakdown', dash.statusBreakdown.labels||[], dash.statusBreakdown.data||[], palette, { legendEl:'statusLegend' });
       document.querySelector('.chart-skel-status')?.classList?.add('hidden');
     }
-
+    if(document.getElementById('settlementStatus') && dash.settlementStatus){
+      const palette = config.palette || [DEFAULTS.BRAND700,DEFAULTS.BRAND500,DEFAULTS.BRAND300,DEFAULTS.NEU300];
+      ChartUtils.renderDonut('settlementStatus', dash.settlementStatus.labels||[], dash.settlementStatus.data||[], palette, { legendEl:'statusLegend' });
+      document.querySelector('.chart-skel-setstatus')?.classList?.add('hidden');
+    }
     if(document.getElementById('collectionsTrend') && dash.collectionsTrend){
       ChartUtils.renderLine('collectionsTrend', dash.collectionsTrend.labels||[], dash.collectionsTrend.data||[], config.lineOpts||{});
       document.querySelector('.chart-skel-req')?.classList?.add('hidden');
@@ -525,7 +529,6 @@
     if(document.getElementById('casesNature') && dash.casesNature){
       const pal = config.palette || [DEFAULTS.BRAND700,DEFAULTS.BRAND500,DEFAULTS.BRAND300,DEFAULTS.NEU300];
       ChartUtils.renderBar('casesNature', dash.casesNature.labels||[], dash.casesNature.data||[], { palette:pal, labelFontSize: 11, });
-      // hide the cases skeleton (was incorrectly hiding .chart-skel-status)
       document.querySelector('.chart-skel-cases')?.classList?.add('hidden');
     }
   };

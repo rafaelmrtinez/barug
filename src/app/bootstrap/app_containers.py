@@ -61,6 +61,7 @@ from src.app.services.dashboards_service import (
     TreasurerDashboardService,
     CaptainDashboardService,
     SecretaryDashboardService,
+    LuponMemberDashboardService,
 )
 
 
@@ -209,4 +210,9 @@ class AppContainer(containers.DeclarativeContainer):
     secretary_dashboard_service: providers.Factory[SecretaryDashboardService] = providers.Factory(
         SecretaryDashboardService,
         dashboard_repo=infra.secretary_dashboard_repository,
+    )
+
+    lupon_mem_dashboard_service: providers.Factory[LuponMemberDashboardService] = providers.Factory(
+        LuponMemberDashboardService,
+        dashboard_repo=infra.lupon_mem_dashboard_repository,
     )

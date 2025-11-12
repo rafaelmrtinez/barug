@@ -30,4 +30,5 @@ app.wire(modules=[
     "clerk.views",
     "treasurer.views",
     "secretary.views",
+    "lupon_mem.views",
 ])

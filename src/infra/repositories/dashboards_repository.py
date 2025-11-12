@@ -784,3 +784,172 @@ class SecretaryDashboardRepository:
     
     def fetch_biz_status_counts(self) -> dict:
         return self._clerk_repo.fetch_biz_status_counts()
+
+class LuponMemDashboardRepository:
+    def __init__(self, ctx: IConnectionAdapter):
+        self._ctx = ctx
+        self._captain_repo = CaptainDashboardRepository(ctx)
+
+    def fetch_kpi_ongoing_cases(self) -> int:
+        return self._captain_repo.fetch_kpi_ongoing_cases()
+    
+    def fetch_kpi_sub_ongoing_cases(self) -> int:
+        return self._captain_repo.fetch_kpi_sub_ongoing_cases()
+    
+    def fetch_kpi_total_cases_settled(self) -> int:
+        query = """
+            SELECT COUNT(*) AS total_cases_settled
+            FROM public.blotter_case bc
+            JOIN public.settlement_status ss
+            ON bc.settlement_status_id = ss.settlement_status_id
+            WHERE ss.settlement_status_name = 'SETTLED';
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('total_cases_settled') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI total cases settled: {str(e)}",
+                code="KPI_TOTAL_CASES_SETTLED"
+            )
+
+    def fetch_kpi_sub_total_cases_settled(self) -> int:
+        query = """
+
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('total_cases_settled_sub') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI total cases settled sub: {str(e)}",
+                code="KPI_TOTAL_CASES_SETTLED_SUB"
+            )
+
+    def fetch_kpi_total_cases_unsettled(self) -> int:
+        query = """
+            SELECT COUNT(*) AS total_cases_unsettled
+            FROM public.blotter_case bc
+            JOIN public.settlement_status ss
+            ON bc.settlement_status_id = ss.settlement_status_id
+            WHERE ss.settlement_status_name = 'NOT SETTLED';
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('total_cases_unsettled') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI total cases unsettled: {str(e)}",
+                code="KPI_TOTAL_CASES_UNSETTLED"
+            )
+
+    def fetch_kpi_sub_total_cases_unsettled(self) -> int:
+        query = """
+    
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('total_cases_unsettledd_sub') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI total cases unsettled sub: {str(e)}",
+                code="KPI_TOTAL_CASES_UNSETTLED_SUB"
+            )
+
+    def fetch_kpi_settlement_rate(self) -> int:
+        query = """
+            WITH status_counts AS (
+                SELECT
+                    SUM(CASE 
+                            WHEN ss.settlement_status_name = 'SETTLED' 
+                                AND cs.case_state_name = 'CLOSED'
+                            THEN 1 ELSE 0 END) AS settled_closed_count,
+                    SUM(CASE 
+                            WHEN ss.settlement_status_name = 'NOT SETTLED' 
+                                AND cs.case_state_name = 'CLOSED'
+                            THEN 1 ELSE 0 END) AS not_settled_closed_count
+                FROM public.blotter_case bc
+                LEFT JOIN public.settlement_status ss
+                    ON bc.settlement_status_id = ss.settlement_status_id
+                LEFT JOIN public.case_state cs
+                    ON bc.case_state_id = cs.case_state_id
+            )
+            SELECT
+                CASE 
+                    WHEN not_settled_closed_count = 0 THEN NULL
+                    ELSE ROUND(100.0 * settled_closed_count / not_settled_closed_count, 2)
+                END AS settlement_percentage
+            FROM status_counts;
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('settlement_rate') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch settlement_rate: {str(e)}",
+                code="SETTLEMENT_RATE"
+            )
+
+    def fetch_case_nature_counts(self) -> dict:
+        return self._captain_repo.fetch_case_nature_counts()
+
+    def fetch_settlement_status_counts(self) -> int:
+        query = """
+            SELECT
+            ss.settlement_status_name AS settlement_status,
+            COUNT(bc.blotter_case_id) AS case_count
+            FROM public.settlement_status ss
+            LEFT JOIN public.blotter_case bc
+            ON bc.settlement_status_id = ss.settlement_status_id
+            GROUP BY ss.settlement_status_id, ss.settlement_status_name
+            ORDER BY case_count DESC;
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            normalized = []
+            for row in result:
+                if isinstance(row, dict):
+                    normalized.append({
+                        "settlement_status": row.get("settlement_status"),
+                        "case_count": int(row.get("case_count") or 0)
+                    })
+                else:
+                    # tuple-like
+                    normalized.append({
+                        "settlement_status": row[0],
+                        "case_count": int(row[1] or 0)
+                    })
+            return normalized
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI total cases open: {str(e)}",
+                code="KPI_TOTAL_CASES_OPEN"
+            )
+
