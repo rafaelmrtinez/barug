@@ -31,4 +31,5 @@ app.wire(modules=[
     "treasurer.views",
     "secretary.views",
     "lupon_mem.views",
+    "lupon_pres.views",
 ])

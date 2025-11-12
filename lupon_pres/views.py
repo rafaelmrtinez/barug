@@ -32,6 +32,9 @@ from .forms import (
     UpdateInfo,   # ← if this lives in lupon_pres.forms; otherwise import from secretary.forms
 )
 
+from dependency_injector.wiring import inject, Provide
+from src.app.bootstrap.app_containers import AppContainer
+
 # Supabase upload helper you already use elsewhere
 from common.supabase_client import supabase
 from common.services.storage import upload_to_storage
@@ -55,6 +58,52 @@ user_role = 'Barangay Lupon President'
 
 LUPON_PRES_ROLE = "Barangay Lupon President"
 user_role_template = user_role.lower().replace(' ', '_')
+
+def _auth_role_name(request: HttpRequest) -> str:
+    return (((request.session.get("auth") or {}).get("role_name")) or "Staff").title()
+
+# --- Dashboard ---
+@session_login_required
+@role_required(LUPON_PRES_ROLE)
+@nocache
+@inject
+def dashboard(
+    request: HttpRequest,
+    lupon_mem_dashboard_service=Provide[AppContainer.lupon_mem_dashboard_service],
+):
+    user_role = _auth_role_name(request)
+
+    kpis = {
+        "ongoing_cases": 0,
+        "open_cases": None,
+        "total_case_settled": 0,
+        "total_case_settled_delta": None,
+        "total_case_unsettled": 0,
+        "total_case_unsettled_delta": None,
+        "settlement_rate": 0,
+    }
+
+    dashboard_json = None
+
+    try:
+        payload = lupon_mem_dashboard_service.get_dashboard_content() or {}
+        kpis = payload.get("kpis", kpis)
+        dashboard_json = payload.get("dashboard_json") 
+    except Exception as exc:
+        print("Error fetching lupon mem dashboard KPIs:", exc)
+
+    return render(
+        request,
+        "lupon_pres/dashboard.html",
+        {
+            'page_path' : f'{user_role} / Dashboard',
+            'page_title' : 'Dashboard',
+            'kpis': kpis,
+            'dashboard_json': dashboard_json,
+            'today': datetime.now().strftime("%B %d, %Y"),
+        },
+    )
+
 
 # Create your views here.
 def staff_selection(request):
