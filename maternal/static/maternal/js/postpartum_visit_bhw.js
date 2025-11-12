@@ -50,7 +50,6 @@
       const syst = toInt(document.getElementById('bp_systolic').value);
       const diast = toInt(document.getElementById('bp_diastolic').value);
       const feeding = sanitizeText(document.getElementById('feeding_type').value);
-      const notes = sanitizeText(document.getElementById('bhw_notes').value);
       const maternal_record_id = sanitizeText(document.getElementById('bhw_maternal_record_id').value || '');
 
       const errors = [];
@@ -66,7 +65,7 @@
         return;
       }
 
-      const payload = { maternal_record_id, lochial_discharge: lochial, bp_systolic: syst, bp_diastolic: diast, feeding_type_id: Number(feeding), notes };
+      const payload = { maternal_record_id, lochial_discharge: lochial, bp_systolic: syst, bp_diastolic: diast, feeding_type_id: Number(feeding) };
 
       try{
         submitBtn.disabled = true;
