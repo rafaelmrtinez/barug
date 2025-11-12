@@ -4,7 +4,12 @@ from pprint import pprint
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.core.paginator import Paginator
+from django.core.cache import cache
 from django.contrib import messages
+import time
+import re
+
+from child_health.utilities.repo_sequence import RepoSequence
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_protect
 
@@ -542,13 +547,96 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
 @role_required(*ACCESS)
 @nocache
 def child_record_list_view(request: HttpRequest) -> HttpRequest:
-    # rows = CHILD_HEALTH_REPOSITORY.fetch_all_basic_records()
-    rows = CHILD_HEALTH_REPOSITORY.fetch_all_basic_chr_record()
-    page_obj = Paginator(rows, 10).get_page(request.GET.get("page"))
+    # Raw query as received (for showing back in UI); keep original raw for safe display
+    raw_q = request.GET.get("q")
+    # Normalize and defensively sanitize
+    q = (raw_q or "")
+    q = re.sub(r"[\x00-\x1f\x7f]", "", q).strip()
+    # Cap query length to prevent abuse
+    MAX_Q_LEN = 128
+    if len(q) > MAX_Q_LEN:
+        q = q[:MAX_Q_LEN]
+
+    # Validate page param
+    try:
+        page = int(request.GET.get("page", 1))
+        if page < 1:
+            page = 1
+    except Exception:
+        page = 1
+    # Prevent extremely large page values
+    MAX_PAGE = 1000
+    if page > MAX_PAGE:
+        page = MAX_PAGE
+
+    per_page = 10
+
+    # If there is a search query, use repository-level count + limit/offset
+    # to avoid loading all rows into memory. We wrap the repo with a
+    # lightweight sequence object so Django's Paginator can call len()
+    # and slice() without fetching everything.
+    if q:
+        # Rate limiting per staff or per IP for basic DOS protection
+        auth_info = request.session.get("auth") or {}
+        staff_id = auth_info.get("staff_id")
+        identifier = staff_id or request.META.get("REMOTE_ADDR", "anon")
+        cache_key = f"chr_search_rl:{identifier}"
+        window_seconds = 60
+        max_requests_per_window = 20
+        try:
+            count = int(cache.get(cache_key) or 0)
+        except Exception:
+            count = 0
+        if count >= max_requests_per_window:
+            messages.error(request, "Search rate limit exceeded. Please wait a minute and try again.")
+            total = 0
+            p = Paginator([], per_page)
+            page_obj = p.get_page(1)
+            return render(request, "child_health/child_record.html", {"page_obj": page_obj, "q": raw_q, "total_matches": total})
+        else:
+            try:
+                cache.set(cache_key, count + 1, timeout=window_seconds)
+            except Exception:
+                # non-fatal: proceed even if cache unavailable
+                pass
+
+        # Minimum query length guard to avoid expensive wildcard scans
+        if len(q) < 2:
+            total = 0
+            p = Paginator([], per_page)
+            page_obj = p.get_page(1)
+            return render(request, "child_health/child_record.html", {"page_obj": page_obj, "q": raw_q, "total_matches": total})
+
+        try:
+            total = CHILD_HEALTH_REPOSITORY.count_basic_chr_record_search(q)
+            seq = RepoSequence.create(CHILD_HEALTH_REPOSITORY, q, total)
+            paginator = Paginator(seq, per_page)
+            page_obj = paginator.get_page(page)
+        except Exception as e:
+            logger.exception("Error searching child records: %s", e)
+            messages.error(request, "An error occurred while searching. Please try again later.")
+            total = 0
+            p = Paginator([], per_page)
+            page_obj = p.get_page(1)
+            return render(request, "child_health/child_record.html", {"page_obj": page_obj, "q": raw_q, "total_matches": total})
+    else:
+        try:
+            rows = CHILD_HEALTH_REPOSITORY.fetch_all_basic_chr_record()
+            page_obj = Paginator(rows, per_page).get_page(page)
+            total = None
+        except Exception as e:
+            logger.exception("Error fetching child records: %s", e)
+            messages.error(request, "An error occurred fetching records. Please try again later.")
+            p = Paginator([], per_page)
+            page_obj = p.get_page(1)
+            total = 0
+
     return render(
         request,
         "child_health/child_record.html",
         {
             "page_obj": page_obj,
+            "q": raw_q,
+            "total_matches": total,
         },
     )

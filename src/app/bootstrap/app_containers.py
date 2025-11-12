@@ -12,6 +12,7 @@ from src.app.contracts.maternal_postpartum_service import IMaternalPostpartumSer
 from src.app.contracts.maternal_status_service import IMaternalRecordStatusService
 from src.app.contracts.laboratory_service import ILaboratoryService
 from src.app.contracts.image_download_service import IImageDownloadService
+from src.app.contracts.child_health_schedule_service import IChildHealthScheduleService
 
 # concrete service implementations
 from src.app.services.antenatal_service import AntenatalCareService
@@ -26,6 +27,7 @@ from src.app.services.maternal_status_service import MaternalRecordStatusService
 from src.app.services.laboratory_service import LaboratoryService
 from src.app.services.image_download_service import ImageDownloadService
 from src.app.services.faq_ingestion_service import FAQIngestionService
+from src.app.services.child_health_schedule_service import ChildHealthScheduleService
 
 
 from src.app.contracts.business_service_contract import (
@@ -68,10 +70,6 @@ from src.app.services.dashboards_service import (
 class AppContainer(containers.DeclarativeContainer):
     """Application container for dependency injection."""
 
-    # wiring_config = containers.WiringConfiguration(
-    #     modules=["clerk.views.business"]   # 👈 THIS matches your file path
-    # )
-    
     config = providers.Configuration()
 
     infra = providers.DependenciesContainer()

@@ -21,8 +21,6 @@
     </div>
   </div>
 
-  {% include 'partials/messages.html' %}
-
   <div class="container px-3 py-4">
     <section class="rounded-3 border bg-white p-4 shadow-sm">
       <div class="d-flex align-items-center gap-2 mb-3">
@@ -101,10 +99,10 @@
                   <div class="kv-item">
                     <span class="kv-key">Home Address</span>
                     <span class="kv-val">
-                      {{ res_details.street_name|default:""|title }},
-                      {{ res_details.purok_sitio_name|default:""|title }},
-                      {{ res_details.barangay_name|default:""|title }},
-                      {{ res_details.city_name|default:""|title }}
+                      {% if res_details.street_name %}{{ res_details.street_name|title }}{% if res_details.purok_sitio_name or res_details.barangay_name or res_details.city_name %}, {% endif %}{% endif %}
+                      {% if res_details.purok_sitio_name %}{{ res_details.purok_sitio_name|title }}{% if res_details.barangay_name or res_details.city_name %}, {% endif %}{% endif %}
+                      {% if res_details.barangay_name %}{{ res_details.barangay_name|title }}{% if res_details.city_name %}, {% endif %}{% endif %}
+                      {% if res_details.city_name %}{{ res_details.city_name|title }}{% endif %}
                     </span>
                   </div>
                   <div class="kv-item"><span class="kv-key">Email Address</span><span class="kv-val">{{ res_details.email|default:"" }}</span></div>
@@ -187,7 +185,7 @@
       </div>
 
       <!-- ONLY SHOW THIS PART AFTER SELECTING A RESIDENT-->
-      <form id="controlsForm5" method="post" action="{% url 'captain:staff_selection_resident' %}" novalidate>
+      <form id="controlsForm5" method="post" action="{% url 'captain:staff_selection_resident' %}" enctype="multipart/form-data" novalidate>
         {% csrf_token %}
         <input type="hidden" name="pid" id="pid" value="{{ res_details.person_id|default_if_none:'' }}">
 
@@ -305,6 +303,7 @@
   </div>
 </div>
 
+{% include 'partials/modal_messages.html' %}
 
 <script>
 (() => {
