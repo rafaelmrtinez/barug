@@ -154,6 +154,7 @@ TEMPLATES = [
             BASE_DIR / "maternal/templates/maternal",
             BASE_DIR / "child_health/templates/child_health",
             BASE_DIR / "doc_ingest/templates/doc_ingest",
+            BASE_DIR / "event_logs/templates/event_logs",
         ],
         "APP_DIRS": True,
         "OPTIONS": {
