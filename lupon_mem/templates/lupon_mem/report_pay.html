@@ -64,12 +64,9 @@
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
     <div>
       <h2 class="title m-0">Confirm Payment & Open Case</h2>
-      <div class="subtle">Everything is locked for review—only <b>Paid by</b> can be changed.</div>
+
     </div>
-    <div class="d-flex align-items-center gap-2">
-      <span class="pill"><i class="bi bi-shield-check"></i> Read-only Review</span>
-      <span class="pill"><i class="bi bi-receipt-cutoff"></i> Treasurer Flow</span>
-    </div>
+
   </div>
 
   <!-- Report Header -->
@@ -89,9 +86,7 @@
         </div>
         {% if report.3 %}<div class="text-muted mt-1">{{ report.3 }}</div>{% endif %}
       </div>
-      <div class="text-end">
-        <div class="text-muted small">Keyboard: <span class="kbd">Tab</span> move • <span class="kbd">Enter</span> submit</div>
-      </div>
+
     </div>
   </div>
 
@@ -211,7 +206,7 @@
 
           <div class="d-grid gap-2">
             <button type="button" class="btn btn-brand btn-lg" id="createCaseBtn" disabled>
-              <i class="bi bi-check2-circle"></i> Create Case
+              <i class="bi bi-check2-circle"></i> Accept Payment for Case Creation
             </button>
             <a href="{% url 'lupon_mem:report_list' %}" class="btn btn-outline-secondary">
               <i class="bi bi-arrow-left"></i> Back to Reports
@@ -235,7 +230,7 @@
         <p>This will officially open the case and cannot be undone. The case will be created with the following details:</p>
         <ul>
           <li><strong>Case Name:</strong> <span id="modalCaseName"></span></li>
-          <li><strong>Payment Status:</strong> <span id="modalPaymentStatus"></span></li>
+          <li hidden><strong>Payment Status:</strong> <span id="modalPaymentStatus"></span></li>
           <li><strong>Paid By:</strong> <span id="modalPaidBy"></span></li>
         </ul>
         <p class="text-muted">Are you sure you want to proceed?</p>
@@ -454,6 +449,13 @@
   });
 
   $('#confirmCreateBtn').addEventListener('click', async ()=>{
+    const confirmBtn = $('#confirmCreateBtn');
+    const originalText = confirmBtn.innerHTML;
+    
+    // Show processing state
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processing...';
+    
     if(withPay.checked){
       if(!orHidden.value.trim()){ const v=genOR(); orHidden.value=v; orDisp.value=v; }
       amtHidden.value = normalizeAmount(amtHidden.value || amtDisp.value || '0.00');
@@ -468,6 +470,7 @@
       });
       
       if(response.ok){
+        confirmBtn.innerHTML = '<i class="bi bi-check-circle"></i> Success!';
         confirmModal.hide();
         flash('Case created successfully!');
         setTimeout(() => window.location.href = '{% url "lupon_mem:report_list" %}', 1500);
@@ -475,6 +478,9 @@
         throw new Error('Server error');
       }
     } catch(e){
+      // Reset button on error
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML = originalText;
       flash('Error creating case. Please try again.');
     }
   });

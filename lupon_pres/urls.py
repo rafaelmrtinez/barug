@@ -31,6 +31,8 @@ urlpatterns = [
     path("cases/<int:case_id>/update-settlement/", views_cases.case_settlement_update, name="update_settlement_status"),
     path("cases/<int:case_id>/close",  views_cases.case_close,  name="case_close"),
     path("cases/<int:case_id>/reopen", views_cases.case_reopen, name="case_reopen"),
+    path("cases/<int:case_id>/update-case-state/", views_reports.update_case_state, name="update_case_state"),
+    path("cases/<int:case_id>/update-settlement-status/", views_reports.update_settlement_status, name="update_settlement_status"),
 
     # chooser + builder
     path("cases/<int:case_id>/forms/add/", views_cases.add_form_choose, name="add_form_choose"),

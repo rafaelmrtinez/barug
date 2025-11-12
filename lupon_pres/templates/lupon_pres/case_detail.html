@@ -69,8 +69,8 @@
 
   .flow-list{ list-style:none; margin:0; padding:0 0 0 .25rem; }
   .flow-step{ display:flex; gap:.8rem; position:relative; padding:.4rem 0 .4rem .1rem; }
-  .flow-step::before{ content:""; position:absolute; left:6px; top:0; bottom:0; width:2px; background:#e5e7eb; }
-  .flow-dot{ width:14px; height:14px; border-radius:50%; flex:0 0 14px; margin-top:.2rem; border:2px solid #cbd5e1; background:#fff; }
+  .flow-step::before{ content:""; position:absolute; left:6px; top:0; bottom:0; width:2px; background:#e5e7eb; z-index:1; }
+  .flow-dot{ width:14px; height:14px; border-radius:50%; flex:0 0 14px; margin-top:.2rem; border:2px solid #cbd5e1; background:#fff; position:relative; z-index:2; }
   .flow-step .content{ flex:1; }
   .flow-step .title{ font-weight:800; color:#0f172a; }
   .flow-step .subtitle{ font-size:.85rem; color:#475569; }
@@ -92,7 +92,34 @@
   .hw-kv{ font-size:.85rem; color:#334155; }
   .hw-kv strong{ color:#0f172a; }
   .hw-stat{ margin-left:auto; font-size:.85rem; color:#475569; }
+  
+  /* Preload Critical Styles */
+  .modal-content{ contain:layout style; }
+  .form-select, .form-control{ contain:layout; }
+  .btn{ contain:layout; }
   @media (max-width: 768px){ .sticky-add{ bottom:10px; } }
+
+  /* Modal Performance Optimizations */
+  .modal{ will-change:transform,opacity; }
+  .modal-dialog{ will-change:transform; }
+  .modal.fade .modal-dialog{ transition:transform 0.2s ease-out; }
+  .modal.show .modal-dialog{ transform:none; }
+  
+  /* Form Focus States */
+  .form-select:focus, .form-control:focus{
+    border-color:var(--brand-600)!important;
+    box-shadow:0 0 0 3px rgba(109,41,50,0.1)!important;
+    outline:none;
+  }
+  
+  /* Button Hover Effects */
+  .btn{ transition:all 0.15s ease; }
+  .btn:hover{ transform:translateY(-1px); }
+  .btn:active{ transform:translateY(0); }
+  
+  /* Card Hover Effects */
+  .card{ transition:box-shadow 0.15s ease; }
+  .card:hover{ box-shadow:0 4px 20px rgba(0,0,0,0.08); }
 </style>
 {% endblock css %}
 
@@ -163,8 +190,8 @@
           {% bs_icon 'envelope' extra_classes='me-1' %} Summons / Attendance
         </a>
 
-        <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#updateSettlementModal">
-          {% bs_icon 'hand-thumbs-up' extra_classes='me-1' %} Update Settlement
+        <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#updateCaseStatusModal">
+          {% bs_icon 'gear' extra_classes='me-1' %} Update Case Status
         </button>
 
         <button class="btn btn-outline-brand" type="button" data-bs-toggle="offcanvas" data-bs-target="#luponFlowCanvas" aria-controls="luponFlowCanvas">
@@ -367,8 +394,8 @@
       </div>
     </div>
 
-    <div class="flow-legend mb-2">
-      Date-conscious guide. <strong>PB mediation:</strong> 15 days from the <em>first PB meeting</em>. Up to 3 mediation attempts (KP-8/KP-9) allowed within that window. <strong>Pangkat:</strong> convene ≤3 days from constitution; conciliate 15 days (one extension up to 30). Use KP-7 through KP-25 as needed.
+    <div class="flow-legend mb-2" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:0.75rem; font-size:0.8rem; color:#64748b;">
+      <strong>📅 Guide:</strong> <strong>PB mediation:</strong> 15 days from first meeting (up to 3 attempts). <strong>Pangkat:</strong> convene ≤3 days; conciliate 15 days (extendable to 30). Use KP-7 through KP-25 as needed.
     </div>
 
     <div id="flowMount" class="card-lite">
@@ -380,6 +407,82 @@
     </div>
   </div>
 </div>
+</div>
+
+<!-- Update Case Status Modal -->
+<div class="modal fade" id="updateCaseStatusModal" tabindex="-1" aria-labelledby="updateCaseStatusLabel" aria-hidden="true" style="margin-top:150px;">
+  <div class="modal-dialog">
+    <div class="modal-content" style="border-radius:12px; border:none; box-shadow:0 10px 40px rgba(0,0,0,0.1);">
+      <div class="modal-header" style="border-bottom:1px solid var(--line); background:var(--brand-050); padding:1rem 1.25rem;">
+        <h5 class="modal-title d-flex align-items-center gap-2" id="updateCaseStatusLabel" style="font-weight:700; color:var(--brand-800);">
+          {% bs_icon 'gear' %} Update Case Status
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" style="padding:1.25rem;">
+        <!-- Settlement Status -->
+        <div class="mb-3">
+          <h6 class="mb-2 d-flex align-items-center gap-2" style="font-weight:600; color:var(--brand-700); font-size:0.9rem;">
+            {% bs_icon 'hand-thumbs-up' %} Settlement Status
+          </h6>
+          <form method="post" action="{% url 'lupon_pres:update_settlement_status' case_id %}">
+            {% csrf_token %}
+            <div class="row g-2">
+              <div class="col-7">
+                <select class="form-select form-select-sm" name="settlement_status_id">
+                  {% for id,name in settlement_statuses %}
+                    <option value="{{ id }}" {% if name == case.7 %}selected{% endif %}>{{ name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-5">
+                <input type="text" class="form-control form-control-sm" name="remarks" placeholder="Remarks...">
+              </div>
+              <div class="col-12">
+                <button type="submit" class="btn btn-outline-brand btn-sm" onclick="return confirm('Are you sure you want to update the settlement status?')">
+                  {% bs_icon 'hand-thumbs-up' extra_classes='me-1' %} Update Settlement
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+        
+        <hr style="margin:1rem 0; border-color:var(--line);">
+        
+        <!-- Case State -->
+        <div>
+          <h6 class="mb-2 d-flex align-items-center gap-2" style="font-weight:600; color:var(--brand-700); font-size:0.9rem;">
+            {% bs_icon 'toggle-on' %} Case State
+          </h6>
+          <form method="post" action="{% url 'lupon_pres:update_case_state' case_id %}">
+            {% csrf_token %}
+            <div class="row g-2">
+              <div class="col-7">
+                <select class="form-select form-select-sm" name="case_state_id">
+                  {% for id,name in case_states %}
+                    <option value="{{ id }}" {% if name|lower == case_state_name|lower %}selected{% endif %}>{{ name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-5">
+                <input type="text" class="form-control form-control-sm" name="remarks" placeholder="Remarks...">
+              </div>
+              <div class="col-12">
+                <button type="submit" class="btn btn-outline-brand btn-sm" onclick="return confirm('Are you sure you want to update the case state?')">
+                  {% bs_icon 'toggle-on' extra_classes='me-1' %} Update Case State
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid var(--line); padding:0.75rem 1.25rem;">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock content %}
 
 {% block js %}
@@ -763,7 +866,10 @@
       code: "KP-16", 
       title: "Amicable Settlement",
       note: "Case settled through mediation/conciliation. Parties sign settlement agreement.",
-      next: "case_closed"
+      branches: [
+        { label: "Settlement Upheld", next: "kp23" },
+        { label: "Settlement Repudiated", next: "kp17" }
+      ]
     },
     
     kp20: {
@@ -805,6 +911,27 @@
       next: "kp20"
     },
     
+    kp23: {
+      code: "KP-23", 
+      title: "Notice of Execution",
+      note: "Notice for execution of amicable settlement terms.",
+      next: "kp24"
+    },
+    
+    kp24: {
+      code: "KP-24", 
+      title: "Motion for Execution",
+      note: "Motion filed for execution of settlement agreement.",
+      next: "kp25"
+    },
+    
+    kp25: {
+      code: "KP-25", 
+      title: "Writ of Execution",
+      note: "Writ issued for enforcement of settlement terms.",
+      next: "case_closed"
+    },
+    
     kp18: {
       code: "KP-18", 
       title: "Notice of Hearing (Repudiation)",
@@ -826,26 +953,7 @@
       next: "case_closed"
     },
     
-    kp23: {
-      code: "KP-23", 
-      title: "Motion for Execution of Settlement",
-      note: "Motion to enforce settlement agreement.",
-      next: "kp24"
-    },
-    
-    kp24: {
-      code: "KP-24", 
-      title: "Notice of Hearing (Motion for Execution)",
-      note: "Hearing on motion for execution of settlement.",
-      next: "kp25"
-    },
-    
-    kp25: {
-      code: "KP-25", 
-      title: "Notice of Execution",
-      note: "Final notice for execution of settlement agreement.",
-      next: "case_closed"
-    },
+
     
     case_closed: {
       code: "—", 
@@ -981,6 +1089,11 @@
       else if (step.code && step.code !== '—') {
         canShowBranches = haveForm(step.code);
       }
+      // Special handling for KP-16 to ensure branches show
+      if (currentStep === 'kp16_settled') {
+        canShowBranches = haveForm('KP-16');
+      }
+
       
       if (canShowBranches) {
         const branchDiv = document.createElement('div');
@@ -1255,6 +1368,23 @@
   document.addEventListener('DOMContentLoaded', async function(){
     showWindowPills();
     setInterval(showWindowPills, 60000);
+
+    // Preload modal for instant opening
+    const modal = document.getElementById('updateCaseStatusModal');
+    if (modal && window.bootstrap?.Modal) {
+      // Pre-initialize modal instance
+      const modalInstance = new bootstrap.Modal(modal, { backdrop: true, keyboard: true });
+      
+      // Preload form elements
+      const forms = modal.querySelectorAll('form');
+      forms.forEach(form => {
+        const selects = form.querySelectorAll('select');
+        const inputs = form.querySelectorAll('input');
+        // Touch elements to ensure they're ready
+        selects.forEach(s => s.offsetHeight);
+        inputs.forEach(i => i.offsetHeight);
+      });
+    }
 
     const canvasEl = document.getElementById('luponFlowCanvas');
     if (canvasEl && window.bootstrap?.Offcanvas) {

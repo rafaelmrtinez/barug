@@ -246,72 +246,80 @@ def report_list(request: HttpRequest):
     blotter_options = ["", "FOR LUPON REVIEW", "REVIEWED"]
 
     with connection.cursor() as cur:
-        # Optimized query for Supabase
-        sql = """
-        SELECT 
-            br.blotter_report_id AS id,
-            COALESCE(br.incident_subject, '(no subject)') AS subject,
-            to_char(br.date_time_reported, 'FMMonth DD, YYYY at FMHH12:MI AM') AS reported_at,
-            COALESCE(ps.payment_status_name, '') AS payment_status,
-            CASE 
-                WHEN ps.payment_status_name IS NULL OR ps.payment_status_name = '' THEN 'FOR LUPON REVIEW'
-                WHEN UPPER(ps.payment_status_name) IN ('PAID','UNPAID','DECLINED') THEN 'REVIEWED'
-                ELSE 'FOR LUPON REVIEW'
-            END AS blotter_status
-        FROM blotter_report br
-        LEFT JOIN payment_status ps ON ps.payment_status_id = br.payment_status_id
-        WHERE 1=1
-        """
-        params = []
-
-        # Add filters
+        # DEBUG: Direct query for report 71 to check actual payment status
+        cur.execute("""
+            SELECT br.blotter_report_id, ps.payment_status_name
+            FROM blotter_report br
+            LEFT JOIN payment_status ps ON ps.payment_status_id = br.payment_status_id
+            WHERE br.blotter_report_id = 71
+        """)
+        direct_result = cur.fetchone()
+        if direct_result:
+            print(f"[DEBUG] Direct query - Report 71 payment_status: '{direct_result[1]}'")
+        
+        cur.execute("SELECT * FROM get_all_report_details()")
+        columns = [col[0] for col in cur.description]
+        all_reports = cur.fetchall()
+        
+        # DEBUG: Check what payment status we're getting for report 71
+        for row in all_reports:
+            row_dict = dict(zip(columns, row))
+            if row_dict.get('blotter_report_id') == 71:
+                print(f"[DEBUG] Report 71 payment_status_name: '{row_dict.get('payment_status_name')}'")
+        
+        # Convert to tuples for template compatibility
+        reports_data = []
+        for row in all_reports:
+            row_dict = dict(zip(columns, row))
+            payment_status = row_dict.get('payment_status_name') or ''
+            blotter_status = 'REVIEWED' if payment_status and str(payment_status).upper() in ('PAID','UNPAID','DECLINED') else 'FOR LUPON REVIEW'
+            
+            # Create tuple: (id, subject, reported_at, payment_status, blotter_status, complainant_names, respondent_names, current_status_name, has_case)
+            report_tuple = (
+                row_dict.get('blotter_report_id'),
+                row_dict.get('incident_subject') or '(no subject)',
+                row_dict.get('date_time_reported'),
+                payment_status,
+                blotter_status,
+                row_dict.get('complainant_names') or '',
+                row_dict.get('respondent_names') or '',
+                row_dict.get('current_status_name') or '',
+                row_dict.get('has_case') or False
+            )
+            reports_data.append(report_tuple)
+        
+        # Apply filters
+        filtered_reports = reports_data
+        
+        # For barangay treasurer, show reports with "FOR CASE FILING" or "ESCALATED TO CASE" status
+        if user_role.lower() == 'barangay treasurer':
+            filtered_reports = [r for r in filtered_reports if str(r[7]).upper() in ('FOR CASE FILING', 'ESCALATED TO CASE')]
+        
         if q_raw:
-            sql += " AND br.incident_subject ILIKE %s"
-            params.append(f"%{q_raw}%")
-
+            filtered_reports = [r for r in filtered_reports if q_raw.lower() in (r[1] or '').lower()]
+        
         if f_payment and f_payment.upper() in ("PAID", "UNPAID", "DECLINED"):
-            sql += " AND UPPER(ps.payment_status_name) = %s"
-            params.append(f_payment.upper())
-
-        if f_date_from:
-            sql += " AND br.date_time_reported::date >= %s"
-            params.append(f_date_from)
-        if f_date_to:
-            sql += " AND br.date_time_reported::date <= %s"
-            params.append(f_date_to)
-
+            filtered_reports = [r for r in filtered_reports if str(r[3]).upper() == f_payment.upper()]
+        
         if f_blotter:
             if f_blotter == 'FOR LUPON REVIEW':
-                sql += " AND (ps.payment_status_name IS NULL OR ps.payment_status_name = '')"
+                filtered_reports = [r for r in filtered_reports if r[4] == 'FOR LUPON REVIEW']
             elif f_blotter == 'REVIEWED':
-                sql += " AND UPPER(ps.payment_status_name) IN ('PAID','UNPAID','DECLINED')"
-
-        # Add sorting based on filter
+                filtered_reports = [r for r in filtered_reports if r[4] == 'REVIEWED']
+        
+        # Apply sorting
         if f_sort == "newest":
-            sql += " ORDER BY br.date_time_reported DESC LIMIT 200"
-        else:
-            sql += " ORDER BY br.date_time_reported ASC LIMIT 200"
+            filtered_reports.reverse()
         
-        cur.execute(sql, params)
-        rows = cur.fetchall()
+        # Limit to 200 results
+        rows = filtered_reports[:200]
         
-        # Get statistics with a single fast query
-        stats_sql = """
-        SELECT 
-            COUNT(*) FILTER (WHERE ps.payment_status_name IS NULL OR ps.payment_status_name = '') AS for_review,
-            COUNT(*) FILTER (WHERE UPPER(ps.payment_status_name) IN ('PAID','UNPAID','DECLINED')) AS reviewed,
-            COUNT(*) FILTER (WHERE UPPER(ps.payment_status_name) = 'PAID') AS paid,
-            COUNT(*) FILTER (WHERE UPPER(ps.payment_status_name) = 'UNPAID') AS unpaid
-        FROM blotter_report br
-        LEFT JOIN payment_status ps ON ps.payment_status_id = br.payment_status_id
-        """
-        cur.execute(stats_sql)
-        stats = cur.fetchone()
+        # Calculate statistics
         stats_dict = {
-            'for_review': stats[0] or 0,
-            'reviewed': stats[1] or 0, 
-            'paid': stats[2] or 0,
-            'unpaid': stats[3] or 0
+            'for_review': len([r for r in reports_data if r[4] == 'FOR LUPON REVIEW']),
+            'reviewed': len([r for r in reports_data if r[4] == 'REVIEWED']),
+            'paid': len([r for r in reports_data if str(r[3]).upper() == 'PAID']),
+            'unpaid': len([r for r in reports_data if str(r[3]).upper() == 'UNPAID'])
         }
 
     # Add pagination
@@ -355,7 +363,6 @@ def report_list(request: HttpRequest):
 
 
 
-
 @session_login_required
 @role_required(*LUPON_ROLES)
 def report_new(request: HttpRequest):
@@ -364,6 +371,12 @@ def report_new(request: HttpRequest):
 
     auth = request.session.get("auth") or {}
     staff_id = auth.get("staff_id")
+
+    # Get form data
+    incident_subject = (request.POST.get("incident_subject") or "").strip()
+    incident_date = (request.POST.get("incident_date") or "").strip()
+    incident_time = (request.POST.get("incident_time") or "").strip()
+    incident_desc = (request.POST.get("incident_desc") or "").strip()
 
     # helpers
     def _toi(x):
@@ -442,10 +455,10 @@ def report_new(request: HttpRequest):
             """,
             [
                 staff_id,
-                request.POST.get("incident_subject") or None,
-                request.POST.get("incident_desc") or None,
-                request.POST.get("incident_date") or None,
-                request.POST.get("incident_time") or None,
+                incident_subject,
+                incident_desc,
+                incident_date,
+                incident_time,
                 incident_address_id,  # <— now filled if we created one
                 complainant_id,
                 respondent_ids if respondent_ids else None,
@@ -650,8 +663,6 @@ def report_confirm(request: HttpRequest, report_id: int):
 
 
 
-
-
 # ------------------------------
 # REVIEW (Lupon) – no Payment card; Approve/Decline here
 # ------------------------------
@@ -823,193 +834,29 @@ def report_decline(request: HttpRequest, report_id: int):
 
 
 @session_login_required
-@role_required(*LUPON_ROLES, "barangay treasurer")
-def report_confirm(request: HttpRequest, report_id: int):
-    if request.method == "GET":
-        auth = request.session.get("auth") or {}
-        user_role = (auth.get("role_name") or auth.get("role") or "").strip()
-
-        with connection.cursor() as cur:
-            cur.execute(
-                """
-                SELECT br.blotter_report_id, br.incident_subject, br.incident_desc,
-                       br.incident_date, br.incident_time
-                  FROM blotter_report br
-                 WHERE br.blotter_report_id=%s
-                """,
-                [report_id],
-            )
-            rpt = cur.fetchone()
-            if not rpt:
-                return HttpResponseBadRequest("Report not found.")
-
-            cur.execute(
-                """
-                SELECT p.person_id, p.first_name || ' ' || p.last_name AS name, 'COMPLAINANT' AS role
-                  FROM complainant_report cr JOIN person p ON p.person_id=cr.person_id
-                 WHERE cr.blotter_report_id=%s
-                UNION ALL
-                SELECT p.person_id, p.first_name || ' ' || p.last_name, 'RESPONDENT'
-                  FROM respondent_report rr JOIN person p ON p.person_id=rr.person_id
-                 WHERE rr.blotter_report_id=%s
-                """,
-                [report_id, report_id],
-            )
-            parties = cur.fetchall()
-
-            cur.execute("SELECT complaint_title_id, complaint_title_name FROM complaint_title ORDER BY 2")
-            complaint_titles = cur.fetchall()
-            cur.execute("SELECT case_nature_id, case_name FROM case_nature ORDER BY 2")
-            case_natures = cur.fetchall()
-            cur.execute("SELECT settlement_status_id, settlement_status_name FROM settlement_status ORDER BY 2")
-            settlements = cur.fetchall()
-
-            # Server-side default case name (fallback if JS off)
-            cur.execute(
-                """
-                SELECT p.last_name
-                  FROM complainant_report cr
-                  JOIN person p ON p.person_id = cr.person_id
-                 WHERE cr.blotter_report_id=%s
-                 ORDER BY p.last_name, p.first_name
-                 LIMIT 1
-                """,
-                [report_id],
-            )
-            row_c = cur.fetchone()
-            c_last = (row_c and (row_c[0] or "").strip()) or ""
-
-            cur.execute(
-                """
-                SELECT p.last_name
-                  FROM respondent_report rr
-                  JOIN person p ON p.person_id = rr.person_id
-                 WHERE rr.blotter_report_id=%s
-                 ORDER BY p.last_name, p.first_name
-                 LIMIT 1
-                """,
-                [report_id],
-            )
-            row_r = cur.fetchone()
-            r_last = (row_r and (row_r[0] or "").strip()) or ""
-
-            initial_case_name = f"{c_last} vs {r_last}" if (c_last and r_last) else "People vs"
-
-        ctx = {
-            "rpt": rpt,
-            "parties": parties,
-            "complaint_titles": complaint_titles,
-            "case_natures": case_natures,
-            "settlement_statuses": settlements,
-            "report_id": report_id,
-            "page_title": "Confirm & Open Case",
-            "user_role": user_role,
-            "initial_case_name": initial_case_name,
-        }
-        return render(request, "lupon_mem/report_confirm.html", ctx)
-
-    # ---------- POST ----------
-    auth = request.session.get("auth") or {}
-    staff_id = auth.get("staff_id")
-    if not staff_id:
-        messages.error(request, "Session expired. Please login again.")
-        return redirect("lupon_mem:report_confirm", report_id=report_id)
-
-    def _default_case_name(cur) -> str:
-        # compute a basic default if the client didn't send case_name
+@role_required("barangay treasurer")
+def report_payment_details(request: HttpRequest, report_id: int):
+    with connection.cursor() as cur:
         cur.execute(
             """
-            SELECT coalesce(c_last,''), coalesce(r_last,'')
-            FROM (
-              SELECT
-                (SELECT p.last_name
-                   FROM complainant_report cr
-                   JOIN person p ON p.person_id = cr.person_id
-                  WHERE cr.blotter_report_id=%s
-                  ORDER BY p.last_name, p.first_name
-                  LIMIT 1) AS c_last,
-                (SELECT p.last_name
-                   FROM respondent_report rr
-                   JOIN person p ON p.person_id = rr.person_id
-                  WHERE rr.blotter_report_id=%s
-                  ORDER BY p.last_name, p.first_name
-                  LIMIT 1) AS r_last
-            ) s
+            SELECT p.*, br.incident_subject, br.date_time_reported
+            FROM rpc_report_payment_latest(%s) p,
+                 blotter_report br
+            WHERE br.blotter_report_id = %s
             """,
-            [report_id, report_id],
+            [report_id, report_id]
         )
         row = cur.fetchone()
-        c_last = (row and (row[0] or "").strip()) or ""
-        r_last = (row and (row[1] or "").strip()) or ""
-        return f"{c_last} vs {r_last}" if (c_last and r_last) else "People vs"
-
-    # Pull fields
-    case_name = (request.POST.get("case_name") or "").strip()
-    complaint_title_id = _toi(request.POST.get("complaint_title_id"))
-    case_nature_id = _toi(request.POST.get("case_nature_id"))
-    settlement_status_id = _toi(request.POST.get("settlement_status_id"))
-
-    # fill case_name if blank
-    if not case_name:
-        with connection.cursor() as cur:
-            case_name = _default_case_name(cur)
-
-    with_payment = (request.POST.get("with_payment") == "on")
-    payment_receipt = (request.POST.get("payment_receipt") or "").strip() or None
-    payment_amount = request.POST.get("payment_amount")
-    try:
-        payment_amount = float(payment_amount) if payment_amount not in (None, "",) else 0.0
-    except ValueError:
-        payment_amount = 0.0
-    payment_status = (request.POST.get("payment_status") or "PAID").strip().upper()
-    paid_by_person_id = _toi(request.POST.get("paid_by_person_id"))
-
-    if not complaint_title_id or not case_nature_id or not settlement_status_id:
-        messages.error(request, "Please select Complaint Title, Case Nature, and Settlement Status.")
-        return redirect("lupon_mem:report_confirm", report_id=report_id)
-
-    if with_payment and not payment_receipt:
-        messages.error(request, "Enter an OR / Receipt No. to record the payment.")
-        return redirect("lupon_mem:report_confirm", report_id=report_id)
-
-    try:
-        with connection.cursor() as cur:
-            cur.execute(
-                """
-                SELECT confirm_report_and_open_case(
-                    %s,%s,%s,%s,%s,%s,
-                    %s,%s,%s,%s,%s
-                )
-                """,
-                [
-                    report_id,
-                    case_name,
-                    complaint_title_id,
-                    case_nature_id,
-                    settlement_status_id,
-                    staff_id,
-                    with_payment,
-                    payment_receipt,
-                    payment_amount,
-                    payment_status,
-                    paid_by_person_id,
-                ],
-            )
-            row = cur.fetchone()
-            if not row or not row[0]:
-                messages.error(request, "Case could not be created.")
-                return redirect("lupon_mem:report_confirm", report_id=report_id)
-            case_id = int(row[0])
-    except DatabaseError as e:
-        messages.error(request, f"Failed to create case: {e}")
-        return redirect("lupon_mem:report_confirm", report_id=report_id)
-    except Exception:
-        messages.error(request, "Unexpected error while creating case.")
-        return redirect("lupon_mem:report_confirm", report_id=report_id)
-
-    messages.success(request, f"Case #{case_id} created.")
-    return redirect("lupon_mem:case_detail", case_id=case_id)
-
+        if not row:
+            return HttpResponseBadRequest("Payment or report not found.")
+        
+        cols = [d[0] for d in cur.description]
+        data = dict(zip(cols, row))
+    
+    return render(request, "lupon_mem/report_payment_details.html", {
+        "report": (data['blotter_report_id'], data['incident_subject'], data['date_time_reported']),
+        "payment": data
+    })
 
 
 @session_login_required
@@ -1113,10 +960,10 @@ def report_pay_and_open_case(request: HttpRequest, report_id: int):
         ct_id, ct_name = (complaint_titles[0][0], complaint_titles[0][1]) if complaint_titles else (None, "")
         cn_id, cn_name = (case_natures[0][0], case_natures[0][1]) if case_natures else (None, "")
 
-        # settlement defaults to PENDING
+        # settlement defaults to ONGOING
         st_id, st_name = (None, "")
         for sid, sname in settlements:
-            if str(sname).upper() == "PENDING":
+            if str(sname).upper() == "ONGOING":
                 st_id, st_name = sid, sname
                 break
         if st_id is None and settlements:
@@ -1145,7 +992,7 @@ def report_pay_and_open_case(request: HttpRequest, report_id: int):
             "settlement_status_id": st_id,
             "settlement_status_name": st_name,
 
-            # lists kept only for safety; UI won’t expose them for editing
+            # lists kept only for safety; UI won't expose them for editing
             "complaint_titles": complaint_titles,
             "case_natures": case_natures,
             "settlement_statuses": settlements,
@@ -1183,7 +1030,7 @@ def report_pay_and_open_case(request: HttpRequest, report_id: int):
         if not payment_status:
             payment_status = "PAID"
     else:
-        # when NOT recording payment, ensure we don’t pass stray values
+        # when NOT recording payment, ensure we don't pass stray values
         payment_receipt = None
         payment_amount = None
         payment_status = "UNPAID"
@@ -1205,7 +1052,7 @@ def report_pay_and_open_case(request: HttpRequest, report_id: int):
         paid_by_person_id,
 
         # status after
-        "FOR CASE FILING",
+        "ESCALATED TO CASE",
         "Report converted to case",
     ]
     print("[DEBUG][PAY-OPEN][POST] SQL → confirm_report_and_open_case(...) args:", args)
@@ -1219,7 +1066,102 @@ def report_pay_and_open_case(request: HttpRequest, report_id: int):
             args,
         )
         case_id = cur.fetchone()[0]
+        
+        # FIX: Manually update payment status since the function doesn't do it
+        if with_payment and payment_status:
+            cur.execute(
+                "UPDATE blotter_report SET payment_status_id = (SELECT payment_status_id FROM payment_status WHERE payment_status_name = %s) WHERE blotter_report_id = %s",
+                [payment_status, report_id]
+            )
+            # Also set case state to OPEN
+            cur.execute(
+                "UPDATE blotter_case SET case_state_id = 1 WHERE blotter_case_id = %s",
+                [case_id]
+            )
 
     messages.success(request, f"Case #{case_id} created.")
     return redirect("lupon_mem:case_detail", case_id=case_id)
 
+
+@session_login_required
+@role_required(*LUPON_ROLES, "barangay treasurer")
+@require_POST
+def update_case_state(request, case_id: int):
+    case_state_id = _toi(request.POST.get("case_state_id"))
+    remarks = (request.POST.get("remarks") or "").strip()
+    auth = request.session.get("auth") or {}
+    staff_id = auth.get("staff_id")
+
+    if not staff_id:
+        messages.error(request, "Missing staff ID.")
+        return redirect("lupon_mem:case_detail", case_id=case_id)
+
+    if not case_state_id:
+        messages.info(request, "No case state selected.")
+        return redirect("lupon_mem:case_detail", case_id=case_id)
+
+    try:
+        with transaction.atomic():
+            with connection.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT update_case_status(
+                      p_blotter_case_id := %s,
+                      p_new_state_id    := %s,
+                      p_by_staff_id     := %s,
+                      p_note            := %s
+                    )
+                    """,
+                    [case_id, case_state_id, staff_id, remarks or None],
+                )
+                changed = cur.fetchone()[0]
+        if changed:
+            messages.success(request, "Case state updated and logged.")
+        else:
+            messages.info(request, "No change (same state as before).")
+    except Exception as e:
+        messages.error(request, f"Failed to update case state: {e}")
+
+    return redirect("lupon_mem:case_detail", case_id=case_id)
+
+
+@session_login_required
+@role_required(*LUPON_ROLES, "barangay treasurer")
+@require_POST
+def update_settlement_status(request, case_id: int):
+    settlement_status_id = _toi(request.POST.get("settlement_status_id"))
+    remarks = (request.POST.get("remarks") or "").strip()
+    auth = request.session.get("auth") or {}
+    staff_id = auth.get("staff_id")
+
+    if not staff_id:
+        messages.error(request, "Missing staff ID.")
+        return redirect("lupon_mem:case_detail", case_id=case_id)
+
+    if not settlement_status_id:
+        messages.info(request, "No settlement status selected.")
+        return redirect("lupon_mem:case_detail", case_id=case_id)
+
+    try:
+        with transaction.atomic():
+            with connection.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT update_case_settlement_status(
+                      p_blotter_case_id := %s,
+                      p_new_status_id   := %s,
+                      p_by_staff_id     := %s,
+                      p_note            := %s
+                    )
+                    """,
+                    [case_id, settlement_status_id, staff_id, remarks or None],
+                )
+                changed = cur.fetchone()[0]
+        if changed:
+            messages.success(request, "Settlement status updated and logged.")
+        else:
+            messages.info(request, "No change (same settlement status as before).")
+    except Exception as e:
+        messages.error(request, f"Failed to update settlement status: {e}")
+
+    return redirect("lupon_mem:case_detail", case_id=case_id)

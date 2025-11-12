@@ -109,9 +109,29 @@ def case_new(request: HttpRequest):
 @role_required(*LUPON_ROLES)
 def case_detail(request: HttpRequest, case_id: int):
     """Case detail view with all forms and progress"""
-    # Implementation mirrors lupon_mem.views_cases.case_detail
+    with connection.cursor() as cur:
+        cur.execute("""
+            SELECT bc.blotter_case_id, bc.blotter_case_num, bc.blotter_case_name,
+                   cs.case_state_name, ss.settlement_status_name
+            FROM blotter_case bc
+            LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
+            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+            WHERE bc.blotter_case_id = %s
+        """, [case_id])
+        case_row = cur.fetchone()
+        
+        cur.execute("SELECT case_state_id, case_state_name FROM case_state ORDER BY case_state_name")
+        case_states = cur.fetchall()
+        
+        cur.execute("SELECT settlement_status_id, settlement_status_name FROM settlement_status ORDER BY settlement_status_name")
+        settlement_statuses = cur.fetchall()
+    
     return render(request, "lupon_pres/case_detail.html", {
         "case_id": case_id,
+        "case": case_row,
+        "case_state_name": case_row[3] if case_row else None,
+        "case_states": case_states,
+        "settlement_statuses": settlement_statuses,
         "page_title": f"Case #{case_id}",
         "page_path": f"Barangay Lupon President/Cases/{case_id}",
     })

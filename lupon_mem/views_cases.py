@@ -142,6 +142,12 @@ def _fetch_lookups() -> dict:
         "settlement_statuses": settlement_statuses,
     }
 
+def _fetch_case_states() -> list:
+    """Fetch case states from database."""
+    with connection.cursor() as cur:
+        cur.execute("SELECT case_state_id, case_state_name FROM case_state ORDER BY case_state_name")
+        return cur.fetchall()
+
 def _to_none_if_blank(value: str) -> str | None:
     """Convert empty string to None."""
     return value.strip() if value and value.strip() else None
@@ -320,41 +326,27 @@ from lupon_mem.services.hearings_window import get_hearing_window
 @session_login_required 
 @role_required(*LUPON_ROLES, "barangay treasurer")
 def case_detail(request: HttpRequest, case_id: int):
-    
-    forms_per_page = 5
-    forms_page_raw = request.GET.get("forms_page") or "1"
-    try:
-        requested_page = max(int(forms_page_raw), 1)
-    except ValueError:
-        requested_page = 1
-    total_forms = 0
-    total_pages = 1
-    page = requested_page
-    submitted_form_codes: Set[str] = set()
-    
+    flow_steps = ['KP-7', 'KP-8', 'KP-9', 'KP-10', 'KP-11', 'KP-12', 'KP-16']
     hearing_window = get_hearing_window(case_id)
-    # Ultra-fast single query with minimal processing
+
     with connection.cursor() as cur:
         cur.execute("""
             SELECT 
                 bc.blotter_case_id, bc.blotter_case_num, bc.blotter_case_name,
                 TO_CHAR(bc.date_filed,'Mon DD, YYYY') AS date_filed, bc.incident_desc,
-                COALESCE(ct.complaint_title_name,'—') AS type_name,
-                COALESCE(cn.case_name,'—') AS nature_name,
+                COALESCE(ct.complaint_title_name,'') AS type_name,
+                COALESCE(cn.case_name,'') AS nature_name,
                 ss.settlement_status_name, bc.settlement_status_id,
                 cs.case_state_name, bc.closed_at,
-                -- Forms count
-                (SELECT COUNT(*) FROM blotter_kp_submission s2 WHERE s2.blotter_case_id = bc.blotter_case_id) as forms_count,
-                -- KP9 stats
+                (SELECT COUNT(*) FROM blotter_kp_submission s2 WHERE s2.blotter_case_id = bc.blotter_case_id) AS forms_count,
                 (SELECT COUNT(*) FROM blotter_kp_submission s3 
                  JOIN kp_form kf3 ON kf3.form_id = s3.form_id 
-                 WHERE s3.blotter_case_id = bc.blotter_case_id AND UPPER(kf3.form_code) = 'KP-9') as kp9_count,
-                -- Hearings set
+                 WHERE s3.blotter_case_id = bc.blotter_case_id AND UPPER(kf3.form_code) = 'KP-9') AS kp9_count,
                 (SELECT COUNT(*) FROM blotter_kp_submission s4 
                  JOIN kp_form kf4 ON kf4.form_id = s4.form_id 
                  WHERE s4.blotter_case_id = bc.blotter_case_id 
-                 AND UPPER(kf4.form_code) IN ('KP-8', 'KP-12') 
-                 AND s4.submitted_at IS NOT NULL) as hearings_set
+                   AND UPPER(kf4.form_code) IN ('KP-8', 'KP-12') 
+                   AND s4.submitted_at IS NOT NULL) AS hearings_set
             FROM blotter_case bc
             LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
             LEFT JOIN case_nature cn ON cn.case_nature_id = bc.case_nature_id
@@ -362,92 +354,65 @@ def case_detail(request: HttpRequest, case_id: int):
             LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
             WHERE bc.blotter_case_id = %s
         """, [case_id])
-        
+
         case_row = cur.fetchone()
         if not case_row:
             return HttpResponseNotFound("Case not found")
-        
-        total_forms = int(case_row[11] or 0)
-        total_pages = max((total_forms + forms_per_page - 1) // forms_per_page, 1)
-        page = max(1, min(requested_page, total_pages))
-        offset = (page - 1) * forms_per_page
-        start_rank = offset + 1
-        end_rank = offset + forms_per_page
-        
-        # Get forms - only essential data
+
+        # Get ALL forms without pagination
         cur.execute("""
-            WITH ordered AS (
+            WITH all_forms AS (
                 SELECT s.submission_id,
                        s.form_id,
                        s.status,
-                       s.submitted_at,
-                       ROW_NUMBER() OVER (ORDER BY s.submission_id DESC) AS rn
+                       s.submitted_at
                   FROM blotter_kp_submission s
                  WHERE s.blotter_case_id = %s
+                 ORDER BY s.submission_id DESC
+            ),
+            audit AS (
+                SELECT b.submission_id,
+                       MAX(CASE WHEN b.field_id = 1120 THEN b.value_json #>> '{}' END) AS processed_by_name,
+                       MAX(CASE WHEN b.field_id = 1121 THEN b.value_json #>> '{}' END) AS processed_on_date,
+                       MAX(CASE WHEN b.field_id = 1122 THEN b.value_json #>> '{}' END) AS processed_on_time
+                  FROM blotter_kp_answer b
+                 WHERE b.field_id IN (1120, 1121, 1122)
+                   AND b.submission_id IN (SELECT submission_id FROM all_forms)
+                 GROUP BY b.submission_id
             )
             SELECT
-                o.submission_id,
+                r.submission_id,
                 UPPER(kf.form_code) AS form_code,
                 kf.form_name,
-                o.status,
+                r.status,
                 COALESCE(a.processed_by_name, '') AS processed_by_name,
                 COALESCE(a.processed_on_date, '') AS processed_on_date,
                 COALESCE(a.processed_on_time, '') AS processed_on_time
-            FROM ordered o
-            JOIN kp_form kf ON kf.form_id = o.form_id
-            LEFT JOIN LATERAL (
-                SELECT
-                    MAX(CASE WHEN b.field_id = 1120 THEN b.value_json #>> '{}' END) AS processed_by_name,
-                    MAX(CASE WHEN b.field_id = 1121 THEN b.value_json #>> '{}' END) AS processed_on_date,
-                    MAX(CASE WHEN b.field_id = 1122 THEN b.value_json #>> '{}' END) AS processed_on_time
-                FROM blotter_kp_answer b
-                WHERE b.submission_id = o.submission_id
-                  AND b.field_id IN (1120, 1121, 1122)
-            ) a ON TRUE
-            WHERE o.rn BETWEEN %s AND %s
-            ORDER BY o.submission_id DESC
-        """, [case_id, start_rank, end_rank])
+            FROM all_forms r
+            JOIN kp_form kf ON kf.form_id = r.form_id
+            LEFT JOIN audit a ON a.submission_id = r.submission_id
+            ORDER BY r.submission_id DESC
+        """, [case_id])
         forms = cur.fetchall()
-        
+
         cur.execute("""
             SELECT DISTINCT UPPER(kf.form_code)
             FROM blotter_kp_submission s
             JOIN kp_form kf ON kf.form_id = s.form_id
             WHERE s.blotter_case_id = %s
               AND UPPER(s.status) = 'SUBMITTED'
-        """, [case_id])
+              AND UPPER(kf.form_code) IN %s
+        """, [case_id, tuple(flow_steps)])
         submitted_form_codes = {row[0] for row in cur.fetchall()}
-    
-    start_page = max(1, page - 2)
-    end_page = min(total_pages, page + 2)
-    forms_page_numbers = list(range(start_page, end_page + 1))
-    base_params = request.GET.copy()
-    if 'forms_page' in base_params:
-        base_params.pop('forms_page')
 
-    def _build_forms_page_url(num: int) -> str:
-        params = base_params.copy()
-        params['forms_page'] = num
-        return f"?{params.urlencode()}"
-
-    forms_prev_url = _build_forms_page_url(page - 1) if page > 1 else ""
-    forms_next_url = _build_forms_page_url(page + 1) if page < total_pages else ""
-    forms_page_links = [
-        {"number": p, "url": _build_forms_page_url(p), "active": p == page}
-        for p in forms_page_numbers
-    ]
-    
-    # Track submitted forms for flow guide
     submitted_forms = submitted_form_codes
-    
-    # Calculate progress
-    flow_steps = ['KP-7', 'KP-8', 'KP-9', 'KP-10', 'KP-11', 'KP-12', 'KP-16']
     completed_count = sum(1 for step in flow_steps if step in submitted_forms)
-    progress_percentage = int((completed_count / len(flow_steps)) * 100)
-    
-    # Minimal context - NO GATES, NO BLOCKING
+    progress_percentage = int((completed_count / len(flow_steps)) * 100) if flow_steps else 0
+
+    lookup_cache = _fetch_lookups()
+
     context = {
-        "case": case_row[:11],
+        "case": case_row,
         "forms": [
             (
                 f[0],
@@ -460,15 +425,6 @@ def case_detail(request: HttpRequest, case_id: int):
             )
             for f in forms
         ],
-        "forms_total": total_forms,
-        "forms_per_page": forms_per_page,
-        "forms_total_pages": total_pages,
-        "forms_page": page,
-        "forms_has_prev": page > 1,
-        "forms_has_next": page < total_pages,
-        "forms_prev_url": forms_prev_url,
-        "forms_next_url": forms_next_url,
-        "forms_page_links": forms_page_links,
         "case_id": case_id,
         "hearing_window": hearing_window,
         "settlement_choices": ["Settled", "Not Settled", "Pending"],
@@ -476,26 +432,16 @@ def case_detail(request: HttpRequest, case_id: int):
         "case_nature": case_row[6] if len(case_row) > 6 else None,
         "case_state_name": case_row[9] if len(case_row) > 9 else None,
         "case_closed_at": case_row[10] if len(case_row) > 10 else None,
-        # Simplified stats
-        "kp9_count": case_row[12] if len(case_row) > 12 else 0,
-        "hearings_set_count": case_row[14] if len(case_row) > 14 else 0,
+        "settlement_statuses": lookup_cache["settlement_statuses"],
+        "case_states": _fetch_case_states(),
+        "kp9_count": int(case_row[12] or 0),
+        "hearings_set_count": int(case_row[13] or 0),
         "hearings_count": 0,
         "has_hearing": False,
-        # ALL GATES DISABLED
-        # "hearing_gate": {},
-        # "kp9_latest_status": None,
-        # "kp9_latest_party": None,
-        # "kp9_pending_count": 0,
-        # "force_open_block_modal": False,
-        # "block_reason": None,
-        # "block_due_to_summons": False,
-        # "block_due_to_hearing": False,
-        # "block_reason_summons": "",
-        # "block_reason_hearing": "",
-        # "has_med_summary": False,
-        # "med_summary_sid": None,
+        "submitted_form_codes": list(submitted_form_codes),
+        "progress_percentage": progress_percentage,
     }
-    
+
     return render(request, "lupon_mem/case_detail.html", context)
 
 

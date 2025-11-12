@@ -440,6 +440,14 @@ class KP17Handler:
 
         out["date_filed"] = self._fmt_full_date(date_obj)
         out["time_filed"] = self._fmt_time_12h(time_obj) if time_obj else ""
+        
+        # Add complaint date fields from date_filed
+        if date_obj:
+            out["complaint_date_month"] = date_obj.strftime("%B")
+            out["complaint_year"] = str(date_obj.year)
+        else:
+            out["complaint_date_month"] = ""
+            out["complaint_year"] = ""
 
         # -------- Ensure place_sworned has a value --------
         if not (out.get("place_sworned") or "").strip():
@@ -467,15 +475,18 @@ class KP17Handler:
             out["month_sworn"] = now_ph.strftime("%B")
             out["year_sworn"]  = str(now_ph.year)
 
-        # -------- Checkbox coercion ("Yes" if true/details present) --------
-        def decide_chk(detail_key: str, chk_key: str) -> str:
-            detail = (out.get(detail_key) or "").strip()
-            chk    = (out.get(chk_key) or "").strip()
-            return "Yes" if (self._boolish(chk) or bool(detail)) else ""
-
-        out["fraud_chkbx"]        = decide_chk("fraud_details", "fraud_chkbx")
-        out["violence_chkbx"]     = decide_chk("violence_details", "violence_chkbx")
-        out["intimidation_chkbx"] = decide_chk("intimidation_details", "intimidation_chkbx")
+        # -------- Checkbox coercion ("Yes" if checked, display ground names) --------
+        grounds = []
+        if self._boolish(out.get("fraud_chkbx", "")):
+            grounds.append("Fraud")
+        if self._boolish(out.get("violence_chkbx", "")):
+            grounds.append("Violence")
+        if self._boolish(out.get("intimidation_chkbx", "")):
+            grounds.append("Intimidation")
+        
+        out["fraud_chkbx"] = "Yes" if self._boolish(out.get("fraud_chkbx", "")) else ""
+        out["violence_chkbx"] = "Yes" if self._boolish(out.get("violence_chkbx", "")) else ""
+        out["intimidation_chkbx"] = "Yes" if self._boolish(out.get("intimidation_chkbx", "")) else ""
 
         # -------- Chairman / Brgy Captain syncing --------
         chair = (out.get("chairman") or "").strip()

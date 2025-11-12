@@ -7,6 +7,7 @@ from . import views_cases
 from . import views_progress  # ← ADDED: import for flow progress API
 from . import views_hearing_api
 from . import views_resident_records
+from .views_case_state import update_case_state
 
 from lupon_mem.views_sql import (
     SubmissionViewSQL,
@@ -31,6 +32,7 @@ urlpatterns = [
     path("cases/<int:case_id>/update-settlement/", views_cases.case_settlement_update, name="update_settlement_status"),
     path("cases/<int:case_id>/close",  views_cases.case_close,  name="case_close"),
     path("cases/<int:case_id>/reopen", views_cases.case_reopen, name="case_reopen"),
+    path("cases/<int:case_id>/update-case-state/", update_case_state, name="update_case_state"),
 
     # chooser + builder
     path("cases/<int:case_id>/forms/add/", views_cases.add_form_choose, name="add_form_choose"),
@@ -92,6 +94,7 @@ urlpatterns = [
     path("reports/<int:report_id>/approve/",  views_reports.report_approve, name="report_approve"), # added to views_reports
     path("reports/<int:report_id>/decline/",  views_reports.report_decline, name="report_decline"), # added to views_reports 
     path("reports/<int:report_id>/pay-open/", views_reports.report_pay_and_open_case, name="report_pay_and_open_case"), # added to views_reports
+    path("reports/<int:report_id>/payment-details/", views_reports.report_payment_details, name="report_payment_details"), # added to views_reports
 
     # ===== ADDED: flow progress API (namespaced) =====
     path("api/case/<int:case_id>/flow-progress", views_progress.flow_progress_api, name="flow_progress_api"),
