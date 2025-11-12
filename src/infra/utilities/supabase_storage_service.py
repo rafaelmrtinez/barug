@@ -51,12 +51,15 @@ class SupabaseStorageService:
             if content_type:
                 options['content-type'] = content_type
 
+            # Ensure destination_path doesn't start with slash for Supabase
+            clean_path = destination_path.lstrip('/')
+            
             # call upload (some clients accept options dict as third arg)
             try:
-                raw = supabase.storage.from_(bucket_name).upload(destination_path, data, options)
+                raw = supabase.storage.from_(bucket_name).upload(clean_path, data, options)
             except TypeError:
                 # fallback: call without options if client signature differs
-                raw = supabase.storage.from_(bucket_name).upload(destination_path, data)
+                raw = supabase.storage.from_(bucket_name).upload(clean_path, data)
 
             # Normalize response
             error = None
@@ -89,9 +92,9 @@ class SupabaseStorageService:
             supabase_url = getattr(settings, 'SUPABASE_URL', None)
             public_url = None
             if supabase_url:
-                public_url = f"{supabase_url.rstrip('/')}/storage/v1/object/public/{bucket_name}/{destination_path}"
+                public_url = f"{supabase_url.rstrip('/')}/storage/v1/object/public/{bucket_name}/{clean_path}"
 
-            return {"path": destination_path, "public_url": public_url, "raw": raw}
+            return {"path": clean_path, "public_url": public_url, "raw": raw}
 
         except Exception as e:
             # if the storage client included a dict-like first arg with a statusCode, treat 409 as success
@@ -101,8 +104,9 @@ class SupabaseStorageService:
                     supabase_url = getattr(settings, 'SUPABASE_URL', None)
                     public_url = None
                     if supabase_url:
-                        public_url = f"{supabase_url.rstrip('/')}/storage/v1/object/public/{bucket_name}/{destination_path}"
-                    return {"path": destination_path, "public_url": public_url, "raw": first}
+                        clean_path = destination_path.lstrip('/')
+                        public_url = f"{supabase_url.rstrip('/')}/storage/v1/object/public/{bucket_name}/{clean_path}"
+                    return {"path": clean_path, "public_url": public_url, "raw": first}
             except Exception:
                 pass
 
@@ -116,18 +120,21 @@ class SupabaseStorageService:
         """
         try:
             logger = logging.getLogger(__name__)
+            # Ensure destination_path doesn't start with slash for Supabase
+            clean_path = destination_path.lstrip('/')
             # the client expects a list of paths
-            logger.debug('Supabase remove_file called for bucket=%s path=%s', bucket_name, destination_path)
-            res = supabase.storage.from_(bucket_name).remove([destination_path])
+            logger.debug('Supabase remove_file called for bucket=%s path=%s', bucket_name, clean_path)
+            res = supabase.storage.from_(bucket_name).remove([clean_path])
             # log response when available (some clients return dict-like)
             try:
-                logger.debug('Supabase remove response for %s: %s', destination_path, res)
+                logger.debug('Supabase remove response for %s: %s', clean_path, res)
             except Exception:
                 pass
             # some clients return dict/error shape; treat any non-exception as success
             return True
         except Exception as e:
             logger = logging.getLogger(__name__)
-            logger.exception('Supabase remove_file failed for bucket=%s path=%s', bucket_name, destination_path)
+            clean_path = destination_path.lstrip('/')
+            logger.exception('Supabase remove_file failed for bucket=%s path=%s', bucket_name, clean_path)
             # bubble up the exception to let callers decide what to do
             raise

@@ -281,7 +281,7 @@ def household_info(
 def dashboard(request: HttpRequest) -> HttpResponse:
     auth = request.session.get("auth")
     profile = getattr(request, "person_profile", None)
-    return render(request, "bhw/dashboard.html", {
+    return render(request, "bhw_dashboard.html", {
         "page_path": "Barangay Health Worker/Dashboard",
         "page_title": "Dashboard",
         "profile": profile,

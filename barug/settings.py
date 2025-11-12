@@ -30,6 +30,23 @@ ANDROID_PACKAGE = "host.exp.exponent"
 SEMAPHORE_API_KEY = os.getenv("SEMAPHORE_API_KEY", "")
 SEMAPHORE_SENDER_NAME = os.getenv("SEMAPHORE_SENDER_NAME", "SEMAPHORE")
 
+ABSTRACT_EMAIL_KEY = os.getenv("ABSTRACT_EMAIL_KEY", "")
+
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY")
+PAYMENTS_DEV_BYPASS = os.getenv("PAYMENTS_DEV_BYPASS", "false").lower() in ("1","true","yes")
+PAYMONGO_SECRET_KEY    = os.getenv("PAYMONGO_SECRET_KEY")
+PAYMONGO_WEBHOOK_SECRET= os.getenv("PAYMONGO_WEBHOOK_SECRET")
+STAFF_SYSTEM_ID        =13
+
+DEBUG = True
+ALLOWED_HOSTS = ["*", "localhost", "127.0.0.1", ".ngrok-free.app"]
+CSRF_TRUSTED_ORIGINS = ["https://*.ngrok-free.app"]
+
+ANDROID_PACKAGE = "host.exp.exponent"
+
+SEMAPHORE_API_KEY = os.getenv("SEMAPHORE_API_KEY", "")
+SEMAPHORE_SENDER_NAME = os.getenv("SEMAPHORE_SENDER_NAME", "SEMAPHORE")
+
 # Email backend (Gmail SMTP)
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
@@ -174,7 +191,7 @@ SUPABASE_ID_UPLOADS_BUCKET = os.getenv("SUPABASE_ID_UPLOADS_BUCKET", "id-uploads
 
 # DB connection tuning (env-driven; safe defaults for local/dev)
 DB_CONN_MAX_AGE = int(os.getenv("DB_CONN_MAX_AGE", "0"))           # 0 = close after each request
-DB_CONNECT_TIMEOUT = int(os.getenv("DB_CONNECT_TIMEOUT", "10"))    # seconds
+DB_CONNECT_TIMEOUT = int(os.getenv("DB_CONNECT_TIMEOUT", "100"))    # seconds
 DB_SSL_MODE = os.getenv("DB_SSL_MODE", "require")                  # adjust for your environment
 SUPABASE_OCR_TEST_BUCKET = os.getenv("SUPABASE_OCR_TEST_BUCKET ", "ocr-testing")
 SUPABASE_BUSINESS_PROOF_BUCKET = os.getenv("SUPABASE_BUSINESS_PROOF_BUCKET", "business-proofs")

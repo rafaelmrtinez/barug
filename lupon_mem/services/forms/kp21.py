@@ -223,6 +223,17 @@ class KP21Handler:
         for k in _KP21_FIELDS:
             out.setdefault(k, "")
 
+        # ---------------------------------------------------
+        # Send notifications for KP-21 submission
+        # ---------------------------------------------------
+        try:
+            from notifications.views import notify_kp21_certification_bar_action
+            if case_id:
+                case_num = out.get("case_no", "")
+                notify_kp21_certification_bar_action(case_id, case_num)
+        except Exception as e:
+            logger.warning("[KP21] Failed to send notifications: %s", e)
+
         self._log(out)
         return out
 

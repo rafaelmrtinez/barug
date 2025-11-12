@@ -43,7 +43,6 @@ from django.views.decorators.http import require_GET
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
 from authentication.supabase_client import supabase
-from django.views.decorators.http import require_POST
 from .forms import (
     SearchVerificationRequest, SearchBusinessOwner, SelectOwnerForm , BusinessOwnerInfo,
     BusinessDetails, BusinessFilters, RequestedDocsFilters, SelectOwnerForm, RenewalFilters
@@ -771,6 +770,9 @@ def _apply_pdf_field_mapping(
 # ────────────────────────────────────────────────────────────
 # SECTION: Printing action
 # ────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────
+# SECTION: Printing action
+# ────────────────────────────────────────────────────────────
 @session_login_required
 @role_required(CLERK_ROLE)
 @require_POST
@@ -1007,7 +1009,6 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
     return resp
 
 
-
 # ────────────────────────────────────────────────────────────
 # SECTION: Release / Decline
 # ────────────────────────────────────────────────────────────
@@ -1180,6 +1181,7 @@ def dashboard(
 def review_approve(request: HttpRequest):
     """List of ID verification requests."""
     profile = getattr(request, "person_profile", None)
+
 def review_approve(request: HttpRequest):
     """List of ID verification requests."""
     profile = getattr(request, "person_profile", None)
@@ -2709,6 +2711,7 @@ def business_details(
         if form.is_valid():
             cd = form.cleaned_data
 
+            # Build a JSON-serializable payload for session
             payload: Dict[str, Any] = {
                 # strings → strip safely
                 "b_name": _sstrip(cd.get("b_name")) or "",
@@ -3298,6 +3301,8 @@ def api_business_pins(
     )
     return JsonResponse(pins, safe=False)
 
+
+# ==================     CLERK - ID DECISION REQUESTS     ==================      
 @session_login_required
 @role_required(CLERK_ROLE)
 @csrf_protect

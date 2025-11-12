@@ -630,6 +630,19 @@ class BusinessDetails(forms.Form):
         decimal_places=7,
         widget=forms.HiddenInput(attrs={'id': 'longitude'}),
     )
+    # Hidden fields filled by the map script
+    latitude = forms.DecimalField(
+        required=False,
+        max_digits=10,
+        decimal_places=7,
+        widget=forms.HiddenInput(attrs={'id': 'latitude'}),
+    )
+    longitude = forms.DecimalField(
+        required=False,
+        max_digits=10,
+        decimal_places=7,
+        widget=forms.HiddenInput(attrs={'id': 'longitude'}),
+    )
     b_desc = forms.CharField(
         widget=forms.Textarea(attrs={
             'id' : 'b_desc',

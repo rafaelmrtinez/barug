@@ -453,7 +453,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     auth = request.session.get("auth")
     return render(
         request,
-        "midwife/dashboard.html",
+        "midwife_dashboard.html",
         {
             "page_path": "Midwife/Dashboard",
             "page_title": "Dashboard",

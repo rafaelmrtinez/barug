@@ -49,12 +49,13 @@
     </a>
   </div>
 
-  {% if gate_msg %}
+  {# Commented out gate/guard logic - show all forms without blocking #}
+  {# {% if gate_msg %}
     <div class="alert alert-secondary border rounded-3">{{ gate_msg }}</div>
-  {% endif %}
+  {% endif %} #}
 
-  <!-- Summary badges (visible, high contrast) -->
-  {% if badge_flags %}
+  {# Summary badges (visible, high contrast) #}
+  {# {% if badge_flags %}
   <div class="mb-3 d-flex flex-wrap align-items-center gap-2">
     <span class="hint-pill pill-muted">{% bs_icon 'envelope' %} Summons: ×{{ badge_flags.summons_count }}</span>
     {% if badge_flags.no_show_complainant %}
@@ -67,7 +68,7 @@
       <span class="hint-pill pill-summons">{% bs_icon 'envelope-plus' %} New Summons</span>
     {% endif %}
   </div>
-  {% endif %}
+  {% endif %} #}
 
   <form class="toolbar d-flex align-items-center flex-wrap mb-3" onsubmit="return false;">
     <div class="searchbox">

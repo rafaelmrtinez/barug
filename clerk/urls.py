@@ -33,10 +33,11 @@ urlpatterns = [
     path("dashboard/", views.dashboard, name="dashboard"),
     path("identity_verification/", views.review_approve, name="identity_verification"),
     path("person_details/<int:req_id>/", views.person_submission_dets, name="person_details"),
-
-    # actions
-    # path("account-verification/<int:req_id>/approve/", views.approve_request, name="approve_request"),
-    # path("account-verification/<int:req_id>/decision/", views.decision_request, name="decision_request"),
+    path("decision_request/", views.decision_request, name="decision_request"),
+    
+    # Actions
+    path("account-verification/<int:req_id>/approve/", views.approve_request, name="approve_request"),
+    path("account-verification/<int:req_id>/decision/", views.decision_request, name="decision_request"),
 
     # BUSINESS
     path("business/business_owner/", views.business_owner, name="business_owner"),
