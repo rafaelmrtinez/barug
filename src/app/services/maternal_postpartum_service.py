@@ -2,6 +2,7 @@ from datetime import date, time
 from typing import Any, Dict, Optional
 
 from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
+from src.app.contracts.maternal_postpartum_service import IMaternalPostpartumService
 from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
 
 
@@ -25,7 +26,7 @@ def _sanitize_str(val: Any, max_len: Optional[int] = None) -> Optional[str]:
     return s
 
 
-class MaternalPostpartumService:
+class MaternalPostpartumService(IMaternalPostpartumService):
     """Service to validate/sanitize postpartum payloads and persist via repository.
 
     Responsibilities:

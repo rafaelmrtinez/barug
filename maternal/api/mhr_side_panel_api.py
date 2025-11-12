@@ -8,6 +8,8 @@ from authentication.guards import session_login_required, role_required
 import datetime
 from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
+from dependency_injector.wiring import inject, Provide
+from barug.containers import app
 
 
 ALLOWED_ROLES = ("MIDWIFE", "Midwife", "midwife", "Barangay Health Worker", "bhw", "Super Admin")
@@ -23,7 +25,8 @@ class MhrSidePanelAPI(View):
       - mhr_id: integer (required)
     """
 
-    def get(self, request: HttpRequest, *args, **kwargs) -> JsonResponse:
+    @inject
+    def get(self, request: HttpRequest, repo: MaternalHealthRecordRepository = Provide[app.infra.maternal_health_record_repository], *args, **kwargs) -> JsonResponse:
         mhr_id = request.GET.get('mhr_id')
         if not mhr_id:
             return JsonResponse({'success': False, 'message': 'mhr_id is required.'}, status=400)
@@ -32,7 +35,21 @@ class MhrSidePanelAPI(View):
         except (TypeError, ValueError):
             return JsonResponse({'success': False, 'message': 'mhr_id must be an integer.'}, status=400)
 
-        repo = MaternalHealthRecordRepository(ConnectionAdapter())
+        # If DI wiring didn't resolve the Provide placeholder, try to resolve
+        # from the container at runtime. As a last resort construct the
+        # repository locally using a ConnectionAdapter so the endpoint stays
+        # functional when wiring hasn't been performed early enough.
+        try:
+            if not hasattr(repo, 'fetch_anc_trimester_tracker_by_mhr_id'):
+                try:
+                    repo = app.infra.maternal_health_record_repository()
+                except Exception:
+                    # attempt to construct directly
+                    repo = MaternalHealthRecordRepository(ConnectionAdapter())
+        except Exception:
+            import logging
+            logging.exception('Error resolving maternal_health_record_repository provider')
+            return JsonResponse({'success': False, 'message': 'Unexpected server error.'}, status=500)
 
         try:
             # Delegate to the repository helper which returns the ANC trimester tracker

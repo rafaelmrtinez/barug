@@ -1,6 +1,9 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python,django,node,database
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,django,node,database
 
+test/
+tests/
+
 .vscode/
 
 ### Add your virtual environments here ###

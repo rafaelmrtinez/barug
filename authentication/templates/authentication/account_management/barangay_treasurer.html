@@ -10,6 +10,18 @@
 }
 </style>
 
+<style>
+.nav-link:hover {
+    color: #ffd000 !important;
+}
+.nav-link.active {
+    color: #ff8c00 !important;
+}
+.dropdown-item:hover {
+    color: #ff8c00 !important;
+}
+</style>
+
 <nav class="navbar navbar-expand-lg pt-0 pb-3">
     <div>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarText" aria-controls="navbarText" aria-expanded="false" aria-label="Toggle navigation">
@@ -48,7 +60,37 @@
                 </li>
                 <li class="nav-item me-3">
                     <a class="nav-link" href="{% url 'treasurer:fees_index' %}">Fee Catalog</a>
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="">Document Requests</a>
                 </li>
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'clerk:identity_verification' %}">Identity Verification</a>
+                </li>
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'clerk:business_list' %}">Business Records</a>
+                </li>
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="">Activity Log</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>  
+<nav class="navbar navbar-expand-lg pt-0 pb-3">
+    <div>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarText" aria-controls="navbarText" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarText">
+            <ul class="navbar-nav me-auto mb-lg-0">
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'treasurer:dashboard' %}">Dashboard</a>
+                </li>
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'treasurer:fees_index' %}">Fee Catalog</a>
+                </li>
+
+                
 
                 
                 <!-- <li class="nav-item me-3">
@@ -63,6 +105,9 @@
                     </a>
                     <ul class="dropdown-menu" aria-labelledby="resident_dropdown">
                         <li><a class="dropdown-item" href="{% url 'treasurer:business_queue' %}">Business</a></li>
+                        <li><a class="dropdown-item" href="{% url 'treasurer:queue' %}">Resident (Requests)</a></li>
+                        <li><a class="dropdown-item" href="{% url 'treasurer:business_renewal' %}">Business Renewal</a></li>
+                        <li><a class="dropdown-item" href="{% url 'treasurer:payment_refunds' %}">Payment Refunds</a></li>
                         <li><a class="dropdown-item" href="{% url 'treasurer:queue' %}">Resident (Requests)</a></li>
                         <li><a class="dropdown-item" href="{% url 'treasurer:business_renewal' %}">Business Renewal</a></li>
                         <li><a class="dropdown-item" href="{% url 'treasurer:payment_refunds' %}">Payment Refunds</a></li>

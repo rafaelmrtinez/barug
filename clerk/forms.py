@@ -1,5 +1,7 @@
 from django import forms
 from decimal import Decimal
+from datetime import date, timedelta
+import re
 
 CIVIL_STATUS_CHOICES = [
     ("", "— Select Civil Status —"),
@@ -247,7 +249,32 @@ class SearchBusinessOwner(forms.Form):
 class SelectOwnerForm(forms.Form):
     owner_person_id = forms.IntegerField(widget=forms.HiddenInput())
     search = forms.CharField(required=False, widget=forms.HiddenInput)
-    
+
+def _norm_email(txt: str | None) -> str | None:
+    if not txt:
+        return None
+    return txt.strip().lower() or None
+
+MOBILE_RE = re.compile(r"\D+")
+def _norm_mobile(txt: str | None) -> str | None:
+    """
+    Keep digits only; PH-friendly:
+    - strip +63 or leading 0
+    - return last 11 (or last 10) digits if present
+    """
+    if not txt:
+        return None
+    digits = MOBILE_RE.sub("", txt)
+    if digits.startswith("63"):
+        digits = digits[2:]
+    if digits.startswith("0"):
+        digits = digits[1:]
+    if len(digits) >= 11:
+        return digits[-11:]
+    if len(digits) >= 10:
+        return digits[-10:]
+    return digits or None
+ 
 class BusinessOwnerInfo(forms.Form):
     # PERSONAL INFORMATION
     last_name = forms.CharField(
@@ -255,37 +282,48 @@ class BusinessOwnerInfo(forms.Form):
             'id' : 'last_name',
             'class' : 'form-control',
             'placeholder' : 'Last Name',
+            'style': 'text-transform: uppercase;',
+            "autocomplete": "family-name",
     }),
         label= 'Last Name',
         required= True,
+        error_messages={"required": "Last name is required."},
     )
     first_name = forms.CharField(
         widget=forms.TextInput(attrs={
             'id' : 'first_name',
             'class' : 'form-control',
             'placeholder' : 'First Name',
-
+            'style': 'text-transform: uppercase;',
+            "autocomplete": "given-name",
     }),
         label= 'First Name',
         required= True,
+        error_messages={"required": "First name is required."},
     )
     middle_name = forms.CharField(
         widget=forms.TextInput(attrs={
             'id' : 'middle_name',
             'class' : 'form-control',
             'placeholder' : 'Middle Name',
+            'style': 'text-transform: uppercase;',
+            "autocomplete": "additional-name",
     }),
         label= 'Middle Name',
-        required= True,
+        required= False,
+        error_messages={"required": "Middle name is required."},
     )
     suffix = forms.CharField(
         widget=forms.TextInput(attrs={
             'id' : 'suffix',
             'class' : 'form-control',
             'placeholder' : 'Suffix',
+            'style': 'text-transform: uppercase;',
+            "autocomplete": "suffix",
     }),
         label= 'Suffix',
-        required= True,
+        required= False,
+        error_messages={"required": "Suffix is required."},
     )
     sex = forms.ChoiceField(
         choices= [(1, 'Male'), (2, 'Female')],
@@ -295,6 +333,7 @@ class BusinessOwnerInfo(forms.Form):
     }),
         label= 'Sex',
         required= True,
+        error_messages={"required": "Please select sex."},
     )
     dob = forms.DateField(
         widget=forms.DateInput(attrs={
@@ -305,6 +344,7 @@ class BusinessOwnerInfo(forms.Form):
     }),
         label= 'Date of Birth',
         required= True,
+        error_messages={"required": "Date of birth is required."},
     )
     civil_status = forms.ChoiceField(
         choices= CIVIL_STATUS_CHOICES, 
@@ -350,6 +390,7 @@ class BusinessOwnerInfo(forms.Form):
             'id' : 'street',
             'class' : 'form-control',
             'placeholder' : 'Street',
+            'style': 'text-transform: uppercase;',
     }),
         label= 'Street',
         required= True,
@@ -359,6 +400,7 @@ class BusinessOwnerInfo(forms.Form):
             'id' : 'purok_sitio',
             'class' : 'form-control',
             'placeholder' : 'Purok / Sitio',
+            'style': 'text-transform: uppercase;',
     }),
         label= 'Purok / Sitio',
         required= True,
@@ -368,6 +410,7 @@ class BusinessOwnerInfo(forms.Form):
             'id' : 'barangay',
             'class' : 'form-control',
             'placeholder' : 'Barangay',
+            'style': 'text-transform: uppercase;',
     }),
         label= 'Barangay',
         required= True,
@@ -377,6 +420,7 @@ class BusinessOwnerInfo(forms.Form):
             'id' : 'city',
             'class' : 'form-control',
             'placeholder' : 'City',
+            'style': 'text-transform: uppercase;',
     }),
         label= 'City',
         required= True,
@@ -386,6 +430,7 @@ class BusinessOwnerInfo(forms.Form):
             'id' : 'email',
             'class' : 'form-control',
             'placeholder' : 'Email Address',
+            "autocomplete": "email",
     }),
         label= 'Email Address',
         required= True,
@@ -395,6 +440,8 @@ class BusinessOwnerInfo(forms.Form):
             'id' : 'mob_num',
             'class' : 'form-control',
             'placeholder' : 'Mobile Number',
+            "inputmode": "tel",
+            "autocomplete": "tel-national",
     }),
         label= 'Mobile Number',
         required= True,
@@ -425,6 +472,32 @@ class BusinessOwnerInfo(forms.Form):
     #     label= 'Back of the ID',
     #     required= True, 
     # )
+    def clean_email(self):
+        return _norm_email(self.cleaned_data.get("email"))
+    
+    def clean_mob_num(self):
+        return _norm_mobile(self.cleaned_data.get("mob_num"))
+    
+    def clean(self):
+        cleaned = super().clean()
+
+        # DOB sanity: not future, not >120 years old
+        dob = cleaned.get("dob")
+        if dob:
+            today = date.today()
+            if dob > today:
+                self.add_error("dob", "Birthdate cannot be in the future.")
+            else:
+                oldest = today - timedelta(days=120 * 365)
+                if dob < oldest:
+                    self.add_error("dob", "Birthdate seems invalid (older than 120 years).")
+
+        # If neither email nor mobile provided, nudge clerk to enter at least one contact
+        # if not cleaned.get("email") and not cleaned.get("mob_num"):
+        #     self.add_error("mob_num", "Provide at least one contact: mobile or email.")
+        #     # (Alternatively: add to non_field_errors)
+
+        return cleaned
 
 class MultiFileInput(forms.ClearableFileInput):
     # 🔑 This is what enables <input multiple>
@@ -456,6 +529,7 @@ class BusinessDetails(forms.Form):
             'id' : 'bname',
             'class' : 'form-control',
             'placeholder' : 'Business Name',
+            'style': 'text-transform: uppercase;',
         }),
         label= 'Business Name',
         required= True,
@@ -465,8 +539,7 @@ class BusinessDetails(forms.Form):
             'id' : 'b_nature',
             'class' : 'form-control',
             'placeholder' : 'Nature of Business (e.g., Sari-Sari Store, Eatery, etc.)',
-            'class' : 'form-control',
-            'placeholder' : 'Nature of Business (e.g., Sari-Sari Store, Eatery, etc.)',
+            'style': 'text-transform: uppercase;',
     }),
         label= 'Nature of Business',
         required= True,
@@ -497,6 +570,7 @@ class BusinessDetails(forms.Form):
             'readonly' : 'readonly',
             'data-bs-toggle' : 'modal',
             'data-bs-target' : '#address_modal',
+            'style': 'text-transform: uppercase;',
     }),
         label= 'Business Address',
         required= True
@@ -506,6 +580,7 @@ class BusinessDetails(forms.Form):
             'id' : 'street',
             'class' : 'form-control',
             'placeholder' : 'Street',
+            'style': 'text-transform: uppercase;',
     }),
         label= 'Street',
         required= True,
@@ -515,6 +590,7 @@ class BusinessDetails(forms.Form):
             'id' : 'purok_sitio',
             'class' : 'form-control',
             'placeholder' : 'Purok / Sitio',
+            'style': 'text-transform: uppercase;',
     }),
         label= 'Purok / Sitio',
         required= True,
@@ -525,6 +601,7 @@ class BusinessDetails(forms.Form):
             'class' : 'form-control',
             'placeholder' : 'Barangay',
             'readonly' : 'readonly',
+            'style': 'text-transform: uppercase;',
     }),
         label= 'Barangay',
         required= True,
@@ -535,32 +612,33 @@ class BusinessDetails(forms.Form):
             'class' : 'form-control',
             'placeholder' : 'City',
             'readonly' : 'readonly',
+            'style': 'text-transform: uppercase;',
     }),
         label= 'City',
         required= True,
     )
     # Hidden fields filled by the map script
     latitude = forms.DecimalField(
-        required=False,
+        required=True,
         max_digits=10,
         decimal_places=7,
         widget=forms.HiddenInput(attrs={'id': 'latitude'}),
     )
     longitude = forms.DecimalField(
-        required=False,
+        required=True,
         max_digits=10,
         decimal_places=7,
         widget=forms.HiddenInput(attrs={'id': 'longitude'}),
     )
     # Hidden fields filled by the map script
     latitude = forms.DecimalField(
-        required=False,
+        required=True,
         max_digits=10,
         decimal_places=7,
         widget=forms.HiddenInput(attrs={'id': 'latitude'}),
     )
     longitude = forms.DecimalField(
-        required=False,
+        required=True,
         max_digits=10,
         decimal_places=7,
         widget=forms.HiddenInput(attrs={'id': 'longitude'}),
@@ -571,6 +649,7 @@ class BusinessDetails(forms.Form):
             'class' : 'form-control',
             'placeholder' : 'e.g., near the barangay hall / corner of …',
             'rows' : 3,
+            'style': 'text-transform: uppercase;',
     }),
         label= 'Location Description',
         required= True,
@@ -593,7 +672,7 @@ class BusinessDetails(forms.Form):
             'autocomplete' : 'off',
     }),
         label= 'DTI/SEC Registration Number',
-        required= True,
+        required= False,
     )
     capital_invested = forms.DecimalField(
         widget=forms.NumberInput(attrs={
@@ -702,3 +781,28 @@ class BusinessDetails(forms.Form):
             'multiple': True,
         }),
     )
+
+    def clean(self):
+        cleaned = super().clean()
+
+        # Ownership-based DTI rule
+        ot_val = cleaned.get('ownership_type')  # ChoiceField returns the key (often str)
+        dti = (cleaned.get('dti') or '').strip()
+
+        # Map id -> label so we can check by label (safe if IDs change)
+        id_to_label = {str(k): v for (k, v) in self.fields['ownership_type'].choices}
+        label = (id_to_label.get(str(ot_val)) or "").upper()
+
+        # ✅ Only SOLE PROPRIETORSHIP must provide DTI
+        needs_dti = "SOLE PROPRIETORSHIP" in label
+
+        if needs_dti and not dti:
+            self.add_error('dti', "DTI/SEC registration number is required for Sole Proprietorship.")
+
+        # Time sanity check
+        t_start = cleaned.get('opt_start')
+        t_end = cleaned.get('opt_end')
+        if t_start and t_end and t_end <= t_start:
+            self.add_error('opt_end', "End time must be later than start time.")
+
+        return cleaned

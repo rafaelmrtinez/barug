@@ -11,6 +11,8 @@ from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
 from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
 from src.app.services.maternal_postpartum_service import MaternalPostpartumService
+from dependency_injector.wiring import inject, Provide
+from barug.containers import app
 
 
 ALLOWED_ROLES = ("MIDWIFE", "Midwife", "midwife", "Barangay Health Worker", "bhw", "Super Admin")
@@ -26,7 +28,8 @@ class PostpartumRecordAPI(View):
     redirects back to the record_detail page on success. If called with JSON, returns JSON.
     """
 
-    def post(self, request: HttpRequest, *args, **kwargs):
+    @inject
+    def post(self, request: HttpRequest, service: MaternalPostpartumService = Provide[app.maternal_postpartum_service], *args, **kwargs):
         # Accept both JSON and form-encoded
         payload = None
         if request.content_type and 'application/json' in request.content_type:
@@ -38,16 +41,25 @@ class PostpartumRecordAPI(View):
             # use POST dict
             payload = {k: v for k, v in request.POST.items()}
 
-        # The service layer handles validation and sanitation. Build repo+service and delegate.
+        # The service layer handles validation and sanitation. Use injected service when available.
         staff_id = request.session.get('auth', {}).get('staff_id')
         staff_role = request.session.get('auth', {}).get('role_name')
         try:
             staff_id = int(staff_id)
         except Exception:
             return JsonResponse({'success': False, 'message': 'Invalid staff id in session.'}, status=400)
+        # If DI failed to resolve, attempt to resolve from container or construct
+        try:
+            need_resolve = not service or not hasattr(service, 'insert_postpartum_record')
+        except Exception:
+            need_resolve = True
 
-        repo = MaternalHealthRecordRepository(ConnectionAdapter())
-        service = MaternalPostpartumService(repo)
+        if need_resolve:
+            try:
+                service = app.maternal_postpartum_service()
+            except Exception:
+                repo = MaternalHealthRecordRepository(ConnectionAdapter())
+                service = MaternalPostpartumService(repo)
 
         try:
             # service will validate/sanitize payload and perform insert

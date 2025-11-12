@@ -7,7 +7,7 @@ from src.app.transfer_objects.request.init_chilld_immunization_request import In
 from src.app.utility.maternal_service_utility import MaternalServiceUtility
 from src.domain.contracts.family_repository import IFamilyRepository
 from src.domain.contracts.maternal_repository import IMaternalRepository
-from src.domain.contracts.maternal_service import IMaternalService
+from src.app.contracts.maternal_service import IMaternalService
 from src.domain.services.maternal_immunization_service import MaternalDomainService
 from src.infra.utilities.json_deep_conversion import JSONConverterUtility
 

@@ -1086,7 +1086,7 @@ def business_pay_and_print(request: HttpRequest, business_id: int, doc_request_i
 def business_renewal(request: HttpRequest):
     q = (request.GET.get("q") or "").strip() or None
     period_types = [p.strip().upper() for p in request.GET.getlist("period_type") if p.strip()]
-    year = request.GET.get("year", "").strip()
+    year = (request.GET.get("year") or "").strip()
     paid_filters = [p.strip().lower() for p in request.GET.getlist("paid") if p.strip()]
     try:
         per_page = int(request.GET.get("per_page", "10") or "10")
@@ -1111,19 +1111,51 @@ def business_renewal(request: HttpRequest):
     res = query.limit(500).execute()
     rows = res.data or []
 
+    STATUS_ID_MAP = {8: "FOR_TREASURER_REVIEW", 9: "PAID"}
+
     if paid_filters:
         want_paid = "paid" in paid_filters and "unpaid" not in paid_filters
         want_unpaid = "unpaid" in paid_filters and "paid" not in paid_filters
         if want_paid:
-            rows = [r for r in rows if r.get("paid_on")]
+            rows = [r for r in rows if r.get("request_status_id") == 9]
         elif want_unpaid:
-            rows = [r for r in rows if not r.get("paid_on")]
+            rows = [r for r in rows if r.get("request_status_id") == 8]
 
-    STATUS_ID_MAP = {8: "FOR_TREASURER_REVIEW", 9: "PAID"}
+    def _to_float(v):
+        try:
+            return float(v)
+        except Exception:
+            return None
+
+    def _sec(ts):
+        if not ts:
+            return ""
+        s = str(ts)
+        return s[:19]  # YYYY-MM-DDTHH:MM:SS
+
+    def _fmt_iso_local(ts):
+        if not ts:
+            return None
+        dt = parse_datetime(str(ts))
+        if not dt:
+            return None
+        if timezone.is_naive(dt):
+            dt = timezone.make_aware(dt, timezone.utc)
+        return timezone.localtime(dt).strftime("%Y-%m-%d %H:%M")
+
+    def _epoch(ts) -> float:
+        dt = parse_datetime(str(ts)) if ts else None
+        if not dt:
+            return 0.0
+        if timezone.is_naive(dt):
+            dt = timezone.make_aware(dt, timezone.utc)
+        return dt.timestamp()
+
+    # decorate each row
     for r in rows:
-        name = "PAID" if r.get("paid_on") else STATUS_ID_MAP.get(r.get("request_status_id"), "—")
-        ui = STATUS_UI.get(name) or {"label": name, "cls": "badge text-bg-secondary"}
-        r["status_name"] = name
+        status_name = STATUS_ID_MAP.get(r.get("request_status_id"), "—")
+        ui = STATUS_UI.get(status_name) or {"label": status_name, "cls": "badge text-bg-secondary"}
+        r["status_name"] = status_name
         r["status_ui"] = ui
 
         ptype = (r.get("period_type") or "").upper()
@@ -1134,16 +1166,77 @@ def business_renewal(request: HttpRequest):
         else:
             r["period_label"] = str(yr or "—")
 
-        def _to_float(v):
-            try:
-                return float(v)
-            except Exception:
-                return None
         r["base_fee_quote_f"] = _to_float(r.get("base_fee_quote"))
         r["surcharge_quote_f"] = _to_float(r.get("surcharge_quote"))
         r["total_quote_f"] = _to_float(r.get("total_quote"))
+        r["paid_on_disp"] = _fmt_iso_local(r.get("paid_on"))
 
-    paginator = Paginator(rows, per_page)
+    # ------- visual headers without reordering (keep latest-first from DB) -------
+    def _gkey(r):
+        return (
+            r.get("business_id"),
+            (r.get("period_type") or "").upper(),
+            r.get("created_by_user_id"),
+            _sec(r.get("created_at")),
+        )
+
+    grouped_rows = []
+    last_key = None
+    for r in rows:  # DO NOT sort here; preserve created_at DESC
+        k = _gkey(r)
+        if k != last_key:
+            grouped_rows.append({
+                "is_group_header": True,
+                "business_id": k[0],
+                "period_type": k[1],
+                "created_by_user_id": k[2],
+                "created_at_sec": k[3],
+                "header_request_id": None,  # will fill below
+            })
+            last_key = k
+        grouped_rows.append(r)
+
+    # --------- Reorder children in each group: FTR first → then PAID (both newest-first) ---------
+    # Also set header_request_id to the first child after reordering.
+    n = len(grouped_rows)
+    i = 0
+    while i < n:
+        row = grouped_rows[i]
+        if row.get("is_group_header"):
+            header = row
+            children = []
+            j = i + 1
+            while j < n and not grouped_rows[j].get("is_group_header"):
+                child = grouped_rows[j]
+                same_group = (
+                    child.get("business_id") == header.get("business_id")
+                    and (child.get("period_type") or "").upper() == (header.get("period_type") or "")
+                )
+                if not same_group:
+                    break
+                children.append(child)
+                j += 1
+
+            if children:
+                # priority: FTR (id=8) first, then by created_at (newer first); PAID (id=9) after FTR, newer first
+                def _key(c):
+                    is_ftr = 0 if c.get("request_status_id") == 8 else 1
+                    created = -_epoch(c.get("created_at"))  # newer first
+                    return (is_ftr, created)
+
+                children_sorted = sorted(children, key=_key)
+                grouped_rows[i + 1 : j] = children_sorted
+                header["header_request_id"] = children_sorted[0].get("renewal_request_id")
+            else:
+                header["header_request_id"] = None
+
+            i = j
+            continue
+        i += 1
+    # -------------------------------------------------------------------------------
+
+    # paginate the final list (headers + rows)
+    paginator = Paginator(grouped_rows, per_page)
     try:
         page_num = int(request.GET.get("page", "1") or "1")
     except Exception:
@@ -1158,14 +1251,14 @@ def business_renewal(request: HttpRequest):
         page_obj = paginator.page(1)
 
     page_numbers = build_page_numbers(page_obj.number, paginator.num_pages)
-    period_type_all = sorted({(r.get("period_type") or "").upper() for r in rows if r.get("period_type")})
-    year_all = sorted({int(r.get("period_year")) for r in rows if r.get("period_year")}, reverse=True)
+    period_type_all = sorted({(r.get("period_type") or "").upper() for r in rows if r and not r.get("is_group_header") and r.get("period_type")})
+    year_all = sorted({int(r.get("period_year")) for r in rows if r and not r.get("is_group_header") and r.get("period_year")}, reverse=True)
 
     ctx = {
         "q": q or "",
         "per_page": per_page,
         "period_types": period_types,
-        "paid_filters": paid_filters,
+        "paid_filters": paid_filters,  # "paid" -> PAID; "unpaid" -> FTR (alias)
         "year": year,
         "period_type_all": period_type_all,
         "year_all": year_all,
@@ -1224,12 +1317,216 @@ def business_renewal_detail(request: HttpRequest, renewal_request_id: int):
     except Exception:
         biz = {}
 
-    return render(request, "treasurer/business_renewal_details.html", {
+    # Payment methods (and WAIVED id) - mirror behavior from detail view
+    try:
+        payment_methods = list_payment_methods()
+    except Exception:
+        payment_methods = []
+
+    waived_method_id = next(
+        (m.get("payment_method_id") for m in (payment_methods or [])
+         if (m.get("method_name") or "").strip().upper() == "WAIVED"),
+        None
+    )
+
+    # Expose a payments-like dict to the template (uses renewal fields when available)
+    payments = {
+        "latest_or_number": r.get("or_number") or "",
+        "latest_or_time": r.get("paid_on"),
+        "total_paid": r.get("amount_paid") or None,
+    }
+
+    # Status and paid flags (mirroring detail view logic)
+    def _to_f(x):
+        try:
+            return float(x)
+        except Exception:
+            return 0.0
+
+    amount_due = _to_f(r.get("total_quote_f") or r.get("total_quote"))
+    total_paid = _to_f(payments.get("total_paid"))
+    latest_or = payments.get("latest_or_number") or ""
+    status = (status_name or "").upper()
+
+    is_paid_no_or = ((status == "PAID") or (total_paid >= amount_due)) and (latest_or == "")
+    is_paid = bool(latest_or) or (status == "PAID") or is_paid_no_or
+
+    # Attach status name to renewal for template checks
+    r["status"] = status_name
+
+    context = {
         "renewal": r,
         "status_ui": status_ui,
         "biz": biz,
-    })
+        "payment_methods": payment_methods,
+        "waived_method_id": waived_method_id,
+        "payments": payments,
+        # expose as 'methods' so template code copied from detail.html still works
+        "methods": payment_methods,
+        "timeline": [],
+        "is_paid_no_or": is_paid_no_or,
+        "is_paid": is_paid,
+        "paid_method_label": None,
+        "doc_request_id": None,
+        "refunds_all": [],
+        "refunds_pending": [],
+        "latest_pending_refund": None,
+        "has_pending_refund": False,
+        "last_completed_refund": None,
+    }
 
+    return render(request, "treasurer/business_renewal_details.html", context)
+
+
+# ---------- BUSINESS RENEWAL (GROUP / PAY-ALL) ----------
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_GET
+def business_renewal_group(request: HttpRequest, business_id: int):
+    """
+    Shows all renewal items (unpaid + paid) for a Business in one page,
+    and includes the Pay-All-Unpaid card (moved from detail page).
+    """
+
+    # Fetch all renewals for this business (newest first)
+    res = (
+        supabase.table("renewal_request")
+        .select("*")
+        .eq("business_id", business_id)
+        .order("created_at", desc=True)
+        .limit(1000)
+        .execute()
+    )
+    rows = res.data or []
+
+    # Business snapshot (best-effort)
+    try:
+        biz_res = supabase.rpc("get_business_details", {"p_business_id": business_id}).execute()
+        biz = (biz_res.data[0] if isinstance(biz_res.data, list) else biz_res.data) or {}
+    except Exception:
+        biz = {}
+
+    # Payment methods (+ WAIVED id)
+    try:
+        payment_methods = list_payment_methods()
+    except Exception:
+        payment_methods = []
+
+    waived_method_id = next(
+        (m.get("payment_method_id") for m in (payment_methods or [])
+         if (m.get("method_name") or "").strip().upper() == "WAIVED"),
+        None
+    )
+
+    # ---------- small helpers ----------
+    def _fnum(v):
+        try:
+            return float(v)
+        except Exception:
+            return 0.0
+
+    def _period_label(r):
+        ptype = (r.get("period_type") or "").upper()
+        yr = r.get("period_year")
+        qtr = r.get("period_quarter")
+        if ptype == "QUARTERLY":
+            return f"Q{qtr} {yr}" if (yr and qtr) else (ptype or "—")
+        return str(yr or "—")
+
+    def _fmt_iso_local(ts):
+        """Return local date string YYYY-MM-DD for a timestamp/ISO string."""
+        if not ts:
+            return None
+        dt = parse_datetime(str(ts))
+        if not dt:
+            return None
+        if timezone.is_naive(dt):
+            dt = timezone.make_aware(dt, timezone.utc)
+        return timezone.localtime(dt).strftime("%Y-%m-%d")
+    # -----------------------------------
+
+    # Decorate, then split to unpaid / paid
+    unpaid, paid = [], []
+    for r in rows:
+        r["period_label"] = _period_label(r)
+        r["base_fee_quote_f"] = _fnum(r.get("base_fee_quote"))
+        r["surcharge_quote_f"] = _fnum(r.get("surcharge_quote"))
+        r["total_quote_f"] = _fnum(r.get("total_quote"))
+
+        if r.get("request_status_id") == 9:  # PAID
+            paid.append(r)
+        else:
+            unpaid.append(r)
+
+    # Build "preview-like" breakdown from UNPAID items
+    quote_rows, base_sum, surch_sum, grand_total = [], 0.0, 0.0, 0.0
+    for r in unpaid:
+        # heuristic for CURRENT vs ARREARS
+        deadline = r.get("deadline") or r.get("due_date")  # support either column
+        kind = "CURRENT"
+        try:
+            d = parse_datetime(str(deadline))
+            if d:
+                if timezone.is_naive(d):
+                    d = timezone.make_aware(d, timezone.utc)
+                if timezone.localtime(d).date() < timezone.localdate():
+                    kind = "ARREARS"
+        except Exception:
+            pass
+
+        line = {
+            "item_year": r.get("period_year"),
+            "kind": kind,
+            "base_fee": r.get("base_fee_quote_f") or 0.0,
+            "offense_no": r.get("offense_no") or None,
+            "surcharge": r.get("surcharge_quote_f") or 0.0,
+            "total": r.get("total_quote_f") or 0.0,
+            "deadline": deadline,
+            "days_late": r.get("days_late") or None,
+            "renewal_request_id": r.get("renewal_request_id"),
+            "period_label": r.get("period_label"),
+        }
+        base_sum += line["base_fee"]
+        surch_sum += line["surcharge"]
+        grand_total += line["total"]
+        quote_rows.append(line)
+
+    # Paid history rows (now with formatted paid_on)
+    paid_rows = []
+    for r in paid:
+        paid_rows.append({
+            "period_year": r.get("period_year"),
+            "or_number": r.get("or_number"),
+            "paid_on": r.get("paid_on"),
+            "paid_on_disp": _fmt_iso_local(r.get("paid_on")),  # <-- formatted here
+            "period_label": r.get("period_label"),
+            "total_paid": r.get("amount_paid") or r.get("total_quote_f"),
+        })
+
+    # Defaults for the Pay-All form
+    try:
+        latest_unpaid_year = max([x.get("period_year") for x in unpaid if x.get("period_year")], default=None)
+    except Exception:
+        latest_unpaid_year = None
+
+    has_quarterly = any((r.get("period_type") or "").upper() == "QUARTERLY" for r in rows)
+    default_period_type = "QUARTERLY" if has_quarterly else "ANNUAL"
+
+    ctx = {
+        "biz": biz,
+        "business_id": business_id,
+        "quote_rows": quote_rows,
+        "paid_rows": paid_rows,
+        "base_sum": base_sum,
+        "surch_sum": surch_sum,
+        "grand_total": grand_total,
+        "payment_methods": payment_methods,
+        "methods": payment_methods,          # alias for template reuse
+        "waived_method_id": waived_method_id,
+        "default_period_type": default_period_type,
+        "default_year": latest_unpaid_year or timezone.now().year,
+    }
+    return render(request, "treasurer/business_renewal_group.html", ctx)
 
 @session_login_required
 @role_required(TREASURER_ROLE)
@@ -1306,6 +1603,490 @@ def confirm_post_or(request: HttpRequest, doc_request_id: int):
 
     messages.info(request, "Request moved to FOR_PRINTING.")
     return redirect("treasurer:detail", doc_request_id=doc_request_id)
+
+
+# ========= BUSINESS RENEWAL: TAKE PAYMENT =========
+
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_POST
+def business_renewal_take_payment(request: HttpRequest, renewal_request_id: int):
+    staff_id = _staff_id(request) or 0
+    try:
+        method_id = int(request.POST.get("payment_method_id", "0") or 0)
+    except Exception:
+        method_id = 0
+    # amount is ignored by RPC; allow 0, block negatives
+    try:
+        amount_paid = float(request.POST.get("amount_paid", "0") or 0)
+    except Exception:
+        amount_paid = 0.0
+
+    or_number = (request.POST.get("or_number") or None)
+    paid_on   = (request.POST.get("paid_on") or None)
+
+    if staff_id <= 0 or method_id <= 0 or amount_paid < 0:
+        messages.error(request, "Select a payment method and ensure your staff session is active.")
+        return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)
+
+    try:
+        from .services.payments_service import accept_renewal_payment
+        clearance_id = accept_renewal_payment(
+            renewal_request_id=int(renewal_request_id),
+            method_id=method_id,
+            amount_paid=amount_paid,  # kept for signature; RPC ignores
+            staff_id=staff_id,
+            or_number=or_number,
+            paid_on=paid_on,
+            # rpc_name can be overridden here if you renamed the SQL fn
+        )
+    except Exception as e:
+        messages.error(request, f"Payment failed: {escape(str(getattr(e, 'message', e)))}")
+        return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)
+
+    messages.success(request, f"Payment posted (clearance id {clearance_id}).")
+    return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)
+
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_POST
+def business_renewal_take_payment_all(request: HttpRequest, business_id: int):
+    staff_id = _staff_id(request) or 0
+    try:
+        method_id = int(request.POST.get("payment_method_id", "0") or 0)
+    except Exception:
+        method_id = 0
+
+    period_type = (request.POST.get("period_type") or "ANNUAL").upper()
+    try:
+        period_year = int(request.POST.get("period_year"))
+    except Exception:
+        from datetime import date
+        period_year = date.today().year
+
+    paid_on = (request.POST.get("paid_on") or None)
+
+    if staff_id <= 0 or method_id <= 0:
+        messages.error(request, "Select a payment method and ensure your staff session is active.")
+        return redirect("treasurer:business_renewal_detail", b_id=business_id)
+
+    try:
+        from .services.payments_service import accept_all_unpaid_payments
+        summary = accept_all_unpaid_payments(
+            business_id=business_id,
+            period_type=period_type,
+            period_year=period_year,
+            method_id=method_id,
+            staff_id=staff_id,
+            paid_on=paid_on,
+        )
+        cnt   = (summary or {}).get("processed_count", 0)
+        total = (summary or {}).get("sum_quoted_total", "0")
+        messages.success(request, f"Accepted payments for {cnt} unpaid year(s). Total due: {total}.")
+    except Exception as e:
+        messages.error(request, f"Bulk payment failed: {escape(str(getattr(e, 'message', e)))}")
+
+    return redirect("treasurer:business_renewal_group", business_id=business_id)
+
+# ========= CLOSURE =========
+STATUS_ID_MAP = {8: "FOR_TREASURER_REVIEW", 9: "PAID"} 
+
+def _fmt_iso_local(ts):
+    if not ts:
+        return None
+    dt = parse_datetime(str(ts))
+    if not dt:
+        return None
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.utc)
+    return timezone.localtime(dt).strftime("%Y-%m-%d %H:%M")
+
+def _epoch(ts) -> float:
+    dt = parse_datetime(str(ts)) if ts else None
+    if not dt:
+        return 0.0
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.utc)
+    return dt.timestamp()
+
+def _fnum(v):
+    try:
+        return float(v)
+    except Exception:
+        return None
+
+# ---------- CLOSURE LIST ----------
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_GET
+def closure_list(request):
+    q = (request.GET.get("q") or "").strip() or None
+    period_types = [p.strip().upper() for p in request.GET.getlist("period_type") if p.strip()]
+    year = (request.GET.get("year") or "").strip()
+    paid_filters = [p.strip().lower() for p in request.GET.getlist("paid") if p.strip()]
+    try:
+        per_page = int(request.GET.get("per_page", "10") or "10")
+    except Exception:
+        per_page = 10
+    if per_page not in (5, 10, 25, 50):
+        per_page = 10
+
+    query = supabase.table("closure_payment_request").select("*").order("created_at", desc=True)
+
+    if q:
+        or_parts = [f"request_code.ilike.%{q}%", f"or_number.ilike.%{q}%"]
+        if q.isdigit():
+            or_parts += [f"period_year.eq.{q}", f"business_id.eq.{q}"]
+        query = query.or_(",".join(or_parts))
+
+    if year.isdigit():
+        query = query.eq("period_year", int(year))
+    if period_types:
+        query = query.in_("period_type", period_types)
+
+    res = query.limit(500).execute()
+    rows = res.data or []
+
+    if paid_filters:
+        want_paid = "paid" in paid_filters and "unpaid" not in paid_filters
+        want_unpaid = "unpaid" in paid_filters and "paid" not in paid_filters
+        if want_paid:
+            rows = [r for r in rows if r.get("request_status_id") == 9]
+        elif want_unpaid:
+            rows = [r for r in rows if r.get("request_status_id") == 8]
+
+    # decorate
+    for r in rows:
+        status_name = STATUS_ID_MAP.get(r.get("request_status_id"), "—")
+        ui = STATUS_UI.get(status_name) or {"label": status_name, "cls": "badge text-bg-secondary"}
+        r["status_name"] = status_name
+        r["status_ui"] = ui
+
+        ptype = (r.get("period_type") or "").upper()
+        yr = r.get("period_year")
+        qtr = r.get("period_quarter")
+        r["period_label"] = (f"Q{qtr} {yr}" if (ptype == "QUARTERLY" and yr and qtr) else str(yr or "—"))
+        r["base_fee_quote_f"] = _fnum(r.get("base_fee_quote"))
+        r["surcharge_quote_f"] = _fnum(r.get("surcharge_quote"))
+        r["total_quote_f"] = _fnum(r.get("total_quote"))
+        r["paid_on_disp"] = _fmt_iso_local(r.get("paid_on"))
+
+    # grouping (same approach as renewal)
+    def _gkey(r):
+        return (r.get("business_id"), (r.get("period_type") or "").upper(), r.get("created_by_user_id"), str(r.get("created_at") or "")[:19])
+
+    grouped_rows, last_key = [], None
+    for r in rows:
+        k = _gkey(r)
+        if k != last_key:
+            grouped_rows.append({
+                "is_group_header": True,
+                "business_id": k[0],
+                "period_type": k[1],
+                "created_by_user_id": k[2],
+                "created_at_sec": k[3],
+            })
+            last_key = k
+        grouped_rows.append(r)
+
+    # reorder children: FTR first, then PAID (newest-first each)
+    n, i = len(grouped_rows), 0
+    while i < n:
+        row = grouped_rows[i]
+        if row.get("is_group_header"):
+            header, children, j = row, [], i + 1
+            while j < n and not grouped_rows[j].get("is_group_header"):
+                child = grouped_rows[j]
+                same_group = (child.get("business_id") == header.get("business_id")
+                              and (child.get("period_type") or "").upper() == (header.get("period_type") or ""))
+                if not same_group:
+                    break
+                children.append(child)
+                j += 1
+            if children:
+                def _key(c):
+                    is_ftr = 0 if c.get("request_status_id") == 8 else 1
+                    created = -_epoch(c.get("created_at"))
+                    return (is_ftr, created)
+                grouped_rows[i + 1 : j] = sorted(children, key=_key)
+            i = j
+            continue
+        i += 1
+
+    paginator = Paginator(grouped_rows, per_page)
+    try:
+        page_num = int(request.GET.get("page", "1") or "1")
+    except Exception:
+        page_num = 1
+    if page_num < 1:
+        page_num = 1
+    if paginator.num_pages and page_num > paginator.num_pages:
+        page_num = paginator.num_pages
+    try:
+        page_obj = paginator.page(page_num)
+    except EmptyPage:
+        page_obj = paginator.page(1)
+
+    # derivations for filter panels
+    def build_page_numbers(cur, pages, window=2):
+        nums = []
+        for p in range(1, pages + 1):
+            if p in (1, pages) or abs(p - cur) <= window:
+                nums.append(p)
+            elif nums and nums[-1] is not None:
+                nums.append(None)
+        return nums
+
+    period_type_all = sorted({(r.get("period_type") or "").upper()
+                              for r in rows if r and not r.get("is_group_header") and r.get("period_type")})
+    year_all = sorted({int(r.get("period_year"))
+                       for r in rows if r and not r.get("is_group_header") and r.get("period_year")}, reverse=True)
+
+    ctx = {
+        "q": q or "",
+        "per_page": per_page,
+        "period_types": period_types,
+        "paid_filters": paid_filters,
+        "year": year,
+        "period_type_all": period_type_all,
+        "year_all": year_all,
+        "rows": page_obj.object_list,
+        "page_obj": page_obj,
+        "paginator": paginator,
+        "page_numbers": build_page_numbers(page_obj.number, paginator.num_pages),
+        "is_paginated": paginator.num_pages > 1,
+    }
+    return render(request, "treasurer/closure_list.html", ctx)
+
+
+# ---------- CLOSURE DETAIL ----------
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_GET
+def closure_detail(request, closure_payment_request_id: int):
+    res = (supabase.table("closure_payment_request")
+           .select("*")
+           .eq("closure_payment_request_id", closure_payment_request_id)
+           .single()
+           .execute())
+    if getattr(res, "error", None) or not res.data:
+        messages.error(request, "Closure payment request not found.")
+        return redirect("treasurer:closure_list")
+
+    r = res.data
+    status_name = "PAID" if r.get("paid_on") else STATUS_ID_MAP.get(r.get("request_status_id"), "—")
+    status_ui = STATUS_UI.get(status_name) or {"label": status_name, "cls": "badge text-bg-secondary"}
+
+    ptype = (r.get("period_type") or "").upper()
+    yr = r.get("period_year")
+    qtr = r.get("period_quarter")
+    period_label = f"Q{qtr} {yr}" if (ptype == "QUARTERLY" and yr and qtr) else str(yr or "—")
+
+    r["base_fee_quote_f"] = _fnum(r.get("base_fee_quote"))
+    r["surcharge_quote_f"] = _fnum(r.get("surcharge_quote"))
+    r["total_quote_f"] = _fnum(r.get("total_quote"))
+    r["period_label"] = period_label
+    r["status"] = status_name
+
+    # Business snapshot (best-effort)
+    try:
+        biz_res = supabase.rpc("get_business_details", {"p_business_id": r["business_id"]}).execute()
+        biz = (biz_res.data[0] if isinstance(biz_res.data, list) else biz_res.data) or {}
+    except Exception:
+        biz = {}
+
+    try:
+        payment_methods = list_payment_methods()
+    except Exception:
+        payment_methods = []
+
+    payments = {
+        "latest_or_number": r.get("or_number") or "",
+        "latest_or_time": r.get("paid_on"),
+        "total_paid": r.get("total_quote") or r.get("base_fee_quote"),
+    }
+
+    # Controls visibility
+    def _to_f(x):
+        try:
+            return float(x)
+        except Exception:
+            return 0.0
+
+    amount_due = _to_f(r.get("total_quote_f") or r.get("total_quote"))
+    total_paid = _to_f(payments.get("total_paid"))
+    latest_or = payments.get("latest_or_number") or ""
+    status = (status_name or "").upper()
+    is_paid_no_or = ((status == "PAID") or (total_paid >= amount_due)) and (latest_or == "")
+    is_paid = bool(latest_or) or (status == "PAID") or is_paid_no_or
+
+    ctx = {
+        "item": r,
+        "status_ui": status_ui,
+        "biz": biz,
+        "payment_methods": payment_methods,
+        "methods": payment_methods,
+        "payments": payments,
+        "is_paid_no_or": is_paid_no_or,
+        "is_paid": is_paid,
+    }
+    return render(request, "treasurer/closure_detail.html", ctx)
+
+
+# ---------- POST: Take single payment ----------
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_POST
+def closure_take_payment(request, closure_payment_request_id: int):
+    method_id = int(request.POST.get("payment_method_id"))
+    amount_paid = request.POST.get("amount_paid")  # not used by RPC; kept for symmetry
+    or_number = request.POST.get("or_number") or None
+    paid_on = request.POST.get("paid_on") or None
+
+    staff_id = (request.session.get("auth") or {}).get("staff_id")
+    if not staff_id:
+        messages.error(request, "Session expired.")
+        return redirect("treasurer:closure_detail", closure_payment_request_id=closure_payment_request_id)
+
+    try:
+        payload = {
+            "p_closure_payment_request_id": int(closure_payment_request_id),
+            "p_payment_method_id": int(method_id),
+            "p_received_by_staff_id": int(staff_id),
+            "p_paid_on": paid_on,
+            "p_or_number": or_number,
+        }
+        res = supabase.rpc("treasurer_accept_closure_payment_h", payload).execute()
+        if getattr(res, "error", None):
+            raise RuntimeError(getattr(res.error, "message", str(res.error)))
+        messages.success(request, "Closure payment accepted and business set to CLOSED.")
+    except Exception as e:
+        messages.error(request, f"Failed to accept closure payment: {e}")
+
+    return redirect("treasurer:closure_detail", closure_payment_request_id=closure_payment_request_id)
+
+
+# ---------- GROUP (Pay-All) ----------
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_GET
+def closure_group(request, business_id: int):
+    res = (
+        supabase.table("closure_payment_request")
+        .select("*")
+        .eq("business_id", business_id)
+        .order("created_at", desc=True)
+        .limit(1000)
+        .execute()
+    )
+    rows = res.data or []
+
+    try:
+        biz_res = supabase.rpc("get_business_details", {"p_business_id": business_id}).execute()
+        biz = (biz_res.data[0] if isinstance(biz_res.data, list) else biz_res.data) or {}
+    except Exception:
+        biz = {}
+
+    try:
+        payment_methods = list_payment_methods()
+    except Exception:
+        payment_methods = []
+
+    unpaid, paid = [], []
+    for r in rows:
+        ptype = (r.get("period_type") or "").upper()
+        yr = r.get("period_year")
+        qtr = r.get("period_quarter")
+        r["period_label"] = (f"Q{qtr} {yr}" if (ptype == "QUARTERLY" and yr and qtr) else str(yr or "—"))
+        r["base_fee_quote_f"] = _fnum(r.get("base_fee_quote"))
+        r["surcharge_quote_f"] = _fnum(r.get("surcharge_quote"))
+        r["total_quote_f"] = _fnum(r.get("total_quote"))
+        if r.get("request_status_id") == 9:
+            paid.append(r)
+        else:
+            unpaid.append(r)
+
+    quote_rows, base_sum, surch_sum, grand_total = [], 0.0, 0.0, 0.0
+    for r in unpaid:
+        line = {
+            "item_year": r.get("period_year"),
+            "kind": "ARREARS",  # closure is typically settling before closure; keep label consistent with renewal table
+            "base_fee": r.get("base_fee_quote_f") or 0.0,
+            "offense_no": r.get("offense_no") or None,  # tolerate if present
+            "surcharge": r.get("surcharge_quote_f") or 0.0,
+            "total": r.get("total_quote_f") or 0.0,
+            "period_label": r.get("period_label"),
+            "closure_payment_request_id": r.get("closure_payment_request_id"),
+        }
+        base_sum += line["base_fee"]
+        surch_sum += line["surcharge"]
+        grand_total += line["total"]
+        quote_rows.append(line)
+
+    try:
+        latest_unpaid_year = max([x.get("period_year") for x in unpaid if x.get("period_year")], default=None)
+    except Exception:
+        latest_unpaid_year = None
+
+    has_quarterly = any((r.get("period_type") or "").upper() == "QUARTERLY" for r in rows)
+    default_period_type = "QUARTERLY" if has_quarterly else "ANNUAL"
+
+    ctx = {
+        "biz": biz,
+        "business_id": business_id,
+        "quote_rows": quote_rows,
+        "base_sum": base_sum,
+        "surch_sum": surch_sum,
+        "grand_total": grand_total,
+        "payment_methods": payment_methods,
+        "methods": payment_methods,
+        "default_period_type": default_period_type,
+        "default_year": latest_unpaid_year or timezone.now().year,
+        "paid_rows": [
+            {
+                "period_year": r.get("period_year"),
+                "period_label": r.get("period_label"),
+                "or_number": r.get("or_number"),
+                "paid_on_disp": (_fmt_iso_local(r.get("paid_on")) or "—"),
+                "total_paid": r.get("total_quote_f") or r.get("total_quote"),
+            } for r in paid
+        ],
+    }
+    return render(request, "treasurer/closure_group.html", ctx)
+
+
+# ---------- POST: Pay all unpaid ----------
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_POST
+def closure_take_payment_all(request, business_id: int):
+    period_type = (request.POST.get("period_type") or "ANNUAL").upper()
+    period_year = int(request.POST.get("period_year"))
+    method_id = int(request.POST.get("payment_method_id"))
+    paid_on = request.POST.get("paid_on") or None
+
+    staff_id = (request.session.get("auth") or {}).get("staff_id")
+    if not staff_id:
+        messages.error(request, "Session expired.")
+        return redirect("treasurer:closure_group", business_id=business_id)
+
+    try:
+        payload = {
+            "p_business_id": int(business_id),
+            "p_period_type": period_type,
+            "p_period_year": int(period_year),
+            "p_payment_method_id": int(method_id),
+            "p_received_by_staff_id": int(staff_id),
+            "p_paid_on": paid_on,
+        }
+        res = supabase.rpc("treasurer_accept_all_unpaid_closure_h", payload).execute()
+        if getattr(res, "error", None):
+            raise RuntimeError(getattr(res.error, "message", str(res.error)))
+        messages.success(request, "All unpaid closure items were paid and the business was marked CLOSED.")
+    except Exception as e:
+        messages.error(request, f"Failed to process bulk closure payment: {e}")
+
+    return redirect("treasurer:closure_group", business_id=business_id)
 
 
 # ========= REFUND COMPLETE =========
@@ -1645,42 +2426,12 @@ def fees_index(request: HttpRequest):
     return render(request, "treasurer/fees_index.html", ctx)
 
 
-
-# treasurer/views.py (or appropriate module)
-from typing import Tuple
-from django.shortcuts import render, redirect
-from django.core.paginator import Paginator, EmptyPage
-from django.contrib import messages
-from django.views.decorators.http import require_GET
-
-# service helpers (adjust import path to match your project structure)
-from treasurer.services.fees_service import (
-    list_fee_document_types,
-    search_fee_items_by_doc_type_id,
-    recent_fee_changes,
-)
-
-
+# 3) NEW: Level-2 (reuse fees.html; scoped to a single document type id)
 @session_login_required
 @role_required(TREASURER_ROLE)
 @require_GET
-def fees_by_type(request, doc_type_id: int):
-    """
-    Level-2: Browse fees scoped to a single document type.
-
-    Query params:
-      - q: optional search text
-      - per_page: 5|10|25|50 (default 5 in the original)
-      - page: page number
-
-    Context provided to template (treasurer/fees.html):
-      - q, per_page, is_paginated, paginator, page_obj, page_numbers, history
-      - selected_doc_type_id, selected_doc_type
-      - doc_types, fee_types, doc_types_all, fee_types_all, active_count (left empty to hide multi-type chips)
-    """
+def fees_by_type(request: HttpRequest, doc_type_id: int):
     q = (request.GET.get("q") or "").strip() or None
-
-    # per-page parsing (default 5 to match your original snippet)
     try:
         per_page = int(request.GET.get("per_page", "10") or "10")
     except Exception:
@@ -1688,38 +2439,23 @@ def fees_by_type(request, doc_type_id: int):
     if per_page not in (5, 10, 25, 50):
         per_page = 5
 
-    # Resolve the selected doc type name for breadcrumb (from service)
+    # Resolve the selected doc type name for breadcrumb
     types = list_fee_document_types() or []
     selected_doc_type = None
-    try:
-        for t in types:
-            # ensure robust comparison (rpc may return id as int or string)
-            if int(t.get("request_document_type_id") or t.get("id") or 0) == int(doc_type_id):
-                selected_doc_type = (
-                    t.get("request_document_type_name")
-                    or t.get("name")
-                    or t.get("request_document_type")
-                )
-                break
-    except Exception:
-        selected_doc_type = None
-
+    for t in types:
+        if int(t.get("request_document_type_id")) == int(doc_type_id):
+            selected_doc_type = t.get("request_document_type_name")
+            break
     if not selected_doc_type:
         messages.error(request, "Unknown document type.")
         return redirect("treasurer:fees_index")
 
-    # Fetch items for this doc type (RPC) and prepare name_main/name_sub
     items_all = search_fee_items_by_doc_type_id(doc_type_id, q) or []
     for r in items_all:
-        # _split_main_sub returns (main, sub). Example implementation should live in treasurer.utils
-        try:
-            main, sub = _split_main_sub(r.get("name") or r.get("fee_name") or "")
-        except Exception:
-            main, sub = (r.get("name") or r.get("fee_name") or ""), ""
+        main, sub = _split_main_sub(r.get("name") or "")
         r["name_main"] = main
         r["name_sub"] = sub
 
-    # Pagination
     paginator = Paginator(items_all, per_page)
     try:
         page = int(request.GET.get("page", "1") or "1")
@@ -1729,16 +2465,13 @@ def fees_by_type(request, doc_type_id: int):
         page = 1
     if paginator.num_pages >= 1 and page > paginator.num_pages:
         page = paginator.num_pages
-
     try:
         page_obj = paginator.page(page)
     except EmptyPage:
         page_obj = paginator.page(1)
 
     page_numbers = build_page_numbers(page_obj.number, paginator.num_pages)
-
-    # Use recent_fee_changes for sidebar/history (you can later replace with per-fee timeline)
-    history = recent_fee_changes(limit=6) or []
+    history = recent_fee_changes(limit=6)
 
     ctx = {
         "q": q or "",

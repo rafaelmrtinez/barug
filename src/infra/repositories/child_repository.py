@@ -1,9 +1,10 @@
 from src.app.transfer_objects.response.child_basic_info_response import BasicInformationResponse
 from src.infra.contracts.child_repository import IChildRepository
+from src.domain.contracts.child_repository import IChildRepository as IDomainChildRepository
 from src.infra.contracts.connection_adapter import IConnectionAdapter
 
 
-class ChildRepository(IChildRepository):
+class ChildRepository(IChildRepository, IDomainChildRepository):
     
     def __init__(self, ctx: IConnectionAdapter) -> None:
         self.ctx = ctx

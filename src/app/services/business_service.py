@@ -28,14 +28,16 @@ from src.app.contracts.business_service_contract import (
     IBusinessInfoService,
     IBusinessRenewalService,
     IBusinessRenewalQuoteService,
-    IBusinessRenewalRequestService
+    IBusinessRenewalRequestService,
+    IBusinessClosurePaymentRequestService,
 )
 from src.domain.contracts.business_repository_contract import (
     IBusinessRepository,
     IResidentOwnerRepository,
     IBusinessRenewalRepository,
     IBusinessRenewalQuoteRepository,
-    IBusinessRenewalRequestRepository
+    IBusinessRenewalRequestRepository,
+    IBusinessClosurePaymentRequestRepository,
 )
 from src.infra.repositories.business_repository import (
     OwnerBusinessInformationRepository,
@@ -67,6 +69,29 @@ class BusinessService(IBusinessService):
         
         return self._business_repo.fetch_business_list()
     
+    def check_business_duplicate(
+        self,
+        *,
+        owner_person_id: int,
+        business_name: str,
+        city: str,
+        barangay: str,
+        street: str,
+        purok_sitio_id: Optional[int],
+        b_category_id: Optional[int],
+    ) -> Optional[int]:
+        if not owner_person_id or not (business_name and city and barangay and street):
+            return None
+        return self._business_repo.find_duplicate_business(
+            owner_person_id=owner_person_id,
+            business_name=business_name,
+            city=city,
+            barangay=barangay,
+            street=street,
+            purok_sitio_id=purok_sitio_id,
+            b_category_id=b_category_id,
+        )
+
 class ResidentOwnerService(IResidentOwnerService):
     def __init__(
         self,
@@ -210,6 +235,7 @@ class BusinessRegistrationService(IBusinessRegistrationService):
         # For your current UI, OwnerBusinessInfoService lists directly from storage,
         # so storing is optional. Still, we’ll return the same pair:
         return business_id, owner_person_id
+    
 class OwnerBusinessInfoService(IBusinessInfoService):
     def __init__(
         self,
@@ -348,3 +374,29 @@ class BusinessRenewalRequestService(IBusinessRenewalRequestService):
         if cmd.period_type == "ANNUAL":
             object.__setattr__(cmd, "period_quarter", None)  # force None
         return self._repo.request_renewal(cmd)
+    
+    def request_unpaid(self, cmd: CreateRenewalRequestCmd) -> List[int]:
+        if cmd.period_type not in ("ANNUAL","QUARTERLY"):
+            raise ValueError("period_type must be ANNUAL or QUARTERLY")
+        if cmd.period_type == "ANNUAL":
+            object.__setattr__(cmd, "period_quarter", None)
+        return self._repo.request_unpaid(cmd)
+
+class BusinessClosurePaymentRequestService(IBusinessClosurePaymentRequestService):
+    def __init__(self, repo: IBusinessClosurePaymentRequestRepository):
+        self._repo = repo
+
+    def request_payment(self, cmd: CreateRenewalRequestCmd) -> int:
+        if cmd.period_type not in ("ANNUAL","QUARTERLY"):
+            raise ValueError("period_type must be ANNUAL or QUARTERLY")
+        if cmd.period_type == "ANNUAL":
+            object.__setattr__(cmd, "period_quarter", None)
+        return self._repo.request_payment(cmd)
+
+    def request_unpaid(self, cmd: CreateRenewalRequestCmd) -> list[int]:
+        if cmd.period_type not in ("ANNUAL","QUARTERLY"):
+            raise ValueError("period_type must be ANNUAL or QUARTERLY")
+        if cmd.period_type == "ANNUAL":
+            object.__setattr__(cmd, "period_quarter", None)
+        return self._repo.request_unpaid(cmd)
+

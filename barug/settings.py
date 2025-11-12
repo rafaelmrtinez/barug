@@ -15,6 +15,20 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY")
+PAYMENTS_DEV_BYPASS = os.getenv("PAYMENTS_DEV_BYPASS", "false").lower() in ("1","true","yes")
+PAYMONGO_SECRET_KEY    = os.getenv("PAYMONGO_SECRET_KEY")
+PAYMONGO_WEBHOOK_SECRET= os.getenv("PAYMONGO_WEBHOOK_SECRET")
+STAFF_SYSTEM_ID        =13
+
+DEBUG = True
+ALLOWED_HOSTS = ["*", "localhost", "127.0.0.1", ".ngrok-free.app"]
+CSRF_TRUSTED_ORIGINS = ["https://*.ngrok-free.app"]
+
+ANDROID_PACKAGE = "host.exp.exponent"
+
+SEMAPHORE_API_KEY = os.getenv("SEMAPHORE_API_KEY", "")
+SEMAPHORE_SENDER_NAME = os.getenv("SEMAPHORE_SENDER_NAME", "SEMAPHORE")
 
 ABSTRACT_EMAIL_KEY = os.getenv("ABSTRACT_EMAIL_KEY", "")
 
@@ -73,6 +87,7 @@ CORS_ALLOW_ALL_ORIGINS = True
 # Application definition
 
 INSTALLED_APPS = [
+    "doc_ingest.apps.DocIngestConfig",
     "maternal.apps.MaternalConfig",
     "child_health.apps.ChildHealthConfig",
     "metrics.apps.MetricsConfig",
@@ -137,6 +152,7 @@ TEMPLATES = [
             BASE_DIR / "midwife/templates/midwife",
             BASE_DIR / "maternal/templates/maternal",
             BASE_DIR / "child_health/templates/child_health",
+            BASE_DIR / "doc_ingest/templates/doc_ingest",
         ],
         "APP_DIRS": True,
         "OPTIONS": {
@@ -395,6 +411,8 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "midwife/static/midwife"),
     os.path.join(BASE_DIR, "maternal/static/maternal"),
     os.path.join(BASE_DIR, "child_health/static/child_health"),
+    os.path.join(BASE_DIR, "captain/static/captain"),
+    os.path.join(BASE_DIR, "doc_ingest/static/doc_ingest"),
 ]
 
 # STATICFILES_DIRS = [

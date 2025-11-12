@@ -11,7 +11,12 @@ class ChildHealthRecordException(QueryExecutionException):
         "P6136", "P6137", "P6138", "P6139", "P6140", "P6143", "P6144",
         "P6233", "P6234", "P6235", "P6236", "P6237", "P6238", "P6239",
         "P6240", "P6242", "P6243", "P6244", "P6245", "P6246",
-        "P6317"
+        "P6317",
+        # custom error codes raised by add_child_visit_schedule stored procedure
+        "P6145",  # scheduled date/time required
+        "P6147",  # pending status not found
+        "P6S06",  # (commented guard for duplicate exact datetime) keep for completeness
+        "P6148"   # pending schedule already exists for this child on date
     }
 
     def __init__(self, message: str):

@@ -16,20 +16,23 @@
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center">
             <h5 class="card-title d-flex align-items-center gap-2 mb-0">
-              <i class="bi bi-person-fill text-primary"></i>
               <span>Business Owner Details</span>
             </h5>
-            {% with res_name=owner.residency_name|default:"NON-RESIDENT"|upper %}
-              {% if res_name == "NON-RESIDENT" %}
-                {% url 'clerk:business_owner_nonres' as owner_edit_url %}
-              {% else %}
-                {% url 'clerk:business_owner_resident' as owner_edit_url %}
-              {% endif %}
+              {% with res_name=owner.residency_name|default:"NON-RESIDENT"|upper %}
+                {% if res_name == "NON-RESIDENT" %}
+                  {% url 'clerk:business_owner_nonres' as base_url %}
+                {% else %}
+                  {% url 'clerk:business_owner_resident' as base_url %}
+                {% endif %}
 
-              <div class="d-flex gap-2">
-                <a class="btn btn-sm btn-submit" href="{{ owner_edit_url }}">Edit Owner</a>
-              </div>
-            {% endwith %}
+                {% if owner_disp.person_code %}
+                  <a class="btn btn-sm btn-submit"
+                    href="{{ base_url }}?tab=search&search={{ owner_disp.person_code|urlencode }}">Edit Owner</a>
+                {% else %}
+                  <a class="btn btn-sm btn-submit"
+                    href="{{ base_url }}?tab=create">Edit Owner</a>
+                {% endif %}
+              {% endwith %}
           </div>
 
           <div class="mt-4">
@@ -102,7 +105,6 @@
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center">
             <h5 class="card-title d-flex align-items-center gap-2 mb-0">
-              <i class="bi bi-briefcase-fill text-success"></i>
               <span>Business Details</span>
             </h5>
             <div class="d-flex gap-2">
@@ -216,7 +218,6 @@
         {% csrf_token %}
         <input type="hidden" name="action" value="confirm_add">
         <button type="submit" class="btn btn-submit">
-          <i class="bi bi-plus-circle me-2"></i>
           Add Business
         </button>
       </form>

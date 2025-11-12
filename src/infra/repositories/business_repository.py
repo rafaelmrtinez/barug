@@ -25,6 +25,7 @@ from src.domain.contracts.business_repository_contract import (
     IBusinessRenewalRepository,
     IBusinessRenewalQuoteRepository,
     IBusinessRenewalRequestRepository,
+    IBusinessClosurePaymentRequestRepository
 )
 
 try:
@@ -427,6 +428,34 @@ class BusinessRepository(IBusinessRepository):
             # If your class supports kwargs, you could do: QueryExecutionException(str(e), code="E_DB")
             raise QueryExecutionException(f"fetch_business_pins failed: {e}", "E_DB")
 
+    def find_duplicate_business(
+        self,
+        *,
+        owner_person_id: int,
+        business_name: str,
+        city: str,
+        barangay: str,
+        street: str,
+        purok_sitio_id: int | None,
+        b_category_id: int | None,
+    ) -> int | None:
+        try:
+            sql = "SELECT public.find_duplicate_business_by_owner_name_addr_id(%s,%s,%s,%s,%s,%s,%s)"
+            with connection.cursor() as cur:
+                cur.execute(sql, [
+                    int(owner_person_id),
+                    business_name,
+                    city,
+                    barangay,
+                    street,
+                    purok_sitio_id,
+                    b_category_id,
+                ])
+                row = cur.fetchone()
+                return int(row[0]) if row and row[0] is not None else None
+        except Exception as e:
+            raise QueryExecutionException(f"find_duplicate_business failed: {e}", "E_DB")
+
 class ResidentOwnerRepository(IResidentOwnerRepository):
     def __init__(self, ctx: IConnectionAdapter):
         self._ctx = ctx
@@ -791,3 +820,92 @@ class BusinessRenewalRequestRepository(IBusinessRenewalRequestRepository):
             return int(rows[0]["id"])
         except Exception as e:
             raise QueryExecutionException(f"create_renewal_request failed: {e}", "E_DB") from e
+        
+    def request_unpaid(self, cmd: CreateRenewalRequestCmd) -> List[int]:
+        """
+        Calls:
+          create_renewal_requests_for_unpaid_h(
+            p_business_id int,
+            p_period_type text,
+            p_period_year int,
+            p_created_by_user_id int,
+            p_period_quarter int DEFAULT NULL
+          ) RETURNS int[]
+        """
+        try:
+            sql = "SELECT public.create_renewal_requests_for_unpaid_h(%s,%s,%s,%s,%s) AS ids"
+            rows = self._ctx.execute_query_to_dict(sql, [
+                cmd.business_id,
+                cmd.period_type,
+                cmd.period_year,
+                cmd.created_by_user_id,     # note: order matches SQL!
+                cmd.period_quarter,         # None for ANNUAL
+            ]) or []
+
+            raw = rows[0].get("ids") if rows else None
+            # Depending on adapter, int[] may come as Python list, tuple, or a string like '{1,2,3}'
+            if raw is None:
+                return []
+            if isinstance(raw, (list, tuple)):
+                return [int(x) for x in raw]
+            if isinstance(raw, str):
+                s = raw.strip()
+                if s.startswith("{") and s.endswith("}"):
+                    s = s[1:-1].strip()
+                    return [int(x) for x in s.split(",") if x.strip() != ""]
+                # fallback: single id as string?
+                return [int(raw)]
+            # fallback: single int?
+            try:
+                return [int(raw)]
+            except Exception:
+                return []
+        except Exception as e:
+            raise QueryExecutionException(f"create_renewal_requests_for_unpaid_h failed: {e}", "E_DB") from e
+
+class BusinessClosurePaymentRequestRepository(IBusinessClosurePaymentRequestRepository):
+    def __init__(self, ctx: IConnectionAdapter):
+        self._ctx = ctx
+
+    def request_payment(self, cmd: CreateRenewalRequestCmd) -> int:
+        try:
+            sql = "SELECT public.create_closure_payment_request_h(%s,%s,%s,%s,%s) AS id"
+            rows = self._ctx.execute_query_to_dict(sql, [
+                cmd.business_id,
+                cmd.period_type,
+                cmd.period_year,
+                cmd.period_quarter,     # None for ANNUAL
+                cmd.created_by_user_id,
+            ]) or []
+            return int(rows[0]["id"])
+        except Exception as e:
+            raise QueryExecutionException(f"create_closure_payment_request_h failed: {e}", "E_DB") from e
+
+    def request_unpaid(self, cmd: CreateRenewalRequestCmd) -> list[int]:
+        try:
+            sql = "SELECT public.create_closure_payment_requests_for_unpaid_h(%s,%s,%s,%s,%s) AS ids"
+            rows = self._ctx.execute_query_to_dict(sql, [
+                cmd.business_id,
+                cmd.period_type,
+                cmd.period_year,
+                cmd.created_by_user_id,
+                cmd.period_quarter,     # None for ANNUAL
+            ]) or []
+            raw = rows[0].get("ids") if rows else None
+            if raw is None:
+                return []
+            if isinstance(raw, (list, tuple)):
+                return [int(x) for x in raw]
+            if isinstance(raw, str):
+                s = raw.strip()
+                if s.startswith("{") and s.endswith("}"):
+                    s = s[1:-1].strip()
+                    return [int(x) for x in s.split(",") if x.strip() != ""]
+                return [int(raw)]
+            try:
+                return [int(raw)]
+            except Exception:
+                return []
+        except Exception as e:
+            raise QueryExecutionException(f"create_closure_payment_requests_for_unpaid_h failed: {e}", "E_DB") from e
+
