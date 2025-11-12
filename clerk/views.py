@@ -15,6 +15,10 @@ import io, os, zipfile, json, re
 from datetime import datetime
 from decimal import Decimal
 import logging
+import traceback
+import uuid
+from datetime import datetime, date, time
+from urllib.parse import quote as urlquote
 
 from decimal import Decimal
 from django.forms import Form
@@ -29,8 +33,12 @@ from django.utils.html import escape
 from django.utils import timezone
 from django.conf import settings
 from django.views.decorators.http import require_POST
+from django.template.loader import render_to_string
+from django.http import JsonResponse
+from django.db import connection
 
 from postgrest.exceptions import APIError
+from django.views.decorators.http import require_GET
 
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
@@ -79,6 +87,37 @@ def _norm(s) -> str:
 # ────────────────────────────────────────────────────────────
 # SECTION: Logger + tiny email preview helpers
 # ────────────────────────────────────────────────────────────
+import logging
+log = logging.getLogger(__name__)
+from dataclasses import is_dataclass, asdict as dc_asdict
+from django.views.decorators.csrf import csrf_protect
+from dependency_injector.wiring import inject, Provide
+from src.app.bootstrap.app_containers import AppContainer
+from src.app.contracts.business_service_contract import (
+    IBusinessService,
+    IResidentOwnerService,
+    IBusinessRegistrationService,
+    IBusinessInfoService,
+    INonResidentOwnerService,
+    IBusinessRenewalService,
+    IBusinessRenewalQuoteService,
+    IBusinessRenewalRequestService,
+    IBusinessClosurePaymentRequestService,
+)
+from src.domain.contracts.business_repository_contract import IBusinessRepository
+from src.app.transfer_objects.commands.business_cmd import (
+    RegisterBusinessProfileCmd,
+    CreateRenewalRequestCmd,
+)
+from src.app.services.business_notification import notify_registration_received
+from common.send_sms import send_sms
+
+def _auth_role_name(request: HttpRequest) -> str:
+    return (((request.session.get("auth") or {}).get("role_name")) or "Staff").title()
+
+# =========================
+# Logger + tiny debug helpers
+# =========================
 logger = logging.getLogger(__name__)
 
 def _format_rcpt(rcpt: Any) -> str:
@@ -732,9 +771,6 @@ def _apply_pdf_field_mapping(
 # ────────────────────────────────────────────────────────────
 # SECTION: Printing action
 # ────────────────────────────────────────────────────────────
-# ────────────────────────────────────────────────────────────
-# SECTION: Printing action
-# ────────────────────────────────────────────────────────────
 @session_login_required
 @role_required(CLERK_ROLE)
 @require_POST
@@ -970,6 +1006,8 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
     resp["Content-Disposition"] = f'attachment; filename="{req_code}-documents.zip'
     return resp
 
+
+
 # ────────────────────────────────────────────────────────────
 # SECTION: Release / Decline
 # ────────────────────────────────────────────────────────────
@@ -1117,7 +1155,6 @@ def dashboard(request: HttpRequest):
 def review_approve(request: HttpRequest):
     """List of ID verification requests."""
     profile = getattr(request, "person_profile", None)
-
 def review_approve(request: HttpRequest):
     """List of ID verification requests."""
     profile = getattr(request, "person_profile", None)
@@ -1790,23 +1827,229 @@ def confirm_forward_treasurer(request: HttpRequest, doc_request_id: int):
 def _auth_staff_id(request: HttpRequest) -> Optional[int]:
     return ((request.session.get("auth") or {}).get("staff_id")) or None
 
-def _auth_role_name(request: HttpRequest) -> str:
-    return (((request.session.get("auth") or {}).get("role_name")) or "Staff").title()
+def _sstrip(v: Any) -> Optional[str]:
+    """Strip only if string; return None for empty strings; pass through other types."""
+    if v is None:
+        return None
+    if isinstance(v, str):
+        t = v.strip()
+        return t or None
+    return v  # keep non-strings as-is
 
-def _get_draft(request: HttpRequest) -> Dict[str, Any]:
-    return request.session.get(BIZ_DRAFT_KEY) or {}
+def _to_str_num(v: Any, default: str = "0") -> str:
+    """Convert Decimal/int/float to string for session JSON safety."""
+    if v is None or v == "":
+        return default
+    try:
+        return str(v)
+    except Exception:
+        return default
 
-def _save_draft(request: HttpRequest, draft: Dict[str, Any]) -> None:
-    request.session[BIZ_DRAFT_KEY] = draft
-    request.session.modified = True
+def _to_float_or_none(val) -> Optional[float]:
+    try:
+        if val in (None, "", "None"):
+            return None
+        return float(val)
+    except Exception:
+        return None
 
-def _clear_draft(request: HttpRequest) -> None:
-    if BIZ_DRAFT_KEY in request.session:
-        del request.session[BIZ_DRAFT_KEY]
-        request.session.modified = True
+def _to_int_or_none(val) -> Optional[int]:
+    try:
+        if val in (None, "", "None"):
+            return None
+        return int(val)
+    except Exception:
+        return None
 
-def _js(v):
-    """Make values JSON-safe for Supabase RPC."""
+def _parse_date_iso(s: Any) -> Any:
+    if isinstance(s, date):
+        return s
+    if isinstance(s, str) and s:
+        try:
+            return date.fromisoformat(s)
+        except ValueError:
+            return s
+    return s
+
+def _parse_time_hms(s: Any) -> Any:
+    if isinstance(s, time):
+        return s
+    if isinstance(s, str) and s:
+        try:
+            parts = s.split(":")
+            if len(parts) == 2:
+                h, m = parts
+                return time(int(h), int(m), 0)
+            elif len(parts) == 3:
+                h, m, sec = parts
+                return time(int(h), int(m), int(sec))
+        except Exception:
+            return s
+    return s
+
+def _fmt_peso(v: Any) -> str:
+    # We stored money-like values as strings earlier; accept Decimal/float/string
+    if v in (None, "", "None"):
+        return "₱ 0.00"
+    try:
+        num = float(v) if not isinstance(v, (int, float)) else v
+        return f"₱ {num:,.2f}"
+    except Exception:
+        return f"₱ {v}"
+
+def _json_safe(val):
+    """Recursively convert Decimals, dates, times, etc. to JSON-serializable types."""
+    if isinstance(val, Decimal):
+        # choose float for numbers (you already stringified money fields separately)
+        return float(val)
+    if isinstance(val, (list, tuple)):
+        return [ _json_safe(v) for v in val ]
+    if isinstance(val, dict):
+        return { k: _json_safe(v) for k, v in val.items() }
+    # dates/times in your code are already converted to isoformat or HH:MM:SS
+    return val
+
+def _owner_full_name(o: dict) -> str:
+    last = (o.get("last_name") or "").strip()
+    first = (o.get("first_name") or "").strip()
+    mid = (o.get("middle_name") or "").strip()
+    suffix = (o.get("suffix") or "").strip()
+    parts: List[str] = []
+    if last: parts.append(last.upper())
+    if first: parts.append(", " + first.title())
+    if mid: parts.append(" " + (mid[0].upper() + "."))
+    if suffix: parts.append(" " + suffix.upper())
+    if parts:
+        return "".join(parts)
+    # 🔽 DTO fallback
+    fn = (o.get("full_name") or "").strip()
+    return fn or "—"
+
+def _join_addr(parts: List[str]) -> str:
+    return ", ".join([p.strip() for p in parts if p and p.strip()])
+
+def _norm_mobile(s: str | None) -> str | None:
+    if not s:
+        return None
+    # Keep digits only, drop leading +63/0 normalization to last 10–11 digits
+    digits = re.sub(r"\D+", "", s)
+    if digits.startswith("63"):
+        digits = digits[2:]
+    if digits.startswith("0"):
+        digits = digits[1:]
+    # Return last 10 or 11 digits if present
+    return digits[-11:] if len(digits) >= 11 else (digits[-10:] if len(digits) >= 10 else digits or None)
+
+def _find_duplicate_owner(*, email: str | None, mobile: str | None,
+                          last_name: str | None, first_name: str | None,
+                          dob_iso: str | None, barangay: str | None, city: str | None) -> int | None:
+    """
+    Duplicate rules (short-circuit in this order):
+      1) Exact email (case-insensitive)
+      2) Normalized mobile match (digits, PH-friendly)
+      3) Same LAST, FIRST, DOB — and same city+barangay if provided
+
+    Returns person_id if found, else None.
+    """
+    email = (email or "").strip().lower() or None
+    m_norm = _norm_mobile(mobile)
+
+    with connection.cursor() as cur:
+        # 1) Email (case-insensitive)
+        if email:
+            cur.execute("""
+                SELECT person_id
+                FROM person
+                WHERE lower(coalesce(email,'')) = %s
+                ORDER BY person_id DESC
+                LIMIT 1
+            """, [email])
+            row = cur.fetchone()
+            if row:
+                return int(row[0])
+
+        # 2) Mobile (normalized)
+        if m_norm:
+            cur.execute("""
+                SELECT p.person_id
+                FROM person p
+                CROSS JOIN LATERAL (
+                    SELECT regexp_replace(coalesce(p.mobile_num,''), '\\D+', '', 'g') AS p_digits
+                ) d
+                WHERE right(
+                        CASE
+                        WHEN d.p_digits LIKE '63%%' THEN substr(d.p_digits, 3)
+                        WHEN d.p_digits LIKE '0%%'  THEN substr(d.p_digits, 2)
+                        ELSE d.p_digits
+                        END,
+                        LEAST(GREATEST(length(
+                            CASE
+                            WHEN d.p_digits LIKE '63%%' THEN substr(d.p_digits, 3)
+                            WHEN d.p_digits LIKE '0%%'  THEN substr(d.p_digits, 2)
+                            ELSE d.p_digits
+                            END
+                        ), 10), 11)
+                    ) = %s
+                ORDER BY p.person_id DESC
+                LIMIT 1
+            """, [m_norm])
+            row = cur.fetchone()
+            if row:
+                return int(row[0])
+
+        # 3) Name + DOB (+ optional city/barangay to reduce false-positives)
+        if last_name and first_name and dob_iso:
+            params = [last_name.strip().upper(), first_name.strip().upper(), dob_iso]
+            where_loc = ""
+            if city:
+                where_loc += " AND upper(coalesce(a.city,'')) = %s"
+                params.append(city.strip().upper())
+            if barangay:
+                where_loc += " AND upper(coalesce(a.barangay,'')) = %s"
+                params.append(barangay.strip().upper())
+
+            cur.execute(f"""
+                SELECT p.person_id
+                FROM person p
+                LEFT JOIN addresss a ON a.address_id = p.address_id
+                WHERE upper(coalesce(p.last_name,''))  = %s
+                  AND upper(coalesce(p.first_name,'')) = %s
+                  AND p.birthdate = %s
+                  {where_loc}
+                ORDER BY p.person_id DESC
+                LIMIT 1
+            """, params)
+            row = cur.fetchone()
+            if row:
+                return int(row[0])
+
+    return None
+
+def _choices_to_map(choices: Iterable) -> Dict[Any, str]:
+    """
+    Convert Django choices (which may include optgroups) to {value: label}.
+    Safely handles:
+      - [("", "— Select —"), (1, "ONE"), (2, "TWO")]
+      - [("WEEKDAYS", [(1,"Mon"), (2,"Tue")]), ("WEEKEND", [(6,"Sat"), (7,"Sun")])]
+    """
+    out: Dict[Any, str] = {}
+    for item in choices or []:
+        # Optgroup: (group_label, list_of_choices)
+        if isinstance(item, (list, tuple)) and len(item) == 2 and isinstance(item[1], (list, tuple)):
+            _group_label, _group_choices = item
+            for v, lbl in _group_choices:
+                out[_coerce_key(v)] = str(lbl)
+        else:
+            # Regular choice: (value, label)
+            try:
+                v, lbl = item
+                out[_coerce_key(v)] = str(lbl)
+            except Exception:
+                continue
+    return out
+
+def _coerce_key(v: Any) -> Any:
+    """Try to turn numeric-looking keys into int for easy matching; else leave as-is."""
     if v is None:
         return None
     # If already an int, or your TypedChoiceField coerces to int, this keeps it as int.
@@ -2113,52 +2356,41 @@ def business_owner_resident(
       - front-end enhances with AJAX type-ahead
     """
     user_role = _auth_role_name(request)
-
-    # allow "Change" to clear selection
-    if request.GET.get("clear") == "1":
-        draft = _get_draft(request)
-        draft.pop("owner_person_id", None)
-        _save_draft(request, draft)
-        messages.info(request, "Selection cleared.")
-        return redirect("clerk:business_owner_resident")
-
-    # POST: selecting an owner
-    search_form = SearchBusinessOwner(request.GET or None)
+    form = SearchBusinessOwner(request.GET or None)
     select_form = SelectOwnerForm(request.POST or None)
 
-    if request.method == "POST":
-        if select_form.is_valid():
-            owner_person_id = select_form.cleaned_data["owner_person_id"]
-            draft = _get_draft(request)
-            draft["owner_person_id"] = int(owner_person_id)
-            _save_draft(request, draft)
-            messages.success(request, "Owner selected. Review details below or continue.")
-            return redirect("clerk:business_owner_resident")
-        else:
-            messages.error(request, "Please select a resident owner.")
+    search = (request.GET.get("search") or request.POST.get("search") or "").strip()
 
-    # GET: searching residents
-    q = ""
-    results: List[Dict[str, Any]] = []
-    if search_form.is_bound and search_form.is_valid():
-        q = (search_form.cleaned_data.get("search") or "").strip()
-        if q:
-            try:
-                resp = supabase.rpc("search_person_by_code_or_name", {"p_key": q}).execute()
-                results = resp.data or []
-            except APIError as e:
-                messages.error(request, f"Search error: {getattr(e,'message',str(e))}")
-
-    # Load selected resident (if any)
-    selected = None
-    owner_person_id = (_get_draft(request) or {}).get("owner_person_id")
-    if owner_person_id:
+    rows: List[Dict[str, Any]] = []
+    if search:
         try:
-            sel = supabase.rpc("get_details", {"p_person_id": int(owner_person_id)}).execute()
-            data = sel.data
-            selected = (data[0] if isinstance(data, list) and data else data) or None
-        except APIError as e:
-            messages.error(request, f"Failed to load selected resident: {getattr(e,'message',e)}")
+            rows = resident_owner_service.execute(search=search) or []
+        except Exception:
+            log.exception("Owner search failed for %r", search)  # <-- keep a trace
+            rows = []
+
+    results_payload = _normalize_owner_rows(rows)
+
+    selected: dict | None = None
+    if request.method == "POST" and select_form.is_valid():
+        try:
+            owner_id = int(select_form.cleaned_data["owner_person_id"])
+            selected = resident_owner_service.get_owner_details(owner_id)
+        except Exception:
+            log.exception("Fetching owner details failed for id=%s", request.POST.get("owner_person_id"))
+            selected = None
+
+    if selected:
+        owner_payload = _owner_payload_common_from_dict(selected)
+
+        request.session["bizreg_owner"] = owner_payload
+        request.session.set_expiry(1800)
+
+        messages.success(request, "Owner selected. Continue with business details.")
+
+    # keep form pristine if invalid
+    if search and not form.is_valid():
+        form = SearchBusinessOwner()
 
     return render(
         request,
@@ -2166,18 +2398,233 @@ def business_owner_resident(
         {
             "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
             "page_title": "Business Owner Information",
-            "search_form": search_form,  # GET form
-            "select_form": select_form,  # POST form
-            "q": q,
-            "results": results,
+            "form": form,
+            "select_form": select_form,
+            "search": search,           # single source of truth (no 'q')
+            "results": results_payload, # server-rendered initial list (optional)
             "selected": selected,
         },
     )
 
-#DO NOT TOUCH THIS FUNCTION
-def business_owner_nonresident(request: HttpRequest):
-    user_role = (request.session.get("auth") or {}).get("role_name").title()
-    form = BusinessOwnerInfo()
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_GET
+@inject
+def ajax_owner_search(
+    request: HttpRequest,
+    resident_owner_service: IResidentOwnerService = Provide[AppContainer.resident_owner_service],
+):
+    """
+    AJAX endpoint for live search.
+    Expects: ?search=<term>
+    Returns: {"results": [ ...normalized rows... ]}
+    """
+    search = (request.GET.get("search") or "").strip()
+    if not search:
+        return JsonResponse({"results": []})
+
+    try:
+        rows = resident_owner_service.execute(search=search) or []
+    except Exception:
+        rows = []
+
+    payload = _normalize_owner_rows(rows)
+    return JsonResponse({"results": payload})
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@csrf_protect
+@nocache
+@inject
+def business_owner_nonresident(
+    request: HttpRequest,
+    resident_owner_service: IResidentOwnerService = Provide[AppContainer.resident_owner_service],
+) -> HttpResponse:
+    user_role = _auth_role_name(request)
+
+    # Forms
+    search_form = SearchBusinessOwner(request.GET or None)
+    select_form = SelectOwnerForm(request.POST or None)  # for "Select as Owner" button
+    create_form: BusinessOwnerInfo | None = None         # for Fill-up tab
+
+    # Single source of truth for the current search term
+    search = (request.GET.get("search") or request.POST.get("search") or "").strip()
+
+    # --- SEARCH (non-residents only) ---
+    results_payload: list[dict] = []
+    if search:
+        try:
+            # Prefer kwarg if the service supports it, else fall back to a dedicated method
+            try:
+                rows = resident_owner_service.execute(search=search, only_nonresident=True)
+            except TypeError:
+                rows = getattr(resident_owner_service, "execute_nonresident")(search=search)
+
+            # Normalize to the payload the template/JS expects
+            results_payload = _normalize_owner_rows(rows)
+
+            # DEBUG: log if no results so you can see what was searched
+            if not results_payload:
+                # use both print (visible in runserver) and logger (if configured)
+                msg = f"[nonresident search] No results. term={search!r}, only_nonresident=True"
+                print(msg, flush=True)
+                log.info(msg)
+
+        except Exception as e:
+            # Keep the page responsive even if the repository errors out
+            log.exception("Non-resident search failed for %r: %s", search, e)
+            print(f"[nonresident search] ERROR for {search!r}: {e}", flush=True)
+            results_payload = []
+
+    selected = None
+
+    if request.method == "POST" and "owner_person_id" in request.POST:
+        # --- PATH A: selecting an existing person from search results ---
+        if select_form.is_valid():
+            try:
+                owner_id = int(select_form.cleaned_data["owner_person_id"])
+                selected = resident_owner_service.get_owner_details(owner_id)
+            except Exception:
+                log.exception(
+                    "Fetching non-resident owner details failed for id=%s",
+                    request.POST.get("owner_person_id"),
+                )
+                selected = None
+
+        if selected:
+            owner_payload = _owner_payload_common_from_dict(selected)
+            # ensure display badge stays consistent
+            owner_payload["residency_name"] = _normalize_residency_name(
+                owner_payload.get("residency_name") or "NON-RESIDENT"
+            )
+            # Store ONLY JSON-safe types in session
+            request.session["bizreg_owner"] = owner_payload
+            request.session.set_expiry(1800)
+            messages.success(request, "Owner selected. Continue with business details.")
+        # If invalid, fall through and re-render with errors on search tab.
+
+    elif request.method == "POST":
+        # --- PATH B: fill-up / create flow ---
+        create_form = BusinessOwnerInfo(request.POST, request.FILES or None)
+        if create_form.is_valid():
+            cd = create_form.cleaned_data
+
+            # 0) Prepare raw fields for duplicate probing
+            dob_val = cd["dob"]
+            dob_str = dob_val.isoformat() if isinstance(dob_val, date) else str(dob_val)
+            email   = (cd.get("email")   or "").strip() or None
+            mobile  = (cd.get("mob_num") or "").strip() or None
+
+            # 1) Duplicate check — short-circuit to existing PERSON if any
+            dup_person_id = _find_duplicate_owner(
+                email=email,
+                mobile=mobile,
+                last_name=cd["last_name"],
+                first_name=cd["first_name"],
+                dob_iso=dob_str,
+                barangay=(cd.get("barangay") or "").strip() or None,
+                city=(cd.get("city") or "").strip() or None,
+            )
+
+            if dup_person_id:
+                # Fetch full details for display (best effort)
+                try:
+                    selected = resident_owner_service.get_owner_details(dup_person_id)
+                except Exception:
+                    selected = None
+
+                dup_name = (getattr(selected, "full_name", None) or "Existing Person").strip() or "Existing Person"
+
+                # Optional: preload results (same as before) so the Search tab is ready if user proceeds
+                try:
+                    preload_term = dup_name
+                    preload_rows = resident_owner_service.execute(search=preload_term, only_nonresident=True)
+                    results_payload = _normalize_owner_rows(preload_rows)
+                    search_form = SearchBusinessOwner(initial={"search": preload_term})
+                except Exception as _e:
+                    print(f"[dup-check] preload search failed: {getattr(_e, 'args', _e)}", flush=True)
+
+                # Build a target URL that lands on Search tab with the prefilled term
+                target_url = (
+                    reverse("clerk:business_owner_nonres")
+                    + f"?tab=search&search={urlquote(preload_term if 'preload_term' in locals() else (search or ''))}"
+                )
+
+                # Re-render the SAME page (stay on Create tab) but with a flag to show the modal.
+                return render(
+                    request,
+                    "business/business_owner_nonres.html",
+                    {
+                        "page_path": f"{user_role} / Business Records / Add Business / Business Owner Information",
+                        "page_title": "Business Owner Information",
+
+                        # Search tab context (preloaded results so the tab is ready)
+                        "search_form": search_form,
+                        "search": (preload_term if 'preload_term' in locals() else search),
+                        "results": results_payload,
+                        "selected": None,
+
+                        # Create tab context (keep the filled form)
+                        "form": create_form,
+
+                        # 🔔 NEW: modal flags + payload
+                        "open_dup_modal": True,
+                        "dup_modal": {
+                            "name": dup_name,
+                            "person_id": dup_person_id,
+                            "target_url": target_url,
+                        },
+                    },
+                )
+
+            # 2) No duplicate → keep your original creation payload in session
+            owner_payload: Dict[str, Any] = {
+                "owner_person_id": cd.get("owner_person_id") or None,  # usually None for brand-new
+                "last_name": cd["last_name"].strip(),
+                "first_name": cd["first_name"].strip(),
+                "middle_name": (cd.get("middle_name") or "").strip() or None,
+                "suffix": (cd.get("suffix") or "").strip() or None,
+                "dob": dob_str,  # JSON-safe string
+                "email": email,
+                "mobile": mobile,
+                "sex_id": int(cd["sex"]),
+                "civil_status_id": int(cd["civil_status"]),
+                "nationality_id": int(cd["nationality"]),
+                "religion_id": int(cd["religion"]),
+                "street": cd["street"].strip(),
+                "purok_sitio": (cd.get("purok_sitio") or "").strip(),
+                "barangay": (cd["barangay"]).strip(),
+                "city": (cd["city"]).strip(),
+                "residency_name": "NON-RESIDENT",
+            }
+
+            request.session["bizreg_owner"] = owner_payload
+            request.session.set_expiry(1800)
+            messages.success(request, "Owner info saved. Continue with business details.")
+            return redirect("clerk:business_details")
+        else:
+            # form errors: stay on create tab and show errors
+            messages.error(request, "Please correct the errors below.")
+
+    # Default create_form on GET (or when selection path used)
+    if create_form is None:
+        # IMPORTANT: copy before converting strings to date objects for form initial
+        saved_raw = request.session.get("bizreg_owner") or {}
+        saved = copy.deepcopy(saved_raw)  # <- do NOT mutate the session dict
+
+        # Convert ISO string -> date only for the initial dict (keeps session JSON-safe)
+        if "dob" in saved and isinstance(saved["dob"], str):
+            try:
+                saved["dob"] = date.fromisoformat(saved["dob"])
+            except ValueError:
+                pass
+
+        create_form = BusinessOwnerInfo(initial=saved or None)
+
+    # Keep search form pristine if invalid in GET
+    if search and not search_form.is_valid():
+        search_form = SearchBusinessOwner()
+
     return render(
         request,
         "business/business_owner_nonres.html",
@@ -2195,135 +2642,329 @@ def business_owner_nonresident(request: HttpRequest):
     )
 
 @session_login_required
-@role_required("Barangay Clerk")
+@role_required(CLERK_ROLE)
+@require_GET
+@inject
+def ajax_nonresident_owner_search(
+    request: HttpRequest,
+    resident_owner_service: IResidentOwnerService = Provide[AppContainer.resident_owner_service],
+):
+    q = (request.GET.get("search") or "").strip()
+    if not q:
+        return JsonResponse({"results": []})
+
+    try:
+        rows = resident_owner_service.execute(search=q, only_nonresident=True)
+    except TypeError:
+        # Service doesn’t accept the kwarg; try a dedicated nonresident method if present
+        fn = getattr(resident_owner_service, "execute_nonresident", None)
+        rows = fn(search=q) if callable(fn) else []
+    except Exception:
+        rows = []
+
+    return JsonResponse({"results": _normalize_owner_rows(rows)})
+
+@session_login_required
+@role_required(CLERK_ROLE)
 @nocache
-def business_details(request: HttpRequest) -> HttpResponse:
+def business_details(
+    request: HttpRequest,
+    business_service: IBusinessService = Provide[AppContainer.business_service],
+):
     user_role = _auth_role_name(request)
-    staff_id = _auth_staff_id(request)
-    if not staff_id:
-        messages.error(request, "Missing staff context. Please log in again.")
-        return redirect("login")
 
-    # bucket from settings (required)
-    BUCKET = getattr(settings, "SUPABASE_BUCKET", None)
-    if not BUCKET:
-        messages.error(request, "Storage bucket is not configured. Set SUPABASE_BUCKET in settings.")
-        return redirect("clerk:business_owner_resident")
-
-    draft = _get_draft(request)
-    owner_person_id = draft.get("owner_person_id")
-    if not owner_person_id:
-        messages.warning(request, "Please choose a resident owner first.")
-        return redirect("clerk:business_owner_resident")
-
-    form = BusinessDetails(request.POST or None, request.FILES or None)
-
+    owner = request.session.get("bizreg_owner")
+    if not owner:
+        messages.warning(request, "No owner info found. Please fill the form first.")
+        return redirect("clerk:business_owner")
+    
     if request.method == "POST":
         form = BusinessDetails(request.POST, request.FILES or None)
 
         if form.is_valid():
             cd = form.cleaned_data
 
-            # upload proof file(s) to the configured bucket
-            uploaded_paths: List[str] = []
-            files = request.FILES.getlist("proof")
-            for f in files:
-                ext = f.name.rsplit(".", 1)[-1].lower() if "." in f.name else ""
-                key = f"business-proofs/{uuid4().hex}.{ext}"
-                try:
-                    supabase.storage.from_(BUCKET).upload(
-                        key, f.read(), {"content-type": f.content_type}
-                    )
-                    uploaded_paths.append(key)
-                except Exception as e:
-                    messages.error(request, f"Failed to upload proof '{f.name}': {e}")
-                    return render(
-                        request,
-                        "business/business_details.html",
-                        {
-                            "page_path": f"{user_role} / Business Records / Add Business / Business Information",
-                            "page_title": "Business Information",
-                            "form": form,
-                        },
-                    )
-                
-            # coerce ints from choices
-            btype_id   = int(cd["b_type"])           if cd.get("b_type") else None
-            own_id     = int(cd["ownership_type"])   if cd.get("ownership_type") else None
-            day_start  = int(cd["opt_days_start"])   if cd.get("opt_days_start") else None
-            day_end    = int(cd["opt_days_end"])     if cd.get("opt_days_end") else None
-            has_clearance = (cd.get("prev_clearance") == "yes")
+            payload: Dict[str, Any] = {
+                # strings → strip safely
+                "b_name": _sstrip(cd.get("b_name")) or "",
+                "b_nature": _sstrip(cd.get("b_nature")),
+                "b_address": _sstrip(cd.get("b_address")) or "",
+                "b_desc": _sstrip(cd.get("b_desc")),
+                "dti": _sstrip(cd.get("dti")),
+                "inc_est": _sstrip(cd.get("inc_est")),
 
-            payload = {
-                "p_performer_staff_id": int(staff_id),
-                "p_owner_person_id": int(owner_person_id),
+                # choice/ids
+                "ownership_type": _to_int_or_none(cd.get("ownership_type")),
+                "b_category": _to_int_or_none(cd.get("b_category")),
 
-                # business
-                "p_business_name": cd.get("b_name"),
-                "p_business_location_desc": cd.get("b_desc"),
-                "p_business_nature": cd.get("b_nature"),
+                # numbers (keep JSON-safe as strings)
+                "capital_invested": _to_str_num(cd.get("capital_invested"), "0"),
+                "prevgross": _to_str_num(cd.get("prevgross"), "0"),
+                "emp_num": _to_int_or_none(cd.get("emp_num") or 0),
 
-                "p_prev_yr_total_gross_sales": _js(cd.get("prevgross")),
-                "p_date_est": _js(cd.get("date_est")),
-                "p_dti_sec_reg_num": cd.get("dti"),
-                "p_capital_invested": _js(cd.get("capital_invested")),
-                "p_mnthly_gross_incom_est": _js(cd.get("inc_est")),
-                "p_num_of_emp": cd.get("emp_num"),
-                "p_has_business_clearance": has_clearance,
+                # days/time
+                "opt_days_start": _to_int_or_none(cd.get("opt_days_start")),
+                "opt_days_end": _to_int_or_none(cd.get("opt_days_end")),
+                "opt_start": cd["opt_start"].strftime("%H:%M:%S") if cd.get("opt_start") else None,
+                "opt_end": cd["opt_end"].strftime("%H:%M:%S") if cd.get("opt_end") else None,
 
-                "p_business_type_id": btype_id,
-                "p_ownership_type_id": own_id,
+                # date
+                "date_est": (cd["date_est"].isoformat() if cd.get("date_est") else None),
 
-                # operating schedule
-                "p_operating_day_start": day_start,
-                "p_operating_day_end": day_end,
-                "p_operating_hour_start": _js(cd.get("opt_start")),
-                "p_operating_hour_end": _js(cd.get("opt_end")),
+                # geo
+                "latitude": _to_float_or_none(cd.get("latitude")),
+                "longitude": _to_float_or_none(cd.get("longitude")),
 
-                # business address
-                "p_business_latitude": _js(cd.get("latitude")),
-                "p_business_longitude": _js(cd.get("longitude")),
-                "p_business_city": cd.get("city"),
-                "p_business_barangay": cd.get("barangay"),
-                "p_business_street": cd.get("street"),
-                "p_business_purok_sitio_name": cd.get("purok_sitio"),
+                # address modal fields
+                "street": _sstrip(cd.get("street")) or "",
+                "barangay": _sstrip(cd.get("barangay")) or "",
+                "city": _sstrip(cd.get("city")) or "",
 
-                # proofs
-                "p_business_proof_files": uploaded_paths or None,
+                # ✅ NEW: use ID for purok/sitio
+                "purok_sitio_id": _to_int_or_none(cd.get("purok_sitio_id")),
+                # (Optional) keep display label if your UI shows it in a review card
+                "purok_sitio": _sstrip(cd.get("purok_sitio")) or "",
             }
 
-            try:
-                resp = supabase.rpc("register_business_and_owner", payload).execute()
-                rows = resp.data or []
-                if not rows:
-                    messages.warning(request, "The server did not return IDs, but the request may have been processed.")
-                else:
-                    first = rows[0]
-                    _ = first.get("business_id") if isinstance(first, dict) else first[0]
-                    _ = first.get("owner_person_id") if isinstance(first, dict) else first[1]
+            proof_pairs = []
+            if request.FILES:
+                files = request.FILES.getlist("proof") if "proof" in request.FILES else []
+                for up in files:
+                    info = _save_temp_upload(up, "bizproof")  # stores under tmp/bizproof/...
+                    if info and info.get("path"):
+                        proof_pairs.append(info)
 
-                _clear_draft(request)
-                messages.success(request, "Business registered successfully.")
-                return redirect("clerk:business_list")
+            if proof_pairs:
+                payload["proof_name"] = ", ".join(p["name"] for p in proof_pairs)
+                payload["proof_tmp_pairs"] = proof_pairs
 
-            except APIError as e:
-                code = getattr(e, "code", None) or getattr(e, "error", None) or ""
-                detail = getattr(e, "message", None) or str(e)
-                if "P6057" in code or "P6057" in detail:
-                    messages.error(request, "Invalid business type. Please pick a valid type.")
-                elif "P6058" in code or "P6058" in detail:
-                    messages.error(request, "Invalid ownership type. Please pick a valid type.")
-                elif "P6061" in code or "P6061" in detail:
-                    messages.error(request, "Invalid operating day range. Start must be ≤ End within 1..7.")
-                elif "P6062" in code or "P6062" in detail:
-                    messages.error(request, "Invalid operating hour range. Start time must be before end time.")
-                elif "P6065" in code or "P6065" in detail:
-                    messages.error(request, "Missing link type 'BUSINESS PROFILING'. Contact admin.")
-                else:
-                    messages.error(request, f"RPC error: {detail}")
+            # If user chose to continue despite duplicate warning, skip duplicate check
+            is_ignore = (request.POST.get("action") or "").lower() == "ignore_duplicate"
+
+            dup_biz_id: Optional[int] = None
+            if not is_ignore:
+                try:
+                    owner = request.session.get("bizreg_owner") or {}
+                    owner_person_id = _to_int_or_none(owner.get("owner_person_id") or owner.get("person_id"))
+
+                    if owner_person_id:
+                        # ✅ Use the repository/service (ID-based) instead of inline SQL
+                        dup_biz_id = business_service.check_business_duplicate(
+                            owner_person_id=owner_person_id,
+                            business_name=payload["b_name"],
+                            city=payload["city"],
+                            barangay=payload["barangay"],
+                            street=payload["street"],
+                            purok_sitio_id=payload.get("purok_sitio_id"),
+                            b_category_id=payload.get("b_category"),
+                        )
+                except Exception as e:
+                    print("[dup-check] business duplicate check failed:", e, flush=True)
+                    # Non-fatal: continue as if no duplicate
+
+            if dup_biz_id:
+                # 🚫 Do NOT redirect yet — render the same page and open a modal.
+                form = BusinessDetails(initial=cd)
+
+                addr_parts = [
+                    payload.get("street") or "",
+                    (payload.get("purok_sitio") or ""),  # label for display only
+                    payload.get("barangay") or "",
+                    payload.get("city") or "",
+                ]
+                addr_line = _join_addr(addr_parts)
+                maps = fetch_display_maps_from_forms()
+                b_category_id = payload.get("b_category")
+                b_category_label = (maps.get("business_category", {}) or {}).get(b_category_id) or "—"
+
+                owner_ctx = request.session.get("bizreg_owner") or {}
+
+                return render(
+                    request,
+                    "business/business_details.html",
+                    {
+                        "page_path": f"{_auth_role_name(request)} / Business Records / Add Business / Business Information",
+                        "page_title": "Business Information",
+                        "form": form,
+                        "owner": owner_ctx,
+
+                        # Modal flags + data
+                        "open_dup_modal": True,
+                        "dup_modal": {
+                            "business_id": dup_biz_id,
+                            "business_name": payload["b_name"],
+                            "business_category": b_category_label,
+                            "address_line": addr_line,
+                            "view_url": reverse("clerk:business_information", kwargs={"b_id": dup_biz_id}),
+                        },
+
+                        # Keep map/proof previews working on the page render
+                        "proof_urls": [
+                            (default_storage.url(p["path"]) if p.get("path") else None)
+                            for p in (payload.get("proof_tmp_pairs") or [])
+                            if p.get("path")
+                        ],
+                    },
+                )
+
+            # ✅ Either no duplicate, or user clicked "Continue anyway"
+            payload = _json_safe(payload)
+            request.session["bizreg_business"] = payload
+            request.session.set_expiry(1800)  # 30 minutes
+
+            messages.success(request, "Business details saved.")
+            return redirect("clerk:business_information_review")
         else:
-            messages.error(request, "Please fix the errors in the Business Information form.")
+            messages.error(request, "Please correct the errors below.")
 
+    else:
+        saved = request.session.get("bizreg_business") or {}
+
+        # Convert back to proper field types for form initial
+        if "date_est" in saved:
+            saved["date_est"] = _parse_date_iso(saved["date_est"])
+        if "opt_start" in saved:
+            saved["opt_start"] = _parse_time_hms(saved["opt_start"])
+        if "opt_end" in saved:
+            saved["opt_end"] = _parse_time_hms(saved["opt_end"])
+
+        form = BusinessDetails(initial=saved or None)
+
+    return render(
+        request,
+        "business/business_details.html",
+        {
+            "page_path": f"{user_role} / Business Records / Add Business / Business Information",
+            "page_title": "Business Information",
+            "form": form,
+            "owner": owner,
+        },
+    )
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+@inject
+def business_information_review(
+    request: HttpRequest,
+    business_registration_service: IBusinessRegistrationService = Provide[AppContainer.business_registration_service],
+):
+    user_role = _auth_role_name(request)
+
+    owner = request.session.get("bizreg_owner")
+    if not owner:
+        return redirect("clerk:business_owner")
+
+    business = request.session.get("bizreg_business")
+    if not business:
+        return redirect("clerk:business_details")
+    
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").lower()
+        if action == "confirm_add":
+            # Accept single or multiple files (template may use name="proof")
+            uploads = []
+            if "proof" in request.FILES:
+                uploads = request.FILES.getlist("proof")
+
+            if not uploads:
+                for p in (business or {}).get("proof_tmp_pairs", []) or []:
+                    spath = p.get("path")
+                    if not spath:
+                        continue
+                    try:
+                        # default_storage.open works across any backend (local/S3/Supabase)
+                        uploads.append(default_storage.open(spath, "rb"))
+                    except Exception:
+                        pass
+
+            lat_post = _to_float_or_none(request.POST.get("latitude"))
+            lng_post = _to_float_or_none(request.POST.get("longitude"))
+            if lat_post is not None:
+                business["latitude"] = lat_post
+            if lng_post is not None:
+                business["longitude"] = lng_post
+
+            cmd = RegisterBusinessProfileCmd(
+                owner=owner,
+                business=business,
+                performer_staff_id=_auth_staff_id(request),
+                proof_files_uploads=uploads,
+            )
+
+            try:
+                business_id, owner_person_id = business_registration_service.business_registration(cmd)
+
+                for p in (business or {}).get("proof_tmp_pairs", []) or []:
+                    spath = p.get("path")
+                    if spath:
+                        try:
+                            default_storage.delete(spath)
+                        except Exception:
+                            pass
+
+                # try:
+                #     notify_registration_received(owner=owner, business=business, business_id=business_id)
+                # except Exception:
+                #     pass
+
+                # try:
+                #     owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
+                #     if owner_mobile:
+                #         bname = (business.get("b_name") or "your business").strip()
+                #         msg = (
+                #             f"BARUG: Business Registration received for '{bname}'.\n"
+                #             f"Ref: {business_id: 06d}.\n"
+                #             f"Sign in to the mobile app to request the necessary business documents."
+                #         )
+                #         # fail_silently so we don't break the user flow
+                #         send_sms(owner_mobile, msg, fail_silently=True)
+                # except Exception:
+                #     # fully swallow—logging optional
+                #     pass
+
+                request.session.pop("bizreg_owner", None)
+                request.session.pop("bizreg_business", None)
+                messages.success(request, f'Business #{business_id} created for owner #{owner_person_id}.')
+                return redirect("clerk:business_information", b_id=business_id)
+            except Exception as e:
+                print("[business_information_review] Failed to register business:", e, flush=True)
+                traceback.print_exc()
+                messages.error(request, f"Failed to register business: {e}")
+                return redirect("clerk:business_information_review")
+
+    
+     # Normalize a few fields for nicer display on the review page
+    owner = dict(owner)  # shallow copy so we can tweak for display
+    if "dob" in owner:
+        owner["dob"] = _parse_date_iso(owner["dob"])
+
+    business = dict(business)
+    if "date_est" in business:
+        business["date_est"] = _parse_date_iso(business["date_est"])
+    if "opt_start" in business:
+        business["opt_start"] = _parse_time_hms(business["opt_start"])
+    if "opt_end" in business:
+        business["opt_end"] = _parse_time_hms(business["opt_end"])
+
+    maps = fetch_display_maps_from_forms()
+    owner_disp = build_owner_display(owner, maps)
+    biz_disp   = build_business_display(business, maps)
+
+    tmp_pairs = (business.get("proof_tmp_pairs") or [])
+    proof_urls = []
+    for p in tmp_pairs:
+        spath = p.get("path")
+        if not spath:
+            continue
+        try:
+            proof_urls.append(default_storage.url(spath))
+        except Exception:
+            # If your storage backend has no .url(), fall back to MEDIA_URL (dev only)
+            url = (getattr(settings, "MEDIA_URL", "/media/").rstrip("/") + "/" + spath)
+            proof_urls.append(url)
+
+        
     return render(
         request,
         "business/business_information_review.html",
@@ -2435,74 +3076,203 @@ def ajax_business_search(
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
-def business_information(request: HttpRequest, b_id: int):
-    user_role = (request.session.get("auth") or {}).get("role_name").title()
+@inject
+def business_information(
+    request, 
+    b_id: int,
+    business_info: IBusinessInfoService = Provide[AppContainer.owner_business_service],
+    renewal_quote_svc: IBusinessRenewalQuoteService = Provide[AppContainer.business_renewal_quote_service],
+) -> HttpResponse:
+    user_role = _auth_role_name(request)
+    
+    person_id = request.GET.get("owner")
+    person_id = int(person_id) if person_id and str(person_id).isdigit() else None
 
-    b_resp = supabase.rpc("get_business_details", {"p_business_id" : b_id}).execute()
-    b_rows = b_resp.data or []
-    b = b_rows[0] if b_rows else None
+    dto = (
+        business_info.execute(person_id=person_id, business_id=b_id)
+        if person_id is not None
+        else business_info.execute_by_business_id(b_id)  # see helper below
+    )
 
-    raw_days = str(b.get("operating_days") or "").strip()
-    operating_days_list = [d.strip() for d in raw_days.split(",") if d.strip()] if raw_days else []
-    b["operating_days_list"] = operating_days_list
+    def _compose_owner_full_name(data: dict) -> str | None:
+        last   = (data.get("last_name") or "").strip()
+        first  = (data.get("first_name") or "").strip()
+        middle = (data.get("middle_name") or "").strip()
+        suffix = (data.get("suffix") or "").strip()
 
-    owner = None
-    owner_id = b.get("owner_person_id") or None
+        parts = []
+        if last:
+            parts.append(last.upper())                   # LAST
+        if first:
+            parts.append((", " if parts else "") + first.title())  # , First
+        if middle:
+            parts.append(" " + middle[:1].upper() + ".")           #  M.
+        if suffix:
+            parts.append(" " + suffix.upper())                     #  JR / III, etc.
+        return "".join(parts) or None
+    
+    def _compose_full_address_from_owner(data: dict) -> str | None:
+        street      = (data.get("street") or "").strip()
+        sitio_purok = (data.get("sitio_purok") or "").strip()
+        barangay    = (data.get("barangay") or "").strip()
+        city        = (data.get("city") or "").strip()
 
-    if owner_id:
-        p_resp = supabase.rpc("get_details", {"p_person_id" : owner_id}).execute()
-        p_rows = p_resp.data or []
-        owner = p_rows[0] if p_rows else None
+        # Order strictly: STREET, PUROK/SITIO, BARANGAY, CITY
+        parts = [p for p in [street, sitio_purok, barangay, city] if p]
+        return ", ".join(parts) if parts else None
 
-    if not b:
-        raise Http404(f"Business {b_id} not found.")
+    owner = dict(dto.owner or {})
+    owner["owner_full_name"] = _compose_owner_full_name(owner)
+    owner["full_address"]    = _compose_full_address_from_owner(owner)
+
+    operating_days = (dto.business.get("operating_days") or "").strip()  # e.g., "Mon, Tue, Wed"
+    days = [d.strip() for d in operating_days.split(",")] if operating_days else []
+    operating_days_start_name = days[0] if days else None
+    operating_days_end_name = days[-1] if days else None
+
+    formatted_id = f"{int(b_id):06d}"
+    current_year = date.today().year
+
+    grand_total, quote_rows, paid_rows = renewal_quote_svc.execute(business_id=b_id, year=current_year)
+
+    business_dict = dict(dto.business or {})
+    status_upper = (business_dict.get("business_status") or "").strip().upper()
+
+    renewal_href = reverse("clerk:create_renewal_request", kwargs={"b_id": b_id})
+    closure_href = reverse("clerk:initiate_business_closure", kwargs={"b_id": b_id})
+    doc_req_href = reverse("clerk:walkin_new")
+
+    try:
+        _gt = grand_total if isinstance(grand_total, Decimal) else Decimal(str(grand_total or 0))
+    except Exception:
+        _gt = Decimal("0")
+    has_dues = (_gt > 0)
+
+    # Defaults
+    show_summary_cta = False
+    summary_cta_href = None
+    summary_cta_label = None
+    cta_mode = "link"
+
+    if status_upper == "ACTIVE":
+        if has_dues:
+            # NEW: even if ACTIVE, show Renew/Pay action when there are dues
+            show_summary_cta = True
+            # summary_cta_href = renewal_href
+            cta_mode = "selector"
+            summary_cta_label = "Create Renewal Request"
+        else:
+            show_summary_cta = False
+    elif status_upper == "PENDING":
+        show_summary_cta = True
+        cta_mode = "link"
+        summary_cta_href = doc_req_href
+        summary_cta_label = "Proceed to Document Request"
+    elif status_upper == "EXPIRED":
+        show_summary_cta = True
+        # summary_cta_href = renewal_href
+        cta_mode = "selector"
+        summary_cta_label = "Create Renewal Request"
+    else:
+        # Fallback: show renewal CTA for other non-active statuses
+        show_summary_cta = True
+        cta_mode = "selector"
+        summary_cta_label = "Continue"
 
     return render(
         request,
         "business/business_information.html",
         {
-            "page_path": f"{user_role} / Business Records / Business Details : {b_id}",
-            "page_title": f"Business Details : {b_id}",
-            "b": b,
-            "owner" : owner,
+            "page_path": f"{user_role} / Business Records / Business Details : {formatted_id}",
+            "page_title": f"Business Details : {formatted_id}",
+            "owner": owner,
+            "business": dto.business,
+            "business_files": (dto.business_proof or {}).get("files") or [],
+            "operating_days_start_name": operating_days_start_name,
+            "operating_days_end_name": operating_days_end_name,
+            "grand_total": grand_total,
+            "quote_rows": quote_rows,
+            "paid_rows": paid_rows,
+            "business_status_upper": status_upper,
+            "show_summary_cta": show_summary_cta,
+            "summary_cta_href": summary_cta_href,
+            "summary_cta_label": summary_cta_label,
+            "renewal_href": renewal_href,
+            "closure_href": closure_href,
+            "cta_mode": cta_mode,
         },
     )
 
-#DO NOT TOUCH THIS FUNCTION
-# Hannah's Code (kept as-is; unrelated to printing)
-def business_owner_nonresident(request: HttpRequest):
-    user_fullname, user_role_template = _profile_fallbacks(request)
-    form = BusinessOwnerInfo()
+@session_login_required
+@role_required(CLERK_ROLE)
+@csrf_protect
+@nocache
+@inject
+def business_map_list(
+    request: HttpRequest,
+    business_service: IBusinessService = Provide[AppContainer.business_service],
+) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+    
+    user_role = _auth_role_name(request)
+    form = BusinessFilters(request.GET or None)
+
+    search = request.GET.get("search")
+    b_category = _to_int_or_none(request.GET.get("b_category"))
+    ownership_type = _to_int_or_none(request.GET.get("ownership_type"))
+    status = _to_int_or_none(request.GET.get("status"))
+
+    rows = business_service.execute(
+        search=search,
+        b_category=b_category,
+        ownership_type=ownership_type,
+        status=status,
+    )
+
+    paginator = Paginator(rows, 5)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    if (search or b_category is not None or ownership_type is not None or status is not None) and not form.is_valid():
+        form = BusinessFilters()
+
     return render(
         request,
-        "business/business_owner_nonres.html",
+        "business/business_map_list.html",
         {
-            "user_fullname": user_fullname,
-            "user_role": user_fullname,
-            "page_path": f"{user_fullname} / Business Records / Add Business / Business Owner Information",
-            "page_title": "Business Owner Information",
-            "user_role_template": user_role_template,
-            "form": form,
-        },
+            'page_path': f"{user_role} / Business Map",
+            'page_title': "Business Map",
+            'form': form,
+            'page_obj' : page_obj,
+            'filters' : {
+                'search' : search,
+                'b_category' : b_category,
+                'ownership_type' :ownership_type,
+                'status' : status,
+            },
+            "pins_url": reverse("clerk:api_business_pins"),
+            'search_url': 'clerk:ajax_business_search',
+        }
     )
 
-def _rpc_approve_person_by_clerk(request: HttpRequest, person_id: int, status_id: int, remarks: str | None):
-    auth = request.session.get("auth") or {}
-    staff_id = auth.get("staff_id") or _staff_id(request)
-    if not staff_id:
-        raise Http404("Staff not found in session.")
-    payload = {"p_clerk_staff_id": staff_id, "p_person_id": person_id, "p_status_id": status_id, "p_remarks": remarks}
-    try:
-        return supabase.rpc("approve_person_by_clerk", payload).execute()
-    except APIError as e:
-        try:
-            msg = e.message.get("message")
-        except Exception:
-            msg = str(e)
-        raise APIError({"message": msg or "Update failed."})
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+@inject
+def api_business_pins(
+    request: HttpRequest,
+    business_repo: IBusinessRepository = Provide[AppContainer.infra.business],
+):
+    if request.method != "GET":
+        return HttpResponseBadRequest("GET only")
 
+    pins = business_repo.fetch_business_pins(
+        search=(request.GET.get("search") or None),
+        b_category=_to_int_or_none(request.GET.get("b_category")),
+        ownership_type=_to_int_or_none(request.GET.get("ownership_type")),
+        status=_to_int_or_none(request.GET.get("status")),
+    )
+    return JsonResponse(pins, safe=False)
 
-# ==================     CLERK - ID DECISION REQUESTS     ==================      
 @session_login_required
 @role_required(CLERK_ROLE)
 @csrf_protect
@@ -2701,23 +3471,244 @@ def create_renewal_request(
 
 @session_login_required
 @role_required(CLERK_ROLE)
-@require_POST
-def decision_request(request: HttpRequest, req_id: int):
-    action = (request.POST.get("action") or "").lower()
-    remarks = (request.POST.get("remarks") or "").strip()
-    if action not in ("reject","decline"):
-        messages.error(request, "Invalid action.")
-        return redirect("clerk:person_details", req_id=req_id)
-    if not remarks:
-        messages.error(request, "Remarks are required.")
-        return redirect("clerk:person_details", req_id=req_id)
-    status_id = STATUS_REJECTED if action == "reject" else STATUS_DECLINE
-    try:
-        _rpc_approve_person_by_clerk(request, req_id, status_id, remarks)
-        messages.success(request, f"Request marked as {'Rejected' if status_id==STATUS_REJECTED else 'Declined'}.")
-    except APIError as e:
+@inject
+def initiate_business_closure(
+    request: HttpRequest,
+    b_id: int,
+    business_info: IBusinessInfoService = Provide[AppContainer.owner_business_service],
+    renewal_quote_svc: IBusinessRenewalQuoteService = Provide[AppContainer.business_renewal_quote_service],
+):
+    user_role = _auth_role_name(request)
+
+    # Reuse the same DTO pattern used elsewhere
+    dto = business_info.execute_by_business_id(b_id)
+
+    def _compose_owner_full_name(data: dict) -> str | None:
+        last   = (data.get("last_name") or "").strip()
+        first  = (data.get("first_name") or "").strip()
+        middle = (data.get("middle_name") or "").strip()
+        suffix = (data.get("suffix") or "").strip()
+        parts = []
+        if last:   parts.append(last.upper())
+        if first:  parts.append((", " if parts else "") + first.title())
+        if middle: parts.append(" " + middle[:1].upper() + ".")
+        if suffix: parts.append(" " + suffix.upper())
+        return "".join(parts) or None
+
+    owner = dict(dto.owner or {})
+    owner["owner_full_name"] = _compose_owner_full_name(owner)
+
+    business = dto.business or {}
+    header_status = ((business.get("business_status") or "").strip().upper())
+
+    # NEW: compute outstanding dues (reusing renewal quote)
+    current_year = date.today().year
+    grand_total, quote_rows, paid_rows = renewal_quote_svc.execute(business_id=b_id, year=current_year)
+
+    def _to_decimal(x):
+        if x is None:
+            return Decimal("0")
+        return x if isinstance(x, Decimal) else Decimal(str(x))
+
+    quote_rows = quote_rows or []
+    base_sum  = sum(_to_decimal(getattr(r, "base_fee", 0))   for r in quote_rows)
+    surch_sum = sum(_to_decimal(getattr(r, "surcharge", 0))  for r in quote_rows)
+    has_dues  = (_to_decimal(grand_total) > 0)
+
+    return render(request, "business/initiate_business_closure.html", {
+        'page_path'    : f'{user_role} / Business Closure : {b_id:06d}',
+        'page_title'   : f'Business Closure : {b_id:06d}',
+        'business'     : business,
+        'owner'        : owner,
+        'header_status': header_status,
+
+        # NEW context for dues display
+        'grand_total'  : grand_total,
+        'quote_rows'   : quote_rows,
+        'base_sum'     : base_sum,
+        'surch_sum'    : surch_sum,
+        'has_dues'     : has_dues,
+        'clearance_year': current_year,  # optional for display/consistency
+    })
+
+# clerk/views.py  (add)
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+@inject
+def create_closure_payment_request(
+    request: HttpRequest,
+    b_id: int,
+    business_info: IBusinessInfoService = Provide[AppContainer.owner_business_service],
+    renewal_quote_svc: IBusinessRenewalQuoteService = Provide[AppContainer.business_renewal_quote_service],
+    svc: IBusinessClosurePaymentRequestService = Provide[AppContainer.business_closure_payment_request_service],
+) -> HttpResponse:
+    user_role = _auth_role_name(request)
+
+    if request.method == "POST":
         try:
-            messages.warning(request, e.message.get("message"))
-        except Exception:
-            messages.warning(request, "This request cannot be updated right now.")
-    return redirect("clerk:person_details", req_id=req_id)
+            business_id   = int(request.POST.get("business_id") or b_id)
+            period_type   = (request.POST.get("period_type") or "ANNUAL").upper()
+            period_year   = int(request.POST.get("period_year") or date.today().year)
+
+            raw_q = request.POST.get("period_quarter")
+            period_quarter = None
+            if period_type == "QUARTERLY" and raw_q:
+                s = raw_q.strip().upper()
+                if s.startswith("Q") and s[1:].isdigit(): period_quarter = int(s[1:])
+                elif s.isdigit(): period_quarter = int(s)
+
+            cmd = CreateRenewalRequestCmd(
+                business_id=business_id,
+                period_type=period_type,
+                period_year=period_year,
+                period_quarter=period_quarter,
+                created_by_user_id=_auth_staff_id(request),
+            )
+
+            # Create per-unpaid-year requests (closure-payment flavor)
+            new_ids = svc.request_unpaid(cmd)  # returns List[int]
+
+            if new_ids:
+                ids_str = ", ".join(str(i) for i in new_ids)
+                messages.success(
+                    request,
+                    f"Created {len(new_ids)} closure payment request(s) up to {period_type} {period_year}: [{ids_str}] "
+                    f"(status: FOR_TREASURER_REVIEW)."
+                )
+            else:
+                messages.info(request, "No unpaid items found. Nothing to create.")
+
+            return redirect("clerk:initiate_business_closure", b_id=business_id)
+        except Exception as e:
+            try:
+                post_dump = json.dumps({k: v for k, v in request.POST.items()}, default=str)
+            except Exception:
+                post_dump = str(dict(request.POST))
+            print("\n[create_closure_payment_request][ERROR]:", repr(e), flush=True)
+            print("[create_closure_payment_request][POST]:", post_dump, flush=True)
+            traceback.print_exc()
+            messages.error(request, f"Create closure payment request failed: {e}")
+            return redirect("clerk:initiate_business_closure", b_id=b_id)
+
+    # GET — load summary UI
+    dto = business_info.execute_by_business_id(b_id)
+
+    def _compose_owner_full_name(data: dict) -> str | None:
+        last = (data.get("last_name") or "").strip()
+        first = (data.get("first_name") or "").strip()
+        middle = (data.get("middle_name") or "").strip()
+        suffix = (data.get("suffix") or "").strip()
+        parts = []
+        if last: parts.append(last.upper())
+        if first: parts.append((", " if parts else "") + first.title())
+        if middle: parts.append(" " + middle[:1].upper() + ".")
+        if suffix: parts.append(" " + suffix.upper())
+        return "".join(parts) or None
+
+    owner = dict(dto.owner or {})
+    owner["owner_full_name"] = _compose_owner_full_name(owner)
+
+    current_year = date.today().year
+    grand_total, quote_rows, paid_rows = renewal_quote_svc.execute(business_id=b_id, year=current_year)
+
+    def to_dec(x):
+        if x is None: return Decimal("0")
+        return x if isinstance(x, Decimal) else Decimal(str(x))
+
+    quote_rows = quote_rows or []
+    base_sum  = sum(to_dec(getattr(r, "base_fee", 0))  for r in quote_rows)
+    surch_sum = sum(to_dec(getattr(r, "surcharge", 0)) for r in quote_rows)
+
+    header_status = ((dict(dto.business or {}).get("business_status") or "").strip().upper())
+    clearance_year = current_year
+
+    return render(request, "business/create_closure_payment_request.html", {
+        'page_path' : f'{user_role} / Closure Payment Request',
+        'page_title': 'Closure Payment Request',
+        "owner": owner,
+        "business": dto.business,
+        "grand_total": grand_total,
+        "quote_rows": quote_rows,
+        "paid_rows": paid_rows,
+        "base_sum": base_sum,
+        "surch_sum": surch_sum,
+        "header_status": header_status,
+        "clearance_year": clearance_year,
+    })
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@inject
+def initiate_business_closure(
+    request: HttpRequest,
+    b_id: int,
+    business_info: IBusinessInfoService = Provide[AppContainer.owner_business_service],
+    renewal_quote_svc: IBusinessRenewalQuoteService = Provide[AppContainer.business_renewal_quote_service],
+):
+    user_role = _auth_role_name(request)
+
+    # Reuse the same DTO pattern used elsewhere
+    dto = business_info.execute_by_business_id(b_id)
+
+    def _compose_owner_full_name(data: dict) -> str | None:
+        last   = (data.get("last_name") or "").strip()
+        first  = (data.get("first_name") or "").strip()
+        middle = (data.get("middle_name") or "").strip()
+        suffix = (data.get("suffix") or "").strip()
+        parts = []
+        if last:   parts.append(last.upper())
+        if first:  parts.append((", " if parts else "") + first.title())
+        if middle: parts.append(" " + middle[:1].upper() + ".")
+        if suffix: parts.append(" " + suffix.upper())
+        return "".join(parts) or None
+
+    owner = dict(dto.owner or {})
+    owner["owner_full_name"] = _compose_owner_full_name(owner)
+
+    business = dto.business or {}
+    header_status = ((business.get("business_status") or "").strip().upper())
+
+    # NEW: compute outstanding dues (reusing renewal quote)
+    current_year = date.today().year
+    grand_total, quote_rows, paid_rows = renewal_quote_svc.execute(business_id=b_id, year=current_year)
+
+    def _to_decimal(x):
+        if x is None:
+            return Decimal("0")
+        return x if isinstance(x, Decimal) else Decimal(str(x))
+
+    quote_rows = quote_rows or []
+    base_sum  = sum(_to_decimal(getattr(r, "base_fee", 0))   for r in quote_rows)
+    surch_sum = sum(_to_decimal(getattr(r, "surcharge", 0))  for r in quote_rows)
+    has_dues  = (_to_decimal(grand_total) > 0)
+
+    return render(request, "business/initiate_business_closure.html", {
+        'page_path'    : f'{user_role} / Business Closure : {b_id:06d}',
+        'page_title'   : f'Business Closure : {b_id:06d}',
+        'business'     : business,
+        'owner'        : owner,
+        'header_status': header_status,
+
+        # NEW context for dues display
+        'grand_total'  : grand_total,
+        'quote_rows'   : quote_rows,
+        'base_sum'     : base_sum,
+        'surch_sum'    : surch_sum,
+        'has_dues'     : has_dues,
+        'clearance_year': current_year,  # optional for display/consistency
+    })
+
+def renewal_request(request, b_id):
+    user_role = _auth_role_name(request)
+
+    return render(request, "business/renewal_request.html", {
+        'page_path' : f'{user_role} / Renewal Request : {b_id}',
+        'page_title' : f'Renewal Request : {b_id}',
+    })
+
+def decision_request(request):
+    pass
+
+def approve_request(request):
+    pass

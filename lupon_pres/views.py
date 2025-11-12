@@ -1,4 +1,5 @@
 # lupon_pres/views.py
+from __future__ import annotations
 from django.shortcuts import render
 from authentication.guards import session_login_required, role_required
 
@@ -37,7 +38,7 @@ def dashboard(request):
         "page_title": "Dashboard",
         "auth": auth,
     })
-from __future__ import annotations
+
 
 import os
 os.environ.setdefault("HTTPX_DISABLE_HTTP2", "1")
