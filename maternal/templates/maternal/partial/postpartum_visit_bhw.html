@@ -1,0 +1,61 @@
+<div class="modal fade mhr" id="postpartumVisitBHWModal" tabindex="-1" aria-labelledby="postpartumVisitBHWLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="postpartumVisitBHWLabel">Postpartum Visit (Barangay Health Worker)</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="postpartumVisitBHWForm" class="needs-validation" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="maternal_record_id" id="bhw_maternal_record_id" value="" />
+        <div class="modal-body">
+          <div id="bhwFormAlert"></div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label for="lochial_discharge" class="form-label">Lochial Discharge</label>
+              <input type="text" class="form-control" id="lochial_discharge" name="lochial_discharge" required />
+              <div class="invalid-feedback">Please enter lochial discharge description.</div>
+            </div>
+
+            <div class="col-md-3">
+              <label for="bp_systolic" class="form-label">BP Systolic</label>
+              <input type="number" class="form-control" id="bp_systolic" name="bp_systolic" min="30" max="300" required />
+              <div class="invalid-feedback">Enter a valid systolic value.</div>
+            </div>
+
+            <div class="col-md-3">
+              <label for="bp_diastolic" class="form-label">BP Diastolic</label>
+              <input type="number" class="form-control" id="bp_diastolic" name="bp_diastolic" min="20" max="200" required />
+              <div class="invalid-feedback">Enter a valid diastolic value.</div>
+            </div>
+
+            <div class="col-12">
+              <label for="feeding_type" class="form-label">Feeding Type</label>
+              <select class="form-select" id="feeding_type" name="feeding_type" required>
+                <option value="">Select feeding type</option>
+                <option value="1">EXCLUSIVE BREASTFEEDING</option>
+                <option value="2">MIXED FEEDING</option>
+                <option value="3">FORMULA FEEDING</option>
+              </select>
+              <div class="invalid-feedback">Please choose a feeding type.</div>
+            </div>
+
+            <div class="col-12">
+              <label for="bhw_notes" class="form-label">Notes (optional)</label>
+              <textarea class="form-control" id="bhw_notes" name="notes" rows="3"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer sticky-footer">
+          <div>
+            <small class="text-muted">Measurements recorded will be saved to the maternal record.</small>
+          </div>
+          <div>
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="bhw_submit_btn">Save</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
