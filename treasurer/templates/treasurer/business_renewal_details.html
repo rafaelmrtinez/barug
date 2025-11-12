@@ -251,6 +251,73 @@
       </div>
     </div>
 
+    <!-- Pay All Unpaid Years (Bulk) -->
+    <div class="card card-soft sticky-aside mt-3">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="section-title mb-0"><span class="dot"></span> Pay All Unpaid Years</div>
+        </div>
+
+        <div class="small text-muted mb-2">
+          Creates/uses renewal requests for all unpaid years up to the year you set below, then accepts a single bulk payment.
+        </div>
+
+        <form method="post" action="{% url 'treasurer:business_renewal_take_payment_all' biz.business_id|default:renewal.business_id %}">
+          {% csrf_token %}
+
+          <!-- Period type (ANNUAL / QUARTERLY) -->
+          <div class="mb-2">
+            <label class="form-label">Period Type</label>
+            <div class="d-flex gap-3">
+              <label class="form-check-label">
+                <input class="form-check-input" type="radio" name="period_type"
+                      value="ANNUAL" {% if renewal.period_type|upper != 'QUARTERLY' %}checked{% endif %}>
+                ANNUAL
+              </label>
+              <label class="form-check-label">
+                <input class="form-check-input" type="radio" name="period_type"
+                      value="QUARTERLY" {% if renewal.period_type|upper == 'QUARTERLY' %}checked{% endif %}>
+                QUARTERLY
+              </label>
+            </div>
+            <div class="form-text">For QUARTERLY, arrears are created/paid by quarter.</div>
+          </div>
+
+          <!-- Pay all unpaid up to YEAR -->
+          <div class="mb-2">
+            <label class="form-label">Pay up to Year (inclusive)</label>
+            {% now "Y" as current_year %}
+            <input class="form-control" name="period_year" type="number"
+                  value="{{ renewal.period_year|default_if_none:current_year }}"
+                  min="2000" max="2100" required>
+          </div>
+
+          <!-- Optional: Paid On (defaults to today if blank) -->
+          <div class="mb-2">
+            <label class="form-label">Paid On (optional)</label>
+            <input class="form-control" name="paid_on" type="date" value="">
+          </div>
+
+          <!-- Payment Method -->
+          <div class="mb-3">
+            <label class="form-label">Payment Method</label>
+            <select class="form-select" name="payment_method_id" required>
+              {% for m in methods %}
+                <option value="{{ m.payment_method_id }}">{{ m.method_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <button type="button"
+                  class="btn btn-brand w-100 py-2 js-confirm"
+                  data-confirm-title="Pay All Unpaid Years"
+                  data-confirm-message="This will create/confirm renewal requests for all unpaid years up to the selected year and accept a single bulk payment. Proceed?">
+            {% bs_icon 'calendar-check' extra_classes='me-2' %}Pay All Unpaid Years
+          </button>
+        </form>
+      </div>
+    </div>
+
     {# --- Recalculate Surcharge (Preview) --- #}
 <div class="card card-soft sticky-aside mb-3">
   <div class="card-body">

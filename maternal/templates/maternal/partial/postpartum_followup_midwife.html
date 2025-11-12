@@ -1,0 +1,38 @@
+<div class="modal fade mhr" id="postpartumFollowupMidwifeModal" tabindex="-1" aria-labelledby="postpartumFollowupMidwifeLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="postpartumFollowupMidwifeLabel">Postpartum Follow-up (Midwife)</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="postpartumFollowupMidwifeForm" class="needs-validation" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="maternal_record_id" id="midwife_maternal_record_id" value="" />
+        <div class="modal-body">
+          <div id="midwifeFormAlert"></div>
+          <div class="row g-3">
+            <div class="col-12">
+              <label for="mid_findings" class="form-label">Findings</label>
+              <textarea class="form-control" id="mid_findings" name="findings" rows="4" required></textarea>
+              <div class="invalid-feedback">Please provide findings.</div>
+            </div>
+
+            <div class="col-12">
+              <label for="mid_notes" class="form-label">Notes</label>
+              <textarea class="form-control" id="mid_notes" name="notes" rows="3"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer sticky-footer">
+          <div>
+            <small class="text-muted">All fields are saved to the maternal record.</small>
+          </div>
+          <div>
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="midwife_submit_btn">Save</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

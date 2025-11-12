@@ -1,0 +1,46 @@
+{% load static %}
+<!-- Upload Barangay FAQ's Modal Partial -->
+<div class="modal fade" id="uploadFaqModal" tabindex="-1" aria-labelledby="uploadFaqModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content cardx">
+        <div class="modal-header cap d-flex align-items-center" style="gap:8px;">
+          <div>
+            <h5 class="modal-title" id="uploadFaqModalLabel" style="margin:0; color:var(--brand-800);">Upload Barangay FAQ's (Excel)</h5>
+            <div class="text-muted" style="font-size:.85rem;">Preview the sheet before updating the public FAQs</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body body">
+        <div class="mb-3">
+          <label for="faqFileInput" class="form-label">Select Excel file (.xls, .xlsx)</label>
+          <input class="form-control" type="file" id="faqFileInput" accept=".xls,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+          <div id="faqFileHelp" class="form-text">Choose an Excel file containing the FAQ records. Preview to inspect first rows before updating.</div>
+        </div>
+
+        <div class="mb-3 d-flex gap-2">
+          <button type="button" id="faqPreviewBtn" class="btn btn-outline-secondary" disabled>Preview File</button>
+          <button type="button" id="faqUploadBtn" class="btn btn-primary" disabled style="background:var(--brand-700); border-color:var(--brand-700);">Update FAQ's</button>
+          <div id="faqSpinner" class="spinner-border text-primary" role="status" style="display:none; width:1.3rem; height:1.3rem; align-self:center; margin-left:6px;">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+
+        <div id="faqMsg" class="mb-2" style="display:none;"></div>
+
+        <div id="faqPreviewContainer" style="max-height:360px; overflow:auto; display:none; border:1px solid var(--line); padding:8px; border-radius:6px; background:var(--card);">
+          <!-- Preview table will be injected here -->
+        </div>
+      </div>
+      <div class="modal-footer cap" style="background:transparent; border-top:none;">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SheetJS (XLSX) CDN -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- Ensure toast helper loads before the API client so MHRToast is available -->
+<script src="{% static 'maternal/js/mhr_toast.js' %}"></script>
+<script defer src="{% static 'captain/js/faqs_paginator.js' %}"></script>
+<script defer src="{% static 'captain/js/faqs_api.js' %}"></script>

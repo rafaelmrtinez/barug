@@ -95,6 +95,8 @@ class MaternalHealthRecordException(Exception):
         "P6220",  # Pending schedule exists for this maternal record on date
         "P6M05",  # Provided status id does not exist (note: as-seen in SQL)
         "P6256",  # Postpartum record not found for maternal record
+    "P6255",  # Postpartum record for today's visit not found
+    "P6124",  # Feeding type not found
         "P6257",  # Scheduled date/time required (postpartum)
         "P6258",  # Pending postpartum schedule already exists on date
         "P6147",  # Pending status not found (postpartum)

@@ -51,6 +51,20 @@ class IBusinessRepository(ABC):
     ) -> list[Dict[str, Any]]:
         pass
 
+    @abstractmethod
+    def find_duplicate_business(
+        self,
+        *,
+        owner_person_id: int,
+        business_name: str,
+        city: str,
+        barangay: str,
+        street: str,
+        purok_sitio_id: Optional[int],
+        b_category_id: Optional[int],
+    ) -> Optional[int]:
+        pass
+
 class IResidentOwnerRepository(ABC):
 
     @abstractmethod
@@ -114,4 +128,20 @@ class IBusinessRenewalRequestRepository(ABC):
     @abstractmethod
     def request_renewal(self, cmd: CreateRenewalRequestCmd) -> int:
         """Calls public.create_renewal_request(...) and returns renewal_request_id."""
+        pass
+    
+    @abstractmethod
+    def request_unpaid(self, cmd: CreateRenewalRequestCmd) -> list[int]:
+        """Calls public.create_renewal_requests_for_unpaid_h(...) and returns a list of renewal_request_id."""
+        pass
+
+class IBusinessClosurePaymentRequestRepository(ABC):
+    @abstractmethod
+    def request_payment(self, cmd: CreateRenewalRequestCmd) -> int:
+        """Calls public.create_closure_payment_request_h(...)"""
+        pass
+
+    @abstractmethod
+    def request_unpaid(self, cmd: CreateRenewalRequestCmd) -> list[int]:
+        """Calls public.create_closure_payment_requests_for_unpaid_h(...)"""
         pass

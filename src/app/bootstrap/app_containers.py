@@ -12,6 +12,7 @@ from src.app.contracts.maternal_postpartum_service import IMaternalPostpartumSer
 from src.app.contracts.maternal_status_service import IMaternalRecordStatusService
 from src.app.contracts.laboratory_service import ILaboratoryService
 from src.app.contracts.image_download_service import IImageDownloadService
+from src.app.contracts.child_health_schedule_service import IChildHealthScheduleService
 
 # concrete service implementations
 from src.app.services.antenatal_service import AntenatalCareService
@@ -25,6 +26,8 @@ from src.app.services.maternal_postpartum_service import MaternalPostpartumServi
 from src.app.services.maternal_status_service import MaternalRecordStatusService
 from src.app.services.laboratory_service import LaboratoryService
 from src.app.services.image_download_service import ImageDownloadService
+from src.app.services.faq_ingestion_service import FAQIngestionService
+from src.app.services.child_health_schedule_service import ChildHealthScheduleService
 
 
 from src.app.contracts.business_service_contract import (
@@ -34,6 +37,7 @@ from src.app.contracts.business_service_contract import (
     IBusinessRenewalService,
     IBusinessRenewalQuoteService,
     IBusinessRenewalRequestService,
+    IBusinessClosurePaymentRequestService,
 )
 from src.domain.contracts.household_repository_contract import (
     IHouseholdRepository
@@ -46,6 +50,7 @@ from src.app.services.business_service import (
     BusinessRenewalService,
     BusinessRenewalQuoteService,
     BusinessRenewalRequestService,
+    BusinessClosurePaymentRequestService,
 )
 from src.app.contracts.household_service_contract import (
     IHouseholdService
@@ -58,10 +63,6 @@ from src.app.services.household_service import (
 class AppContainer(containers.DeclarativeContainer):
     """Application container for dependency injection."""
 
-    # wiring_config = containers.WiringConfiguration(
-    #     modules=["clerk.views.business"]   # 👈 THIS matches your file path
-    # )
-    
     config = providers.Configuration()
 
     infra = providers.DependenciesContainer()
@@ -168,4 +169,21 @@ class AppContainer(containers.DeclarativeContainer):
     business_renewal_request_service: providers.Factory[IBusinessRenewalRequestService] = providers.Factory(
         BusinessRenewalRequestService,
         repo=infra.business_renewal_request
+    )
+
+    business_closure_payment_request_service: providers.Factory[IBusinessClosurePaymentRequestService] = providers.Factory(
+        BusinessClosurePaymentRequestService,
+        repo=infra.business_closure_payment_request,
+    )
+
+    # FAQ ingestion service
+    faq_ingestion_service = providers.Factory(
+        FAQIngestionService,
+        repository=infra.faq_ingestion_repository,
+    )
+
+    # Child health schedule service (thin orchestration service)
+    child_health_schedule_service: providers.Factory[IChildHealthScheduleService] = providers.Factory(
+        ChildHealthScheduleService,
+        repo=infra.child_health_record_repository,
     )

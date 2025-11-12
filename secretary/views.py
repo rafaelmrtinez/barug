@@ -47,7 +47,9 @@ from src.domain.contracts.household_repository_contract import (
 from .forms import (
     StaffFilters,
     BusinessFilters,
-    HouseholdFilters
+    HouseholdFilters,
+    AnnouncementDraftForm,
+    DraftListSearch,
 )
 
 
@@ -1862,3 +1864,28 @@ def api_business_pins(
     )
     return JsonResponse(pins, safe=False)
 
+# -------------------------------
+# ANNOUNCEMENT
+# -------------------------------
+
+def annoucement_draf(request):
+    user_role = _auth_role_name(request)
+
+    form = AnnouncementDraftForm()
+
+    return render(request, "announcement/draft.html", {
+        'page_path': f'{user_role} / Resident List',
+        'page_title': 'Resident List',
+        'form': form,
+    })
+
+def announcement_draft_list(request):
+    user_role = _auth_role_name(request)
+
+    form = DraftListSearch()
+
+    return render(request, "announcement/draft_list.html", {
+        'page_path': f'{user_role} / Resident List',
+        'page_title': 'Resident List',
+        'form': form,
+    })
