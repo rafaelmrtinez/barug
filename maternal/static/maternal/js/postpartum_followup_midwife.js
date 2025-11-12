@@ -57,31 +57,50 @@
 
       const payload = { maternal_record_id, findings, notes };
 
+      // spinner on submit
+      const origBtnHtml = submitBtn.innerHTML;
       try{
         submitBtn.disabled = true;
-        const endpoint = '/api/dummy/maternal/postpartum/midwife'; // dummy endpoint
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' + origBtnHtml;
+        const endpoint = '/maternal/api/form/postpartum/midwife/';
         const resp = await submitForm(payload, endpoint);
         if (!resp.ok){
           let text = 'Failed to save. Please try again.';
-          try { const j = await resp.json(); if (j && j.error) text = j.error; } catch(e){}
-          MHRToast.show(text, false);
+          try {
+            const j = await resp.json();
+            if (j) {
+              if (j.message) text = j.message;
+              else if (j.error) text = j.error;
+              else if (j.errors) text = Array.isArray(j.errors) ? j.errors.join('\n') : JSON.stringify(j.errors);
+            }
+          } catch(_e) { /* ignore */ }
+          globalThis.MHRToast.show(text, false);
           return;
         }
 
-        MHRToast.show('Postpartum follow-up saved', true);
+        let successMsg = 'Postpartum follow-up saved';
+        try { const j = await resp.json(); if (j && j.message) successMsg = j.message; } catch (_e) { /* ignore */ }
+        globalThis.MHRToast.show(successMsg, true);
+        // clear form
+        try {
+          form.reset();
+          const hid = document.getElementById('midwife_maternal_record_id');
+          if (hid) hid.value = '';
+        } catch (_e) { /* ignore */ }
         // optionally close modal if bootstrap present
         try{
-          if (window.bootstrap){
+          if (globalThis.bootstrap){
             const modalEl = document.getElementById('postpartumFollowupMidwifeModal');
-            const modal = bootstrap.Modal.getInstance(modalEl);
+            const modal = globalThis.bootstrap.Modal.getInstance(modalEl);
             if (modal) modal.hide();
           }
         }catch(e){}
 
       }catch(err){
         console.error(err);
-        MHRToast.show('An unexpected error occured', false);
+        try { globalThis.MHRToast.show(err && err.message ? err.message : 'An unexpected error occured', false); } catch (_e) { console.warn(_e); }
       }finally{
+        try { submitBtn.innerHTML = origBtnHtml; } catch (_e) { /* ignore */ }
         submitBtn.disabled = false;
       }
 
