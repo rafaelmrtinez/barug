@@ -1,4 +1,4 @@
-class ChildHealthRecordException(Exception):
+class GenericChildHealthRecordException(Exception):
     """Base exception for child health record/report operations."""
 
     def __init__(self, message: str):

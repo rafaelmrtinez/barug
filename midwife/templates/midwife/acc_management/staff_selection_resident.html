@@ -92,17 +92,29 @@
                   <div class="kv-item"><span class="kv-key">Middle Name</span><span class="kv-val">{{ res_details.middle_name|default:""|title }}</span></div>
                   <div class="kv-item"><span class="kv-key">Suffix</span><span class="kv-val">{{ res_details.suffix|default:""|title }}</span></div>
                   <div class="kv-item"><span class="kv-key">Sex</span><span class="kv-val">{{ res_details.sex|default:""|title }}</span></div>
-                  <div class="kv-item"><span class="kv-key">Date of Birth</span><span class="kv-val">{{ res_details.birthdate|default:""|title }}</span></div>
+                  <div class="kv-item"><span class="kv-key">Date of Birth</span>
+                    <span class="kv-val">
+                      {% if res_details.birthdate_display %}
+                        {{ res_details.birthdate_display }}
+                      {% elif res_details.birthdate %}
+                        {{ res_details.birthdate }}
+                      {% else %}
+                        
+                      {% endif %}
+                    </span>
+                  </div>
                   <div class="kv-item"><span class="kv-key">Civil Status</span><span class="kv-val">{{ res_details.civil_status|default:""|title }}</span></div>
                   <div class="kv-item"><span class="kv-key">Nationality</span><span class="kv-val">{{ res_details.nationality|default:""|title }}</span></div>
                   <div class="kv-item"><span class="kv-key">Religion</span><span class="kv-val">{{ res_details.religion|default:""|title }}</span></div>
                   <div class="kv-item">
                     <span class="kv-key">Home Address</span>
                     <span class="kv-val">
-                      {{ res_details.street_name|default:""|title }},
-                      {{ res_details.purok_sitio_name|default:""|title }},
-                      {{ res_details.barangay_name|default:""|title }},
-                      {{ res_details.city_name|default:""|title }}
+                      {% with street=res_details.street_name|default_if_none:''|title purok=res_details.purok_sitio_name|default_if_none:''|title barangay=res_details.barangay_name|default_if_none:''|title city=res_details.city_name|default_if_none:''|title %}
+                        {% if street %}{{ street }}{% endif %}
+                        {% if purok %}{% if street %}, {% endif %}{{ purok }}{% endif %}
+                        {% if barangay %}{% if street or purok %}, {% endif %}{{ barangay }}{% endif %}
+                        {% if city %}{% if street or purok or barangay %}, {% endif %}{{ city }}{% endif %}
+                      {% endwith %}
                     </span>
                   </div>
                   <div class="kv-item"><span class="kv-key">Email Address</span><span class="kv-val">{{ res_details.email|default:"" }}</span></div>
@@ -184,7 +196,7 @@
       </div>
 
       <!-- ALWAYS SHOW PUROK SELECTION -->
-      <form id="controlsForm8" method="post" action="{% url 'midwife:staff_selection_resident' %}" novalidate>
+      <form id="controlsForm8" method="post" action="{% url 'midwife:staff_selection_resident' %}" enctype="multipart/form-data" novalidate>
         {% csrf_token %}
         <input type="hidden" name="pid" id="pid" value="{{ res_details.person_id|default_if_none:'' }}">
 
@@ -261,8 +273,8 @@
   };
 
   const el = {
-    formSearch: document.getElementById('controlsForm1'),
-    formMain:   document.getElementById('controlsForm2'),
+    formSearch: document.getElementById('controlsForm7'),
+    formMain:   document.getElementById('controlsForm8'),
     inputSearch:document.getElementById('residentSearch'),
     dd:         document.getElementById('residentDropdown'),
     pid:        document.getElementById('pid'),

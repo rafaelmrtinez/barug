@@ -10,10 +10,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
-logger = logging.getLogger(__name__)
-
-
 class MaternalHealthRecordRepository(IMaternalHealthRecordRepository):
 
     def __init__(self, ctx: ConnectionAdapter):
@@ -643,6 +639,43 @@ class MaternalHealthRecordRepository(IMaternalHealthRecordRepository):
             return rows[0] if rows else None
         except QueryExecutionException as e:
             logger.error(f"Error inserting ANC row findings: {e.message}")
+            if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
+                raise MaternalHealthRecordException(e.message) from e
+            raise e
+
+    def get_or_create_today_postpartum_visit(self, p_maternal_record_id, p_staff_id, p_lochial_discharges=None, p_bp_systolic=None, p_bp_diastolic=None, p_feeding_type_id=None):
+        """Call DB func _get_or_create_today_postpartum_visit and return the visit row or id.
+
+        Parameters align with the DB function:
+          p_maternal_record_id, p_staff_id, p_lochial_discharges, p_bp_systolic, p_bp_diastolic, p_feeding_type_id
+        """
+    # p_lochial_discharges may be textual (description) while bp and feeding_type are numeric
+        sql = """SELECT * FROM _get_or_create_today_postpartum_visit(%s::INTEGER, %s::INTEGER, %s::TEXT, %s::INTEGER, %s::INTEGER, %s::INTEGER);"""
+        params = (p_maternal_record_id, p_staff_id, p_lochial_discharges, p_bp_systolic, p_bp_diastolic, p_feeding_type_id)
+        try:
+            rows = self.ctx.execute_query(sql, params)
+            # SQL function returns a single column (pp_visit_id) — return as int if present
+            if rows and len(rows) and len(rows[0]):
+                return int(rows[0][0])
+            return None
+        except QueryExecutionException as e:
+            logger.error(f"Error calling _get_or_create_today_postpartum_visit: %s", getattr(e, 'message', e))
+            if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
+                raise MaternalHealthRecordException(e.message) from e
+            raise e
+
+    def update_postpartum_visit_row_findings(self, p_maternal_record_id, p_performed_by_id, p_findings, p_nurse_notes):
+        """Call DB func update_postpartum_visit_row_findings to update findings/notes for today's postpartum visit."""
+        sql = """SELECT * FROM update_postpartum_visit_row_findings(%s::INTEGER, %s::INTEGER, %s::TEXT, %s::TEXT);"""
+        params = (p_maternal_record_id, p_performed_by_id, p_findings, p_nurse_notes)
+        try:
+            rows = self.ctx.execute_query(sql, params)
+            # SQL function returns a boolean TRUE on success — return as bool
+            if rows and len(rows) and len(rows[0]):
+                return bool(rows[0][0])
+            return False
+        except QueryExecutionException as e:
+            logger.error(f"Error updating postpartum visit row findings: %s", getattr(e, 'message', e))
             if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
                 raise MaternalHealthRecordException(e.message) from e
             raise e

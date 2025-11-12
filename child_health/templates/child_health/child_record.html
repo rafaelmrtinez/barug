@@ -26,6 +26,13 @@
                     </div>
                 </form>
 
+                {% comment %} Show total matches when a query is present {% endcomment %}
+                {% if request.GET.q %}
+                    <div class="align-self-center ms-3">
+                        <small class="text-muted">{{ total_matches|default:"0" }} matches</small>
+                    </div>
+                {% endif %}
+
                 {% if request.session.auth.role_name == "barangay health worker" %}
                     <button type="button"
                             class="btn btn-brand d-flex align-items-center justify-content-center px-3"
@@ -45,9 +52,7 @@
                             <th>Mother</th>
                             <th>Father</th>
                             <th>Date Added</th>
-                            {% if request.session.auth.role_name == "midwife" %}
                             <th>Action</th>
-                            {% endif %}
                         </tr>
                     </thead>
                     <tbody>
@@ -59,32 +64,51 @@
                                     <td>{{ record.mother_full_name }}</td>
                                     <td>{{ record.father_full_name }}</td>
                                     <td>{{ record.record_created_at|date:"Y-m-d H:i" }}</td>
-                                    {% if request.session.auth.role_name == "midwife" %}
                                     <td>
                                         <div class="dropdown position-static">
                                             <button class="btn btn-outline-brand btn-sm dropdown-toggle" type="button" id="actionDropdown{{ record.child_record_id }}" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
                                                 {% bs_icon 'three-dots-vertical' extra_classes='me-1' %} Actions
                                             </button>
                                             <ul class="dropdown-menu" aria-labelledby="actionDropdown{{ record.child_record_id }}">
-                                                <li>
-                                                    <a class="dropdown-item" href="{% url 'child_health:child_health_entry' record.child_record_id %}">
-                                                        {% bs_icon 'folder2-open' extra_classes='me-1' %}Open
-                                                    </a>
-                                                </li>
-                                                <li>
-                                                    <button class="dropdown-item btn-generate-child-summary" data-child-id="{{ record.child_record_id }}" type="button">
-                                                        {% bs_icon 'file-earmark-pdf' extra_classes='me-1' %}Generate Child Health Report Summary
-                                                    </button>
-                                                </li>
+                                                {% if request.session.auth.role_name == "midwife" %}
+                                                    <li>
+                                                        <a class="dropdown-item" href="{% url 'child_health:child_health_entry' record.child_record_id %}">
+                                                            {% bs_icon 'folder2-open' extra_classes='me-1' %}Open
+                                                        </a>
+                                                    </li>
+                                                                        {% elif request.session.auth.role_name == "barangay health worker" %}
+                                                                            <li>
+                                                                                <button class="dropdown-item btn-generate-child-summary" data-child-id="{{ record.child_record_id }}" type="button">
+                                                                                    {% bs_icon 'file-earmark-pdf' extra_classes='me-1' %}Generate Child Health Report Summary
+                                                                                </button>
+                                                                            </li>
+                                                                            <li>
+                                                                                <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#visitScheduleModal" data-child-id="{{ record.child_record_id }}">
+                                                                                    {% bs_icon 'calendar3' extra_classes='me-1' %}Schedule Visit
+                                                                                </a>
+                                                                            </li>
+                                                {% else %}
+                                                    <!-- Default for other roles: show Open -->
+                                                    <li>
+                                                        <a class="dropdown-item" href="{% url 'child_health:child_health_entry' record.child_record_id %}">
+                                                            {% bs_icon 'folder2-open' extra_classes='me-1' %}Open
+                                                        </a>
+                                                    </li>
+                                                {% endif %}
                                             </ul>
                                         </div>
                                     </td>
-                                    {% endif %}
                                 </tr>
                             {% endfor %}
                         {% else %}
                             <tr>
-                                <td colspan="6" class="text-center text-muted">No records found.</td>
+                                <td colspan="6" class="text-center text-muted">
+                                    {% if request.GET.q %}
+                                        No results for "{{ request.GET.q }}" ({{ total_matches|default:0 }} matches).
+                                    {% else %}
+                                        No records found.
+                                    {% endif %}
+                                </td>
                             </tr>
                         {% endif %}
                     </tbody>
@@ -129,9 +153,15 @@
         </div>
     </div>
 </div>
-                <!-- Toast utility (used by generator) -->
-                <script defer src="{% static 'maternal/js/mhr_toast.js' %}"></script>
-                <!-- Child report script -->
-                <script src="{% static 'child_health/js/generate_child_summary.js' %}"></script>
+<!-- Toast utility (used by generator) -->
+<script defer src="{% static 'maternal/js/mhr_toast.js' %}"></script>
+<!-- Child report script -->
+<script src="{% static 'child_health/js/generate_child_summary.js' %}"></script>
+<!-- Visit schedule scripts (UI + API) -->
+<script defer src="{% static 'child_health/js/visit_schedule/ui.js' %}"></script>
+<script defer src="{% static 'child_health/js/visit_schedule/api.js' %}"></script>
+
+{# Include modal partial for scheduling visits #}
+{% include 'child_health/partial/visit_schedule_modal.html' %}
 
 {% endblock %}

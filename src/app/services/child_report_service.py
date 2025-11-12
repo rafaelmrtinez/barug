@@ -3,7 +3,7 @@ from typing import Optional, Tuple, List
 from src.infra.utilities.pdf_generator import PdfGenerator
 from src.infra.utilities.age_calculator import AgeCalculator
 from src.infra.repositories.child_report_repository import ChildReportRepository
-from src.infra.exceptions.child_health_record_exceptions import ChildHealthRecordException
+from src.infra.exceptions.generic_child_health_record_exceptions import GenericChildHealthRecordException
 import logging
 from src.app.utility.maternal_report_helpers import MaternalReportHelpers
 from reportlab.platypus import Paragraph
@@ -65,7 +65,7 @@ class ChildReportService:
 
             if not payload.get("patient_info"):
                 logger.error("Child health record %s not found", child_record_id)
-                raise ChildHealthRecordException("Child health record not found")
+                raise GenericChildHealthRecordException("Child health record not found")
 
             # Quick presence checks for many required fields from the
             # user's checklist. We collect human-readable labels for any

@@ -3,7 +3,9 @@ from django import forms
 ROLE_CHOICES = [
     (3,  "Barangay Captain"), (4,  "Barangay Secretary"),(5,  "Barangay Treasurer"), 
     (6,  "Barangay Clerk"), (7,  "Barangay Lupon President"), (8,  "Barangay Lupon Member"), 
-    (9,  "Barangay Health Worker"), (10, "Nurse"), (11, "Midwife"),
+    (9,  "Barangay Health Worker"), 
+    # (10, "Nurse"), 
+    (11, "Midwife"),
 ]
 
 PUROK_CHOICES = [
@@ -52,6 +54,57 @@ VALID_ID_TYPE_CHOICES = [
 STAFF_ACCOUNT_STATUS = [
     (1, "Active"), (2, "Inactive"), (3, "Deactivated"), (4, "Pending"),
 ]
+
+class StaffUpdateForm(forms.Form):
+    role = forms.ChoiceField(
+        choices=[("", "— Select a Role —")] + ROLE_CHOICES,
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+        }),
+        label='Role',
+        required=False,
+    )
+    assigned_purok = forms.ChoiceField(
+        choices=[("", "— Select Purok/Sitio —")] + PUROK_CHOICES,
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+        }),
+        label='Assigned Purok',
+        required=False,
+    )
+    schedule = forms.CharField(
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'Enter schedule details'
+        }),
+        label='Schedule',
+        required=False,
+    )
+    account_status = forms.ChoiceField(
+        choices=[("", "— Select Status —")] + STAFF_ACCOUNT_STATUS,
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+        }),
+        label='Account Status',
+        required=False,
+    )
+    username = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter username'
+        }),
+        label='Username',
+        required=False,
+    )
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Leave blank to keep current'
+        }),
+        label='New Password',
+        required=False,
+    )
 
 class UpdateInfo(forms.Form):
     role = forms.ChoiceField(
@@ -130,14 +183,11 @@ class UpdateInfo(forms.Form):
     )
 
 class Schedule(forms.Form):
-    day = forms.ChoiceField(
-        choices = [],
-        widget=forms.Select(attrs={
-            'id' : 'day',
-            'class' : 'form-select',
-    }),
-        label= 'Select a Day',
-        required= True,
+    day = forms.TypedChoiceField(
+        label="Select a Day",
+        choices=[("", "— Select a Day —")] + DAY_CHOICES,
+        coerce=int, empty_value=None, required=True,
+        widget=forms.Select(attrs={"id": "day", "class": "form-select"})
     )
     time_start = forms.TimeField(
         widget=forms.TimeInput(attrs={
@@ -196,6 +246,54 @@ class StaffFilters(forms.Form):
     )
 
 
+class StaffAccountRequestFilters(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search Staff Requests',
+            'name': 'q'
+        }),
+        label='Search Staff Requests',
+        required= False,
+    )
+    role = forms.ChoiceField(
+        choices=[("", "— Select a Role —")] + ROLE_CHOICES,
+        widget=forms.Select(attrs={
+            'id': 'role_filter',
+            'class': 'form-select',
+            'name': 'role',
+        }),
+        label='Filter by Role',
+        required=False,
+    )
+    date_submitted = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'id': 'date_submitted',
+            'class': 'form-control',
+            'name': 'date_submitted',
+        }),
+        label='Date Submitted',
+        required=False,
+    )
+    status = forms.ChoiceField(
+        choices=[
+            ("", "ALL"),
+            ("46", "WAITING FOR ID VALIDATION"),
+            ("29", "WAITING FOR BARANGAY CAPTAIN'S APPROVAL"),
+            ("30", "WAITING FOR ADMIN'S APPROVAL"),
+            ("3", "APPROVED"),
+            ("4", "REJECTED")
+        ],
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'name': 'status',
+        }),
+        label='Request Status',
+        required=False,
+    )
+
 class SearchPerson(forms.Form):
     search = forms.CharField(
         widget=forms.TextInput(attrs={
@@ -209,23 +307,17 @@ class SearchPerson(forms.Form):
     )
 
 class ChooseRole(forms.Form):
-    role = forms.ChoiceField(
-        choices = [],
-        widget=forms.Select(attrs={
-            'id' : 'role',
-            'class' : 'form-select',
-    }),
-        label= 'Select a Role',
-        required= True,
+    role = forms.TypedChoiceField(
+        label="Select a Role",
+        choices=[("", "— Select a Role —")] + ROLE_CHOICES,
+        coerce=int, empty_value=None, required=True,
+        widget=forms.Select(attrs={"id": "role", "class": "form-select"})
     )
-    purok_sitio = forms.ChoiceField(
-        choices=[],
-        widget=forms.Select(attrs={
-            "id": "purok_sitio",
-            "class": "form-select",
-        }),
+    purok_sitio = forms.TypedChoiceField(
         label="Assign to Purok/Sitio",
-        required=False,
+        choices=[("", "— Select Purok/Sitio —")] + PUROK_CHOICES,
+        coerce=int, empty_value=None, required=False,
+        widget=forms.Select(attrs={"id": "purok_sitio", "class": "form-select"})
     )
 
 
@@ -327,7 +419,7 @@ class ResidentProfileform(forms.Form):
             'placeholder' : 'Middle Name',
     }),
         label= 'Middle Name',
-        required= True,
+        required= False,
     )
     suffix = forms.CharField(
         widget=forms.TextInput(attrs={
@@ -336,10 +428,10 @@ class ResidentProfileform(forms.Form):
             'placeholder' : 'Suffix',
     }),
         label= 'Suffix',
-        required= True,
+        required= False,
     )
     sex = forms.ChoiceField(
-        choices= [('male', 'Male'), ('female', 'Female')],
+        choices= [('1', 'Male'), ('2', 'Female')],
         widget=forms.RadioSelect(attrs={
             'id' : 'sex',
             'class' : 'form-check-input',
@@ -357,33 +449,23 @@ class ResidentProfileform(forms.Form):
         label= 'Date of Birth',
         required= True,
     )
-    civil_status = forms.ChoiceField(
-        choices= [], 
-        widget=forms.Select(attrs={
-            'id' : 'civil_status',
-            'class' : 'form-select',
-    }),
-        label= 'Civil Status',
-        required= True,
+    civil_status = forms.TypedChoiceField(
+        choices=[("", "— Select civil status —")] + [(str(i), n) for i, n in CIVIL_STATUS_CHOICES],
+        coerce=int, empty_value=None, required=True,
+        widget=forms.Select(attrs={"class": "form-select", "id": "civil_status"})
     )
-    nationality = forms.ChoiceField(
-        choices= [], 
-        widget=forms.Select(attrs={
-            'id' : 'nationality',
-            'class' : 'form-select',
-    }),
-        label= 'Nationality',
-        required= True,
+    nationality = forms.TypedChoiceField(
+        choices=[("", "— Select nationality —")] + [(str(i), n) for i, n in NATIONALITY_CHOICES],
+        coerce=int, empty_value=None, required=True,
+        widget=forms.Select(attrs={"class": "form-select", "id": "nationality"})
     )
-    religion = forms.ChoiceField(
-        choices= [], 
-        widget=forms.Select(attrs={
-            'id' : 'religion',
-            'class' : 'form-select',
-    }),
-        label= 'Religion',
-        required= True,
+
+    religion = forms.TypedChoiceField(
+        choices=[("", "— Select religion —")] + [(str(i), n) for i, n in RELIGION_CHOICES],
+        coerce=int, empty_value=None, required=True,
+        widget=forms.Select(attrs={"class": "form-select", "id": "religion"})
     )
+
     home_address = forms.CharField(
         widget=forms.TextInput(attrs={
             'id' : 'home_address',
@@ -419,7 +501,7 @@ class ResidentProfileform(forms.Form):
             'id' : 'barangay',
             'class' : 'form-control',
             'placeholder' : 'Barangay',
-            'readonly' : 'readonly',
+            # 'readonly' : 'readonly',
     }),
         label= 'Barangay',
         required= True,
@@ -429,7 +511,7 @@ class ResidentProfileform(forms.Form):
             'id' : 'city',
             'class' : 'form-control',
             'placeholder' : 'City',
-            'readonly' : 'readonly',
+            # 'readonly' : 'readonly',
     }),
         label= 'City',
         required= True,
@@ -498,14 +580,13 @@ class ResidentProfileform(forms.Form):
     #     required= True,
     # )
     # SUPPORTING DOCUMENTS
-    type_of_id = forms.ChoiceField(
-        choices= [], 
-        widget=forms.Select(attrs={
-            'id' : 'type_of_id',
-            'class' : 'form-select',
-    }),
-        label= 'ID Type',
-        required= True,
+    type_of_id = forms.TypedChoiceField(
+        label="Type of ID",
+        choices=[("", "— Select ID Type —")] + [(str(i), n) for i, n in VALID_ID_TYPE_CHOICES],
+        coerce=int,
+        empty_value=None,
+        required=True,
+        widget=forms.Select(attrs={"class": "form-select", "id": "type_of_id"})
     )
     front_id = forms.ImageField(
         widget=forms.ClearableFileInput(attrs={

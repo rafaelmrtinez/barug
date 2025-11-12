@@ -50,7 +50,7 @@ class Captain(models.Model):
         try:
             with connection.cursor() as cursor:
                 logger.info(
-                    "DB ▶ process_staff_account_request_approval(req_id=%s, by=%s, new_status=%s, remarks=%s)",
+                    "DB > process_staff_account_request_approval(req_id=%s, by=%s, new_status=%s, remarks=%s)",
                     p_staff_acc_req_id, p_approver_id, p_request_status_id, p_remarks
                 )
 
@@ -64,14 +64,14 @@ class Captain(models.Model):
                 result_text = row[0] if row else None  # 'TRUE' (Captain) or staff_code (Admin)
 
                 logger.info(
-                    "DB ✓ process_staff_account_request_approval(req_id=%s) result=%s",
+                    "DB OK process_staff_account_request_approval(req_id=%s) result=%s",
                     p_staff_acc_req_id, result_text
                 )
                 return result_text
 
         except Exception:
             logger.exception(
-                "DB ✗ process_staff_account_request_approval failed (req_id=%s, by=%s, new_status=%s, remarks=%s)",
+                "DB ERROR process_staff_account_request_approval failed (req_id=%s, by=%s, new_status=%s, remarks=%s)",
                 p_staff_acc_req_id, p_approver_id, p_request_status_id, p_remarks
             )
             raise

@@ -14,6 +14,9 @@ urlpatterns = [
 
     # New unauthorized endpoint
     path("unauthorized/", views.unauthorized, name="unauthorized"),
+    
+    # Account settings
+    path("account-settings/", views.account_settings, name="account_settings"),
 ]
 
 # (Optional) In your project root urls.py you can also set:

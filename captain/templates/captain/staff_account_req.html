@@ -7,27 +7,68 @@
 <link rel="stylesheet" href="{% static 'css/table.css' %}">
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
 <link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<link rel="stylesheet" href="{% static 'css/filters.css' %}">
+<style>
+  #filterForm input[type="date"] {
+    border: 2px solid black;
+    border-radius: 24px;
+    padding: 0.375rem 0.75rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    background-color: #fff;
+    width: 100%;
+  }
+  #filterForm input[type="date"]:focus {
+    border-color: var(--bs-danger-text-emphasis);
+    box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+    outline: none;
+  }
+</style>
 {% endblock %}
 
 {% block content %}
 <div class="page-wrap">
 
   <div class="container-fluid pt-3 page-main" style="margin-top: 40px;">
-
-    {% include 'partials/messages.html' %}
-
     <div class="row">
       <div>
 
-        <div class="col-md-4">
-            <form method="post">
-              {% csrf_token %}
+        {# ─── Toolbar: search + filters ─── #}
+        <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+          {% csrf_token %}
+          <div class="searchbox">
+            {% bs_icon 'search' extra_classes='bi' %}
+            {{form.search}}
+          </div>
 
-              <div class="form-floating mb-3">
-                  {{ form.search }}
-                  <label for="{{ form.search.id_for_label }}">{{ form.search.label }}</label>
-              </div>
-          </form>
+          {# preserve selected filters when searching #}
+          <input type="hidden" name="role" value="{{ current_filters.role }}">
+          <input type="hidden" name="date_submitted" value="{{ current_filters.date_submitted }}">
+
+          <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
+              type="button" data-bs-toggle="offcanvas" data-bs-target="#filterPanel" aria-controls="filterPanel">
+              {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+              {% if active_filters %}
+                <span class="badge rounded-pill text-bg-light ms-2">{{ active_filters|length }}</span>
+              {% endif %}
+          </button>
+        </form>
+
+        {# ─── Active filter chips ─── #}
+        <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
+          {% if active_filters %}
+            <span class="text-muted me-2 small">Active:</span>
+            {% for filter in active_filters %}
+              <a href="{{ filter.remove_url }}" class="filter-chip">
+                {{ filter.label }} <span class="x" aria-hidden="true">×</span>
+              </a>
+            {% endfor %}
+            <a href="{{ clear_filters_url }}" class="btn btn-sm btn-outline-brand ms-2 d-inline-flex align-items-center">
+              <i class="bi bi-x-circle me-1"></i>Clear all
+            </a>
+          {% else %}
+            <span class="text-muted small">No active filters.</span>
+          {% endif %}
         </div>
         
         <table class="table">
@@ -40,27 +81,30 @@
               <th scope="col">Review</th>
             </tr>
           </thead>
-          <tbody>
-            {% for row in staff_req %}
-              <tr class="table-row-height">
-                <td>{{ row.name|default:""|title }}</td>
-                <td>{{ row.role_name|default:""|title }}</td>
-                <!-- <td>{{ row.date_time_submitted|date:"M d, Y h:mma" }}</td> -->
-                <td>{{ row.date_time_submitted_pretty }}</td>
-                <td>{{ row.status_name|default:""|title }}</td>
-                <td>
-                <div class="d-flex gap-1">
-                    <a class="btn btn-icon btn-sm"
-                    href="{% url 'captain:pending_staff_details' p_staff_acc_req_id=row.staff_acc_req_id %}"
-                    title="Review request" aria-label="Review request">
-                    {% bs_icon 'eye' size='1em' %} <span class="ms-1 d-none d-sm-inline">Review</span>
-                    </a>
-                </div>
-                </td>
-              </tr>
-            {% empty %}
-              <tr><td colspan="4" class="text-center">No pending records</td></tr>
-            {% endfor %}
+          <tbody id="staff-req-tbody">
+            {% if page_obj.object_list %}
+              {% for row in page_obj.object_list %}
+                <tr class="table-row-height">
+                  <td>{{ row.name|default:""|title }}</td>
+                  <td>{{ row.role_name|default:""|title }}</td>
+                  <td>{{ row.date_time_submitted_pretty }}</td>
+                  <td>
+                    <span class="badge px-2 py-1 rounded-pill {% if row.status_id == 46 or row.status_name|upper == 'WAITING FOR ID VALIDATION' %}bg-info text-secondary{% elif row.status_id == 29 or row.status_name|upper == 'WAITING FOR BARANGAY CAPTAIN\'S APPROVAL' %}bg-primary{% elif row.status_id == 30 or row.status_name|upper == 'WAITING FOR ADMIN\'S APPROVAL' %}bg-info{% elif row.status_id == 3 or row.status_name|upper == 'APPROVED' %}bg-success{% elif row.status_id == 4 or row.status_name|upper == 'REJECTED' %}bg-danger{% else %}bg-warning text-dark{% endif %}" style="font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">{{ row.status_name|default_if_none:"PENDING" }}</span>
+                  </td>
+                  <td>
+                    <div class="d-flex gap-1">
+                      <a class="btn btn-icon btn-sm"
+                         href="{% url 'captain:pending_staff_details' p_staff_acc_req_id=row.staff_acc_req_id %}"
+                         title="Review request" aria-label="Review request">
+                        {% bs_icon 'eye' size='1em' %} <span class="ms-1 d-none d-sm-inline">Review</span>
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr><td colspan="5" class="text-center">No pending records</td></tr>
+            {% endif %}
           </tbody>
         </table>
       </div>
@@ -72,6 +116,39 @@
       {% include 'paginator.html' %}
     </div>
   {% endif %}
+
+  {# ─── Offcanvas Filters ─── #}
+  <div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
+       aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150px;">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+
+    <div class="offcanvas-body">
+      <form method="get" id="filterForm">
+        <div class="mb-3">
+          <label class="form-label">Role</label>
+          {{ form.role }}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Date Submitted</label>
+          {{ form.date_submitted }}
+        </div>
+
+        {# keep search term when applying filters #}
+        <input type="hidden" name="q" value="{{ current_filters.q }}"/>
+
+        <div class="offcanvas-footer">
+          <div class="d-flex justify-content-between">
+            <a class="btn btn-outline-brand" href="{{ clear_filters_url }}">Clear</a>
+            <button type="submit" class="btn btn-brand">Apply Filters</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
 
 </div>
 {% endblock %}

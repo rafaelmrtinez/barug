@@ -13,7 +13,7 @@ from barug import containers as app
 
 from barug.settings import BASE_DIR
 from src.infra.database.connection_adapter import ConnectionAdapter
-from src.infra.exceptions.child_health_record_exceptions import ChildHealthRecordException
+from src.infra.exceptions.generic_child_health_record_exceptions import GenericChildHealthRecordException
 from src.infra.repositories.child_report_repository import ChildReportRepository
 from src.app.services.child_report_service import ChildReportService
 from src.infra.utilities.pdf_generator import PdfGenerator
@@ -145,7 +145,7 @@ class ChildReportAPI(View):
                 except Exception:
                     logger.exception('Failed to set missing-fields header')
             return response
-        except ChildHealthRecordException as chre:
+        except GenericChildHealthRecordException as chre:
             return JsonResponse({'success': False, 'message': str(chre)}, status=404)
         except Exception:
             logger.exception('Failed generating child report for child_record %s', child_id)

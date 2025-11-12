@@ -51,22 +51,37 @@ VALID_ID_TYPE_CHOICES = [
 ]
 
 STAFF_ACCOUNT_STATUS = [
-    (1, "Active"), (2, "Inactive"), (3, "Deactivated"), #(4, "Pending"),
+    (1, "Active"), (2, "Inactive"), (3, "Deactivated"), (4, "Pending"),
 ]
 
 class UpdateInfo(forms.Form):
     role = forms.ChoiceField(
         choices=[],
         widget=forms.Select(attrs={
-            "id": "role_filter",
+            "id": "role",
             "class": "form-select",
-            "name": "role",
+            "disabled": "disabled",
+            "aria-disabled": "true",
+            "tabindex": "-1",
         }),
-        label="Filter by Role",
-        required=False,
+        label="Select a Role",
+        required=True,
     )
     # hidden twin so the value is submitted even when the select is disabled
     role_locked = forms.CharField(widget=forms.HiddenInput(), required=False)
+    
+    day = forms.ChoiceField(
+        choices=[],
+        widget=forms.Select(attrs={
+            "id": "day",
+            "class": "form-select",
+            "disabled": "disabled",
+            "aria-disabled": "true",
+            "tabindex": "-1",
+        }),
+        label="Select a Day",
+        required=True,
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -75,6 +90,9 @@ class UpdateInfo(forms.Form):
         self.fields["role"].disabled = True        # ← disable the dropdown
         self.fields["role"].widget.attrs["disabled"] = "disabled"  # (adds HTML attr)
         self.fields["role_locked"].initial = self.fields["role"].initial
+        
+        # Initialize day field choices
+        self.fields["day"].choices = [("", "— Select a Day —")] + DAY_CHOICES
 
     def clean(self):
         cd = super().clean()
@@ -82,13 +100,6 @@ class UpdateInfo(forms.Form):
         if self.fields["role"].disabled:
             cd["role"] = self.fields["role"].initial or cd.get("role_locked")
         return cd
-    
-    day = forms.TypedChoiceField(
-        label="Select a Day",
-        choices=[("", "— Select a Day —")] + DAY_CHOICES,
-        coerce=int, empty_value=None, required=True,
-        widget=forms.Select(attrs={"id": "day", "class": "form-select"})
-    )
     time_start = forms.TimeField(
         widget=forms.TimeInput(attrs={
             "id": "time_start",
