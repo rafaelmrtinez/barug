@@ -947,7 +947,7 @@
     }
   }
 
-  function goToStep(stepId){ if (!FLOW_STEPS[stepId]) return; stepHistory.push(currentStep); currentStep = stepId; renderCurrentStep(); }
+
   function goBack(){ if (stepHistory.length > 0){ currentStep = stepHistory.pop(); renderCurrentStep(); } }
   function resetFlow(){ hearingNo=1; hearingAttempt=1; mediationCount=0; Object.values(FLOW_STEPS).forEach(s=>{ if(s.__entered) delete s.__entered; }); currentStep='start'; stepHistory=[]; showGuard(''); renderCurrentStep(); }
 
@@ -1046,6 +1046,27 @@
     showWindowPills();
     setInterval(showWindowPills, 60000);
 
+    // Auto-update settlement status to REPUDIATED if KP-17 is present
+    if (haveForm('KP-17')) {
+      const currentStatus = '{{ case.7|default:"" }}'.toUpperCase();
+      if (currentStatus !== 'REPUDIATED') {
+        // Auto-submit form to update settlement status
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+        formData.append('settlement_status', 'REPUDIATED');
+        formData.append('remarks', 'Auto-updated due to KP-17 presence');
+        
+        fetch('{% url "lupon_mem:case_settlement_update" case_id %}', {
+          method: 'POST',
+          body: formData,
+          credentials: 'same-origin'
+        }).then(() => {
+          // Refresh page to show updated status
+          window.location.reload();
+        }).catch(err => console.error('Failed to update settlement status:', err));
+      }
+    }
+
     // Preload modal for instant opening
     const modal = document.getElementById('updateCaseStatusModal');
     if (modal && window.bootstrap?.Modal) {
@@ -1091,5 +1112,33 @@
     }
     renderCurrentStep();
   });
+
+  // Also check when flow steps change
+  function goToStep(stepId){ 
+    if (!FLOW_STEPS[stepId]) return; 
+    stepHistory.push(currentStep); 
+    currentStep = stepId; 
+    
+    // Auto-update settlement status when reaching KP-17
+    if (stepId === 'kp17') {
+      const currentStatus = '{{ case.7|default:"" }}'.toUpperCase();
+      if (currentStatus !== 'REPUDIATED') {
+        setTimeout(() => {
+          const formData = new FormData();
+          formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+          formData.append('settlement_status', 'REPUDIATED');
+          formData.append('remarks', 'Auto-updated due to repudiation');
+          
+          fetch('{% url "lupon_mem:case_settlement_update" case_id %}', {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+          }).catch(err => console.error('Failed to update settlement status:', err));
+        }, 500);
+      }
+    }
+    
+    renderCurrentStep(); 
+  }
 </script>
 {% endblock js %}
