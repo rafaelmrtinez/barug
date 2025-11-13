@@ -120,6 +120,17 @@
   /* Card Hover Effects */
   .card{ transition:box-shadow 0.15s ease; }
   .card:hover{ box-shadow:0 4px 20px rgba(0,0,0,0.08); }
+  
+  /* Force stronger disabled styling */
+  .dropdown-item.disabled{ 
+    background-color:#e9ecef!important; 
+    color:#adb5bd!important; 
+    pointer-events:none!important; 
+    opacity:0.3!important;
+    cursor:not-allowed!important;
+    text-decoration:line-through!important;
+    filter:grayscale(100%)!important;
+  }
 </style>
 {% endblock css %}
 
@@ -383,7 +394,14 @@
     <h5 class="offcanvas-title d-flex align-items-center gap-2" id="luponFlowCanvasLabel">
       {% bs_icon 'diagram-3' %} Interactive Lupon Flow Guide
     </h5>
-    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    <div class="d-flex align-items-center gap-2">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="demoModeSwitch" checked>
+        <label class="form-check-label" for="demoModeSwitch" style="font-size:0.85rem; font-weight:600;">Demo Mode</label>
+        <span id="demoStatus" style="font-size:0.75rem; color:#28a745; font-weight:600;">ON</span>
+      </div>
+      <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
   </div>
   <div class="offcanvas-body">
 
@@ -437,12 +455,12 @@
             Quick Jump
           </button>
           <ul class="dropdown-menu">
-            <li><a class="dropdown-item" href="#" onclick="jumpToMediation(1)">1st Mediation</a></li>
-            <li><a class="dropdown-item" href="#" onclick="jumpToMediation(2)">2nd Mediation</a></li>
-            <li><a class="dropdown-item" href="#" onclick="jumpToMediation(3)">3rd Mediation</a></li>
+            <li><a id="jump1st" class="dropdown-item" href="#" onclick="jumpToMediation(1)">1st Mediation</a></li>
+            <li><a id="jump2nd" class="dropdown-item" href="#" onclick="jumpToMediation(2)">2nd Mediation</a></li>
+            <li><a id="jump3rd" class="dropdown-item" href="#" onclick="jumpToMediation(3)">3rd Mediation</a></li>
             <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item" href="#" onclick="jumpToPangkat()">Pangkat</a></li>
-            <li><a class="dropdown-item" href="#" onclick="jumpToResolution()">Resolution/CFA</a></li>
+            <li><a id="jumpPangkat" class="dropdown-item" href="#" onclick="jumpToPangkat()">Pangkat</a></li>
+            <li><a id="jumpResolution" class="dropdown-item" href="#" onclick="jumpToResolution()">Resolution/CFA</a></li>
           </ul>
         </div>
         <button class="btn btn-brand btn-sm" onclick="resetFlow()" type="button">Reset</button>
@@ -707,6 +725,7 @@
   }
   let HEARING_HELD = false;
   let HEARING_STATUS = null;
+  let DEMO_MODE = true;
 
   /* ===== Stateful flow engine ===== */
   let hearingNo = 1;       // 1=PB, 2=Pangkat#1, 3=Pangkat#2
@@ -728,6 +747,23 @@
     banner.hidden = false;
     banner.className = "alert alert-warning";
     banner.innerHTML = `{% bs_icon 'exclamation-triangle' %} <strong>Time Guard:</strong> ${msg}`;
+  }
+
+  function updateDemoMode(){
+    DEMO_MODE = document.getElementById('demoModeSwitch').checked;
+    document.getElementById('demoStatus').textContent = DEMO_MODE ? 'ON' : 'OFF';
+    document.getElementById('demoStatus').style.color = DEMO_MODE ? '#28a745' : '#dc3545';
+    updateQuickJump();
+    renderCurrentStep();
+  }
+
+  function updateQuickJump(){
+    // Always enable all quick jump options regardless of demo mode
+    document.getElementById('jump1st').classList.remove('disabled');
+    document.getElementById('jump2nd').classList.remove('disabled');
+    document.getElementById('jump3rd').classList.remove('disabled');
+    document.getElementById('jumpPangkat').classList.remove('disabled');
+    document.getElementById('jumpResolution').classList.remove('disabled');
   }
 
   function hearingLabel(n){
@@ -912,13 +948,35 @@
               b.className = 'btn btn-outline-brand btn-sm me-2 mb-2';
               b.textContent = label; b.onclick = handler; return b;
             };
-            branchDiv.appendChild(mkBtn('SETTLED', () => goToStep('kp16_settled')));
-            branchDiv.appendChild(mkBtn('NOT SETTLED', () => {
+            const settledBtn = mkBtn('SETTLED', () => goToStep('kp16_settled'));
+            const notSettledBtn = mkBtn('NOT SETTLED', () => {
               if (currentStep === 'kp9_first') goToStep('mediation_choice');
               else if (currentStep === 'kp9_second') goToStep('mediation_choice_2');
               else goToStep('kp10');
-            }));
-            branchDiv.appendChild(mkBtn('ARBITRATION', () => goToStep('kp14')));
+            });
+            const arbitrationBtn = mkBtn('ARBITRATION', () => goToStep('kp14'));
+            
+            if (!DEMO_MODE && currentHearing.settlement_outcome) {
+              if (currentHearing.settlement_outcome !== 'SETTLED') {
+                settledBtn.className = 'btn btn-outline-secondary btn-sm me-2 mb-2';
+                settledBtn.disabled = true;
+                settledBtn.onclick = null;
+              }
+              if (currentHearing.settlement_outcome !== 'NOT SETTLED') {
+                notSettledBtn.className = 'btn btn-outline-secondary btn-sm me-2 mb-2';
+                notSettledBtn.disabled = true;
+                notSettledBtn.onclick = null;
+              }
+              if (currentHearing.settlement_outcome !== 'ARBITRATION') {
+                arbitrationBtn.className = 'btn btn-outline-secondary btn-sm me-2 mb-2';
+                arbitrationBtn.disabled = true;
+                arbitrationBtn.onclick = null;
+              }
+            }
+            
+            branchDiv.appendChild(settledBtn);
+            branchDiv.appendChild(notSettledBtn);
+            branchDiv.appendChild(arbitrationBtn);
           } else {
             branchDiv.innerHTML = `
               <div class="fw-bold mb-2 text-muted">What happened?</div>
@@ -1022,9 +1080,15 @@
     return 'start';
   }
   
-  function jumpToMediation(attempt){ hearingAttempt=attempt; mediationCount=attempt; if(attempt===1) goToStep('kp8_first'); else if(attempt===2) goToStep('kp8_second'); else if(attempt===3) goToStep('kp8_third'); }
-  function jumpToPangkat(){ hearingNo=2; goToStep('kp10'); }
-  function jumpToResolution(){ goToStep('kp20'); }
+  function jumpToMediation(attempt){ 
+    hearingAttempt=attempt; mediationCount=attempt; if(attempt===1) goToStep('kp8_first'); else if(attempt===2) goToStep('kp8_second'); else if(attempt===3) goToStep('kp8_third'); 
+  }
+  function jumpToPangkat(){ 
+    hearingNo=2; goToStep('kp10'); 
+  }
+  function jumpToResolution(){ 
+    goToStep('kp20'); 
+  }
 
   const FORM_MAP = {
     'KP-1':1,'KP-2':2,'KP-3':3,'KP-4':4,'KP-5':5,'KP-6':6,
@@ -1200,6 +1264,7 @@
         renderCurrentStep();
       });
     }
+    document.getElementById('demoModeSwitch').addEventListener('change', updateDemoMode);
     renderCurrentStep();
   });
 
