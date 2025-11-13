@@ -234,7 +234,7 @@
   <!-- ======= ATTACHED FORMS ======= -->
   <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
     <h6 class="text-uppercase text-muted fw-bold mb-0 d-flex align-items-center">
-      {% bs_icon 'files' extra_classes='me-1' %} Attached KP Forms Test
+      {% bs_icon 'files' extra_classes='me-1' %} Attached KP Forms test
     </h6>
     <div class="forms-count d-none d-md-block">
       {% if forms %}{{ forms|length }} form{{ forms|length|pluralize }}{% else %}0 forms{% endif %}
@@ -727,19 +727,19 @@
     kp19_pangkat_1:{code:"KP-19",title:"Failure to Appear (1st Pangkat)",note:"Party failed to appear for 1st Pangkat hearing.",next:"pangkat_choice_1"},
     kp19_pangkat_2:{code:"KP-19",title:"Failure to Appear (2nd Pangkat)",note:"Party failed to appear for 2nd Pangkat hearing. Issue Certificate to File Action.",next:"kp20"},
     kp14:{code:"KP-14",title:"Agreement for Arbitration",note:"Parties agreed to arbitration. Pangkat will decide the case.",next:"kp15"},
-    kp15:{code:"KP-15",title:"Arbitration Award",note:"Pangkat renders arbitration decision. Case resolved through arbitration.",branches:[{label:"Award Accepted",next:"case_closed"},{label:"Award Repudiated",next:"kp17"}]},
-    kp16_settled:{code:"KP-16",title:"Amicable Settlement",note:"Case settled through mediation/conciliation. Parties sign settlement agreement.",next:"case_closed"},
+    kp15:{code:"KP-15",title:"Arbitration Award",note:"Pangkat renders arbitration decision. Case resolved through arbitration.",branches:[{label:"Award Honored",next:"kp23"},{label:"Award Repudiated",next:"kp17"}]},
+    kp16_settled:{code:"KP-16",title:"Amicable Settlement",note:"Case settled through mediation/conciliation. Parties sign settlement agreement.",branches:[{label:"Settlement Honored",next:"kp23"},{label:"Settlement Repudiated",next:"kp17"}]},
     kp20:{code:"KP-20",title:"Certificate to File Action (CFA)",note:"Barangay conciliation failed. Issue CFA allowing parties to file case in court.",branches:[{label:"Issue KP-20",next:"kp20_issued"},{label:"Issue KP-20A (Complainant)",next:"kp20a"},{label:"Issue KP-20B (Respondent)",next:"kp20b"}]},
     kp20_issued:{code:"KP-20",title:"Certificate to File Action Issued",note:"CFA issued to both parties. Case may proceed to court.",next:"case_closed"},
     kp20a:{code:"KP-20A",title:"CFA for Complainant",note:"Certificate issued specifically for complainant to file action in court.",next:"case_closed"},
     kp20b:{code:"KP-20B",title:"CFA for Respondent",note:"Certificate issued for respondent (counter-complaint or defense).",next:"case_closed"},
-    kp17:{code:"KP-17",title:"Repudiation of Settlement",note:"Party repudiates previously signed settlement. May lead to CFA issuance.",next:"kp20"},
+    kp17:{code:"KP-17",title:"Repudiation of Settlement",note:"Party repudiates previously signed settlement. Issue Certificate to File Action.",next:"kp20"},
     kp18:{code:"KP-18",title:"Notice of Hearing (Repudiation)",note:"Hearing for repudiation of settlement agreement.",next:"kp17"},
     kp21:{code:"KP-21",title:"Withdrawal of Complaint/Petition",note:"Complainant withdraws the case. Case closed.",next:"case_closed"},
     kp22:{code:"KP-22",title:"Dismissal of Complaint/Petition",note:"Case dismissed by Lupon. Case closed.",next:"case_closed"},
     kp23:{code:"KP-23",title:"Motion for Execution of Settlement",note:"Motion to enforce settlement agreement.",next:"kp24"},
     kp24:{code:"KP-24",title:"Notice of Hearing (Motion for Execution)",note:"Hearing on motion for execution of settlement.",next:"kp25"},
-    kp25:{code:"KP-25",title:"Notice of Execution",note:"Final notice for execution of settlement agreement.",next:"case_closed"},
+    kp25:{code:"KP-25",title:"Execution of Settlement",note:"Court-ordered execution of settlement agreement. Case resolved through enforcement.",next:"case_closed"},
     case_closed:{code:"—",title:"Case Closed",note:"Case has been resolved and closed. No further action required.",final:true}
   };
 
