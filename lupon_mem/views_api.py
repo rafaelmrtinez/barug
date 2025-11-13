@@ -745,7 +745,8 @@ def staff_lookup(request: HttpRequest):
         return JsonResponse({"ok": False, "error": "Staff not found."}, status=404)
 
     _staff_id, person_id, name, role = row
-    mobile = _get_person_mobile_number(person_id) or ""
+    from lupon_mem.services.helpers import get_person_mobile_number
+    mobile = get_person_mobile_number(person_id) or ""
 
     return JsonResponse({
         "ok": True,
@@ -757,3 +758,23 @@ def staff_lookup(request: HttpRequest):
             "mobile": mobile.strip()
         }
     })
+
+
+@session_login_required
+@role_required(*LUPON_ROLES)
+@require_GET
+def kp16_date_api(request: HttpRequest, case_id: int):
+    """
+    API endpoint to fetch KP-16 date for repudiation window.
+    Returns: { ok: true, date: "October 29, 2025" } or { ok: false, error: "..." }
+    """
+    from lupon_mem.services.fields_util import get_this_case_kp16_date_filed
+    
+    try:
+        date_str = get_this_case_kp16_date_filed(case_id)
+        if date_str:
+            return JsonResponse({"ok": True, "date": date_str})
+        else:
+            return JsonResponse({"ok": False, "error": "KP-16 date not found"})
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)

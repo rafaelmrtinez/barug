@@ -407,6 +407,16 @@
       </div>
     {% endif %}
 
+    <!-- Repudiation Window Bar -->
+    <div class="hw-bar mb-3" id="repudiationWindowBar" style="background:#fff5f5; border-color:#fecaca;">
+      <span class="hw-phase" style="background:#fef2f2; border-color:#fca5a5; color:#991b1b;">Repudiation Window</span>
+      <span class="hw-dot"></span>
+      <div class="hw-kv"><strong id="repudiationDaysLeft">—</strong> days left</div>
+      <span class="hw-dot"></span>
+      <div class="hw-kv">Ends <strong id="repudiationEndDate">—</strong></div>
+      <!-- <div class="hw-stat">10 days from settlement/award date</div> -->
+    </div>
+
     <div class="flow-toolbar">
       <span id="chipPB" class="flow-chip">1: PB Mediation (3 attempts max)</span>
       <span id="chipP1" class="flow-chip">2: Pangkat Conciliation</span>
@@ -558,8 +568,16 @@
   const PB_FIRST_MEET = "{{ pb_first_meeting_at|default_if_none:'' }}";
   const PANGKAT_CONS  = "{{ pangkat_constituted_at|default_if_none:'' }}";
   const PANGKAT_EXT   = "{{ pangkat_extended_until|default_if_none:'' }}";
-
   function parseISO(s){ return s ? new Date(s) : null; }
+  function parseKP16Date(dateStr) {
+    if (!dateStr) return null;
+    try {
+      // Parse "October 29, 2025" format
+      return new Date(dateStr);
+    } catch (e) {
+      return null;
+    }
+  }
   function fmtDaysLeft(until){
     if(!until) return "—";
     const now = new Date();
@@ -576,12 +594,31 @@
   const pbDeadline = pbFirst ? addDays(pbFirst, 15) : null;
   const pangkatBaseDeadline = pangkatCons ? addDays(pangkatCons, 15) : null;
   const pangkatDeadline = pangkatExt ? new Date(pangkatExt) : pangkatBaseDeadline;
+  
+  // Repudiation deadline will be calculated after fetching KP-16 date
+  let repudiationDeadline = null;
 
   function showWindowPills(){
     const pbPill = document.getElementById('pbDaysLeft');
     const pangkatPill = document.getElementById('pangkatDaysLeft');
     if(pbPill && pbDeadline) pbPill.textContent = fmtDaysLeft(pbDeadline);
     if(pangkatPill && pangkatDeadline) pangkatPill.textContent = fmtDaysLeft(pangkatDeadline);
+    
+    // Show repudiation window if KP-17 exists
+    const repudiationBar = document.getElementById('repudiationWindowBar');
+    const repudiationDaysLeft = document.getElementById('repudiationDaysLeft');
+    const repudiationEndDate = document.getElementById('repudiationEndDate');
+    
+    // Fetch KP-16 date and update repudiation window
+    if (haveForm('KP-16') || haveForm('KP-15')) {
+      fetchKP16Date().then(date => {
+        if (date) {
+          repudiationDeadline = addDays(date, 10);
+          updateRepudiationWindow();
+        }
+      });
+    }
+    updateRepudiationWindow();
 
     const pbChip = document.getElementById('pbChipDays');
     const pkChip = document.getElementById('pangkatChipDays');
@@ -1039,6 +1076,59 @@
     } else {
       // Fallback cleanup if onafterprint not supported
       setTimeout(removeFrame, 10000);
+    }
+  }
+
+  // Fetch KP-16 date from backend
+  async function fetchKP16Date() {
+    try {
+      const response = await fetch(`/lupon_mem/api/kp16-date/{{ case_id }}/`, { credentials: 'same-origin' });
+      if (!response.ok) throw new Error('API failed');
+      const data = await response.json();
+      if (data.date) {
+        return parseKP16Date(data.date);
+      }
+    } catch (e) {
+      console.error('Failed to fetch KP-16 date:', e);
+    }
+    return null;
+  }
+
+  // Update repudiation window display
+  function updateRepudiationWindow() {
+    const repudiationBar = document.getElementById('repudiationWindowBar');
+    const repudiationDaysLeft = document.getElementById('repudiationDaysLeft');
+    const repudiationEndDate = document.getElementById('repudiationEndDate');
+    
+    if (!repudiationBar) return;
+    
+    if (haveForm('KP-17')) {
+      repudiationBar.style.display = 'flex';
+      
+      if (repudiationDeadline) {
+        const daysLeft = Math.ceil((repudiationDeadline - new Date()) / (1000*60*60*24));
+        repudiationDaysLeft.textContent = daysLeft >= 0 ? daysLeft : 0;
+        repudiationEndDate.textContent = repudiationDeadline.toLocaleDateString(undefined, { 
+          month: 'long', day: 'numeric', year: 'numeric'
+        });
+        
+        // Add danger/warn classes
+        const repudiationPhase = repudiationBar.querySelector('.hw-phase');
+        if (daysLeft < 0) {
+          repudiationPhase.style.background = '#fef2f2';
+          repudiationPhase.style.borderColor = '#fca5a5';
+          repudiationPhase.style.color = '#991b1b';
+        } else if (daysLeft <= 3) {
+          repudiationPhase.style.background = '#fffbeb';
+          repudiationPhase.style.borderColor = '#fde68a';
+          repudiationPhase.style.color = '#92400e';
+        }
+      } else {
+        repudiationDaysLeft.textContent = '—';
+        repudiationEndDate.textContent = 'Fetching date...';
+      }
+    } else {
+      repudiationBar.style.display = 'none';
     }
   }
 

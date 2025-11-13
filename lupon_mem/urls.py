@@ -99,6 +99,7 @@ urlpatterns = [
     # ===== ADDED: flow progress API (namespaced) =====
     path("api/case/<int:case_id>/flow-progress", views_progress.flow_progress_api, name="flow_progress_api"),
     path("api/hearing-status/<int:case_id>/", views_hearing_api.hearing_status_api, name="hearing_status_api"),
+    path("api/kp16-date/<int:case_id>/", views_api.kp16_date_api, name="kp16_date_api"),
 
     # apis
     path("api/mediation-hearings/<int:case_id>/", views_cases.mediation_hearings_api, name="mediation_hearings_api"),
