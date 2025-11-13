@@ -1,0 +1,41 @@
+{# templates/lupon_mem/submission_detail.html #}
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4>KP {{ submission.form.form_code }} — {{ submission.form.form_name }}</h4>
+  <div>
+    {% if mode == "view" %}
+      <a class="btn btn-primary" href="{% url 'kp_submission_edit' submission.pk %}">Edit</a>
+    {% else %}
+      <a class="btn btn-secondary" href="{% url 'kp_submission_view' submission.pk %}">Cancel</a>
+      <button form="kp-form" class="btn btn-primary">Save</button>
+    {% endif %}
+  </div>
+</div>
+
+{% if submission.status == "SUBMITTED" and mode == "view" %}
+  <div class="alert alert-success">Submitted on {{ submission.submitted_at }}</div>
+{% endif %}
+
+<form id="kp-form" method="post" action="{% url 'kp_submission_update' submission.pk %}">
+  {% csrf_token %}
+  {% for f in render_fields %}
+    <div class="mb-3">
+      <label class="form-label">{{ f.label }}</label>
+      {% if mode == "view" %}
+        <div class="form-control bg-light">{{ f.value|default:"—" }}</div>
+      {% else %}
+        {% if f.type == "DATE" %}
+          <input type="date" class="form-control" name="field_{{ f.field_id }}" value="{{ f.value|default_if_none:'' }}">
+        {% elif f.type == "TIME" %}
+          <input type="time" class="form-control" name="field_{{ f.field_id }}" value="{{ f.value|default_if_none:'' }}">
+        {% elif f.type == "TEXTAREA" %}
+          <textarea class="form-control" name="field_{{ f.field_id }}">{{ f.value }}</textarea>
+        {% else %}
+          <input type="text" class="form-control" name="field_{{ f.field_id }}" value="{{ f.value|default_if_none:'' }}">
+        {% endif %}
+      {% endif %}
+    </div>
+  {% endfor %}
+</form>
+{% endblock %}

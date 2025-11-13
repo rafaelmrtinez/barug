@@ -117,9 +117,9 @@ OWNERSHIP_TYPE_CHOICES = [
 BUSINESS_STATUS_CHOICES = [
     ("", "— All statuses —"),
     (1, "ACTIVE"),
-    (2, "INACTIVE"),
-    (3, "SUSPENDED"),
-    (4, "REVOKED"),
+    # (2, "INACTIVE"),
+    # (3, "SUSPENDED"),
+    # (4, "REVOKED"),
     (5, "CLOSED"),
     (6, "EXPIRED"),
     (7, "PENDING"),
@@ -626,6 +626,19 @@ class BusinessDetails(forms.Form):
     )
     longitude = forms.DecimalField(
         required=True,
+        max_digits=10,
+        decimal_places=7,
+        widget=forms.HiddenInput(attrs={'id': 'longitude'}),
+    )
+    # Hidden fields filled by the map script
+    latitude = forms.DecimalField(
+        required=False,
+        max_digits=10,
+        decimal_places=7,
+        widget=forms.HiddenInput(attrs={'id': 'latitude'}),
+    )
+    longitude = forms.DecimalField(
+        required=False,
         max_digits=10,
         decimal_places=7,
         widget=forms.HiddenInput(attrs={'id': 'longitude'}),

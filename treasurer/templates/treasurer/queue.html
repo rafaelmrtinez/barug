@@ -129,7 +129,7 @@
                   <tr class="table-row-height">
                     <td><span class="code-badge">{{ r.request_code }}</span></td>
                     <td>{{ r.requester_display|default:r.requested_by|default:"—" }}</td>
-                    <td>{{ r.on_behalf_of|default:"Self" }} ID {{ r.business_id }}</td>
+                    <td>{{ r.on_behalf_of|default:"Self" }}</td>
                     <td>
                       {% if r.doc_types %}
                         {% for d in r.doc_types %}

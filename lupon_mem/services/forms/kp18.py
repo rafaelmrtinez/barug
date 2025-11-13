@@ -499,6 +499,28 @@ class KP18Handler:
         for k in _KP18_FIELDS:
             out.setdefault(k, "")
 
+        # ---------------------------------------------------
+        # Send notifications for KP-18 submission
+        # ---------------------------------------------------
+        try:
+            from notifications.views import notify_kp18_hearing_complainant
+            with connection.cursor() as cur:
+                cur.execute(
+                    "SELECT blotter_case_id FROM blotter_kp_submission WHERE submission_id=%s",
+                    [submission_id]
+                )
+                row = cur.fetchone()
+                if row:
+                    case_id = row[0]
+                    case_num = out.get("brgy_case_number", "")
+                    if not case_num:
+                        cur.execute("SELECT blotter_case_num FROM blotter_case WHERE blotter_case_id=%s", [case_id])
+                        case_row = cur.fetchone()
+                        case_num = case_row[0] if case_row else ""
+                    notify_kp18_hearing_complainant(case_id, case_num)
+        except Exception as e:
+            logger.warning("[KP18] Failed to send notifications: %s", e)
+
         # Log final map
         self._log_fill_map(out)
         return out

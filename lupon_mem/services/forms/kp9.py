@@ -361,6 +361,20 @@ class KP9Handler:
         for k in _KP9_FIELDS:
             out.setdefault(k, "")
 
+        # ---------------------------------------------------
+        # Send notifications for summon issued
+        # ---------------------------------------------------
+        try:
+            from notifications.views import notify_kp9_summon_issued
+            if case_id and out.get('summon_date') and out.get('summon_time'):
+                case_num = out.get("brgy_case_number", "")
+                hearing_date = f"{out.get('summon_month', '')} {out.get('summon_date', '')}, {out.get('summon_year', '')}".strip()
+                hearing_time = out.get("summon_time", "")
+                if hearing_date.strip(", "):  # Only notify if we have a proper date
+                    notify_kp9_summon_issued(case_id, case_num, hearing_date, hearing_time)
+        except Exception as e:
+            logger.warning("[KP9] Failed to send notifications: %s", e)
+
         # Debug log (ordered)
         self._log_fill_map(out)
 

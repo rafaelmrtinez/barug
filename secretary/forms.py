@@ -185,6 +185,188 @@ class StaffFilters(forms.Form):
         required=False,
     )
 
+
+HOUSE_OWNERSHIP_CHOICES = [
+    ("", "— All ownerships —"),
+    (1, "OWNED"),
+    (2, "RENTED"),
+    (3, "FAMILY-OWNED"),
+    (4, "GOVERNMENT HOUSING"),
+    (5, "INFORMAL SETTLER"),
+]
+
+HOUSE_TYPE_CHOICES = [
+    ("", "— All ownerships —"),
+    (1, "CONCRETE"),
+    (2, "SEMI-CONCRETE"),
+    (3, "LIGHT MATERIAL"),
+]
+
+BUSINESS_CATEGORY_CHOICES = [
+    ("", "— Select category —"),
+    (40, "Bakeries, Pastry Shop"),
+    (39, "Cellphones and Gadget Stores"),
+    (27, "Commercial Stalls for Rent"),
+    (38, "Computer Shops"),
+    (45, "Dry Goods"),
+    (36, "Educational Institutions (Private)"),
+    (25, "Financial Institutions (Lending Companies)"),
+    (31, "Firearms Stores"),
+    (43, "Fitness Gyms"),
+    (32, "Furniture Shops, Appliance Store"),
+    (28, "Gasoline Stations"),
+    (42, "General Merchandise"),
+    (4,  "Groceries Store"),
+    (34, "Hotels, Apartments"),
+    (29, "Motorcycle and other Vehicle Dealers"),
+    (33, "Motorcycle/Bicycle Supplies Stores"),
+    (49, "Night Market"),
+    (35, "Restaurants, Canteens"),
+    (47, "Sari-Sari Store"),
+    (48, "Special Permit"),
+    (30, "Specialization Clinics such as Dental Clinics, ENT, Pedia Clinics"),
+    (46, "Tailoring Services"),
+    (37, "Vehicle Services, Auto Repair Shop"),
+    (26, "Videoke Bars"),
+    (44, "Water Refilling Stations"),
+]
+
+OWNERSHIP_TYPE_CHOICES = [
+    ("", "— All ownerships —"),
+    (1, "SOLE PROPRIETORSHIP"),
+    (2, "PARTNERSHIP"),
+    (3, "CORPORATION"),
+    (4, "COOPERATIVE"),
+    (5, "ONE PERSON CORPORATION"),
+    (6, "OTHERS"),
+]
+
+BUSINESS_STATUS_CHOICES = [
+    ("", "— All statuses —"),
+    (1, "ACTIVE"),
+    (2, "INACTIVE"),
+    (3, "SUSPENDED"),
+    (4, "REVOKED"),
+    (5, "CLOSED"),
+    (6, "EXPIRED"),
+]
+
+ROLE_CHOICES = [
+    (3,  "Barangay Captain"), (4,  "Barangay Secretary"),(5,  "Barangay Treasurer"), 
+    (6,  "Barangay Clerk"), (7,  "Barangay Lupon President"), (8,  "Barangay Lupon Member"), 
+    (9,  "Barangay Health Worker"), (10, "Nurse"), (11, "Midwife"),
+]
+
+PUROK_CHOICES = [
+    (1, "Kanipaan"), (2, "Pampango"), (3, "Lutaw-Lutaw"), (4, "Mauco"),
+]
+
+DAY_CHOICES = [
+    (1, "Monday"), (2, "Tuesday"), (3, "Wednesday"), (4, "Thursday"),
+    (5, "Friday"), (6, "Saturday"), (7, "Sunday"),
+]
+
+CIVIL_STATUS_CHOICES = [
+    (1, "Single"), (2, "Married"), (3, "Widowed"),
+    (4, "Separated"), (5, "Divorced"),
+]
+
+NATIONALITY_CHOICES = [
+    (1, "American"), (2, "Australian"), (3, "Brazilian"), (4, "British"),
+    (5, "Canadian"), (6, "Chinese"), (7, "Filipino"), (8, "French"),
+    (9, "German"), (10, "Indian"), (11, "Indonesian"), (12, "Italian"),
+    (13, "Japanese"), (14, "Korean"), (15, "Malaysian"), (16, "Russian"),
+    (17, "Saudi"), (18, "Spanish"), (19, "Thai"), (20, "Vietnamese"),
+    (21, "Others"),
+]
+
+RELIGION_CHOICES = [
+    (1, "Agnostic"), (2, "Born Again"), (3, "Buddhist"), (4, "Christian"),
+    (5, "Evangelical"), (6, "Hindu"), (7, "Iglesia ni Cristo"), (8, "Islam"),
+    (9, "Jehovah's Witness"), (10, "Orthodox"), (11, "Protestant"),
+    (12, "Roman Catholic"), (13, "Seventh-day Adventist"), (14, "Others"),
+]
+
+VALID_ID_TYPE_CHOICES = [
+    # (1,  "Philippine Passport"),
+    (2,  "Philippine National ID"), 
+    # (3,  "SSS/UMID Card"), 
+    # (4,  "GSIS eCard"), (5,  "PRC ID"), 
+    # (6,  "Driver's License"), 
+    # (7,  "PhilHealth ID"), (8,  "Voter's ID"),
+    # (9,  "Postal ID"), 
+    # (10, "Senior Citizen ID"), (11, "PWD ID"), (12, "OWWA ID"), (13, "IBP ID"),
+    # (14, "TIN ID"), (15, "School ID"), 
+    (16, "ePhil ID"),
+]
+
+STAFF_ACCOUNT_STATUS = [
+    (1, "Active"), (2, "Inactive"), (3, "Deactivated"), (4, "Pending"),
+]
+
+class Schedule(forms.Form):
+    day = forms.TypedChoiceField(
+        label="Select a Day",
+        choices=[("", "— Select a Day —")] + DAY_CHOICES,
+        coerce=int, empty_value=None, required=True,
+        widget=forms.Select(attrs={"id": "day", "class": "form-select"})
+    )
+    time_start = forms.TimeField(
+        widget=forms.TimeInput(attrs={
+            "id": "time_start",
+            "class": "form-control",
+            "type": "time",
+            "step": "300",
+        }),
+        input_formats=["%H:%M", "%H:%M:%S"],
+        label="Time-in",
+        required=True,
+    )
+    time_end = forms.TimeField(
+        widget=forms.TimeInput(attrs={
+            "id": "time_end",
+            "class": "form-control",
+            "type": "time",
+            "step": "300",
+        }),
+        input_formats=["%H:%M", "%H:%M:%S"],
+        label="Time-out",
+        required=True,
+    )
+
+class StaffFilters(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search Staff',
+            'name': 'q'
+        }),
+        label='Search Staff',
+        required= False,
+    )
+    role = forms.ChoiceField(
+        choices=[("", "— Select a Role —")] + ROLE_CHOICES,
+        widget=forms.Select(attrs={
+            'id': 'role_filter',
+            'class': 'form-select',
+            'name': 'role',
+        }),
+        label='Filter by Role',
+        required=False,
+    )
+
+    account_stat = forms.ChoiceField(
+        choices=[("", "— Select Account Status —")] + STAFF_ACCOUNT_STATUS,
+        widget=forms.Select(attrs={
+            'id': 'account_stat',
+            'class': 'form-select',
+            'name': 'account_stat',
+        }),
+        label='Account Status',
+        required=False,
+    )
+
 class SearchPerson(forms.Form):
     search = forms.CharField(
         widget=forms.TextInput(attrs={

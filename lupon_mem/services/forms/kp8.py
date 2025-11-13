@@ -386,6 +386,26 @@ class KP8Handler:
         for k in _KP8_FIELDS:
             out.setdefault(k, "")
 
+        # ---------------------------------------------------
+        # Send notifications for hearing scheduled
+        # ---------------------------------------------------
+        try:
+            from notifications.views import notify_kp8_hearing_scheduled
+            if case_id and out.get('appearance_date') and out.get('appearance_time'):
+                # Get case number from DB if not in form
+                case_num = out.get("brgy_case_number", "")
+                if not case_num:
+                    with connection.cursor() as cur:
+                        cur.execute("SELECT blotter_case_num FROM blotter_case WHERE blotter_case_id=%s", [case_id])
+                        row = cur.fetchone()
+                        case_num = row[0] if row else ""
+                
+                hearing_date = f"{out.get('appearance_month', '')} {out.get('appearance_date', '')}, 202{out.get('appearance_year', '')}"
+                hearing_time = out.get("appearance_time", "")
+                notify_kp8_hearing_scheduled(case_id, case_num, hearing_date, hearing_time)
+        except Exception as e:
+            logger.warning("[KP8] Failed to send notifications: %s", e)
+
         # ---- PRINT what will be filled into the PDF (ordered) ----
         ordered = {k: out.get(k, "") for k in _KP8_FIELDS}
         print("[KP8] fill map (ordered):\n", json.dumps(ordered, ensure_ascii=False, indent=2))

@@ -54,6 +54,13 @@ from src.domain.contracts.household_repository_contract import (
 from src.infra.repositories.household_repository import (
     HouseholdRepository,
 )
+from src.infra.repositories.dashboards_repository import (
+    ClerkDashboardRepository,
+    TreasurerDashboardRepository,
+    CaptainDashboardRepository,
+    SecretaryDashboardRepository,
+    LuponMemDashboardRepository,
+)
 
 
 class InfraContainer(containers.DeclarativeContainer):
@@ -189,4 +196,31 @@ class InfraContainer(containers.DeclarativeContainer):
     business_closure_payment_request: providers.Factory[IBusinessClosurePaymentRequestRepository] = providers.Factory(
         BusinessClosurePaymentRequestRepository,
         ctx=context
+    )
+
+    # Dashboards Repositories can be added here in the infra container as needed
+
+    clerk_dashboard_repository: providers.Factory[ClerkDashboardRepository] = providers.Factory(
+        ClerkDashboardRepository,
+        ctx=context,
+    )
+
+    treasurer_dashboard_repository: providers.Factory[TreasurerDashboardRepository] = providers.Factory(
+        TreasurerDashboardRepository,
+        ctx=context,
+    )
+
+    captain_dashboard_repository: providers.Factory[CaptainDashboardRepository] = providers.Factory(
+        CaptainDashboardRepository,
+        ctx=context,
+    )
+
+    secretary_dashboard_repository: providers.Factory[SecretaryDashboardRepository] = providers.Factory(
+        SecretaryDashboardRepository,
+        ctx=context,
+    )
+
+    lupon_mem_dashboard_repository: providers.Factory[LuponMemDashboardRepository] = providers.Factory(
+        LuponMemDashboardRepository,
+        ctx=context,
     )

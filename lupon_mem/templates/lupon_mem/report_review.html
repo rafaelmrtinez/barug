@@ -56,7 +56,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-wrap">
+<div class="page-wrap" style="margin-top: 40px;">
   <!-- Header -->
   <div class="hero mb-3 d-flex align-items-center justify-content-between">
     <div>
@@ -157,25 +157,25 @@
           <div class="form-text">Auto-generated from complainant and respondent last names.</div>
         </div>
 
-        <div class="col-md-4">
+        <div class="col-md-6">
           <label class="form-label">Complaint Title</label>
           <select class="form-select" id="complaintTitleSelect" name="complaint_title_id">
             {% for id,name in complaint_titles %}<option value="{{ id }}">{{ name }}</option>{% endfor %}
           </select>
         </div>
 
-        <div class="col-md-4">
+        <div class="col-md-6">
           <label class="form-label">Case Nature</label>
           <select class="form-select" id="caseNatureSelect" name="case_nature_id">
             {% for id,name in case_natures %}<option value="{{ id }}">{{ name }}</option>{% endfor %}
           </select>
         </div>
 
-        <div class="col-md-4">
+        <div class="col-md-4" hidden>
           <label class="form-label">Settlement Status</label>
           <select class="form-select" id="settlementStatusSelect" name="settlement_status_id" disabled>
             {% for id,name in settlement_statuses %}
-              <option value="{{ id }}" {% if name|upper == "PENDING" %}selected{% endif %}>{{ name }}</option>
+              <option value="{{ id }}" {% if name|upper == "ONGOING" %}selected{% endif %}>{{ name }}</option>
             {% endfor %}
           </select>
         </div>
@@ -211,7 +211,7 @@
       <div class="card shadow-sm mb-3">
         <div class="card-body d-flex flex-wrap gap-2">
           <button type="button" class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#approveModal">
-            {% bs_icon 'check2' extra_classes='me-2' %} Approve Blotter Report
+            {% bs_icon 'check2' extra_classes='me-2' %} Convert to Case
           </button>
           <button type="button" class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#declineModal">
             {% bs_icon 'x-circle' extra_classes='me-2' %} Decline
@@ -221,7 +221,7 @@
     {% endif %}
   {% endif %}
 
-  {% if user_role|lower == 'barangay treasurer' and not is_reviewed %}
+  {% if user_role|lower == 'barangay treasurer' %}
     <div class="card shadow-sm">
       <div class="card-body d-flex justify-content-between align-items-center">
         <div class="hint"><i>Payment required to open a case.</i></div>
@@ -251,11 +251,11 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">{% bs_icon 'check2-circle' extra_classes='text-success me-2' %} Approve Report</h5>
+        <h5 class="modal-title">{% bs_icon 'check2-circle' extra_classes='text-success me-2' %} Convert to Case</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <p class="mb-2">Do you really want to <strong>approve</strong> this blotter report?</p>
+        <p class="mb-2">Do you really want to <strong>convert</strong> this blotter report to a case?</p>
         <ul class="mb-0 ps-3">
           <li>The case will be created using the case name shown above.</li>
           <li>Parties and selected attributes will be linked to the new case.</li>
@@ -263,7 +263,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-brand" data-bs-dismiss="modal">{% bs_icon 'x' extra_classes='me-1' %} Cancel</button>
-        <button type="button" class="btn btn-brand" id="approveConfirmBtn">{% bs_icon 'check2' extra_classes='me-1' %} Yes, Approve</button>
+        <button type="button" class="btn btn-brand" id="approveConfirmBtn">{% bs_icon 'check2' extra_classes='me-1' %} Yes, Convert to Case</button>
       </div>
     </div>
   </div>

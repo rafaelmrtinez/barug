@@ -16,6 +16,8 @@ from django.core.paginator import Paginator, EmptyPage
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime, parse_date
 from zoneinfo import ZoneInfo
+from dependency_injector.wiring import inject, Provide
+from src.app.bootstrap.app_containers import AppContainer
 
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
@@ -51,19 +53,46 @@ PH_TZ = ZoneInfo("Asia/Manila")
 # views.py (imports)
 from treasurer.services.dashboard_api import build_dashboard_payload, PH_TZ
 
+
+def _auth_role_name(request: HttpRequest) -> str:
+    return (((request.session.get("auth") or {}).get("role_name")) or "Staff").title()
+
 @session_login_required
 @role_required(TREASURER_ROLE)
 @nocache
-def dashboard(request: HttpRequest):
-    auth = request.session.get("auth")
-    # initial snapshot -> template json_script
-    dash = build_dashboard_payload("7d", None)
+@inject
+def dashboard(
+    request: HttpRequest,
+    treasurer_dashboard_service=Provide[AppContainer.treasurer_dashboard_service],
+):
+    user_role = _auth_role_name(request)
+
+    kpis = {
+        "pending_payments": 0,
+        "pending_payments_delta": None,
+        "or_issued_this_week": 0,
+        "or_issued_this_week_delta": None,
+        "collections_this_week": 0,
+        "collections_this_week_delta": None,
+        "collections_this_year": 0,
+        "collections_this_year_delta": None,
+    }
+
+    dashboard_json = None
+
+    try:
+        payload = treasurer_dashboard_service.get_dashboard_content() or {}
+        kpis = payload.get("kpis", kpis)
+        dashboard_json = payload.get("dashboard_json")
+    except Exception as exc:
+        print("Error fetching treasurer dashboard KPIs:", exc)
+
     return render(request, "treasurer/dashboard.html", {
-        "page_path": "Barangay Treasurer/Dashboard",
-        "page_title": "Dashboard",
-        "auth": auth,
-        "today": timezone.now().astimezone(PH_TZ).strftime("%b %d, %Y"),
-        "dashboard_json": dash,
+        'page_path' : f'{user_role} / Dashboard',
+        'page_title' : 'Dashboard',
+        'kpis': kpis,
+        'dashboard_json': dashboard_json,
+        'today': datetime.now().strftime("%B %d, %Y"),
     })
 
 
@@ -2426,12 +2455,42 @@ def fees_index(request: HttpRequest):
     return render(request, "treasurer/fees_index.html", ctx)
 
 
-# 3) NEW: Level-2 (reuse fees.html; scoped to a single document type id)
+
+# treasurer/views.py (or appropriate module)
+from typing import Tuple
+from django.shortcuts import render, redirect
+from django.core.paginator import Paginator, EmptyPage
+from django.contrib import messages
+from django.views.decorators.http import require_GET
+
+# service helpers (adjust import path to match your project structure)
+from treasurer.services.fees_service import (
+    list_fee_document_types,
+    search_fee_items_by_doc_type_id,
+    recent_fee_changes,
+)
+
+
 @session_login_required
 @role_required(TREASURER_ROLE)
 @require_GET
-def fees_by_type(request: HttpRequest, doc_type_id: int):
+def fees_by_type(request, doc_type_id: int):
+    """
+    Level-2: Browse fees scoped to a single document type.
+
+    Query params:
+      - q: optional search text
+      - per_page: 5|10|25|50 (default 5 in the original)
+      - page: page number
+
+    Context provided to template (treasurer/fees.html):
+      - q, per_page, is_paginated, paginator, page_obj, page_numbers, history
+      - selected_doc_type_id, selected_doc_type
+      - doc_types, fee_types, doc_types_all, fee_types_all, active_count (left empty to hide multi-type chips)
+    """
     q = (request.GET.get("q") or "").strip() or None
+
+    # per-page parsing (default 5 to match your original snippet)
     try:
         per_page = int(request.GET.get("per_page", "10") or "10")
     except Exception:
@@ -2439,23 +2498,38 @@ def fees_by_type(request: HttpRequest, doc_type_id: int):
     if per_page not in (5, 10, 25, 50):
         per_page = 5
 
-    # Resolve the selected doc type name for breadcrumb
+    # Resolve the selected doc type name for breadcrumb (from service)
     types = list_fee_document_types() or []
     selected_doc_type = None
-    for t in types:
-        if int(t.get("request_document_type_id")) == int(doc_type_id):
-            selected_doc_type = t.get("request_document_type_name")
-            break
+    try:
+        for t in types:
+            # ensure robust comparison (rpc may return id as int or string)
+            if int(t.get("request_document_type_id") or t.get("id") or 0) == int(doc_type_id):
+                selected_doc_type = (
+                    t.get("request_document_type_name")
+                    or t.get("name")
+                    or t.get("request_document_type")
+                )
+                break
+    except Exception:
+        selected_doc_type = None
+
     if not selected_doc_type:
         messages.error(request, "Unknown document type.")
         return redirect("treasurer:fees_index")
 
+    # Fetch items for this doc type (RPC) and prepare name_main/name_sub
     items_all = search_fee_items_by_doc_type_id(doc_type_id, q) or []
     for r in items_all:
-        main, sub = _split_main_sub(r.get("name") or "")
+        # _split_main_sub returns (main, sub). Example implementation should live in treasurer.utils
+        try:
+            main, sub = _split_main_sub(r.get("name") or r.get("fee_name") or "")
+        except Exception:
+            main, sub = (r.get("name") or r.get("fee_name") or ""), ""
         r["name_main"] = main
         r["name_sub"] = sub
 
+    # Pagination
     paginator = Paginator(items_all, per_page)
     try:
         page = int(request.GET.get("page", "1") or "1")
@@ -2471,7 +2545,9 @@ def fees_by_type(request: HttpRequest, doc_type_id: int):
         page_obj = paginator.page(1)
 
     page_numbers = build_page_numbers(page_obj.number, paginator.num_pages)
-    history = recent_fee_changes(limit=6)
+
+    # Use recent_fee_changes for sidebar/history (you can later replace with per-fee timeline)
+    history = recent_fee_changes(limit=6) or []
 
     ctx = {
         "q": q or "",
