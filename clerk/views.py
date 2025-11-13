@@ -100,6 +100,7 @@ from src.app.contracts.business_service_contract import (
     IBusinessRenewalService,
     IBusinessRenewalQuoteService,
     IBusinessRenewalRequestService,
+    IBusinessClosurePaymentRequestService,
 )
 from src.domain.contracts.business_repository_contract import IBusinessRepository
 from src.app.transfer_objects.commands.business_cmd import (
@@ -1138,14 +1139,39 @@ STATUS_DECLINE  = 7
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
-def dashboard(request: HttpRequest):
-    auth = request.session.get("auth")
-    profile = getattr(request, "person_profile", None)
+@inject
+def dashboard(
+    request: HttpRequest,
+    clerk_dashboard_service=Provide[AppContainer.clerk_dashboard_service],
+):
+    user_role = _auth_role_name(request)
+
+    kpis = {
+        "doc_requests": 0,
+        "doc_requests_delta": None,
+        "pending_verifications": 0,
+        "verif_delta": None,
+        "active_businesses": 0,
+        "new_businesses_week": None,
+        "residents_total": 0,
+        "new_residents_month": None,
+    }
+
+    dashboard_json = None
+
+    try:
+        payload = clerk_dashboard_service.get_dashboard_content() or {}
+        kpis = payload.get("kpis", kpis)
+        dashboard_json = payload.get("dashboard_json")
+    except Exception as exc:
+        print("Error fetching clerk dashboard KPIs:", exc)
+
     return render(request, "clerk/dashboard.html", {
-        "page_path": f"Barangay Clerk/Dashboard",
-        "page_title": "Dashboard",
-        "profile": profile,
-        "auth": auth
+        'page_path' : f'{user_role} / Dashboard',
+        'page_title' : 'Dashboard',
+        'kpis': kpis,
+        'dashboard_json': dashboard_json,
+        'today': datetime.now().strftime("%B %d, %Y"),
     })
 
 @session_login_required

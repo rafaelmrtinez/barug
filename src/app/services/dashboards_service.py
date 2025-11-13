@@ -507,3 +507,241 @@ class LuponMemberDashboardService:
             "dashboard_json": dashboard_json,
         }
 
+class BhwDashboardService:
+    def __init__(self, dashboard_repo):
+        self.repo = dashboard_repo
+
+    def _normalize_rows_to_labels_data(self, rows, label_col='label', value_col='total_amount_collected'):
+        """
+        Normalize repository return values into {"labels": [...], "data": [...]}.
+
+        Accepted inputs:
+          - None -> {"labels": [], "data": []}
+          - dict already shaped -> returns a copy
+          - list of dicts -> uses dict[label_col], dict[value_col]
+          - list of tuples -> uses tuple[0], tuple[1]
+          - single scalar / unexpected shapes -> returns empty lists
+
+        Ensures numbers in data are floats (safe-cast with fallback 0.0).
+        """
+        if rows is None:
+            return {"labels": [], "data": []}
+
+        # Already shaped
+        if isinstance(rows, dict):
+            if 'labels' in rows and 'data' in rows:
+                return {
+                    "labels": list(rows.get('labels') or []),
+                    "data": [float(v or 0) for v in (rows.get('data') or [])]
+                }
+            # Maybe repo returned {"rows": [...]}
+            if 'rows' in rows and isinstance(rows['rows'], (list, tuple)):
+                rows = rows['rows']
+            else:
+                # unexpected dict shape
+                return {"labels": [], "data": []}
+
+        # If rows is a single row (tuple/dict), convert to list
+        if isinstance(rows, (tuple, dict)):
+            rows = [rows]
+
+        labels = []
+        data = []
+        try:
+            for r in rows:
+                if isinstance(r, dict):
+                    lbl = r.get(label_col)
+                    val = r.get(value_col)
+                else:
+                    # Tuple-like
+                    try:
+                        lbl = r[0]
+                        val = r[1]
+                    except Exception:
+                        # unexpected shape, skip
+                        continue
+
+                labels.append(lbl)
+                try:
+                    data.append(float(val) if val is not None else 0.0)
+                except Exception:
+                    # catch e.g. 'Tue' or other bad values
+                    data.append(0.0)
+        except Exception:
+            return {"labels": [], "data": []}
+
+        return {"labels": labels, "data": data}
+
+    def get_dashboard_content(self, bhw_id: int | None = None) -> dict:
+        ongoing_maternal_total= self.repo.fetch_kpi_ongoing_maternal_total()
+        ongoing_maternal_total_sub = self.repo.fetch_kpi_sub_ongoing_maternal_total(bhw_id) if bhw_id is not None else 0
+        visit_today_maternal = self.repo.fetch_kpi_visit_today_maternal()
+        visit_today_postpartum = self.repo.fetch_kpi_visit_today_postpartum()
+        visit_today_child = self.repo.fetch_kpi_visit_today_child()
+        household_to_be_visited = self.repo.fetch_kpi_household_to_be_visited(bhw_id) if bhw_id is not None else 0
+        total_residents = self.repo.fetch_kpi_demographic_residents()
+        total_families = self.repo.fetch_kpi_demographic_families()
+        total_households = self.repo.fetch_kpi_demographic_households()
+
+        kpis = {
+            "ongoing_maternal_total": ongoing_maternal_total,
+            "ongoing_maternal_total_sub": ongoing_maternal_total_sub,
+            "visit_today_maternal": visit_today_maternal,
+            "visit_today_postpartum": visit_today_postpartum,
+            "visit_today_child": visit_today_child,
+            "household_to_be_visited": household_to_be_visited,
+            "residents_total": total_residents,
+            "families_total": total_families,
+            "household_total": total_households,
+        }
+
+        maternal_vax_per_month_raw = self.repo.fetch_maternal_vax_per_month()
+        maternal_vax_per_month = self._normalize_rows_to_labels_data(
+            maternal_vax_per_month_raw,
+            label_col='month_label',
+            value_col='women_vaccinated'
+        )
+
+        child_vax_per_month_raw = self.repo.fetch_children_vax_per_month()
+        child_vax_per_month = self._normalize_rows_to_labels_data(
+            child_vax_per_month_raw,
+            label_col='month_label',
+            value_col='unique_children_vaccinated'
+        )
+
+        dashboard_json = {
+            "childvaxPerMonth": {
+                "labels": child_vax_per_month.get("labels", []),
+                "data": child_vax_per_month.get("data", [])
+            },
+            "maternalvaxPerMonth": {
+                "labels": maternal_vax_per_month.get("labels", []),
+                "data": maternal_vax_per_month.get("data", [])
+            }
+        }
+
+        return {
+            "kpis": kpis,
+            "dashboard_json": dashboard_json,
+        }
+    
+class MidwifeDashboardService:
+    def __init__(self, dashboard_repo):
+        self.repo = dashboard_repo
+
+    def _normalize_rows_to_labels_data(self, rows, label_col='label', value_col='total_amount_collected'):
+        """
+        Normalize repository return values into {"labels": [...], "data": [...]}.
+
+        Accepted inputs:
+          - None -> {"labels": [], "data": []}
+          - dict already shaped -> returns a copy
+          - list of dicts -> uses dict[label_col], dict[value_col]
+          - list of tuples -> uses tuple[0], tuple[1]
+          - single scalar / unexpected shapes -> returns empty lists
+
+        Ensures numbers in data are floats (safe-cast with fallback 0.0).
+        """
+        if rows is None:
+            return {"labels": [], "data": []}
+
+        # Already shaped
+        if isinstance(rows, dict):
+            if 'labels' in rows and 'data' in rows:
+                return {
+                    "labels": list(rows.get('labels') or []),
+                    "data": [float(v or 0) for v in (rows.get('data') or [])]
+                }
+            # Maybe repo returned {"rows": [...]}
+            if 'rows' in rows and isinstance(rows['rows'], (list, tuple)):
+                rows = rows['rows']
+            else:
+                # unexpected dict shape
+                return {"labels": [], "data": []}
+
+        # If rows is a single row (tuple/dict), convert to list
+        if isinstance(rows, (tuple, dict)):
+            rows = [rows]
+
+        labels = []
+        data = []
+        try:
+            for r in rows:
+                if isinstance(r, dict):
+                    lbl = r.get(label_col)
+                    val = r.get(value_col)
+                else:
+                    # Tuple-like
+                    try:
+                        lbl = r[0]
+                        val = r[1]
+                    except Exception:
+                        # unexpected shape, skip
+                        continue
+
+                labels.append(lbl)
+                try:
+                    data.append(float(val) if val is not None else 0.0)
+                except Exception:
+                    # catch e.g. 'Tue' or other bad values
+                    data.append(0.0)
+        except Exception:
+            return {"labels": [], "data": []}
+
+        return {"labels": labels, "data": data}
+
+
+    def get_dashboard_content(self, midwife_id: int | None = None) -> dict:
+        ongoing_maternal_total= self.repo.fetch_kpi_ongoing_maternal_total()
+        ongoing_maternal_total_sub = self.repo.fetch_kpi_sub_ongoing_maternal_total(midwife_id) if midwife_id is not None else 0
+        visit_today_maternal = self.repo.fetch_kpi_visit_today_maternal()
+        visit_today_postpartum = self.repo.fetch_kpi_visit_today_postpartum()
+        visit_today_child = self.repo.fetch_kpi_visit_today_child()
+        women_vaccinated = self.repo.fetch_kpi_women_vaccinated_this_week()
+        children_vaccinated = self.repo.fetch_kpi_children_vaccinated_this_week()
+        total_residents = self.repo.fetch_kpi_demographic_residents()
+        total_families = self.repo.fetch_kpi_demographic_families()
+        total_households = self.repo.fetch_kpi_demographic_households()
+
+        kpis = {
+            "ongoing_maternal_total": ongoing_maternal_total,
+            "ongoing_maternal_total_sub": ongoing_maternal_total_sub,
+            "visit_today_maternal": visit_today_maternal,
+            "visit_today_postpartum": visit_today_postpartum,
+            "visit_today_child": visit_today_child,
+            "women_vaccinated": women_vaccinated,
+            "children_vaccinated": children_vaccinated,
+            "residents_total": total_residents,
+            "families_total": total_families,
+            "household_total": total_households,
+        }
+
+        maternal_vax_per_month_raw = self.repo.fetch_maternal_vax_per_month()
+        maternal_vax_per_month = self._normalize_rows_to_labels_data(
+            maternal_vax_per_month_raw,
+            label_col='month_label',
+            value_col='women_vaccinated'
+        )
+
+        child_vax_per_month_raw = self.repo.fetch_children_vax_per_month()
+        child_vax_per_month = self._normalize_rows_to_labels_data(
+            child_vax_per_month_raw,
+            label_col='month_label',
+            value_col='unique_children_vaccinated'
+        )
+
+        dashboard_json = {
+            "childvaxPerMonth": {
+                "labels": child_vax_per_month.get("labels", []),
+                "data": child_vax_per_month.get("data", [])
+            },
+            "maternalvaxPerMonth": {
+                "labels": maternal_vax_per_month.get("labels", []),
+                "data": maternal_vax_per_month.get("data", [])
+            }
+        }
+
+        return {
+            "kpis": kpis,
+            "dashboard_json": dashboard_json
+        }

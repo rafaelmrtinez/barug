@@ -96,7 +96,7 @@ def _to_int_or_none(val) -> Optional[int]:
 @role_required("admin", "Admin")
 def dashboard(request):
     user_fullname, user_role, user_role_template = get_user_info(request)
-    return render(request, "captain_dashboard.html", {
+    return render(request, "staff_admin/dashboard.html", {
         'user_fullname' : user_fullname,
         'user_role' : user_role,
         'page_path' : f'Admin / Dashboard',
