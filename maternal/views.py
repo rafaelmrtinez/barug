@@ -330,7 +330,6 @@ def maternal_health_record_form(request, record_id : int):
         risk_code_form = RiskCodeForm(
             mhr_repo=REPOSITORY,
             mhr_id=record_id,
-            assisted_by=assistant
         )
         
         pre_natal_existing_data = REPOSITORY.fetch_prenatal_information_by_mhr_id(record_id)

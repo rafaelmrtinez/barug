@@ -650,6 +650,21 @@
                 <button type="submit" class="btn btn-brand">Save Micronutrients</button>
             </div>
         </form>
+        <!-- Risk Code Form (displayed after Micronutrients) -->
+        <form method="post" class="card mb-4 card-brand" id="form-risk-code" action="">
+            {% csrf_token %}
+            <div class="card card-brand mb-3">
+                <span class="card-header">Risk Codes</span>
+                <div class="card-body">
+                    <div id="risk-codes" class="row g-3">
+                        {{ risk_code_form }}
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer text-end">
+                <button type="submit" class="btn btn-brand">Save Risk Codes</button>
+            </div>
+        </form>
     {% endif %}
     {% include 'maternal/partial/prenatal_logs_and_entry.html' with mhr_id=mhr_id prenatal_form=prenatal_followup_entry_form %}
 </div>
