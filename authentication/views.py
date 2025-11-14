@@ -155,7 +155,7 @@ def login(request):
         # 2) RPC
         try:
             logger.debug("RPC call_staff_login() | user=%s", username)
-            row = call_staff_login(username, (form.cleaned_data.get("password") or ""))
+            row = call_staff_login(username, (form.cleaned_data.get("password") or ""), ip)
             logger.debug("RPC returned | user=%s row=%s", username, bool(row))
         except DatabaseError as e:
             msg = str(e)
@@ -188,7 +188,7 @@ def login(request):
             return render(request, "authentication_index.html", {"form": form})
 
         # 4) Success — unpack row
-        staff_id, person_id, user_type, role_name_db, first_name, last_name, middle_name = row
+        staff_id, person_id, user_type, role_name_db, first_name, middle_name, last_name, account_status_name = row
         role_lower = (role_name_db or "").strip().lower()
 
         logger.debug(
