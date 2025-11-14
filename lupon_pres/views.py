@@ -1204,14 +1204,3 @@ from lupon_mem.views import (
     case_timeline,
     incident_heatmap
 )
-
-@session_login_required
-@role_required("barangay lupon president")
-def dashboard(request):
-    """Dashboard for Barangay Lupon President"""
-    auth = request.session.get("auth")
-    return render(request, "lupon_pres/dashboard.html", {
-        "page_path": "Barangay Lupon President/Dashboard",
-        "page_title": "Dashboard",
-        "auth": auth,
-    })

@@ -444,20 +444,53 @@ def household_info(request: HttpRequest) -> HttpResponse:
         },
     )
 
+def _auth_role_name(request: HttpRequest) -> str:
+    return (((request.session.get("auth") or {}).get("role_name")) or "Staff").title()
+
+def _auth_staff_id(request: HttpRequest) -> Optional[int]:
+    return ((request.session.get("auth") or {}).get("staff_id")) or None
 
 @session_login_required
-
 @role_required(*ROLE_MIDWIFE, "Super Admin")
 @nocache
-def dashboard(request: HttpRequest) -> HttpResponse:
-    auth = request.session.get("auth")
+@inject
+def dashboard(
+    request: HttpRequest,
+    midwife_dashboard_service=Provide[AppContainer.midwife_dashboard_service],
+):
+    user_role = _auth_role_name(request)
+
+    bhw_id = _auth_staff_id(request)
+
+    kpis = {
+        "ongoing_maternal_total": 0,
+        "ongoing_maternal_total_sub": 0,
+        "visit_today_maternal": 0,
+        "visit_today_postpartum": 0,
+        "visit_today_child": 0,
+        "residents_total": 0,
+        "families_total": 0,
+        "household_total": 0,
+}
+
+    dashboard_json = None
+
+    try:
+        payload = midwife_dashboard_service.get_dashboard_content(bhw_id) or {}
+        kpis = payload.get("kpis", kpis)
+        dashboard_json = payload.get("dashboard_json")
+    except Exception as exc:
+        print("Error fetching midwife dashboard KPIs:", exc)
+
     return render(
         request,
-        "midwife_dashboard.html",
+        "midwife/dashboard.html",
         {
-            "page_path": "Midwife/Dashboard",
-            "page_title": "Dashboard",
-            "auth": auth,
+            'page_path' : f'{user_role} / Dashboard',
+            'page_title' : 'Dashboard',
+            'kpis': kpis,
+            'dashboard_json': dashboard_json,
+            'today': datetime.now().strftime("%B %d, %Y"),
         },
     )
 
