@@ -41,6 +41,7 @@ urlpatterns = [
     path("maternal/", include("maternal.urls", namespace="maternal")),
     path("child-health/", include("child_health.urls", namespace="child_health")),
     path("docs/", include("doc_ingest.urls", namespace="doc_ingest")),
+    path("e/", include("event_logs.urls", namespace="event_logs")),
 ]
 
 if settings.DEBUG:

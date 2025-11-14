@@ -64,12 +64,9 @@
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
     <div>
       <h2 class="title m-0">Confirm Payment & Open Case</h2>
-      <div class="subtle">Everything is locked for review—only <b>Paid by</b> can be changed.</div>
+
     </div>
-    <div class="d-flex align-items-center gap-2">
-      <span class="pill"><i class="bi bi-shield-check"></i> Read-only Review</span>
-      <span class="pill"><i class="bi bi-receipt-cutoff"></i> Treasurer Flow</span>
-    </div>
+
   </div>
 
   <!-- Report Header -->
@@ -89,9 +86,7 @@
         </div>
         {% if report.3 %}<div class="text-muted mt-1">{{ report.3 }}</div>{% endif %}
       </div>
-      <div class="text-end">
-        <div class="text-muted small">Keyboard: <span class="kbd">Tab</span> move • <span class="kbd">Enter</span> submit</div>
-      </div>
+
     </div>
   </div>
 
@@ -166,14 +161,14 @@
       <div class="col-lg-5">
         <div class="cardx p-3">
           <div class="d-flex align-items-center justify-content-between">
-            <div class="label m-0">Payment</div>
+            <div class="label m-0">Payment <span class="text-danger">*</span></div>
             <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" id="with_payment" name="with_payment">
+              <input class="form-check-input" type="checkbox" id="with_payment" name="with_payment" checked>
               <label class="form-check-label" for="with_payment">Record payment</label>
             </div>
           </div>
 
-          <div id="payFields" class="mt-3 ghost" aria-disabled="true">
+          <div id="payFields" class="mt-3" aria-disabled="false">
             <div class="mb-2" hidden>
               <div class="label">Official Receipt No.</div>
               <input type="text" class="readonly mono" id="payment_receipt_display" value="" readonly>
@@ -196,7 +191,7 @@
 
             <!-- PAID BY — ONLY EDITABLE PART -->
             <div class="mt-2">
-              <div class="label">Paid by</div>
+              <div class="label">Paid by <span class="text-danger">*</span></div>
               <input type="text" class="form-control" id="paid_by_search" placeholder="Start typing name…" disabled>
               <input type="hidden" name="paid_by_person_id" id="paid_by_person_id" value="">
               <div id="payerDropdown" class="results-viewport mt-2" style="display:none;"></div>
@@ -210,8 +205,8 @@
           <div class="divider"></div>
 
           <div class="d-grid gap-2">
-            <button type="submit" class="btn btn-brand btn-lg">
-              <i class="bi bi-check2-circle"></i> Create Case
+            <button type="button" class="btn btn-brand btn-lg" id="createCaseBtn" disabled>
+              <i class="bi bi-check2-circle"></i> Accept Payment for Case Creation
             </button>
             <a href="{% url 'lupon_mem:report_list' %}" class="btn btn-outline-secondary">
               <i class="bi bi-arrow-left"></i> Back to Reports
@@ -223,6 +218,33 @@
   </form>
 </div>
 
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Confirm Case Creation</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>This will officially open the case and cannot be undone. The case will be created with the following details:</p>
+        <ul>
+          <li><strong>Case Name:</strong> <span id="modalCaseName"></span></li>
+          <li hidden><strong>Payment Status:</strong> <span id="modalPaymentStatus"></span></li>
+          <li><strong>Paid By:</strong> <span id="modalPaidBy"></span></li>
+        </ul>
+        <p class="text-muted">Are you sure you want to proceed?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-brand" id="confirmCreateBtn">
+          <i class="bi bi-check2-circle"></i> Yes, Create Case
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
@@ -232,6 +254,8 @@
   const form = $('#payForm');
   const withPay = $('#with_payment');
   const payFields = $('#payFields');
+  const createBtn = $('#createCaseBtn');
+  const confirmModal = new bootstrap.Modal($('#confirmModal'));
 
   // Display + hidden mirrors for OR/Amount (read-only to user)
   const orDisp   = $('#payment_receipt_display');
@@ -263,8 +287,9 @@
     payerInput.disabled = !enabled;
     if (!enabled){
       hideDrop();
-      // Optional: clear payer if toggled off
-      // paidById.value=''; payerInput.value=''; resetDisplay();
+      paidById.value=''; 
+      payerInput.value=''; 
+      resetDisplay();
     }
   }
 
@@ -277,6 +302,7 @@
       amtDisp.value   = amtHidden.value;
       if(!statusHidden.value){ statusHidden.value='PAID'; }
     }
+    updateCreateButton();
   });
 
   function pad(n){ return String(n).padStart(2,'0'); }
@@ -372,13 +398,16 @@
       payerInput.value = '';
       resetDisplay();
       payerInput.focus();
+      updateCreateButton();
     });
     payerHelp.textContent = 'Payer selected from registry.';
+    updateCreateButton();
   }
 
   function resetDisplay(){
     payerDisp.innerHTML = `<span class="text-muted">No payer selected</span>`;
     payerHelp.textContent = 'Type at least 2 letters to search residents.';
+    updateCreateButton();
   }
 
   function escapeHtml(s){
@@ -391,21 +420,68 @@
   }
   // ==========================
 
-  // Submit guard (validate required fields still present)
-  form.addEventListener('submit', (e)=>{
+  function updateCreateButton(){
+    // Payment is now required, so both payment checkbox and payer must be filled
+    const isValid = withPay.checked && paidById.value.trim() !== '';
+    createBtn.disabled = !isValid;
+  }
+
+  createBtn.addEventListener('click', ()=>{
     if(!String(caseName.value||'').trim() || !ctId.value || !cnId.value || !ssId.value){
-      e.preventDefault();
       flash('Required case fields are missing.');
       return;
     }
+    if(!withPay.checked){
+      flash('Payment is required. Please enable payment recording.');
+      return;
+    }
+    if(!paidById.value.trim()){
+      flash('Please select who paid from the registry.');
+      return;
+    }
+    
+    // Update modal content
+    $('#modalCaseName').textContent = caseName.value || '(no name)';
+    $('#modalPaymentStatus').textContent = 'With Payment';
+    $('#modalPaidBy').textContent = payerInput.value || 'Not selected';
+    
+    confirmModal.show();
+  });
+
+  $('#confirmCreateBtn').addEventListener('click', async ()=>{
+    const confirmBtn = $('#confirmCreateBtn');
+    const originalText = confirmBtn.innerHTML;
+    
+    // Show processing state
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processing...';
+    
     if(withPay.checked){
       if(!orHidden.value.trim()){ const v=genOR(); orHidden.value=v; orDisp.value=v; }
       amtHidden.value = normalizeAmount(amtHidden.value || amtDisp.value || '0.00');
-      if(!paidById.value.trim()){
-        e.preventDefault();
-        flash('Please select a payer from the registry.');
-        return;
+    }
+    
+    const formData = new FormData(form);
+    try{
+      const response = await fetch(form.action || window.location.href, {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      
+      if(response.ok){
+        confirmBtn.innerHTML = '<i class="bi bi-check-circle"></i> Success!';
+        confirmModal.hide();
+        flash('Case created successfully!');
+        setTimeout(() => window.location.href = '{% url "lupon_mem:report_list" %}', 1500);
+      } else {
+        throw new Error('Server error');
       }
+    } catch(e){
+      // Reset button on error
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML = originalText;
+      flash('Error creating case. Please try again.');
     }
   });
 
@@ -431,7 +507,8 @@
   }
 
   // init
-  setPaymentEnabled(false);
+  setPaymentEnabled(true); // Start with payment enabled since it's required
+  updateCreateButton();
 })();
 </script>
 {% endblock %}

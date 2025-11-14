@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<style>
+:root{--brand:#6d2932;--brand-light:#f3eaeb;--brand-dark:#3a1217;}
+.hero{background:linear-gradient(135deg,var(--brand) 0%,var(--brand-dark) 100%);color:#fff;padding:1rem;border-radius:8px;margin-bottom:1rem;}
+.hero h4{margin:0;font-weight:700;}
+.hero .badge{background:rgba(255,255,255,.2);color:#fff;}
+.btn-brand{background:var(--brand);border-color:var(--brand);color:#fff;}
+.btn-brand:hover{background:var(--brand-dark);border-color:var(--brand-dark);color:#fff;}
+.table thead th{background:var(--brand);color:#fff;border:none;}
+.table-hover tbody tr:hover{background:var(--brand-light);}
+.badge-paid{background:#198754;}
+.badge-unpaid{background:#fd7e14;}
+.badge-declined{background:#dc3545;}
+.badge-review{background:#0dcaf0;}
+.badge-reviewed{background:#0d6efd;}
+.search-box{position:relative;}
+.search-box .search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#6c757d;z-index:5;}
+.search-box input{padding-left:40px;}
+.pagination .page-link{color:var(--brand);border-color:var(--brand-light);}
+.pagination .page-link:hover{background:var(--brand-light);border-color:var(--brand);color:var(--brand-dark);}
+.pagination .page-item.active .page-link{background:var(--brand);border-color:var(--brand);color:#fff;}
+.btn-outline-brand{color:var(--brand);border-color:var(--brand);}
+.btn-outline-brand:hover{background:var(--brand);border-color:var(--brand);color:#fff;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-5">
+  <!-- Hero Header -->
+  <div class="hero">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h4>{% bs_icon 'file-earmark-text' %} Blotter Reports</h4>
+        <div class="d-flex gap-2 flex-wrap mt-2">
+          <span class="badge">{{ rows|length }} showing</span>
+          <span class="badge">{{ stats.for_review }} for review</span>
+          <span class="badge">{{ stats.reviewed }} reviewed</span>
+          <span class="badge">{{ stats.paid }} paid</span>
+          <span class="badge">{{ stats.unpaid }} unpaid</span>
+        </div>
+      </div>
+      <a href="{% url 'lupon_mem:report_new' %}" class="btn btn-light">
+        {% bs_icon 'plus' %} New Report
+      </a>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="card mb-3">
+    <div class="card-body">
+      <form method="get" class="row g-2">
+        <div class="col-md-3">
+          <div class="search-box">
+            <span class="search-icon">{% bs_icon 'search' %}</span>
+            <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="Search subject" id="searchInput">
+          </div>
+        </div>
+        <div class="col-md-2">
+          <select name="payment" class="form-select">
+            <option value="">All Payments</option>
+            <option value="PAID" {% if f_payment == 'PAID' %}selected{% endif %}>PAID</option>
+            <option value="UNPAID" {% if f_payment == 'UNPAID' %}selected{% endif %}>UNPAID</option>
+            <option value="DECLINED" {% if f_payment == 'DECLINED' %}selected{% endif %}>DECLINED</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <select name="blotter_status" class="form-select">
+            <option value="">All Status</option>
+            <option value="FOR LUPON REVIEW" {% if f_blotter == 'FOR LUPON REVIEW' %}selected{% endif %}>For Review</option>
+            <option value="REVIEWED" {% if f_blotter == 'REVIEWED' %}selected{% endif %}>Reviewed</option>
+          </select>
+        </div>
+        <div class="col-md-1">
+          <select name="sort" class="form-select">
+            <option value="oldest" {% if f_sort == 'oldest' %}selected{% endif %}>Oldest</option>
+            <option value="newest" {% if f_sort == 'newest' %}selected{% endif %}>Newest</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-brand w-100">
+            {% bs_icon 'funnel' %} Apply Filter
+          </button>
+        </div>
+        <div class="col-md-2">
+          <a href="{% url 'lupon_mem:report_list' %}" class="btn btn-outline-secondary w-100">
+            {% bs_icon 'arrow-counterclockwise' %} Reset
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Report Number</th>
+            <th>Subject</th>
+            <th>Reported</th>
+            <th>Payment</th>
+            <th>Status</th>
+            <th width="120">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+            <tr>
+              <td><code>Blotter Report #{{ r.0 }}</code></td>
+              <td class="fw-medium">{{ r.1 }}</td>
+              <td class="text-muted">{{ r.2 }}</td>
+              <td>
+                {% if r.3|upper == 'PAID' %}
+                  <span class="badge badge-paid">PAID</span>
+                {% elif r.3|upper == 'UNPAID' %}
+                  <span class="badge badge-unpaid">UNPAID</span>
+                {% elif r.3|upper == 'DECLINED' %}
+                  <span class="badge badge-declined">DECLINED</span>
+                {% else %}
+                  <span class="badge bg-light text-dark">—</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if r.4 == 'FOR LUPON REVIEW' %}
+                  <span class="badge badge-review">For Review</span>
+                {% elif r.4 == 'REVIEWED' %}
+                  <span class="badge badge-reviewed">Reviewed</span>
+                {% else %}
+                  <span class="badge bg-light text-dark">—</span>
+                {% endif %}
+              </td>
+              <td>
+                <a href="{% url 'lupon_mem:report_review' r.0 %}" class="btn btn-sm btn-outline-brand">
+                  {% bs_icon 'eye' %}
+                </a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="6" class="text-center text-muted py-4">
+                {% bs_icon 'inbox' %} No reports found.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  {% if reports.has_other_pages %}
+    <nav class="mt-3">
+      <ul class="pagination justify-content-center">
+        {% if reports.has_previous %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ reports.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if f_payment %}&payment={{ f_payment }}{% endif %}{% if f_blotter %}&blotter_status={{ f_blotter }}{% endif %}{% if f_sort %}&sort={{ f_sort }}{% endif %}">‹</a>
+          </li>
+        {% endif %}
+        
+        {% for num in reports.paginator.page_range %}
+          {% if num == reports.number %}
+            <li class="page-item active">
+              <span class="page-link">{{ num }}</span>
+            </li>
+          {% else %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ num }}{% if q %}&q={{ q }}{% endif %}{% if f_payment %}&payment={{ f_payment }}{% endif %}{% if f_blotter %}&blotter_status={{ f_blotter }}{% endif %}{% if f_sort %}&sort={{ f_sort }}{% endif %}">{{ num }}</a>
+            </li>
+          {% endif %}
+        {% endfor %}
+        
+        {% if reports.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ reports.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if f_payment %}&payment={{ f_payment }}{% endif %}{% if f_blotter %}&blotter_status={{ f_blotter }}{% endif %}{% if f_sort %}&sort={{ f_sort }}{% endif %}">›</a>
+          </li>
+        {% endif %}
+      </ul>
+    </nav>
+  {% endif %}
+</div>
+{% endblock %}

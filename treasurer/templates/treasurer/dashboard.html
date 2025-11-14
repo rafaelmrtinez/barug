@@ -1,6 +1,7 @@
 {% extends "base.html" %} 
 {% load static %}
 {% load bootstrap_icons %}
+{% load humanize %}
 
 {% block css %}
 <style>
@@ -111,30 +112,27 @@
 
   <!-- Page Header -->
   <div class="row g-3 align-items-center mb-3">
-    <div class="col-12 col-xl-8">
+    <div class="col-12">
       <div class="card header-card shadow-sm">
         <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
           <div>
-            <div class="eyebrow text-uppercase">Barangay Control Center</div>
+            <div class="eyebrow text-uppercase">Barangay Treasurer</div>
             <h1 class="h4 mb-0 fw-bold">Overview</h1>
             <div class="text-muted small mt-1">{{ today|default:"" }}</div>
           </div>
           <div class="d-flex flex-wrap gap-2">
-            <a href="{% url 'clerk:identity_verification' %}" class="btn btn-outline-brand">
-              {% bs_icon 'shield-check' %}<span class="ms-1">Verify IDs</span>
+            <a href="{% url 'treasurer:fees_index' %}" class="btn btn-outline-brand">
+              {% bs_icon 'card-checklist' %}<span class="ms-1">Fee Catalog</span>
             </a>
-            <a href="" class="btn btn-brand">
-              {% bs_icon 'file-earmark-text' %}<span class="ms-1">Doc Requests</span>
-            </a>
-            <a href="{% url 'clerk:business_owner_resident' %}" class="btn btn-brand-subtle">
-              {% bs_icon 'buildings' %}<span class="ms-1">New Business</span>
+            <a href="{% url 'treasurer:dashboard' %}" class="btn btn-brand-subtle">
+              {% bs_icon 'file-earmark-text' %}<span class="ms-1">RCD</span>
             </a>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Filters -->
+    <!-- Filters
     <div class="col-12 col-xl-4">
       <div class="card shadow-sm">
         <div class="card-body d-flex flex-wrap align-items-center gap-2">
@@ -162,7 +160,7 @@
           </button>
         </div>
       </div>
-    </div>
+    </div> -->
   </div>
 
   <!-- KPIs -->
@@ -170,11 +168,11 @@
     <div class="col">
       <div class="card kpi shadow-sm h-100 lift-on-hover">
         <div class="card-body d-flex align-items-center gap-3">
-          <div class="kpi-icon">{% bs_icon 'file-earmark-text' size='1.2em' %}</div>
+          <div class="kpi-icon">{% bs_icon 'wallet2' size='1.2em' %}</div>
           <div class="flex-grow-1">
-            <div class="kpi-label">Document Requests (Today)</div>
-            <div class="kpi-value" id="kpiDocReq">—</div>
-            <div class="kpi-sub text-success" id="kpiDocReqDelta">{% bs_icon 'arrow-up-right' %} <span>+0%</span></div>
+            <div class="kpi-label">Pending Payments</div>
+            <div class="kpi-value" id="kpiPendingPayments">{{ kpis.pending_payments|default_if_none:"-" }}</div>
+            <div class="kpi-sub" id="kpiPendingPaymentsDelta" title="Pending payments added today.">+{{ kpis.pending_payments_delta|default_if_none:"-" }} today</div>
           </div>
         </div>
       </div>
@@ -182,11 +180,11 @@
     <div class="col">
       <div class="card kpi shadow-sm h-100 lift-on-hover">
         <div class="card-body d-flex align-items-center gap-3">
-          <div class="kpi-icon">{% bs_icon 'person-check' size='1.2em' %}</div>
+          <div class="kpi-icon">{% bs_icon 'receipt-cutoff' size='1.2em' %}</div>
           <div class="flex-grow-1">
-            <div class="kpi-label">Pending Verifications</div>
-            <div class="kpi-value" id="kpiPendingVerif">—</div>
-            <div class="kpi-sub text-danger" id="kpiVerifDelta">{% bs_icon 'arrow-down-right' %} <span>-0%</span></div>
+            <div class="kpi-label">Official Reciept Issued This Week</div>
+            <div class="kpi-value" id="kpiORIssued">{{ kpis.or_issued_this_week|default_if_none:"-" }}</div>
+            <div class="kpi-sub" id="kpiORIssuedfDelta" title="Official receipt issued today.">+{{ kpis.or_issued_this_week_delta|default_if_none:"-" }} today</div>
           </div>
         </div>
       </div>
@@ -194,11 +192,11 @@
     <div class="col">
       <div class="card kpi shadow-sm h-100 lift-on-hover">
         <div class="card-body d-flex align-items-center gap-3">
-          <div class="kpi-icon">{% bs_icon 'buildings' size='1.2em' %}</div>
+          <div class="kpi-icon">{% bs_icon 'cash' size='1.2em' %}</div>
           <div class="flex-grow-1">
-            <div class="kpi-label">Active Businesses</div>
-            <div class="kpi-value" id="kpiActiveBiz">—</div>
-            <span class="badge rounded-pill kpi-pill" id="kpiNewBiz">+0 this week</span>
+            <div class="kpi-label">Collections This Week</div>
+            <div class="kpi-value" id="kpiCollectionsMonth">{{ kpis.collections_this_week|default_if_none:"-"|floatformat:2|intcomma }}</div>
+            <span class="kpi-sub" id="kpiCollectionsMonthDelta" title="Collections today.">+{{ kpis.collections_this_week_delta|default_if_none:"-"|floatformat:2|intcomma }} today</span>
           </div>
         </div>
       </div>
@@ -206,11 +204,11 @@
     <div class="col">
       <div class="card kpi shadow-sm h-100 lift-on-hover">
         <div class="card-body d-flex align-items-center gap-3">
-          <div class="kpi-icon">{% bs_icon 'people' size='1.2em' %}</div>
+          <div class="kpi-icon">{% bs_icon 'cash-stack' size='1.2em' %}</div>
           <div class="flex-grow-1">
-            <div class="kpi-label">Registered Residents</div>
-            <div class="kpi-value" id="kpiResidents">—</div>
-            <span class="badge rounded-pill kpi-pill" id="kpiNewResidents">0 new</span>
+            <div class="kpi-label">Collections This Year</div>
+            <div class="kpi-value" id="kpiCollectionsYear">{{ kpis.collections_this_year|default_if_none:"-"|floatformat:2|intcomma }}</div>
+            <span class="kpi-sub" id="kpiCollectionsYearDelta" title="Collections this month.">+{{ kpis.collections_this_year_delta|default_if_none:"-"|floatformat:2|intcomma }} this month</span>
           </div>
         </div>
       </div>
@@ -218,381 +216,50 @@
   </div>
 
   <!-- Charts -->
-  <div class="row g-3 mt-1">
-    <div class="col-12">
-      <div class="card section chart-section shadow-sm h-100">
-        <div class="card-header d-flex align-items-center justify-content-between">
-          <h5 class="mb-0">Requests — <span id="rangeLabel">Last 7 Days</span></h5>
-          <span class="small text-muted" id="typeLabel">All document types</span>
-        </div>
-        <div class="card-body">
-          <div class="chart-wrap">
-            <canvas id="requestsTrend"></canvas>
-            <div class="skeleton chart-skel-req"></div>
+    <div class="row g-3 mt-1">
+      <div class="col-6">
+        <div class="card section chart-section shadow-sm h-100">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <h5 class="mb-0">Collections — Last 7 Days</h5>
           </div>
-        </div>
-      </div>
-    </div>
-    <div class="col-12">
-      <div class="card section chart-section shadow-sm h-100 mt-3">
-        <div class="card-header d-flex align-items-center justify-content-between">
-          <h5 class="mb-0">Status Breakdown</h5>
-          <span class="small text-muted">Current</span>
-        </div>
-        <div class="card-body">
-          <div class="chart-wrap">
-            <canvas id="statusBreakdown"></canvas>
-            <div class="skeleton chart-skel-status"></div>
-          </div>
-          <div class="legend-inline mt-3" id="statusLegend"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Queues -->
-  <div class="row g-3 mt-1 align-items-stretch">
-    <div class="col-12 col-xl-6">
-      <div class="card section shadow-sm h-100">
-        <div class="card-header d-flex align-items-center justify-content-between">
-          <h5 class="mb-0">Identity Verification Queue</h5>
-          <a href="{% url 'clerk:identity_verification' %}" class="link-brand small">Manage</a>
-        </div>
-        <div class="card-body">
-          <div class="panel-list" id="verifList">{% for v in verifications %}
-            <div class="item-row d-flex justify-content-between align-items-center">
-              <div>
-                <div class="fw-semibold">{{ v.name }}</div>
-                <div class="small text-muted">{{ v.subtext }}</div>
-              </div>
-              <span class="badge rounded-pill status-badge status-{{ v.status|lower }}">{{ v.status }}</span>
+          <div class="card-body">
+            <div class="chart-wrap">
+              <canvas id="collectionsTrend"></canvas>
+              <div class="skeleton chart-skel-req"></div>
             </div>
-          {% empty %}{% endfor %}</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-xl-6">
-      <div class="card section shadow-sm h-100">
-        <div class="card-header d-flex align-items-center justify-content-between">
-          <h5 class="mb-0">Latest Document Requests</h5>
-          <a href="" class="link-brand small">Manage</a>
-        </div>
-        <div class="card-body">
-          <div class="panel-list" id="reqList">
-            <!-- Filled by renderRecentRequests() -->
           </div>
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- Businesses -->
-  <div class="row g-3 mt-1">
-    <div class="col-12">
-      <div class="card section shadow-sm">
-        <div class="card-header d-flex align-items-center justify-content-between">
-          <h5 class="mb-0">Expiring Business Permits</h5>
-          <a href="{% url 'clerk:business_list' %}" class="link-brand small">View all</a>
-        </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table align-middle mb-0">
-              <thead class="table-light">
-                <tr>
-                  <th>Business</th><th class="d-none d-sm-table-cell">Owner</th><th>Expiry</th><th class="text-end">Action</th>
-                </tr>
-              </thead>
-              <tbody id="bizTableBody">{% for b in expiring_businesses %}
-                <tr>
-                  <td><div class="fw-semibold">{{ b.name }}</div><div class="small text-muted">{{ b.address }}</div></td>
-                  <td class="d-none d-sm-table-cell">{{ b.owner }}</td>
-                  <td><span class="badge rounded-pill status-badge status-processing">{{ b.expiry }}</span></td>
-                  <td class="text-end"><a href="{% url 'clerk:business_detail' b.id %}" class="btn btn-sm btn-outline-brand">{% bs_icon 'eye' %} View</a></td>
-                </tr>
-              {% empty %}{% endfor %}</tbody>
-            </table>
+      <div class="col-6">
+        <div class="card section chart-section shadow-sm h-100">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <h5 class="mb-0">Collections — Per Month</h5>
+            <span class="small text-muted">Current Year</span>
+          </div>
+          <div class="card-body">
+            <div class="chart-wrap">
+              <canvas id="collectionsPerMonth"></canvas>
+              <div class="skeleton chart-skel-status"></div>
+            </div>
+            <div class="legend-inline mt-3" id="collectionsLegend"></div>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
   {% if dashboard_json %}
     {{ dashboard_json|json_script:"dash-data" }}
   {% endif %}
 
-  <!-- Inline, zero-dependency charts + API wiring -->
-  <script>
+<script src="{% static 'js/dashboard-charts.js' %}"></script>
+<script>
   (function(){
-    const css = getComputedStyle(document.documentElement);
-    const pick = k => (css.getPropertyValue(k)||'').trim();
-    const BRAND700 = pick('--brand-700') || '#6d2932';
-    const BRAND600 = pick('--brand-600') || '#6d2932';
-    const BRAND500 = pick('--brand-500') || '#561c24';
-    const BRAND300 = pick('--brand-300') || '#e8d8c4';
-    const NEU300 = pick('--neutral-300') || '#d1d5db';
-    const NEU500 = pick('--neutral-500') || '#6b7280';
-    const hide = sel => document.querySelector(sel)?.classList.add('hidden');
-    const show = sel => document.querySelector(sel)?.classList.remove('hidden');
-
     const dashEl = document.getElementById('dash-data');
-    const initialDash = dashEl ? JSON.parse(dashEl.textContent) : null;
-
-    // ---- helpers ----
-    function text(elOrSel, v){ const el = typeof elOrSel==='string'?document.querySelector(elOrSel):elOrSel; if(el) el.textContent = v; }
-    function setTypeLabel(v){
-      text('#typeLabel', v ? v : 'All document types');
-    }
-    function setRangeLabel(token){
-      const map = { '7d':'Last 7 Days', '30d':'Last 30 Days', 'qtd':'Quarter to date', 'ytd':'Year to date' };
-      text('#rangeLabel', map[token] || 'Last 7 Days');
-    }
-
-    // ---- data -> UI renderers ----
-    function renderKPIs(k){
-      if(!k) return;
-      text('#kpiDocReq', (k.doc_requests_today ?? '—'));
-      text('#kpiPendingVerif', (k.pending_verifications ?? '—'));
-      text('#kpiActiveBiz', (k.active_businesses ?? '—'));
-      text('#kpiResidents', (k.residents_total ?? '—'));
-      // You can compute real deltas later; keep placeholders for now
-      text('#kpiNewBiz', `+${k.new_businesses_week ?? 0} this week`);
-      text('#kpiNewResidents', `${k.new_residents_month ?? 0} new`);
-    }
-
-    function niceNum(range, round){
-      const exp = Math.floor(Math.log10(range || 1));
-      const f = range / Math.pow(10, exp);
-      let nf;
-      if (round){
-        if (f < 1.5) nf = 1; else if (f < 3) nf = 2; else if (f < 7) nf = 5; else nf = 10;
-      } else {
-        if (f <= 1) nf = 1; else if (f <= 2) nf = 2; else if (f <= 5) nf = 5; else nf = 10;
-      }
-      return nf * Math.pow(10, exp);
-    }
-    function niceScale(min, max, tickCount=5){
-      let range = niceNum(max-min, false);
-      const step = niceNum(range/(tickCount-1), true);
-      const niceMin = Math.floor(min/step)*step;
-      const niceMax = Math.ceil(max/step)*step;
-      const ticks = [];
-      for (let v = niceMin; v <= niceMax + 1e-9; v += step) ticks.push(v);
-      return {niceMin,niceMax,step,ticks};
-    }
-    function fmt(v){ return Math.round(v*10)/10; }
-
-    function drawLine(canvas, labels, series){
-      if (!canvas) return;
-      const dpr = devicePixelRatio||1;
-      canvas.style.width='100%'; canvas.style.height='100%';
-      const W = canvas.clientWidth||600, H = canvas.clientHeight||320;
-      canvas.width = W*dpr; canvas.height=H*dpr;
-      const ctx = canvas.getContext('2d'); ctx.scale(dpr,dpr);
-
-      const m = {l:48, r:18, t:18, b:32};
-      const x0=m.l, x1=W-m.r, y0=H-m.b, y1=m.t;
-
-      const data = series.slice();
-      const minV = Math.min(...data, 0), maxV = Math.max(...data, 1);
-      const pad = (maxV-minV) * 0.1 || 1;
-      const scale = niceScale(minV-pad, maxV+pad, 5);
-      const range = scale.niceMax - scale.niceMin;
-
-      ctx.clearRect(0,0,W,H);
-
-      // grid + y labels
-      ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif';
-      ctx.textAlign='right'; ctx.textBaseline='middle';
-      ctx.fillStyle = NEU500; ctx.strokeStyle = NEU300; ctx.lineWidth = 1;
-      scale.ticks.forEach(t=>{
-        const y = y0 - ( (t - scale.niceMin)/range )*(y0-y1);
-        ctx.globalAlpha=.6; ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x1,y); ctx.setLineDash([3,3]); ctx.stroke();
-        ctx.setLineDash([]); ctx.globalAlpha=1; ctx.fillText(fmt(t), x0 - 8, y);
-      });
-
-      // x ticks
-      const n = data.length;
-      ctx.textAlign='center'; ctx.textBaseline='top'; ctx.fillStyle=NEU500;
-      labels.forEach((lbl,i)=>{
-        const x = x0 + (x1-x0)*(i/(Math.max(n-1,1)));
-        if (n <= 10 || i%Math.ceil(n/7)===0) ctx.fillText(lbl, x, y0+8);
-      });
-
-      // points
-      const pts = data.map((v,i)=>({
-        x: x0 + (x1-x0)*(i/(Math.max(n-1,1))),
-        y: y0 - ((v - scale.niceMin)/range)*(y0-y1),
-        v
-      }));
-
-      // area
-      const grad = ctx.createLinearGradient(0,y1,0,y0);
-      grad.addColorStop(0, BRAND300);
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.beginPath(); ctx.moveTo(x0,y0);
-      pts.forEach(p=>ctx.lineTo(p.x,p.y));
-      ctx.lineTo(x1,y0); ctx.closePath(); ctx.fillStyle=grad; ctx.fill();
-
-      // line
-      ctx.strokeStyle = BRAND700; ctx.lineWidth = 2;
-      ctx.beginPath();
-      for (let i=0;i<pts.length;i++){
-        const p = pts[i];
-        if (i===0) ctx.moveTo(p.x,p.y);
-        else {
-          const prev = pts[i-1];
-          const cx = (prev.x+p.x)/2;
-          ctx.quadraticCurveTo(prev.x, prev.y, cx, p.y);
-        }
-      }
-      ctx.stroke();
-
-      // average dash
-      const avg = data.reduce((a,b)=>a+b,0)/Math.max(data.length,1);
-      const yAvg = y0 - ((avg - scale.niceMin)/range)*(y0-y1);
-      ctx.save(); ctx.setLineDash([6,6]); ctx.strokeStyle = BRAND500; ctx.lineWidth = 1.2;
-      ctx.beginPath(); ctx.moveTo(x0,yAvg); ctx.lineTo(x1,yAvg); ctx.stroke(); ctx.restore();
-
-      // dots
-      ctx.fillStyle = BRAND700;
-      pts.forEach(p=>{ ctx.beginPath(); ctx.arc(p.x,p.y,2.5,0,Math.PI*2); ctx.fill(); });
-
-      // tooltip
-      let tip = canvas.parentElement.querySelector('.line-tip');
-      if(!tip){
-        tip = document.createElement('div');
-        tip.className='line-tip';
-        tip.style.cssText = 'position:absolute;padding:6px 8px;background:#fff;border:1px solid var(--border);color:#111;font:12px system-ui;border-radius:8px;box-shadow:var(--shadow);pointer-events:none;transform:translate(-50%,-140%);white-space:nowrap;display:none;';
-        canvas.parentElement.appendChild(tip);
-      }
-      function nearest(x){
-        let best=0, bestDx=1e9;
-        pts.forEach((p,i)=>{ const dx=Math.abs(p.x-x); if(dx<bestDx){best=i;bestDx=dx;} });
-        return best;
-      }
-      function showTip(i){
-        const p = pts[i]; if(!p) return;
-        tip.style.left = p.x+'px'; tip.style.top = p.y+'px';
-        tip.textContent = `${labels[i]} • ${fmt(p.v)}`;
-        tip.style.display='block';
-      }
-      function hideTip(){ tip.style.display='none'; }
-      canvas.onmousemove = (e)=>{
-        const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX - rect.left) * (canvas.width / rect.width) / (devicePixelRatio||1);
-        showTip(nearest(x));
-      };
-      canvas.onmouseleave = hideTip;
-    }
-
-    function drawDonut(canvas, labels, data, colors){
-      if (!canvas) return;
-      const dpr=devicePixelRatio||1;
-      canvas.style.width='100%'; canvas.style.height='100%';
-      const W=canvas.clientWidth||600, H=canvas.clientHeight||320;
-      canvas.width=W*dpr; canvas.height=H*dpr; const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
-
-      ctx.clearRect(0,0,W,H);
-
-      const cx=W/2, cy=H/2, R=Math.min(W,H)/2-10, cut=R*0.62;
-      const total = data.reduce((a,b)=>a+b,0) || 1;
-      let a0=-Math.PI/2;
-      data.forEach((v,i)=>{
-        const a1=a0+(v/total)*Math.PI*2;
-        ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,a0,a1); ctx.closePath();
-        ctx.fillStyle=colors[i%colors.length]; ctx.fill(); a0=a1;
-      });
-      ctx.globalCompositeOperation='destination-out';
-      ctx.beginPath(); ctx.arc(cx,cy,cut,0,Math.PI*2); ctx.fill();
-      ctx.globalCompositeOperation='source-over';
-
-      const legend = document.getElementById('statusLegend');
-      legend.innerHTML = labels.map((t,i)=>`<span class="legend-dot" style="--dot:${colors[i%colors.length]}"></span><span class="legend-label">${t}</span>`).join('');
-    }
-
-    function renderCharts(dash){
-      const lineCanvas=document.getElementById('requestsTrend');
-      const donutCanvas=document.getElementById('statusBreakdown');
-      show('.chart-skel-req'); show('.chart-skel-status');
-      // Defer slightly to allow skeleton paint in slower devices
-      requestAnimationFrame(()=>{
-        drawLine(lineCanvas, dash.requestsTrend.labels, dash.requestsTrend.data);
-        hide('.chart-skel-req');
-        const palette=[BRAND700, BRAND500, BRAND300, NEU300];
-        drawDonut(donutCanvas, dash.statusBreakdown.labels, dash.statusBreakdown.data, palette);
-        hide('.chart-skel-status');
-      });
-    }
-
-    function renderRecentRequests(list){
-      const host = document.getElementById('reqList');
-      if(!host) return;
-      const rows = (list||[]).map(r=>`
-        <div class="item-row">
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="fw-semibold">${(r.doc_name||'—')}</div>
-            <span class="badge rounded-pill status-badge status-${String(r.status||'').toLowerCase()}">${r.status||'—'}</span>
-          </div>
-          <div class="small text-muted">${r.requestor||'—'} — ${r.code||'—'}</div>
-        </div>
-      `).join('');
-      host.innerHTML = rows || `
-        <div class="text-muted small">No recent requests.</div>
-      `;
-    }
-
-    function renderAll(dash){
-      if(!dash) return;
-      renderKPIs(dash.kpis);
-      renderCharts(dash);
-      renderRecentRequests(dash.recentRequests);
-    }
-
-    // ---- API fetch wiring ----
-    async function fetchAndRender(){
-      const range = document.getElementById('rangeSel').value || '7d';
-      const dtype = document.getElementById('typeSel').value || '';
-      setRangeLabel(range); setTypeLabel(dtype);
-      try{
-        const url = new URL("{% url 'treasurer:dashboard_api' %}", window.location.origin);
-        url.searchParams.set('range', range);
-        if(dtype) url.searchParams.set('doc_type', dtype);
-        show('.chart-skel-req'); show('.chart-skel-status');
-        const res = await fetch(url.toString(), { headers: { 'X-Requested-With':'fetch' } });
-        const data = await res.json();
-        renderAll(data);
-      }catch(e){
-        console.error(e);
-      }finally{
-        hide('.chart-skel-req'); hide('.chart-skel-status');
-      }
-    }
-
-    // ---- boot ----
-    // first paint from server
-    if(initialDash){ renderAll(initialDash); }
-    else {
-      // fallback demo data (should rarely happen)
-      renderAll({
-        kpis:{ doc_requests_today:27, pending_verifications:12, active_businesses:48, residents_total:2354 },
-        requestsTrend:{ labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], data:[12,18,21,15,27,23,30] },
-        statusBreakdown:{ labels:['Pending','Processing','Approved','Rejected'], data:[18,9,22,3] },
-        recentRequests:[]
-      });
-    }
-
-    // events
-    document.getElementById('rangeSel')?.addEventListener('change', fetchAndRender);
-    document.getElementById('typeSel')?.addEventListener('change', fetchAndRender);
-    document.getElementById('refreshBtn')?.addEventListener('click', fetchAndRender);
-
-    // labels init
-    setRangeLabel(document.getElementById('rangeSel').value);
-    setTypeLabel(document.getElementById('typeSel').value);
+    const parsed = dashEl ? JSON.parse(dashEl.textContent) : null;
+    ChartUtils.renderDashboardFromJSON(parsed || {});
   })();
-  </script>
+</script>
+
 </div>
 {% endblock %}
-
-{% block extra_js %}{% endblock %}

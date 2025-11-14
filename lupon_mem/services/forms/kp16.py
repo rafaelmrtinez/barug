@@ -344,6 +344,28 @@ class KP16Handler:
         for k in _KP16_FIELDS:
             out.setdefault(k, "")
 
+        # ---------------------------------------------------
+        # Send notifications for KP-16 submission
+        # ---------------------------------------------------
+        try:
+            from notifications.views import notify_kp16_amicable_settlement
+            with connection.cursor() as cur:
+                cur.execute(
+                    "SELECT blotter_case_id FROM blotter_kp_submission WHERE submission_id=%s",
+                    [submission_id]
+                )
+                row = cur.fetchone()
+                if row:
+                    case_id = row[0]
+                    case_num = out.get("brgy_case_num", "")
+                    if not case_num:
+                        cur.execute("SELECT blotter_case_num FROM blotter_case WHERE blotter_case_id=%s", [case_id])
+                        case_row = cur.fetchone()
+                        case_num = case_row[0] if case_row else ""
+                    notify_kp16_amicable_settlement(case_id, case_num)
+        except Exception as e:
+            logger.warning("[KP16] Failed to send notifications: %s", e)
+
         self._log_fill_map(out)
         return out
 

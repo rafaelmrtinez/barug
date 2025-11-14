@@ -81,6 +81,9 @@
     </div>
   </div>
 
+  <!-- Toast Container -->
+  <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1055;"></div>
+
   <!-- Form Card -->
   <div class="card">
     <div class="card-header d-flex align-items-center justify-content-between">
@@ -110,36 +113,37 @@
           </div>
           <div class="col-md-3">
             <label class="form-label">Date</label>
-            <input type="date" class="form-control" name="incident_date">
+            <input type="date" class="form-control" name="incident_date" required>
+            <div class="invalid-feedback">Required.</div>
           </div>
           <div class="col-md-3">
             <label class="form-label">Time</label>
-            <input type="time" class="form-control" name="incident_time">
+            <input type="time" class="form-control" name="incident_time" required>
+            <div class="invalid-feedback">Required.</div>
           </div>
           <div class="col-12">
             <label class="form-label">Narrative</label>
-            <textarea class="form-control" name="incident_desc" rows="4"></textarea>
+            <textarea class="form-control" name="incident_desc" rows="4" required></textarea>
+            <div class="invalid-feedback">Required.</div>
           </div>
         </div>
 
         <!-- Address + Parties -->
         <div class="row g-3">
           <div class="col-md-4">
+            <!-- Hidden Incident Address ID field -->
+            <input type="hidden" name="incident_address_id">
+            
             <label class="form-label d-flex justify-content-between align-items-center">
-              <span>Incident Address ID (optional)</span>
+              <span>Incident Location</span>
               <button class="btn btn-sm btn-outline-brand" type="button" data-bs-toggle="modal" data-bs-target="#address_modal">
                 <i class="bi bi-geo-alt me-1"></i> Pick on Map
               </button>
             </label>
-            <input class="form-control" name="incident_address_id" placeholder="e.g., 101">
-
-            <!-- Address text captured from map (readonly for clarity) -->
-            <div class="mt-2">
-              <label class="form-label mb-1">Incident Location</label>
-              <input id="incident_address" name="incident_address" class="form-control" placeholder="No address chosen" readonly>
-              <input type="hidden" id="incident_lat" name="incident_lat">
-              <input type="hidden" id="incident_lng" name="incident_lng">
-            </div>
+            <input id="incident_address" name="incident_address" class="form-control" placeholder="No address chosen" readonly required>
+            <div class="invalid-feedback">Please select an incident location using the map.</div>
+            <input type="hidden" id="incident_lat" name="incident_lat">
+            <input type="hidden" id="incident_lng" name="incident_lng">
           </div>
 
           <!-- Complainant -->
@@ -155,23 +159,24 @@
             <div id="complainantDisplay" class="form-control bg-body-tertiary" style="min-height:38px; display:flex; align-items:center;">
               <span class="text-muted">No complainant selected</span>
             </div>
-            <input type="hidden" name="complainant_id" id="complainantId">
+            <input type="hidden" name="complainant_id" id="complainantId" required>
+            <div class="invalid-feedback">Please select a complainant.</div>
           </div>
 
-          <!-- Respondents -->
+          <!-- Respondent -->
           <div class="col-md-4">
             <label class="form-label d-flex justify-content-between align-items-center">
-              <span>Respondents</span>
+              <span>Respondent</span>
               <button class="btn btn-sm btn-outline-brand" type="button"
                       data-bs-toggle="modal" data-bs-target="#personModal"
                       data-mode="respondent">
-                <i class="bi bi-people me-1"></i> Add Respondent
+                <i class="bi bi-person-plus me-1"></i> Choose
               </button>
             </label>
-            <div id="respondentsDisplay" class="form-control bg-body-tertiary" style="min-height:38px;">
-              <span class="text-muted">No respondents added</span>
+            <div id="respondentDisplay" class="form-control bg-body-tertiary" style="min-height:38px; display:flex; align-items:center;">
+              <span class="text-muted">No respondent selected</span>
             </div>
-            <input type="hidden" name="respondent_ids" id="respondentIds">
+            <input type="hidden" name="respondent_ids" id="respondentId">
           </div>
         </div>
 
@@ -282,10 +287,8 @@
   let mode = 'complainant';
   const complainantIdInput = document.getElementById('complainantId');
   const complainantDisplay = document.getElementById('complainantDisplay');
-  const respondentIdsInput = document.getElementById('respondentIds');
-  const respondentsDisplay = document.getElementById('respondentsDisplay');
-
-  const selectedRespondents = new Map();
+  const respondentIdInput = document.getElementById('respondentId');
+  const respondentDisplay = document.getElementById('respondentDisplay');
 
   const personModal = document.getElementById('personModal');
   personModal.addEventListener('show.bs.modal', function (evt){
@@ -387,36 +390,23 @@
       });
       bootstrap.Modal.getInstance(personModal).hide();
     }else{
-      if (!selectedRespondents.has(id)){
-        selectedRespondents.set(id, name || `#${id}`);
-        renderRespondentChips();
-      }
+      respondentIdInput.value = id;
+      respondentDisplay.innerHTML =
+        `<span class="chip">
+           ${escapeHtml(name)} <small class="text-muted">(#${id})</small>
+           <button type="button" class="rm" title="Remove" aria-label="Remove">
+             <i class="bi bi-x-lg"></i>
+           </button>
+         </span>`;
+      respondentDisplay.querySelector('.rm').addEventListener('click', ()=>{
+        respondentIdInput.value = '';
+        respondentDisplay.innerHTML = `<span class="text-muted">No respondent selected</span>`;
+      });
       bootstrap.Modal.getInstance(personModal).hide();
     }
   }
 
-  function renderRespondentChips(){
-    if (!selectedRespondents.size){
-      respondentsDisplay.innerHTML = `<span class="text-muted">No respondents added</span>`;
-      respondentIdsInput.value = '';
-      return;
-    }
-    respondentsDisplay.innerHTML = '';
-    selectedRespondents.forEach((nm,id)=>{
-      const chip = document.createElement('span');
-      chip.className='chip';
-      chip.innerHTML = `${escapeHtml(nm)} <small class="text-muted">(#${id})</small>
-                        <button type="button" class="rm" title="Remove" aria-label="Remove">
-                          <i class="bi bi-x-lg"></i>
-                        </button>`;
-      chip.querySelector('.rm').addEventListener('click', ()=>{
-        selectedRespondents.delete(id);
-        renderRespondentChips();
-      });
-      respondentsDisplay.appendChild(chip);
-    });
-    respondentIdsInput.value = Array.from(selectedRespondents.keys()).join(',');
-  }
+
 
   function escapeHtml(s){
     return String(s ?? '')
@@ -663,13 +653,55 @@
     syncHidden(); // ensure latest values are posted
   };
 
-  // Bootstrap form validation
-  const forms = document.querySelectorAll('.needs-validation');
-  Array.from(forms).forEach(form => {
-    form.addEventListener('submit', event => {
-      if (!form.checkValidity()) { event.preventDefault(); event.stopPropagation(); }
-      form.classList.add('was-validated');
-    }, false);
+  // Toast function
+  function showToast(message, type = 'danger') {
+    const toastContainer = document.querySelector('.toast-container');
+    const toastId = 'toast-' + Date.now();
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center text-bg-${type} border-0`;
+    toast.setAttribute('role', 'alert');
+    toast.id = toastId;
+    toast.innerHTML = `
+      <div class="d-flex">
+        <div class="toast-body">${message}</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>`;
+    toastContainer.appendChild(toast);
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+    toast.addEventListener('hidden.bs.toast', () => toast.remove());
+  }
+
+  // Form validation and submission
+  const form = document.querySelector('form');
+  form.addEventListener('submit', function(event) {
+    event.preventDefault();
+    
+    // Validate required fields
+    const subject = document.querySelector('[name="incident_subject"]').value.trim();
+    const date = document.querySelector('[name="incident_date"]').value.trim();
+    const time = document.querySelector('[name="incident_time"]').value.trim();
+    const desc = document.querySelector('[name="incident_desc"]').value.trim();
+    const address = document.querySelector('[name="incident_address"]').value.trim();
+    const complainant = document.querySelector('[name="complainant_id"]').value.trim();
+    const respondent = document.querySelector('[name="respondent_ids"]').value.trim();
+    
+    if (!subject) { showToast('Incident subject is required'); return; }
+    if (!date) { showToast('Incident date is required'); return; }
+    if (!time) { showToast('Incident time is required'); return; }
+    if (!desc) { showToast('Incident description is required'); return; }
+    if (!address) { showToast('Incident location is required. Please select a location using the map'); return; }
+    if (!complainant) { showToast('Complainant is required'); return; }
+    
+    // Confirmation with respondent reminder
+    let confirmMsg = 'Are you sure you want to save this blotter report?';
+    if (!respondent) {
+      confirmMsg += '\n\nNote: No respondent has been added to this report.';
+    }
+    
+    if (confirm(confirmMsg)) {
+      this.submit();
+    }
   });
 })();
 </script>

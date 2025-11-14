@@ -29,5 +29,8 @@ app.wire(modules=[
     "doc_ingest.api.faq_ingest_api",
     "captain.views",
     "clerk.views",
+    "treasurer.views",
     "secretary.views",
+    "lupon_mem.views",
+    "lupon_pres.views",
 ])

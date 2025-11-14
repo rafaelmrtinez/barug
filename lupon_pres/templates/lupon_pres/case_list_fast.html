@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cases - Barangay Lupon</title>
+    <style>
+        /* Bootstrap 5 Core - Inline */
+        *,::after,::before{box-sizing:border-box}
+        body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff}
+        .container-fluid{width:100%;padding-right:.75rem;padding-left:.75rem;margin-right:auto;margin-left:auto}
+        .row{display:flex;flex-wrap:wrap;margin-right:-.75rem;margin-left:-.75rem}
+        .col-md-4{position:relative;width:100%;padding-right:.75rem;padding-left:.75rem;flex:0 0 33.333333%;max-width:33.333333%}
+        .d-flex{display:flex!important}
+        .justify-content-between{justify-content:space-between!important}
+        .justify-content-center{justify-content:center!important}
+        .align-items-center{align-items:center!important}
+        .flex-wrap{flex-wrap:wrap!important}
+        .gap-2{gap:.5rem!important}
+        .mb-3{margin-bottom:1rem!important}
+        .me-1{margin-right:.25rem!important}
+        .me-2{margin-right:.5rem!important}
+        .ms-auto{margin-left:auto!important}
+        .ms-1{margin-left:.25rem!important}
+        .text-muted{color:#6c757d!important}
+        .text-center{text-align:center!important}
+        .small{font-size:.875em}
+        .fw-semibold{font-weight:600!important}
+        .py-3{padding-top:1rem!important;padding-bottom:1rem!important}
+        .py-4{padding-top:1.5rem!important;padding-bottom:1.5rem!important}
+        
+        /* Tables */
+        .table{width:100%;margin-bottom:1rem;color:#212529;vertical-align:top;border-color:#dee2e6}
+        .table>:not(caption)>*>*{padding:.5rem .5rem;background-color:var(--bs-table-bg);border-bottom-width:1px}
+        .table>tbody{vertical-align:inherit}
+        .table>thead{vertical-align:bottom}
+        .table-responsive{overflow-x:auto}
+        .align-middle{vertical-align:middle!important}
+        
+        /* Buttons */
+        .btn{display:inline-block;padding:.375rem .75rem;margin-bottom:0;font-size:1rem;font-weight:400;line-height:1.5;color:#212529;text-align:center;text-decoration:none;vertical-align:middle;cursor:pointer;border:1px solid transparent;border-radius:.375rem;transition:color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out}
+        .btn-sm{padding:.25rem .5rem;font-size:.875rem;border-radius:.25rem}
+        
+        /* Forms */
+        .form-control{display:block;width:100%;padding:.375rem .75rem;font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff;border:1px solid #ced4da;border-radius:.375rem;transition:border-color .15s ease-in-out,box-shadow .15s ease-in-out}
+        .form-select{display:block;width:100%;padding:.375rem 2.25rem .375rem .75rem;font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff;border:1px solid #ced4da;border-radius:.375rem}
+        .form-label{margin-bottom:.5rem;font-weight:600}
+        
+        /* Pagination */
+        .pagination{display:flex;padding-left:0;list-style:none}
+        .page-item:not(:first-child) .page-link{margin-left:-1px}
+        .page-link{position:relative;display:block;padding:.375rem .75rem;font-size:1rem;color:#0d6efd;text-decoration:none;background-color:#fff;border:1px solid #dee2e6;transition:color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out}
+        
+        /* Badges */
+        .badge{display:inline-block;padding:.35em .65em;font-size:.75em;font-weight:700;line-height:1;color:#fff;text-align:center;white-space:nowrap;vertical-align:baseline;border-radius:.375rem}
+        .rounded-pill{border-radius:50rem!important}
+        .text-bg-light{color:#000!important;background-color:#f8f9fa!important}
+        
+        /* Offcanvas */
+        .offcanvas{position:fixed;bottom:0;z-index:1045;display:flex;flex-direction:column;max-width:100%;visibility:hidden;background-color:#fff;background-clip:padding-box;outline:0;transition:transform .3s ease-in-out}
+        .offcanvas-end{top:0;right:0;width:320px;border-left:1px solid rgba(0,0,0,.2);transform:translateX(100%)}
+        .offcanvas-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1rem;border-bottom:1px solid #dee2e6}
+        .offcanvas-body{flex-grow:1;padding:1rem;overflow-y:auto}
+        .offcanvas-title{margin-bottom:0;line-height:1.5}
+        .btn-close{box-sizing:content-box;width:1em;height:1em;padding:.25em .25em;color:#000;background:transparent;border:0;border-radius:.375rem;opacity:.5}
+        
+        /* Custom Brand Colors */
+        :root{
+            --brand-700:#6d2932;
+            --brand-800:#561c24;
+            --brand-100:#f3eaeb;
+            --brand-050:#fbf6f6;
+        }
+        
+        /* Custom Styles */
+        .btn-brand{color:#fff;background:var(--brand-700);border-color:var(--brand-700);}
+        .btn-brand:hover{background:var(--brand-800);border-color:var(--brand-800);color:#fff;}
+        .btn-outline-brand{color:var(--brand-700);border-color:var(--brand-700);background:#fff;}
+        .btn-outline-brand:hover{background:var(--brand-700);color:#fff;}
+        .btn-brand-subtle{background:var(--brand-100);color:var(--brand-700);border-color:var(--brand-100);}
+        .btn-brand-subtle:hover{background:var(--brand-050);color:var(--brand-700);}
+        .form-control:focus,.form-select:focus{border-color:var(--brand-700);box-shadow:0 0 0 .25rem rgba(109,41,50,.25);}
+        .toolbar{background:#fff;border:1px solid #dee2e6;border-radius:1rem;padding:.75rem;gap:.5rem;}
+        .search-box{position:relative;flex:1;min-width:280px;}
+        .search-box input{padding-left:2.5rem!important;}
+        .table thead th{border-bottom:2px solid #dee2e6;font-weight:600;color:#495057;font-size:.85rem;white-space:nowrap;}
+        .table tbody tr:hover{background:#f8f9fa;}
+        .case-num{font-family:ui-monospace,Consolas,monospace;font-weight:600;color:var(--brand-700);background:var(--brand-050);padding:.25rem .5rem;border-radius:.375rem;border:1px solid rgba(109,41,50,.15);}
+        .dt-display{font-size:.9rem;color:#6c757d;}
+        .dt-display .date{font-weight:600;color:#212529;}
+        .status-pill{display:inline-flex;align-items:center;gap:.25rem;font-size:.75rem;font-weight:600;padding:.25rem .5rem;border-radius:999px;border:1px solid;}
+        .status-open{background:#e7f3ff;color:#0066cc;border-color:#b3d9ff;}
+        .status-closed{background:#f1f3f4;color:#5f6368;border-color:#dadce0;}
+        .status-settled{background:#e8f5e8;color:#137333;border-color:#c8e6c9;}
+        .status-pending{background:#fef7e0;color:#b06000;border-color:#f9c74f;}
+        .status-unsettled{background:#fce8e6;color:#d93025;border-color:#f28b82;}
+        .stats-card{background:var(--brand-800);border:1px solid var(--brand-700);border-radius:.5rem;padding:1rem;text-align:center;box-shadow:0 2px 4px rgba(109,41,50,.1);}
+        .stats-number{font-size:1.5rem;font-weight:700;color:#fff;}
+        .stats-label{font-size:.8rem;color:rgba(255,255,255,.8);text-transform:uppercase;letter-spacing:.5px;}
+        .filter-chip{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .65rem;border-radius:999px;font-size:.8rem;text-decoration:none;border:1px solid rgba(109,41,50,.18);background:var(--brand-050);color:var(--brand-700);}
+        .filter-chip:hover{background:var(--brand-100);}
+        .filter-chip .x{display:inline-grid;place-items:center;width:1rem;height:1rem;border-radius:50%;background:#fff;border:1px solid rgba(109,41,50,.22);line-height:1;font-weight:700;color:var(--brand-700);}
+        .pagination .page-link{color:var(--brand-700);border-color:#dee2e6;}
+        .pagination .page-link:hover{background:var(--brand-100);border-color:var(--brand-700);color:var(--brand-700);}
+        .pagination .page-item.active .page-link{background:var(--brand-700);border-color:var(--brand-700);color:#fff;}
+        .pagination .page-item.disabled .page-link{color:#6c757d;}
+    </style>
+</head>
+<body style="margin-top:60px;">
+
+<div class="container-fluid">
+  <!-- Stats -->
+  <div class="row mb-3">
+    <div class="col-md-4">
+      <div class="stats-card">
+        <div class="stats-number">{{ stats.total_cases }}</div>
+        <div class="stats-label">Total Cases</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="stats-card">
+        <div class="stats-number">{{ stats.open_cases }}</div>
+        <div class="stats-label">Open Cases</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="stats-card">
+        <div class="stats-number">{{ stats.settled_cases }}</div>
+        <div class="stats-label">Settled Cases</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+    <div class="search-box">
+      <input type="text" class="form-control" name="q" value="{{ q }}" 
+             placeholder="Search case number or name..." id="searchInput">
+    </div>
+    
+    {% if state %}<input type="hidden" name="state" value="{{ state }}">{% endif %}
+    {% if settlement %}<input type="hidden" name="settlement" value="{{ settlement }}">{% endif %}
+    {% if filed_from %}<input type="hidden" name="filed_from" value="{{ filed_from }}">{% endif %}
+    {% if filed_to %}<input type="hidden" name="filed_to" value="{{ filed_to }}">{% endif %}
+    
+    <button type="submit" class="btn btn-brand d-flex align-items-center">
+      🔍 Search
+    </button>
+    
+    <button class="btn btn-brand-subtle d-flex align-items-center ms-auto" type="button"
+            data-bs-toggle="offcanvas" data-bs-target="#filterPanel">
+      ⚙️ Filters
+      {% if state or settlement or filed_from or filed_to %}
+        <span class="badge rounded-pill text-bg-light ms-2">●</span>
+      {% endif %}
+    </button>
+  </form>
+  
+  <!-- Active Filters -->
+  {% if state or settlement or filed_from or filed_to %}
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <span class="text-muted me-1">Active:</span>
+    {% if state %}
+      <a class="filter-chip" href="?q={{ q|urlencode }}{% if settlement %}&settlement={{ settlement|urlencode }}{% endif %}{% if filed_from %}&filed_from={{ filed_from }}{% endif %}{% if filed_to %}&filed_to={{ filed_to }}{% endif %}">
+        State: {{ state }} <span class="x">×</span>
+      </a>
+    {% endif %}
+    {% if settlement %}
+      <a class="filter-chip" href="?q={{ q|urlencode }}{% if state %}&state={{ state|urlencode }}{% endif %}{% if filed_from %}&filed_from={{ filed_from }}{% endif %}{% if filed_to %}&filed_to={{ filed_to }}{% endif %}">
+        Settlement: {{ settlement }} <span class="x">×</span>
+      </a>
+    {% endif %}
+    {% if filed_from %}
+      <a class="filter-chip" href="?q={{ q|urlencode }}{% if state %}&state={{ state|urlencode }}{% endif %}{% if settlement %}&settlement={{ settlement|urlencode }}{% endif %}{% if filed_to %}&filed_to={{ filed_to }}{% endif %}">
+        From {{ filed_from }} <span class="x">×</span>
+      </a>
+    {% endif %}
+    {% if filed_to %}
+      <a class="filter-chip" href="?q={{ q|urlencode }}{% if state %}&state={{ state|urlencode }}{% endif %}{% if settlement %}&settlement={{ settlement|urlencode }}{% endif %}{% if filed_from %}&filed_from={{ filed_from }}{% endif %}">
+        To {{ filed_to }} <span class="x">×</span>
+      </a>
+    {% endif %}
+    <a class="btn btn-sm btn-outline-brand ms-1" href="?q={{ q|urlencode }}">
+      ❌ Clear all
+    </a>
+  </div>
+  {% endif %}
+  
+  <!-- Results Info -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="text-muted small">
+      {% if total > 0 %}
+        Showing {{ first_item }}–{{ last_item }} of {{ total }}
+      {% else %}
+        No results
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>Case No.</th>
+          <th>Case Name</th>
+          <th>Date Filed</th>
+          <th>Status</th>
+          <th>Settlement</th>
+          <th width="100">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>
+            <span class="case-num">#{{ row.1 }}</span>
+          </td>
+          <td class="fw-semibold">{{ row.2 }}</td>
+          <td>
+            <div class="dt-display">
+              <div class="date">{{ row.3 }}</div>
+              <div>🕐 {{ row.4 }}</div>
+            </div>
+          </td>
+          <td>
+            {% if row.5|lower == "open" %}
+              <span class="status-pill status-open">🔓 Open</span>
+            {% else %}
+              {% if row.5|lower == "closed" %}
+                <span class="status-pill status-closed">🔒 Closed</span>
+              {% else %}
+                {% if row.5|lower == "pending" %}
+                  <span class="status-pill status-pending">⏳ Pending</span>
+                {% else %}
+                  <span class="status-pill status-pending">{{ row.5 }}</span>
+                {% endif %}
+              {% endif %}
+            {% endif %}
+          </td>
+          <td>
+            {% if row.6|lower == "settled" %}
+              <span class="status-pill status-settled">✅ Settled</span>
+            {% else %}
+              {% if row.6|lower == "pending" %}
+                <span class="status-pill status-pending">⏳ Pending</span>
+              {% else %}
+                {% if "unsettled" in row.6|lower or "failed" in row.6|lower %}
+                  <span class="status-pill status-unsettled">❌ {{ row.6 }}</span>
+                {% else %}
+                  <span class="status-pill status-pending">{{ row.6 }}</span>
+                {% endif %}
+              {% endif %}
+            {% endif %}
+          </td>
+          <td>
+            <a href="{% url 'lupon_mem:case_detail' row.0 %}" class="btn btn-outline-brand btn-sm">
+              →
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="text-center py-4 text-muted">
+            {% if q %}No cases found matching "{{ q }}"{% else %}No cases found{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if total_pages > 1 %}
+  <nav class="d-flex justify-content-center">
+    <ul class="pagination">
+      <li class="page-item {% if not has_prev %}disabled{% endif %}">
+        <a class="page-link" href="?page=1{% if q %}&q={{ q|urlencode }}{% endif %}{% if state %}&state={{ state|urlencode }}{% endif %}{% if settlement %}&settlement={{ settlement|urlencode }}{% endif %}{% if filed_from %}&filed_from={{ filed_from }}{% endif %}{% if filed_to %}&filed_to={{ filed_to }}{% endif %}">First</a>
+      </li>
+      <li class="page-item {% if not has_prev %}disabled{% endif %}">
+        <a class="page-link" href="?page={{ prev_page }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if state %}&state={{ state|urlencode }}{% endif %}{% if settlement %}&settlement={{ settlement|urlencode }}{% endif %}{% if filed_from %}&filed_from={{ filed_from }}{% endif %}{% if filed_to %}&filed_to={{ filed_to }}{% endif %}">‹</a>
+      </li>
+      {% for p in page_numbers %}
+      <li class="page-item {% if p == page %}active{% endif %}">
+        <a class="page-link" href="?page={{ p }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if state %}&state={{ state|urlencode }}{% endif %}{% if settlement %}&settlement={{ settlement|urlencode }}{% endif %}{% if filed_from %}&filed_from={{ filed_from }}{% endif %}{% if filed_to %}&filed_to={{ filed_to }}{% endif %}">{{ p }}</a>
+      </li>
+      {% endfor %}
+      <li class="page-item {% if not has_next %}disabled{% endif %}">
+        <a class="page-link" href="?page={{ next_page }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if state %}&state={{ state|urlencode }}{% endif %}{% if settlement %}&settlement={{ settlement|urlencode }}{% endif %}{% if filed_from %}&filed_from={{ filed_from }}{% endif %}{% if filed_to %}&filed_to={{ filed_to }}{% endif %}">›</a>
+      </li>
+      <li class="page-item {% if not has_next %}disabled{% endif %}">
+        <a class="page-link" href="?page={{ total_pages }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if state %}&state={{ state|urlencode }}{% endif %}{% if settlement %}&settlement={{ settlement|urlencode }}{% endif %}{% if filed_from %}&filed_from={{ filed_from }}{% endif %}{% if filed_to %}&filed_to={{ filed_to }}{% endif %}">Last</a>
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+
+<!-- Filter Panel -->
+<div class="offcanvas offcanvas-end" id="filterPanel" tabindex="-1" style="margin-top:150px;">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title">Filters</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+  </div>
+  <div class="offcanvas-body">
+    <form method="get">
+      <input type="hidden" name="q" value="{{ q }}">
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Case State</label>
+        <select class="form-select" name="state">
+          <option value="">All States</option>
+          {% for choice in state_choices %}
+            <option value="{{ choice }}" {% if state == choice %}selected{% endif %}>{{ choice }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Settlement Status</label>
+        <select class="form-select" name="settlement">
+          <option value="">All Settlements</option>
+          {% for choice in settlement_choices %}
+            <option value="{{ choice }}" {% if settlement == choice %}selected{% endif %}>{{ choice }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Date Filed</label>
+        <div class="d-flex gap-2">
+          <input type="date" class="form-control" name="filed_from" value="{{ filed_from }}">
+          <input type="date" class="form-control" name="filed_to" value="{{ filed_to }}">
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-brand" type="submit">
+          ✅ Apply
+        </button>
+        <a class="btn btn-outline-brand" href="?q={{ q|urlencode }}">
+          ❌ Clear
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+let t;document.getElementById('searchInput').addEventListener('input',e=>{clearTimeout(t);t=setTimeout(()=>{if(e.target.value.length>=2||!e.target.value)e.target.form.submit()},500)});
+</script>
+
+</body>
+</html>

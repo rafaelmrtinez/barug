@@ -1,0 +1,86 @@
+{% load static bootstrap_icons %}
+
+<!-- Staff Picker Modal -->
+<div class="modal fade" id="staffPickerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title">Add Staff</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="mb-3 position-relative">
+          <span class="position-absolute" style="left:.75rem;top:.7rem;opacity:.6">
+            {% bs_icon 'search' %}
+          </span>
+          <input id="staffSearchInput" type="text" class="form-control ps-5" placeholder="Search staff by name…" autocomplete="off">
+        </div>
+
+        <div id="staffResults" class="list-group small">
+          <!-- results appear here -->
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const inp   = document.getElementById('staffSearchInput');
+  const list  = document.getElementById('staffResults');
+  let t = null;
+
+  function renderResults(items){
+    list.innerHTML = '';
+    if(!items || !items.length){
+      list.innerHTML = '<div class="list-group-item text-muted">No matches…</div>';
+      return;
+    }
+    items.forEach(it=>{
+      const a = document.createElement('button');
+      a.type = 'button';
+      a.className = 'list-group-item list-group-item-action d-flex align-items-center justify-content-between';
+      a.innerHTML = `
+        <span class="me-2">${it.name}</span>
+        <span class="badge bg-light text-body-secondary">#${it.id}</span>
+      `;
+      a.addEventListener('click', async ()=>{
+        try{
+          const r = await fetch(`{% url 'lupon_mem:staff_lookup' %}?staff_id=${encodeURIComponent(it.id)}`);
+          const j = await r.json();
+          if(!j.ok) throw new Error(j.error || 'Lookup failed');
+          window._onStaffPicked && window._onStaffPicked(j.result);   // hand off to page
+          bootstrap.Modal.getOrCreateInstance(document.getElementById('staffPickerModal')).hide();
+          inp.value = ''; list.innerHTML = '';
+        }catch(e){
+          alert(e.message || e);
+        }
+      });
+      list.appendChild(a);
+    });
+  }
+
+  async function search(q){
+    if(!q || q.length < 2){ renderResults([]); return; }
+    const url = `{% url 'lupon_mem:staff_suggest' %}?q=${encodeURIComponent(q)}`;
+    const r = await fetch(url);
+    const j = await r.json();
+    renderResults(j.results || []);
+  }
+
+  inp.addEventListener('input', ()=>{
+    clearTimeout(t);
+    t = setTimeout(()=>search((inp.value||'').trim()), 250);
+  });
+
+  // Clear when opened
+  document.getElementById('staffPickerModal')?.addEventListener('shown.bs.modal', ()=>{
+    inp.value=''; list.innerHTML=''; inp.focus();
+  });
+})();
+</script>

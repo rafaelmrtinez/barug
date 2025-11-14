@@ -33,6 +33,9 @@ from .forms import (
     UpdateInfo,   # ← if this lives in lupon_pres.forms; otherwise import from secretary.forms
 )
 
+from dependency_injector.wiring import inject, Provide
+from src.app.bootstrap.app_containers import AppContainer
+
 # Supabase upload helper you already use elsewhere
 from common.supabase_client import supabase
 from common.services.storage import upload_to_storage
@@ -71,6 +74,52 @@ DAY_LABELS = {
 # Buckets
 BUCKET_FINAL = getattr(settings, "SUPABASE_ID_UPLOADS_BUCKET", "id-uploads")
 BUCKET_STAFF_PROOF = getattr(settings, "SUPABASE_STAFF_PROOF_BUCKET", "staff-proof")
+
+
+def _auth_role_name(request: HttpRequest) -> str:
+    return (((request.session.get("auth") or {}).get("role_name")) or "Staff").title()
+
+# --- Dashboard ---
+@session_login_required
+@role_required(LUPON_PRES_ROLE)
+@nocache
+@inject
+def dashboard(
+    request: HttpRequest,
+    lupon_mem_dashboard_service=Provide[AppContainer.lupon_mem_dashboard_service],
+):
+    user_role = _auth_role_name(request)
+
+    kpis = {
+        "ongoing_cases": 0,
+        "open_cases": None,
+        "total_case_settled": 0,
+        "total_case_settled_delta": None,
+        "total_case_unsettled": 0,
+        "total_case_unsettled_delta": None,
+        "settlement_rate": 0,
+    }
+
+    dashboard_json = None
+
+    try:
+        payload = lupon_mem_dashboard_service.get_dashboard_content() or {}
+        kpis = payload.get("kpis", kpis)
+        dashboard_json = payload.get("dashboard_json") 
+    except Exception as exc:
+        print("Error fetching lupon mem dashboard KPIs:", exc)
+
+    return render(
+        request,
+        "lupon_pres/dashboard.html",
+        {
+            'page_path' : f'{user_role} / Dashboard',
+            'page_title' : 'Dashboard',
+            'kpis': kpis,
+            'dashboard_json': dashboard_json,
+            'today': datetime.now().strftime("%B %d, %Y"),
+        },
+    )
 
 
 def _wiz_get(request) -> Dict[str, Any]:
@@ -553,6 +602,7 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
             final_base = f"staff_acc_req_proof/{pid}"
 
         BUCKET_FOR_PROOF = BUCKET_STAFF_PROOF
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         if proof_file:
@@ -1448,3 +1498,29 @@ def member_dets(request: HttpRequest, staff_code: str) -> HttpResponse:
         "schedule_list": schedule_list,
         "day_choices": day_choices,
     })
+
+
+# Import all view functions from lupon_mem.views
+from lupon_mem.views import (
+    form_builder,
+    add_form_choose_static,
+    form_builder_by_code,
+    generate_settlement_summary,
+    hearing_list,
+    case_hearing_list,
+    case_hearing_schedule,
+    open_kp16_from_hearing,
+    open_med_attendance_from_hearing,
+    open_mediation_attendance,
+    hearing_media_upload,
+    mediation_photos_upload,
+    mediation_complete,
+    conciliation_complete,
+    case_summary_pdf,
+    mark_hearing_held_dev,
+    case_summon_list,
+    summon_attendance,
+    summon_set_status,
+    case_timeline,
+    incident_heatmap
+)

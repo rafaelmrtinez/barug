@@ -115,13 +115,40 @@ def _to_int_or_none(val) -> Optional[int]:
         
 @session_login_required
 @role_required(CAPTAIN_ROLE)
-def dashboard(request):
-    return render(request, "captain_dashboard.html", {
-        'user_fullname' : user_fullname,
-        'user_role' : user_role,
+@nocache
+@inject
+def dashboard(
+    request: HttpRequest,
+    captain_dashboard_service=Provide[AppContainer.captain_dashboard_service],
+):
+    user_role = _auth_role_name(request)
+
+    kpis = {
+        "ongoing_cases": 0,
+        "open_cases": None,
+        "residents_total": 0,
+        "new_residents_month": None,
+        "collections_this_week": 0,
+        "collections_this_week_delta": None,
+        "collections_this_year": 0,
+        "collections_this_year_delta": None,
+    }
+
+    dashboard_json = None
+
+    try:
+        payload = captain_dashboard_service.get_dashboard_content() or {}
+        kpis = payload.get("kpis", kpis)
+        dashboard_json = payload.get("dashboard_json")
+    except Exception as exc:
+        print("Error fetching captain dashboard KPIs:", exc)
+
+    return render(request, "captain/dashboard.html", {
         'page_path' : f'{user_role} / Dashboard',
         'page_title' : 'Dashboard',
-        'user_role_template' : user_role_template,
+        'kpis': kpis,
+        'dashboard_json': dashboard_json,
+        'today': datetime.now().strftime("%B %d, %Y"),
     })
 
 def _smart_redirect(request, url_name, *args, **kwargs):
