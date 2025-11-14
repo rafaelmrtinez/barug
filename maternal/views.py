@@ -332,6 +332,25 @@ def maternal_health_record_form(request, record_id : int):
             mhr_repo=REPOSITORY,
             mhr_id=record_id,
         )
+        # Prefill risk_code_form initial values from repository
+        try:
+            _risk_rows = REPOSITORY.fetch_risk_codes_by_mhr_id(record_id) or []
+            # Map the two categories to our form fields
+            for r in _risk_rows:
+                cat = (r.get('category') or '').upper()
+                is_present = bool(r.get('is_present'))
+                if cat == 'OBSTETRIC RISKS':
+                    risk_code_form.fields['risk_obstetric_history'].initial = is_present
+                    risk_code_form.initial['risk_obstetric_history'] = is_present
+                elif cat == 'MEDICAL CONDITIONS':
+                    risk_code_form.fields['risk_medical_comorbidities'].initial = is_present
+                    risk_code_form.initial['risk_medical_comorbidities'] = is_present
+            # expose flag for template/JS to know if existing entries exist
+            risk_code_form.has_existing = any(r.get('is_present') for r in _risk_rows)
+        except Exception:
+            # If fetch fails, do not block rendering; log and continue
+            logger.exception('Unable to load existing risk codes for mhr_id=%s', record_id)
+            risk_code_form.has_existing = False
         
         pre_natal_existing_data = REPOSITORY.fetch_prenatal_information_by_mhr_id(record_id)
         

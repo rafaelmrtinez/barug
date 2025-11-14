@@ -59,12 +59,28 @@ class MaternalRiskService:
 
         try:
             assessed_by = int(assessed_by_id)
-            # if assessed_by <= 0:
-            #     raise ValueError()
+            if assessed_by <= 0:
+                raise ValueError()
         except Exception:
             raise MaternalHealthRecordException("Invalid assessed_by id.")
 
         categories = self._normalize_categories(risk_categories)
+
+        # Domain rule: do not allow inserting risk codes if any already exist for this MHR.
+        try:
+            existing = self.repo.fetch_risk_codes_by_mhr_id(mhr_id)
+            # existing is list of dicts with keys 'category' and 'is_present'
+            if existing:
+                for row in existing:
+                    if row.get('is_present'):
+                        raise MaternalHealthRecordException('Risk codes already exist for this maternal health record.')
+        except MaternalHealthRecordException:
+            # propagate domain exception
+            raise
+        except Exception:
+            # If repository check fails unexpectedly, stop and return friendly error
+            logger.exception('Failed to validate existing risk codes')
+            raise MaternalHealthRecordException('Unable to validate existing risk codes. Please try again.')
 
         # Delegate to repository. Repository will convert to Json/JSONB.
         try:

@@ -651,7 +651,7 @@
             </div>
         </form>
         <!-- Risk Code Form (displayed after Micronutrients) -->
-        <form method="post" class="card mb-4 card-brand" id="form-risk-code" action="">
+        <form method="post" class="card mb-4 card-brand" id="form-risk-code" action="" data-has-existing="{% if risk_code_form.has_existing %}true{% else %}false{% endif %}">
             {% csrf_token %}
             <div class="card card-brand mb-3">
                 <span class="card-header">Risk Codes</span>
@@ -669,7 +669,10 @@
                 </div>
             </div>
             <div class="card-footer text-end">
-                <button type="submit" class="btn btn-brand">Save Risk Codes</button>
+                {% if risk_code_form.has_existing %}
+                    <span class="text-muted me-3">Risk codes already recorded for this record.</span>
+                {% endif %}
+                <button type="submit" class="btn btn-brand" {% if risk_code_form.has_existing %}disabled{% endif %}>Save Risk Codes</button>
             </div>
         </form>
     {% endif %}
@@ -702,5 +705,6 @@
 <script src="{% static 'maternal/js/prenatal_status_api.js' %}"></script>
 <script src="{% static 'maternal/js/lock_forms.js' %}"></script>
 <script src="{% static 'maternal/js/downloadAllLabImages.js' %}"></script>
+<script src="{% static 'js/toast.js' %}"></script>
 <script src="{% static 'maternal/js/risk_codes_submit.js' %}"></script>
 {% endblock %}
