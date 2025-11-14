@@ -262,7 +262,7 @@ def create_new_maternal_entry(request: HttpRequest) -> HttpResponse:
 def maternal_health_record_form(request, record_id : int):
     try:
         role = request.session.get("auth", {}).get("role_name")
-        assistant = request.session.get("auth", {}).get("first_name") + " " + request.session.get("auth", {}).get("last_name")
+        assistant = (request.session.get("auth", {}).get("first_name") or "") + " " + (request.session.get("auth", {}).get("last_name") or "")
         staff_id = request.session.get("auth", {}).get("staff_id")
 
         mhr_status = MHRCompletionForm(repository=REPOSITORY, mhr_id=record_id)
@@ -1231,7 +1231,7 @@ def record_detail(request: HttpRequest, person_id: int) -> HttpResponse:
     record = REPOSITORY.fetch_latest_maternal_record_by_person_and_maternal_id(person_id, maternal_record_id=maternal_health_record_id) or {}
     all_records = REPOSITORY.fetch_all_maternal_records_for_person(person_id)
     basic_info = REPOSITORY.fetch_mhr_count_and_fam_id_by_person_id(person_id)
-    staff_name = request.session.get('auth', {}).get('first_name') + ' ' + request.session.get('auth', {}).get('last_name')
+    staff_name = (request.session.get('auth', {}).get('first_name') or "") + ' ' + (request.session.get('auth', {}).get('last_name') or "")
     # prepare postpartum form pre-populated with maternal record id
     postpartum_form = PostpartumRecordForm(
         mhr_id=maternal_health_record_id,
