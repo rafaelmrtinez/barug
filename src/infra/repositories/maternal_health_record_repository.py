@@ -770,6 +770,39 @@ class MaternalHealthRecordRepository(IMaternalHealthRecordRepository):
                 raise MaternalHealthRecordException(e.message) from e
             raise e
 
+    def insert_risk_codes(self, p_maternal_health_record_id: int, p_assessed_by_id: int, p_risk_categories):
+        """
+        Insert risk codes for a maternal health record.
+
+        Parameters:
+          - p_maternal_health_record_id: int
+          - p_assessed_by_id: int
+          - p_risk_categories: list[int] (will be sent as JSONB)
+
+        Returns the inserted row (first returned row) or None.
+        """
+        sql = """SELECT * FROM add_maternal_risk_categories_json(%s::INTEGER, %s::INTEGER, %s::JSONB);"""
+        # Convert python list to psycopg2 Json wrapper for JSONB param
+        try:
+            json_param = Json(p_risk_categories)
+        except Exception:
+            json_param = Json(list(p_risk_categories) if p_risk_categories is not None else [])
+
+        params = (
+            p_maternal_health_record_id,
+            p_assessed_by_id,
+            json_param,
+        )
+        logger.debug("Inserting risk codes params: %s", params)
+        try:
+            rows = self.ctx.execute_query(sql, params)
+            return rows[0] if rows else None
+        except QueryExecutionException as e:
+            logger.error(f"Error inserting risk codes: {getattr(e, 'message', str(e))}")
+            if MaternalHealthRecordException.is_maternal_health_record_exception(e.code):
+                raise MaternalHealthRecordException(e.message) from e
+            raise e
+
     def insert_plan_and_baseline(self, mhr_id, staff_id, nbs_plan, delivery_plan):
         sql = """SELECT * FROM insert_plan_and_baseline(%s::INTEGER, %s::INTEGER, %s::BOOLEAN, %s::TEXT);"""
         params = (

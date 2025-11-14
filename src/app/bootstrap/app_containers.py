@@ -23,6 +23,7 @@ from src.app.services.maternal_service import MaternalService
 from src.app.services.scheduling_service import SchedulingService
 from src.app.services.maternal_schedule_service import MaternalScheduleService
 from src.app.services.maternal_postpartum_service import MaternalPostpartumService
+from src.app.services.maternal_risk_service import MaternalRiskService
 from src.app.services.maternal_status_service import MaternalRecordStatusService
 from src.app.services.laboratory_service import LaboratoryService
 from src.app.services.image_download_service import ImageDownloadService
@@ -140,6 +141,11 @@ class AppContainer(containers.DeclarativeContainer):
 
     maternal_postpartum_service: providers.Factory[IMaternalPostpartumService] = providers.Factory(
         MaternalPostpartumService,
+        repository=infra.maternal_health_record_repository,
+    )
+
+    maternal_risk_service = providers.Factory(
+        MaternalRiskService,
         repository=infra.maternal_health_record_repository,
     )
 

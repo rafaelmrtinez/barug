@@ -657,7 +657,14 @@
                 <span class="card-header">Risk Codes</span>
                 <div class="card-body">
                     <div id="risk-codes" class="row g-3">
-                        {{ risk_code_form }}
+                        <div class="col-md-6 form-check">
+                            <input type="checkbox" class="form-check-input risk-category" id="risk_obstetric_history" name="risk_obstetric_history" data-risk-id="1" {% if risk_code_form.risk_obstetric_history.value %}checked{% endif %}>
+                            <label class="form-check-label" for="risk_obstetric_history">{{ risk_code_form.risk_obstetric_history.label }}</label>
+                        </div>
+                        <div class="col-md-6 form-check">
+                            <input type="checkbox" class="form-check-input risk-category" id="risk_medical_comorbidities" name="risk_medical_comorbidities" data-risk-id="2" {% if risk_code_form.risk_medical_comorbidities.value %}checked{% endif %}>
+                            <label class="form-check-label" for="risk_medical_comorbidities">{{ risk_code_form.risk_medical_comorbidities.label }}</label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -695,4 +702,5 @@
 <script src="{% static 'maternal/js/prenatal_status_api.js' %}"></script>
 <script src="{% static 'maternal/js/lock_forms.js' %}"></script>
 <script src="{% static 'maternal/js/downloadAllLabImages.js' %}"></script>
+<script src="{% static 'maternal/js/risk_codes_submit.js' %}"></script>
 {% endblock %}
