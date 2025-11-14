@@ -58,6 +58,41 @@ from src.app.contracts.household_service_contract import (
 from src.app.services.household_service import (
     HouseholdService
 )
+from src.app.services.dashboards_service import (
+    ClerkDashboardService,
+    TreasurerDashboardService,
+    CaptainDashboardService,
+    SecretaryDashboardService,
+    LuponMemberDashboardService,
+)
+
+
+from src.app.contracts.business_service_contract import (
+    IBusinessService,
+    IResidentOwnerService,
+    IBusinessRegistrationService,
+    IBusinessRenewalService,
+    IBusinessRenewalQuoteService,
+    IBusinessRenewalRequestService,
+)
+from src.domain.contracts.household_repository_contract import (
+    IHouseholdRepository
+)
+from src.app.services.business_service import (
+    BusinessService,
+    ResidentOwnerService,
+    BusinessRegistrationService,
+    OwnerBusinessInfoService,
+    BusinessRenewalService,
+    BusinessRenewalQuoteService,
+    BusinessRenewalRequestService,
+)
+from src.app.contracts.household_service_contract import (
+    IHouseholdService
+)
+from src.app.services.household_service import (
+    HouseholdService
+)
 
 
 class AppContainer(containers.DeclarativeContainer):
@@ -182,6 +217,32 @@ class AppContainer(containers.DeclarativeContainer):
         repository=infra.faq_ingestion_repository,
     )
 
+    # Dashboard Services can be added here in the app container as needed
+    clerk_dashboard_service: providers.Factory[ClerkDashboardService] = providers.Factory(
+        ClerkDashboardService,
+        dashboard_repo=infra.clerk_dashboard_repository,
+    )
+
+    treasurer_dashboard_service: providers.Factory[TreasurerDashboardService] = providers.Factory(
+        TreasurerDashboardService,
+        dashboard_repo=infra.treasurer_dashboard_repository,
+    )
+
+    captain_dashboard_service: providers.Factory[CaptainDashboardService] = providers.Factory(
+        CaptainDashboardService,
+        dashboard_repo=infra.captain_dashboard_repository,
+    )
+
+    secretary_dashboard_service: providers.Factory[SecretaryDashboardService] = providers.Factory(
+        SecretaryDashboardService,
+        dashboard_repo=infra.secretary_dashboard_repository,
+    )
+
+    lupon_mem_dashboard_service: providers.Factory[LuponMemberDashboardService] = providers.Factory(
+        LuponMemberDashboardService,
+        dashboard_repo=infra.lupon_mem_dashboard_repository,
+    )
+    
     # Child health schedule service (thin orchestration service)
     child_health_schedule_service: providers.Factory[IChildHealthScheduleService] = providers.Factory(
         ChildHealthScheduleService,

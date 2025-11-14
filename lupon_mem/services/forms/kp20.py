@@ -54,7 +54,8 @@ def _try_parse_date(s: str) -> Optional[_date]:
     fmts = (
         "%Y-%m-%d","%m/%d/%Y","%d/%m/%Y",
         "%B %d, %Y","%b %d, %Y",
-        "%d %B %Y","%d %b %Y"
+        "%d %B %Y","%d %b %Y",
+        "%d %B, %Y","%d %b, %Y"
     )
     for fmt in fmts:
         try:
@@ -202,7 +203,7 @@ def _derive_by_and_grounds_from_kp17(kp17_sid: int) -> Tuple[str, str]:
         # fallback: use first available party line
         by_txt = _find({"complainants", "complainants_two", "respondents", "respondents_2"})
 
-    # 3) Grounds: build from checkboxes + optional details (aligns with kp17.py names)
+    # 3) Grounds: build from checkboxes (no details)
     fraud_on  = _find({"fraud_chkbx"})
     viol_on   = _find({"violence_chkbx"})
     intimid_on= _find({"intimidation_chkbx"})
@@ -212,11 +213,11 @@ def _derive_by_and_grounds_from_kp17(kp17_sid: int) -> Tuple[str, str]:
 
     grounds: List[str] = []
     if _boolish(fraud_on) or fraud_det:
-        grounds.append("Fraud" + (f" ({fraud_det})" if fraud_det else ""))
+        grounds.append("Fraud")
     if _boolish(viol_on) or viol_det:
-        grounds.append("Violence" + (f" ({viol_det})" if viol_det else ""))
+        grounds.append("Violence")
     if _boolish(intimid_on) or intim_det:
-        grounds.append("Intimidation" + (f" ({intim_det})" if intim_det else ""))
+        grounds.append("Intimidation")
 
     ground_txt = ", ".join([g for g in grounds if g.strip()])
     return (by_txt, ground_txt)
@@ -305,20 +306,13 @@ class KP20Handler:
             t_obj = _parse_time(t_ans) or t_by_num or t_by_sub
             out["time_filed"] = _fmt12(t_obj) if t_obj else ""
 
-        # Complaint month/year → use KP-7 date_filed if available
-        if kp7_date_str:
-            kp7_date_obj = _try_parse_date(kp7_date_str)
-            if kp7_date_obj:
-                if not (out.get("complaint_date_month") or "").strip():
-                    out["complaint_date_month"] = f"{kp7_date_obj.strftime('%B')} {kp7_date_obj.day}"
-                if not (out.get("complaint_year") or "").strip():
-                    out["complaint_year"] = str(kp7_date_obj.year)
-        else:
-            fallback_date = d_by_num or d_by_sub or _dt.now(ZoneInfo("Asia/Manila")).date()
-            if not (out.get("complaint_date_month") or "").strip():
-                out["complaint_date_month"] = f"{fallback_date.strftime('%B')} {fallback_date.day}"
-            if not (out.get("complaint_year") or "").strip():
-                out["complaint_year"] = str(fallback_date.year)
+        # Complaint month/year → use same date as date_filed
+        date_filed_str = out.get("date_filed", "")
+        if date_filed_str:
+            date_obj = _try_parse_date(date_filed_str)
+            if date_obj:
+                out["complaint_date_month"] = f"{date_obj.strftime('%B')} {date_obj.day}"
+                out["complaint_year"] = str(date_obj.year)
 
         # -------- Item 4: BY + GROUNDS (derive from latest KP-17 if missing) --------
         kp17_sid = _latest_kp17_submission_id(case_id) if case_id else None
@@ -353,6 +347,17 @@ class KP20Handler:
                 out[k] = FS.sanitize_text(v)
         for k in _KP20_FIELDS:
             out.setdefault(k, "")
+
+        # ---------------------------------------------------
+        # Send notifications for KP-20 submission
+        # ---------------------------------------------------
+        try:
+            from notifications.views import notify_kp20_certification_file_action
+            if case_id:
+                case_num = out.get("brgy_case_number", "")
+                notify_kp20_certification_file_action(case_id, case_num)
+        except Exception as e:
+            logger.warning("[KP20] Failed to send notifications: %s", e)
 
         # Final ordered log of exactly what goes into the PDF
         self._log(out)

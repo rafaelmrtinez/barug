@@ -6,12 +6,30 @@ from common.send_sms import send_sms
 from datetime import datetime
 import os
 import uuid
+from dependency_injector.wiring import inject, Provide
+
+from typing import Dict
+from datetime import date as _date
+from django.db import connection
 
 from lupon_mem.services.forms.kp8 import KP8Handler  # reuse its normalization
 from lupon_mem.services.forms.kp10 import KP10Handler
 from lupon_mem.services.forms.kp11 import KP11Handler
 from lupon_mem.services.forms.kp12 import KP12Handler
+# add near the top with your other imports
+from lupon_mem.services.timeline import get_case_timeline
 
+# Roles
+LUPON_ROLES = {"BARANGAY LUPON MEMBER", "BARANGAY LUPON PRESIDENT"}
+LUPON_ROLES_LIST = ["BARANGAY LUPON MEMBER", "BARANGAY LUPON PRESIDENT"]  # pass to templates
+
+from django.views.decorators.http import require_POST
+
+
+from lupon_mem.utils.http import json_ok, json_err, flash_success, flash_warning, require_post_view
+from lupon_mem.utils.params import post_int, post_bool, post_str
+from lupon_mem.services import hearings as svc_hear
+from django.views.decorators.csrf import csrf_protect
 import logging
 log = logging.getLogger(__name__)
 
@@ -33,6 +51,8 @@ from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
 from common.supabase_client import supabase
 
+from src.app.bootstrap.app_containers import AppContainer
+
 from lupon_mem.services.form_renderer import render_preview_png, render_final_pdf
 from django.core.exceptions import ValidationError
 from lupon_mem.constants import KP_FORMS_CATALOG   # static chooser catalog
@@ -50,7 +70,24 @@ from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
 from lupon_mem.services.case_state import close_case, reopen_case
+from lupon_mem.services.helpers import (
+    ordinal,
+    one_val, row, rows,
+    get_form_id, submitted_codes, latest_submission_for_codes,
+    latest_notice_submitted_at, is_hearing_held, hearings_held, hearing_gate,
+    prefill_minimal_for_case, create_and_submit_form_from_prefill,
+    list_case_photos, list_mediation_photos,
+    get_person_mobile_number,
+    slice_until_code,
+)
 
+from django.contrib import messages
+from django.db import connection
+from django.http import HttpRequest
+from django.shortcuts import render, redirect
+from django.urls import reverse
+from lupon_mem.services.all_helpers import *
+from lupon_mem.services.all_helpers import _hearing_gate
 
 # caching / logging
 from django.core.cache import cache
@@ -74,6 +111,8 @@ def _ordinal(n: int) -> str:
         suf = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
     return f"{n}{suf}"
 
+def _auth_role_name(request: HttpRequest) -> str:
+    return (((request.session.get("auth") or {}).get("role_name")) or "Staff").title()
 
 def _autogen_settled_summary(case_id: int, kp16_submission_id: int):
     """
@@ -417,6 +456,77 @@ def _autogen_settled_summary(case_id: int, kp16_submission_id: int):
                     DO UPDATE SET value_json=EXCLUDED.value_json
                 """, [med_sid, field_id, _json.dumps(val)])
 
+            # propagate 'processed_by' meta and printable fields from the KP-16 submission (if available)
+            try:
+                # 1) Who processed KP-16?
+                cur.execute(
+                    "SELECT processed_by_id FROM blotter_kp_submission WHERE submission_id=%s",
+                    [kp16_submission_id]
+                )
+                row_proc = cur.fetchone()
+                kp16_proc_id = int(row_proc[0]) if row_proc and row_proc[0] is not None else None
+
+                if kp16_proc_id:
+                    # 2) Set MEDx processed_by_id (trigger fills processed_at/name/position)
+                    cur.execute(
+                        "UPDATE blotter_kp_submission SET processed_by_id=%s WHERE submission_id=%s",
+                        [kp16_proc_id, med_sid]
+                    )
+
+                    # 3) Read cached values from MEDx submission
+                    cur.execute(
+                        """
+                        SELECT processed_at, COALESCE(processed_by_name,''), COALESCE(processed_by_position,'')
+                          FROM blotter_kp_submission
+                         WHERE submission_id=%s
+                        """,
+                        [med_sid]
+                    )
+                    proc_at, proc_name, proc_pos = cur.fetchone() if cur.rowcount else (None, '', '')
+
+                    # 4) Upsert printable fields if present on the form
+                    cur.execute(
+                        "SELECT field_code, field_id FROM kp_field WHERE field_code IN %s",
+                        [("processed_by_staff_id", "processed_by_staff_name", "processed_by_staff_position", "processed_on_date", "processed_on_time")]
+                    )
+                    code_to_id = {fc: fid for fc, fid in cur.fetchall()}
+
+                    def _iso(d):
+                        try:
+                            return d.date().isoformat()
+                        except Exception:
+                            return None
+
+                    def _hm(t):
+                        try:
+                            return t.strftime('%H:%M')
+                        except Exception:
+                            return None
+
+                    values_map = {
+                        'processed_by_staff_id': str(kp16_proc_id),
+                        'processed_by_staff_name': proc_name,
+                        'processed_by_staff_position': proc_pos,
+                        'processed_on_date': _iso(proc_at),
+                        'processed_on_time': _hm(proc_at),
+                    }
+                    for code, val in values_map.items():
+                        fid = code_to_id.get(code)
+                        if not fid:
+                            continue
+                        cur.execute(
+                            """
+                            INSERT INTO blotter_kp_answer (submission_id, field_id, value_json)
+                            VALUES (%s, %s, %s)
+                            ON CONFLICT (submission_id, field_id)
+                            DO UPDATE SET value_json = EXCLUDED.value_json
+                            """,
+                            [med_sid, int(fid), _json.dumps(val)]
+                        )
+            except Exception:
+                # Non-fatal; continue with submission
+                pass
+
             # mark submitted
             cur.execute("UPDATE blotter_kp_submission SET status='SUBMITTED', submitted_at=now() WHERE submission_id=%s",
                         [med_sid])
@@ -579,6 +689,8 @@ def _open_kp16_draft(case_id: int) -> int:
 
         return sid
 
+
+
 def _latest_notice_submitted_at(case_id: int):
     """Newest submitted_at among KP-8 / KP-12 for this case, or None."""
     with connection.cursor() as cur:
@@ -594,6 +706,9 @@ def _latest_notice_submitted_at(case_id: int):
         """, [case_id])
         row = cur.fetchone()
     return row[0] if row else None
+
+
+
 
 
 def _is_hearing_held(case_id: int, *, strict: bool = True) -> bool:
@@ -835,115 +950,6 @@ def _current_settlement(case_id: int) -> str:
         row = cur.fetchone()
         return row[0] if row else 'NOT SETTLED'
 
-
-
-
-
-from django.db import connection
-
-def _hearing_gate(case_id: int) -> dict:
-    """
-    Gate computed entirely from fn_case_mediation_hearings(case_id).
-    Returns:
-      {
-        'hearings_held': int,                 # rows with hearing_held=true or held_at not null
-        'hearings_set': int,                  # total rows from the TVF
-        'latest_notice_submitted_at': datetime|None,
-        'latest_notice_submission_id': int|None,
-        'latest_notice_code': str|None,       # 'KP-8' or 'KP-12'
-        'latest_notice_outstanding': bool,    # latest row NOT marked held
-        'settlement_name': str|None,
-        'can_issue_notice': bool,
-        'reason': str,
-        'limit_reached': bool,                # 3 held already
-      }
-    """
-    rows = []
-    with connection.cursor() as cur:
-        # 1) Pull per-hearing rows (one per KP-8/12)
-        cur.execute("""
-            SELECT
-              hearing_no, source, notice_sid, notice_created_at,
-              hearing_date, hearing_time,
-              hearing_held, held_at, held_remarks,
-              complainant_attended, respondent_attended,
-              settlement_outcome
-            FROM fn_case_mediation_hearings(%s)
-            ORDER BY notice_created_at ASC NULLS LAST, notice_sid ASC
-        """, [case_id])
-        rows = cur.fetchall()
-
-        # 2) Settlement text (same as before)
-        cur.execute("""
-            SELECT COALESCE(ss.settlement_status_name,'PENDING') AS name
-            FROM blotter_case bc
-            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
-            WHERE bc.blotter_case_id = %s
-        """, [case_id])
-        st = cur.fetchone()
-        settlement_name = (st[0] if st else None)
-
-    # Columns (index map from SELECT above)
-    IDX = {
-        "hearing_no": 0, "source": 1, "notice_sid": 2, "notice_created_at": 3,
-        "hearing_date": 4, "hearing_time": 5,
-        "hearing_held": 6, "held_at": 7, "held_remarks": 8,
-        "compl_att": 9, "resp_att": 10, "settlement_outcome": 11,
-    }
-
-    hearings_set = len(rows)
-    hearings_held = sum(1 for r in rows if (bool(r[IDX["hearing_held"]]) or r[IDX["held_at"]] is not None))
-
-    # Latest = the last row in our ORDER BY (ASC), or compute max explicitly
-    latest_row = rows[-1] if rows else None
-    latest_at  = latest_row[IDX["notice_created_at"]] if latest_row else None
-    latest_sid = int(latest_row[IDX["notice_sid"]]) if latest_row else None
-    latest_code= latest_row[IDX["source"]] if latest_row else None
-
-    # “Outstanding” means the latest hearing isn't marked HELD yet
-    latest_outstanding = False
-    if latest_row:
-        latest_outstanding = not (bool(latest_row[IDX["hearing_held"]]) or latest_row[IDX["held_at"]] is not None)
-
-    # Last held timestamp across all hearings (for info/consistency)
-    last_held_at = None
-    if rows:
-        held_times = [r[IDX["held_at"]] for r in rows if r[IDX["held_at"]] is not None]
-        last_held_at = max(held_times) if held_times else None
-
-    # Same gating rules you had
-    settlement_up = (settlement_name or '').strip().upper()
-    settlement_pending = settlement_up in ('PENDING', 'NOT SETTLED', 'UNSET', 'FOR MEDIATION', 'FOR CONCILIATION')
-
-    limit_reached = hearings_held >= 3
-    can_issue = (not limit_reached) and (not latest_outstanding) and settlement_pending
-
-    reason = ""
-    if limit_reached:
-        reason = "Limit reached: 3 hearings already held (proceed to Arbitration/CFA)."
-    elif latest_outstanding:
-        reason = "There is a scheduled hearing not yet marked HELD."
-    elif not settlement_pending:
-        reason = f"Settlement is “{settlement_name}” (set to Pending/Not Settled to schedule another)."
-
-    return {
-        "hearings_held": int(hearings_held or 0),
-        "hearings_set": int(hearings_set or 0),
-        "latest_notice_submitted_at": latest_at,
-        "latest_notice_submission_id": latest_sid,
-        "latest_notice_code": latest_code,
-        "latest_notice_outstanding": bool(latest_outstanding),
-        "settlement_name": settlement_name,
-        "can_issue_notice": bool(can_issue),
-        "reason": reason,
-        "limit_reached": bool(limit_reached),
-    }
-
-
-
-from typing import Dict
-from datetime import date as _date
-from django.db import connection
 
 def _prefill_minimal_for_case(case_id: int) -> Dict[str, str]:
     """
@@ -1212,502 +1218,19 @@ def _get_person_mobile_number(person_id: int) -> str | None:
     return None
 
     
+
+    
 # --- list cases (with safe search) ---
 from urllib.parse import urlencode
 
 
-@session_login_required
-@role_required(*LUPON_ROLES, "barangay treasurer")
-def case_list(request: HttpRequest):
-    """
-    Live-searchable case list using v_blotter_case_summary.
-    GET:
-      q, state, settlement, filed_from (YYYY-MM-DD), filed_to (YYYY-MM-DD),
-      page, per_page, partial=1
-    """
-    from urllib.parse import urlencode
-    from django.db import connection
 
-    q          = (request.GET.get("q") or "").strip()
-    state      = (request.GET.get("state") or "").strip()        # case_final_status text
-    settlement = (request.GET.get("settlement") or "").strip()   # settlement_status text
-    filed_from = (request.GET.get("filed_from") or "").strip()
-    filed_to   = (request.GET.get("filed_to") or "").strip()
-
-    # pagination
-    try:
-        page = max(int(request.GET.get("page", "1")), 1)
-    except ValueError:
-        page = 1
-    try:
-        per_page = max(int(request.GET.get("per_page", "10")), 1)
-    except ValueError:
-        per_page = 10
-    offset = (page - 1) * per_page
-
-    # choices (distinct values from the view)
-    with connection.cursor() as cur:
-        cur.execute("SELECT DISTINCT case_final_status FROM v_blotter_case_summary ORDER BY 1")
-        state_choices = [row[0] for row in cur.fetchall()]
-        cur.execute("SELECT DISTINCT settlement_status FROM v_blotter_case_summary ORDER BY 1")
-        settlement_choices = [row[0] for row in cur.fetchall()]
-
-    base_from = "FROM v_blotter_case_summary v"
-    where_parts = []
-    params: list = []
-
-    if q:
-        where_parts.append("""
-            (
-              v.blotter_case_num  ILIKE CONCAT('%%', %s, '%%')
-           OR v.blotter_case_name ILIKE CONCAT('%%', %s, '%%')
-            )
-        """)
-        params.extend([q, q])
-
-    if state:
-        where_parts.append("v.case_final_status = %s")
-        params.append(state)
-
-    if settlement:
-        where_parts.append("v.settlement_status = %s")
-        params.append(settlement)
-
-    if filed_from:
-        where_parts.append("v.date_filed >= %s")
-        params.append(filed_from)
-
-    if filed_to:
-        where_parts.append("v.date_filed <= %s")
-        params.append(filed_to)
-
-    where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
-
-    # total
-    with connection.cursor() as cur:
-        cur.execute(f"SELECT COUNT(*) {base_from} {where_sql}", params)
-        total = int(cur.fetchone()[0])
-
-    # page rows (adds time_filed)
-    with connection.cursor() as cur:
-        select_sql = f"""
-            SELECT
-              v.blotter_case_id,                                       -- 0
-              v.blotter_case_num,                                      -- 1
-              v.blotter_case_name,                                     -- 2
-              to_char(v.date_filed, 'Mon DD, YYYY') AS date_filed_fmt, -- 3
-              to_char(v.time_filed, 'HH12:MI AM')    AS time_filed_fmt,-- 4  ← NEW
-              v.case_final_status,                                     -- 5
-              v.settlement_status                                      -- 6
-            {base_from}
-            {where_sql}
-            ORDER BY v.blotter_case_id DESC
-            LIMIT %s OFFSET %s
-        """
-        cur.execute(select_sql, params + [per_page, offset])
-        rows = cur.fetchall()
-
-    # pagination helpers
-    total_pages = max((total + per_page - 1) // per_page, 1)
-    has_prev = page > 1
-    has_next = page < total_pages
-    start_p = max(1, page - 2)
-    end_p = min(total_pages, page + 2)
-    page_numbers = list(range(start_p, end_p + 1))
-
-    preserved = {
-        "q": q,
-        "state": state,
-        "settlement": settlement,
-        "filed_from": filed_from,
-        "filed_to": filed_to,
-        "per_page": per_page,
-    }
-    preserved = {k: v for k, v in preserved.items() if v not in (None, "", [])}
-    query_no_page = urlencode(preserved)
-
-    ctx = {
-        "rows": rows,
-        "q": q,
-        "page": page,
-        "per_page": per_page,
-        "total": total,
-        "total_pages": total_pages,
-        "has_prev": has_prev,
-        "has_next": has_next,
-        "prev_page": page - 1,
-        "next_page": page + 1,
-        "first_item": offset + 1 if total else 0,
-        "last_item": min(offset + per_page, total),
-        "page_numbers": page_numbers,
-        "query_no_page": query_no_page,
-
-        # filters + choices
-        "state": state,
-        "settlement": settlement,
-        "filed_from": filed_from,
-        "filed_to": filed_to,
-        "state_choices": state_choices,
-        "settlement_choices": settlement_choices,
-    }
-
-    if request.GET.get("partial") == "1":
-        return render(request, "lupon_mem/partials/case_table.html", ctx)
-
-    return render(request, "lupon_mem/case_list.html", ctx)
 
 # --- case detail ---
 # lupon_mem/views.py  (replace your case_detail with this version)
 
-@session_login_required 
-@role_required(*LUPON_ROLES, "barangay treasurer")
-def case_detail(request: HttpRequest, case_id: int):
-    from django.utils import timezone
-    from django.db import connection
-
-    def _fmt_dt(dt) -> str | None:
-        if not dt:
-            return None
-        try:
-            return timezone.localtime(dt).strftime("%b %d, %Y %I:%M %p")
-        except Exception:
-            try:
-                return dt.strftime("%b %d, %Y %I:%M %p")
-            except Exception:
-                return None
-
-    def _ordinal(n: int) -> str:
-        n = int(n)
-        if 11 <= (n % 100) <= 13:
-            suffix = "th"
-        else:
-            suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
-        return f"{n}{suffix}"
-
-    with connection.cursor() as cur:
-        # ----- Case header
-        cur.execute(
-            """
-            SELECT
-              bc.blotter_case_id,
-              bc.blotter_case_num,
-              bc.blotter_case_name,
-              to_char(bc.date_filed,'Mon DD, YYYY') AS date_filed,
-              bc.incident_desc,
-              COALESCE(ct.complaint_title_name,'—') AS type_name,
-              COALESCE(cn.case_name,'—') AS nature_name,
-              ss.settlement_status_name,
-              bc.settlement_status_id
-            FROM blotter_case bc
-            LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
-            LEFT JOIN case_nature   cn ON cn.case_nature_id   = bc.case_nature_id
-            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
-            WHERE bc.blotter_case_id=%s
-            """,
-            [case_id],
-        )
-        case = cur.fetchone()
-
-        # ----- Attached forms (list + KP-17 meta)
-        cur.execute(
-            """
-            SELECT
-              s.submission_id,
-              UPPER(kf.form_code) AS form_code,
-              kf.form_name,
-              s.status,
-              CASE WHEN s.submitted_at IS NULL THEN '—'
-                   ELSE to_char(s.submitted_at,'Mon DD, YYYY HH12:MI AM')
-              END AS submitted_fmt,
-              ppt.party_name AS kp17_party,
-              TRIM(
-                COALESCE(p.last_name,'') || ', ' ||
-                COALESCE(p.first_name,'') || ' ' ||
-                COALESCE(p.middle_name,'')
-              ) AS kp17_person
-            FROM blotter_kp_submission s
-            JOIN kp_form kf ON kf.form_id = s.form_id
-            LEFT JOIN kp17_repudiation m   ON m.submission_id = s.submission_id
-            LEFT JOIN kp_party_type  ppt   ON ppt.kp_party_type_id = m.party_type_id
-            LEFT JOIN person         p     ON p.person_id = m.party_person_id
-            WHERE s.blotter_case_id=%s
-            ORDER BY (s.submitted_at IS NULL), s.submitted_at DESC, s.submission_id DESC
-            """,
-            [case_id],
-        )
-        forms_raw = cur.fetchall()
-
-        # ----- KP-9 meta (count + latest attendance status/party)
-        cur.execute(
-            """
-            WITH f AS (SELECT form_id FROM kp_form WHERE UPPER(form_code)='KP-9' LIMIT 1)
-            SELECT COUNT(*) FROM blotter_kp_submission
-            WHERE blotter_case_id=%s AND form_id=(SELECT form_id FROM f)
-            """,
-            [case_id],
-        )
-        kp9_count = int((cur.fetchone() or [0])[0] or 0)
-
-        cur.execute(
-            """
-            WITH f AS (SELECT form_id FROM kp_form WHERE UPPER(form_code)='KP-9' LIMIT 1)
-            SELECT a.status, a.no_show_party
-            FROM kp9_attendance a
-            JOIN blotter_kp_submission s ON s.submission_id = a.submission_id
-            WHERE s.blotter_case_id = %s
-              AND s.form_id = (SELECT form_id FROM f)
-            ORDER BY a.marked_at DESC NULLS LAST, s.submission_id DESC
-            LIMIT 1
-            """,
-            [case_id],
-        )
-        r = cur.fetchone()
-        kp9_latest_status = (r[0] or "").upper() if r else None
-        kp9_latest_party = (r[1] or "").upper() if r and r[1] else None
-
-        # ----- NEW: count of KP-9 submissions WITHOUT attendance
-        cur.execute(
-            """
-            WITH f AS (SELECT form_id FROM kp_form WHERE UPPER(form_code)='KP-9' LIMIT 1)
-            SELECT COUNT(*)
-            FROM blotter_kp_submission s
-            WHERE s.blotter_case_id=%s
-              AND s.form_id=(SELECT form_id FROM f)
-              AND NOT EXISTS (
-                    SELECT 1 FROM kp9_attendance a
-                    WHERE a.submission_id = s.submission_id
-              )
-            """,
-            [case_id],
-        )
-        kp9_pending_count = int((cur.fetchone() or [0])[0] or 0)
-
-        # ----- Settlement choices
-        cur.execute("SELECT settlement_status_name FROM settlement_status ORDER BY settlement_status_name")
-        settlement_choices = [row[0] for row in cur.fetchall()]
-
-    # ===============================
-    # Sequence labels (badges) setup
-    # ===============================
-    form_seq_labels: dict[int, str] = {}
-
-    # A) Use fn_case_mediation_hearings for KP-8/KP-12 numbering (1st/2nd/3rd Hearing)
-    with connection.cursor() as cur:
-        cur.execute(
-            """
-            SELECT notice_sid, hearing_no, source
-            FROM fn_case_mediation_hearings(%s)
-            ORDER BY hearing_no
-            """,
-            [case_id],
-        )
-        tvf_rows = cur.fetchall()  # (notice_sid, hearing_no, source)
-
-    for notice_sid, hearing_no, _source in tvf_rows:
-        form_seq_labels[int(notice_sid)] = f"{_ordinal(int(hearing_no))} Hearing"
-
-    # B) Also number KP-9 and MED-ATT-2025 (1st Summons / 1st Med Attendance ...)
-    with connection.cursor() as cur:
-        cur.execute(
-            """
-            SELECT s.submission_id, UPPER(kf.form_code) AS code, s.submitted_at
-            FROM blotter_kp_submission s
-            JOIN kp_form kf ON kf.form_id = s.form_id
-            WHERE s.blotter_case_id=%s
-              AND UPPER(kf.form_code) IN ('KP-9','MED-ATT-2025')
-            ORDER BY s.submitted_at ASC NULLS LAST, s.submission_id ASC
-            """,
-            [case_id],
-        )
-        seq_rows = cur.fetchall()
-
-    counters = {"KP-9": 0, "MED-ATT-2025": 0}
-    for sid, code, _submitted_at in seq_rows:
-        code = (code or "").upper()
-        if code in counters:
-            counters[code] += 1
-            n = counters[code]
-            if code == "KP-9":
-                form_seq_labels[int(sid)] = f"{_ordinal(n)} Summons"
-            elif code == "MED-ATT-2025":
-                form_seq_labels[int(sid)] = f"{_ordinal(n)} Med Attendance"
-
-    # ----- annotate forms: append seq label as last column (index 7)
-    forms = [(*row, form_seq_labels.get(int(row[0]))) for row in forms_raw]
-
-    # ===============================
-    # Gate logic + KPI values
-    # ===============================
-    gate = _hearing_gate(case_id)  # expects updated helper that returns 'hearings_set'
-    latest_notice_dt = gate.get("latest_notice_submitted_at")
-    latest_hearing_dt = _fmt_dt(latest_notice_dt)
-
-    hearings_set_count  = int(gate.get("hearings_set") or 0)
-    hearings_held_count = int(gate.get("hearings_held") or 0)
-
-    # ----- NEW blocking logic for Add Form (summons)
-    finalized_attendance = {"ATTENDED", "NO SHOW"}
-    block_due_to_summons = kp9_pending_count > 0
-    if block_due_to_summons:
-        if kp9_count and (kp9_latest_status not in finalized_attendance):
-            pass  # keep behavior as-is
-
-    block_reason_summons = (
-        f"{kp9_pending_count} summons pending attendance marking (ATTENDED / NO SHOW)."
-        if block_due_to_summons else ""
-    )
-
-    has_upcoming = bool(
-        gate.get("has_upcoming_hearing")
-        or gate.get("latest_notice_outstanding")
-    )
-    needs_outcome = bool(
-        gate.get("pending_hearing_requires_outcome")
-        or gate.get("has_unresolved_mediation")
-    )
-    block_due_to_hearing = bool(has_upcoming or needs_outcome)
-    block_reason_hearing = ""
-    if block_due_to_hearing:
-        if needs_outcome:
-            block_reason_hearing = "There is a mediation/conciliation hearing without a recorded outcome (Settled / Not Settled)."
-        elif has_upcoming:
-            block_reason_hearing = "There is a scheduled hearing that must be completed or marked with an outcome first."
-
-    force_open_block_modal = bool(request.GET.get("open_block_modal"))
-    block_reason = request.GET.get("reason")  # 'summons' | 'hearing' | None
-    med_row = _latest_submission_for_codes(case_id, ["MED1-SETTLED","MED2-SETTLED","MED3-SETTLED"])
-    has_med_summary = bool(med_row)
-    med_summary_sid = int(med_row[0]) if med_row else None
-
-    # Pull case state name + closed_at to drive Close/Reopen UI
-    with connection.cursor() as cur:
-        cur.execute("""
-            SELECT cs.case_state_name, bc.closed_at
-            FROM blotter_case bc
-            LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
-            WHERE bc.blotter_case_id=%s
-        """, [case_id])
-        r = cur.fetchone() or (None, None)
-        case_state_name, case_closed_at = r[0], r[1]
-
-    context = {
-        "case": case,
-        "forms": forms,
-        "case_id": case_id,
-        "settlement_choices": settlement_choices,
-        "hearing_gate": gate,
-
-        "incident_description": case[4] if case else None,
-        "case_nature": case[6] if case else None,
-        "case_state_name": case_state_name,
-        "case_closed_at": case_closed_at,
-
-        # KPIs
-        "latest_hearing_dt": latest_hearing_dt,
-        "last_hearing_dt": latest_hearing_dt,
-        "next_hearing_dt": None,
-        "kp9_count": kp9_count,
-        "hearings_set_count": hearings_set_count,
-        "hearings_count": hearings_held_count,  # kept for “Held” KPI if you still show it
-
-        # KP-9 quick state
-        "kp9_latest_status": kp9_latest_status,
-        "kp9_latest_party": kp9_latest_party,
-        "kp9_pending_count": kp9_pending_count,
-        "has_hearing": hearings_held_count > 0,
-
-        # gating / modals
-        "force_open_block_modal": force_open_block_modal,
-        "block_reason": block_reason,
-        "block_due_to_summons": block_due_to_summons,
-        "block_due_to_hearing": block_due_to_hearing,
-        "block_reason_summons": block_reason_summons,
-        "block_reason_hearing": block_reason_hearing,
-
-        # summary availability
-        "has_med_summary": has_med_summary,
-        "med_summary_sid": med_summary_sid,
-    }
-
-    return render(request, "lupon_mem/case_detail.html", context)
-
-@session_login_required
-@role_required(*LUPON_ROLES, "barangay treasurer")
-@require_POST
-def case_settlement_update(request: HttpRequest, case_id: int):
-    """Handle the Update Settlement Status modal submit (with debug prints)."""
-    status_name = (request.POST.get("settlement_status") or "").strip()
-    remarks     = (request.POST.get("remarks") or "").strip() or None
-    staff_id    = (request.session.get("auth") or {}).get("staff_id")
-
-    # --- DEBUG: echo the incoming payload ---
-    print("\n[SETTLEMENT][POST] case_id=", case_id)
-    print("[SETTLEMENT][POST] payload:", {
-        "settlement_status": status_name,
-        "remarks": remarks,
-        "staff_id": staff_id,
-    })
-    log.debug("[SETTLEMENT][POST] case_id=%s status=%s remarks=%s staff_id=%s",
-              case_id, status_name, remarks, staff_id)
-
-    if not status_name:
-        messages.error(request, "Please choose a settlement status.")
-        return redirect("lupon_mem:case_detail", case_id=case_id)
-
-    try:
-        with connection.cursor() as cur:
-            print("[SETTLEMENT][SQL] calling fn_set_case_settlement(%s,%s,%s,%s)")
-            cur.execute(
-                "SELECT * FROM fn_set_case_settlement(%s,%s,%s,%s)",
-                [case_id, status_name, remarks, staff_id],
-            )
-            row = cur.fetchone()
-            print("[SETTLEMENT][SQL][RESULT]:", row)
-            log.debug("[SETTLEMENT][SQL][RESULT]: %s", row)
-
-        ok, _case, new_status, changed_at = row if row else (False, None, None, None)
-        if ok:
-            messages.success(request, f"Settlement status updated to “{new_status}”.")
-        else:
-            messages.warning(request, "No change was made.")
-    except Exception as e:
-        print("[SETTLEMENT][ERROR]:", e)
-        log.exception("Settlement update failed")
-        messages.error(request, f"Failed to update settlement status: {e}")
-
-    return redirect("lupon_mem:case_detail", case_id=case_id)
-
 
 # --- choose form (DB-backed; cached) ---
-@session_login_required
-@role_required(*LUPON_ROLES)
-def add_form_choose(request, case_id: int):
-    t0 = time.perf_counter()
-    cache_key = "kp_forms_active_v1"
-    forms = cache.get(cache_key)
-    cache_hit = forms is not None
-    sql_ms = 0.0
-    if not cache_hit:
-        with connection.cursor() as cur:
-            ts = time.perf_counter()
-            cur.execute("""
-                SELECT form_id, form_code, form_name
-                FROM kp_form
-                WHERE is_active IS TRUE
-                ORDER BY form_code
-            """)
-            sql_ms = (time.perf_counter() - ts) * 1000
-            forms = cur.fetchall()
-        cache.set(cache_key, forms, 300)
-    total_ms = (time.perf_counter() - t0) * 1000
-    log.info("add_form_choose total=%.1fms sql=%s cache=%s",
-             total_ms, f"{sql_ms:.1f}ms" if not cache_hit else "0ms(hit)", cache_hit)
-    gate = _hearing_gate(case_id)
-    return render(
-        request,
-        "lupon_mem/add_form_choose.html",
-        {"case_id": case_id, "forms": forms, "hearing_gate": gate}
-    )
 
 
 # --- split builder (left fields, right preview) ---
@@ -1855,49 +1378,6 @@ def form_builder(request, case_id: int, form_id: int = None, submission_id: int 
 
 
 
-# --- AJAX: save answers ---
-@role_required(*LUPON_ROLES)
-@session_login_required
-def save_answers(request: HttpRequest):
-    if request.method != "POST":
-        return HttpResponseBadRequest("Method not allowed")
-
-    data = request.POST
-    case_id = int(data["case_id"])
-    form_id = int(data["form_id"])
-    submission_id = data.get("submission_id")
-
-    import json as _json
-    payload = _json.loads(data["answers"])  # {field_id: value}
-
-    with transaction.atomic():
-        with connection.cursor() as cur:
-            if submission_id:
-                sid = int(submission_id)
-            else:
-                cur.execute(
-                    """
-                  INSERT INTO blotter_kp_submission(blotter_case_id, form_id, status)
-                  VALUES (%s,%s,'DRAFT') RETURNING submission_id
-                """,
-                    [case_id, form_id],
-                )
-                sid = cur.fetchone()[0]
-
-            for field_id, value in payload.items():
-                cur.execute(
-                    """
-                  INSERT INTO blotter_kp_answer(submission_id, field_id, value_json)
-                  VALUES (%s,%s,%s)
-                  ON CONFLICT (submission_id, field_id)
-                  DO UPDATE SET value_json=EXCLUDED.value_json
-                """,
-                    [sid, int(field_id), _json.dumps(value)],
-                )
-
-    return JsonResponse({"ok": True, "submission_id": sid})
-
-
 
 # Helper kp17
 def _insert_kp17_meta(submission_id: int, case_id: int, request) -> None:
@@ -1927,307 +1407,45 @@ def _insert_kp17_meta(submission_id: int, case_id: int, request) -> None:
         )
 
 
-# --- AJAX: submit & generate PDF ---
-@role_required(*LUPON_ROLES)
-@session_login_required
-def submit_form(request: HttpRequest):
-    """
-    Save any posted answers, render PDF, upload, mark submitted, then allow the
-    form-specific handler to persist its auto-computed answers via a universal hook.
-
-    Extras retained:
-      • KP-23: record 'who filed' meta (party/person) via function.
-      • KP-16: set case status SETTLED, optional MED summary generation, auto-mark hearing HELD.
-    """
-    import json as _json
-    import json
-    from datetime import datetime as _dt
-    from django.db import transaction
-    from django.urls import reverse
-    from django.http import JsonResponse
-    from django.conf import settings
-    from django.contrib import messages
-    from zoneinfo import ZoneInfo
-
-    log = logging.getLogger(__name__)
-
-    # ---------- Parse body ----------
-    try:
-        data = _json.loads(request.body.decode())
-    except Exception:
-        return JsonResponse({"ok": False, "error": "Invalid JSON body."}, status=400)
-
-    try:
-        submission_id = int(data["submission_id"])
-        case_id       = int(data["case_id"])
-    except Exception:
-        return JsonResponse({"ok": False, "error": "Missing or invalid submission_id/case_id."}, status=400)
-
-    # ---------- Persist latest posted answers (generic for ALL forms) ----------
-    answers_payload = data.get("answers")
-    if isinstance(answers_payload, dict) and answers_payload:
-        try:
-            with transaction.atomic():
-                with connection.cursor() as cur:
-                    for field_id_str, value in answers_payload.items():
-                        cur.execute("""
-                            INSERT INTO blotter_kp_answer (submission_id, field_id, value_json)
-                            VALUES (%s, %s, %s)
-                            ON CONFLICT (submission_id, field_id)
-                            DO UPDATE SET value_json = EXCLUDED.value_json
-                        """, [submission_id, int(field_id_str), _json.dumps(value)])
-        except Exception:
-            log.exception("submit_form upsert answers failed (submission_id=%s)", submission_id)
-            return JsonResponse({"ok": False, "error": "Failed to save answers before rendering."}, status=500)
-
-    # ---------- Render PDF ----------
-    try:
-        # Uses your per-form handlers internally
-        from lupon_mem.services.form_renderer import render_final_pdf
-        pdf_bytes, filename = render_final_pdf(submission_id=submission_id)
-    except ValidationError as e:
-        return JsonResponse({"ok": False, "error": str(e)}, status=400)
-    except Exception:
-        log.exception("submit_form render_final_pdf failed")
-        return JsonResponse({"ok": False, "error": "Failed to generate PDF."}, status=500)
-
-    # ---------- Upload to Supabase (best-effort) ----------
-    bucket = getattr(settings, "SUPABASE_BUCKET", "documents")
-    path = f"blotter/{case_id}/{filename}"
-    storage_url = None
-    try:
-        supabase.storage.from_(bucket).upload(path, pdf_bytes,
-                                              {"contentType": "application/pdf", "upsert": "true"})
-        try:
-            pub = supabase.storage.from_(bucket).get_public_url(path)
-            storage_url = pub.get("publicUrl") if isinstance(pub, dict) else (pub if isinstance(pub, str) else None)
-        except Exception:
-            storage_url = None
-        if not storage_url:
-            try:
-                signed = supabase.storage.from_(bucket).create_signed_url(path, 60 * 60 * 24 * 7)
-                storage_url = (signed.get("signedURL") or signed.get("signedUrl") or signed.get("signed_url")) \
-                              if isinstance(signed, dict) else None
-            except Exception:
-                storage_url = None
-    except Exception:
-        storage_url = None
-
-    # ---------- Mark SUBMITTED ----------
-    try:
-        with connection.cursor() as cur:
-            cur.execute(
-                "UPDATE blotter_kp_submission "
-                "SET status='SUBMITTED', submitted_at=now() "
-                "WHERE submission_id=%s",
-                [submission_id]
-            )
-    except Exception:
-        log.exception("submit_form failed to mark SUBMITTED (submission_id=%s)", submission_id)
-        return JsonResponse({"ok": False, "error": "Failed to finalize submission."}, status=500)
-
-    # ---------- Determine form_code + form_id ----------
-    row_fc = None
-    form_id_of_submission = None
-    form_code = None
-    try:
-        with connection.cursor() as cur:
-            cur.execute("""
-                SELECT UPPER(kf.form_code), s.form_id
-                  FROM blotter_kp_submission s
-                  JOIN kp_form kf ON kf.form_id = s.form_id
-                 WHERE s.submission_id=%s
-            """, [submission_id])
-            row_fc = cur.fetchone()
-            if row_fc:
-                form_code = str(row_fc[0])
-                form_id_of_submission = int(row_fc[1])
-    except Exception:
-        log.exception("submit_form failed to lookup form_code (submission_id=%s)", submission_id)
-
-    # ---------- Universal: let the specific handler persist its computed answers ----------
-    try:
-        if form_code and form_id_of_submission:
-            # Rebuild the exact name→value map used to render the PDF (so persisted values match the PDF)
-            from lupon_mem.services.forms import get_handler
-            handler = get_handler(form_code)
-            # Many handlers expose build_name_value_map(form_id, submission_id)
-            out_map = {}
-            try:
-                out_map = handler.build_name_value_map(form_id_of_submission, submission_id) or {}
-            except Exception:
-                # If a specific handler doesn’t implement it, fall back to generic answers mapping
-                from lupon_mem.services.form_shared import answers_to_names_strict
-                out_map = answers_to_names_strict(form_id_of_submission, submission_id)
-
-            # Give the handler a chance to persist its auto-computed values
-            if hasattr(handler, "persist_computed"):
-                handler.persist_computed(
-                    form_id=form_id_of_submission,
-                    submission_id=submission_id,
-                    case_id=case_id,
-                    out_map=out_map,
-                )
-    except Exception:
-        log.exception("persist_computed hook failed (submission_id=%s)", submission_id)
-        # Non-fatal; continue
-
-    # ---------- KP-23: record who filed (party/person) ----------
-    try:
-        if form_code and form_code.upper() == "KP-23":
-            meta = data.get("meta") or {}
-            party_raw  = (data.get("filed_by_party") or meta.get("filed_by_party") or "").strip().upper()
-            person_raw = (data.get("filed_by_person_id") or meta.get("filed_by_person_id"))
-
-            if party_raw not in ("COMPLAINANT", "RESPONDENT"):
-                return JsonResponse({"ok": False,
-                                     "error": "For KP-23, 'filed_by_party' must be COMPLAINANT or RESPONDENT."},
-                                    status=400)
-            try:
-                party_person_id = int(person_raw)
-            except Exception:
-                return JsonResponse({"ok": False,
-                                     "error": "For KP-23, 'filed_by_person_id' must be a valid person_id integer."},
-                                    status=400)
-
-            staff_id = (request.session.get("auth") or {}).get("staff_id")
-
-            try:
-                with connection.cursor() as cur:
-                    cur.execute(
-                        "SELECT insert_kp23_filer_meta(%s,%s,%s,%s)",
-                        [submission_id, party_raw, party_person_id, staff_id]
-                    )
-            except Exception as e:
-                msg = str(e)
-                if "P6310" in msg:
-                    return JsonResponse({"ok": False, "error": "Submission is not KP-23."}, status=400)
-                if "P6311" in msg:
-                    return JsonResponse({"ok": False, "error": "Submission not found or case mismatch."}, status=400)
-                if "P6312" in msg:
-                    return JsonResponse({"ok": False, "error": "Invalid party type for KP-23."}, status=400)
-                if "P6313" in msg:
-                    return JsonResponse({"ok": False, "error": "Selected person is not on that side for this case."}, status=400)
-                if "P6314" in msg:
-                    return JsonResponse({"ok": False, "error": "Filer meta already exists for this submission."}, status=400)
-                log.exception("submit_form KP-23 meta insert failed (submission_id=%s)", submission_id)
-                return JsonResponse({"ok": False, "error": "Failed to record KP-23 filer."}, status=500)
-
-            # Optional: also save a display string to a TEXT field if present (kp23_filed_by)
-            try:
-                filed_by_text = f"{party_raw.title()} — person_id #{party_person_id}"
-                if form_id_of_submission:
-                    with connection.cursor() as cur:
-                        cur.execute("""
-                            SELECT f.field_id
-                              FROM kp_form_field kff
-                              JOIN kp_field f ON f.field_id = kff.field_id
-                             WHERE kff.form_id = %s AND LOWER(f.field_code) = 'kp23_filed_by'
-                             LIMIT 1
-                        """, [int(form_id_of_submission)])
-                        row = cur.fetchone()
-                    if row:
-                        fb_field_id = int(row[0])
-                        with transaction.atomic():
-                            with connection.cursor() as cur:
-                                cur.execute("""
-                                    INSERT INTO blotter_kp_answer (submission_id, field_id, value_json)
-                                    VALUES (%s, %s, %s)
-                                    ON CONFLICT (submission_id, field_id)
-                                    DO UPDATE SET value_json = EXCLUDED.value_json
-                                """, [submission_id, fb_field_id, json.dumps(filed_by_text)])
-            except Exception:
-                log.warning("submit_form KP-23: failed to persist kp23_filed_by display text", exc_info=True)
-    except Exception:
-        log.exception("submit_form KP-23 filer block error (submission_id=%s)", submission_id)
-        return JsonResponse({"ok": False, "error": "KP-23 filer recording failed unexpectedly."}, status=500)
-
-    # ---------- KP-16: set case SETTLED on submit ----------
-    extra_files = []
-    try:
-        if form_code and form_code.upper() == "KP-16":
-            staff_id = (request.session.get("auth") or {}).get("staff_id")
-            with connection.cursor() as cur:
-                cur.execute("SELECT * FROM fn_set_case_settlement(%s,%s,%s,%s)",
-                            [case_id, 'SETTLED', 'Settled via KP-16', staff_id])
-            messages.success(request, "Settlement finalized (KP-16 submitted).")
-    except Exception:
-        log.exception("Failed to set case SETTLED on KP-16 submit")
-
-    # ---------- KP-16: optional MEDx settled summary (feature-flag) ----------
-    try:
-        if form_code and form_code.upper() == "KP-16" and getattr(settings, "LUPON_AUTOGEN_MEDX", False):
-            from lupon_mem.services.med_settled import _autogen_settled_summary
-            extra_files = _autogen_settled_summary(case_id=case_id, kp16_submission_id=submission_id) or []
-    except Exception as e:
-        print("[MED-SETTLED][DEBUG] auto generation failed:", e)
-
-    # ---------- KP-16: auto-mark hearing as HELD when triggered from hearing page ----------
-    try:
-        if form_code and form_code.upper() == "KP-16":
-            sid = request.session.get("auto_mark_hearing_after_kp16_sid")
-            sid_case = request.session.get("auto_mark_hearing_case_id")
-            if sid and sid_case and int(sid_case) == int(case_id):
-                try:
-                    with connection.cursor() as cur:
-                        cur.execute("""
-                            UPDATE blotter_hearing
-                               SET held = TRUE,
-                                   held_at = NOW()
-                             WHERE blotter_case_id = %s
-                               AND notice_submission_id = %s
-                        """, [case_id, int(sid)])
-                    messages.success(request, "Hearing automatically marked as HELD.")
-                    print(f"[auto-held] case_id={case_id} notice_sid={sid} (via KP-16)")
-                except Exception as e:
-                    log.exception("Auto-mark hearing HELD failed (case_id=%s, sid=%s)", case_id, sid)
-                    messages.warning(request, "Settlement saved, but auto-marking the hearing as HELD failed. Please mark it manually.")
-                request.session.pop("auto_mark_hearing_after_kp16_sid", None)
-                request.session.pop("auto_mark_hearing_case_id", None)
-                request.session.modified = True
-    except Exception as e:
-        log.exception("submit_form post-KP16 auto-held hook error: %s", e)
-
-    # ---------- Local download url (always works) ----------
-    local_download = request.build_absolute_uri(reverse("lupon_mem:submission_pdf", args=[submission_id]))
-
-    return JsonResponse({
-        "ok": True,
-        "file": filename,
-        "download_url": local_download,
-        "storage_url": storage_url,
-        "extra_files": extra_files,
-    })
-
-
-
-
-# --- preview image (PNG) ---
-@session_login_required
-@role_required(*LUPON_ROLES)
-def preview_image(request: HttpRequest):
-    form_id = int(request.GET["form_id"])
-    submission_id = request.GET.get("submission_id")
-    answers_json = request.GET.get("answers")
-    img_bytes = render_preview_png(
-        form_id=form_id, submission_id=submission_id, answers_json=answers_json
-    )
-    return HttpResponse(img_bytes, content_type="image/png")
-
-
 # --- Dashboard ---
 @session_login_required
 @role_required(*LUPON_ROLES)
 @nocache
-def dashboard(request: HttpRequest):
-    auth = request.session.get("auth")
+@inject
+def dashboard(
+    request: HttpRequest,
+    lupon_mem_dashboard_service=Provide[AppContainer.lupon_mem_dashboard_service],
+):
+    user_role = _auth_role_name(request)
+
+    kpis = {
+        "ongoing_cases": 0,
+        "open_cases": None,
+        "total_case_settled": 0,
+        "total_case_settled_delta": None,
+        "total_case_unsettled": 0,
+        "total_case_unsettled_delta": None,
+        "settlement_rate": 0,
+    }
+
+    dashboard_json = None
+
+    try:
+        payload = lupon_mem_dashboard_service.get_dashboard_content() or {}
+        kpis = payload.get("kpis", kpis)
+        dashboard_json = payload.get("dashboard_json") 
+    except Exception as exc:
+        print("Error fetching lupon mem dashboard KPIs:", exc)
+
     return render(
         request,
         "lupon_mem/dashboard.html",
         {
-            "page_path": f"Barangay Lupon Member/Dashboard",
-            "page_title": "Dashboard",
-            "auth": auth,
+            'page_path' : f'{user_role} / Dashboard',
+            'page_title' : 'Dashboard',
+            'kpis': kpis,
+            'dashboard_json': dashboard_json,
+            'today': datetime.now().strftime("%B %d, %Y"),
         },
     )
 
@@ -2271,208 +1489,6 @@ def _to_none_if_blank(s: Optional[str]) -> Optional[str]:
     return s if s else None
 
 
-@session_login_required
-@role_required(*LUPON_ROLES, "barangay treasurer")
-def case_new(request: HttpRequest) -> HttpResponse:
-    if request.method == "GET":
-        ctx = {
-            "lookups": _fetch_lookups(),
-            "initial": {},
-            "page_title": "New Blotter Case",
-        }
-        return render(request, "lupon_mem/case_new.html", ctx)
-
-    auth = request.session.get("auth") or {}
-    staff_id = auth.get("staff_id")
-
-    blotter_case_name = _to_none_if_blank(request.POST.get("blotter_case_name"))
-    incident_desc = _to_none_if_blank(request.POST.get("incident_desc"))
-
-    if not blotter_case_name:
-        return HttpResponseBadRequest("Case name is required.")
-
-    def _toi(x):
-        try:
-            return int(x) if x not in (None, "", "0") else None
-        except Exception:
-            return None
-
-    complaint_title_id = _toi(request.POST.get("complaint_title_id"))
-    case_nature_id = _toi(request.POST.get("case_nature_id"))
-    settlement_status_id = _toi(request.POST.get("settlement_status_id"))
-    blotter_report_id = _toi(request.POST.get("blotter_report_id"))
-
-    date_filed = _to_none_if_blank(request.POST.get("date_filed"))
-    time_filed = _to_none_if_blank(request.POST.get("time_filed"))
-    incident_date = _to_none_if_blank(request.POST.get("incident_date"))
-    incident_time = _to_none_if_blank(request.POST.get("incident_time"))
-
-    incident_location = _to_none_if_blank(request.POST.get("incident_location"))
-
-    complainants = request.POST.getlist("complainants[]")
-    respondents = request.POST.getlist("respondents[]")
-
-    with transaction.atomic():
-        with connection.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO blotter_case
-                    (blotter_case_name, date_filed, time_filed,
-                     incident_date, incident_time, incident_location, incident_desc,
-                     complaint_title_id, case_nature_id, blotter_report_id, settlement_status_id, added_by)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                RETURNING blotter_case_id
-            """,
-                [
-                    blotter_case_name,
-                    date_filed,
-                    time_filed,
-                    incident_date,
-                    incident_time,
-                    incident_location,
-                    incident_desc,
-                    complaint_title_id,
-                    case_nature_id,
-                    blotter_report_id,
-                    settlement_status_id,
-                    staff_id,
-                ],
-            )
-            case_id = cur.fetchone()[0]
-
-            for pid in complainants:
-                if pid and pid.isdigit():
-                    cur.execute(
-                        """
-                        INSERT INTO complainant_case (blotter_case_id, person_id)
-                        VALUES (%s, %s) ON CONFLICT DO NOTHING
-                    """,
-                        [case_id, int(pid)],
-                    )
-            for pid in respondents:
-                if pid and pid.isdigit():
-                    cur.execute(
-                        """
-                        INSERT INTO respondent_case (blotter_case_id, person_id)
-                        VALUES (%s, %s) ON CONFLICT DO NOTHING
-                    """,
-                        [case_id, int(pid)],
-                    )
-
-    messages.success(request, "Blotter case created.")
-    return redirect("lupon_mem:case_detail", case_id=case_id)
-
-
-def _toi(x):
-    try:
-        return int(x) if x not in (None, "", "0") else None
-    except Exception:
-        return None
-
-
-@session_login_required
-@role_required(*LUPON_ROLES)
-def report_new(request: HttpRequest):
-    if request.method == "GET":
-        return render(request, "lupon_mem/report_new.html", {"page_title": "New Report"})
-
-    auth = request.session.get("auth") or {}
-    staff_id = auth.get("staff_id")
-
-    # helpers
-    def _toi(x):
-        try:
-            return int(x) if x not in (None, "",) else None
-        except (TypeError, ValueError):
-            return None
-
-    def _tof(x):
-        try:
-            return float(x) if x not in (None, "",) else None
-        except (TypeError, ValueError):
-            return None
-
-    complainant_id = _toi(request.POST.get("complainant_id"))
-    respondent_ids = [_toi(x) for x in (request.POST.get("respondent_ids") or "").split(",")]
-    respondent_ids = [x for x in respondent_ids if x]
-
-    # address fields coming from the map picker
-    incident_address_id = _toi(request.POST.get("incident_address_id"))
-
-    lat = _tof(request.POST.get("incident_lat"))
-    lng = _tof(request.POST.get("incident_lng"))
-
-    map_street    = (request.POST.get("map_street") or "").strip() or None
-    map_purok     = (request.POST.get("map_purok") or "").strip() or None  # e.g. "KANIPAAN (S01)" OR "KANIPAAN"
-    map_barangay  = (request.POST.get("map_barangay") or "").strip() or None
-    map_city      = (request.POST.get("map_city") or "").strip() or None
-
-    # If no explicit address_id was provided, try to create one from the map fields
-    if not incident_address_id and (lat is not None and lng is not None):
-        with connection.cursor() as cur:
-            # Resolve purok_sitio_id from a name like "KANIPAAN (S01)" or just "KANIPAAN"
-            purok_name_for_lookup = None
-            if map_purok:
-                # pull out the part before " (" if present
-                purok_name_for_lookup = map_purok.split(" (", 1)[0].strip()
-
-            v_purok_sitio_id = None
-            if purok_name_for_lookup:
-                cur.execute(
-                    """
-                    SELECT ps.purok_sitio_id
-                      FROM purok_sitio ps
-                     WHERE upper(trim(ps.purok_sitio_name)) = upper(trim(%s))
-                     LIMIT 1
-                    """,
-                    [purok_name_for_lookup],
-                )
-                row = cur.fetchone()
-                if row:
-                    v_purok_sitio_id = row[0]
-
-            # Uppercase like your PL/pgSQL does
-            up = lambda s: s.upper() if isinstance(s, str) else s
-            up_street   = up(map_street)
-            up_brgy     = up(map_barangay)
-            up_city     = up(map_city)
-
-            # Insert the address (allow some fields to be NULL if not available)
-            cur.execute(
-                """
-                INSERT INTO addresss (latitude, longitude, street, barangay, city, purok_sitio_id)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                RETURNING address_id
-                """,
-                [lat, lng, up_street, up_brgy, up_city, v_purok_sitio_id],
-            )
-            incident_address_id = cur.fetchone()[0]
-
-    # Now create the blotter report using the (possibly newly created) address_id
-    with connection.cursor() as cur:
-        cur.execute(
-            """
-            SELECT create_blotter_report(%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb)
-            """,
-            [
-                staff_id,
-                request.POST.get("incident_subject") or None,
-                request.POST.get("incident_desc") or None,
-                request.POST.get("incident_date") or None,
-                request.POST.get("incident_time") or None,
-                incident_address_id,  # <— now filled if we created one
-                complainant_id,
-                respondent_ids if respondent_ids else None,
-                None,  # evidence jsonb
-            ],
-        )
-        report_id = cur.fetchone()[0]
-
-    messages.success(request, f"Report #{report_id} filed.")
-    return redirect("lupon_mem:report_list")
-
-
-
 from django.db import DatabaseError
 
 def _toi(x):
@@ -2481,214 +1497,6 @@ def _toi(x):
     except Exception:
         return None
 
-
-@session_login_required
-@role_required(*LUPON_ROLES, "barangay treasurer")
-def report_confirm(request: HttpRequest, report_id: int):
-    if request.method == "GET":
-        auth = request.session.get("auth") or {}
-        user_role = (auth.get("role_name") or auth.get("role") or "").strip()
-
-        with connection.cursor() as cur:
-            cur.execute(
-                """
-                SELECT br.blotter_report_id, br.incident_subject, br.incident_desc,
-                       br.incident_date, br.incident_time
-                  FROM blotter_report br
-                 WHERE br.blotter_report_id=%s
-                """,
-                [report_id],
-            )
-            rpt = cur.fetchone()
-            if not rpt:
-                return HttpResponseBadRequest("Report not found.")
-
-            cur.execute(
-                """
-                SELECT p.person_id, p.first_name || ' ' || p.last_name AS name, 'COMPLAINANT' AS role
-                  FROM complainant_report cr JOIN person p ON p.person_id=cr.person_id
-                 WHERE cr.blotter_report_id=%s
-                UNION ALL
-                SELECT p.person_id, p.first_name || ' ' || p.last_name, 'RESPONDENT'
-                  FROM respondent_report rr JOIN person p ON p.person_id=rr.person_id
-                 WHERE rr.blotter_report_id=%s
-                """,
-                [report_id, report_id],
-            )
-            parties = cur.fetchall()
-
-            cur.execute("SELECT complaint_title_id, complaint_title_name FROM complaint_title ORDER BY 2")
-            complaint_titles = cur.fetchall()
-            cur.execute("SELECT case_nature_id, case_name FROM case_nature ORDER BY 2")
-            case_natures = cur.fetchall()
-            cur.execute("SELECT settlement_status_id, settlement_status_name FROM settlement_status ORDER BY 2")
-            settlements = cur.fetchall()
-
-            # Server-side default case name (fallback if JS off)
-            cur.execute(
-                """
-                SELECT p.last_name
-                  FROM complainant_report cr
-                  JOIN person p ON p.person_id = cr.person_id
-                 WHERE cr.blotter_report_id=%s
-                 ORDER BY p.last_name, p.first_name
-                 LIMIT 1
-                """,
-                [report_id],
-            )
-            row_c = cur.fetchone()
-            c_last = (row_c and (row_c[0] or "").strip()) or ""
-
-            cur.execute(
-                """
-                SELECT p.last_name
-                  FROM respondent_report rr
-                  JOIN person p ON p.person_id = rr.person_id
-                 WHERE rr.blotter_report_id=%s
-                 ORDER BY p.last_name, p.first_name
-                 LIMIT 1
-                """,
-                [report_id],
-            )
-            row_r = cur.fetchone()
-            r_last = (row_r and (row_r[0] or "").strip()) or ""
-
-            initial_case_name = f"{c_last} vs {r_last}" if (c_last and r_last) else "People vs"
-
-        ctx = {
-            "rpt": rpt,
-            "parties": parties,
-            "complaint_titles": complaint_titles,
-            "case_natures": case_natures,
-            "settlement_statuses": settlements,
-            "report_id": report_id,
-            "page_title": "Confirm & Open Case",
-            "user_role": user_role,
-            "initial_case_name": initial_case_name,
-        }
-        return render(request, "lupon_mem/report_confirm.html", ctx)
-
-    # ---------- POST ----------
-    auth = request.session.get("auth") or {}
-    staff_id = auth.get("staff_id")
-    if not staff_id:
-        messages.error(request, "Session expired. Please login again.")
-        return redirect("lupon_mem:report_confirm", report_id=report_id)
-
-    def _default_case_name(cur) -> str:
-        # compute a basic default if the client didn't send case_name
-        cur.execute(
-            """
-            SELECT coalesce(c_last,''), coalesce(r_last,'')
-            FROM (
-              SELECT
-                (SELECT p.last_name
-                   FROM complainant_report cr
-                   JOIN person p ON p.person_id = cr.person_id
-                  WHERE cr.blotter_report_id=%s
-                  ORDER BY p.last_name, p.first_name
-                  LIMIT 1) AS c_last,
-                (SELECT p.last_name
-                   FROM respondent_report rr
-                   JOIN person p ON p.person_id = rr.person_id
-                  WHERE rr.blotter_report_id=%s
-                  ORDER BY p.last_name, p.first_name
-                  LIMIT 1) AS r_last
-            ) s
-            """,
-            [report_id, report_id],
-        )
-        row = cur.fetchone()
-        c_last = (row and (row[0] or "").strip()) or ""
-        r_last = (row and (row[1] or "").strip()) or ""
-        return f"{c_last} vs {r_last}" if (c_last and r_last) else "People vs"
-
-    # Pull fields
-    case_name = (request.POST.get("case_name") or "").strip()
-    complaint_title_id = _toi(request.POST.get("complaint_title_id"))
-    case_nature_id = _toi(request.POST.get("case_nature_id"))
-    settlement_status_id = _toi(request.POST.get("settlement_status_id"))
-
-    # fill case_name if blank
-    if not case_name:
-        with connection.cursor() as cur:
-            case_name = _default_case_name(cur)
-
-    with_payment = (request.POST.get("with_payment") == "on")
-    payment_receipt = (request.POST.get("payment_receipt") or "").strip() or None
-    payment_amount = request.POST.get("payment_amount")
-    try:
-        payment_amount = float(payment_amount) if payment_amount not in (None, "",) else 0.0
-    except ValueError:
-        payment_amount = 0.0
-    payment_status = (request.POST.get("payment_status") or "PAID").strip().upper()
-    paid_by_person_id = _toi(request.POST.get("paid_by_person_id"))
-
-    if not complaint_title_id or not case_nature_id or not settlement_status_id:
-        messages.error(request, "Please select Complaint Title, Case Nature, and Settlement Status.")
-        return redirect("lupon_mem:report_confirm", report_id=report_id)
-
-    if with_payment and not payment_receipt:
-        messages.error(request, "Enter an OR / Receipt No. to record the payment.")
-        return redirect("lupon_mem:report_confirm", report_id=report_id)
-
-    try:
-        with connection.cursor() as cur:
-            cur.execute(
-                """
-                SELECT confirm_report_and_open_case(
-                    %s,%s,%s,%s,%s,%s,
-                    %s,%s,%s,%s,%s
-                )
-                """,
-                [
-                    report_id,
-                    case_name,
-                    complaint_title_id,
-                    case_nature_id,
-                    settlement_status_id,
-                    staff_id,
-                    with_payment,
-                    payment_receipt,
-                    payment_amount,
-                    payment_status,
-                    paid_by_person_id,
-                ],
-            )
-            row = cur.fetchone()
-            if not row or not row[0]:
-                messages.error(request, "Case could not be created.")
-                return redirect("lupon_mem:report_confirm", report_id=report_id)
-            case_id = int(row[0])
-    except DatabaseError as e:
-        messages.error(request, f"Failed to create case: {e}")
-        return redirect("lupon_mem:report_confirm", report_id=report_id)
-    except Exception:
-        messages.error(request, "Unexpected error while creating case.")
-        return redirect("lupon_mem:report_confirm", report_id=report_id)
-
-    messages.success(request, f"Case #{case_id} created.")
-    return redirect("lupon_mem:case_detail", case_id=case_id)
-
-
-
-@session_login_required
-@role_required(*LUPON_ROLES)
-def submission_pdf(request: HttpRequest, submission_id: int):
-    try:
-        pdf_bytes, filename = render_final_pdf(submission_id=submission_id)
-    except ValidationError as e:
-        return HttpResponse(str(e), status=400)
-    except Exception:
-        return HttpResponse("Failed to generate PDF.", status=500)
-
-    resp = HttpResponse(pdf_bytes, content_type="application/pdf")
-    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
-    return resp
-
-
-# add near the top with your other imports
-from lupon_mem.services.timeline import get_case_timeline
 
 # --- Case timeline (read-only) ---
 @session_login_required
@@ -2699,150 +1507,6 @@ def case_timeline(request: HttpRequest, case_id: int):
         return HttpResponseBadRequest("Case not found.")
     return render(request, "lupon_mem/case_timeline.html", data)
 
-
-
-from django.views.decorators.http import require_GET
-
-@session_login_required
-@role_required(*LUPON_ROLES)
-@require_GET
-def staff_lookup(request: HttpRequest):
-    """
-    JSON lookup for a single staff member.
-    Input:  GET ?staff_id=123
-    Output: { ok: true, result: { id, person_id, name, role, mobile } }
-    """
-    sid_raw = (request.GET.get("staff_id") or "").strip()
-    if not sid_raw.isdigit():
-        return JsonResponse({"ok": False, "error": "Invalid staff_id."}, status=400)
-
-    staff_id = int(sid_raw)
-    with connection.cursor() as cur:
-        cur.execute("""
-            SELECT
-              s.staff_id,
-              p.person_id,
-              trim(coalesce(p.first_name,'') || ' ' ||
-                   coalesce(p.middle_name,'') || ' ' ||
-                   coalesce(p.last_name,'')  || ' ' ||
-                   coalesce(p.suffix,''))    AS name,
-              coalesce(r.role_name,'')       AS role
-            FROM staff s
-            JOIN person p ON p.person_id = s.person_id
-            LEFT JOIN rolee r ON r.role_id = s.role_id
-            WHERE s.staff_id=%s
-            LIMIT 1
-        """, [staff_id])
-        row = cur.fetchone()
-
-    if not row:
-        return JsonResponse({"ok": False, "error": "Staff not found."}, status=404)
-
-    _staff_id, person_id, name, role = row
-    mobile = _get_person_mobile_number(person_id) or ""
-
-    return JsonResponse({
-        "ok": True,
-        "result": {
-            "id": _staff_id,
-            "person_id": person_id,
-            "name": (name or "").strip(),
-            "role": (role or "").strip(),
-            "mobile": mobile.strip()
-        }
-    })
-
-
-# --- lightweight staff suggest for officer picker (KP-9 offcr_name) ---
-@session_login_required
-@role_required(*LUPON_ROLES)
-def staff_suggest(request: HttpRequest):
-    q = (request.GET.get("q") or "").strip()
-    if len(q) < 2:
-        return JsonResponse({"results": []})
-
-    like = f"%{q}%"
-    with connection.cursor() as cur:
-        cur.execute(
-            """
-            SELECT s.staff_id,
-                   trim(
-                       coalesce(p.first_name,'') || ' ' ||
-                       coalesce(p.middle_name,'') || ' ' ||
-                       coalesce(p.last_name,'') || ' ' ||
-                       coalesce(p.suffix,'')
-                   ) AS name
-            FROM staff s
-            JOIN person p ON p.person_id = s.person_id
-            JOIN rolee  r ON r.role_id = s.role_id
-            WHERE (r.role_name IN ('BARANGAY LUPON MEMBER','BARANGAY LUPON PRESIDENT'))
-              AND (
-                   p.first_name ILIKE %s
-                OR p.last_name  ILIKE %s
-                OR (p.first_name || ' ' || p.last_name) ILIKE %s
-              )
-            ORDER BY name
-            LIMIT 20
-            """,
-            [like, like, like],
-        )
-        rows = cur.fetchall()
-
-    return JsonResponse({"results": [{"id": r[0], "name": r[1].strip()} for r in rows]})
-
-
-@session_login_required
-@role_required(*LUPON_ROLES)
-def staff_suggest_all(request: HttpRequest):
-    q = (request.GET.get("q") or "").strip()
-    if len(q) < 2:
-        return JsonResponse({"results": []})
-
-    like = f"%{q}%"
-    with connection.cursor() as cur:
-        cur.execute(
-            """
-            SELECT s.staff_id,
-                   trim(
-                       coalesce(p.first_name,'') || ' ' ||
-                       coalesce(p.middle_name,'') || ' ' ||
-                       coalesce(p.last_name,'') || ' ' ||
-                       coalesce(p.suffix,'')
-                   ) AS name
-            FROM staff s
-            JOIN person p ON p.person_id = s.person_id
-            JOIN rolee  r ON r.role_id = s.role_id
-            WHERE r.role_name IN (
-                'BARANGAY LUPON MEMBER',
-                'BARANGAY LUPON PRESIDENT',
-                'BARANGAY SECRETARY',
-                'BARANGAY CAPTAIN'
-            )
-              AND (
-                   p.first_name ILIKE %s
-                OR p.last_name  ILIKE %s
-                OR (p.first_name || ' ' || p.last_name) ILIKE %s
-              )
-            ORDER BY name
-            LIMIT 20
-            """,
-            [like, like, like],
-        )
-        rows = cur.fetchall()
-
-    return JsonResponse({"results": [{"id": r[0], "name": r[1].strip()} for r in rows]})
-
-
-# --- zero-DB chooser using constants ---
-# lupon_mem/views.py  (replace your add_form_choose_static with this version)
-
-# lupon_mem/views.py  (replace your add_form_choose_static with this one)
-
-from django.contrib import messages
-from django.db import connection
-from django.http import HttpRequest
-from django.shortcuts import render, redirect
-from django.urls import reverse
 
 @session_login_required
 @role_required(*LUPON_ROLES)
@@ -2885,7 +1549,7 @@ def add_form_choose_static(request, case_id: int):
             return c.fetchall()
 
     # ---- hearing gate (your existing util) ----
-    gate = _hearing_gate(case_id)
+    gate = hearing_gate(case_id)
     latest_notice_outstanding = bool(gate.get("latest_notice_outstanding"))
 
     # ---- case snapshot (settlement text) ----
@@ -2984,80 +1648,25 @@ def add_form_choose_static(request, case_id: int):
     can_kp23 = final_and_executory
 
     # ---- HARD GATES (bypass allowed for MED-ATT-2025) ----
-    if pending_summons and not allow_med_att:
-        messages.warning(
-            request,
-            "Please mark the latest summons attendance (ATTENDED / NO SHOW) before adding a new form."
-        )
-        return redirect("lupon_mem:case_detail", case_id=case_id)
+    # COMMENTED OUT FOR NOW - DISPLAY ALL FORMS
+    # if pending_summons and not allow_med_att:
+    #     messages.warning(
+    #         request,
+    #         "Please mark the latest summons attendance (ATTENDED / NO SHOW) before adding a new form."
+    #     )
+    #     return redirect("lupon_mem:case_detail", case_id=case_id)
 
-    if notice_outstanding and not allow_med_att:
-        messages.warning(
-            request,
-            "There is a scheduled mediation/conciliation hearing. Please record the outcome (HELD → Settled / Not Settled) first."
-        )
-        return redirect("lupon_mem:case_detail", case_id=case_id)
+    # if notice_outstanding and not allow_med_att:
+    #     messages.warning(
+    #         request,
+    #         "There is a scheduled mediation/conciliation hearing. Please record the outcome (HELD → Settled / Not Settled) first."
+    #     )
+    #     return redirect("lupon_mem:case_detail", case_id=case_id)
 
-    # ---- Decide allowed codes (KP-7..KP-25) ----
-    allowed_codes: list[str] = []
-    gate_msg = None
-
-    is_settled_text = ('SETTLED' in (settlement_status_name or ''))
-    latest_is_noshow = (latest_att_status == 'NO SHOW')
-
-    if allow_med_att:
-        allowed_codes = ['MED-ATT-2025']
-        gate_msg = "You are adding Mediation/Pangkat Attendance for the scheduled hearing."
-    else:
-        if not _has('KP-7'):
-            allowed_codes = ['KP-7']
-            gate_msg = "Start the case: file KP-7 (Complaint)."
-        else:
-            if not _has('KP-9'):
-                allowed_codes = ['KP-8', 'KP-9']
-                gate_msg = "Issue KP-9 (Summons). You may also schedule PB Mediation (KP-8)."
-            else:
-                if latest_is_noshow:
-                    if latest_att_party in ('COMPLAINANT','BOTH'):
-                        allowed_codes.append('KP-18')
-                    if latest_att_party in ('RESPONDENT','BOTH'):
-                        allowed_codes.append('KP-19')
-                    allowed_codes.append('KP-9')
-                    if repeated_ns_compl:
-                        allowed_codes.extend(['KP-21','KP-20B'])
-                    if repeated_ns_resp:
-                        allowed_codes.extend(['KP-22','KP-20B'])
-                    gate_msg = "Latest summons marked NO SHOW — issue the proper failure form(s) and/or a new summons."
-                else:
-                    # Normal running track
-                    allowed_codes.extend(['KP-8','KP-9','KP-10','KP-11','KP-12','MED-ATT-2025','KP-13'])
-                    allowed_codes.append('KP-16')
-
-                    if has_kp16 and within_repudiation_window:
-                        allowed_codes.append('KP-17')
-                    if has_kp16 and kp17_exists:
-                        allowed_codes.append('KP-20')  # CFA (repudiation)
-
-                    if (hearings_held >= 1) and (not is_settled_text) and (not notice_outstanding):
-                        allowed_codes.append('KP-20A')  # CFA (no settlement)
-
-                    if can_kp23:
-                        allowed_codes.append('KP-23')
-                        has_kp23 = _has('KP-23')
-                        has_kp24 = _has('KP-24')
-                        if has_kp23:
-                            allowed_codes.append('KP-24')
-                        if has_kp24:
-                            allowed_codes.append('KP-25')
-
-                    gate_msg = (
-                        "Proceed with Mediation/Pangkat flow. Use KP-16 when settled; "
-                        "KP-17 (within 10 days) if repudiated; KP-20A (no settlement); "
-                        "KP-20B (repeated non-appearance); KP-20 (repudiation). "
-                        "Use KP-23→24→25 for execution when a settlement/award is final and not complied with."
-                    )
-
-    # ---- order + dedupe ----
+    # ---- DISPLAY ALL FORMS (guards commented out) ----
+    from django.core.paginator import Paginator
+    
+    # Get all forms from KP-7 to KP-25 plus MED-ATT-2025
     wanted_order = [
         'KP-7','KP-8','KP-9','KP-10','KP-11','KP-12','KP-13',
         'MED-ATT-2025','KP-16','KP-17',
@@ -3066,20 +1675,23 @@ def add_form_choose_static(request, case_id: int):
         'KP-21','KP-22',
         'KP-23','KP-24','KP-25'
     ]
-    allowed_set = {c.upper() for c in allowed_codes}
-    allowed_codes = [c for c in wanted_order if c in allowed_set]
-
-    # ---- fetch display names for allowed codes ----
-    forms: list[tuple[str, str]] = []
-    if allowed_codes:
-        with connection.cursor() as cur:
-            cur.execute("""
-                SELECT UPPER(form_code) AS code, form_name
-                FROM kp_form
-                WHERE UPPER(form_code) = ANY(%s)
-                ORDER BY array_position(%s::text[], UPPER(form_code))
-            """, [allowed_codes, allowed_codes])
-            forms = [(code, name) for code, name in cur.fetchall()]
+    
+    # ---- fetch all forms ----
+    with connection.cursor() as cur:
+        cur.execute("""
+            SELECT UPPER(form_code) AS code, form_name
+            FROM kp_form
+            WHERE UPPER(form_code) = ANY(%s)
+            ORDER BY array_position(%s::text[], UPPER(form_code))
+        """, [wanted_order, wanted_order])
+        all_forms = [(code, name) for code, name in cur.fetchall()]
+    
+    # ---- pagination ----
+    paginator = Paginator(all_forms, 10)  # 10 forms per page
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+    
+    gate_msg = "All forms are displayed (guards temporarily disabled)"
 
     # ---- badges for template ----
     badge_flags = {
@@ -3097,15 +1709,312 @@ def add_form_choose_static(request, case_id: int):
 
     print(f"[add_form_choose_static] case_id={case_id} allow_med_att={allow_med_att} requested_code={requested_code} "
           f"pending_summons={pending_summons} latest_notice_outstanding={notice_outstanding} "
-          f"allowed_codes={allowed_codes} badge_flags={badge_flags}")
+          f"total_forms={len(all_forms)} badge_flags={badge_flags}")
 
     return render(request, "lupon_mem/add_form_choose_static.html", {
         "case_id": case_id,
-        "forms": forms,
+        "forms": page_obj.object_list,
+        "page_obj": page_obj,
         "gate_msg": gate_msg,
         "badge_flags": badge_flags,
     })
 
+
+
+@session_login_required
+@role_required(*LUPON_ROLES, "barangay treasurer")
+def incident_heatmap(request: HttpRequest):
+    """
+    Display comprehensive barangay incident heatmap with advanced analytics and filtering.
+    """
+    # Get filter parameters
+    time_filter = request.GET.get('time_filter', '1_year')
+    case_type_filter = request.GET.get('case_type', 'all')
+    settlement_filter = request.GET.get('settlement', 'all')
+
+    # Build time filter condition (reports)
+    time_conditions = {
+        '1_month': "AND br.date_time_reported >= CURRENT_DATE - INTERVAL '1 month'",
+        '3_months': "AND br.date_time_reported >= CURRENT_DATE - INTERVAL '3 months'",
+        '6_months': "AND br.date_time_reported >= CURRENT_DATE - INTERVAL '6 months'",
+        '1_year': "AND br.date_time_reported >= CURRENT_DATE - INTERVAL '1 year'",
+        'all': ""
+    }
+    time_condition = time_conditions.get(time_filter, time_conditions['1_year'])
+
+    # Build time filter condition (cases)
+    case_time_conditions = {
+        '1_month': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '1 month'",
+        '3_months': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '3 months'",
+        '6_months': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '6 months'",
+        '1_year': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '1 year'",
+        'all': ""
+    }
+    case_time_condition = case_time_conditions.get(time_filter, case_time_conditions['1_year'])
+
+    # Build case type filter (parameterized)
+    case_type_condition = ""
+    case_type_params = []
+    if case_type_filter != 'all':
+        case_type_condition = "AND ct.complaint_title_name = %s"
+        case_type_params.append(case_type_filter)
+
+    # Build settlement filter
+    settlement_condition = ""
+    if settlement_filter == 'settled':
+        settlement_condition = "AND UPPER(ss.settlement_status_name) = 'SETTLED'"
+    elif settlement_filter == 'pending':
+        settlement_condition = "AND (ss.settlement_status_name IS NULL OR UPPER(ss.settlement_status_name) = 'PENDING')"
+    elif settlement_filter == 'not_settled':
+        settlement_condition = "AND UPPER(ss.settlement_status_name) = 'NOT SETTLED'"
+
+    with connection.cursor() as cur:
+        # ---------- 1) Incident rows ----------
+        sql_incidents = f"""
+            WITH incident_data AS (
+                -- Blotter Reports (not yet converted to cases)
+                SELECT 
+                    'BR-' || br.blotter_report_id as incident_id,
+                    COALESCE(br.incident_subject, 'Unnamed Incident') as incident_name,
+                    COALESCE(br.incident_desc, 'No description') as incident_desc,
+                    br.date_time_reported::date as date_filed,
+                    br.date_time_reported::time as time_filed,
+                    a.latitude,
+                    a.longitude,
+                    COALESCE(a.street, 'Unknown Street') as street,
+                    COALESCE(a.barangay, 'Unknown Barangay') as barangay,
+                    COALESCE(ps.purok_sitio_name, 'Unknown Purok') as purok,
+                    'Blotter Report' as incident_type,
+                    'Pending Review' as case_status,
+                    'Not Applicable' as settlement_status,
+                    COALESCE(pst.payment_status_name, 'Unpaid') as payment_status,
+                    'Low' as severity_level,
+                    br.date_time_reported as created_at
+                FROM blotter_report br
+                LEFT JOIN addresss a ON a.address_id = br.incident_address_id
+                LEFT JOIN purok_sitio ps ON ps.purok_sitio_id = a.purok_sitio_id
+                LEFT JOIN payment_status pst ON pst.payment_status_id = br.payment_status_id
+                WHERE a.latitude IS NOT NULL 
+                  AND a.longitude IS NOT NULL
+                  {time_condition}
+                  
+                UNION ALL
+                
+                -- Blotter Cases (converted from reports or direct cases)
+                SELECT 
+                    'BC-' || bc.blotter_case_id as incident_id,
+                    COALESCE(bc.blotter_case_name, 'Unnamed Case') as incident_name,
+                    COALESCE(bc.incident_desc, 'No description') as incident_desc,
+                    bc.date_filed::date as date_filed,
+                    bc.time_filed as time_filed,
+                    a.latitude,
+                    a.longitude,
+                    COALESCE(a.street, 'Unknown Street') as street,
+                    COALESCE(a.barangay, 'Unknown Barangay') as barangay,
+                    COALESCE(ps.purok_sitio_name, 'Unknown Purok') as purok,
+                    COALESCE(ct.complaint_title_name, 'General Complaint') as incident_type,
+                    COALESCE(cs.case_state_name, 'Open') as case_status,
+                    COALESCE(ss.settlement_status_name, 'Pending') as settlement_status,
+                    'Paid' as payment_status,
+                    CASE 
+                        WHEN UPPER(ss.settlement_status_name) = 'SETTLED' THEN 'Low'
+                        WHEN UPPER(cs.case_state_name) = 'CLOSED' THEN 'Medium'
+                        WHEN bc.date_filed < CURRENT_DATE - INTERVAL '6 months' AND UPPER(ss.settlement_status_name) != 'SETTLED' THEN 'High'
+                        ELSE 'Medium'
+                    END as severity_level,
+                    COALESCE(bc.date_filed::timestamp, CURRENT_TIMESTAMP) as created_at
+                FROM blotter_case bc
+                LEFT JOIN addresss a ON a.address_id = (
+                    SELECT br.incident_address_id 
+                    FROM blotter_report br 
+                    WHERE br.blotter_report_id = bc.blotter_report_id
+                    LIMIT 1
+                )
+                LEFT JOIN purok_sitio ps ON ps.purok_sitio_id = a.purok_sitio_id
+                LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
+                LEFT JOIN case_nature cn ON cn.case_nature_id = bc.case_nature_id
+                LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
+                LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+                WHERE a.latitude IS NOT NULL 
+                  AND a.longitude IS NOT NULL
+                  AND bc.date_filed >= CURRENT_DATE - INTERVAL '2 years'
+                  {case_time_condition}
+                  {case_type_condition}
+                  {settlement_condition}
+            )
+            SELECT * FROM incident_data
+            ORDER BY created_at DESC, incident_id
+            LIMIT 1000
+        """
+        cur.execute(sql_incidents, case_type_params)
+        incidents = cur.fetchall()
+
+        # ---------- 2) Stats by incident type ----------
+        # FIX: remove EXTRACT(... from integer). Just average the integer day-difference.
+        sql_stats = f"""
+            WITH stats_data AS (
+                SELECT 
+                    COALESCE(ct.complaint_title_name, 'General Complaint') as incident_type,
+                    COUNT(*) as total_count,
+                    COUNT(CASE WHEN UPPER(ss.settlement_status_name) = 'SETTLED' THEN 1 END) as settled_count,
+                    COUNT(CASE WHEN UPPER(cs.case_state_name) = 'CLOSED' THEN 1 END) as closed_count,
+                    COUNT(CASE WHEN a.latitude IS NOT NULL AND a.longitude IS NOT NULL THEN 1 END) as mapped_count,
+                    AVG(
+                        CASE 
+                            WHEN bc.date_filed IS NOT NULL AND ss.settlement_status_id IS NOT NULL
+                            THEN (CURRENT_DATE::date - bc.date_filed::date)
+                            ELSE NULL
+                        END
+                    ) AS avg_resolution_days
+                FROM blotter_case bc
+                LEFT JOIN addresss a ON a.address_id = (
+                    SELECT br.incident_address_id 
+                    FROM blotter_report br 
+                    WHERE br.blotter_report_id = bc.blotter_report_id
+                    LIMIT 1
+                )
+                LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
+                LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
+                LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+                WHERE bc.date_filed >= CURRENT_DATE - INTERVAL '2 years'
+                {case_time_condition}
+                GROUP BY ct.complaint_title_name
+                
+                UNION ALL
+                
+                SELECT 
+                    'Blotter Report' as incident_type,
+                    COUNT(*) as total_count,
+                    0 as settled_count,
+                    0 as closed_count,
+                    COUNT(CASE WHEN a.latitude IS NOT NULL AND a.longitude IS NOT NULL THEN 1 END) as mapped_count,
+                    NULL as avg_resolution_days
+                FROM blotter_report br
+                LEFT JOIN addresss a ON a.address_id = br.incident_address_id
+                WHERE 1=1
+                {time_condition}
+            )
+            SELECT incident_type, total_count, settled_count, closed_count, mapped_count, avg_resolution_days
+            FROM stats_data
+            WHERE total_count > 0
+            ORDER BY total_count DESC
+        """
+        cur.execute(sql_stats)
+        incident_stats = cur.fetchall()
+
+        # ---------- 2b) Summary counts for headers ----------
+        # Total blotter reports (apply selected time filter)
+        cur.execute(f"SELECT COUNT(*) FROM blotter_report br WHERE 1=1 {time_condition}")
+        blotter_reports_count = cur.fetchone()[0]
+
+        # Total blotter cases (base window 2 years + selected time filter)
+        cur.execute(f"SELECT COUNT(*) FROM blotter_case bc WHERE bc.date_filed >= CURRENT_DATE - INTERVAL '2 years' {case_time_condition}")
+        blotter_cases_count = cur.fetchone()[0]
+
+        # ---------- 3) Street-level stats ----------
+        sql_streets = """
+            SELECT 
+                COALESCE(a.street, 'Unknown Street') as street_name,
+                COALESCE(a.barangay, 'Unknown Barangay') as barangay_name,
+                COUNT(*) as incident_count,
+                COUNT(CASE WHEN UPPER(ss.settlement_status_name) = 'SETTLED' THEN 1 END) as settled_count,
+                COUNT(CASE WHEN bc.date_filed >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as recent_count,
+                MAX(bc.date_filed) as last_incident_date
+            FROM blotter_case bc
+            LEFT JOIN addresss a ON a.address_id = (
+                SELECT br.incident_address_id 
+                FROM blotter_report br 
+                WHERE br.blotter_report_id = bc.blotter_report_id
+                LIMIT 1
+            )
+            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+            WHERE a.latitude IS NOT NULL 
+              AND a.longitude IS NOT NULL
+              AND bc.date_filed >= CURRENT_DATE - INTERVAL '1 year'
+            GROUP BY a.street, a.barangay
+            HAVING COUNT(*) >= 1
+            ORDER BY incident_count DESC, recent_count DESC
+            LIMIT 25
+        """
+        cur.execute(sql_streets)
+        street_stats = cur.fetchall()
+
+        # ---------- 4) Case type options ----------
+        cur.execute("""
+            SELECT DISTINCT ct.complaint_title_name
+            FROM complaint_title ct
+            JOIN blotter_case bc ON bc.complaint_title_id = ct.complaint_title_id
+            WHERE bc.date_filed >= CURRENT_DATE - INTERVAL '2 years'
+            ORDER BY ct.complaint_title_name
+        """)
+        case_types = [row[0] for row in cur.fetchall()]
+
+    # -------- Format payloads for the template --------
+    import json
+    incident_data = []
+    for incident in incidents:
+        incident_data.append({
+            'id': incident[0],
+            'name': incident[1] or 'Unnamed Incident',
+            'description': incident[2] or 'No description',
+            'date': incident[3].strftime('%Y-%m-%d') if incident[3] else '',
+            'time': str(incident[4]) if incident[4] else '',
+            'lat': float(incident[5]) if incident[5] else 0,
+            'lng': float(incident[6]) if incident[6] else 0,
+            'street': incident[7] or 'Unknown Street',
+            'barangay': incident[8] or 'Unknown Barangay',
+            'purok': incident[9] or 'Unknown Purok',
+            'type': incident[10] or 'Unknown Type',
+            'case_status': incident[11] or 'Unknown Status',
+            'settlement_status': incident[12] or 'Pending',
+            'payment_status': incident[13] or 'Unknown',
+            'severity': incident[14] or 'Medium',
+            'created_at': incident[15].strftime('%Y-%m-%d %H:%M') if incident[15] else ''
+        })
+
+    stats_data = []
+    for stat in incident_stats:
+        settlement_rate = round((stat[2] / stat[1] * 100) if stat[1] > 0 else 0, 1)
+        # stat[5] is numeric (avg int days); leave None if null
+        avg_days = round(stat[5]) if stat[5] is not None else None
+        stats_data.append({
+            'type': stat[0],
+            'total_count': stat[1],
+            'settled_count': stat[2],
+            'closed_count': stat[3],
+            'mapped_count': stat[4],
+            'settlement_rate': settlement_rate,
+            'avg_resolution_days': avg_days,
+            'efficiency_score': min(100, max(0, 100 - (avg_days or 30) + settlement_rate)) if avg_days is not None else settlement_rate
+        })
+
+    street_data = []
+    for street in street_stats:
+        settlement_rate = round((street[3] / street[2] * 100) if street[2] > 0 else 0, 1)
+        street_data.append({
+            'street': street[0],
+            'barangay': street[1],
+            'incident_count': street[2],
+            'settled_count': street[3],
+            'recent_count': street[4],
+            'settlement_rate': settlement_rate,
+            'last_incident': street[5].strftime('%Y-%m-%d') if street[5] else 'N/A',
+            'risk_level': 'High' if street[4] >= 3 else 'Medium' if street[4] >= 1 else 'Low'
+        })
+
+    return render(request, "lupon_mem/incident_heatmap.html", {
+        "incident_data_json": json.dumps(incident_data),
+        "incident_data": incident_data,
+        "incident_stats": json.dumps(stats_data),  # For JavaScript charts
+        "street_stats": street_data,
+        "blotter_reports_count": blotter_reports_count,
+        "blotter_cases_count": blotter_cases_count,
+        "case_types": case_types,
+        "time_filter": time_filter,
+        "case_type_filter": case_type_filter,
+        "settlement_filter": settlement_filter,
+        "page_title": "Barangay Incident Heatmap & Analytics"
+    })
 
 
 @session_login_required
@@ -3126,41 +2035,6 @@ def form_builder_by_code(request: HttpRequest, case_id: int, form_code: str):
     form_id = int(row[0])
     return redirect("lupon_mem:form_builder", case_id=case_id, form_id=form_id)
 
-
-# --- lightweight person suggest for subpoena_to / subpoena_witness (KP-13) ---
-@session_login_required
-@role_required(*LUPON_ROLES, "barangay treasurer")
-def person_suggest(request: HttpRequest):
-    q = (request.GET.get("q") or "").strip()
-    if len(q) < 2:
-        return JsonResponse({"results": []})
-
-    like = f"%{q}%"
-    with connection.cursor() as cur:
-        cur.execute(
-            """
-            SELECT p.person_id,
-                   trim(
-                       coalesce(p.first_name,'') || ' ' ||
-                       coalesce(p.middle_name,'') || ' ' ||
-                       coalesce(p.last_name,'')  || ' ' ||
-                       coalesce(p.suffix,'')
-                   ) AS name
-            FROM person p
-            WHERE
-                 p.first_name ILIKE %s
-              OR p.last_name  ILIKE %s
-              OR (p.first_name || ' ' || coalesce(p.middle_name,'') || ' ' || p.last_name) ILIKE %s
-            ORDER BY name
-            LIMIT 20
-            """,
-            [like, like, like],
-        )
-        rows = cur.fetchall()
-
-    return JsonResponse({"results": [{"id": r[0], "name": (r[1] or "").strip()} for r in rows]})
-
-
 # ---------- CHANGED: report_list shows payment_status ----------
 # helper to read role
 def _user_role(request: HttpRequest) -> str:
@@ -3173,478 +2047,6 @@ LUPON_ROLES_LIST = ["BARANGAY LUPON MEMBER", "BARANGAY LUPON PRESIDENT"]  # pass
 
 from django.views.decorators.http import require_POST
 
-# ------------------------------
-# REPORT LIST
-# ------------------------------
-@session_login_required
-@role_required(*LUPON_ROLES, "barangay treasurer")
-def report_list(request: HttpRequest):
-    q_raw        = (request.GET.get("q") or "").strip()
-    f_payment    = (request.GET.get("payment") or "").strip()            # '', PAID, UNPAID, DECLINED
-    f_blotter    = (request.GET.get("blotter_status") or "").strip()     # '', FOR LUPON REVIEW, REVIEWED
-    f_date_from  = (request.GET.get("date_from") or "").strip()
-    f_date_to    = (request.GET.get("date_to") or "").strip()
-
-    auth = request.session.get("auth") or {}
-    user_role = (auth.get("role_name") or auth.get("role") or "").strip()
-
-    # ✅ Payment filter now includes DECLINED
-    payment_options = ["", "PAID", "UNPAID", "DECLINED"]
-    blotter_options = ["", "FOR LUPON REVIEW", "REVIEWED"]
-
-    with connection.cursor() as cur:
-        sql = """
-        WITH base AS (
-          SELECT
-            br.blotter_report_id                               AS id,
-            COALESCE(br.incident_subject,'(no subject)')       AS subject,
-            to_char(br.date_time_reported,'YYYY-MM-DD HH24:MI') AS reported_at,
-            br.date_time_reported                               AS reported_sort,
-            ps.payment_status_name                              AS payment_status,
-            CASE
-              WHEN ps.payment_status_name IS NULL OR ps.payment_status_name = '' THEN 'FOR LUPON REVIEW'
-              WHEN UPPER(ps.payment_status_name) IN ('PAID','UNPAID','DECLINED') THEN 'REVIEWED'
-              ELSE NULL
-            END                                                 AS blotter_status
-          FROM blotter_report br
-          LEFT JOIN payment_status ps ON ps.payment_status_id = br.payment_status_id
-        )
-        SELECT id, subject, reported_at, payment_status, blotter_status
-        FROM base
-        WHERE 1=1
-        """
-        params = []
-
-        if q_raw:
-            sql += " AND subject ILIKE CONCAT('%%', %s, '%%')"
-            params.append(q_raw)
-
-        # ✅ Allow PAID / UNPAID / DECLINED filters
-        if f_payment and f_payment.upper() in ("PAID", "UNPAID", "DECLINED"):
-            sql += " AND UPPER(payment_status) = UPPER(%s)"
-            params.append(f_payment)
-
-        if f_blotter:
-            sql += " AND blotter_status = %s"
-            params.append(f_blotter)
-
-        if f_date_from:
-            sql += " AND reported_sort::date >= %s"
-            params.append(f_date_from)
-        if f_date_to:
-            sql += " AND reported_sort::date <= %s"
-            params.append(f_date_to)
-
-        sql += " ORDER BY reported_sort DESC LIMIT 500"
-        cur.execute(sql, params)
-        rows = cur.fetchall()
-
-    return render(
-        request,
-        "lupon_mem/report_list.html",
-        {
-            "rows": rows,
-            "q": q_raw,
-            "user_role": user_role,
-            "LUPON_ROLES_LIST": LUPON_ROLES_LIST,
-            "payment_options": payment_options,
-            "blotter_options": blotter_options,
-            "f_payment": f_payment,
-            "f_blotter": f_blotter,
-            "f_date_from": f_date_from,
-            "f_date_to": f_date_to,
-        },
-    )
-
-
-
-# ------------------------------
-# REVIEW (Lupon) – no Payment card; Approve/Decline here
-# ------------------------------
-@session_login_required
-@role_required(*LUPON_ROLES, "barangay treasurer")
-def report_review(request: HttpRequest, report_id: int):
-    auth = request.session.get("auth") or {}
-    role = (auth.get("role_name") or auth.get("role") or "").strip()
-
-    with connection.cursor() as cur:
-        # main report record
-        cur.execute("""
-            SELECT br.blotter_report_id,
-                   COALESCE(br.incident_subject,'(no subject)') AS subj,
-                   COALESCE(br.incident_desc,'') AS descr,
-                   to_char(br.date_time_reported,'YYYY-MM-DD HH24:MI') AS reported_at,
-                   COALESCE(ps.payment_status_name, '—') AS pay_status,
-                   COALESCE(
-                     NULLIF(
-                       trim(
-                         concat_ws(', ',
-                           NULLIF(a.street, ''),
-                           NULLIF(pks.purok_sitio_name, ''),
-                           NULLIF(a.barangay, ''),
-                           NULLIF(a.city, '')
-                         )
-                       ), ''
-                     ), '—'
-                   ) AS incident_address,
-                   a.latitude,
-                   a.longitude
-            FROM blotter_report br
-            LEFT JOIN payment_status ps ON ps.payment_status_id = br.payment_status_id
-            LEFT JOIN addresss a        ON a.address_id = br.incident_address_id
-            LEFT JOIN purok_sitio pks   ON pks.purok_sitio_id = a.purok_sitio_id
-            WHERE br.blotter_report_id=%s
-        """, [report_id])
-        rpt = cur.fetchone()
-        if not rpt:
-            return HttpResponseBadRequest("Report not found.")
-
-        # parties
-        cur.execute("""
-            SELECT p.person_id, trim(coalesce(p.first_name,'') || ' ' || coalesce(p.last_name,'')) AS name, 'COMPLAINANT' AS role
-              FROM complainant_report cr
-              JOIN person p ON p.person_id = cr.person_id
-             WHERE cr.blotter_report_id=%s
-            UNION ALL
-            SELECT p.person_id, trim(coalesce(p.first_name,'') || ' ' || coalesce(p.last_name,'')), 'RESPONDENT'
-              FROM respondent_report rr
-              JOIN person p ON p.person_id = rr.person_id
-             WHERE rr.blotter_report_id=%s
-             ORDER BY role, name
-        """, [report_id, report_id])
-        parties = cur.fetchall()
-
-        # picklist data
-        cur.execute("SELECT complaint_title_id, complaint_title_name FROM complaint_title ORDER BY 2")
-        complaint_titles = cur.fetchall()
-        cur.execute("SELECT case_nature_id, case_name FROM case_nature ORDER BY 2")
-        case_natures = cur.fetchall()
-        cur.execute("SELECT settlement_status_id, settlement_status_name FROM settlement_status ORDER BY 2")
-        settlements = cur.fetchall()
-
-        # latest review trail entry (who/when/remarks)
-        # Note: adjust table/column names if they differ in your schema.
-        cur.execute("""
-            SELECT
-              rs.report_status_name      AS action,             -- APPROVED / DECLINED / REVIEWED ...
-              rsd.remarks                AS remarks,            -- reason text (if any)
-              to_char(rsd.verification_date,'YYYY-MM-DD HH24:MI') AS acted_at,
-              s.staff_id,
-              trim(coalesce(p.first_name,'') || ' ' || coalesce(p.last_name,'')) AS reviewer_name
-            FROM report_status_detail rsd
-            LEFT JOIN report_status rs ON rs.report_status_id = rsd.report_status_id
-            LEFT JOIN staff s           ON s.staff_id = rsd.processed_by_id
-            LEFT JOIN person p          ON p.person_id = s.person_id
-            WHERE rsd.blotter_report_id = %s
-            ORDER BY rsd.verification_date DESC, rsd.report_status_detail_id DESC
-            LIMIT 1
-        """, [report_id])
-        latest_review = cur.fetchone()
-
-    pay_status = (rpt[4] or "—").upper()
-    # is reviewed if payment status is conclusive OR we have an approve/decline entry
-    action = (latest_review[0] if latest_review else "") or ""
-    is_reviewed = pay_status in ("PAID", "UNPAID", "DECLINED") or action in ("APPROVED", "DECLINED")
-
-    ctx = {
-        "page_title": "Approve Blotter Report",
-        "report": rpt,
-        "parties": parties,
-        "complaint_titles": complaint_titles,
-        "case_natures": case_natures,
-        "settlement_statuses": settlements,
-        "user_role": role,
-        "LUPON_ROLES_LIST": LUPON_ROLES_LIST,
-
-        # review meta (safe-guard for None)
-        "is_reviewed": is_reviewed,
-        "review_action": action,
-        "reviewed_by": (latest_review[4] if latest_review else None),
-        "reviewed_at": (latest_review[2] if latest_review else None),
-        "review_remarks": (latest_review[1] if latest_review else None),
-    }
-    return render(request, "lupon_mem/report_review.html", ctx)
-
-
-# APPROVE (Lupon -> set UNPAID via DB func)
-# ------------------------------
-@session_login_required
-@role_required(*LUPON_ROLES)
-@require_POST
-def report_approve(request: HttpRequest, report_id: int):
-    staff_id = (request.session.get("auth") or {}).get("staff_id")
-    if not staff_id:
-        return HttpResponseBadRequest("Missing staff id.")
-
-    # DEBUG: show who/what is approving
-    print("\n[DEBUG][APPROVE] report_id=", report_id, " staff_id=", staff_id)
-    try:
-        with connection.cursor() as cur:
-            print("[DEBUG][APPROVE] SQL → approve_report_set_unpaid(%s,%s,%s)")
-            cur.execute(
-                "SELECT approve_report_set_unpaid(%s,%s,%s)",
-                [report_id, staff_id, "Approved for case payment"],
-            )
-            res = cur.fetchone()
-            print("[DEBUG][APPROVE] DB result:", res)
-    except Exception as e:
-        print("[DEBUG][APPROVE][ERROR]", e)
-        raise
-
-    messages.success(request, f"Report #{report_id} approved. Payment status set to UNPAID.")
-    return redirect("lupon_mem:report_review", report_id=report_id)
-
-
-# ------------------------------
-# DECLINE (Lupon)
-# ------------------------------
-@session_login_required
-@role_required(*LUPON_ROLES)
-@require_POST
-def report_decline(request: HttpRequest, report_id: int):
-    staff_id = (request.session.get("auth") or {}).get("staff_id")
-    if not staff_id:
-        return HttpResponseBadRequest("Missing staff id.")
-
-    reason = (request.POST.get("reason") or "").strip() or "Declined by Lupon"
-
-    # DEBUG: same style as your approve view
-    print("\n[DEBUG][DECLINE] report_id=", report_id, " staff_id=", staff_id, " reason=", reason)
-    try:
-        with connection.cursor() as cur:
-            print("[DEBUG][DECLINE] SQL → decline_report_set_declined(%s,%s,%s)")
-            cur.execute(
-                "SELECT decline_report_set_declined(%s,%s,%s)",
-                [report_id, staff_id, reason],
-            )
-            res = cur.fetchone()  # may be None; just echo for symmetry
-            print("[DEBUG][DECLINE] DB result:", res)
-    except Exception as e:
-        print("[DEBUG][DECLINE][ERROR]", e)
-        raise
-
-    messages.success(request, f"Report #{report_id} declined. Payment status set to DECLINED.")
-    return redirect("lupon_mem:report_review", report_id=report_id)
-
-
-
-# ------------------------------
-# TREASURER: PAY & OPEN CASE
-# ------------------------------
-# lupon_mem/views.py
-
-@session_login_required
-@role_required("barangay treasurer")
-def report_pay_and_open_case(request: HttpRequest, report_id: int):
-    """
-    Treasurer flow:
-      • Shows report details (read-only) + read-only case fields prefilled by sensible defaults
-      • Only "Record payment now" card is editable
-      • On submit, uses confirm_report_and_open_case(...)
-    """
-    # ---- small helpers kept local to avoid scope/import issues ----
-    def _toi(x):
-        try:
-            return int(x) if (x is not None and str(x).strip() and str(x).strip() != "0") else None
-        except Exception:
-            return None
-
-    def _to_decimal(x, default="0"):
-        from decimal import Decimal as _Dec
-        try:
-            return _Dec(str(x)) if (x is not None and str(x).strip()) else _Dec(default)
-        except Exception:
-            return _Dec(default)
-
-    def _make_default_or(rpt_id: int) -> str:
-        from datetime import datetime
-        return f"OR-{datetime.now():%Y%m%d-%H%M%S}-{rpt_id:05d}"
-
-    # -------- GET: build read-only page --------
-    if request.method == "GET":
-        with connection.cursor() as cur:
-            # exact report details
-            cur.execute(
-                """
-                SELECT br.blotter_report_id,
-                       COALESCE(br.incident_subject,'(no subject)') AS subj,
-                       to_char(br.date_time_reported,'YYYY-MM-DD HH24:MI') AS reported_at,
-                       COALESCE(br.incident_desc,'') AS desc
-                  FROM blotter_report br
-                 WHERE br.blotter_report_id = %s
-                """,
-                [report_id],
-            )
-            rpt = cur.fetchone()
-            if not rpt:
-                return HttpResponseBadRequest("Report not found.")
-
-            # parties (COMPLAINANT / RESPONDENT)
-            cur.execute(
-                """
-                SELECT p.person_id,
-                       trim(coalesce(p.first_name,'') || ' ' || coalesce(p.last_name,'')) AS name,
-                       'COMPLAINANT' AS role
-                  FROM complainant_report cr
-                  JOIN person p ON p.person_id = cr.person_id
-                 WHERE cr.blotter_report_id = %s
-                UNION ALL
-                SELECT p.person_id,
-                       trim(coalesce(p.first_name,'') || ' ' || coalesce(p.last_name,'')) AS name,
-                       'RESPONDENT'
-                  FROM respondent_report rr
-                  JOIN person p ON p.person_id = rr.person_id
-                 WHERE rr.blotter_report_id = %s
-                 ORDER BY role, name
-                """,
-                [report_id, report_id],
-            )
-            parties = cur.fetchall()
-
-            # lookups
-            cur.execute("SELECT complaint_title_id, complaint_title_name FROM complaint_title ORDER BY 2")
-            complaint_titles = cur.fetchall()
-
-            cur.execute("SELECT case_nature_id, case_name FROM case_nature ORDER BY 2")
-            case_natures = cur.fetchall()
-
-            cur.execute("SELECT settlement_status_id, settlement_status_name FROM settlement_status ORDER BY 2")
-            settlements = cur.fetchall()
-
-            cur.execute("SELECT payment_status_name FROM payment_status ORDER BY 1")
-            payment_statuses = [r[0] for r in cur.fetchall()]
-
-        # derive case name "Lastname vs. Lastname" (fallback "People vs.")
-        def _role_first_name(role_label: str) -> str | None:
-            for pid, nm, rl in parties:
-                if str(rl).upper() == role_label.upper():
-                    return (nm or "").strip() or None
-            return None
-
-        cmp_name = _role_first_name("COMPLAINANT")
-        rsp_name = _role_first_name("RESPONDENT")
-        initial_case_name = "People vs."
-        if cmp_name and rsp_name:
-            # try last tokens
-            c_last = cmp_name.split()[-1]
-            r_last = rsp_name.split()[-1]
-            initial_case_name = f"{c_last} vs. {r_last}"
-
-        # defaults for read-only selects (we still need IDs to POST, so we'll render hidden inputs)
-        ct_id, ct_name = (complaint_titles[0][0], complaint_titles[0][1]) if complaint_titles else (None, "")
-        cn_id, cn_name = (case_natures[0][0], case_natures[0][1]) if case_natures else (None, "")
-
-        # settlement defaults to PENDING
-        st_id, st_name = (None, "")
-        for sid, sname in settlements:
-            if str(sname).upper() == "PENDING":
-                st_id, st_name = sid, sname
-                break
-        if st_id is None and settlements:
-            st_id, st_name = settlements[0]
-
-        # DEBUG: what the page will show as read-only defaults
-        print("\n[DEBUG][PAY-OPEN][GET] report:", rpt)
-        print("[DEBUG][PAY-OPEN][GET] case defaults:",
-            {"case_name": initial_case_name,
-            "complaint_title_id": ct_id, "complaint_title_name": ct_name,
-            "case_nature_id": cn_id, "case_nature_name": cn_name,
-            "settlement_status_id": st_id, "settlement_status_name": st_name,
-            "default_or": _make_default_or(report_id), "default_amount": "150.00"})
-
-        ctx = {
-            "page_title": "Confirm Payment & Open Case",
-            "report": rpt,
-            "parties": parties,
-
-            # read-only case values (also mirrored as hidden inputs in the template)
-            "case_name": initial_case_name,
-            "complaint_title_id": ct_id,
-            "complaint_title_name": ct_name,
-            "case_nature_id": cn_id,
-            "case_nature_name": cn_name,
-            "settlement_status_id": st_id,
-            "settlement_status_name": st_name,
-
-            # lists kept only for safety; UI won’t expose them for editing
-            "complaint_titles": complaint_titles,
-            "case_natures": case_natures,
-            "settlement_statuses": settlements,
-
-            # payment UI
-            "payment_statuses": payment_statuses,
-            "default_or": _make_default_or(report_id),
-            "default_amount": "150.00",
-        }
-        return render(request, "lupon_mem/report_pay.html", ctx)
-
-    # -------- POST: consume hidden read-only values and optional payment --------
-    auth = request.session.get("auth") or {}
-    staff_id = auth.get("staff_id")
-    if not staff_id:
-        messages.error(request, "Session expired. Please login again.")
-        return redirect("lupon_mem:report_pay_and_open_case", report_id=report_id)
-
-    case_name            = (request.POST.get("case_name") or "").strip() or "Untitled Case"
-    complaint_title_id   = _toi(request.POST.get("complaint_title_id"))
-    case_nature_id       = _toi(request.POST.get("case_nature_id"))
-    settlement_status_id = _toi(request.POST.get("settlement_status_id"))
-
-    # payment toggle + details
-    with_payment      = (request.POST.get("with_payment") == "on")
-    payment_receipt   = (request.POST.get("payment_receipt") or "").strip()
-    payment_amount    = _to_decimal(request.POST.get("payment_amount"), default="0")
-    payment_status    = (request.POST.get("payment_status") or "PAID").strip()
-    paid_by_person_id = _toi(request.POST.get("paid_by_person_id"))
-
-    # if recording payment, force defaults where needed
-    if with_payment:
-        if not payment_receipt:
-            payment_receipt = _make_default_or(report_id)
-        if not payment_status:
-            payment_status = "PAID"
-    else:
-        # when NOT recording payment, ensure we don’t pass stray values
-        payment_receipt = None
-        payment_amount = None
-        payment_status = "UNPAID"
-        paid_by_person_id = None
-
-    args = [
-        report_id,
-        case_name,
-        complaint_title_id,
-        case_nature_id,
-        settlement_status_id,
-        staff_id,
-
-        # payment group
-        with_payment,
-        payment_receipt,
-        payment_amount,
-        payment_status,
-        paid_by_person_id,
-
-        # status after
-        "FOR CASE FILING",
-        "Report converted to case",
-    ]
-    print("[DEBUG][PAY-OPEN][POST] SQL → confirm_report_and_open_case(...) args:", args)
-    with connection.cursor() as cur:
-        cur.execute(
-            """SELECT confirm_report_and_open_case(
-                %s,%s,%s,%s,%s,%s,
-                %s,%s,%s,%s,%s,
-                %s,%s
-            )""",
-            args,
-        )
-        case_id = cur.fetchone()[0]
-
-    messages.success(request, f"Case #{case_id} created.")
-    return redirect("lupon_mem:case_detail", case_id=case_id)
-
-
 
 
 # views.py
@@ -3653,99 +2055,38 @@ def report_pay_and_open_case(request: HttpRequest, report_id: int):
 def case_hearing_list(request: HttpRequest, case_id: int):
     """
     Per-case KP-8/KP-12 notices with per-notice Held status.
+    Uses fn_case_mediation_hearings function to get accurate hearing data.
     """
     from django.utils import timezone
 
+    # Get case info
     with connection.cursor() as cur:
         cur.execute("""
-            WITH forms AS (
-              SELECT form_id, UPPER(form_code) AS code
-              FROM kp_form
-              WHERE UPPER(form_code) IN ('KP-8','KP-12')
-            ),
-            subs AS (
-              SELECT
-                s.submission_id,
-                s.form_id,
-                (SELECT code FROM forms f WHERE f.form_id = s.form_id) AS source_code,
-                s.blotter_case_id,
-                s.submitted_at
-              FROM blotter_kp_submission s
-              JOIN forms f ON f.form_id = s.form_id
-              WHERE s.blotter_case_id = %s
-            ),
-            ans AS (
-              SELECT
-                s.submission_id,
-                LOWER(kf.field_code) AS code,
-                TRIM(BOTH '"' FROM a.value_json::text) AS v
-              FROM subs s
-              JOIN blotter_kp_answer a ON a.submission_id = s.submission_id
-              JOIN kp_field kf         ON kf.field_id      = a.field_id
-              WHERE LOWER(kf.field_code) IN (
-                'appearance_date','appearance_time',
-                'hearing_date','hearing_time',
-                'details','text box 1','venue'
-              )
-            ),
-            pivot AS (
-              SELECT
-                s.submission_id,
-                MAX(CASE WHEN code IN ('hearing_date','appearance_date') THEN NULLIF(v,'') END) AS hearing_date,
-                MAX(CASE WHEN code IN ('hearing_time','appearance_time') THEN NULLIF(v,'') END) AS hearing_time,
-                MAX(CASE WHEN code IN ('details','text box 1','venue')   THEN NULLIF(v,'') END) AS details
-              FROM subs s
-              LEFT JOIN ans ON ans.submission_id = s.submission_id
-              GROUP BY s.submission_id
-            ),
-            held_per_row AS (
-              SELECT
-                s.submission_id,
-                EXISTS(
-                  SELECT 1
-                  FROM case_progress_tracking cpt
-                  JOIN case_progress_type t ON t.case_progress_type_id = cpt.case_progress_type_id
-                  WHERE cpt.blotter_case_id = %s
-                    AND UPPER(t.case_progress_type_name) IN ('HEARING HELD','CONCILIATION HELD')
-                    AND cpt.date_processed > s.submitted_at
-                ) AS hearing_held,
-                (
-                  SELECT MAX(cpt.date_processed)
-                  FROM case_progress_tracking cpt
-                  JOIN case_progress_type t ON t.case_progress_type_id = cpt.case_progress_type_id
-                  WHERE cpt.blotter_case_id = %s
-                    AND UPPER(t.case_progress_type_name) IN ('HEARING HELD','CONCILIATION HELD')
-                    AND cpt.date_processed > s.submitted_at
-                ) AS held_at
-              FROM subs s
-            )
-            SELECT
-              bc.blotter_case_id  AS case_id,
-              bc.blotter_case_num AS case_num,
-              COALESCE(bc.blotter_case_name,'') AS case_title,
-              COALESCE(ct.complaint_title_name,'') AS case_type,
-              COALESCE(cn.case_name,'') AS case_nature,
-              s.source_code       AS source,
-              s.submission_id,
-              p.hearing_date,
-              p.hearing_time,
-              p.details,
-              h.hearing_held,
-              h.held_at
-            FROM subs s
-            JOIN blotter_case bc          ON bc.blotter_case_id = s.blotter_case_id
-            LEFT JOIN complaint_title ct  ON ct.complaint_title_id = bc.complaint_title_id
-            LEFT JOIN case_nature   cn    ON cn.case_nature_id     = bc.case_nature_id
-            LEFT JOIN pivot p             ON p.submission_id = s.submission_id
-            LEFT JOIN held_per_row h      ON h.submission_id = s.submission_id
-            ORDER BY s.submitted_at DESC NULLS LAST, s.submission_id DESC
-        """, [case_id, case_id, case_id])
-        rows = cur.fetchall()
+            SELECT bc.blotter_case_num, 
+                   COALESCE(bc.blotter_case_name,'') AS case_title,
+                   COALESCE(ct.complaint_title_name,'') AS case_type,
+                   COALESCE(cn.case_name,'') AS case_nature
+            FROM blotter_case bc
+            LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
+            LEFT JOIN case_nature cn ON cn.case_nature_id = bc.case_nature_id
+            WHERE bc.blotter_case_id = %s
+        """, [case_id])
+        case_info = cur.fetchone()
+        if not case_info:
+            return render(request, "lupon_mem/hearing_list.html", {"items": []})
+        
+        case_num, case_title, case_type, case_nature = case_info
+
+        # Use the fn_case_mediation_hearings function to get hearing data
+        cur.execute("SELECT * FROM fn_case_mediation_hearings(%s)", [case_id])
+        cols = [c[0] for c in cur.description] if cur.description else []
+        hearing_rows = [dict(zip(cols, r)) for r in cur.fetchall()] if cols else []
 
     items = []
-    for (cid, case_num, case_title, case_type, case_nature, source,
-         submission_id, hearing_date, hearing_time, details, hearing_held, held_at) in rows:
+    for hearing in hearing_rows:
+        # Format held_at timestamp
         held_at_fmt = None
+        held_at = hearing.get('held_at')
         if held_at:
             try:
                 held_at_fmt = timezone.localtime(held_at).strftime("%b %d, %Y %I:%M %p")
@@ -3756,17 +2097,17 @@ def case_hearing_list(request: HttpRequest, case_id: int):
                     held_at_fmt = str(held_at)
 
         items.append({
-            "case_id": cid,
+            "case_id": case_id,
             "case_num": case_num,
             "case_title": case_title,
             "case_type": case_type,
             "case_nature": case_nature,
-            "source": source,
-            "submission_id": submission_id,
-            "hearing_date": hearing_date,
-            "hearing_time": hearing_time,
-            "details": details,
-            "hearing_held": bool(hearing_held),
+            "source": hearing.get('source', ''),
+            "submission_id": hearing.get('notice_sid'),
+            "hearing_date": hearing.get('hearing_date'),
+            "hearing_time": hearing.get('hearing_time'),
+            "details": None,  # Not provided by fn_case_mediation_hearings
+            "hearing_held": bool(hearing.get('hearing_held')),
             "held_at": held_at,
             "held_at_fmt": held_at_fmt,
         })
@@ -3804,7 +2145,6 @@ def _case_has_kp16(case_id: int) -> bool:
         """, [case_id])
         return cur.fetchone() is not None
 
-
 @session_login_required
 @role_required(*LUPON_ROLES, "barangay treasurer")
 def case_hearing_schedule(request, case_id: int):
@@ -3816,7 +2156,11 @@ def case_hearing_schedule(request, case_id: int):
     - Count Med-ATT within the time window of the currently picked hearing.
     - Re-enable 'Add Mediation Attendance' for subsequent hearings.
     - Expose has_kp16 to the template (for the JS guard + [DEBUG] pill).
+    - NEW: Expose settlement_outcome + last attendance + KP-14 URL for ARBITRATION UI.
     """
+    from django.utils import timezone
+    from django.urls import reverse
+
     sid = _toi(request.GET.get("sid"))
 
     # 1) All KP-8/KP-12 hearing notices for this case, ascending by time
@@ -3855,6 +2199,12 @@ def case_hearing_schedule(request, case_id: int):
             "hearing_label": None,
             "has_kp16": _case_has_kp16(case_id),
             "kp16_just_created": (request.GET.get("kp16") == "1"),
+
+            # NEW: keep template JS happy even when no hearing exists
+            "settlement_outcome": "",
+            "compl_attended_last": False,
+            "resp_attended_last": False,
+            "kp14_url": reverse("lupon_mem:form_builder_by_code", args=[case_id, "KP-14"]),
         })
 
     # 2) Decide which hearing to show (by sid or latest)
@@ -3969,6 +2319,33 @@ def case_hearing_schedule(request, case_id: int):
     has_kp16 = _case_has_kp16(case_id)
     kp16_just_created = (request.GET.get("kp16") == "1")
 
+    # ===== NEW: Pull the computed outcome/attendance from fn_case_mediation_hearings =====
+    settlement_outcome = ""
+    compl_attended_last = False
+    resp_attended_last = False
+    with connection.cursor() as cur:
+        cur.execute("SELECT * FROM fn_case_mediation_hearings(%s)", [case_id])
+        cols = [c[0] for c in cur.description] if cur.description else []
+        rows = [dict(zip(cols, r)) for r in cur.fetchall()] if cols else []
+
+    # Prefer the row that matches the currently picked notice (sid)
+    chosen = None
+    if rows:
+        for r in rows:
+            if int(r.get("notice_sid") or 0) == int(picked_submission_id or 0):
+                chosen = r
+                break
+        if not chosen:
+            chosen = rows[-1]  # fallback to latest
+
+    if chosen:
+        settlement_outcome = (chosen.get("settlement_outcome") or "").upper()
+        compl_attended_last = (str(chosen.get("complainant_attended") or "").upper() == "TRUE")
+        resp_attended_last  = (str(chosen.get("respondent_attended") or "").upper() == "TRUE")
+
+    # Build KP-14 link for the UI (used when ARBITRATION)
+    kp14_url = reverse("lupon_mem:form_builder_by_code", args=[case_id, "KP-14"])
+
     return render(request, "lupon_mem/case_hearing_schedule.html", {
         "case_id": case_id,
         "hearing_source": hearing_source,
@@ -3995,8 +2372,13 @@ def case_hearing_schedule(request, case_id: int):
         # Flags for JS guard + debug UI
         "has_kp16": has_kp16,
         "kp16_just_created": kp16_just_created,
-    })
 
+        # ===== NEW: for arbitration/settlement UI =====
+        "settlement_outcome": settlement_outcome,         # e.g. ARBITRATION / SETTLED / NOT SETTLED / BOTH_NO_SHOW...
+        "compl_attended_last": compl_attended_last,       # bool for JS
+        "resp_attended_last": resp_attended_last,         # bool for JS
+        "kp14_url": kp14_url,                             # link to build KP-14
+    })
 
 @session_login_required
 @role_required(*LUPON_ROLES, "barangay treasurer")
@@ -4084,122 +2466,76 @@ from django.http import HttpResponseNotFound
 def hearing_list(request: HttpRequest):
     """
     All-cases list of KP-8/KP-12 notices with per-notice Held status.
+    Uses fn_case_mediation_hearings function for each case to get accurate hearing data.
     """
+    from django.utils import timezone
+
+    # Get all cases that have hearings
     with connection.cursor() as cur:
         cur.execute("""
-            WITH forms AS (
-              SELECT form_id, UPPER(form_code) AS code
-              FROM kp_form
-              WHERE UPPER(form_code) IN ('KP-8','KP-12')
-            ),
-            subs AS (
-              SELECT
-                s.submission_id,
-                s.form_id,
-                (SELECT code FROM forms f WHERE f.form_id = s.form_id) AS source_code,
-                s.blotter_case_id,
-                s.submitted_at
-              FROM blotter_kp_submission s
-              JOIN forms f ON f.form_id = s.form_id
-            ),
-            ans AS (
-              SELECT
-                s.submission_id,
-                LOWER(kf.field_code) AS code,
-                TRIM(BOTH '"' FROM a.value_json::text) AS v
-              FROM subs s
-              JOIN blotter_kp_answer a ON a.submission_id = s.submission_id
-              JOIN kp_field kf         ON kf.field_id      = a.field_id
-              WHERE LOWER(kf.field_code) IN (
-                'appearance_date','appearance_time',
-                'hearing_date','hearing_time',
-                'details','text box 1','venue'
-              )
-            ),
-            pivot AS (
-              SELECT
-                s.submission_id,
-                MAX(CASE WHEN code IN ('hearing_date','appearance_date') THEN NULLIF(v,'') END) AS hearing_date,
-                MAX(CASE WHEN code IN ('hearing_time','appearance_time') THEN NULLIF(v,'') END) AS hearing_time,
-                MAX(CASE WHEN code IN ('details','text box 1','venue')   THEN NULLIF(v,'') END) AS details
-              FROM subs s
-              LEFT JOIN ans ON ans.submission_id = s.submission_id
-              GROUP BY s.submission_id
-            ),
-            held_per_row AS (
-              SELECT
-                s.submission_id,
-                EXISTS(
-                  SELECT 1
-                  FROM case_progress_tracking cpt
-                  JOIN case_progress_type t ON t.case_progress_type_id = cpt.case_progress_type_id
-                  WHERE cpt.blotter_case_id = s.blotter_case_id
-                    AND UPPER(t.case_progress_type_name) IN ('HEARING HELD','CONCILIATION HELD')
-                    AND cpt.date_processed > s.submitted_at
-                ) AS hearing_held,
-                (
-                  SELECT MAX(cpt.date_processed)
-                  FROM case_progress_tracking cpt
-                  JOIN case_progress_type t ON t.case_progress_type_id = cpt.case_progress_type_id
-                  WHERE cpt.blotter_case_id = s.blotter_case_id
-                    AND UPPER(t.case_progress_type_name) IN ('HEARING HELD','CONCILIATION HELD')
-                    AND cpt.date_processed > s.submitted_at
-                ) AS held_at
-              FROM subs s
-            )
-            SELECT
-              bc.blotter_case_id  AS case_id,
-              bc.blotter_case_num AS case_num,
-              COALESCE(bc.blotter_case_name,'') AS case_title,
-              COALESCE(ct.complaint_title_name,'') AS case_type,
-              COALESCE(cn.case_name,'') AS case_nature,
-              s.source_code       AS source,
-              s.submission_id,
-              p.hearing_date,
-              p.hearing_time,
-              p.details,
-              h.hearing_held,
-              h.held_at
-            FROM subs s
-            JOIN blotter_case bc          ON bc.blotter_case_id = s.blotter_case_id
-            LEFT JOIN complaint_title ct  ON ct.complaint_title_id = bc.complaint_title_id
-            LEFT JOIN case_nature   cn    ON cn.case_nature_id     = bc.case_nature_id
-            LEFT JOIN pivot p             ON p.submission_id = s.submission_id
-            LEFT JOIN held_per_row h      ON h.submission_id = s.submission_id
-            ORDER BY s.submitted_at DESC NULLS LAST, s.submission_id DESC
-            LIMIT 500
+            SELECT DISTINCT bc.blotter_case_id
+            FROM blotter_case bc
+            JOIN blotter_kp_submission s ON s.blotter_case_id = bc.blotter_case_id
+            JOIN kp_form f ON f.form_id = s.form_id
+            WHERE UPPER(f.form_code) IN ('KP-8','KP-12')
+            ORDER BY bc.blotter_case_id DESC
+            LIMIT 100
         """)
-        rows = cur.fetchall()
+        case_ids = [row[0] for row in cur.fetchall()]
 
-    # shape to dicts + format held_at
     items = []
-    for (case_id, case_num, case_title, case_type, case_nature, source,
-         submission_id, hearing_date, hearing_time, details, hearing_held, held_at) in rows:
-        held_at_fmt = None
-        if held_at:
-            try:
-                held_at_fmt = timezone.localtime(held_at).strftime("%b %d, %Y %I:%M %p")
-            except Exception:
-                try:
-                    held_at_fmt = held_at.strftime("%b %d, %Y %I:%M %p")
-                except Exception:
-                    held_at_fmt = str(held_at)
+    for case_id in case_ids:
+        with connection.cursor() as cur:
+            # Get case info
+            cur.execute("""
+                SELECT bc.blotter_case_num, 
+                       COALESCE(bc.blotter_case_name,'') AS case_title,
+                       COALESCE(ct.complaint_title_name,'') AS case_type,
+                       COALESCE(cn.case_name,'') AS case_nature
+                FROM blotter_case bc
+                LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
+                LEFT JOIN case_nature cn ON cn.case_nature_id = bc.case_nature_id
+                WHERE bc.blotter_case_id = %s
+            """, [case_id])
+            case_info = cur.fetchone()
+            if not case_info:
+                continue
+            
+            case_num, case_title, case_type, case_nature = case_info
 
-        items.append({
-            "case_id": case_id,
-            "case_num": case_num,
-            "case_title": case_title,
-            "case_type": case_type,
-            "case_nature": case_nature,
-            "source": source,
-            "submission_id": submission_id,
-            "hearing_date": hearing_date,
-            "hearing_time": hearing_time,
-            "details": details,
-            "hearing_held": bool(hearing_held),
-            "held_at": held_at,
-            "held_at_fmt": held_at_fmt,
-        })
+            # Use the fn_case_mediation_hearings function to get hearing data
+            cur.execute("SELECT * FROM fn_case_mediation_hearings(%s)", [case_id])
+            cols = [c[0] for c in cur.description] if cur.description else []
+            hearing_rows = [dict(zip(cols, r)) for r in cur.fetchall()] if cols else []
+
+            for hearing in hearing_rows:
+                # Format held_at timestamp
+                held_at_fmt = None
+                held_at = hearing.get('held_at')
+                if held_at:
+                    try:
+                        held_at_fmt = timezone.localtime(held_at).strftime("%b %d, %Y %I:%M %p")
+                    except Exception:
+                        try:
+                            held_at_fmt = held_at.strftime("%b %d, %Y %I:%M %p")
+                        except Exception:
+                            held_at_fmt = str(held_at)
+
+                items.append({
+                    "case_id": case_id,
+                    "case_num": case_num,
+                    "case_title": case_title,
+                    "case_type": case_type,
+                    "case_nature": case_nature,
+                    "source": hearing.get('source', ''),
+                    "submission_id": hearing.get('notice_sid'),
+                    "hearing_date": hearing.get('hearing_date'),
+                    "hearing_time": hearing.get('hearing_time'),
+                    "details": None,  # Not provided by fn_case_mediation_hearings
+                    "hearing_held": bool(hearing.get('hearing_held')),
+                    "held_at": held_at,
+                    "held_at_fmt": held_at_fmt,
+                })
 
     return render(request, "lupon_mem/hearing_list.html", {
         "items": items,
@@ -4234,6 +2570,7 @@ def _maybe_upsert_hearing_attendance(
     settlement: str | None,
     remarks: str | None,
 ) -> None:
+    print(f"[_maybe_upsert_hearing_attendance] case_id={case_id}, notice_sid={notice_sid}, settlement='{settlement}'")
     with connection.cursor() as cur:
         # ensure cache table exists
         cur.execute("""
@@ -4250,6 +2587,8 @@ def _maybe_upsert_hearing_attendance(
         """)
 
         # try UPDATE first
+        settlement_value = settlement or ""
+        print(f"[_maybe_upsert_hearing_attendance] Attempting UPDATE with settlement_value='{settlement_value}'")
         cur.execute("""
             UPDATE hearing_attendance
                SET held_at = NOW(),
@@ -4262,12 +2601,15 @@ def _maybe_upsert_hearing_attendance(
                AND notice_submission_id = %s
         """, [
             compl_attended, resp_attended,
-            (settlement or ""), (remarks or ""),
+            settlement_value, (remarks or ""),
             case_id, source_code, notice_sid
         ])
+        
+        print(f"[_maybe_upsert_hearing_attendance] UPDATE affected {cur.rowcount} rows")
 
         # if no existing row, INSERT
         if cur.rowcount == 0:
+            print(f"[_maybe_upsert_hearing_attendance] Attempting INSERT with settlement_value='{settlement_value}'")
             cur.execute("""
                 INSERT INTO hearing_attendance
                   (blotter_case_id, source_code, notice_submission_id,
@@ -4277,12 +2619,26 @@ def _maybe_upsert_hearing_attendance(
             """, [
                 case_id, source_code, notice_sid,
                 compl_attended, resp_attended,
-                (settlement or ""), (remarks or "")
+                settlement_value, (remarks or "")
             ])
+            print(f"[_maybe_upsert_hearing_attendance] INSERT completed")
+        
+        print(f"[_maybe_upsert_hearing_attendance] Function completed")
 
 
 # =========================== VIEWS ===========================
 # ---------- Server-side finalize: blocks SETTLED without KP-16 ----------
+# lupon_mem/views_mediation.py  (or wherever your view lives)
+
+
+
+# =========================== VIEWS ===========================
+# ---------- Server-side finalize: blocks SETTLED without KP-16 ----------
+# views_hearings.py (or wherever your mediation_complete lives)
+from django.contrib import messages
+from django.db import connection, transaction
+from django.urls import reverse
+
 @session_login_required
 @role_required(*LUPON_ROLES)
 @require_POST
@@ -4294,36 +2650,27 @@ def mediation_complete(request, case_id: int):
     submission_id   = int(raw_sid) if raw_sid and raw_sid.isdigit() else None
     compl_attended  = bool(request.POST.get("compl_attended"))
     resp_attended   = bool(request.POST.get("resp_attended"))
-    att_slot_only   = bool(request.POST.get("att_slot_only"))   # ← NEW: consume slot as no-show
+    att_slot_only   = bool(request.POST.get("att_slot_only"))   # consume slot as no-show
     staff_id        = (request.session.get("auth") or {}).get("staff_id")
 
-    # 1) Attendance requirement rules
-    #    - SETTLED → require attendance
-    #    - PENDING → allow zero attendance; if att_slot_only=1 and no attendance yet, consume 1st slot as "no-show"
+    print(f"[mediation_complete] START - case_id={case_id}, submission_id={submission_id}")
+    print(f"[mediation_complete] compl_attended={compl_attended}, resp_attended={resp_attended}")
+    print(f"[mediation_complete] settlement='{settlement}', remarks='{remarks}'")
+    print(f"[mediation_complete] staff_id={staff_id}")
+
+    # Allow direct settlement; attendance can be written later
     has_att = _has_med_attendance(case_id)
+    print(f"[mediation_complete] has_att={has_att}, allowing direct settlement")
 
-    if settlement == "SETTLED" and not has_att:
-        messages.error(request, "Please add Mediation Attendance first before marking the mediation as held (SETTLED).")
-        if submission_id:
-            return redirect(f"{reverse('lupon_mem:case_hearing_schedule', args=[case_id])}?sid={submission_id}")
-        return redirect('lupon_mem:case_hearing_schedule', case_id)
-
-    # 2) If SETTLED, require KP-16 already on file; otherwise bounce them to create it
-    if settlement == "SETTLED" and not _case_has_kp16(case_id):
-        messages.info(request, "Please complete the Amicable Settlement (KP-16) before finalizing as SETTLED.")
-        kp16_url = f"{reverse('lupon_mem:open_kp16_from_hearing', args=[case_id])}"
-        if submission_id:
-            kp16_url += f"?sid={submission_id}"
-        return redirect(kp16_url)
-
-    # 3) Ensure we’re marking the correct KP-8 (or pick latest KP-8 if none provided)
+    # Ensure we are acting on a valid KP-8 (or pick latest KP-8 if none provided)
     with connection.cursor() as cur:
         if not submission_id:
             cur.execute("""
                 SELECT s.submission_id
                   FROM blotter_kp_submission s
-                  JOIN kp_form f ON f.form_id=s.form_id
-                 WHERE s.blotter_case_id=%s AND UPPER(f.form_code)='KP-8'
+                  JOIN kp_form f ON f.form_id = s.form_id
+                 WHERE s.blotter_case_id = %s
+                   AND UPPER(f.form_code) = 'KP-8'
                  ORDER BY (UPPER(s.status)='SUBMITTED') DESC,
                           s.submitted_at DESC NULLS LAST,
                           s.submission_id DESC
@@ -4333,9 +2680,12 @@ def mediation_complete(request, case_id: int):
             submission_id = int(r[0]) if r else None
 
         cur.execute("""
-            SELECT COUNT(*) FROM blotter_kp_submission s
-            JOIN kp_form f ON f.form_id=s.form_id
-            WHERE s.submission_id=%s AND s.blotter_case_id=%s AND UPPER(f.form_code)='KP-8'
+            SELECT COUNT(*)
+              FROM blotter_kp_submission s
+              JOIN kp_form f ON f.form_id = s.form_id
+             WHERE s.submission_id = %s
+               AND s.blotter_case_id = %s
+               AND UPPER(f.form_code) = 'KP-8'
         """, [submission_id, case_id])
         valid = (cur.fetchone() or [0])[0] == 1
 
@@ -4343,7 +2693,7 @@ def mediation_complete(request, case_id: int):
         messages.error(request, "Invalid KP-8 submission selected.")
         return redirect("lupon_mem:case_hearing_schedule", case_id=case_id)
 
-    # 4) rank of this schedule among all hearings (for remarks)
+    # Rank (1st/2nd/…) of this schedule among all notices (KP-8/KP-12)
     with connection.cursor() as cur:
         cur.execute("""
             WITH sched AS (
@@ -4353,20 +2703,21 @@ def mediation_complete(request, case_id: int):
                        ORDER BY s.submitted_at ASC NULLS LAST, s.submission_id ASC
                      ) AS rn
               FROM blotter_kp_submission s
-              JOIN kp_form f ON f.form_id=s.form_id
-              WHERE s.blotter_case_id=%s AND UPPER(f.form_code) IN ('KP-8','KP-12')
+              JOIN kp_form f ON f.form_id = s.form_id
+              WHERE s.blotter_case_id = %s
+                AND UPPER(f.form_code) IN ('KP-8','KP-12')
             )
-            SELECT rn FROM sched WHERE submission_id=%s
+            SELECT rn FROM sched WHERE submission_id = %s
         """, [case_id, submission_id])
         row = cur.fetchone()
         sched_rn = int(row[0]) if row else None
 
-    # 5) resolve progress_type_id
+    # Resolve progress type: HEARING HELD
     with connection.cursor() as cur:
         cur.execute("""
             SELECT case_progress_type_id
               FROM case_progress_type
-             WHERE UPPER(case_progress_type_name)='HEARING HELD'
+             WHERE UPPER(case_progress_type_name) = 'HEARING HELD'
              LIMIT 1
         """)
         row = cur.fetchone()
@@ -4375,9 +2726,10 @@ def mediation_complete(request, case_id: int):
             return redirect("lupon_mem:case_hearing_schedule", case_id=case_id)
         progress_type_id = int(row[0])
 
-    # 6) If PENDING and no attendance yet but att_slot_only=1, consume the 1st slot as a "no-show"
-    #    We do this BEFORE inserting the HELD tracking, so any downstream readers already see the increment.
+    # If not SETTLED and no attendance exists but user chose to consume a slot, insert a no-show record first
+    print(f"[mediation_complete] Step 4 check: settlement={settlement}, has_att={has_att}, att_slot_only={att_slot_only}")
     if settlement != "SETTLED" and not has_att and att_slot_only:
+        print(f"[mediation_complete] Step 4: Creating no-show attendance slot")
         try:
             _maybe_upsert_hearing_attendance(
                 case_id=case_id,
@@ -4388,30 +2740,113 @@ def mediation_complete(request, case_id: int):
                 settlement="PENDING",
                 remarks=(remarks or "NO-SHOW") + " (slot consumed: no-show)",
             )
-            has_att = True  # for any later logic; next real attendance will be #2
+            has_att = True
         except Exception:
-            # Don't block the flow; still proceed to mark HELD, but inform user we didn't mark no-show
-            messages.warning(request, "Proceeding without recording a no-show attendance slot (could not insert).")
+            messages.warning(request, "Proceeding without recording a no-show attendance slot.")
+    else:
+        print(f"[mediation_complete] Step 4: Skipping no-show slot creation")
 
-    # 7) insert HELD tracking
+    # Insert HEARING HELD tracking (remark includes outcome)
+    outcome_suffix = f", outcome={settlement}" if settlement else ""
+    held_remarks = remarks or f"KP-8 held (sched #{sched_rn}); comp_att={compl_attended}, resp_att={resp_attended}{outcome_suffix}"
     with transaction.atomic():
         with connection.cursor() as cur:
             cur.execute("""
                 INSERT INTO case_progress_tracking
                     (blotter_case_id, case_progress_type_id, date_processed, remarks, processed_by_id)
-                VALUES (%s,%s, now(),
-                        %s,
-                        %s)
+                VALUES (%s, %s, now(), %s, %s)
                 RETURNING progress_tracking_id, date_processed
-            """, [
-                case_id,
-                progress_type_id,
-                remarks or f"KP-8 held (sched #{sched_rn}); comp_att={compl_attended}, resp_att={resp_attended}",
-                staff_id,
-            ])
+            """, [case_id, progress_type_id, held_remarks, staff_id])
 
-    # 8) persist attendance flags from form (normal path)
-    #    - If they left both unchecked, that's fine for PENDING; for SETTLED we already gated above.
+    # Outcome branches
+    print(f"[mediation_complete] settlement={settlement}, case_id={case_id}")
+    if settlement == "SETTLED":
+        # Set case to SETTLED and auto-create KP-16 if missing
+        try:
+            with connection.cursor() as cur:
+                cur.execute("SELECT * FROM fn_set_case_settlement(%s,%s,%s,%s)",
+                            [case_id, 'SETTLED', 'Marked settled from KP-8 mediation', staff_id])
+            print(f"[mediation_complete] Case {case_id} set to SETTLED successfully")
+            messages.success(request, "Mediation marked HELD and case set to SETTLED. Settlement agreement (KP-16) created automatically.")
+        except Exception as e:
+            print(f"[mediation_complete] Error setting case to SETTLED: {e}")
+            messages.success(request, "Mediation marked HELD. (Could not update case settlement automatically.)")
+            
+            # Only create KP-16 if fn_set_case_settlement failed
+            try:
+                with connection.cursor() as cur:
+                    cur.execute("""
+                        SELECT 1
+                          FROM blotter_kp_submission s
+                          JOIN kp_form f ON f.form_id = s.form_id
+                         WHERE s.blotter_case_id = %s
+                           AND UPPER(f.form_code) = 'KP-16'
+                           AND UPPER(s.status) = 'SUBMITTED'
+                    """, [case_id])
+                    kp16_exists = cur.fetchone() is not None
+
+                if not kp16_exists:
+                    print(f"[mediation_complete] No KP-16 exists, creating one as fallback")
+                    kp16_sid = _create_and_submit_form_from_prefill(
+                        case_id=case_id,
+                        form_code="KP-16",
+                        prefill=_prefill_minimal_for_case(case_id)
+                    )
+                    if kp16_sid:
+                        print(f"[mediation_complete] Created fallback KP-16 submission_id={kp16_sid}")
+            except Exception as fallback_e:
+                print(f"[mediation_complete] Error creating fallback KP-16: {fallback_e}")
+
+    elif settlement == "ARBITRATION":
+        # Optional: mark case ARBITRATED (you already have settlement_status_id=8 seeded)
+        try:
+            with connection.cursor() as cur:
+                cur.execute("SELECT * FROM fn_set_case_settlement(%s,%s,%s,%s)",
+                            [case_id, 'ARBITRATED', 'Agreed to arbitration from KP-8 mediation', staff_id])
+            messages.success(request, "Mediation marked HELD and case set to ARBITRATED.")
+        except Exception as e:
+            print(f"[mediation_complete] Error setting case to ARBITRATED: {e}")
+            messages.success(request, "Mediation marked HELD. (Could not update case settlement automatically.)")
+
+        # Ensure KP-14 (Agreement to Arbitrate) exists
+        try:
+            with connection.cursor() as cur:
+                cur.execute("""
+                    SELECT 1
+                      FROM blotter_kp_submission s
+                      JOIN kp_form f ON f.form_id = s.form_id
+                     WHERE s.blotter_case_id = %s
+                       AND UPPER(f.form_code) = 'KP-14'
+                       AND UPPER(s.status) = 'SUBMITTED'
+                """, [case_id])
+                kp14_exists = cur.fetchone() is not None
+
+            if not kp14_exists:
+                kp14_sid = _create_and_submit_form_from_prefill(
+                    case_id=case_id,
+                    form_code="KP-14",
+                    prefill=_prefill_minimal_for_case(case_id)
+                )
+                if kp14_sid:
+                    print(f"[mediation_complete] Created KP-14 submission_id={kp14_sid}")
+            else:
+                print(f"[mediation_complete] KP-14 already exists for case {case_id}")
+        except Exception as e:
+            print(f"[mediation_complete] Error creating KP-14: {e}")
+
+        # Notifications (guard import)
+        try:
+            from notifications.views import notify_kp14_agreement_arbitration  # adjust module if needed
+            notify_kp14_agreement_arbitration(case_id=case_id)
+        except Exception as e:
+            print(f"[KP14] Notification skipped: {e}")
+
+    else:
+        print(f"[mediation_complete] Settlement not SETTLED/ARBITRATION, just marking held")
+        messages.success(request, "Mediation marked HELD.")
+
+    # Persist attendance + the chosen settlement string (e.g., ARBITRATION)
+    print(f"[mediation_complete] Recording attendance: compl={compl_attended}, resp={resp_attended}, settlement={settlement}")
     _maybe_upsert_hearing_attendance(
         case_id=case_id,
         source_code="KP-8",
@@ -4422,66 +2857,72 @@ def mediation_complete(request, case_id: int):
         remarks=remarks,
     )
 
-    # 9) If SETTLED and KP-16 exists, optionally flip case to SETTLED
-    if settlement == "SETTLED" and _case_has_kp16(case_id):
-        try:
-            with connection.cursor() as cur:
-                cur.execute("SELECT * FROM fn_set_case_settlement(%s,%s,%s,%s)",
-                            [case_id, 'SETTLED', 'Marked settled from KP-8 (KP-16 on file)', staff_id])
-            messages.success(request, "Mediation marked HELD and case set to SETTLED.")
-        except Exception:
-            messages.success(request, "Mediation marked HELD. (Could not update case settlement automatically.)")
-    else:
-        messages.success(request, "Mediation marked HELD.")
-
-    # back to same hearing
+    print(f"[mediation_complete] END - redirecting to hearing schedule")
     return redirect(f"{reverse('lupon_mem:case_hearing_schedule', args=[case_id])}?sid={submission_id}")
 
 @session_login_required
 @role_required(*LUPON_ROLES)
 @require_POST
-def conciliation_complete(request: HttpRequest, case_id: int):
-    """
-    Mark a KP-12 hearing as HELD (CONCILIATION HELD).
-    Same debug prints as mediation_complete.
-    """
-    raw_sid = request.POST.get("submission_id")
-    submission_id = int(raw_sid) if raw_sid and raw_sid.isdigit() else None
-    compl_attended = bool(request.POST.get("compl_attended"))
-    resp_attended  = bool(request.POST.get("resp_attended"))
-    settlement     = (request.POST.get("settlement") or "").strip().upper() or "PENDING"
-    kp16_confirmed = (request.POST.get("kp16_confirmed") == "1")
-    remarks        = (request.POST.get("remarks") or "").strip() or None
-    staff_id       = (request.session.get("auth") or {}).get("staff_id")
-    now_iso        = timezone.now().isoformat(timespec="seconds")
+def conciliation_complete(request, case_id: int):
+    # Raw parse (mirror mediation_complete)
+    settlement      = (request.POST.get("settlement") or "").upper().strip()
+    remarks         = (request.POST.get("remarks") or "").strip() or None
+    raw_sid         = request.POST.get("submission_id")
+    submission_id   = int(raw_sid) if raw_sid and raw_sid.isdigit() else None
+    compl_attended  = bool(request.POST.get("compl_attended"))
+    resp_attended   = bool(request.POST.get("resp_attended"))
+    att_slot_only   = bool(request.POST.get("att_slot_only"))   # consume slot as no-show
+    staff_id        = (request.session.get("auth") or {}).get("staff_id")
 
-    print(f"\n[HEARING-HELD][KP-12][POST] case_id={case_id}")
-    print("[HEARING-HELD][KP-12] payload:", {
-        "submission_id": submission_id, "compl_attended": compl_attended,
-        "resp_attended": resp_attended, "settlement": settlement,
-        "kp16_confirmed": kp16_confirmed, "remarks": remarks,
-        "staff_id": staff_id, "timestamp": now_iso,
-    })
+    print(f"[conciliation_complete] START - case_id={case_id}, submission_id={submission_id}")
+    print(f"[conciliation_complete] compl_attended={compl_attended}, resp_attended={resp_attended}")
+    print(f"[conciliation_complete] settlement='{settlement}', remarks='{remarks}'")
+    print(f"[conciliation_complete] staff_id={staff_id}")
 
+    # Attendance presence (allow direct settlement; attendance can be written later)
+    # If you have a helper like _has_conc_attendance or a generic checker, use it.
+    # Otherwise, we just check via SQL against existing attendance rows for this case+KP-12
+    has_att = False
+    try:
+        with connection.cursor() as cur:
+            cur.execute("""
+                SELECT EXISTS (
+                  SELECT 1
+                    FROM hearing_attendance a
+                   WHERE a.blotter_case_id = %s
+                     AND UPPER(COALESCE(a.source_code,'')) = 'KP-12'
+                )
+            """, [case_id])
+            has_att = bool((cur.fetchone() or [False])[0])
+    except Exception:
+        # Fallback to "allow direct settlement"
+        has_att = False
+    print(f"[conciliation_complete] has_att={has_att}, allowing direct settlement")
+
+    # Ensure we are acting on a valid KP-12 (or pick latest KP-12 if none provided)
     with connection.cursor() as cur:
         if not submission_id:
             cur.execute("""
                 SELECT s.submission_id
-                FROM blotter_kp_submission s
-                JOIN kp_form f ON f.form_id=s.form_id
-                WHERE s.blotter_case_id=%s AND UPPER(f.form_code)='KP-12'
-                ORDER BY (UPPER(s.status)='SUBMITTED') DESC,
-                         s.submitted_at DESC NULLS LAST,
-                         s.submission_id DESC
-                LIMIT 1
+                  FROM blotter_kp_submission s
+                  JOIN kp_form f ON f.form_id = s.form_id
+                 WHERE s.blotter_case_id = %s
+                   AND UPPER(f.form_code) = 'KP-12'
+                 ORDER BY (UPPER(s.status)='SUBMITTED') DESC,
+                          s.submitted_at DESC NULLS LAST,
+                          s.submission_id DESC
+                 LIMIT 1
             """, [case_id])
             r = cur.fetchone()
             submission_id = int(r[0]) if r else None
 
         cur.execute("""
-            SELECT COUNT(*) FROM blotter_kp_submission s
-            JOIN kp_form f ON f.form_id=s.form_id
-            WHERE s.submission_id=%s AND s.blotter_case_id=%s AND UPPER(f.form_code)='KP-12'
+            SELECT COUNT(*)
+              FROM blotter_kp_submission s
+              JOIN kp_form f ON f.form_id = s.form_id
+             WHERE s.submission_id = %s
+               AND s.blotter_case_id = %s
+               AND UPPER(f.form_code) = 'KP-12'
         """, [submission_id, case_id])
         valid = (cur.fetchone() or [0])[0] == 1
 
@@ -4489,6 +2930,7 @@ def conciliation_complete(request: HttpRequest, case_id: int):
         messages.error(request, "Invalid KP-12 submission selected.")
         return redirect("lupon_mem:case_hearing_schedule", case_id=case_id)
 
+    # Rank (1st/2nd/…) among all notices (KP-8/KP-12), same as mediation_complete
     with connection.cursor() as cur:
         cur.execute("""
             WITH sched AS (
@@ -4498,81 +2940,161 @@ def conciliation_complete(request: HttpRequest, case_id: int):
                        ORDER BY s.submitted_at ASC NULLS LAST, s.submission_id ASC
                      ) AS rn
               FROM blotter_kp_submission s
-              JOIN kp_form f ON f.form_id=s.form_id
-              WHERE s.blotter_case_id=%s AND UPPER(f.form_code) IN ('KP-8','KP-12')
+              JOIN kp_form f ON f.form_id = s.form_id
+              WHERE s.blotter_case_id = %s
+                AND UPPER(f.form_code) IN ('KP-8','KP-12')
             )
-            SELECT rn FROM sched WHERE submission_id=%s
+            SELECT rn FROM sched WHERE submission_id = %s
         """, [case_id, submission_id])
         row = cur.fetchone()
         sched_rn = int(row[0]) if row else None
 
-        cur.execute("""
-            SELECT COUNT(*)::int FROM case_progress_tracking cpt
-            JOIN case_progress_type t ON t.case_progress_type_id=cpt.case_progress_type_id
-            WHERE cpt.blotter_case_id=%s
-              AND UPPER(t.case_progress_type_name) IN ('HEARING HELD','CONCILIATION HELD')
-        """, [case_id])
-        held_so_far = int((cur.fetchone() or [0])[0])
-
-    print(f"[HEARING-HELD][KP-12] schedule_rn={sched_rn}  held_so_far={held_so_far}  expected_next={(held_so_far+1)}")
-
+    # Resolve progress type: HEARING HELD
     with connection.cursor() as cur:
         cur.execute("""
             SELECT case_progress_type_id
-            FROM case_progress_type
-            WHERE UPPER(case_progress_type_name)='CONCILIATION HELD'
-            LIMIT 1
+              FROM case_progress_type
+             WHERE UPPER(case_progress_type_name) = 'HEARING HELD'
+             LIMIT 1
         """)
         row = cur.fetchone()
         if not row:
-            messages.error(request, "Progress type 'CONCILIATION HELD' not configured.")
+            messages.error(request, "Progress type 'HEARING HELD' not configured.")
             return redirect("lupon_mem:case_hearing_schedule", case_id=case_id)
         progress_type_id = int(row[0])
 
-    print("[HEARING-HELD][KP-12] using case_progress_type_id=", progress_type_id)
+    # If not SETTLED and no attendance exists but user chose to consume a slot, insert a no-show record first
+    print(f"[conciliation_complete] Step 4 check: settlement={settlement}, has_att={has_att}, att_slot_only={att_slot_only}")
+    if settlement != "SETTLED" and not has_att and att_slot_only:
+        print(f"[conciliation_complete] Step 4: Creating no-show attendance slot")
+        try:
+            _maybe_upsert_hearing_attendance(
+                case_id=case_id,
+                source_code="KP-12",
+                notice_sid=submission_id,
+                compl_attended=False,
+                resp_attended=False,
+                settlement="PENDING",
+                remarks=(remarks or "NO-SHOW") + " (slot consumed: no-show)",
+            )
+            has_att = True
+        except Exception:
+            messages.warning(request, "Proceeding without recording a no-show attendance slot.")
+    else:
+        print(f"[conciliation_complete] Step 4: Skipping no-show slot creation")
 
+    # Insert HEARING HELD tracking (remark includes outcome)
+    outcome_suffix = f", outcome={settlement}" if settlement else ""
+    held_remarks = remarks or f"KP-12 held (sched #{sched_rn}); comp_att={compl_attended}, resp_att={resp_attended}{outcome_suffix}"
     with transaction.atomic():
         with connection.cursor() as cur:
             cur.execute("""
                 INSERT INTO case_progress_tracking
                     (blotter_case_id, case_progress_type_id, date_processed, remarks, processed_by_id)
-                VALUES (%s,%s, now(),
-                        %s,
-                        %s)
+                VALUES (%s, %s, now(), %s, %s)
                 RETURNING progress_tracking_id, date_processed
-            """, [
-                case_id,
-                progress_type_id,
-                remarks or f"KP-12 held (sched #{sched_rn}); comp_att={compl_attended}, resp_att={resp_attended}",
-                staff_id,
-            ])
-            trk_id, dtp = cur.fetchone()
-    print(f"[HEARING-HELD][KP-12] inserted tracking_id={trk_id}  date_processed={dtp}")
+            """, [case_id, progress_type_id, held_remarks, staff_id])
 
-    # ---- persist attendance flags (no models; safe upsert)
+    # Outcome branches (mirror mediation_complete)
+    print(f"[conciliation_complete] settlement={settlement}, case_id={case_id}")
+    if settlement == "SETTLED":
+        # Set case to SETTLED and auto-create KP-16 if missing
+        try:
+            with connection.cursor() as cur:
+                cur.execute("SELECT * FROM fn_set_case_settlement(%s,%s,%s,%s)",
+                            [case_id, 'SETTLED', 'Marked settled from KP-12 conciliation', staff_id])
+            print(f"[conciliation_complete] Case {case_id} set to SETTLED successfully")
+            messages.success(request, "Conciliation marked HELD and case set to SETTLED. Settlement agreement (KP-16) created automatically.")
+        except Exception as e:
+            print(f"[conciliation_complete] Error setting case to SETTLED: {e}")
+            messages.success(request, "Conciliation marked HELD. (Could not update case settlement automatically.)")
+            
+            # Only create KP-16 if fn_set_case_settlement failed
+            try:
+                with connection.cursor() as cur:
+                    cur.execute("""
+                        SELECT 1
+                          FROM blotter_kp_submission s
+                          JOIN kp_form f ON f.form_id = s.form_id
+                         WHERE s.blotter_case_id = %s
+                           AND UPPER(f.form_code) = 'KP-16'
+                           AND UPPER(s.status) = 'SUBMITTED'
+                    """, [case_id])
+                    kp16_exists = cur.fetchone() is not None
+
+                if not kp16_exists:
+                    print(f"[conciliation_complete] No KP-16 exists, creating one as fallback")
+                    kp16_sid = _create_and_submit_form_from_prefill(
+                        case_id=case_id,
+                        form_code="KP-16",
+                        prefill=_prefill_minimal_for_case(case_id)
+                    )
+                    if kp16_sid:
+                        print(f"[conciliation_complete] Created fallback KP-16 submission_id={kp16_sid}")
+            except Exception as fallback_e:
+                print(f"[conciliation_complete] Error creating fallback KP-16: {fallback_e}")
+
+    elif settlement == "ARBITRATION":
+        # Optional: mark case ARBITRATED
+        try:
+            with connection.cursor() as cur:
+                cur.execute("SELECT * FROM fn_set_case_settlement(%s,%s,%s,%s)",
+                            [case_id, 'ARBITRATED', 'Agreed to arbitration from KP-12 conciliation', staff_id])
+            messages.success(request, "Conciliation marked HELD and case set to ARBITRATED.")
+        except Exception as e:
+            print(f"[conciliation_complete] Error setting case to ARBITRATED: {e}")
+            messages.success(request, "Conciliation marked HELD. (Could not update case settlement automatically.)")
+
+        # Ensure KP-14 exists
+        try:
+            with connection.cursor() as cur:
+                cur.execute("""
+                    SELECT 1
+                      FROM blotter_kp_submission s
+                      JOIN kp_form f ON f.form_id = s.form_id
+                     WHERE s.blotter_case_id = %s
+                       AND UPPER(f.form_code) = 'KP-14'
+                       AND UPPER(s.status) = 'SUBMITTED'
+                """, [case_id])
+                kp14_exists = cur.fetchone() is not None
+
+            if not kp14_exists:
+                kp14_sid = _create_and_submit_form_from_prefill(
+                    case_id=case_id,
+                    form_code="KP-14",
+                    prefill=_prefill_minimal_for_case(case_id)
+                )
+                if kp14_sid:
+                    print(f"[conciliation_complete] Created KP-14 submission_id={kp14_sid}")
+            else:
+                print(f"[conciliation_complete] KP-14 already exists for case {case_id}")
+        except Exception as e:
+            print(f"[conciliation_complete] Error creating KP-14: {e}")
+
+        # Notifications (guard import)
+        try:
+            from notifications.views import notify_kp14_agreement_arbitration  # adjust module if needed
+            notify_kp14_agreement_arbitration(case_id=case_id)
+        except Exception as e:
+            print(f"[KP14] Notification skipped: {e}")
+
+    else:
+        print(f"[conciliation_complete] Settlement not SETTLED/ARBITRATION, just marking held")
+        messages.success(request, "Conciliation marked HELD.")
+
+    # Persist attendance + the chosen settlement string
+    print(f"[conciliation_complete] Recording attendance: compl={compl_attended}, resp={resp_attended}, settlement={settlement}")
     _maybe_upsert_hearing_attendance(
         case_id=case_id,
         source_code="KP-12",
         notice_sid=submission_id,
         compl_attended=compl_attended,
         resp_attended=resp_attended,
-        settlement=settlement,
+        settlement=settlement or "PENDING",
         remarks=remarks,
     )
 
-    if settlement == "SETTLED" and kp16_confirmed:
-        try:
-            with connection.cursor() as cur:
-                cur.execute("SELECT * FROM fn_set_case_settlement(%s,%s,%s,%s)",
-                            [case_id, 'SETTLED', 'Marked settled from KP-12 (KP-16 done)', staff_id])
-            print("[HEARING-HELD][KP-12] settlement status set to SETTLED via fn_set_case_settlement().")
-            messages.success(request, "Marked HELD and settlement set to SETTLED.")
-        except Exception as e:
-            print("[HEARING-HELD][KP-12][WARN] Failed to set settlement:", e)
-            messages.success(request, "Marked HELD. (Could not update settlement automatically.)")
-    else:
-        messages.success(request, "Conciliation marked HELD.")
-
+    print(f"[conciliation_complete] END - redirecting to hearing schedule")
     return redirect(f"{reverse('lupon_mem:case_hearing_schedule', args=[case_id])}?sid={submission_id}")
 
 
@@ -4653,9 +3175,6 @@ def hearing_complete(request: HttpRequest, case_id: int):
     return redirect("lupon_mem:case_detail", case_id=case_id)
 
 
-
-# views.py
-# lupon_mem/views.py  (replace your summon_attendance with this version)
 
 @session_login_required
 @role_required(*LUPON_ROLES, "barangay treasurer")
@@ -4987,7 +3506,7 @@ def mark_hearing_held_dev(request, case_id: int):
     return redirect("lupon_mem:case_hearing_list", case_id=case_id)
 
 
-    from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST
 from django.core.files.uploadedfile import UploadedFile
 
 @session_login_required
@@ -5264,110 +3783,6 @@ def _mark_hearing_held(case_id: int, notice_submission_id: int, outcome: str | N
         print(f"[auto-held][ERROR] case_id={case_id} sid={notice_submission_id}: {e}")
         return False
 
-
-
-# ---------- Resident Lookup (detail) ----------
-from django.views.decorators.http import require_GET
-
-@session_login_required
-@role_required(*LUPON_ROLES, "barangay treasurer")
-@require_GET
-def resident_quick_search(request: HttpRequest):
-    """
-    GET /lupon_mem/resident/quick-search/?q=term
-    Returns top residents for the autocomplete (id, name, purok, address).
-    """
-    q = (request.GET.get("q") or "").strip()
-    if len(q) < 2:
-        return JsonResponse({"ok": True, "results": []})
-
-    like = f"%{q}%"
-    with connection.cursor() as cur:
-        cur.execute(
-            """
-            SELECT
-              p.person_id AS id,
-              trim(coalesce(p.first_name,'') || ' ' ||
-                   coalesce(p.middle_name,'') || ' ' ||
-                   coalesce(p.last_name,'')  || ' ' ||
-                   coalesce(p.suffix,''))    AS name,
-              coalesce(ps.purok_sitio_name,'') AS purok,
-              trim(concat_ws(', ',
-                    NULLIF(a.street,''),
-                    NULLIF(ps.purok_sitio_name,''),
-                    NULLIF(a.barangay,''),
-                    NULLIF(a.city,'')
-              )) AS address
-            FROM person p
-            LEFT JOIN addresss a   ON a.address_id = p.address_id
-            LEFT JOIN purok_sitio ps ON ps.purok_sitio_id = a.purok_sitio_id
-            WHERE
-                 p.first_name ILIKE %s
-              OR p.last_name  ILIKE %s
-              OR (p.first_name || ' ' || coalesce(p.middle_name,'') || ' ' || p.last_name) ILIKE %s
-              OR a.street ILIKE %s
-            ORDER BY name
-            LIMIT 20
-            """,
-            [like, like, like, like],
-        )
-        rows = cur.fetchall()
-
-    results = [
-        {"id": r[0], "name": (r[1] or "").strip(), "purok": (r[2] or "").strip(), "address": (r[3] or "").strip()}
-        for r in rows
-    ]
-    return JsonResponse({"ok": True, "results": results})
-
-
-@session_login_required
-@role_required(*LUPON_ROLES, "barangay treasurer")
-@require_GET
-def person_lookup(request: HttpRequest):
-    """
-    GET /lupon_mem/person/lookup/?person_id=123
-    -> { ok: true, person: { id, name } }
-    """
-    pid = (request.GET.get("person_id") or "").strip()
-    if not pid.isdigit():
-        return JsonResponse({"ok": False, "error": "Invalid person_id."}, status=400)
-
-    with connection.cursor() as cur:
-        cur.execute(
-            """
-            SELECT
-              p.person_id,
-              trim(coalesce(p.first_name,'') || ' ' ||
-                   coalesce(p.middle_name,'') || ' ' ||
-                   coalesce(p.last_name,'')  || ' ' ||
-                   coalesce(p.suffix,'')) AS name
-            FROM person p
-            WHERE p.person_id=%s
-            """,
-            [int(pid)],
-        )
-        row = cur.fetchone()
-
-    if not row:
-        return JsonResponse({"ok": False, "error": "Not found."}, status=404)
-
-    return JsonResponse({"ok": True, "person": {"id": row[0], "name": (row[1] or "").strip()}})
-# ---------- Resident Lookup UI (optional standalone page) ----------
-
-@session_login_required
-@role_required(*LUPON_ROLES, "barangay treasurer")
-def resident_lookup(request: HttpRequest):
-    """
-    A nice standalone page (or embeddable view) to search residents and pick one.
-    Supports ?target=INPUT_ID — if provided and the page is opened from a parent form,
-    clicking "Use this person" will attempt to fill that INPUT_ID in the opener window.
-    """
-    target_input = (request.GET.get("target") or "").strip() or None
-    return render(request, "lupon_mem/resident_lookup.html", {"target_input": target_input})
-
-
-
-#####################
 
 # views.py (helpers)
 def _has_med_att_for_notice(case_id: int, notice_submission_id: int) -> bool:

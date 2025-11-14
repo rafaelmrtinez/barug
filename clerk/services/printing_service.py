@@ -86,7 +86,16 @@ def apply_pdf_field_mapping(doc_name: str, field_names: List[str], values: Dict[
                 print(f"[PRINT MAP] {nm}: {skey} → {pdf_field} = {val!r}")
         return mapped
 
-    return {fn: values.get(fn) for fn in field_names}
+    # For barangay clearance and other documents, return values directly mapped to field names
+    mapped = {}
+    for fn in field_names:
+        val = values.get(fn)
+        if val is not None:
+            mapped[fn] = val
+            print(f"[PRINT MAP] {nm}: {fn} = {val!r}")
+        else:
+            print(f"[PRINT MAP] {nm}: {fn} = MISSING")
+    return mapped
 
 def process_printing(doc_request_id: int, include_debug: bool=False) -> Tuple[bytes, str, str, Dict[str, str]]:
     """
@@ -140,6 +149,9 @@ def process_printing(doc_request_id: int, include_debug: bool=False) -> Tuple[by
         base_values = _fill_fields_for_line(header, line)
         detail_values = (line.get("details") or {})
         combined_values = {**detail_values, **base_values}
+        print(f"[PRINT DEBUG] Base values from _fill_fields_for_line: {base_values}")
+        print(f"[PRINT DEBUG] Detail values: {detail_values}")
+        print(f"[PRINT DEBUG] Combined values: {combined_values}")
 
         try:
             _subj = subject_view(header, line)
@@ -194,11 +206,18 @@ def process_printing(doc_request_id: int, include_debug: bool=False) -> Tuple[by
 
         field_names = _get_all_pdf_field_names(template_path)
         values_mapped = apply_pdf_field_mapping(doc_name, field_names, combined_values, include_debug)
+        print(f"[PRINT DEBUG] Values mapped for {doc_name}: {values_mapped}")
+        print(f"[PRINT DEBUG] Field names found: {field_names}")
+        print(f"[PRINT DEBUG] Combined values keys: {list(combined_values.keys())}")
 
-        merged = {
-            name: (values_mapped.get(name) if str(values_mapped.get(name) or "").strip() else "No data")
-            for name in field_names
-        }
+        # Use actual mapped values instead of test values
+        merged = values_mapped
+        print(f"[CRITICAL DEBUG] Template: {template_path}")
+        print(f"[CRITICAL DEBUG] Template exists: {os.path.exists(template_path)}")
+        print(f"[CRITICAL DEBUG] Field names extracted: {field_names}")
+        print(f"[CRITICAL DEBUG] Number of fields: {len(field_names)}")
+        print(f"[CRITICAL DEBUG] Merged dict for PDF: {merged}")
+        print(f"[CRITICAL DEBUG] Will attempt to fill {len(merged)} fields")
         missing = [n for n in field_names if n not in values_mapped or str(values_mapped.get(n) or "").strip() == ""]
 
         print(json.dumps({
@@ -216,10 +235,16 @@ def process_printing(doc_request_id: int, include_debug: bool=False) -> Tuple[by
         }, indent=2, default=str))
 
         try:
+            print(f"[CRITICAL DEBUG] Attempting to fill PDF with {len(merged)} values")
             pdf_bytes = _fill_pdf_with_values(template_path, merged)
-        except Exception:
+            print(f"[CRITICAL DEBUG] PDF filled successfully for {doc_name}, size: {len(pdf_bytes)} bytes")
+        except Exception as e:
+            print(f"[CRITICAL DEBUG] PDF filling FAILED for {doc_name}: {str(e)}")
+            import traceback
+            print(f"[CRITICAL DEBUG] Full error: {traceback.format_exc()}")
             with open(template_path, "rb") as f:
                 pdf_bytes = f.read()
+            print(f"[CRITICAL DEBUG] Using original PDF, size: {len(pdf_bytes)} bytes")
 
         safe_name = doc_name.lower().replace(" ", "-")
         out_name = f"{header.get('request_code','REQ')}-{safe_name}.pdf"

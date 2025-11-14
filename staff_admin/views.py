@@ -272,7 +272,6 @@ def _get_staff_by_id(staff_id: int) -> dict | None:
         return None
     keys = ["staff_id", "staff_code", "first_name", "middle_name", "last_name", "suffix", "email"]
     return dict(zip(keys, row))
-
 # ── Page: landing ─────────────────────────────────────────────────────────────
 @session_login_required
 @role_required(ADMIN_ROLE)
@@ -864,10 +863,6 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
             from io import BytesIO
             from PIL import Image  # noqa: F401
 
-            def _jpeg_bytes(fileobj):
-                buf, mime, _ext = _prep_image_for_upload(fileobj)
-                return _readall(buf)
-
             b_front  = _jpeg_bytes(front_in)
             b_back   = _jpeg_bytes(back_in)
             b_selfie = _jpeg_bytes(selfie_in)
@@ -905,9 +900,6 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
     })
 
 # ── Non-resident Step 3 (role + finalize -> request) ──────────────────────────
-@session_login_required
-@role_required(ADMIN_ROLE)
-@nocache
 @require_http_methods(["GET","POST"])
 def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
     role_form = ChooseRole(request.POST or None)

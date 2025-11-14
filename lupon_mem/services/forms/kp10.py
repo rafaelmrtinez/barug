@@ -231,6 +231,27 @@ class KP10Handler:
         for k in _KP10_FIELDS:
             out.setdefault(k, "")
 
+        # ---------------------------------------------------
+        # Send notifications for KP-10 submission
+        # ---------------------------------------------------
+        try:
+            from notifications.views import notify_kp10_constitution_pangkat
+            with connection.cursor() as cur:
+                cur.execute(
+                    "SELECT blotter_case_id FROM blotter_kp_submission WHERE submission_id=%s",
+                    [submission_id]
+                )
+                row = cur.fetchone()
+                if row:
+                    case_id = row[0]
+                    # Get case number from DB
+                    cur.execute("SELECT blotter_case_num FROM blotter_case WHERE blotter_case_id=%s", [case_id])
+                    case_row = cur.fetchone()
+                    case_num = case_row[0] if case_row else ""
+                    notify_kp10_constitution_pangkat(case_id, case_num)
+        except Exception as e:
+            logger.warning("[KP10] Failed to send notifications: %s", e)
+
         # ---- Log what's being filled into the PDF (ordered) ----
         self._log_fill_map(out)
 
