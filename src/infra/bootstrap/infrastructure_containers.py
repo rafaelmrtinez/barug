@@ -62,6 +62,7 @@ from src.infra.repositories.dashboards_repository import (
     LuponMemDashboardRepository,
     BhwDashboardRepository,
     MidwifeDashboardRepository,
+    AdminDashboardRepository,
 )
 
 
@@ -234,5 +235,10 @@ class InfraContainer(containers.DeclarativeContainer):
 
     midwife_dashboard_repository: providers.Factory[MidwifeDashboardRepository] = providers.Factory(
         MidwifeDashboardRepository,
+        ctx=context,
+    )
+
+    admin_dashboard_repository: providers.Factory[AdminDashboardRepository] = providers.Factory(
+        AdminDashboardRepository,
         ctx=context,
     )

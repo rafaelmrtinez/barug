@@ -66,6 +66,7 @@ from src.app.services.dashboards_service import (
     LuponMemberDashboardService,
     BhwDashboardService,
     MidwifeDashboardService,
+    AdminDashboardService,
 )
 
 
@@ -253,6 +254,11 @@ class AppContainer(containers.DeclarativeContainer):
     midwife_dashboard_service: providers.Factory[MidwifeDashboardService] = providers.Factory(
         MidwifeDashboardService,
         dashboard_repo=infra.midwife_dashboard_repository,
+    )
+
+    admin_dashboard_service: providers.Factory[AdminDashboardService] = providers.Factory(
+        AdminDashboardService,
+        dashboard_repo=infra.admin_dashboard_repository,
     )
     
     # Child health schedule service (thin orchestration service)

@@ -586,9 +586,7 @@ class BhwDashboardService:
         kpis = {
             "ongoing_maternal_total": ongoing_maternal_total,
             "ongoing_maternal_total_sub": ongoing_maternal_total_sub,
-            "visit_today_maternal": visit_today_maternal,
-            "visit_today_postpartum": visit_today_postpartum,
-            "visit_today_child": visit_today_child,
+            
             "household_to_be_visited": household_to_be_visited,
             "residents_total": total_residents,
             "families_total": total_families,
@@ -745,3 +743,40 @@ class MidwifeDashboardService:
             "kpis": kpis,
             "dashboard_json": dashboard_json
         }
+    
+class AdminDashboardService:
+    def __init__(self, dashboard_repo):
+        self.repo = dashboard_repo
+
+    def get_dashboard_content(self) -> dict:
+        kpi_doc_req = self.repo.fetch_kpi_doc_req()
+        kpi_sub_doc_req = self.repo.fetch_kpi_sub_doc_req()
+        kpi_total_residents = self.repo.fetch_kpi_total_residents()
+        ongoing_cases = self.repo.fetch_kpi_ongoing_cases()
+        open_cases = self.repo.fetch_kpi_open_cases()
+        demographic_households = self.repo.fetch_kpi_total_households()
+        demographic_families = self.repo.fetch_kpi_total_families()
+        women_vaccinated = self.repo.fetch_kpi_women_vaccinated_this_week()
+        children_vaccinated = self.repo.fetch_kpi_children_vaccinated_this_week()
+
+        kpis = {
+            "doc_requests": kpi_doc_req,
+            "doc_requests_delta": kpi_sub_doc_req,
+            "residents_total": kpi_total_residents,
+            "ongoing_cases": ongoing_cases,
+            "open_cases": open_cases,
+            "household_total": demographic_households,
+            "families_total": demographic_families,
+            "women_vaccinated": women_vaccinated,
+            "children_vaccinated": children_vaccinated,
+        }
+
+        dashboard_json = {
+
+        }
+
+        return {
+            "kpis": kpis,
+            "dashboard_json": dashboard_json,
+        }
+        

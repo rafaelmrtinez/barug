@@ -1269,3 +1269,38 @@ class MidwifeDashboardRepository:
     
     def fetch_maternal_vax_per_month(self) -> dict:
         return self._bhw_repo.fetch_maternal_vax_per_month()
+
+class AdminDashboardRepository:
+    def __init__(self, ctx: IConnectionAdapter):
+        self._ctx = ctx
+        self._clerk_repo = ClerkDashboardRepository(ctx)
+        self._captain_repo = CaptainDashboardRepository(ctx)
+        self._secretary_repo = SecretaryDashboardRepository(ctx)
+        self._midwife_repo = MidwifeDashboardRepository(ctx)
+
+    def fetch_kpi_doc_req(self) -> int:
+        return self._clerk_repo.fetch_kpi_doc_req()
+
+    def fetch_kpi_sub_doc_req(self) -> int:
+        return self._clerk_repo.fetch_kpi_sub_doc_req()
+
+    def fetch_kpi_total_residents(self) -> int:
+        return self._clerk_repo.fetch_kpi_total_residents()
+    
+    def fetch_kpi_total_households(self) -> int:
+        return self._secretary_repo.fetch_kpi_demographics()
+    
+    def fetch_kpi_total_families(self) -> int:
+        return self._secretary_repo.fetch_kpi_sub_demographics() 
+    
+    def fetch_kpi_ongoing_cases(self) -> int:
+        return self._captain_repo.fetch_kpi_ongoing_cases()
+    
+    def fetch_kpi_open_cases(self) -> int:
+        return self._captain_repo.fetch_kpi_sub_ongoing_cases()
+    
+    def fetch_kpi_women_vaccinated_this_week(self) -> int:
+        return self._midwife_repo.fetch_kpi_women_vaccinated_this_week()
+    
+    def fetch_kpi_children_vaccinated_this_week(self) -> int:
+        return self._midwife_repo.fetch_kpi_children_vaccinated_this_week()

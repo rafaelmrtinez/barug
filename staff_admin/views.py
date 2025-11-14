@@ -21,6 +21,8 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.templatetags.static import static
 from django.views.decorators.http import require_GET, require_http_methods
+from dependency_injector.wiring import inject, Provide
+from src.app.bootstrap.app_containers import AppContainer
 
 # Local apps / project modules
 from .forms import (
@@ -93,15 +95,43 @@ def _to_int_or_none(val) -> Optional[int]:
         return None
 
 @session_login_required
-@role_required("admin", "Admin")
-def dashboard(request):
-    user_fullname, user_role, user_role_template = get_user_info(request)
+@role_required(ADMIN_ROLE)
+@nocache
+@inject
+def dashboard(
+    request: HttpRequest,
+    admin_dashboard_service=Provide[AppContainer.admin_dashboard_service],
+):
+    user_role = _auth_role_name(request)
+
+    kpis = {
+        "doc_requests": 0,
+        "doc_requests_delta": 0,
+        "residents_total": 0,
+        "ongoing_cases": 0,
+        "open_cases": 0,
+        "residents_total": 0,
+        "household_total": 0,
+        "families_total": 0,
+        "women_vaccinated": 0,
+        "children_vaccinated": 0,
+    }
+
+    dashboard_json = None
+
+    try:
+        payload = admin_dashboard_service.get_dashboard_content() or {}
+        kpis = payload.get("kpis", kpis)
+        dashboard_json = payload.get("dashboard_json")
+    except Exception as exc:
+        print("Error fetching admin dashboard KPIs:", exc)
+
     return render(request, "staff_admin/dashboard.html", {
-        'user_fullname' : user_fullname,
-        'user_role' : user_role,
-        'page_path' : f'Admin / Dashboard',
+        'page_path' : f'{user_role} / Dashboard',
         'page_title' : 'Dashboard',
-        'user_role_template' : user_role_template,
+        'kpis': kpis,
+        'dashboard_json': dashboard_json,
+        'today': datetime.now().strftime("%B %d, %Y"),
     })
 
 def _smart_redirect(request, url_name, *args, **kwargs):
