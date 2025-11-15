@@ -1,212 +1,208 @@
-{% extends "base.html" %}
+{# business_list.html (hardcoded filters) #}
+{% extends 'base.html' %}
 {% load static %}
 {% load bootstrap_icons %}
+{% load choiceextras %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<link rel="stylesheet" href="{% static 'css/filters.css' %}">
+
+<style>
+  .btn-outline-brand{ color:#6d2932; border-color:#6d2932; background:#fff; }
+  .btn-outline-brand:hover{ background:#6d2932; color:#fff; }
+
+  .table thead th{
+    font-size:.80rem;
+    text-transform:capitalize;   /* keep headers uppercase */
+    letter-spacing:.02em;
+    vertical-align:middle;
+    white-space:nowrap;
+    text-align:left;
+  }
+
+  .table .business-id{
+    width:1%;
+    white-space:nowrap;
+  }
+
+  /* Pill-styled, monospace, tabular digits for perfect alignment */
+  .id-pill{
+    display:inline-block;
+    padding:.22rem .55rem;
+    border-radius:999px;
+    background:#f8f1f2;                      /* soft brand-tinted bg */
+    border:1px solid rgba(109,41,50,.18);    /* matches your cat-badge border tone */
+    color:#6d2932;
+    font-weight:700;
+    font-size:.78rem;
+    line-height:1;
+    /* font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", Consolas, "Liberation Mono", monospace; */
+    font-variant-numeric: tabular-nums;      /* aligned digits */
+    letter-spacing:.03em;
+  }
+
+  .table tbody td{
+    font-size:.80rem;           /* slightly smaller body text */
+    vertical-align:middle;
+    text-align:left;
+    font-weight:600;            /* normalize weight */
+  }
+</style>
+
+{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4" style="margin-top: 40px;">
-
-  <div class="d-flex align-items-center justify-content-between mb-3">
-    <div>
-      <div class="text-uppercase small text-muted">Barangay Treasurer</div>
-      <h1 class="h4 fw-bold mb-0">Financial Report</h1>
-    </div>
-    <form method="get" class="d-flex gap-2 align-items-end flex-wrap">
-      <div>
-        <label class="form-label small mb-1">Search</label>
-        <input type="text" class="form-control form-control-sm" name="q" value="{{ q }}" placeholder="OR # / Request ID">
-      </div>
-      <div>
-        <label class="form-label small mb-1">Doc type</label>
-        <select name="doc_type" class="form-select form-select-sm">
-          <option value="">All</option>
-          {% for t in filters.doc_types %}
-            <option value="{{ t }}" {% if t == doc_type %}selected{% endif %}>{{ t }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div>
-        <label class="form-label small mb-1">Payment method</label>
-        <select name="payment_method_id" class="form-select form-select-sm">
-          <option value="">All</option>
-          {% for m in filters.methods %}
-            <option value="{{ m.id }}" {% if m.id|stringformat:"s" == payment_method_id|stringformat:"s" %}selected{% endif %}>{{ m.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div>
-        <label class="form-label small mb-1">Start date (PH)</label>
-        <input type="date" class="form-control form-control-sm" name="start_date" value="{{ start_date }}">
-      </div>
-      <div>
-        <label class="form-label small mb-1">End date (PH)</label>
-        <input type="date" class="form-control form-control-sm" name="end_date" value="{{ end_date }}">
-      </div>
-    <div>
-    <label class="form-label small mb-1">Per page</label>
-    <select name="per_page" class="form-select form-select-sm">
-        <option value="10"  {% if per_page|stringformat:"s" == "10" %}selected{% endif %}>10</option>
-        <option value="25"  {% if per_page|stringformat:"s" == "25" %}selected{% endif %}>25</option>
-        <option value="50"  {% if per_page|stringformat:"s" == "50" %}selected{% endif %}>50</option>
-        <option value="100" {% if per_page|stringformat:"s" == "100" %}selected{% endif %}>100</option>
-    </select>
-    </div>
-
-      <button class="btn btn-sm btn-primary">{% bs_icon 'funnel' %} Apply</button>
-    </form>
-  </div>
-
-  <!-- KPI strip -->
-  <div class="row g-3 mb-3">
-    <div class="col-12 col-md-6 col-xl-3">
-      <div class="card shadow-sm h-100">
-        <div class="card-body">
-          <div class="small text-muted">Total Collected</div>
-          <div class="h4 fw-bold mb-0">₱{{ totals.total_paid|floatformat:2 }}</div>
+<div class="page-wrap" style="margin-top: 40px;">
+  <div class="container-fluid pt-3 page-main">
+    <div class="row">
+      {# ─── Toolbar: search + filters + add ─── #}
+      <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+        {% csrf_token %}
+        <div class="searchbox">
+          {% bs_icon 'search' extra_classes='bi' %}
+          {{ form.search }}
         </div>
-      </div>
-    </div>
-    <div class="col-12 col-md-6 col-xl-3">
-      <div class="card shadow-sm h-100">
-        <div class="card-body">
-          <div class="small text-muted">Total Due</div>
-          <div class="h4 fw-bold mb-0">₱{{ totals.total_due|floatformat:2 }}</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-md-6 col-xl-3">
-      <div class="card shadow-sm h-100">
-        <div class="card-body">
-          <div class="small text-muted">Total Change</div>
-          <div class="h4 fw-bold mb-0">₱{{ totals.total_change|floatformat:2 }}</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-md-6 col-xl-3">
-      <div class="card shadow-sm h-100">
-        <div class="card-body">
-          <div class="small text-muted">Average Ticket</div>
-          <div class="h4 fw-bold mb-0">₱{{ totals.avg_ticket|floatformat:2 }}</div>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <!-- Table -->
-  <div class="card shadow-sm">
-    <div class="card-header d-flex justify-content-between align-items-center">
-      <h5 class="mb-0">Receipts ({{ page_obj.paginator.count }})</h5>
-      <div class="small text-muted">
-        Window: <code>{{ filters.start_iso }}</code> → <code>{{ filters.end_iso }}</code>
+        {# preserve selected filters when searching #}
+        <input type="hidden" name="b_category" value="{{ request.GET.b_category|default:'' }}">
+        <input type="hidden" name="ownership_type" value="{{ request.GET.ownership_type|default:'' }}">
+        <input type="hidden" name="status" value="{{ request.GET.status|default:'' }}">
+
+        {# --- Filters button with badge count (b_category, ownership_type, status) --- #}
+        {% with bcat=request.GET.b_category|yesno:"1,0" own=request.GET.ownership_type|yesno:"1,0" stat=request.GET.status|yesno:"1,0" %}
+          {% with fc=0|add:bcat|add:own|add:stat %}
+            <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
+                    type="button"
+                    data-bs-toggle="offcanvas"
+                    data-bs-target="#filterPanel"
+                    aria-controls="filterPanel">
+              {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+              {% if fc %}
+                <span class="badge rounded-pill text-bg-light ms-2">{{ fc }}</span>
+              {% endif %}
+            </button>
+          {% endwith %}
+        {% endwith %}
+      </form>
+
+      {# ─── Active filter chips (show selected labels) ─── #}
+      <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
+        {% if request.GET.b_category or request.GET.ownership_type or request.GET.status %}
+          <span class="text-muted me-1">Active:</span>
+
+          {# Business Category chip #}
+          {% if request.GET.b_category %}
+            {% with label=form.b_category|choice_label:request.GET.b_category %}
+              <a class="filter-chip"
+                href="?search={{ request.GET.search|urlencode }}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}">
+                {{ label }}
+                <span class="x" aria-hidden="true">×</span>
+              </a>
+            {% endwith %}
+          {% endif %}
+
+          {# Ownership Type chip #}
+          {% if request.GET.ownership_type %}
+            {% with label=form.ownership_type|choice_label:request.GET.ownership_type %}
+              <a class="filter-chip"
+                href="?search={{ request.GET.search|urlencode }}{% if request.GET.b_category %}&b_category={{ request.GET.b_category|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}">
+                {{ label }}
+                <span class="x" aria-hidden="true">×</span>
+              </a>
+            {% endwith %}
+          {% endif %}
+
+          {# Status chip #}
+          {% if request.GET.status %}
+            {% with label=form.status|choice_label:request.GET.status %}
+              <a class="filter-chip"
+                href="?search={{ request.GET.search|urlencode }}{% if request.GET.b_category %}&b_category={{ request.GET.b_category|urlencode }}{% endif %}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}">
+                {{ label }}
+                <span class="x" aria-hidden="true">×</span>
+              </a>
+            {% endwith %}
+          {% endif %}
+
+          <a class="btn btn-sm btn-outline-brand ms-1" href="?search={{ request.GET.search|urlencode }}">
+            {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
+          </a>
+        {% else %}
+          <span class="text-muted small">No active filters.</span>
+        {% endif %}
       </div>
-    </div>
-    <div class="table-responsive">
-      <table class="table align-middle mb-0">
-        <thead class="table-light">
-          <tr>
-            <th>OR Date/Time</th>
-            <th>OR #</th>
-            <th>Request</th>
-            <th>Requester</th>
-            <th>Documents</th>
-            <th>Status</th>
-            <th>Method</th>
-            <th class="text-end">Due</th>
-            <th class="text-end">Paid</th>
-            <th class="text-end">Change</th>
-            <th class="text-end">Balance</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for r in rows %}
-          <tr>
-            <td><span class="small text-muted">{{ r.or_created_at }}</span></td>
-            <td class="fw-semibold">{{ r.or_number }}</td>
-            <td>
-              <div class="fw-semibold">{{ r.request_code|default:"—" }}</div>
-              <div class="small text-muted">#{{ r.doc_request_id }}</div>
-            </td>
-            <td>{{ r.requester|default:"—" }}</td>
-            <td>
-              {% for d in r.doc_types %}
-                <span class="badge rounded-pill text-bg-secondary me-1">{{ d }}</span>
-              {% empty %}&mdash;{% endfor %}
-            </td>
-            <td>
-              <span class="badge text-bg-light">{{ r.status|default:"—" }}</span>
-            </td>
-            <td>{{ r.payment_method_name|default:"—" }}</td>
-            <td class="text-end">₱{{ r.amount_due|floatformat:2 }}</td>
-            <td class="text-end">₱{{ r.amount_paid|floatformat:2 }}</td>
-            <td class="text-end">₱{{ r.change_due|floatformat:2 }}</td>
-            <td class="text-end {% if r.balance > 0 %}text-danger{% endif %}">₱{{ r.balance|floatformat:2 }}</td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="11" class="text-center text-muted py-4">No receipts in this window.</td></tr>
-          {% endfor %}
-        </tbody>
-        <tfoot class="table-light">
-          <tr>
-            <th colspan="7" class="text-end">Totals</th>
-            <th class="text-end">₱{{ totals.total_due|floatformat:2 }}</th>
-            <th class="text-end">₱{{ totals.total_paid|floatformat:2 }}</th>
-            <th class="text-end">₱{{ totals.total_change|floatformat:2 }}</th>
-            <th class="text-end">₱{{ totals.total_balance|floatformat:2 }}</th>
-          </tr>
-        </tfoot>
-      </table>
+
+
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th scope="col">OR</th>
+              <th scope="col">Payment Method</th>
+              <th scope="col">Amount</th>
+              <th scope="col">Purpose</th>
+              <th scope="col">Issued By</th>
+              <th scope="col">Issued At</th>
+              <th scope="col" class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody id="results-body">
+            {% include "treasurer/_financial_report_rows.html" with rows=page_obj.object_list %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <!-- Pagination -->
   {% if page_obj.has_other_pages %}
-  <nav class="mt-3">
-    <ul class="pagination pagination-sm">
-      {% if page_obj.has_previous %}
-      <li class="page-item"><a class="page-link" href="?{% if q %}q={{ q }}&{% endif %}{% if doc_type %}doc_type={{ doc_type }}&{% endif %}{% if payment_method_id %}payment_method_id={{ payment_method_id }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}per_page={{ per_page }}&page={{ page_obj.previous_page_number }}">‹</a></li>
-      {% else %}<li class="page-item disabled"><span class="page-link">‹</span></li>{% endif %}
-      <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} / {{ paginator.num_pages }}</span></li>
-      {% if page_obj.has_next %}
-      <li class="page-item"><a class="page-link" href="?{% if q %}q={{ q }}&{% endif %}{% if doc_type %}doc_type={{ doc_type }}&{% endif %}{% if payment_method_id %}payment_method_id={{ payment_method_id }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}per_page={{ per_page }}&page={{ page_obj.next_page_number }}">›</a></li>
-      {% else %}<li class="page-item disabled"><span class="page-link">›</span></li>{% endif %}
-    </ul>
-  </nav>
+    <div class="page-pagination">
+    <div class="page-pagination">
+      {% include 'paginator.html' %}
+    </div>
   {% endif %}
 
-  <!-- Breakdown cards -->
-  <div class="row g-3 mt-3">
-    <div class="col-12 col-xl-6">
-      <div class="card shadow-sm">
-        <div class="card-header"><strong>Collected by Payment Method</strong></div>
-        <div class="card-body">
-          {% if totals.by_method %}
-            {% for k, v in totals.by_method.items %}
-              <div class="d-flex justify-content-between border-bottom py-1">
-                <div>{{ k }}</div><div>₱{{ v|floatformat:2 }}</div>
-              </div>
-            {% endfor %}
-          {% else %}
-            <div class="text-muted">—</div>
-          {% endif %}
-        </div>
-      </div>
+  {# ─── Offcanvas Filters (dynamic from form choices) ─── #}
+    <div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
+        aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150px;">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
-    <div class="col-12 col-xl-6">
-      <div class="card shadow-sm">
-        <div class="card-header"><strong>Collected by Document Type</strong></div>
-        <div class="card-body">
-          {% if totals.by_doc_type %}
-            {% for k, v in totals.by_doc_type.items %}
-              <div class="d-flex justify-content-between border-bottom py-1">
-                <div>{{ k }}</div><div>₱{{ v|floatformat:2 }}</div>
-              </div>
-            {% endfor %}
-          {% else %}
-            <div class="text-muted">—</div>
-          {% endif %}
+
+    <div class="offcanvas-body">
+        <form method="get" id="filterForm">
+        <div class="mb-3">
+            <label class="form-label">Business Category</label>
+            {{ form.b_category }}
         </div>
-      </div>
+
+        <div class="mb-3">
+            <label class="form-label">Ownership Type</label>
+            {{ form.ownership_type }}
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Status</label>
+            {{ form.status }}
+        </div>
+
+        {# keep search term when applying filters #}
+        <input type="hidden" name="search" value="{{ request.GET.search|default:'' }}"/>
+
+        <!-- Footer pinned to bottom, right-aligned -->
+        <div class="offcanvas-footer">
+            <div class="actions">
+            <a class="btn btn-outline-brand"
+                href="?search={{ request.GET.search|urlencode }}">Clear</a>
+            <button type="submit" class="btn btn-brand">Apply Filters</button>
+            </div>
+        </div>
+        </form>
     </div>
-  </div>
+    </div>
 
 </div>
+
 {% endblock %}
