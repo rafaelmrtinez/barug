@@ -2,18 +2,18 @@ from src.app.transfer_objects.dto.resident_dto import (
     ResidetDTO,
 )
 from src.app.contracts.resident_service_contract import (
-    IResidentRepository,
+    IResidentService,
 )
 from src.domain.contracts.resident_repository_contract import (
     IResidentRepository,
 )
 
-class ResidentService(IResidentRepository):
+class ResidentService(IResidentService):
     def __init__(
         self,
-        resident_repository: IResidentRepository,
+        repo: IResidentRepository,
     ):
-        self._resident_repo = resident_repository
+        self._resident_repo = repo
 
     def execute(
         self,

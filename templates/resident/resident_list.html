@@ -1,4 +1,3 @@
-{# household_list.html #}
 {% extends 'base.html' %}
 {% load static %}
 {% load bootstrap_icons %}
@@ -55,6 +54,7 @@
   <div class="container-fluid pt-3 page-main">
     <div class="row">
 
+      {# Toolbar with search and filter button #}
       <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
         {% csrf_token %}
         <div class="searchbox">
@@ -62,13 +62,12 @@
           {{ form.search }}
         </div>
 
-        {# persist selections in hidden inputs #}
-        <input type="hidden" name="house_type" value="{{ request.GET.house_type|default:'' }}">
-        <input type="hidden" name="house_ownership" value="{{ request.GET.house_ownership|default:'' }}">
+        {# persist purok_sitio selection #}
+        <input type="hidden" name="purok_sitio" value="{{ request.GET.purok_sitio|default:'' }}">
 
         {# Filters button with active-count badge #}
-        {% with ht=request.GET.house_type|yesno:"1,0" ho=request.GET.house_ownership|yesno:"1,0" %}
-          {% with fc=0|add:ht|add:ho %}
+        {% with psitio=request.GET.purok_sitio|yesno:"1,0" %}
+          {% with fc=0|add:psitio %}
             <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
                     type="button"
                     data-bs-toggle="offcanvas"
@@ -85,26 +84,13 @@
 
       {# Active filter chips #}
       <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
-        {% if request.GET.house_type or request.GET.house_ownership %}
+        {% if request.GET.purok_sitio %}
           <span class="text-muted me-1">Active:</span>
 
-          {% if request.GET.house_type %}
-            {% with label=form.house_type|choice_label:request.GET.house_type %}
-              <a class="filter-chip"
-                 href="?search={{ request.GET.search|urlencode }}{% if request.GET.house_ownership %}&house_ownership={{ request.GET.house_ownership|urlencode }}{% endif %}">
-                {{ label }} <span class="x">×</span>
-              </a>
-            {% endwith %}
-          {% endif %}
-
-          {% if request.GET.house_ownership %}
-            {% with label=form.house_ownership|choice_label:request.GET.house_ownership %}
-              <a class="filter-chip"
-                 href="?search={{ request.GET.search|urlencode }}{% if request.GET.house_type %}&house_type={{ request.GET.house_type|urlencode }}{% endif %}">
-                {{ label }} <span class="x">×</span>
-              </a>
-            {% endwith %}
-          {% endif %}
+          <a class="filter-chip"
+             href="?search={{ request.GET.search|urlencode }}">
+            {{ form.purok_sitio|choice_label:request.GET.purok_sitio }} <span class="x">×</span>
+          </a>
 
           <a class="btn btn-sm btn-outline-brand ms-1" href="?search={{ request.GET.search|urlencode }}">
             {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
@@ -114,6 +100,7 @@
         {% endif %}
       </div>
 
+      {# Table of residents #}
       <div class="table-responsive">
         <table class="table align-middle">
           <thead>
@@ -127,7 +114,7 @@
             </tr>
           </thead>
           <tbody id="results-body">
-            {% include "household/_resident_list.html" with rows=page_obj.object_list %}
+            {% include "resident/_resident_list.html" with rows=page_obj.object_list %}
           </tbody>
         </table>
       </div>
@@ -135,6 +122,7 @@
     </div>
   </div>
 
+  {# Pagination #}
   {% if page_obj.has_other_pages %}
     <div class="page-pagination">
       {% include 'paginator.html' %}
@@ -152,12 +140,8 @@
     <div class="offcanvas-body">
       <form method="get" id="filterForm">
         <div class="mb-3">
-          <label class="form-label">House Type</label>
-          {{ form.house_type }}
-        </div>
-        <div class="mb-3">
-          <label class="form-label">House Ownership</label>
-          {{ form.house_ownership }}
+          <label class="form-label">Purok / Sitio</label>
+          {{ form.purok_sitio }}
         </div>
 
         <input type="hidden" name="search" value="{{ request.GET.search|default:'' }}"/>
@@ -173,5 +157,55 @@
     </div>
   </div>
 </div>
+
+<script>
+(function () {
+  // elements
+  const input = document.getElementById('search');   // default Django id for form field "search"
+  const tbody = document.getElementById('results-body');
+  const endpoint = "{% url search_url %}";
+
+  // read current filter values from the page (keep your hidden inputs)
+  function currentParams() {
+    const params = new URLSearchParams();
+    params.set('q', (input?.value || '').trim());
+    params.set('tpl', 'rows');  
+    const purokSitio = document.querySelector('input[name="purok_sitio"]')?.value || '';
+    if (purokSitio) params.set('purok_sitio', purokSitio);
+    return params.toString();
+  }
+
+  // simple debounce
+  let t = null;
+  function debounce(fn, delay) {
+    return function (...args) {
+      clearTimeout(t);
+      t = setTimeout(() => fn.apply(this, args), delay);
+    }
+  }
+
+  async function fetchRows() {
+    try {
+      const url = endpoint + "?" + currentParams();
+      const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+      if (!res.ok) throw new Error("Network error");
+      const html = await res.text();
+      tbody.innerHTML = html;
+    } catch (err) {
+      // optional: show a small error row
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3">Failed to load results</td></tr>`;
+      console.error(err);
+    }
+  }
+
+  if (input && tbody) {
+    // initial live refresh (optional)
+    // fetchRows();
+
+    // live as the user types (300ms feels good)
+    input.addEventListener('input', debounce(fetchRows, 300));
+  }
+})();
+</script>
 
 {% endblock %}
