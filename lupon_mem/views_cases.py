@@ -223,6 +223,8 @@ def case_list(request: HttpRequest):
                 SELECT COUNT(*) FROM blotter_case bc
                 LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
                 LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+                LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
+                LEFT JOIN case_nature cn ON cn.case_nature_id = bc.case_nature_id
                 {where_sql}
             """
         else:
@@ -241,18 +243,22 @@ def case_list(request: HttpRequest):
                 TO_CHAR(bc.time_filed, 'HH12:MI AM')   AS time_filed_fmt,   -- 4
                 COALESCE(cs.case_state_name, 'PENDING')        AS case_state,         -- 5
                 COALESCE(ss.settlement_status_name, 'Pending') AS settlement_status,  -- 6
+                COALESCE(ct.complaint_title_name, '')          AS complaint_title,    -- 7
+                COALESCE(cn.case_name, '')                     AS case_nature,        -- 8
 
                 -- ===== fn_case_hearing_window extras (may be NULL if no KP-8 yet) =====
-                hw.window_end_date_text,      -- 7  e.g., "November 12, 2025"
-                hw.window_end_time_text,      -- 8  e.g., "10:09 pm"
-                hw.days_left,                 -- 9
-                hw.can_set_mediation,         -- 10
-                hw.can_set_conciliation,      -- 11
-                COALESCE(hw.mediation_hearings_set,  0) AS mediation_hearings_set,   -- 12
-                COALESCE(hw.mediation_hearings_held, 0) AS mediation_hearings_held   -- 13
+                hw.window_end_date_text,      -- 9  e.g., "November 12, 2025"
+                hw.window_end_time_text,      -- 10  e.g., "10:09 pm"
+                hw.days_left,                 -- 11
+                hw.can_set_mediation,         -- 12
+                hw.can_set_conciliation,      -- 13
+                COALESCE(hw.mediation_hearings_set,  0) AS mediation_hearings_set,   -- 14
+                COALESCE(hw.mediation_hearings_held, 0) AS mediation_hearings_held   -- 15
             FROM blotter_case bc
             LEFT JOIN case_state       cs ON cs.case_state_id = bc.case_state_id
             LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+            LEFT JOIN complaint_title   ct ON ct.complaint_title_id = bc.complaint_title_id
+            LEFT JOIN case_nature       cn ON cn.case_nature_id = bc.case_nature_id
 
             -- Pull the 15-day mediation window + counters for each row
             LEFT JOIN LATERAL fn_case_hearing_window(bc.blotter_case_id) hw ON TRUE

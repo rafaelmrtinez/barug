@@ -95,11 +95,14 @@ urlpatterns = [
     path("reports/<int:report_id>/decline/",  views_reports.report_decline, name="report_decline"), # added to views_reports 
     path("reports/<int:report_id>/pay-open/", views_reports.report_pay_and_open_case, name="report_pay_and_open_case"), # added to views_reports
     path("reports/<int:report_id>/payment-details/", views_reports.report_payment_details, name="report_payment_details"), # added to views_reports
+    path("store-session-values/", views_reports.store_session_values, name="store_session_values"),
 
     # ===== ADDED: flow progress API (namespaced) =====
     path("api/case/<int:case_id>/flow-progress", views_progress.flow_progress_api, name="flow_progress_api"),
     path("api/hearing-status/<int:case_id>/", views_hearing_api.hearing_status_api, name="hearing_status_api"),
     path("api/kp16-date/<int:case_id>/", views_api.kp16_date_api, name="kp16_date_api"),
+    path("api/case-kp7-details/<int:case_id>/", views_api.kp7_details_api, name="kp7_details_api"),
+    path("api/upcoming-hearings/<int:case_id>/", views_api.upcoming_hearings_api, name="upcoming_hearings_api"),
 
     # apis
     path("api/mediation-hearings/<int:case_id>/", views_cases.mediation_hearings_api, name="mediation_hearings_api"),
@@ -123,4 +126,5 @@ urlpatterns = [
     path("dashboard/", views.dashboard, name="dashboard"),
     path("incident-heatmap/", views.incident_heatmap, name="incident_heatmap"),
     path("mobile/residents/search/", residents_search, name="residents_search"),
+    
 ]

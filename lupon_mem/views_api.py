@@ -778,3 +778,59 @@ def kp16_date_api(request: HttpRequest, case_id: int):
             return JsonResponse({"ok": False, "error": "KP-16 date not found"})
     except Exception as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+
+@session_login_required
+@role_required(*LUPON_ROLES)
+@require_GET
+def kp7_details_api(request: HttpRequest, case_id: int):
+    """
+    API endpoint to fetch KP-7 complaint details and solutions sought.
+    Returns: { complaint_details: "...", solutions_seeked: "..." }
+    """
+    from lupon_mem.services.fields_util import get_latest_form_fields, get_field_text
+    
+    try:
+        rows = get_latest_form_fields(case_id, 'KP-7')
+        complaint_details = get_field_text(rows, 'complaint_details') or ''
+        solutions_seeked = get_field_text(rows, 'solutions_seeked') or ''
+        
+        return JsonResponse({
+            "complaint_details": complaint_details,
+            "solutions_seeked": solutions_seeked
+        })
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@session_login_required
+@role_required(*LUPON_ROLES)
+@require_GET
+def upcoming_hearings_api(request: HttpRequest, case_id: int):
+    """
+    API endpoint to check for upcoming hearings not yet held.
+    Returns: { count: number_of_upcoming_hearings }
+    """
+    try:
+        with connection.cursor() as cur:
+            # Use fn_case_mediation_hearings function like the existing code
+            cur.execute("SELECT * FROM fn_case_mediation_hearings(%s)", [case_id])
+            cols = [c[0] for c in cur.description] if cur.description else []
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()] if cols else []
+            
+            count = 0
+            for row in rows:
+                hearing_held = row.get('hearing_held', True)  # Default to True if missing
+                
+                # Count hearings that are not held yet
+                if not hearing_held:
+                    count += 1
+        
+        return JsonResponse({"count": count})
+    except Exception as e:
+        import logging
+        logging.error(f"upcoming_hearings_api error: {e}")
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+

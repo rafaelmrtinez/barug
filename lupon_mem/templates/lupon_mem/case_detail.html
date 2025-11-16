@@ -120,6 +120,10 @@
   /* Card Hover Effects */
   .card{ transition:box-shadow 0.15s ease; }
   .card:hover{ box-shadow:0 4px 20px rgba(0,0,0,0.08); }
+  
+  /* Notification Bubble */
+  .btn-with-badge{ position:relative; }
+  .btn-badge{ position:absolute; top:-6px; right:-6px; background:#dc3545; color:#fff; border-radius:50%; width:18px; height:18px; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; border:2px solid #fff; }
 </style>
 {% endblock css %}
 
@@ -213,8 +217,9 @@
         <a class="btn btn-outline-brand" href="{% url 'lupon_mem:case_timeline' case_id %}">
           {% bs_icon 'clock-history' extra_classes='me-1' %} Timeline
         </a>
-        <a class="btn btn-outline-brand" href="{% url 'lupon_mem:case_hearing_list' case_id %}">
+        <a class="btn btn-outline-brand btn-with-badge" href="{% url 'lupon_mem:case_hearing_list' case_id %}" id="hearingsBtn">
           {% bs_icon 'calendar-week' extra_classes='me-1' %} Hearings
+          <span class="btn-badge" id="hearingsBadge" style="display: none;"></span>
         </a>
         <!-- <a class="btn btn-brand" href="{% url 'lupon_mem:summon_attendance' case_id %}">
           {% bs_icon 'envelope' extra_classes='me-1' %} Summons / Attendance
@@ -230,6 +235,25 @@
       </div>
     </div>
   </section>
+
+  <!-- ======= KP-7 COMPLAINT DETAILS ======= -->
+  <div id="kp7ComplaintSection" class="card-lite mb-3" style="display: none;">
+    <div class="card-head">
+      {% bs_icon 'file-earmark-text' %} Complaint Details
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-8">
+          <h6 class="text-muted mb-2">Complaint Details:</h6>
+          <div id="kp7ComplaintDetails" class="mb-3" style="white-space: pre-wrap; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem; font-size: 0.9rem;"></div>
+        </div>
+        <div class="col-md-4">
+          <h6 class="text-muted mb-2">Solutions Sought:</h6>
+          <div id="kp7SolutionsSought" style="white-space: pre-wrap; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem; font-size: 0.9rem;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ======= ATTACHED FORMS ======= -->
   <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
@@ -408,9 +432,9 @@
     {% endif %}
 
     <div class="flow-toolbar">
-      <span id="chipPB" class="flow-chip">1: PB Mediation (3 attempts max)</span>
-      <span id="chipP1" class="flow-chip">2: Pangkat Conciliation</span>
-      <span id="chipP2" class="flow-chip">3: Resolution/CFA</span>
+      <span id="chipPB" class="flow-chip" hidden>1: PB Mediation (3 attempts max)</span>
+      <span id="chipP1" class="flow-chip" hidden>2: Pangkat Conciliation</span>
+      <span id="chipP2" class="flow-chip" hidden>3: Resolution/CFA</span>
       <div class="ms-auto d-flex align-items-center gap-2">
         {% if pb_first_meeting_at %}
           <span class="deadline-pill" id="pbChipPill" hidden>
@@ -626,6 +650,65 @@
     return ATTACHED.filter(f => f === upperCode).length;
   }
 
+  /* ===== KP-7 Complaint Details Display ===== */
+  async function loadKP7Details(){
+    if (!haveForm('KP-7')) return;
+    
+    try {
+      const response = await fetch(`/lupon_mem/api/case-kp7-details/{{ case_id }}/`, { credentials:'same-origin' });
+      if (!response.ok) throw new Error('Failed to fetch KP-7 details');
+      const data = await response.json();
+      
+      const section = document.getElementById('kp7ComplaintSection');
+      const detailsDiv = document.getElementById('kp7ComplaintDetails');
+      const solutionsDiv = document.getElementById('kp7SolutionsSought');
+      
+      if (data.complaint_details || data.solutions_seeked) {
+        detailsDiv.textContent = data.complaint_details || 'No complaint details provided.';
+        solutionsDiv.textContent = data.solutions_seeked || 'No solutions specified.';
+        section.style.display = 'block';
+      }
+    } catch (error) {
+      console.warn('Failed to load KP-7 details:', error);
+    }
+  }
+
+  // Load KP-7 details on page load
+  document.addEventListener('DOMContentLoaded', loadKP7Details);
+
+  /* ===== Check for upcoming hearings ===== */
+  async function checkUpcomingHearings(){
+    try {
+      const response = await fetch(`/lupon_mem/api/upcoming-hearings/{{ case_id }}/`, { credentials:'same-origin' });
+      console.log('API Response status:', response.status);
+      if (!response.ok) {
+        console.error('API failed with status:', response.status);
+        return;
+      }
+      const data = await response.json();
+      
+      console.log('Upcoming hearings check:', data); // Debug log
+      
+      const badge = document.getElementById('hearingsBadge');
+      console.log('Badge element found:', !!badge);
+      
+      if (data.count > 0) {
+        badge.textContent = data.count;
+        badge.style.display = 'flex';
+        console.log('Red badge shown with count:', data.count); // Debug log
+      } else {
+        console.log('No upcoming hearings found'); // Debug log
+      }
+    } catch (error) {
+      console.error('Failed to check upcoming hearings:', error);
+    }
+  }
+  
+
+
+  // Check for upcoming hearings on page load
+  document.addEventListener('DOMContentLoaded', checkUpcomingHearings);
+
   /* ===== Hearing status checker (optional API) ===== */
   async function checkHearingStatus(){
     try {
@@ -728,30 +811,31 @@
     kp18_kp19_pangkat_1:{code:"KP-18 & KP-19",title:"Both Parties Failed to Appear (1st Pangkat)",note:"Both parties failed to appear for 1st Pangkat hearing. Issue both failure notices.",next:"pangkat_choice_1"},
     kp18_kp19_pangkat_2:{code:"KP-18 & KP-19",title:"Both Parties Failed to Appear (2nd Pangkat)",note:"Both parties failed to appear for final Pangkat hearing. Issue both notices, then CFA.",next:"kp20"},
     kp10:{code:"KP-10",title:"Notice for Constitution of Pangkat",note:"PB mediation failed or window expired. Constitute Pangkat within 3 days. Select 3 members.",next:"kp11",enter:()=>{hearingNo=2;}},
-    kp11:{code:"KP-11",title:"Notice to Chosen Pangkat Member",note:"Notify selected Pangkat members of their appointment. Pangkat has 15 days to conciliate (extendable to 30).",next:"kp12_first"},
+    kp11:{code:"KP-11",title:"Notice to Chosen Pangkat Member",note:"If you wish to add more Pangkat members, just click “Add Form”.",next:"kp12_first"},
     kp12_first:{code:"KP-12",title:"Notice of Hearing (1st Pangkat Conciliation)",note:"Schedule 1st Pangkat conciliation hearing within 15-day window.",next:"pangkat_hearing_1"},
     pangkat_hearing_1:{code:"—",title:"1st Pangkat Conciliation Hearing",note:"Conduct 1st Pangkat conciliation. Record outcome in Hearings page.",branches:[{label:"SETTLED",next:"kp16_settled"},{label:"NOT SETTLED",next:"pangkat_choice_1"},{label:"NO SHOW",next:"kp19_pangkat_1"},{label:"BOTH NO SHOW",next:"kp18_kp19_pangkat_1"},{label:"AGREE TO ARBITRATION",next:"kp14"}]},
     pangkat_choice_1:{code:"—",title:"Pangkat Options (After 1st Hearing)",note:"1st Pangkat hearing unsuccessful. Choose next action within 15-day window.",branches:[{label:"Schedule 2nd Conciliation",next:"kp12_second"},{label:"Issue Certificate to File Action",next:"kp20"}]},
     kp12_second:{code:"KP-12",title:"Notice of Hearing (2nd Pangkat Conciliation)",note:"Schedule 2nd Pangkat conciliation within remaining window.",next:"pangkat_hearing_2",enter:()=>{hearingNo=3;}},
     pangkat_hearing_2:{code:"—",title:"2nd Pangkat Conciliation Hearing",note:"Final Pangkat conciliation attempt. Record outcome.",branches:[{label:"SETTLED",next:"kp16_settled"},{label:"NOT SETTLED",next:"kp20"},{label:"NO SHOW",next:"kp19_pangkat_2"},{label:"BOTH NO SHOW",next:"kp18_kp19_pangkat_2"},{label:"AGREE TO ARBITRATION",next:"kp14"}]},
     kp19_pangkat_1:{code:"KP-19",title:"Failure to Appear (1st Pangkat)",note:"Party failed to appear for 1st Pangkat hearing.",next:"pangkat_choice_1"},
-    kp19_pangkat_2:{code:"KP-19",title:"Failure to Appear (2nd Pangkat)",note:"Party failed to appear for 2nd Pangkat hearing. Issue Certificate to File Action.",next:"kp20"},
-    kp14:{code:"KP-14",title:"Agreement for Arbitration",note:"Parties agreed to arbitration. Pangkat will decide the case.",next:"kp15"},
-    kp15:{code:"KP-15",title:"Arbitration Award",note:"Pangkat renders arbitration decision. Case resolved through arbitration.",branches:[{label:"Award Accepted",next:"kp23"},{label:"Award Repudiated",next:"kp17"}]},
-    kp16_settled:{code:"KP-16",title:"Amicable Settlement",note:"Case settled through mediation/conciliation. Parties sign settlement agreement.",branches:[{label:"Settlement Accepted",next:"kp23"},{label:"Settlement Repudiated",next:"kp17"}]},
-    kp20:{code:"KP-20",title:"Certificate to File Action (CFA)",note:"Barangay conciliation failed. Issue CFA allowing parties to file case in court.",branches:[{label:"Issue KP-20",next:"kp20_issued"},{label:"Issue KP-20A (Complainant)",next:"kp20a"},{label:"Issue KP-20B (Respondent)",next:"kp20b"}]},
-    kp20_issued:{code:"KP-20",title:"Certificate to File Action Issued",note:"CFA issued to both parties. Case may proceed to court.",next:"case_closed"},
-    kp20_repudiation:{code:"KP-20",title:"Certificate to File Action (Repudiation)",note:"Settlement was repudiated. Issue KP-20 CFA to allow parties to file case in court.",next:"case_closed"},
-    kp20a:{code:"KP-20A",title:"CFA for Complainant",note:"Certificate issued specifically for complainant to file action in court.",next:"case_closed"},
-    kp20b:{code:"KP-20B",title:"CFA for Respondent",note:"Certificate issued for respondent (counter-complaint or defense).",next:"case_closed"},
-    kp17:{code:"KP-17",title:"Repudiation of Settlement",note:"Party repudiates previously signed settlement. Issue Certificate to File Action.",next:"kp20_repudiation"},
-    kp18:{code:"KP-18",title:"Notice of Hearing (Repudiation)",note:"Hearing for repudiation of settlement agreement.",next:"kp17"},
-    kp21:{code:"KP-21",title:"Withdrawal of Complaint/Petition",note:"Complainant withdraws the case. Case closed.",next:"case_closed"},
-    kp22:{code:"KP-22",title:"Dismissal of Complaint/Petition",note:"Case dismissed by Lupon. Case closed.",next:"case_closed"},
-    kp23:{code:"KP-23",title:"Motion for Execution of Settlement",note:"Motion to enforce settlement agreement.",next:"kp24"},
-    kp24:{code:"KP-24",title:"Notice of Hearing (Motion for Execution)",note:"Hearing on motion for execution of settlement.",next:"kp25"},
-    kp25:{code:"KP-25",title:"Notice of Execution",note:"Final notice for execution of settlement agreement.",next:"case_closed"},
-    case_closed:{code:"—",title:"Case Closed",note:"Case has been resolved and closed. No further action required.",final:true}
+    kp19_pangkat_2:{code:"KP-19",title:"Failure to Appear (2nd Pangkat)",note:"Respondent failed to appear for 2nd Pangkat hearing. Issue Certificate to File Action.",next:"kp20"},
+    kp14:{code:"KP-14",title:"Arbitration Agreement",note:"Parties agreed to arbitration. Proceed with arbitration process.",next:"kp15"},
+    kp15:{code:"KP-15",title:"Arbitration Award",note:"Arbitration award issued. Record the outcome.",branches:[{label:"Award Honored",next:"close_case"},{label:"Award Not Complied",next:"kp23"},{label:"Award Repudiated",next:"kp17"}]},
+    kp16_settled:{code:"KP-16",title:"Amicable Settlement",note:"Case settled through mediation/conciliation. Record settlement details.",branches:[{label:"Settlement Complied",next:"close_case"},{label:"Settlement Not Complied",next:"kp23"},{label:"Settlement Repudiated",next:"kp17"}]},
+    kp17:{code:"KP-17",title:"Repudiation of Settlement/Award",note:"Settlement or award was repudiated. Issue notice of repudiation.",next:"kp20"},
+    kp20:{code:"KP-20",title:"Certificate to File Action (CFA)",note:"Issue Certificate to File Action. Case can proceed to court.",next:"close_case"},
+    kp23:{code:"KP-23",title:"Notice of Non-Compliance",note:"Issue notice for non-compliance with settlement/award.",next:"kp24"},
+    kp24:{code:"KP-24",title:"Motion for Execution",note:"File motion for execution of settlement/award.",next:"kp25"},
+    kp25:{code:"KP-25",title:"Writ of Execution",note:"Issue writ of execution to enforce settlement/award.",next:"close_case"},
+    kp14:{code:"KP-14",title:"Arbitration Agreement",note:"Parties agreed to arbitration. Proceed with arbitration process.",next:"kp15"},
+    kp15:{code:"KP-15",title:"Arbitration Award",note:"Arbitration award issued. Record the outcome.",branches:[{label:"Award Honored",next:"close_case"},{label:"Award Not Complied",next:"kp23"},{label:"Award Repudiated",next:"kp17"}]},
+    kp16_settled:{code:"KP-16",title:"Amicable Settlement",note:"Case settled through mediation/conciliation. Record settlement details.",branches:[{label:"Settlement Complied",next:"close_case"},{label:"Settlement Not Complied",next:"kp23"},{label:"Settlement Repudiated",next:"kp17"}]},
+    kp17:{code:"KP-17",title:"Repudiation of Settlement/Award",note:"Settlement or award was repudiated. Issue notice of repudiation.",next:"kp20"},
+    kp20:{code:"KP-20",title:"Certificate to File Action (CFA)",note:"Issue Certificate to File Action. Case can proceed to court.",next:"close_case"},
+    kp23:{code:"KP-23",title:"Notice of Non-Compliance",note:"Issue notice for non-compliance with settlement/award.",next:"kp24"},
+    kp24:{code:"KP-24",title:"Motion for Execution",note:"File motion for execution of settlement/award.",next:"kp25"},
+    kp25:{code:"KP-25",title:"Writ of Execution",note:"Issue writ of execution to enforce settlement/award.",next:"close_case"},
+    close_case:{code:"—",title:"Case Closed",note:"Case has been resolved and closed. No further action required.",actions:["Update Case Status","Generate Final Report"]}
   };
 
   async function renderCurrentStep() {
@@ -795,7 +879,7 @@
     const li = document.createElement('li');
     li.className = 'flow-step';
     const hearingBadge = /Summons|Hearing|Mediation|Pangkat|Conciliation/i.test(step.title)
-      ? `<div class="subtitle mt-1"><span class="branch">${hearingLabel(hearingNo)}</span></div>` : '';
+      ? `<div class="subtitle mt-1" hidden><span class="branch">${hearingLabel(hearingNo)}</span></div>` : '';
     const mediationBadge = currentStep.includes('kp8') || currentStep.includes('kp9')
       ? `<div class="subtitle mt-1"><span class="branch">Mediation ${mediationCount}/3 within PB Window</span></div>` : '';
 

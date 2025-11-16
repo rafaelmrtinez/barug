@@ -693,16 +693,30 @@ def report_review(request: HttpRequest, report_id: int):
                      ), '—'
                    ) AS incident_address,
                    a.latitude,
-                   a.longitude
+                   a.longitude,
+                   br.temp_complaint_title_id,
+                   br.temp_case_nature_id,
+                   ct.complaint_title_name,
+                   cn.case_name
             FROM blotter_report br
             LEFT JOIN payment_status ps ON ps.payment_status_id = br.payment_status_id
             LEFT JOIN addresss a        ON a.address_id = br.incident_address_id
             LEFT JOIN purok_sitio pks   ON pks.purok_sitio_id = a.purok_sitio_id
+            LEFT JOIN complaint_title ct ON ct.complaint_title_id = br.temp_complaint_title_id
+            LEFT JOIN case_nature cn     ON cn.case_nature_id = br.temp_case_nature_id
             WHERE br.blotter_report_id=%s
         """, [report_id])
         rpt = cur.fetchone()
         if not rpt:
             return HttpResponseBadRequest("Report not found.")
+        
+        print(f"[DEBUG][REVIEW] Report data: temp_complaint_title_id={rpt[8]}, temp_case_nature_id={rpt[9]}")
+        print(f"[DEBUG][REVIEW] Names: complaint_title_name='{rpt[10]}', case_name='{rpt[11]}'")
+        
+        # Additional debug: verify the data we got
+        print(f"[DEBUG][REVIEW] Full report tuple length: {len(rpt)}")
+        for i, val in enumerate(rpt):
+            print(f"[DEBUG][REVIEW] rpt[{i}] = {val}")
 
         # parties
         cur.execute("""
@@ -767,6 +781,14 @@ def report_review(request: HttpRequest, report_id: int):
         "reviewed_by": (latest_review[4] if latest_review else None),
         "reviewed_at": (latest_review[2] if latest_review else None),
         "review_remarks": (latest_review[1] if latest_review else None),
+        
+        # stored selections (if approved) - complaint_title_name is at index 10, case_name is at index 11
+        "selected_complaint_title": rpt[10] if len(rpt) > 10 else None,  # complaint_title_name
+        "selected_case_nature": rpt[11] if len(rpt) > 11 else None,      # case_name
+        
+        # Debug what we're passing to template
+        "debug_complaint_title": rpt[10] if len(rpt) > 10 else "None",
+        "debug_case_nature": rpt[11] if len(rpt) > 11 else "None",
     }
     return render(request, "lupon_mem/report_review.html", ctx)
 
@@ -781,17 +803,32 @@ def report_approve(request: HttpRequest, report_id: int):
     if not staff_id:
         return HttpResponseBadRequest("Missing staff id.")
 
-    # DEBUG: show who/what is approving
-    print("\n[DEBUG][APPROVE] report_id=", report_id, " staff_id=", staff_id)
+    # DEBUG: show what form data is being passed
+    case_name = request.POST.get('case_name')
+    complaint_title_id = _toi(request.POST.get('complaint_title_id'))
+    case_nature_id = _toi(request.POST.get('case_nature_id'))
+    settlement_status_id = _toi(request.POST.get('settlement_status_id'))
+    
+    print(f"\n[DEBUG][APPROVE] Form data: case_name={case_name}, complaint_title_id={complaint_title_id}, case_nature_id={case_nature_id}, settlement_status_id={settlement_status_id}")
+    print("[DEBUG][APPROVE] report_id=", report_id, " staff_id=", staff_id)
+    
+    # Store selected values in session for pay-open flow
+    if complaint_title_id:
+        request.session['selected_complaint_title_id'] = complaint_title_id
+    if case_nature_id:
+        request.session['selected_case_nature_id'] = case_nature_id
+    request.session.modified = True
+    print(f"[DEBUG][APPROVE] Stored in session: complaint_title_id={complaint_title_id}, case_nature_id={case_nature_id}")
     try:
         with connection.cursor() as cur:
-            print("[DEBUG][APPROVE] SQL → approve_report_set_unpaid(%s,%s,%s)")
+            print("[DEBUG][APPROVE] SQL → approve_report_set_unpaid(%s,%s,%s,%s,%s)")
             cur.execute(
-                "SELECT approve_report_set_unpaid(%s,%s,%s)",
-                [report_id, staff_id, "Approved for case payment"],
+                "SELECT approve_report_set_unpaid(%s,%s,%s,%s,%s)",
+                [report_id, staff_id, "Approved for case payment", complaint_title_id, case_nature_id],
             )
             res = cur.fetchone()
             print("[DEBUG][APPROVE] DB result:", res)
+            print(f"[DEBUG][APPROVE] Stored case details via function: complaint_title_id={complaint_title_id}, case_nature_id={case_nature_id}")
     except Exception as e:
         print("[DEBUG][APPROVE][ERROR]", e)
         raise
@@ -956,9 +993,38 @@ def report_pay_and_open_case(request: HttpRequest, report_id: int):
             r_last = rsp_name.split()[-1]
             initial_case_name = f"{c_last} vs. {r_last}"
 
-        # defaults for read-only selects (we still need IDs to POST, so we'll render hidden inputs)
-        ct_id, ct_name = (complaint_titles[0][0], complaint_titles[0][1]) if complaint_titles else (None, "")
-        cn_id, cn_name = (case_natures[0][0], case_natures[0][1]) if case_natures else (None, "")
+        # Get selected values from database (stored during approve) or use defaults
+        with connection.cursor() as cur:
+            cur.execute(
+                "SELECT temp_complaint_title_id, temp_case_nature_id FROM blotter_report WHERE blotter_report_id = %s",
+                [report_id]
+            )
+            temp_row = cur.fetchone()
+            ct_id = temp_row[0] if temp_row and temp_row[0] else None
+            cn_id = temp_row[1] if temp_row and temp_row[1] else None
+            print(f"[DEBUG][PAY_OPEN] Retrieved from DB: complaint_title_id={ct_id}, case_nature_id={cn_id}")
+        
+        # Find names for the selected IDs
+        ct_name = ""
+        cn_name = ""
+        
+        if ct_id:
+            for cid, cname in complaint_titles:
+                if cid == ct_id:
+                    ct_name = cname
+                    break
+        else:
+            # Use first as default if no session data
+            ct_id, ct_name = (complaint_titles[0][0], complaint_titles[0][1]) if complaint_titles else (None, "")
+            
+        if cn_id:
+            for nid, nname in case_natures:
+                if nid == cn_id:
+                    cn_name = nname
+                    break
+        else:
+            # Use first as default if no session data
+            cn_id, cn_name = (case_natures[0][0], case_natures[0][1]) if case_natures else (None, "")
 
         # settlement defaults to ONGOING
         st_id, st_name = (None, "")
@@ -1165,3 +1231,22 @@ def update_settlement_status(request, case_id: int):
         messages.error(request, f"Failed to update settlement status: {e}")
 
     return redirect("lupon_mem:case_detail", case_id=case_id)
+
+
+@session_login_required
+@require_POST
+def store_session_values(request):
+    """Store selected complaint title and case nature in session for pay-open flow"""
+    import json
+    try:
+        data = json.loads(request.body)
+        ct_id = data.get('complaint_title_id')
+        cn_id = data.get('case_nature_id')
+        print(f"[DEBUG][STORE_SESSION] Storing: complaint_title_id={ct_id}, case_nature_id={cn_id}")
+        request.session['selected_complaint_title_id'] = ct_id
+        request.session['selected_case_nature_id'] = cn_id
+        request.session.modified = True
+        return JsonResponse({'success': True})
+    except Exception as e:
+        print(f"[DEBUG][STORE_SESSION][ERROR] {e}")
+        return JsonResponse({'success': False}, status=400)

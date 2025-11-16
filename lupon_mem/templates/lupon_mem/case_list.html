@@ -146,6 +146,8 @@
           <tr>
             <th>Case No.</th>
             <th>Name</th>
+            <th>Nature of Case</th>
+            <th>Complaint Title</th>
             <th>Filed</th>
             <th>Case State</th>
             <th>Settlement</th>
@@ -159,6 +161,8 @@
               <span class="code-badge"><span class="hash">#</span>{{ r.1 }}</span>
             </td>
             <td class="fw-semibold">{{ r.2 }}</td>
+            <td>{{ r.8|default:"—" }}</td>
+            <td>{{ r.7|default:"—" }}</td>
 
             <td>
               <span class="dt-chip">
@@ -204,7 +208,7 @@
             </td>
           </tr>
           {% empty %}
-            <tr><td colspan="6" class="text-center py-5 text-muted">No matching cases.</td></tr>
+            <tr><td colspan="8" class="text-center py-5 text-muted">No matching cases.</td></tr>
           {% endfor %}
         </tbody>
       </table>
