@@ -582,7 +582,14 @@ def resident_lookup(request: HttpRequest):
     clicking "Use this person" will attempt to fill that INPUT_ID in the opener window.
     """
     target_input = (request.GET.get("target") or "").strip() or None
-    return render(request, "lupon_mem/resident_lookup.html", {"target_input": target_input})
+    auth = request.session.get("auth") or {}
+    user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
+    
+    return render(request, "lupon_mem/resident_lookup.html", {
+        "target_input": target_input,
+        'page_path': f'{user_role} / Resident Lookup',
+        'page_title': 'Resident Lookup'
+    })
 
 
 @session_login_required

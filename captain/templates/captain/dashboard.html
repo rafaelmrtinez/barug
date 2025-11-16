@@ -95,6 +95,9 @@
             <div class="text-muted small mt-1">{{ today|default:"" }}</div>
           </div>
           <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'captain:incident_heatmap' %}" class="btn btn-outline-brand">
+              {% bs_icon 'geo-alt' %}<span class="ms-1">Incident Heatmap</span>
+            </a>
             <a href="" class="btn btn-outline-brand">
               {% bs_icon 'exclamation-octagon' %}<span class="ms-1">Lupon Cases</span>
             </a>

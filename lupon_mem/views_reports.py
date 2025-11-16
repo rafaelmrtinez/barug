@@ -367,7 +367,12 @@ def report_list(request: HttpRequest):
 @role_required(*LUPON_ROLES)
 def report_new(request: HttpRequest):
     if request.method == "GET":
-        return render(request, "lupon_mem/report_new.html", {"page_title": "New Report"})
+        auth = request.session.get("auth") or {}
+        user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
+        return render(request, "lupon_mem/report_new.html", {
+            'page_path': f'{user_role} / New Report',
+            'page_title': 'New Report'
+        })
 
     auth = request.session.get("auth") or {}
     staff_id = auth.get("staff_id")
@@ -552,9 +557,10 @@ def report_confirm(request: HttpRequest, report_id: int):
             "case_natures": case_natures,
             "settlement_statuses": settlements,
             "report_id": report_id,
-            "page_title": "Confirm & Open Case",
             "user_role": user_role,
             "initial_case_name": initial_case_name,
+            'page_path': f'{user_role} / Confirm & Open Case',
+            'page_title': 'Confirm & Open Case',
         }
         return render(request, "lupon_mem/report_confirm.html", ctx)
 
@@ -766,7 +772,6 @@ def report_review(request: HttpRequest, report_id: int):
     is_reviewed = pay_status in ("PAID", "UNPAID", "DECLINED") or action in ("APPROVED", "DECLINED")
 
     ctx = {
-        "page_title": "Approve Blotter Report",
         "report": rpt,
         "parties": parties,
         "complaint_titles": complaint_titles,
@@ -789,6 +794,8 @@ def report_review(request: HttpRequest, report_id: int):
         # Debug what we're passing to template
         "debug_complaint_title": rpt[10] if len(rpt) > 10 else "None",
         "debug_case_nature": rpt[11] if len(rpt) > 11 else "None",
+        'page_path': f'{role} / Review Report',
+        'page_title': 'Review Blotter Report',
     }
     return render(request, "lupon_mem/report_review.html", ctx)
 
@@ -890,9 +897,13 @@ def report_payment_details(request: HttpRequest, report_id: int):
         cols = [d[0] for d in cur.description]
         data = dict(zip(cols, row))
     
+    auth = request.session.get("auth") or {}
+    user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
     return render(request, "lupon_mem/report_payment_details.html", {
         "report": (data['blotter_report_id'], data['incident_subject'], data['date_time_reported']),
-        "payment": data
+        "payment": data,
+        'page_path': f'{user_role} / Payment Details',
+        'page_title': 'Payment Details'
     })
 
 
@@ -1068,6 +1079,12 @@ def report_pay_and_open_case(request: HttpRequest, report_id: int):
             "default_or": _make_default_or(report_id),
             "default_amount": "150.00",
         }
+        auth = request.session.get("auth") or {}
+        user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
+        ctx.update({
+            'page_path': f'{user_role} / Pay & Open Case',
+            'page_title': 'Pay & Open Case'
+        })
         return render(request, "lupon_mem/report_pay.html", ctx)
 
     # -------- POST: consume hidden read-only values and optional payment --------

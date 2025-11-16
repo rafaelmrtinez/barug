@@ -417,6 +417,9 @@ def case_detail(request: HttpRequest, case_id: int):
 
     lookup_cache = _fetch_lookups()
 
+    auth = request.session.get("auth") or {}
+    user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
+    
     context = {
         "case": case_row,
         "forms": [
@@ -446,6 +449,8 @@ def case_detail(request: HttpRequest, case_id: int):
         "has_hearing": False,
         "submitted_form_codes": list(submitted_form_codes),
         "progress_percentage": progress_percentage,
+        'page_path': f'{user_role} / Case Detail',
+        'page_title': f'Case #{case_row[1]}' if case_row else 'Case Detail',
     }
 
     return render(request, "lupon_mem/case_detail.html", context)
@@ -457,10 +462,13 @@ def case_detail(request: HttpRequest, case_id: int):
 @role_required(*LUPON_ROLES, "barangay treasurer")
 def case_new(request: HttpRequest) -> HttpResponse:
     if request.method == "GET":
+        auth = request.session.get("auth") or {}
+        user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
         ctx = {
             "lookups": _fetch_lookups(),
             "initial": {},
-            "page_title": "New Blotter Case",
+            'page_path': f'{user_role} / New Case',
+            'page_title': 'New Blotter Case',
         }
         return render(request, "lupon_mem/case_new.html", ctx)
 
