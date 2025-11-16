@@ -64,6 +64,9 @@ from src.app.services.dashboards_service import (
     CaptainDashboardService,
     SecretaryDashboardService,
     LuponMemberDashboardService,
+    BhwDashboardService,
+    MidwifeDashboardService,
+    AdminDashboardService,
 )
 
 
@@ -241,6 +244,21 @@ class AppContainer(containers.DeclarativeContainer):
     lupon_mem_dashboard_service: providers.Factory[LuponMemberDashboardService] = providers.Factory(
         LuponMemberDashboardService,
         dashboard_repo=infra.lupon_mem_dashboard_repository,
+    )
+
+    bhw_dashboard_service: providers.Factory[BhwDashboardService] = providers.Factory(
+        BhwDashboardService,
+        dashboard_repo=infra.bhw_dashboard_repository,
+    )
+
+    midwife_dashboard_service: providers.Factory[MidwifeDashboardService] = providers.Factory(
+        MidwifeDashboardService,
+        dashboard_repo=infra.midwife_dashboard_repository,
+    )
+
+    admin_dashboard_service: providers.Factory[AdminDashboardService] = providers.Factory(
+        AdminDashboardService,
+        dashboard_repo=infra.admin_dashboard_repository,
     )
     
     # Child health schedule service (thin orchestration service)
