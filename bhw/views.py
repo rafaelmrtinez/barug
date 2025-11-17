@@ -26,12 +26,13 @@ from .forms import ChildHealtheRecordForm
 
 
 # Raph
-from typing import Any
+from typing import Any, Optional
 from django.shortcuts import render, redirect
 from django.core.paginator import Paginator
 from django.http import JsonResponse, HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.template.loader import render_to_string
 from django.contrib import messages
+from datetime import datetime
 
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
@@ -43,6 +44,7 @@ from .forms import (
     Reschedule,
     MaternalBhwIntakeForm,
 )
+
 
 # All logic lives here:
 from . import health_views as hv
@@ -275,17 +277,53 @@ def household_info(
         'families': household_details.get('family_units'),
     })
 
+def _auth_role_name(request: HttpRequest) -> str:
+    return (((request.session.get("auth") or {}).get("role_name")) or "Staff").title()
+
+def _auth_staff_id(request: HttpRequest) -> Optional[int]:
+    return ((request.session.get("auth") or {}).get("staff_id")) or None
+
 @session_login_required
 @role_required(*hv.ROLE_BHW)
 @nocache
-def dashboard(request: HttpRequest) -> HttpResponse:
-    auth = request.session.get("auth")
-    profile = getattr(request, "person_profile", None)
-    return render(request, "bhw_dashboard.html", {
-        "page_path": "Barangay Health Worker/Dashboard",
-        "page_title": "Dashboard",
-        "profile": profile,
-        "auth": auth,
+@inject
+def dashboard(
+    request: HttpRequest,
+    bhw_dashboard_service=Provide[AppContainer.bhw_dashboard_service],
+):
+    user_role = _auth_role_name(request)
+
+    bhw_id = _auth_staff_id(request)
+
+
+    kpis = {
+        "ongoing_maternal_total": 0,
+        "ongoing_maternal_total_sub": 0,
+        "visit_today_maternal": 0,
+        "visit_today_postpartum": 0,
+        "visit_today_child": 0,
+        "household_to_be_visited": 0,
+        "residents_total": 0,
+        "families_total": 0,
+        "household_total": 0,
+    }
+
+    dashboard_json = None
+
+    try:
+        payload = bhw_dashboard_service.get_dashboard_content(bhw_id) or {}
+        kpis = payload.get("kpis", kpis)
+        dashboard_json = payload.get("dashboard_json")
+    except Exception as exc:
+        print("Error fetching bhw dashboard KPIs:", exc)
+
+
+    return render(request, "bhw/dashboard.html", {
+        'page_path' : f'{user_role} / Dashboard',
+        'page_title' : 'Dashboard',
+        'kpis': kpis,
+        'dashboard_json': dashboard_json,
+        'today': datetime.now().strftime("%B %d, %Y"),
     })
 
 @session_login_required

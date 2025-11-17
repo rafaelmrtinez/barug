@@ -531,6 +531,18 @@
       ChartUtils.renderBar('casesNature', dash.casesNature.labels||[], dash.casesNature.data||[], { palette:pal, labelFontSize: 11, });
       document.querySelector('.chart-skel-cases')?.classList?.add('hidden');
     }
+
+    if(document.getElementById('childvaxPerMonth') && dash.childvaxPerMonth){
+      const pal = config.palette || [DEFAULTS.BRAND700,DEFAULTS.BRAND500,DEFAULTS.BRAND300,DEFAULTS.NEU300];
+      ChartUtils.renderBar('childvaxPerMonth', dash.childvaxPerMonth.labels||[], dash.childvaxPerMonth.data||[], { palette:pal });
+      document.querySelector('.chart-skel-childvax')?.classList?.add('hidden');
+    }
+
+    if(document.getElementById('maternalvaxPerMonth') && dash.maternalvaxPerMonth){
+      const pal = config.palette || [DEFAULTS.BRAND700,DEFAULTS.BRAND500,DEFAULTS.BRAND300,DEFAULTS.NEU300];
+      ChartUtils.renderBar('maternalvaxPerMonth', dash.maternalvaxPerMonth.labels||[], dash.maternalvaxPerMonth.data||[], { palette:pal });
+      document.querySelector('.chart-skel-maternalvax')?.classList?.add('hidden');
+    }
   };
 
   // expose
