@@ -30,6 +30,7 @@ class PostpartumRecordForm(forms.Form):
     )
     vit_a_supplementation = forms.DateField(required=False, widget=forms.DateInput(attrs={'type': 'date'}))
     mebendazole_given = forms.DateField(required=False, widget=forms.DateInput(attrs={'type': 'date'}))
+    bf_initiated_at = forms.DateTimeField(required=False, widget=forms.DateTimeInput(attrs={'type': 'datetime-local'}))
     lochial_discharges_baseline = forms.CharField(required=False, max_length=500)
     pads_per_day_baseline = forms.IntegerField(required=False)
 

@@ -9,7 +9,6 @@
       <form id="postpartumRecordForm" method="post">
         {% csrf_token %}
         {{ postpartum_form.maternal_record_id }}
-        {{ postpartum_form.attended_by_id }}
         <div class="modal-body">
           <div class="row g-3">
             <div class="col-md-6">
@@ -21,8 +20,13 @@
               {{ postpartum_form.time_of_delivery }}
             </div>
 
+            <div class="col-md-6">
+              <label for="bf_initiated_at" class="form-label">Breastfeeding Initiated At</label>
+              {{ postpartum_form.bf_initiated_at }}
+            </div>
+
             <div class="col-md-12">
-              <label for="attended_by_id" class="form-label">Attended By</label>
+              <label for="id_attended_by_id" class="form-label">Attended By</label>
               {{ postpartum_form.attended_by_id }}
             </div>
 

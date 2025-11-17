@@ -1,4 +1,4 @@
-from datetime import date, time
+from datetime import date, time, datetime
 from psycopg2.extras import Json
 
 from src.infra.database.connection_adapter import ConnectionAdapter
@@ -85,10 +85,34 @@ class MaternalHealthRecordRepository(IMaternalHealthRecordRepository):
             logger.exception("Error fetching midwife staff people")
             return []
 
+    def fetch_staff_by_person_id(self, person_id: int, role_id: int = None):
+        """Return staff rows (list[dict]) for the given person_id.
+
+        If `role_id` is provided, filter to that role. Returns an empty list on
+        no results or on query errors. Each returned dict includes keys:
+        `staff_id`, `person_id`, `role_id`, `role_name`, `acc_status_id`.
+        This method intentionally returns all matching rows to allow callers to
+        defend against inconsistent duplicate staff rows in the DB.
+        """
+        sql = """
+            SELECT s.staff_id, s.person_id, s.role_id, r.role_name, s.acc_status_id
+            FROM public.staff AS s
+            LEFT JOIN public.rolee AS r ON r.role_id = s.role_id
+            WHERE s.person_id = %s AND (%s IS NULL OR s.role_id = %s)
+            ORDER BY s.staff_id;
+        """
+        params = (person_id, role_id, role_id)
+        try:
+            rows = self.ctx.execute_query_to_dict(sql, params) or []
+            return rows
+        except QueryExecutionException:
+            logger.exception("Error fetching staff by person_id %s", person_id)
+            return []
+
     def insert_postpartum_record_bhw(
         self, p_added_by_id: int, p_maternal_record_id: int, p_date_of_delivery: date, p_time_of_delivery: time, p_attended_by_id: int,
-        p_attended_by_rolename: str, p_place_of_delivery_id: int, p_outcome: str, p_iron_supplementation: bool,
-        p_vit_a_supplementation: bool, p_mebendazole_given: bool, p_lochial_discharges_baseline: int, p_pads_per_day_baseline):
+        p_attended_by_rolename: str, p_place_of_delivery_id: int, p_outcome: str, p_vit_a_supplementation: date, 
+        p_mebendazole_given: date, p_lochial_discharges_baseline: int, p_pads_per_day_baseline, p_bf_initiated_at: datetime = None):
         """Insert a postpartum record (BHW) using DB function
 
         Parameter order aligns with DB function signature:
@@ -97,7 +121,7 @@ class MaternalHealthRecordRepository(IMaternalHealthRecordRepository):
           p_iron_supplementation, p_vit_a_supplementation, p_mebendazole_given,
           p_lochial_discharges_baseline, p_pads_per_day_baseline
         """
-        sql = """SELECT * FROM create_postpartum_record_bhw(%s::INTEGER, %s::INTEGER, %s::DATE, %s::TIME, %s::INTEGER, %s::TEXT, %s::INTEGER, %s::TEXT, %s::BOOLEAN, %s::BOOLEAN, %s::BOOLEAN, %s::TEXT, %s::INTEGER);"""
+        sql = """SELECT * FROM create_postpartum_record_bhw(%s::INTEGER, %s::INTEGER, %s::DATE, %s::TIME, %s::INTEGER, %s::TEXT, %s::INTEGER, %s::TEXT, %s::DATE, %s::DATE, %s::TEXT, %s::INTEGER, %s::TIMESTAMP);"""
         params = (
             p_added_by_id,
             p_maternal_record_id,
@@ -107,11 +131,11 @@ class MaternalHealthRecordRepository(IMaternalHealthRecordRepository):
             p_attended_by_rolename,
             p_place_of_delivery_id,
             p_outcome,
-            p_iron_supplementation,
             p_vit_a_supplementation,
             p_mebendazole_given,
             p_lochial_discharges_baseline,
             p_pads_per_day_baseline,
+            p_bf_initiated_at,
         )
         try:
             rows = self.ctx.execute_query(sql, params)
