@@ -1267,3 +1267,1275 @@ def store_session_values(request):
     except Exception as e:
         print(f"[DEBUG][STORE_SESSION][ERROR] {e}")
         return JsonResponse({'success': False}, status=400)
+
+
+@session_login_required
+@role_required(*LUPON_ROLES)
+def blotter_reports_menu(request: HttpRequest):
+    """Display blotter reports menu"""
+    auth = request.session.get("auth") or {}
+    user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
+    
+    # Get filter options for modal
+    with connection.cursor() as cur:
+        cur.execute("SELECT complaint_title_id, complaint_title_name FROM complaint_title ORDER BY complaint_title_name")
+        complaint_titles = cur.fetchall()
+        cur.execute("SELECT case_nature_id, case_name FROM case_nature ORDER BY case_name")
+        case_natures = cur.fetchall()
+    
+    return render(request, "lupon_mem/blotter_reports_menu.html", {
+        'complaint_titles': complaint_titles,
+        'case_natures': case_natures,
+        'page_path': f'{user_role} / Reports',
+        'page_title': 'Reports'
+    })
+
+
+def add_barangay_header(elements, styles, report_title):
+    """Add professional barangay header to PDF reports"""
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle, Image
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+    from datetime import datetime
+    from django.conf import settings
+    import os
+    
+    # Add centered logo
+    logo_path = os.path.join(settings.BASE_DIR, 'static', 'images', 'brgy-sto-nino.png')
+    if os.path.exists(logo_path):
+        logo = Image(logo_path, width=1*inch, height=1*inch)
+        logo_table = Table([[logo]], colWidths=[6*inch])
+        logo_table.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'CENTER')]))
+        elements.append(logo_table)
+        elements.append(Spacer(1, 10))
+    
+    # Republic of the Philippines header
+    rp_style = ParagraphStyle('RPHeader', parent=styles['Normal'], fontSize=12, alignment=1, fontName='Helvetica-Bold')
+    elements.append(Paragraph("Republic of the Philippines", rp_style))
+    
+    # Office header
+    office_style = ParagraphStyle('OfficeHeader', parent=styles['Normal'], fontSize=11, alignment=1, fontName='Helvetica')
+    # elements.append(Paragraph("Office of the Barangay Captain", office_style))
+    
+    # Barangay name
+    brgy_style = ParagraphStyle('BrgyHeader', parent=styles['Normal'], fontSize=14, alignment=1, fontName='Helvetica-Bold', spaceAfter=5)
+    elements.append(Paragraph("BARANGAY SEÑOR SANTO NIÑO", brgy_style))
+    
+    # Address and contact info
+    contact_style = ParagraphStyle(
+        'ContactHeader',
+        parent=styles['Normal'],
+        fontSize=10,
+        alignment=1,
+        fontName='Helvetica'
+    )
+    elements.append(Paragraph("032 Legaspi Street, Cebu City", contact_style))
+    elements.append(Paragraph("Telephone No. (032) 265-786/503-3115", contact_style))
+    elements.append(Paragraph("E-mail Address: bss@hotmail.ph", contact_style))
+    
+    # Separator line
+    elements.append(Spacer(1, 20))
+    line_table = Table([['_' * 80]], colWidths=[6*inch])
+    line_table.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'CENTER')]))
+    elements.append(line_table)
+    elements.append(Spacer(1, 20))
+    
+    # Report title
+    title_style = ParagraphStyle(
+        'ReportTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        spaceAfter=20,
+        alignment=1,
+        fontName='Helvetica-Bold'
+    )
+    elements.append(Paragraph(report_title, title_style))
+    
+    # Date generated
+    date_style = ParagraphStyle(
+        'DateStyle',
+        parent=styles['Normal'],
+        fontSize=10,
+        alignment=1
+    )
+    elements.append(Paragraph(f"Generated on: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", date_style))
+    elements.append(Spacer(1, 30))
+
+
+@session_login_required
+@role_required(*LUPON_ROLES)
+def total_cases_by_status_report(request: HttpRequest):
+    """Generate PDF report of total cases by status with filters"""
+    if request.method == "GET":
+        # Show filter form
+        with connection.cursor() as cur:
+            cur.execute("SELECT complaint_title_id, complaint_title_name FROM complaint_title ORDER BY complaint_title_name")
+            complaint_titles = cur.fetchall()
+            cur.execute("SELECT case_nature_id, case_name FROM case_nature ORDER BY case_name")
+            case_natures = cur.fetchall()
+        
+        auth = request.session.get("auth") or {}
+        user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
+        
+        return render(request, "lupon_mem/report_filters.html", {
+            'complaint_titles': complaint_titles,
+            'case_natures': case_natures,
+            'report_type': 'total_cases_by_status',
+            'page_path': f'{user_role} / Reports / Filters',
+            'page_title': 'Report Filters'
+        })
+    
+    # Generate PDF with filters
+    from django.http import HttpResponse
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from io import BytesIO
+    
+    # Get filters
+    complaint_title_id = _toi(request.POST.get('complaint_title_id'))
+    case_nature_id = _toi(request.POST.get('case_nature_id'))
+    date_from = request.POST.get('date_from')
+    date_to = request.POST.get('date_to')
+    
+    # Build query with filters
+    where_conditions = []
+    params = []
+    
+    if complaint_title_id:
+        where_conditions.append("bc.complaint_title_id = %s")
+        params.append(complaint_title_id)
+    
+    if case_nature_id:
+        where_conditions.append("bc.case_nature_id = %s")
+        params.append(case_nature_id)
+    
+    if date_from:
+        where_conditions.append("bc.date_filed >= %s")
+        params.append(date_from)
+    
+    if date_to:
+        where_conditions.append("bc.date_filed <= %s")
+        params.append(date_to)
+    
+    where_clause = " AND " + " AND ".join(where_conditions) if where_conditions else ""
+    
+    # Get case statistics with filters
+    with connection.cursor() as cur:
+        cur.execute(f"""
+            SELECT 
+                cs.case_state_name,
+                COUNT(bc.blotter_case_id) as case_count
+            FROM case_state cs
+            LEFT JOIN blotter_case bc ON bc.case_state_id = cs.case_state_id
+            WHERE 1=1 {where_clause}
+            GROUP BY cs.case_state_id, cs.case_state_name
+            ORDER BY cs.case_state_name
+        """, params)
+        status_data = cur.fetchall()
+        
+        cur.execute(f"SELECT COUNT(*) FROM blotter_case bc WHERE 1=1 {where_clause}", params)
+        total_cases = cur.fetchone()[0]
+    
+    # Create PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Add professional header
+    add_barangay_header(elements, styles, "TOTAL CASES BY STATUS REPORT")
+    
+    # Table data
+    table_data = [['Status', 'Number of Cases', 'Percentage']]
+    for status, count in status_data:
+        percentage = (count / total_cases * 100) if total_cases > 0 else 0
+        table_data.append([status or 'Unknown', str(count), f"{percentage:.1f}%"])
+    
+    # Add total row
+    table_data.append(['TOTAL', str(total_cases), '100.0%'])
+    
+    # Create table
+    table = Table(table_data, colWidths=[3*inch, 1.5*inch, 1.5*inch])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -2), colors.beige),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    elements.append(table)
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    from datetime import datetime
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="total_cases_by_status_{datetime.now().strftime("%Y%m%d")}.pdf"'
+    return response
+
+
+@session_login_required
+@role_required(*LUPON_ROLES)
+def case_summaries_report(request: HttpRequest):
+    """Generate PDF report of case summaries with filters"""
+    if request.method == "GET":
+        # Show filter form
+        with connection.cursor() as cur:
+            cur.execute("SELECT complaint_title_id, complaint_title_name FROM complaint_title ORDER BY complaint_title_name")
+            complaint_titles = cur.fetchall()
+            cur.execute("SELECT case_nature_id, case_name FROM case_nature ORDER BY case_name")
+            case_natures = cur.fetchall()
+        
+        auth = request.session.get("auth") or {}
+        user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
+        
+        return render(request, "lupon_mem/report_filters.html", {
+            'complaint_titles': complaint_titles,
+            'case_natures': case_natures,
+            'report_type': 'case_summaries',
+            'page_path': f'{user_role} / Reports / Filters',
+            'page_title': 'Report Filters'
+        })
+    
+    # Generate PDF with filters
+    from django.http import HttpResponse
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from io import BytesIO
+    
+    # Get filters
+    complaint_title_id = _toi(request.POST.get('complaint_title_id'))
+    case_nature_id = _toi(request.POST.get('case_nature_id'))
+    date_from = request.POST.get('date_from')
+    date_to = request.POST.get('date_to')
+    
+    # Build query with filters
+    where_conditions = []
+    params = []
+    
+    if complaint_title_id:
+        where_conditions.append("bc.complaint_title_id = %s")
+        params.append(complaint_title_id)
+    
+    if case_nature_id:
+        where_conditions.append("bc.case_nature_id = %s")
+        params.append(case_nature_id)
+    
+    if date_from:
+        where_conditions.append("bc.date_filed >= %s")
+        params.append(date_from)
+    
+    if date_to:
+        where_conditions.append("bc.date_filed <= %s")
+        params.append(date_to)
+    
+    where_clause = " AND " + " AND ".join(where_conditions) if where_conditions else ""
+    
+    # Get case summaries with filters
+    with connection.cursor() as cur:
+        cur.execute(f"""
+            SELECT 
+                bc.blotter_case_id,
+                bc.blotter_case_name,
+                bc.date_filed,
+                bc.incident_date,
+                bc.incident_location,
+                bc.incident_desc,
+                cs.case_state_name,
+                ss.settlement_status_name,
+                ct.complaint_title_name,
+                cn.case_name as case_nature,
+                STRING_AGG(DISTINCT comp.first_name || ' ' || comp.last_name, ', ') as complainants,
+                STRING_AGG(DISTINCT resp.first_name || ' ' || resp.last_name, ', ') as respondents
+            FROM blotter_case bc
+            LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
+            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+            LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
+            LEFT JOIN case_nature cn ON cn.case_nature_id = bc.case_nature_id
+            LEFT JOIN complainant_case cc ON cc.blotter_case_id = bc.blotter_case_id
+            LEFT JOIN person comp ON comp.person_id = cc.person_id
+            LEFT JOIN respondent_case rc ON rc.blotter_case_id = bc.blotter_case_id
+            LEFT JOIN person resp ON resp.person_id = rc.person_id
+            WHERE 1=1 {where_clause}
+            GROUP BY bc.blotter_case_id, bc.blotter_case_name, bc.date_filed, bc.incident_date, 
+                     bc.incident_location, bc.incident_desc, cs.case_state_name, ss.settlement_status_name,
+                     ct.complaint_title_name, cn.case_name
+            ORDER BY bc.date_filed DESC
+            LIMIT 50
+        """, params)
+        cases_data = cur.fetchall()
+    
+    # Create PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Add professional header
+    add_barangay_header(elements, styles, "CASE SUMMARIES REPORT")
+    
+    # Case details
+    case_style = ParagraphStyle(
+        'CaseStyle',
+        parent=styles['Normal'],
+        fontSize=9,
+        spaceAfter=10
+    )
+    
+    header_style = ParagraphStyle(
+        'HeaderStyle',
+        parent=styles['Heading2'],
+        fontSize=12,
+        spaceAfter=5
+    )
+    
+    for i, case in enumerate(cases_data):
+        if i > 0:
+            elements.append(Spacer(1, 15))
+            
+        # Case header
+        elements.append(Paragraph(f"Case #{case[0]}: {case[1] or 'Untitled'}", header_style))
+        
+        # Case details table
+        case_details = [
+            ['Date Filed:', case[2].strftime('%B %d, %Y') if case[2] else 'N/A'],
+            ['Incident Date:', case[3].strftime('%B %d, %Y') if case[3] else 'N/A'],
+            ['Location:', case[4] or 'N/A'],
+            ['Status:', case[6] or 'N/A'],
+            ['Settlement:', case[7] or 'N/A'],
+            ['Complaint Type:', case[8] or 'N/A'],
+            ['Case Nature:', case[9] or 'N/A'],
+            ['Complainants:', case[10] or 'N/A'],
+            ['Respondents:', case[11] or 'N/A']
+        ]
+        
+        detail_table = Table(case_details, colWidths=[1.5*inch, 4.5*inch])
+        detail_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 5)
+        ]))
+        
+        elements.append(detail_table)
+        
+        # Description
+        if case[5]:
+            elements.append(Spacer(1, 5))
+            elements.append(Paragraph(f"<b>Description:</b> {case[5]}", case_style))
+        
+        # Add page break every 3 cases to avoid overcrowding
+        if (i + 1) % 3 == 0 and i < len(cases_data) - 1:
+            elements.append(PageBreak())
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    from datetime import datetime
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="case_summaries_{datetime.now().strftime("%Y%m%d")}.pdf"'
+    return response
+
+
+@session_login_required
+@role_required(*LUPON_ROLES)
+def settlement_statistics_report(request: HttpRequest):
+    """Generate PDF report of settlement statistics"""
+    from django.http import HttpResponse
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from io import BytesIO
+    
+    # Get settlement statistics
+    with connection.cursor() as cur:
+        # Settlement status breakdown
+        cur.execute("""
+            SELECT 
+                COALESCE(ss.settlement_status_name, 'Unknown') as status,
+                COUNT(bc.blotter_case_id) as case_count
+            FROM settlement_status ss
+            LEFT JOIN blotter_case bc ON bc.settlement_status_id = ss.settlement_status_id
+            GROUP BY ss.settlement_status_id, ss.settlement_status_name
+            ORDER BY case_count DESC
+        """)
+        settlement_data = cur.fetchall()
+        
+        # Mediation success rate
+        cur.execute("""
+            SELECT 
+                COUNT(CASE WHEN UPPER(ss.settlement_status_name) = 'SETTLED' THEN 1 END) as settled_cases,
+                COUNT(CASE WHEN UPPER(ss.settlement_status_name) = 'NOT SETTLED' THEN 1 END) as not_settled_cases,
+                COUNT(bc.blotter_case_id) as total_cases
+            FROM blotter_case bc
+            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+        """)
+        mediation_stats = cur.fetchone()
+        
+        # Cases by complaint type
+        cur.execute("""
+            SELECT 
+                COALESCE(ct.complaint_title_name, 'Unknown') as complaint_type,
+                COUNT(bc.blotter_case_id) as case_count,
+                COUNT(CASE WHEN UPPER(ss.settlement_status_name) = 'SETTLED' THEN 1 END) as settled_count
+            FROM complaint_title ct
+            LEFT JOIN blotter_case bc ON bc.complaint_title_id = ct.complaint_title_id
+            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+            GROUP BY ct.complaint_title_id, ct.complaint_title_name
+            HAVING COUNT(bc.blotter_case_id) > 0
+            ORDER BY case_count DESC
+            LIMIT 10
+        """)
+        complaint_type_data = cur.fetchall()
+    
+    # Create PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Add professional header
+    add_barangay_header(elements, styles, "SETTLEMENT STATISTICS REPORT")
+    
+    # Settlement Status Breakdown
+    elements.append(Paragraph("Settlement Status Breakdown", styles['Heading2']))
+    elements.append(Spacer(1, 10))
+    
+    settlement_table_data = [['Settlement Status', 'Number of Cases', 'Percentage']]
+    total_settlement_cases = sum(count for _, count in settlement_data)
+    
+    for status, count in settlement_data:
+        percentage = (count / total_settlement_cases * 100) if total_settlement_cases > 0 else 0
+        settlement_table_data.append([status, str(count), f"{percentage:.1f}%"])
+    
+    settlement_table = Table(settlement_table_data, colWidths=[3*inch, 1.5*inch, 1.5*inch])
+    settlement_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    elements.append(settlement_table)
+    elements.append(Spacer(1, 30))
+    
+    # Mediation Success Rate
+    elements.append(Paragraph("Mediation Success Rate", styles['Heading2']))
+    elements.append(Spacer(1, 10))
+    
+    settled_cases, not_settled_cases, total_cases = mediation_stats
+    success_rate = (settled_cases / total_cases * 100) if total_cases > 0 else 0
+    
+    success_data = [
+        ['Total Cases Processed', str(total_cases)],
+        ['Successfully Settled', str(settled_cases)],
+        ['Not Settled', str(not_settled_cases)],
+        ['Success Rate', f"{success_rate:.1f}%"]
+    ]
+    
+    success_table = Table(success_data, colWidths=[3*inch, 2*inch])
+    success_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 11),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.lightgreen),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    elements.append(success_table)
+    elements.append(Spacer(1, 30))
+    
+    # Top Complaint Types
+    elements.append(Paragraph("Top Complaint Types by Settlement Rate", styles['Heading2']))
+    elements.append(Spacer(1, 10))
+    
+    complaint_table_data = [['Complaint Type', 'Total Cases', 'Settled', 'Settlement Rate']]
+    
+    for complaint_type, total_count, settled_count in complaint_type_data:
+        settlement_rate = (settled_count / total_count * 100) if total_count > 0 else 0
+        complaint_table_data.append([
+            complaint_type[:30] + '...' if len(complaint_type) > 30 else complaint_type,
+            str(total_count),
+            str(settled_count),
+            f"{settlement_rate:.1f}%"
+        ])
+    
+    complaint_table = Table(complaint_table_data, colWidths=[2.5*inch, 1*inch, 1*inch, 1.5*inch])
+    complaint_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    elements.append(complaint_table)
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    from datetime import datetime
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="settlement_statistics_{datetime.now().strftime("%Y%m%d")}.pdf"'
+    return response
+
+
+@session_login_required
+@role_required(*LUPON_ROLES)
+def monthly_activity_report(request: HttpRequest):
+    """Generate PDF report of monthly lupon activities"""
+    from django.http import HttpResponse
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from io import BytesIO
+    from datetime import datetime, timedelta
+    
+    # Get current month data
+    current_month = datetime.now().replace(day=1)
+    next_month = (current_month + timedelta(days=32)).replace(day=1)
+    
+    with connection.cursor() as cur:
+        # Cases filed this month
+        cur.execute("""
+            SELECT COUNT(*) as cases_filed
+            FROM blotter_case bc
+            WHERE bc.date_filed >= %s AND bc.date_filed < %s
+        """, [current_month, next_month])
+        cases_filed = cur.fetchone()[0]
+        
+        # Cases settled this month
+        cur.execute("""
+            SELECT COUNT(*) as cases_settled
+            FROM blotter_case bc
+            JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+            WHERE UPPER(ss.settlement_status_name) = 'SETTLED'
+            AND bc.date_filed >= %s AND bc.date_filed < %s
+        """, [current_month, next_month])
+        cases_settled = cur.fetchone()[0]
+        
+        # Hearings conducted this month
+        cur.execute("""
+            SELECT COUNT(*) as hearings_conducted
+            FROM case_progress_tracking cpt
+            JOIN case_progress_type cpt_type ON cpt_type.case_progress_type_id = cpt.case_progress_type_id
+            WHERE UPPER(cpt_type.case_progress_type_name) IN ('HEARING HELD', 'CONCILIATION HELD')
+            AND cpt.date_processed >= %s AND cpt.date_processed < %s
+        """, [current_month, next_month])
+        hearings_conducted = cur.fetchone()[0]
+        
+        # Forms processed this month
+        cur.execute("""
+            SELECT 
+                kf.form_code,
+                COUNT(*) as form_count
+            FROM blotter_kp_submission bks
+            JOIN kp_form kf ON kf.form_id = bks.form_id
+            WHERE bks.submitted_at >= %s AND bks.submitted_at < %s
+            AND UPPER(bks.status) = 'SUBMITTED'
+            GROUP BY kf.form_id, kf.form_code
+            ORDER BY form_count DESC
+            LIMIT 10
+        """, [current_month, next_month])
+        forms_data = cur.fetchall()
+        
+        # Daily activity breakdown
+        cur.execute("""
+            SELECT 
+                DATE(bc.date_filed) as activity_date,
+                COUNT(*) as cases_count
+            FROM blotter_case bc
+            WHERE bc.date_filed >= %s AND bc.date_filed < %s
+            GROUP BY DATE(bc.date_filed)
+            ORDER BY activity_date
+        """, [current_month, next_month])
+        daily_activity = cur.fetchall()
+    
+    # Create PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Add professional header
+    add_barangay_header(elements, styles, f"MONTHLY ACTIVITY REPORT - {current_month.strftime('%B %Y')}")
+    
+    # Monthly Summary
+    elements.append(Paragraph("Monthly Summary", styles['Heading2']))
+    elements.append(Spacer(1, 10))
+    
+    summary_data = [
+        ['Activity', 'Count'],
+        ['Cases Filed', str(cases_filed)],
+        ['Cases Settled', str(cases_settled)],
+        ['Hearings Conducted', str(hearings_conducted)],
+        ['Total Forms Processed', str(sum(count for _, count in forms_data))]
+    ]
+    
+    summary_table = Table(summary_data, colWidths=[3*inch, 2*inch])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    elements.append(summary_table)
+    elements.append(Spacer(1, 30))
+    
+    # Forms Processed
+    if forms_data:
+        elements.append(Paragraph("Forms Processed This Month", styles['Heading2']))
+        elements.append(Spacer(1, 10))
+        
+        forms_table_data = [['Form Code', 'Count']]
+        for form_code, count in forms_data:
+            forms_table_data.append([form_code, str(count)])
+        
+        forms_table = Table(forms_table_data, colWidths=[3*inch, 2*inch])
+        forms_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        elements.append(forms_table)
+        elements.append(Spacer(1, 30))
+    
+    # Daily Activity Breakdown
+    if daily_activity:
+        elements.append(Paragraph("Daily Activity Breakdown", styles['Heading2']))
+        elements.append(Spacer(1, 10))
+        
+        daily_table_data = [['Date', 'Cases Filed']]
+        for activity_date, cases_count in daily_activity:
+            daily_table_data.append([activity_date.strftime('%B %d, %Y'), str(cases_count)])
+        
+        daily_table = Table(daily_table_data, colWidths=[3*inch, 2*inch])
+        daily_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        elements.append(daily_table)
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="monthly_activity_{current_month.strftime('%Y_%m')}.pdf"'
+    return response
+
+
+@session_login_required
+@role_required(*LUPON_ROLES)
+def case_timeline_pdf(request: HttpRequest, case_id: int):
+    """Generate PDF report of case timeline"""
+    from django.http import HttpResponse
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from io import BytesIO
+    
+    # Get case timeline data
+    with connection.cursor() as cur:
+        # Get case basic info
+        cur.execute("""
+            SELECT bc.blotter_case_num, bc.blotter_case_name, bc.date_filed,
+                   COALESCE(ct.complaint_title_name, '') AS complaint_title,
+                   COALESCE(cn.case_name, '') AS case_nature
+            FROM blotter_case bc
+            LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
+            LEFT JOIN case_nature cn ON cn.case_nature_id = bc.case_nature_id
+            WHERE bc.blotter_case_id = %s
+        """, [case_id])
+        case_info = cur.fetchone()
+        if not case_info:
+            return HttpResponse("Case not found", status=404)
+        
+        # Get timeline events
+        cur.execute("""
+            SELECT 
+                cpt.date_processed,
+                cpt_type.case_progress_type_name,
+                cpt.remarks,
+                COALESCE(p.first_name || ' ' || p.last_name, 'System') as processed_by
+            FROM case_progress_tracking cpt
+            JOIN case_progress_type cpt_type ON cpt_type.case_progress_type_id = cpt.case_progress_type_id
+            LEFT JOIN staff s ON s.staff_id = cpt.processed_by
+            LEFT JOIN person p ON p.person_id = s.person_id
+            WHERE cpt.blotter_case_id = %s
+            ORDER BY cpt.date_processed ASC
+        """, [case_id])
+        timeline_events = cur.fetchall()
+        
+        # Get forms submitted
+        cur.execute("""
+            SELECT 
+                kf.form_code,
+                kf.form_name,
+                bks.submitted_at,
+                bks.status,
+                bks.processed_by_name
+            FROM blotter_kp_submission bks
+            JOIN kp_form kf ON kf.form_id = bks.form_id
+            WHERE bks.blotter_case_id = %s
+            ORDER BY bks.submitted_at ASC
+        """, [case_id])
+        forms_data = cur.fetchall()
+    
+    # Create PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Add professional header
+    add_barangay_header(elements, styles, f"CASE TIMELINE REPORT - {case_info[0]}")
+    
+    # Case Information
+    case_info_style = ParagraphStyle(
+        'CaseInfo',
+        parent=styles['Normal'],
+        fontSize=12,
+        spaceAfter=10
+    )
+    elements.append(Paragraph(f"<b>Case Name:</b> {case_info[1] or 'Untitled'}", case_info_style))
+    elements.append(Paragraph(f"<b>Date Filed:</b> {case_info[2].strftime('%B %d, %Y') if case_info[2] else 'N/A'}", case_info_style))
+    elements.append(Paragraph(f"<b>Complaint Type:</b> {case_info[3] or 'N/A'}", case_info_style))
+    elements.append(Paragraph(f"<b>Case Nature:</b> {case_info[4] or 'N/A'}", case_info_style))
+    elements.append(Spacer(1, 20))
+    
+    # Timeline Events
+    if timeline_events:
+        elements.append(Paragraph("Timeline of Events", styles['Heading2']))
+        elements.append(Spacer(1, 10))
+        
+        timeline_data = [['Date', 'Event', 'Processed By', 'Remarks']]
+        for event in timeline_events:
+            timeline_data.append([
+                event[0].strftime('%m/%d/%Y %I:%M %p') if event[0] else 'N/A',
+                event[1] or 'N/A',
+                event[3] or 'N/A',
+                (event[2] or 'N/A')[:50] + '...' if event[2] and len(event[2]) > 50 else (event[2] or 'N/A')
+            ])
+        
+        timeline_table = Table(timeline_data, colWidths=[1.5*inch, 2*inch, 1.5*inch, 2*inch])
+        timeline_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP')
+        ]))
+        
+        elements.append(timeline_table)
+        elements.append(Spacer(1, 30))
+    
+    # Forms Submitted
+    if forms_data:
+        elements.append(Paragraph("Forms Submitted", styles['Heading2']))
+        elements.append(Spacer(1, 10))
+        
+        forms_table_data = [['Form Code', 'Form Name', 'Submitted', 'Status', 'Processed By']]
+        for form in forms_data:
+            forms_table_data.append([
+                form[0] or 'N/A',
+                (form[1] or 'N/A')[:30] + '...' if form[1] and len(form[1]) > 30 else (form[1] or 'N/A'),
+                form[2].strftime('%m/%d/%Y') if form[2] else 'N/A',
+                form[3] or 'N/A',
+                form[4] or 'N/A'
+            ])
+        
+        forms_table = Table(forms_table_data, colWidths=[1*inch, 2.5*inch, 1*inch, 1*inch, 1.5*inch])
+        forms_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP')
+        ]))
+        
+        elements.append(forms_table)
+    
+    # Date generated
+    from datetime import datetime
+    date_style = ParagraphStyle(
+        'DateStyle',
+        parent=styles['Normal'],
+        fontSize=8,
+        alignment=1
+    )
+    elements.append(Spacer(1, 30))
+    elements.append(Paragraph(f"Generated on: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", date_style))
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="case_{case_info[0]}_timeline.pdf"'
+    return response
+
+
+@session_login_required
+@role_required(*LUPON_ROLES)
+def case_forms_pdf(request: HttpRequest, case_id: int):
+    """Generate PDF report of all forms for a case"""
+    from django.http import HttpResponse
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from io import BytesIO
+    
+    # Get case and forms data
+    with connection.cursor() as cur:
+        # Get case basic info
+        cur.execute("""
+            SELECT bc.blotter_case_num, bc.blotter_case_name
+            FROM blotter_case bc
+            WHERE bc.blotter_case_id = %s
+        """, [case_id])
+        case_info = cur.fetchone()
+        if not case_info:
+            return HttpResponse("Case not found", status=404)
+        
+        # Get detailed forms information
+        cur.execute("""
+            SELECT 
+                kf.form_code,
+                kf.form_name,
+                bks.submitted_at,
+                bks.processed_at,
+                bks.status,
+                bks.processed_by_name,
+                bks.processed_by_position
+            FROM blotter_kp_submission bks
+            JOIN kp_form kf ON kf.form_id = bks.form_id
+            WHERE bks.blotter_case_id = %s
+            ORDER BY bks.submitted_at ASC
+        """, [case_id])
+        forms_data = cur.fetchall()
+    
+    # Create PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Add professional header
+    add_barangay_header(elements, styles, f"FORMS REPORT - CASE {case_info[0]}")
+    
+    # Case Information
+    case_info_style = ParagraphStyle(
+        'CaseInfo',
+        parent=styles['Normal'],
+        fontSize=12,
+        spaceAfter=20
+    )
+    elements.append(Paragraph(f"<b>Case Name:</b> {case_info[1] or 'Untitled'}", case_info_style))
+    elements.append(Paragraph(f"<b>Total Forms:</b> {len(forms_data)}", case_info_style))
+    elements.append(Spacer(1, 20))
+    
+    # Forms Table
+    if forms_data:
+        forms_table_data = [[
+            'Form Code', 'Form Name', 'Submitted', 'Processed', 'Status', 'Processed By'
+        ]]
+        
+        for form in forms_data:
+            forms_table_data.append([
+                form[0] or 'N/A',
+                (form[1] or 'N/A')[:40] + '...' if form[1] and len(form[1]) > 40 else (form[1] or 'N/A'),
+                form[2].strftime('%m/%d/%Y %I:%M %p') if form[2] else 'N/A',
+                form[3].strftime('%m/%d/%Y %I:%M %p') if form[3] else 'N/A',
+                form[4] or 'N/A',
+                f"{form[5] or 'N/A'}\n{form[6] or ''}" if form[5] else 'N/A'
+            ])
+        
+        forms_table = Table(forms_table_data, colWidths=[0.8*inch, 2*inch, 1.2*inch, 1.2*inch, 0.8*inch, 1*inch])
+        forms_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP')
+        ]))
+        
+        elements.append(forms_table)
+    else:
+        elements.append(Paragraph("No forms have been submitted for this case.", styles['Normal']))
+    
+    # Date generated
+    from datetime import datetime
+    date_style = ParagraphStyle(
+        'DateStyle',
+        parent=styles['Normal'],
+        fontSize=8,
+        alignment=1
+    )
+    elements.append(Spacer(1, 30))
+    elements.append(Paragraph(f"Generated on: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", date_style))
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="case_{case_info[0]}_forms.pdf"'
+    return response
+
+
+@session_login_required
+@role_required(*LUPON_ROLES)
+def case_hearings_pdf(request: HttpRequest, case_id: int):
+    """Generate PDF report of all hearings for a case"""
+    from django.http import HttpResponse
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from io import BytesIO
+    
+    # Get case and hearings data
+    with connection.cursor() as cur:
+        # Get case basic info
+        cur.execute("""
+            SELECT bc.blotter_case_num, bc.blotter_case_name
+            FROM blotter_case bc
+            WHERE bc.blotter_case_id = %s
+        """, [case_id])
+        case_info = cur.fetchone()
+        if not case_info:
+            return HttpResponse("Case not found", status=404)
+        
+        # Get hearings data using the function
+        cur.execute("SELECT * FROM fn_case_mediation_hearings(%s)", [case_id])
+        cols = [c[0] for c in cur.description] if cur.description else []
+        hearings_data = [dict(zip(cols, r)) for r in cur.fetchall()] if cols else []
+    
+    # Create PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Add professional header
+    add_barangay_header(elements, styles, f"HEARINGS REPORT - CASE {case_info[0]}")
+    
+    # Case Information
+    case_info_style = ParagraphStyle(
+        'CaseInfo',
+        parent=styles['Normal'],
+        fontSize=12,
+        spaceAfter=20
+    )
+    elements.append(Paragraph(f"<b>Case Name:</b> {case_info[1] or 'Untitled'}", case_info_style))
+    elements.append(Paragraph(f"<b>Total Hearings:</b> {len(hearings_data)}", case_info_style))
+    elements.append(Spacer(1, 20))
+    
+    # Hearings Table
+    if hearings_data:
+        hearings_table_data = [[
+            'Source', 'Hearing Date', 'Hearing Time', 'Status', 'Outcome', 'Attendance'
+        ]]
+        
+        for hearing in hearings_data:
+            attendance_info = []
+            if hearing.get('complainant_attended') == 'TRUE':
+                attendance_info.append('Complainant')
+            if hearing.get('respondent_attended') == 'TRUE':
+                attendance_info.append('Respondent')
+            
+            hearings_table_data.append([
+                hearing.get('source', 'N/A'),
+                hearing.get('hearing_date', 'N/A'),
+                hearing.get('hearing_time', 'N/A'),
+                'HELD' if hearing.get('hearing_held') else 'NOT HELD',
+                hearing.get('settlement_outcome', 'N/A'),
+                ', '.join(attendance_info) if attendance_info else 'None'
+            ])
+        
+        hearings_table = Table(hearings_table_data, colWidths=[1*inch, 1.2*inch, 1*inch, 1*inch, 1.3*inch, 1.5*inch])
+        hearings_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP')
+        ]))
+        
+        elements.append(hearings_table)
+    else:
+        elements.append(Paragraph("No hearings have been scheduled for this case.", styles['Normal']))
+    
+    # Date generated
+    from datetime import datetime
+    date_style = ParagraphStyle(
+        'DateStyle',
+        parent=styles['Normal'],
+        fontSize=8,
+        alignment=1
+    )
+    elements.append(Spacer(1, 30))
+    elements.append(Paragraph(f"Generated on: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", date_style))
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="case_{case_info[0]}_hearings.pdf"'
+    return response
+
+
+@session_login_required
+@role_required(*LUPON_ROLES)
+def blotter_reports_summary(request: HttpRequest):
+    """Generate PDF report of blotter reports summary"""
+    from django.http import HttpResponse
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+    from io import BytesIO
+    
+    # Get filters if POST
+    where_conditions = []
+    params = []
+    if request.method == "POST":
+        date_from = request.POST.get('date_from')
+        date_to = request.POST.get('date_to')
+        if date_from:
+            where_conditions.append("br.date_time_reported >= %s")
+            params.append(date_from)
+        if date_to:
+            where_conditions.append("br.date_time_reported <= %s")
+            params.append(date_to)
+    
+    where_clause = " AND " + " AND ".join(where_conditions) if where_conditions else ""
+    
+    with connection.cursor() as cur:
+        cur.execute(f"""
+            SELECT br.blotter_report_id, br.incident_subject, br.date_time_reported,
+                   ps.payment_status_name, rs.report_status_name
+            FROM blotter_report br
+            LEFT JOIN payment_status ps ON ps.payment_status_id = br.payment_status_id
+            LEFT JOIN report_status_detail rsd ON rsd.blotter_report_id = br.blotter_report_id
+            LEFT JOIN report_status rs ON rs.report_status_id = rsd.report_status_id
+            WHERE 1=1 {where_clause}
+            ORDER BY br.date_time_reported DESC
+            LIMIT 100
+        """, params)
+        reports_data = cur.fetchall()
+    
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    add_barangay_header(elements, styles, "BLOTTER REPORTS SUMMARY")
+    
+    table_data = [['Report ID', 'Subject', 'Date Reported', 'Payment Status', 'Review Status']]
+    for report in reports_data:
+        table_data.append([
+            str(report[0]),
+            (report[1] or 'No Subject')[:30] + '...' if report[1] and len(report[1]) > 30 else (report[1] or 'No Subject'),
+            report[2].strftime('%m/%d/%Y') if report[2] else 'N/A',
+            report[3] or 'Pending',
+            report[4] or 'For Review'
+        ])
+    
+    table = Table(table_data, colWidths=[1*inch, 2.5*inch, 1.2*inch, 1.2*inch, 1.1*inch])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    elements.append(table)
+    doc.build(elements)
+    buffer.seek(0)
+    
+    from datetime import datetime
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="blotter_reports_summary_{datetime.now().strftime("%Y%m%d")}.pdf"'
+    return response
+
+
+@session_login_required
+@role_required(*LUPON_ROLES)
+def incident_by_location_report(request: HttpRequest):
+    """Generate PDF report of incidents by location"""
+    from django.http import HttpResponse
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+    from io import BytesIO
+    
+    # Get filters if POST
+    where_conditions = []
+    params = []
+    if request.method == "POST":
+        date_from = request.POST.get('date_from')
+        date_to = request.POST.get('date_to')
+        if date_from:
+            where_conditions.append("br.date_time_reported >= %s")
+            params.append(date_from)
+        if date_to:
+            where_conditions.append("br.date_time_reported <= %s")
+            params.append(date_to)
+    
+    where_clause = " AND " + " AND ".join(where_conditions) if where_conditions else ""
+    
+    with connection.cursor() as cur:
+        cur.execute(f"""
+            SELECT 
+                COALESCE(a.street, 'Unknown Street') as street,
+                COALESCE(a.barangay, 'Unknown Barangay') as barangay,
+                COUNT(br.blotter_report_id) as incident_count,
+                COUNT(CASE WHEN bc.blotter_case_id IS NOT NULL AND UPPER(ss.settlement_status_name) = 'SETTLED' THEN 1 END) as settled_count
+            FROM blotter_report br
+            LEFT JOIN addresss a ON a.address_id = br.incident_address_id
+            LEFT JOIN blotter_case bc ON bc.blotter_report_id = br.blotter_report_id
+            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+            WHERE 1=1 {where_clause}
+            GROUP BY a.street, a.barangay
+            ORDER BY incident_count DESC, a.street
+        """, params)
+        location_data = cur.fetchall()
+    
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    add_barangay_header(elements, styles, "INCIDENT REPORTS BY LOCATION")
+    
+    table_data = [['Street', 'Barangay', 'Incidents', 'Settled', 'Rate']]
+    total_incidents = sum(row[2] for row in location_data)
+    total_settled = sum(row[3] for row in location_data)
+    
+    for street, barangay, incident_count, settled_count in location_data:
+        settlement_rate = (settled_count / incident_count * 100) if incident_count > 0 else 0
+        table_data.append([
+            street,
+            barangay,
+            str(incident_count),
+            str(settled_count),
+            f"{settlement_rate:.0f}%"
+        ])
+    
+    # Add total row
+    overall_rate = (total_settled / total_incidents * 100) if total_incidents > 0 else 0
+    table_data.append(['TOTAL', '', str(total_incidents), str(total_settled), f"{overall_rate:.0f}%"])
+    
+    table = Table(table_data, colWidths=[2*inch, 2*inch, 1*inch, 1*inch, 1*inch])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -2), colors.beige),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    
+    elements.append(table)
+    doc.build(elements)
+    buffer.seek(0)
+    
+    from datetime import datetime
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="incident_by_location_{datetime.now().strftime("%Y%m%d")}.pdf"'
+    return response

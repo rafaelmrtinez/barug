@@ -1240,8 +1240,6 @@ def review_approve(request: HttpRequest):
 @nocache
 def person_submission_dets(request: HttpRequest, req_id: int):
     """Details of a single person's submitted verification + latest status."""
-def person_submission_dets(request: HttpRequest, req_id: int):
-    """Details of a single person's submitted verification + latest status."""
     resp = supabase.rpc("get_details", {"p_person_id": req_id}).execute()
     data = resp.data or []
     if not data:
@@ -1260,8 +1258,18 @@ def person_submission_dets(request: HttpRequest, req_id: int):
         gps = [s.strip() for s in gps.split(",") if s.strip()]
     person["government_programs"] = gps or []
 
-    person["valid_id_files"] = person.get("valid_id_files") or []
+    # Combine front and back ID files
+    front_files = person.get("valid_id_front_files") or []
+    back_files = person.get("valid_id_back_files") or []
+    person["valid_id_files"] = front_files + back_files
     person["selfie_file"] = person.get("selfie_file") or None
+    
+    print(f"TEMPLATE DEBUG - Front files: {front_files}")
+    print(f"TEMPLATE DEBUG - Back files: {back_files}")
+    print(f"TEMPLATE DEBUG - Combined: {person['valid_id_files']}")
+    print(f"TEMPLATE DEBUG - Selfie: {person['selfie_file']}")
+    print(f"TEMPLATE DEBUG - Person ID: {req_id}")
+    print(f"TEMPLATE DEBUG - Raw person data keys: {list(person.keys())}")
 
     parts = [
         (person.get("street") or "").strip(),
@@ -3249,6 +3257,16 @@ def approve_request(request: HttpRequest, req_id: int):
     try:
         _rpc_approve_person_by_clerk(request, req_id, STATUS_APPROVED, None)
         messages.success(request, "Request approved.")
+        
+        # Send notification
+        from notifications.service import notify_user, PERSON
+        notify_user(
+            user_type_id=PERSON,
+            person_id=req_id,
+            staff_id=None,
+            title="Account Verification Approved",
+            body="Your account verification has been approved. You can now access all services."
+        )
     except APIError as e:
         try:
             messages.warning(request, e.message.get("message"))
@@ -3271,7 +3289,18 @@ def decision_request(request: HttpRequest, req_id: int):
     status_id = STATUS_REJECTED if action == "reject" else STATUS_DECLINE
     try:
         _rpc_approve_person_by_clerk(request, req_id, status_id, remarks)
-        messages.success(request, f"Request marked as {'Rejected' if status_id==STATUS_REJECTED else 'Declined'}.")
+        status_text = 'Rejected' if status_id==STATUS_REJECTED else 'Declined'
+        messages.success(request, f"Request marked as {status_text}.")
+        
+        # Send notification
+        from notifications.service import notify_user, PERSON
+        notify_user(
+            user_type_id=PERSON,
+            person_id=req_id,
+            staff_id=None,
+            title=f"Account Verification {status_text}",
+            body=f"Your account verification has been {status_text.lower()}. Reason: {remarks}"
+        )
     except APIError as e:
         try:
             messages.warning(request, e.message.get("message"))

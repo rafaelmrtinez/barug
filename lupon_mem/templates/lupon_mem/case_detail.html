@@ -367,6 +367,43 @@
   </nav>
   {% endif %}
 
+  <!-- ======= CASE PDF REPORTS =======
+  <div class="card-lite mt-4">
+    <div class="card-head">
+      {% bs_icon 'file-earmark-pdf' %} Case PDF Reports
+    </div>
+    <div class="card-body">
+      <div class="row g-2">
+        <div class="col-md-3">
+          <a href="{% url 'lupon_mem:case_summary_pdf' case_id %}" class="btn btn-outline-danger btn-sm w-100" target="_blank">
+            <i class="bi bi-file-earmark-pdf me-1"></i> Case Summary
+          </a>
+        </div>
+        <div class="col-md-3">
+          <button class="btn btn-outline-primary btn-sm w-100" onclick="generateCaseTimeline()">
+            <i class="bi bi-clock-history me-1"></i> Timeline Report
+          </button>
+        </div>
+        <div class="col-md-3">
+          <button class="btn btn-outline-success btn-sm w-100" onclick="generateFormsReport()">
+            <i class="bi bi-files me-1"></i> Forms Report
+          </button>
+        </div>
+        <div class="col-md-3">
+          <button class="btn btn-outline-warning btn-sm w-100" onclick="generateHearingsReport()">
+            <i class="bi bi-calendar-week me-1"></i> Hearings Report
+          </button>
+        </div>
+      </div>
+      <div class="mt-2">
+        <small class="text-muted">
+          <i class="bi bi-info-circle me-1"></i>
+          Generate comprehensive PDF reports for this specific case including summary, timeline, forms, and hearings.
+        </small>
+      </div>
+    </div>
+  </div> -->
+
   <div class="sticky-add d-md-none mt-3">
     <a class="btn btn-outline-brand btn-lg rounded-pill" href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
       {% bs_icon 'plus-circle' extra_classes='me-1' %} Add Form
@@ -1267,6 +1304,22 @@
       // Fallback cleanup if onafterprint not supported
       setTimeout(removeFrame, 10000);
     }
+  }
+
+  /* ===== Case-specific PDF report generators ===== */
+  function generateCaseTimeline(){
+    // Generate a PDF report of the case timeline
+    window.open(`/lupon_mem/cases/{{ case_id }}/timeline-pdf/`, '_blank');
+  }
+
+  function generateFormsReport(){
+    // Generate a PDF report of all forms attached to this case
+    window.open(`/lupon_mem/cases/{{ case_id }}/forms-pdf/`, '_blank');
+  }
+
+  function generateHearingsReport(){
+    // Generate a PDF report of all hearings for this case
+    window.open(`/lupon_mem/cases/{{ case_id }}/hearings-pdf/`, '_blank');
   }
 
   /* ===== Label KP-8 and KP-9 forms with mediation attempts ===== */
