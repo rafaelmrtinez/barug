@@ -17,17 +17,19 @@ class PostpartumRecordForm(forms.Form):
     maternal_record_id = forms.IntegerField(widget=forms.HiddenInput())
     date_of_delivery = forms.DateField(required=True, widget=forms.DateInput(attrs={'type': 'date'}))
     time_of_delivery = forms.TimeField(required=True, widget=forms.TimeInput(attrs={'type': 'time'}))
-    # staff id should not be displayed to the user — keep as hidden input
-    attended_by_id = forms.IntegerField(required=False, widget=forms.HiddenInput())
-    # display staff name and role (read-only)
-    attended_by_name = forms.CharField(required=False, max_length=200)
-    attended_by_rolename = forms.CharField(required=False, max_length=100)
+    # Attended by: present as a dropdown of staff (person id -> display name)
+    attended_by_id = forms.ChoiceField(required=False, choices=[], label="Attended By")
     # will be populated with choices in __init__; store as ChoiceField for dropdown
     place_of_delivery_id = forms.ChoiceField(required=False, choices=[], label="Place of Delivery")
     outcome = forms.CharField(required=False, max_length=200)
-    iron_supplementation = forms.BooleanField(required=False)
-    vit_a_supplementation = forms.BooleanField(required=False)
-    mebendazole_given = forms.BooleanField(required=False)
+    # Track dates when supplements/anthelminthic were given (optional)
+    # Read-only date showing when iron supplementation started (UI only)
+    iron_supplementation = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date', 'readonly': 'readonly'})
+    )
+    vit_a_supplementation = forms.DateField(required=False, widget=forms.DateInput(attrs={'type': 'date'}))
+    mebendazole_given = forms.DateField(required=False, widget=forms.DateInput(attrs={'type': 'date'}))
     lochial_discharges_baseline = forms.CharField(required=False, max_length=500)
     pads_per_day_baseline = forms.IntegerField(required=False)
 
@@ -71,6 +73,22 @@ class PostpartumRecordForm(forms.Form):
             except Exception:
                 logger.exception("Failed to fetch delivery place choices; continuing with empty list")
 
+        # Populate attended_by choices with midwife staff people (person_id, full_name)
+        try:
+            if repository is not None and hasattr(repository, 'fetch_midwife_staff_people'):
+                raw = repository.fetch_midwife_staff_people() or []
+                normalized = []
+                for row in raw:
+                    try:
+                        pid, name = row
+                        normalized.append((str(pid), name))
+                    except Exception:
+                        logger.debug("Skipping malformed midwife staff row: %s", row)
+                # default first option prompting user to pick
+                self.fields['attended_by_id'].choices = [('', 'Select attended by')] + normalized
+        except Exception:
+            logger.exception("Failed to set attended_by choices; continuing with empty list")
+
         # Assign choices (safe if empty)
         try:
             self.fields['place_of_delivery_id'].choices = [('', 'Select place of delivery')] + self._place_of_delivery_choices
@@ -96,25 +114,51 @@ class PostpartumRecordForm(forms.Form):
             except Exception:
                 logger.debug("maternal_record_id field missing; skipping initial assignment")
 
+        # Populate iron start/end initial values from micronutrients when available
+        try:
+            self.iron_intake_incomplete = False
+            self.iron_start_date = None
+            self.iron_end_date = None
+            if repository is not None and hasattr(repository, 'fetch_multiple_micro_nutrients_by_mhr_id') and mhr_id is not None:
+                rows = repository.fetch_multiple_micro_nutrients_by_mhr_id(mhr_id) or []
+                # rows are dicts with keys iron_start_date and iron_end_date (may be None)
+                for r in rows:
+                    try:
+                        start = r.get('iron_start_date')
+                        end = r.get('iron_end_date')
+                        if self.iron_start_date is None and start:
+                            self.iron_start_date = start
+                        if self.iron_end_date is None and end:
+                            self.iron_end_date = end
+                        # stop early if we have both
+                        if self.iron_start_date and self.iron_end_date:
+                            break
+                    except Exception:
+                        continue
+
+                # Rule: do not display a start value if an end exists but start missing
+                if self.iron_end_date and not self.iron_start_date:
+                    # leave initial empty and do not mark incomplete (no start)
+                    self.iron_start_date = None
+                else:
+                    # if start exists and end missing => intake incomplete
+                    if self.iron_start_date and not self.iron_end_date:
+                        self.iron_intake_incomplete = True
+
+                if self.iron_start_date:
+                    try:
+                        self.fields['iron_supplementation'].initial = self.iron_start_date
+                    except Exception:
+                        logger.debug("Failed to set iron_supplementation initial value")
+        except Exception:
+            logger.exception("Failed to fetch micronutrients for postpartum form; continuing without defaults")
+
         if staff_id is not None:
             try:
-                self.fields['attended_by_id'].initial = staff_id
+                # staff_id may be numeric; our choices are strings
+                self.fields['attended_by_id'].initial = str(staff_id)
             except Exception:
                 logger.debug("attended_by_id field missing; skipping initial assignment")
-
-        if staff_name is not None:
-            try:
-                self.fields['attended_by_name'].initial = staff_name
-                self.fields['attended_by_name'].widget.attrs['readonly'] = True
-            except Exception:
-                logger.debug("attended_by_name field missing; skipping initial assignment")
-
-        if role is not None:
-            try:
-                self.fields['attended_by_rolename'].initial = role
-                self.fields['attended_by_rolename'].widget.attrs['readonly'] = True
-            except Exception:
-                logger.debug("attended_by_rolename field missing; skipping initial assignment")
 
     def full_clean(self):
         """Override full_clean to skip validation when this form is UI-only.

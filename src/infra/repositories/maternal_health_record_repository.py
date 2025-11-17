@@ -52,6 +52,39 @@ class MaternalHealthRecordRepository(IMaternalHealthRecordRepository):
             logger.error("Error fetching delivery place types: %s", getattr(e, 'message', e))
             raise
         
+    def fetch_midwife_staff_people(self) -> list[tuple]:
+        """Return a list of (person_id, full_name) for active midwife staff.
+
+        Does not accept parameters. Only returns staff where `role_id = 11` (MIDWIFE)
+        and `acc_status_id = 1` (ACTIVE). Query is parameterized and selects a
+        minimal column set for performance. Returns an empty list on error or
+        when no matching rows exist.
+        """
+        sql = """
+            SELECT s.person_id, CONCAT(p.first_name, ' ', p.last_name) AS full_name
+            FROM public.staff AS s
+            JOIN public.person AS p ON p.person_id = s.person_id
+            WHERE s.role_id = %s
+              AND s.acc_status_id = %s
+            ORDER BY p.last_name NULLS LAST, p.first_name NULLS LAST;
+        """
+        params = (11, 1)
+        try:
+            rows = self.ctx.execute_query(sql, params) or []
+            result = []
+            for r in rows:
+                try:
+                    pid, name = r
+                    result.append((pid, name))
+                except Exception:
+                    # Skip malformed row but continue processing others
+                    logger.debug("Skipping malformed midwife staff row: %s", r)
+                    continue
+            return result
+        except QueryExecutionException:
+            logger.exception("Error fetching midwife staff people")
+            return []
+
     def insert_postpartum_record_bhw(
         self, p_added_by_id: int, p_maternal_record_id: int, p_date_of_delivery: date, p_time_of_delivery: time, p_attended_by_id: int,
         p_attended_by_rolename: str, p_place_of_delivery_id: int, p_outcome: str, p_iron_supplementation: bool,

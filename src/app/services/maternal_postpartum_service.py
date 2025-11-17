@@ -143,13 +143,15 @@ class MaternalPostpartumService(IMaternalPostpartumService):
 
         # call repository to persist the postpartum record
         try:
+            # We no longer collect or persist the attended_by role from the UI.
+            # Pass None for the role parameter to the repository/DB function.
             return self.repo.insert_postpartum_record_bhw(
                 p_added_by_id=added_by_id,
                 p_maternal_record_id=mhr_id,
                 p_date_of_delivery=parsed_date,
                 p_time_of_delivery=parsed_time,
                 p_attended_by_id=attended_by_id,
-                p_attended_by_rolename=_sanitize_str(attended_by_role_name, max_len=100),
+                p_attended_by_rolename=None,
                 p_place_of_delivery_id=place_of_delivery_id,
                 p_outcome=outcome,
                 p_iron_supplementation=iron,
