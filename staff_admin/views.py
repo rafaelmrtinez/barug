@@ -302,6 +302,7 @@ def _get_staff_by_id(staff_id: int) -> dict | None:
         return None
     keys = ["staff_id", "staff_code", "first_name", "middle_name", "last_name", "suffix", "email"]
     return dict(zip(keys, row))
+
 # ── Page: landing ─────────────────────────────────────────────────────────────
 @session_login_required
 @role_required(ADMIN_ROLE)
@@ -893,6 +894,10 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
             from io import BytesIO
             from PIL import Image  # noqa: F401
 
+            def _jpeg_bytes(fileobj):
+                buf, mime, _ext = _prep_image_for_upload(fileobj)
+                return _readall(buf)
+
             b_front  = _jpeg_bytes(front_in)
             b_back   = _jpeg_bytes(back_in)
             b_selfie = _jpeg_bytes(selfie_in)
@@ -930,6 +935,9 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
     })
 
 # ── Non-resident Step 3 (role + finalize -> request) ──────────────────────────
+@session_login_required
+@role_required(ADMIN_ROLE)
+@nocache
 @require_http_methods(["GET","POST"])
 def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
     role_form = ChooseRole(request.POST or None)
@@ -1082,18 +1090,22 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
     back_url  = (up_back.get("public_url") or up_back.get("signed_url"))
     self_url  = (up_selfie.get("public_url") or up_selfie.get("signed_url"))
 
+    # Generate credentials
+    initials = _initials_from_name(
+        first=personal.get("first_name"),
+        middle=personal.get("middle_name"),
+        last=personal.get("last_name"),
+        suffix=personal.get("suffix"),
+    )
+    
+    # Create staff directly
     try:
-        req_id = Secretary.insert_nonres_staff_account_request(
-            p_requested_by_id=staff_id,
-            p_person_id=None,
+        result = Admin.insert_person_and_staff(
+            p_added_by_id=staff_id,
             p_role_id=role_id,
             p_supporting_docs=([proof_url] if proof_url else None),
-            p_lupon_sched=schedules if schedules else None,
-            p_bhw_purok_ids=sorted(set(purok_ids)) if purok_ids else None,
             p_first_name=personal.get("first_name"),
             p_last_name=personal.get("last_name"),
-            p_middle_name=(personal.get("middle_name") or "").strip() or None,
-            p_suffix=(personal.get("suffix") or "").strip() or None,
             p_birthdate=personal.get("birthdate"),
             p_email=personal.get("email"),
             p_mobile_num=personal.get("mobile_num"),
@@ -1109,41 +1121,97 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
             p_valid_id_back=back_url,
             p_valid_id_type_id=valid_id_type_id,
             p_selfie_path=self_url,
+            p_lupon_sched=schedules if schedules else None,
+            p_bhw_purok_ids=sorted(set(purok_ids)) if purok_ids else None,
+            p_middle_name=(personal.get("middle_name") or "").strip() or None,
+            p_suffix=(personal.get("suffix") or "").strip() or None,
         )
+        
+        new_staff_id = result.get("staff_id")
+        
+        # Get staff_code from database
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT staff_code FROM staff WHERE staff_id = %s", [new_staff_id])
+            code_row = cursor.fetchone()
+            staff_code = code_row[0] if code_row else None
+        
+        if not new_staff_id or not staff_code:
+            flash_warning(request, "Staff created but no identifier returned. Please verify in Staff List.")
+            return redirect(request.path)
+            
+    except ValueError as e:
+        error_msg = str(e)
+        if "already exists" in error_msg.lower():
+            flash_warning(request, "This person already exists in the system. Please check if they are already registered.")
+        else:
+            flash_warning(request, error_msg)
+        return redirect(request.path)
     except (DatabaseError, OperationalError, IntegrityError) as e:
-        logger.exception("DB error: insert_nonres_staff_account_request failed")
+        logger.exception("DB error: insert_person_and_staff failed")
         flash_db_error(request, e)
         return redirect(request.path)
     except Exception as e:
-        logger.exception("System error: insert_nonres_staff_account_request failed")
-        flash_system_error(request, "Failed to create staff account request.", exc=e)
+        logger.exception("System error: insert_person_and_staff failed")
+        flash_system_error(request, "Failed to create staff account.", exc=e)
         return redirect(request.path)
 
-    # Notify applicant (best-effort)
+    # Generate and store credentials (same as process_staff_request)
+    username = f"brgySN.{initials}{staff_code}"
+    final_password = _rand_password(8)
+    
     try:
-        applicant_email = (personal.get("email") or "").strip()
-        if applicant_email:
+        from captain.models import Captain
+        ok_upsert = Captain.upsert_staff_credentials_and_log(
+            p_staff_id=new_staff_id,
+            p_username=username,
+            p_password_plain=final_password,
+            p_sender_staff_id=staff_id,
+            p_is_credentials_sent=True,
+        )
+        
+        if not ok_upsert:
+            flash_warning(request, "Staff created but failed to store credentials. Please re-issue credentials.")
+            return redirect(request.path)
+            
+    except (DatabaseError, OperationalError, IntegrityError) as e:
+        flash_db_error(request, e)
+        return redirect(request.path)
+    except Exception as e:
+        flash_system_error(request, "Failed to generate credentials.", exc=e)
+        return redirect(request.path)
+
+    # Send emails
+    applicant_email = (personal.get("email") or "").strip()
+    if applicant_email:
+        try:
             role_label = None
             try:
                 if role_id and hasattr(role_form, "fields") and "role" in role_form.fields:
                     role_label = _label_from_choices(role_form.fields["role"].choices, role_id)
             except Exception:
                 role_label = None
-            if not role_label:
-                role_label = f"Role ID {role_id}" if role_id else "Staff"
+            role_label = role_label or f"Role ID {role_id}" if role_id else "Staff"
 
-            subj = f"Staff Account Request Received"
+            # Send account creation and credentials email
+            subj = f"Barangay Sto. Niño Staff Account Created - {role_label}"
             body_txt = (
                 f"Good day!\n\n"
-                f"Your {role_label} staff account request has been received and created successfully. "
-                "The request is currently waiting for ID validation, which is the final step. "
-                "We will notify you once validation is complete.\n\n"
+                f"Your {role_label} staff account has been created successfully. "
+                "Below are your login credentials:\n\n"
+                f"Username: {username}\n"
+                f"Temporary Password: {final_password}\n\n"
+                "For your security, please sign in as soon as possible and change your password immediately.\n\n"
                 "Thank you,\n"
                 "Barangay Sto. Niño"
             )
             body_html = f"""
             <p>Good day!</p>
-            <p>Your <strong>{role_label}</strong> staff account request has been <strong>received</strong> and created successfully. The request is currently <strong>waiting for ID validation</strong>, which is the final step. We will notify you once validation is complete.</p>
+            <p>Your <strong>{role_label}</strong> staff account has been created successfully. Below are your login credentials:</p>
+            <ul>
+                <li><strong>Username:</strong> {username}</li>
+                <li><strong>Temporary Password:</strong> {final_password}</li>
+            </ul>
+            <p>For your security, please sign in as soon as possible and change your password immediately.</p>
             <p>Thank you,<br>Barangay Sto. Niño</p>
             """.strip()
 
@@ -1155,13 +1223,17 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
                 from_name="Barangay Sto. Niño",
                 fail_silently=True,
             )
+            
             if getattr(resp, "ok", False):
-                flash_success(request, "Staff account request created. Notification email sent to applicant.")
+                flash_success(request, f"Staff account created successfully. Credentials sent to the receiver.")
             else:
-                flash_warning(request, "Staff account request created. Failed to send notification email to applicant.")
-    except Exception as e:
-        logger.warning("Failed to send staff request notification email to %s: %s", personal.get("email"), e)
-        flash_warning(request, "Staff account request created. Notification email could not be sent.")
+                flash_warning(request, "Staff account created but failed to send credentials email.")
+                
+        except Exception as e:
+            logger.warning("Failed to send credentials email to %s: %s", applicant_email, e)
+            flash_warning(request, "Staff account created but failed to send credentials email.")
+    else:
+        flash_success(request, "Staff account created successfully. No email provided for credentials.")
 
     # Clean heavy previews
     try:
@@ -2089,3 +2161,57 @@ def process_staff_request(request: HttpRequest) -> HttpResponse:
         flash_system_error(request, "Unable to process the request.", exc=ex)
     
     return redirect(request.META.get("HTTP_REFERER") or "staff_admin:staff_account_requests_list")
+
+@session_login_required
+@role_required(ADMIN_ROLE)
+@nocache
+def access_logs(request):
+    user_fullname, user_role, user_role_template = get_user_info(request)
+    return render(request, "staff_admin/logs/access_logs.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Access Logs',
+        'page_title': 'Access Logs',
+        'user_role_template': user_role_template,
+    })
+
+@session_login_required
+@role_required(ADMIN_ROLE)
+@nocache
+def operational_logs(request):
+    user_fullname, user_role, user_role_template = get_user_info(request)
+    return render(request, "staff_admin/logs/operational_logs.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Operational Logs',
+        'page_title': 'Operational Logs',
+        'user_role_template': user_role_template,
+    })
+
+@session_login_required
+@role_required(ADMIN_ROLE)
+@nocache
+def access_log_details(request, log_id):
+    user_fullname, user_role, user_role_template = get_user_info(request)
+    return render(request, "staff_admin/logs/access_log_details.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Access Log Details',
+        'page_title': 'Access Log Details',
+        'user_role_template': user_role_template,
+        'log_id': log_id,
+    })
+
+@session_login_required
+@role_required(ADMIN_ROLE)
+@nocache
+def operational_log_details(request, log_id):
+    user_fullname, user_role, user_role_template = get_user_info(request)
+    return render(request, "staff_admin/logs/operational_log_details.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Operational Log Details',
+        'page_title': 'Operational Log Details',
+        'user_role_template': user_role_template,
+        'log_id': log_id,
+    })

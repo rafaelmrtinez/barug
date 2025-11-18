@@ -20,13 +20,9 @@ class Admin(models.Model):
         p_person_id: int,
         p_role_id: int | None = None,
         p_supporting_docs: list[str] | None = None,
-        p_lupon_sched: list[dict] | None = None,   # [{day:1,time_start:"08:00",time_end:"12:00"}, ...]
+        p_lupon_sched: list[dict] | None = None,
         p_bhw_purok_ids: list[int] | None = None,
     ) -> dict:
-        """
-        Calls create_staff_direct(...) which RETURNS TABLE(out_staff_id INT, out_staff_code TEXT).
-        Maps them to {'staff_id': ..., 'staff_code': ...}.
-        """
         _docs_for_log  = p_supporting_docs if p_supporting_docs else None
         _sched_for_log = p_lupon_sched if p_lupon_sched else None
         _purok_for_log = p_bhw_purok_ids if p_bhw_purok_ids else None
@@ -54,9 +50,9 @@ class Admin(models.Model):
                         SELECT out_staff_id, out_staff_code
                         FROM create_staff_direct(
                             %s,%s,%s,
-                            %s,            -- supporting_docs TEXT[]
-                            %s::jsonb,     -- p_lupon_sched
-                            %s::int[]      -- p_bhw_purok_ids
+                            %s,
+                            %s::jsonb,
+                            %s::int[]
                         );
                         """,
                         [
@@ -74,17 +70,9 @@ class Admin(models.Model):
                     raise RuntimeError("No row returned from create_staff_direct().")
 
                 out_staff_id, out_staff_code = row[0], row[1]
-                logger.info(
-                    "DB ✓ create_staff_direct → staff_id=%s, staff_code=%s",
-                    out_staff_id, out_staff_code
-                )
                 return {"staff_id": int(out_staff_id), "staff_code": (out_staff_code or "").strip()}
 
         except Exception:
-            logger.exception(
-                "DB ✗ create_staff_direct failed (person=%s role=%s proof=%s sched=%s puroks=%s)",
-                p_person_id, p_role_id, _docs_for_log, _sched_for_log, _purok_for_log
-            )
             raise
 
     @staticmethod
@@ -99,25 +87,7 @@ class Admin(models.Model):
         purok_ids: list[int] = None,
         schedules_json: list[dict] = None
     ) -> dict:
-        """
-        Update staff information using the database function
-        
-        Args:
-            staff_id: ID of staff to update
-            updated_by_staff_id: ID of staff performing the update
-            role_id: New role ID
-            acc_status_id: New account status ID
-            username: New username (optional)
-            password: New password (optional)
-            email: New email address (optional)
-            purok_ids: List of purok IDs (optional)
-            schedules_json: List of schedule dictionaries (optional)
-            
-        Returns:
-            Dictionary with update results
-        """
         with connection.cursor() as cursor:
-            # Convert schedules to JSONB format
             schedules_jsonb = None
             if schedules_json:
                 schedules_jsonb = json.dumps(schedules_json)
@@ -144,3 +114,79 @@ class Admin(models.Model):
                 return dict(zip(columns, result))
             
             return {}
+
+    @staticmethod
+    def insert_person_and_staff(
+        p_added_by_id: int,
+        p_role_id: int,
+        p_supporting_docs: list[str] | None = None,
+        p_first_name: str = None,
+        p_last_name: str = None,
+        p_birthdate: str = None,
+        p_email: str = None,
+        p_mobile_num: str = None,
+        p_sex_id: int = None,
+        p_civil_status_id: int = None,
+        p_nationality_id: int = None,
+        p_religion_id: int = None,
+        p_city: str = None,
+        p_barangay: str = None,
+        p_sitio_purok: str = None,
+        p_street: str = None,
+        p_valid_id_front: str = None,
+        p_valid_id_back: str = None,
+        p_valid_id_type_id: int = None,
+        p_selfie_path: str = None,
+        p_lupon_sched: list[dict] | None = None,
+        p_bhw_purok_ids: list[int] | None = None,
+        p_middle_name: str = None,
+        p_suffix: str = None,
+    ) -> dict:
+        try:
+            with connection.cursor() as cursor:
+                if _HAS_PGJSON:
+                    cursor.execute(
+                        """
+                        SELECT out_staff_id, out_person_id
+                        FROM insert_person_and_staff(
+                            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s
+                        );
+                        """,
+                        [
+                            p_added_by_id, p_role_id, p_supporting_docs,
+                            p_first_name, p_last_name, p_birthdate, p_email, p_mobile_num,
+                            p_sex_id, p_civil_status_id, p_nationality_id, p_religion_id,
+                            p_city, p_barangay, p_sitio_purok, p_street,
+                            p_valid_id_front, p_valid_id_back, p_valid_id_type_id, p_selfie_path,
+                            PGJson(p_lupon_sched) if p_lupon_sched else None,
+                            p_bhw_purok_ids, p_middle_name, p_suffix
+                        ],
+                    )
+                else:
+                    cursor.execute(
+                        """
+                        SELECT out_staff_id, out_person_id
+                        FROM insert_person_and_staff(
+                            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s
+                        );
+                        """,
+                        [
+                            p_added_by_id, p_role_id, p_supporting_docs,
+                            p_first_name, p_last_name, p_birthdate, p_email, p_mobile_num,
+                            p_sex_id, p_civil_status_id, p_nationality_id, p_religion_id,
+                            p_city, p_barangay, p_sitio_purok, p_street,
+                            p_valid_id_front, p_valid_id_back, p_valid_id_type_id, p_selfie_path,
+                            json.dumps(p_lupon_sched) if p_lupon_sched else None,
+                            p_bhw_purok_ids, p_middle_name, p_suffix
+                        ],
+                    )
+
+                row = cursor.fetchone()
+                if not row:
+                    raise RuntimeError("No row returned from insert_person_and_staff().")
+
+                out_staff_id, out_person_id = row[0], row[1]
+                return {"staff_id": int(out_staff_id), "person_id": int(out_person_id)}
+
+        except Exception:
+            raise
