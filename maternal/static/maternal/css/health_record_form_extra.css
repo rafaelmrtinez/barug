@@ -34,3 +34,20 @@
 .view-entry { display: inline-flex; align-items: center; justify-content: center; padding: 0.125rem 0.4rem; font-size: 1rem; line-height: 1; }
 .view-entry svg { width: 1rem; height: 1rem; }
 .notes-snippet { display: inline-block; vertical-align: middle; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Labs section: make layout wrap and avoid overflow on narrow screens */
+#labs { overflow-x: auto; }
+#labs .row { flex-wrap: wrap; }
+#labs .row > [class*="col-"] { min-width: 0; }
+
+/* Ensure form controls and preview images don't force horizontal scroll */
+#labs input, #labs select, #labs textarea { max-width: 100%; box-sizing: border-box; }
+.upload-gallery img, .upload-gallery .preview-img { max-width: 100%; height: auto; display: block; }
+
+/* Make buttons more compact on small screens inside labs */
+@media (max-width: 576px) {
+  #labs .btn { padding: .25rem .5rem; font-size: .85rem; }
+}
+
+/* Fallback: allow the labs card to scroll horizontally if unavoidable */
+.card-body.table-responsive { overflow-x: auto; }

@@ -27,6 +27,7 @@ from maternal.forms.present_pregnancy_form import PresentPregnancyForm
 from maternal.forms.previous_pregnancy_form import PreviousPregnancyForm, PreviousPregnancyFormSet
 from maternal.forms.tetanus_toxoid_form import TetanusToxoidForm
 from maternal.forms.postpartum_record_form import PostpartumRecordForm
+from maternal.factories.maternal_anc_factory import MaternalANCFactory
 from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
 from maternal.utils.form_lock import FormLockUtility
 from src.infra.database.connection_adapter import ConnectionAdapter
@@ -187,16 +188,10 @@ def maternal_health_record_form(request, record_id : int):
         # lock when COMPLETE or INCOMPLETE (incomplete semantics you described)
         is_locked = status_name in ('COMPLETE', 'INCOMPLETE')
         
-        maternal_identification_form = MaternalIdentificationForm(
-                role=role, maternal_repository=REPOSITORY, maternal_id=record_id)
-        obstetric_form = ObstetricHistoryForm(
-            maternal_repository=REPOSITORY,
-            mhr_id=record_id
-        )
-        medical_history_form = MedicalHistoryForm(
-            maternal_repository=REPOSITORY,
-            mhr_id=record_id
-        )
+        # Use factory to centralize form creation
+        factory = MaternalANCFactory(repository=REPOSITORY, staff_id=staff_id)
+        # Ensure prenatal existing data is available for factory (may be used by create_all_for_view)
+        pre_natal_existing_data = REPOSITORY.fetch_prenatal_information_by_mhr_id(record_id)
         person_id = REPOSITORY.fetch_person_id_by_maternal_record_id(maternal_record_id=record_id) or None
         # Fetch rows once, then map to form initial
         rows = REPOSITORY.fetch_all_previous_pregnancies_by_person_id(person_id)
@@ -216,35 +211,29 @@ def maternal_health_record_form(request, record_id : int):
             form_kwargs={"mhr_repository": REPOSITORY, "maternal_id": record_id},  # <-- pass to each form
         )
         # single-entry form for adding a previous pregnancy (user adds one-by-one)
-        pp_entry_form = PreviousPregnancyForm(mhr_repository=REPOSITORY, maternal_id=record_id)
-        tt_form = TetanusToxoidForm(
-            mhr_repo=REPOSITORY,
-            mhr_id=record_id
+        # Build forms via factory so we keep construction logic in one place.
+        created = factory.create_all_for_view(
+            record_id=record_id,
+            role=role,
+            person_id=person_id,
+            previous_pregnancies=rows,
+            prenatal_existing=pre_natal_existing_data,
         )
-        presemt_pregnancy_form = PresentPregnancyForm(
-            mhr_repo=REPOSITORY,
-            mhr_id=record_id
-        )
-        lab_form = LaboratoryForm(
-            mhr_repo=REPOSITORY,
-            mhr_id=record_id
-        )
-        check_list_form = CheckListForm(
-            mhr_repo=REPOSITORY,
-            mhr_id=record_id
-        )
-        plan_form = PlanForm(
-            mhr_repo=REPOSITORY,
-            mhr_id=record_id
-        )
-        micro_nutrients_form = MicroNutrientsForm(
-            mhr_repo=REPOSITORY,
-            mhr_id=record_id
-        )
-        risk_code_form = RiskCodeForm(
-            mhr_repo=REPOSITORY,
-            mhr_id=record_id,
-        )
+
+        maternal_identification_form = created.get('identification_form')
+        obstetric_form = created.get('obstetric_form')
+        medical_history_form = created.get('medical_history_form')
+        formset = created.get('formset')
+        pp_entry_form = created.get('previous_pregnancy_entry_form')
+        tt_form = created.get('tt_form')
+        presemt_pregnancy_form = created.get('present_pregnancy_form')
+        lab_form = created.get('lab_form')
+        check_list_form = created.get('check_list_form')
+        plan_form = created.get('plan_form')
+        micro_nutrients_form = created.get('micro_nutrients_form')
+        risk_code_form = created.get('risk_code_form')
+        pf_formset = created.get('prenatal_followup_formset')
+        pf_entry_form = created.get('prenatal_followup_entry_form')
         # Prefill risk_code_form initial values from repository
         try:
             _risk_rows = REPOSITORY.fetch_risk_codes_by_mhr_id(record_id) or []
