@@ -2068,7 +2068,7 @@ def monthly_activity_report(request: HttpRequest):
     buffer.seek(0)
     
     response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="monthly_activity_{current_month.strftime('%Y_%m')}.pdf"'
+    response['Content-Disposition'] = f'attachment; filename="monthly_activity_{current_month.strftime("%Y_%m")}.pdf"'
     return response
 
 
