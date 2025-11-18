@@ -650,6 +650,31 @@
                 <button type="submit" class="btn btn-brand">Save Micronutrients</button>
             </div>
         </form>
+        <!-- Risk Code Form (displayed after Micronutrients) -->
+        <form method="post" class="card mb-4 card-brand" id="form-risk-code" action="" data-has-existing="{% if risk_code_form.has_existing %}true{% else %}false{% endif %}">
+            {% csrf_token %}
+            <div class="card card-brand mb-3">
+                <span class="card-header">Risk Codes</span>
+                <div class="card-body">
+                    <div id="risk-codes" class="row g-3">
+                        <div class="col-md-6 form-check">
+                            <input type="checkbox" class="form-check-input risk-category" id="risk_obstetric_history" name="risk_obstetric_history" data-risk-id="1" {% if risk_code_form.risk_obstetric_history.value %}checked{% endif %}>
+                            <label class="form-check-label" for="risk_obstetric_history">{{ risk_code_form.risk_obstetric_history.label }}</label>
+                        </div>
+                        <div class="col-md-6 form-check">
+                            <input type="checkbox" class="form-check-input risk-category" id="risk_medical_comorbidities" name="risk_medical_comorbidities" data-risk-id="2" {% if risk_code_form.risk_medical_comorbidities.value %}checked{% endif %}>
+                            <label class="form-check-label" for="risk_medical_comorbidities">{{ risk_code_form.risk_medical_comorbidities.label }}</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer text-end">
+                {% if risk_code_form.has_existing %}
+                    <span class="text-muted me-3">Risk codes already recorded for this record.</span>
+                {% endif %}
+                <button type="submit" class="btn btn-brand" {% if risk_code_form.has_existing %}disabled{% endif %}>Save Risk Codes</button>
+            </div>
+        </form>
     {% endif %}
     {% include 'maternal/partial/prenatal_logs_and_entry.html' with mhr_id=mhr_id prenatal_form=prenatal_followup_entry_form %}
 </div>
@@ -680,4 +705,6 @@
 <script src="{% static 'maternal/js/prenatal_status_api.js' %}"></script>
 <script src="{% static 'maternal/js/lock_forms.js' %}"></script>
 <script src="{% static 'maternal/js/downloadAllLabImages.js' %}"></script>
+<script src="{% static 'js/toast.js' %}"></script>
+<script src="{% static 'maternal/js/risk_codes_submit.js' %}"></script>
 {% endblock %}

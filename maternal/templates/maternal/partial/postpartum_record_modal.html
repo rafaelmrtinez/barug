@@ -1,5 +1,5 @@
 <!-- Partial: Postpartum Record Modal -->
-<div class="modal fade mhr" id="postpartumRecordModal" tabindex="-1" aria-labelledby="postpartumRecordModalLabel" aria-hidden="true">
+<div class="modal fade mhr mt-5 pt-5" id="postpartumRecordModal" tabindex="-1" aria-labelledby="postpartumRecordModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content">
       <div class="modal-header">
@@ -9,7 +9,6 @@
       <form id="postpartumRecordForm" method="post">
         {% csrf_token %}
         {{ postpartum_form.maternal_record_id }}
-        {{ postpartum_form.attended_by_id }}
         <div class="modal-body">
           <div class="row g-3">
             <div class="col-md-6">
@@ -22,12 +21,13 @@
             </div>
 
             <div class="col-md-6">
-              <label for="attended_by_name" class="form-label">Attended By</label>
-              {{ postpartum_form.attended_by_name }}
+              <label for="bf_initiated_at" class="form-label">Breastfeeding Initiated At</label>
+              {{ postpartum_form.bf_initiated_at }}
             </div>
-            <div class="col-md-6">
-              <label for="attended_by_rolename" class="form-label">Attended By Role</label>
-              {{ postpartum_form.attended_by_rolename }}
+
+            <div class="col-md-12">
+              <label for="id_attended_by_id" class="form-label">Attended By</label>
+              {{ postpartum_form.attended_by_id }}
             </div>
 
             <div class="col-md-6">
@@ -41,20 +41,33 @@
 
             <div class="col-md-4">
               <div class="form-check mt-3">
-                {{ postpartum_form.iron_supplementation }}
                 <label class="form-check-label">Iron Supplementation</label>
+                {{ postpartum_form.iron_supplementation }}
+                {% comment %}If end date exists and start exists, show completed message.{% endcomment %}
+                {% if postpartum_form.iron_end_date and postpartum_form.iron_supplementation.value %}
+                  <div class="mt-1">
+                    <small class="text-success d-block">Completed on {{ postpartum_form.iron_end_date|date:"Y-m-d" }}</small>
+                  </div>
+                {% elif postpartum_form.iron_end_date %}
+                  {# End exists but start missing — don't show start, display end date read-only #}
+                  <div class="mt-1">
+                    <small class="text-muted d-block">Completed on {{ postpartum_form.iron_end_date|date:"Y-m-d" }}</small>
+                  </div>
+                {% elif postpartum_form.iron_intake_incomplete %}
+                  <small class="text-warning d-block">Intake incomplete — end date not recorded</small>
+                {% endif %}
               </div>
             </div>
             <div class="col-md-4">
               <div class="form-check mt-3">
-                {{ postpartum_form.vit_a_supplementation }}
                 <label class="form-check-label">Vit A Supplementation</label>
+                {{ postpartum_form.vit_a_supplementation }}
               </div>
             </div>
             <div class="col-md-4">
               <div class="form-check mt-3">
-                {{ postpartum_form.mebendazole_given }}
                 <label class="form-check-label">Mebendazole Given</label>
+                {{ postpartum_form.mebendazole_given }}
               </div>
             </div>
 
