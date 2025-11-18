@@ -56,14 +56,24 @@
         const maternal_record_id = sanitizeString(getVal('maternal_record_id')?.value || '');
         const date_of_delivery = sanitizeString(getVal('date_of_delivery')?.value || '');
         const time_of_delivery = sanitizeString(getVal('time_of_delivery')?.value || '');
-        const attended_by_id = sanitizeString(getVal('attended_by_id')?.value || '');
+        // read the attended-by dropdown: first try the form field by name
+        // (Django form fields typically use `name="attended_by_id"` and
+        // `id="id_attended_by_id"`). `getVal` queries by name, so prefer
+        // that; if not found, fall back to the element with id `id_attended_by_id`.
+        const attendedByElem = getVal('attended_by_id') || form.querySelector('#id_attended_by_id');
+        const attended_by_id_raw = attendedByElem ? (attendedByElem.value || '') : '';
+        const attended_by_id = attended_by_id_raw !== '' && !Number.isNaN(Number(attended_by_id_raw)) ? Number(attended_by_id_raw) : undefined;
         const place_of_delivery_id = sanitizeString(getVal('place_of_delivery_id')?.value || '');
         const outcome = sanitizeString(getVal('outcome')?.value || '', 200);
-        const iron_supplementation = !!getVal('iron_supplementation')?.checked;
-        const vit_a_supplementation = !!getVal('vit_a_supplementation')?.checked;
-        const mebendazole_given = !!getVal('mebendazole_given')?.checked;
+        // Note: these fields are date inputs in the form (or may be absent).
+        // Read their ISO date string values (YYYY-MM-DD) or undefined.
+        const iron_supplementation = getVal('iron_supplementation')?.value || undefined;
+        const vit_a_supplementation = getVal('vit_a_supplementation')?.value || undefined;
+        const mebendazole_given = getVal('mebendazole_given')?.value || undefined;
         const lochial_discharges_baseline = sanitizeString(getVal('lochial_discharges_baseline')?.value || '', 500);
         const pads_per_day_baseline = sanitizeString(getVal('pads_per_day_baseline')?.value || '');
+        // datetime-local value for breastfeeding initiation (e.g. "2025-11-17T14:30")
+        const bf_initiated_at = getVal('bf_initiated_at')?.value || undefined;
 
         // basic front-end validation
         if (!maternal_record_id || Number.isNaN(Number(maternal_record_id))) {
@@ -86,12 +96,13 @@
             maternal_record_id: Number(maternal_record_id),
             date_of_delivery,
             time_of_delivery,
-            attended_by_id: attended_by_id || undefined,
+            attended_by_id: attended_by_id,
             place_of_delivery_id: place_of_delivery_id || undefined,
             outcome: outcome || undefined,
-            iron_supplementation,
-            vit_a_supplementation,
-            mebendazole_given,
+            iron_supplementation: iron_supplementation || undefined,
+            vit_a_supplementation: vit_a_supplementation || undefined,
+            mebendazole_given: mebendazole_given || undefined,
+            bf_initiated_at: bf_initiated_at || undefined,
             lochial_discharges_baseline: lochial_discharges_baseline || undefined,
             pads_per_day_baseline: pads_per_day_baseline !== '' ? Number(pads_per_day_baseline) : undefined,
         };
