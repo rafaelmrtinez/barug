@@ -1,0 +1,36 @@
+/* Extracted from health_record_form.html - inline styles for maternal health record page */
+
+/* Constrain the width of the status select and button so they don't push the title */
+.mhr-action-group { flex-shrink: 0; }
+.mhr-action-group select, .mhr-action-group .btn {
+    min-width: 9rem; /* equal width for dropdown and button */
+    max-width: 11rem;
+    width: 10rem;
+}
+/* Allow the title to shrink without overflowing the layout */
+.mhr-title {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.mhr-title h1 { margin: 0; }
+
+.mhr-locked .card-footer .btn { display: none !important; }     /* hide save buttons */
+.mhr-locked .card { opacity: 0.9; }                             /* subtle dim */
+.mhr-locked .locked-overlay {
+  border: 2px dashed #f0ad4e;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Sidebar-specific overrides to avoid global navbar styles forcing white links */
+
+/* Back-to-top floating button */
+.back-to-top{ position: fixed; right: 1rem; bottom: 1rem; width:48px; height:48px; border-radius:50%; background:#6d2932; color:#fff; border:none; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 6px 18px rgba(0,0,0,0.18); cursor:pointer; opacity:0; transform:translateY(8px); transition:opacity .2s ease, transform .2s ease; z-index:2050; }
+.back-to-top:focus{ outline: 2px solid rgba(255,255,255,0.12); }
+.back-to-top.visible{ opacity:1; transform:translateY(0); }
+.back-to-top svg{ width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; }
+
+/* Notes icon/button in prenatal logs */
+.view-entry { display: inline-flex; align-items: center; justify-content: center; padding: 0.125rem 0.4rem; font-size: 1rem; line-height: 1; }
+.view-entry svg { width: 1rem; height: 1rem; }
+.notes-snippet { display: inline-block; vertical-align: middle; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

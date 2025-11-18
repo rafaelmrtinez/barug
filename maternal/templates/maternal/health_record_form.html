@@ -6,40 +6,7 @@
 <link rel="stylesheet" href="{% static 'maternal/css/maternal-sidebar.css' %}">
 <link rel="stylesheet" href="{% static 'maternal/css/mhr-theme.css' %}">
 <link rel="stylesheet" href="{% static 'maternal/css/image-preview.css' %}">
-<style>
-/* Constrain the width of the status select and button so they don't push the title */
-.mhr-action-group { flex-shrink: 0; }
-.mhr-action-group select, .mhr-action-group .btn {
-    min-width: 9rem; /* equal width for dropdown and button */
-    max-width: 11rem;
-    width: 10rem;
-}
-/* Allow the title to shrink without overflowing the layout */
-.mhr-title {
-    flex: 1 1 auto;
-    min-width: 0;
-}
-.mhr-title h1 { margin: 0; }
-
-.mhr-locked .card-footer .btn { display: none !important; }     /* hide save buttons */
-.mhr-locked .card { opacity: 0.9; }                             /* subtle dim */
-.mhr-locked .locked-overlay {
-  border: 2px dashed #f0ad4e;
-  padding: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-/* Sidebar-specific overrides to avoid global navbar styles forcing white links */
-
-/* Back-to-top floating button */
-.back-to-top{ position: fixed; right: 1rem; bottom: 1rem; width:48px; height:48px; border-radius:50%; background:#6d2932; color:#fff; border:none; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 6px 18px rgba(0,0,0,0.18); cursor:pointer; opacity:0; transform:translateY(8px); transition:opacity .2s ease, transform .2s ease; z-index:2050; }
-.back-to-top:focus{ outline: 2px solid rgba(255,255,255,0.12); }
-.back-to-top.visible{ opacity:1; transform:translateY(0); }
-.back-to-top svg{ width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; }
-
-
-
-</style>
+<link rel="stylesheet" href="{% static 'maternal/css/health_record_form_extra.css' %}">
 
 {% endblock %}
 
@@ -198,75 +165,85 @@
         <!-- Previous Pregnancies - separated input (single entry) and read-only table -->
         <!-- Single-entry form: user adds one previous pregnancy at a time -->
         <section id="prev-preg-entry-section" class="mb-3">
-        <form method="post" class="card mb-3 card-brand" id="form-prev-preg-entry" action="">
-            {% csrf_token %}
-            {{ previous_pregnancy_entry_form.form_type }}
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Previous Pregnancy (Add one)</span>
-            </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-3">
-                        <label class="form-label">{{ previous_pregnancy_entry_form.delivery_date.label }}</label>
-                        {{ previous_pregnancy_entry_form.delivery_date }}
-                        {% if previous_pregnancy_entry_form.delivery_date.errors %}
-                            <div class="text-danger small">{{ previous_pregnancy_entry_form.delivery_date.errors|join:", " }}</div>
-                        {% endif %}
-                    </div>
+            <form method="post" class="card mb-3 card-brand" id="form-prev-preg-entry" action="">
+                {% csrf_token %}
+                {{ previous_pregnancy_entry_form.form_type }}
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Previous Pregnancy (Add one)</span>
+                </div>
+                <div class="card-body">
+                    <div class="container-fluid">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <div class="row g-3">
+                                    <div class="col-12 col-sm-6">
+                                        <label class="form-label">{{ previous_pregnancy_entry_form.delivery_date.label }}</label>
+                                        {{ previous_pregnancy_entry_form.delivery_date }}
+                                        {% if previous_pregnancy_entry_form.delivery_date.errors %}
+                                            <div class="text-danger small">{{ previous_pregnancy_entry_form.delivery_date.errors|join:", " }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-12 col-sm-6">
+                                        <label class="form-label">{{ previous_pregnancy_entry_form.outcome.label }}</label>
+                                        {{ previous_pregnancy_entry_form.outcome }}
+                                        {% if previous_pregnancy_entry_form.outcome.errors %}
+                                            <div class="text-danger small">{{ previous_pregnancy_entry_form.outcome.errors|join:", " }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
 
-                    <div class="col-md-2">
-                        <label class="form-label">{{ previous_pregnancy_entry_form.outcome.label }}</label>
-                        {{ previous_pregnancy_entry_form.outcome }}
-                        {% if previous_pregnancy_entry_form.outcome.errors %}
-                            <div class="text-danger small">{{ previous_pregnancy_entry_form.outcome.errors|join:", " }}</div>
-                        {% endif %}
-                    </div>
+                            <div class="col-12 col-md-6">
+                                <div class="row g-3">
+                                    <div class="col-12 col-sm-6">
+                                        <label class="form-label">{{ previous_pregnancy_entry_form.delivery_type.label }}</label>
+                                        {{ previous_pregnancy_entry_form.delivery_type }}
+                                        {% if previous_pregnancy_entry_form.delivery_type.errors %}
+                                            <div class="text-danger small">{{ previous_pregnancy_entry_form.delivery_type.errors|join:", " }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-12 col-sm-6">
+                                        <label class="form-label">{{ previous_pregnancy_entry_form.baby_weight_kg.label }}</label>
+                                        {{ previous_pregnancy_entry_form.baby_weight_kg }}
+                                        {% if previous_pregnancy_entry_form.baby_weight_kg.errors %}
+                                            <div class="text-danger small">{{ previous_pregnancy_entry_form.baby_weight_kg.errors|join:", " }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
 
-                    <div class="col-md-2">
-                        <label class="form-label">{{ previous_pregnancy_entry_form.delivery_type.label }}</label>
-                        {{ previous_pregnancy_entry_form.delivery_type }}
-                        {% if previous_pregnancy_entry_form.delivery_type.errors %}
-                            <div class="text-danger small">{{ previous_pregnancy_entry_form.delivery_type.errors|join:", " }}</div>
-                        {% endif %}
-                    </div>
-
-                    <div class="col-md-2">
-                        <label class="form-label">{{ previous_pregnancy_entry_form.baby_weight_kg.label }}</label>
-                        {{ previous_pregnancy_entry_form.baby_weight_kg }}
-                        {% if previous_pregnancy_entry_form.baby_weight_kg.errors %}
-                            <div class="text-danger small">{{ previous_pregnancy_entry_form.baby_weight_kg.errors|join:", " }}</div>
-                        {% endif %}
-                    </div>
-
-                    <div class="col-md-1">
-                        <label class="form-label">{{ previous_pregnancy_entry_form.gender.label }}</label>
-                        {{ previous_pregnancy_entry_form.gender }}
-                        {% if previous_pregnancy_entry_form.gender.errors %}
-                            <div class="text-danger small">{{ previous_pregnancy_entry_form.gender.errors|join:", " }}</div>
-                        {% endif %}
-                    </div>
-
-                    <div class="col-md-1">
-                        <label class="form-label">{{ previous_pregnancy_entry_form.ballard_score.label }}</label>
-                        {{ previous_pregnancy_entry_form.ballard_score }}
-                        {% if previous_pregnancy_entry_form.ballard_score.errors %}
-                            <div class="text-danger small">{{ previous_pregnancy_entry_form.ballard_score.errors|join:", " }}</div>
-                        {% endif %}
-                    </div>
-
-                    <div class="col-md-1">
-                        <label class="form-label">{{ previous_pregnancy_entry_form.apgar_score.label }}</label>
-                        {{ previous_pregnancy_entry_form.apgar_score }}
-                        {% if previous_pregnancy_entry_form.apgar_score.errors %}
-                            <div class="text-danger small">{{ previous_pregnancy_entry_form.apgar_score.errors|join:", " }}</div>
-                        {% endif %}
+                            <div class="col-12">
+                                <div class="row g-3">
+                                    <div class="col-12 col-sm-4">
+                                        <label class="form-label">{{ previous_pregnancy_entry_form.gender.label }}</label>
+                                        {{ previous_pregnancy_entry_form.gender }}
+                                        {% if previous_pregnancy_entry_form.gender.errors %}
+                                            <div class="text-danger small">{{ previous_pregnancy_entry_form.gender.errors|join:", " }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-12 col-sm-4">
+                                        <label class="form-label">{{ previous_pregnancy_entry_form.ballard_score.label }}</label>
+                                        {{ previous_pregnancy_entry_form.ballard_score }}
+                                        {% if previous_pregnancy_entry_form.ballard_score.errors %}
+                                            <div class="text-danger small">{{ previous_pregnancy_entry_form.ballard_score.errors|join:", " }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-12 col-sm-4">
+                                        <label class="form-label">{{ previous_pregnancy_entry_form.apgar_score.label }}</label>
+                                        {{ previous_pregnancy_entry_form.apgar_score }}
+                                        {% if previous_pregnancy_entry_form.apgar_score.errors %}
+                                            <div class="text-danger small">{{ previous_pregnancy_entry_form.apgar_score.errors|join:", " }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="card-footer text-end">
-                <button type="submit" class="btn btn-brand">Add Previous Pregnancy</button>
-            </div>
-        </form>
+                <div class="card-footer text-end">
+                    <button type="submit" class="btn btn-brand">Add Previous Pregnancy</button>
+                </div>
+            </form>
         </section>
 
         <!-- Read-only table of existing previous pregnancies -->
@@ -795,17 +772,6 @@
 <script src="{% static 'maternal/js/downloadAllLabImages.js' %}"></script>
 <script src="{% static 'js/toast.js' %}"></script>
 <script src="{% static 'maternal/js/risk_codes_submit.js' %}"></script>
-<script>
-// Back-to-top button behaviour for maternal page
-document.addEventListener('DOMContentLoaded', function(){
-    const btn = document.getElementById('maternal-back-to-top');
-    if(!btn) return;
-    function onScroll(){
-        if(window.scrollY > 200) btn.classList.add('visible'); else btn.classList.remove('visible');
-    }
-    window.addEventListener('scroll', onScroll, {passive:true});
-    btn.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
-    onScroll();
-});
-</script>
+<script src="{% static 'maternal/js/health_record_form_extra.js' %}"></script>
+<script src="{% static 'maternal/js/prenatal_notes.js' %}"></script>
 {% endblock %}
