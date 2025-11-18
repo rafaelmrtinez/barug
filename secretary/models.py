@@ -245,7 +245,7 @@ class Secretary(models.Model):
                 docs_payload  = None if not p_supporting_docs else p_supporting_docs 
 
                 logger.info(
-                    "DB ▶ insert_staff_account_request(by=%s, person=%s, role=%s, proof=%s, sched=%s, puroks=%s)",
+                    "DB - insert_staff_account_request(by=%s, person=%s, role=%s, proof=%s, sched=%s, puroks=%s)",
                     p_requested_by_id, p_person_id, p_role_id, docs_payload, sched_payload, purok_payload
                 )
 
@@ -370,14 +370,14 @@ class Secretary(models.Model):
 
                 staff_req_id, person_id = row[0], row[1]
                 logger.info(
-                    "DB ✓ insert_staff_account_request → staff_req_id=%s, person_id=%s",
+                    "DB / insert_staff_account_request → staff_req_id=%s, person_id=%s",
                     staff_req_id, person_id
                 )
                 return {"staff_acc_req_id": int(staff_req_id), "person_id": int(person_id)}
 
         except Exception:
             logger.exception(
-                "DB ✗ insert_staff_account_request failed (person=%s role=%s proof=%s sched=%s puroks=%s)",
+                "DB x insert_staff_account_request failed (person=%s role=%s proof=%s sched=%s puroks=%s)",
                 p_person_id, p_role_id, _docs_for_log, _sched_for_log, _purok_for_log
             )
             raise
