@@ -27,6 +27,7 @@ urlpatterns = [
     # Resident (legacy paths kept if still used elsewhere)
     path("resident/resident_list/", views.resident_list, name="resident_list"),
     path("resident/resident_map/", views.resident_map_list, name="resident_map"),
+    path("ajax/resident_search/", views.ajax_resident_search, name="ajax_resident_search"),
 
     # Household
     path("household/household_list/", views.household_list, name="household_list"),
