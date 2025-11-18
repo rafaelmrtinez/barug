@@ -1,5 +1,4 @@
 {% load static %}
-
 {% load django_bootstrap5 %}
 {% bootstrap_css %}
 {% bootstrap_javascript %}
@@ -26,15 +25,19 @@
 
                     <div class="header-text mb-3 text-start mt-3 align-items-center justify-content-between">
                         <h4>Check your email</h4>
+
+                        <!-- CHANGED FORGOT PASS -->
                         <p class="text-muted mb-2" style="font-size: 0.9rem;">
-                            A password reset link has been sent to (replace with real email). <br>
+                            If an account is associated with the email you entered, a password reset link has been sent. <br>
                             Please follow the instructions in the email to set a new password.
                         </p>
+
+                        <!-- CHANGED FORGOT PASS -->
                         <p class="text-muted mb-2" style="font-size: 0.9rem;">
                             If the message does not arrive shortly, please check your spam folder or 
-                            <a href="" style="color: black">
-                                request another email.
-                            </a>
+                            <a href="{% url 'authentication:forgot_password' %}?resend=1" style="color: black">
+                                request another email
+                            </a>.
                         </p>
                     </div>
 
@@ -46,3 +49,4 @@
     </div>
 </body>
 </html>
+{% include 'partials/modal_messages.html' %}

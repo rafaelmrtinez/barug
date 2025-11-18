@@ -64,6 +64,18 @@ from src.infra.repositories.dashboards_repository import (
     MidwifeDashboardRepository,
     AdminDashboardRepository,
 )
+from src.domain.contracts.or_repository_contract import (
+    IORRepository,
+)
+from src.infra.repositories.or_repository import (
+    ORRepository,
+)
+from src.domain.contracts.resident_repository_contract import (
+    IResidentRepository,
+)
+from src.infra.repositories.resident_repository import (
+    ResidentRepository,
+)
 
 
 class InfraContainer(containers.DeclarativeContainer):
@@ -241,4 +253,16 @@ class InfraContainer(containers.DeclarativeContainer):
     admin_dashboard_repository: providers.Factory[AdminDashboardRepository] = providers.Factory(
         AdminDashboardRepository,
         ctx=context,
+    )
+
+    # Reports repositories can be added here in the infra container as needed
+
+    or_repository: providers.Factory[IORRepository] = providers.Factory(
+        ORRepository,
+        ctx=context
+    )
+
+    resident_repository: providers.Factory[IResidentRepository] = providers.Factory(
+        ResidentRepository,
+        ctx=context
     )

@@ -102,6 +102,18 @@ from src.app.contracts.household_service_contract import (
 from src.app.services.household_service import (
     HouseholdService
 )
+from src.app.contracts.or_service_contract import (
+    IORService,
+)
+from src.app.services.or_service import (
+    ORService,
+)
+from src.app.contracts.resident_service_contract import (
+    IResidentService,
+)
+from src.app.services.resident_service import (
+    ResidentService,
+)
 
 
 class AppContainer(containers.DeclarativeContainer):
@@ -323,4 +335,16 @@ class AppContainer(containers.DeclarativeContainer):
     child_health_schedule_service: providers.Factory[IChildHealthScheduleService] = providers.Factory(
         ChildHealthScheduleService,
         repo=infra.child_health_record_repository,
+    )
+
+    # Reports services can be added here in the app container as needed
+
+    or_service: providers.Factory[IORService] = providers.Factory(
+        ORService,
+        repo=infra.or_repository,
+    )
+
+    resident_service: providers.Factory[IResidentService] = providers.Factory(
+        ResidentService,
+        repo=infra.resident_repository,
     )
