@@ -22,6 +22,7 @@ from django.views.decorators.http import require_GET
 
 from lupon_mem.utils.http import json_ok, json_err, flash_success, flash_warning, require_post_view
 from lupon_mem.utils.params import post_int, post_bool, post_str
+from lupon_mem.utils.logging import blotter_log_event
 from lupon_mem.services import hearings as svc_hear
 from django.views.decorators.csrf import csrf_protect
 import logging
@@ -146,6 +147,15 @@ def save_answers(request: HttpRequest):
                     [case_id, form_id],
                 )
                 sid = cur.fetchone()[0]
+                
+                # Log the draft creation
+                blotter_log_event(
+                    action="CREATE",
+                    table_affected="blotter_kp_submission",
+                    record_affected_id=sid,
+                    details={"case_id": case_id, "form_id": form_id, "status": "DRAFT"},
+                    performer_staff_id=(request.session.get("auth") or {}).get("staff_id")
+                )
 
             for field_id, value in payload.items():
                 cur.execute(
@@ -313,19 +323,6 @@ def submit_form(request: HttpRequest):
     except Exception:
         storage_url = None
 
-    # ---------- Mark SUBMITTED ----------
-    try:
-        with connection.cursor() as cur:
-            cur.execute(
-                "UPDATE blotter_kp_submission "
-                "SET status='SUBMITTED', submitted_at=now() "
-                "WHERE submission_id=%s",
-                [submission_id]
-            )
-    except Exception:
-        log.exception("submit_form failed to mark SUBMITTED (submission_id=%s)", submission_id)
-        return JsonResponse({"ok": False, "error": "Failed to finalize submission."}, status=500)
-
     # ---------- Determine form_code + form_id ----------
     row_fc = None
     form_id_of_submission = None
@@ -344,6 +341,31 @@ def submit_form(request: HttpRequest):
                 form_id_of_submission = int(row_fc[1])
     except Exception:
         log.exception("submit_form failed to lookup form_code (submission_id=%s)", submission_id)
+
+    # ---------- Mark SUBMITTED ----------
+    try:
+        with connection.cursor() as cur:
+            cur.execute(
+                "UPDATE blotter_kp_submission "
+                "SET status='SUBMITTED', submitted_at=now() "
+                "WHERE submission_id=%s",
+                [submission_id]
+            )
+            
+            # Log the form submission
+            blotter_log_event(
+                action="UPDATE",
+                table_affected="blotter_kp_submission",
+                record_affected_id=submission_id,
+                details={"case_id": case_id, "form_code": form_code, "filename": filename},
+                performer_staff_id=(request.session.get("auth") or {}).get("staff_id"),
+                field_changed="status",
+                old_value="DRAFT",
+                new_value="SUBMITTED"
+            )
+    except Exception:
+        log.exception("submit_form failed to mark SUBMITTED (submission_id=%s)", submission_id)
+        return JsonResponse({"ok": False, "error": "Failed to finalize submission."}, status=500)
 
     # ---------- Universal: let the specific handler persist its computed answers ----------
     try:
@@ -582,7 +604,14 @@ def resident_lookup(request: HttpRequest):
     clicking "Use this person" will attempt to fill that INPUT_ID in the opener window.
     """
     target_input = (request.GET.get("target") or "").strip() or None
-    return render(request, "lupon_mem/resident_lookup.html", {"target_input": target_input})
+    auth = request.session.get("auth") or {}
+    user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
+    
+    return render(request, "lupon_mem/resident_lookup.html", {
+        "target_input": target_input,
+        'page_path': f'{user_role} / Resident Lookup',
+        'page_title': 'Resident Lookup'
+    })
 
 
 @session_login_required
@@ -745,7 +774,8 @@ def staff_lookup(request: HttpRequest):
         return JsonResponse({"ok": False, "error": "Staff not found."}, status=404)
 
     _staff_id, person_id, name, role = row
-    mobile = _get_person_mobile_number(person_id) or ""
+    from lupon_mem.services.helpers import get_person_mobile_number
+    mobile = get_person_mobile_number(person_id) or ""
 
     return JsonResponse({
         "ok": True,
@@ -757,3 +787,79 @@ def staff_lookup(request: HttpRequest):
             "mobile": mobile.strip()
         }
     })
+
+
+@session_login_required
+@role_required(*LUPON_ROLES)
+@require_GET
+def kp16_date_api(request: HttpRequest, case_id: int):
+    """
+    API endpoint to fetch KP-16 date for repudiation window.
+    Returns: { ok: true, date: "October 29, 2025" } or { ok: false, error: "..." }
+    """
+    from lupon_mem.services.fields_util import get_this_case_kp16_date_filed
+    
+    try:
+        date_str = get_this_case_kp16_date_filed(case_id)
+        if date_str:
+            return JsonResponse({"ok": True, "date": date_str})
+        else:
+            return JsonResponse({"ok": False, "error": "KP-16 date not found"})
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+
+@session_login_required
+@role_required(*LUPON_ROLES)
+@require_GET
+def kp7_details_api(request: HttpRequest, case_id: int):
+    """
+    API endpoint to fetch KP-7 complaint details and solutions sought.
+    Returns: { complaint_details: "...", solutions_seeked: "..." }
+    """
+    from lupon_mem.services.fields_util import get_latest_form_fields, get_field_text
+    
+    try:
+        rows = get_latest_form_fields(case_id, 'KP-7')
+        complaint_details = get_field_text(rows, 'complaint_details') or ''
+        solutions_seeked = get_field_text(rows, 'solutions_seeked') or ''
+        
+        return JsonResponse({
+            "complaint_details": complaint_details,
+            "solutions_seeked": solutions_seeked
+        })
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@session_login_required
+@role_required(*LUPON_ROLES)
+@require_GET
+def upcoming_hearings_api(request: HttpRequest, case_id: int):
+    """
+    API endpoint to check for upcoming hearings not yet held.
+    Returns: { count: number_of_upcoming_hearings }
+    """
+    try:
+        with connection.cursor() as cur:
+            # Use fn_case_mediation_hearings function like the existing code
+            cur.execute("SELECT * FROM fn_case_mediation_hearings(%s)", [case_id])
+            cols = [c[0] for c in cur.description] if cur.description else []
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()] if cols else []
+            
+            count = 0
+            for row in rows:
+                hearing_held = row.get('hearing_held', True)  # Default to True if missing
+                
+                # Count hearings that are not held yet
+                if not hearing_held:
+                    count += 1
+        
+        return JsonResponse({"count": count})
+    except Exception as e:
+        import logging
+        logging.error(f"upcoming_hearings_api error: {e}")
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+

@@ -131,10 +131,14 @@ def resident_records_list(request: HttpRequest):
     paginator = Paginator(residents, 20)
     page_obj = paginator.get_page(page_number)
     
+    auth = request.session.get("auth") or {}
+    user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
+    
     return render(request, 'lupon_mem/resident_records_list.html', {
         'page_obj': page_obj,
         'residents': page_obj.object_list,
         'search_query': search_query,
+        'page_path': f'{user_role} / Resident Records',
         'page_title': 'Resident Records',
     })
 
@@ -159,10 +163,13 @@ def resident_records_detail(request: HttpRequest, person_id: int):
         person_row = cur.fetchone()
         if not person_row:
             messages.error(request, "Person not found.")
+            auth = request.session.get("auth") or {}
+            user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
             return render(request, 'lupon_mem/resident_records_detail.html', {
                 'person': None,
                 'report_history': [],
                 'case_history': [],
+                'page_path': f'{user_role} / Resident Records',
                 'page_title': 'Resident Not Found',
             })
         
@@ -201,6 +208,9 @@ def resident_records_detail(request: HttpRequest, person_id: int):
     complainant_cases_count = sum(1 for c in case_history if c.get('role_in_case') == 'COMPLAINANT')
     respondent_cases_count = sum(1 for c in case_history if c.get('role_in_case') == 'RESPONDENT')
     
+    auth = request.session.get("auth") or {}
+    user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
+    
     return render(request, 'lupon_mem/resident_records_detail.html', {
         'person': person,
         'report_history': report_history,
@@ -209,6 +219,7 @@ def resident_records_detail(request: HttpRequest, person_id: int):
         'respondent_reports_count': respondent_reports_count,
         'complainant_cases_count': complainant_cases_count,
         'respondent_cases_count': respondent_cases_count,
+        'page_path': f'{user_role} / Resident Records',
         'page_title': f'Records for {person["full_name"]}',
     })
 

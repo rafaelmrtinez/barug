@@ -62,6 +62,8 @@
       background: #fff; border-radius: 8px; padding: 6px 8px; box-shadow: 0 2px 8px rgba(0,0,0,.1);
     }
     .addr-preview { font-size: .9rem; color:#495057; background:#f8f9fa; padding:.5rem .75rem; border-radius:8px; }
+    .brgy-logo{ width:56px; height:56px; object-fit:contain; border-radius:50%; border:2px solid #ffd100; box-shadow:0 2px 4px rgba(0,0,0,.06); }
+    @media (min-width:992px){ .brgy-logo{ width:64px; height:64px; } }
   </style>
 </head>
 
@@ -70,9 +72,12 @@
 
   <!-- Header -->
   <div class="hero mb-3 d-flex align-items-center justify-content-between">
-    <div>
-      <div class="eyebrow" style="color:#FC9700; letter-spacing:.32em;">BARANGAY SEÑOR SANTO NIÑO</div>
-      <h4 class="title" style="color:#7B1E22;">BLOTTER CASE REPORT</h4>
+    <div class="d-flex align-items-center gap-3">
+      <img src="{% static 'images/brgy-sto-nino.png' %}" alt="Barangay Sto. Niño" class="brgy-logo">
+      <div>
+        <div class="eyebrow" style="color:#FC9700; letter-spacing:.32em;">BARANGAY SEÑOR SANTO NIÑO</div>
+        <h4 class="title" style="color:#7B1E22;">BLOTTER CASE REPORT</h4>
+      </div>
     </div>
     <div class="d-flex align-items-center gap-2">
       <a href="{% url 'lupon_mem:report_list' %}" class="btn btn-link-compact">
@@ -252,7 +257,7 @@
               <label for="purok_sitio">Purok / Sitio</label>
             </div>
             <div class="form-floating mb-3">
-              <input id="barangay" type="text" class="form-control" placeholder="Barangay" value="Sto. Niño">
+              <input id="barangay" type="text" class="form-control" placeholder="Barangay" value="SEÑOR SANTO NIÑO">
               <label for="barangay">Barangay</label>
             </div>
             <div class="form-floating mb-3">
@@ -375,6 +380,16 @@
   }
 
   function choosePerson(id, name){
+    // Check if trying to select the same person for both roles
+    if (mode === 'complainant' && respondentIdInput.value === id) {
+      showToast('This person is already selected as the respondent. Please choose a different person.');
+      return;
+    }
+    if (mode === 'respondent' && complainantIdInput.value === id) {
+      showToast('This person is already selected as the complainant. Please choose a different person.');
+      return;
+    }
+
     if (mode === 'complainant'){
       complainantIdInput.value = id;
       complainantDisplay.innerHTML =
@@ -597,7 +612,7 @@
 
       if (inside){
         purokEl.value  = purokName ? `${purokName}${purokCode ? ' ('+purokCode+')' : ''}` : '';
-        brgyEl.value   = brgyEl.value || 'Sto. Niño';
+        brgyEl.value   = brgyEl.value || 'SEÑOR SANTO NIÑO';
         fillCombinedAddress();
         syncHidden(); // keep hidden inputs updated
         preview.textContent = fullEl.value || `Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`;
@@ -608,12 +623,12 @@
         if (addrOut) addrOut.value = '';
         syncHidden(); // will clear hidden as well
         setPreviewOutside(true);
-        preview.textContent = 'Outside the barangay range. Move the pin inside Barangay Sto. Niño.';
+        preview.textContent = 'Outside the barangay range. Move the pin inside Barangay SEÑOR SANTO NIÑO.';
       }
     } catch(e){
       if (inside){
         purokEl.value  = purokName ? `${purokName}${purokCode ? ' ('+purokCode+')' : ''}` : '';
-        brgyEl.value   = brgyEl.value || 'Sto. Niño';
+        brgyEl.value   = brgyEl.value || 'SEÑOR SANTO NIÑO';
         fillCombinedAddress();
         syncHidden();
         preview.textContent = fullEl.value || `Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`;
@@ -624,20 +639,20 @@
         if (addrOut) addrOut.value = '';
         syncHidden();
         setPreviewOutside(true);
-        preview.textContent = 'Outside the barangay range. Move the pin inside Barangay Sto. Niño.';
+        preview.textContent = 'Outside the barangay range. Move the pin inside Barangay SEÑOR SANTO NIÑO.';
       }
     }
   }
 
   function fillCombinedAddress(){
-    const parts = [streetEl.value.trim(), purokEl.value.trim(), (brgyEl.value||'Sto. Niño').trim(), cityEl.value.trim()].filter(Boolean);
+    const parts = [streetEl.value.trim(), purokEl.value.trim(), (brgyEl.value||'SEÑOR SANTO NIÑO').trim(), cityEl.value.trim()].filter(Boolean);
     fullEl.value = parts.join(', ');
   }
 
   document.getElementById('btnClearPin').addEventListener('click', () => {
     streetEl.value = '';
     purokEl.value  = '';
-    brgyEl.value   = 'Sto. Niño';
+    brgyEl.value   = 'SEÑOR SANTO NIÑO';
     cityEl.value   = '';
     if (addrOut) addrOut.value = '';
     if (latEl) latEl.value = '';
@@ -653,8 +668,8 @@
     syncHidden(); // ensure latest values are posted
   };
 
-  // Toast function
-  function showToast(message, type = 'danger') {
+  // Make showToast available globally for person selection validation
+  window.showToast = function(message, type = 'danger') {
     const toastContainer = document.querySelector('.toast-container');
     const toastId = 'toast-' + Date.now();
     const toast = document.createElement('div');
@@ -670,7 +685,7 @@
     const bsToast = new bootstrap.Toast(toast);
     bsToast.show();
     toast.addEventListener('hidden.bs.toast', () => toast.remove());
-  }
+  };
 
   // Form validation and submission
   const form = document.querySelector('form');
@@ -692,6 +707,12 @@
     if (!desc) { showToast('Incident description is required'); return; }
     if (!address) { showToast('Incident location is required. Please select a location using the map'); return; }
     if (!complainant) { showToast('Complainant is required'); return; }
+    
+    // Check if complainant and respondent are the same person
+    if (complainant && respondent && complainant === respondent) {
+      showToast('Complainant and respondent cannot be the same person');
+      return;
+    }
     
     // Confirmation with respondent reminder
     let confirmMsg = 'Are you sure you want to save this blotter report?';

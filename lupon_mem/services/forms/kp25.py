@@ -13,6 +13,11 @@ from ..kp16_utils import (
     format_full,
     get_kp16_settlement_text_for_case,  # ← NEW
 )
+# Use KP-7 date/time fields
+from ..fields_util import (
+    get_this_case_kp7_date_filed,
+    get_this_case_kp7_time_filed,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -142,14 +147,23 @@ class KP25Handler:
         if not (out.get("case_num") or "").strip() and case_num:
             out["case_num"] = str(case_num)
 
-        # Own date/time
-        d_ans = (out.get("date_filed") or "").strip()
-        d_obj = _try_parse_date(d_ans) or d_by_sub or _dt.now(ZoneInfo("Asia/Manila")).date()
-        out["date_filed"] = _fmt_full(d_obj)
+        # Own date/time - use KP-7 fields if available
+        kp7_date = get_this_case_kp7_date_filed(case_id or 0)
+        kp7_time = get_this_case_kp7_time_filed(case_id or 0)
+        
+        if kp7_date:
+            out["date_filed"] = kp7_date
+        else:
+            d_ans = (out.get("date_filed") or "").strip()
+            d_obj = _try_parse_date(d_ans) or d_by_sub or _dt.now(ZoneInfo("Asia/Manila")).date()
+            out["date_filed"] = _fmt_full(d_obj)
 
-        t_ans = (out.get("time_filed") or "").strip()
-        t_obj = _parse_time(t_ans) or t_by_sub
-        out["time_filed"] = _fmt12(t_obj) if t_obj else ""
+        if kp7_time:
+            out["time_filed"] = kp7_time
+        else:
+            t_ans = (out.get("time_filed") or "").strip()
+            t_obj = _parse_time(t_ans) or t_by_sub
+            out["time_filed"] = _fmt12(t_obj) if t_obj else ""
 
         # Whereas, on ______ : prefer KP-16 settlement date
         if not (out.get("whereas_on") or "").strip():

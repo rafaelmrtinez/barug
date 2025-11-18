@@ -57,7 +57,7 @@ def notify_kp_submission(submission_id: int, case_id: int, form_code: str):
         # Create notification message
         title = f"New {form_code} Submission"
         body = f"{form_name} has been submitted for Case #{case_num}: {case_name or complaint_title}"
-        deep_link = f"/lupon_mem/case/{case_id}/"
+        deep_link = f"/(residentmodals)/(brgycases)/brgycasesdetails/{case_id}"
         
         # Send notifications to all relevant staff
         for staff_id, person_id, role_name, full_name in staff_members:
@@ -124,7 +124,7 @@ def notify_case_progress(case_id: int, progress_type: str, remarks: str = None):
         body = f"Case #{case_num}: {case_name or complaint_title} - {progress_type}"
         if remarks:
             body += f" - {remarks}"
-        deep_link = f"/lupon_mem/case/{case_id}/"
+        deep_link = f"/(residentmodals)/(brgycases)/brgycasesdetails/{case_id}"
         
         # Send notifications to parties involved
         for person_id, full_name, party_type in parties:
