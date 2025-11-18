@@ -620,3 +620,60 @@ class ResidentProfileform(forms.Form):
         label= 'Proof of Employment',
         required= True,
     )
+
+class AccessLogFilters(forms.Form):
+    user_type = forms.ChoiceField(
+        choices=[
+            ("all", "All Users"),
+            ("staff", "Staff Only"),
+            ("resident", "Residents Only"),
+        ],
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    date_from = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+    )
+    date_to = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+    )
+    search = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "Search by name or role...",
+            "name": "q"
+        }),
+    )
+
+class OperationalLogFilters(forms.Form):
+    action_type = forms.ChoiceField(
+        choices=[
+            ("all", "All Actions"),
+            ("create", "Create"),
+            ("update", "Update"),
+            ("delete", "Delete"),
+            ("login", "Login"),
+            ("logout", "Logout"),
+        ],
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    date_from = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+    )
+    date_to = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+    )
+    search = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "Search by name, action, or description...",
+            "name": "q"
+        }),
+    )

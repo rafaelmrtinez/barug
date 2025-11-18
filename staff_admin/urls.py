@@ -22,4 +22,9 @@ urlpatterns = [
 
     path("api/staff/search/", views.staff_search_api, name="staff_search_api"),
     path("api/staff/filter/", views.staff_filter_api, name="staff_filter_api"),
+    # Log views
+    path("access_logs/", views.access_logs, name="access_logs"),
+    path("operational_logs/", views.operational_logs, name="operational_logs"),
+    path("access_log_details/<int:log_id>/", views.access_log_details, name="access_log_details"),
+    path("operational_log_details/<int:log_id>/", views.operational_log_details, name="operational_log_details"),
 ]

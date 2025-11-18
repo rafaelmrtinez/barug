@@ -10,7 +10,10 @@ from django.db import DatabaseError
 from django.urls import reverse
 
 from .forms import LoginForm, ForgotPasswordForm, NewPasswordForm, ChangePasswordForm, VerificationCodeForm
-from .db import call_staff_login
+from .db import call_staff_login, call_change_staff_password, call_staff_request_password_reset, call_staff_reset_password_with_token, call_staff_check_password_reset_token
+from common.flash import flash_warning, flash_success, flash_system_error, flash_db_error
+from common.send_email import send_email 
+from urllib.parse import urlencode
 
 
 logger = logging.getLogger(__name__)  # << use module logger
@@ -133,6 +136,10 @@ def roles_required(*role_names):
 
 @csrf_protect
 def login(request):
+    # Clear any existing force_password_change session
+    if "force_password_change" in request.session:
+        request.session.pop("force_password_change", None)
+    
     form = LoginForm(request.POST or None)
 
     if request.method == "POST" and form.is_valid():
@@ -166,6 +173,8 @@ def login(request):
                 messages.error(request, "Invalid username or password.", extra_tags="auth")
             elif "Wrong password" in msg or "Incorrect password" in msg:
                 messages.error(request, "Invalid username or password.", extra_tags="auth")
+            elif "Account is not active" in msg:
+                messages.error(request, "This account is not active. For assistance, please reach out to your system administrator.", extra_tags="auth")
             elif "could not translate host name" in msg or "could not connect" in msg:
                 messages.error(
                     request,
@@ -190,10 +199,41 @@ def login(request):
         # 4) Success — unpack row
         staff_id, person_id, user_type, role_name_db, first_name, middle_name, last_name, account_status_name = row
         role_lower = (role_name_db or "").strip().lower()
+        acc_status_upper = (account_status_name or "").strip().upper()
+
+        # Check if account is PENDING - redirect to forgot password
+        # SPECIAL CASE: PENDING → force password reset BEFORE full login
+        if acc_status_upper == "PENDING":
+            logger.debug(
+                "LOGIN PENDING | user=%s staff_id=%s acc_status=%s",
+                username, staff_id, account_status_name
+            )
+
+            # Minimal session info for password-change flow ONLY
+            request.session.cycle_key()
+            request.session["force_password_change"] = {
+                "staff_id": staff_id,
+                "person_id": person_id,
+                "user_type": user_type,
+                "username": username,
+                "ip": ip,
+                "created_at": timezone.now().isoformat(),
+            }
+
+            # Clear rate-limit counter because creds were correct
+            cache.delete(rl_key)
+
+            flash_warning(
+                request,
+                "Your account is pending activation. Please set a new password to activate your account."
+            )
+            
+            # Direct to your "Change Password" screen, not forgot password
+            return redirect("authentication:new_password")
 
         logger.debug(
-            "LOGIN OK | user=%s staff_id=%s person_id=%s role=%s (normalized=%s)",
-            username, staff_id, person_id, role_name_db, role_lower
+            "LOGIN OK | user=%s staff_id=%s person_id=%s role=%s (normalized=%s) acc_status=%s",
+            username, staff_id, person_id, role_name_db, role_lower, account_status_name
         )
 
         # 5) Session (store normalized role; keep original in case you ever need it)
@@ -243,14 +283,457 @@ def logout(request):
     return redirect("authentication:login")
 
 
-def forgot_password(request):
+@csrf_protect  # ADDED FORGOT PASS
+def forgot_password(request):  # ADDED FORGOT PASS
+    """
+    Handle staff forgot-password flow:
+    - Accepts an email address.
+    - Asks the DB to create one or more password reset tokens for all staff
+      accounts associated with that email.
+    - Sends a single email listing reset links for each account.
+    - Always shows a generic success message to avoid email enumeration.
+    """  # ADDED FORGOT PASS
+
+    # ADDED FORGOT PASS (helper): shared logic for initial + resend flows
+    def _process_password_reset(email: str, ip: str):  # ADDED FORGOT PASS
+        """
+        Internal helper:
+        - Calls DB to generate reset tokens
+        - Sends a single email with one or more reset links
+        Does NOT raise to caller; all errors are logged only.
+        """  # ADDED FORGOT PASS
+        try:
+            # One row per staff account associated with this email.
+            # Expected tuple: (staff_id, username, email_address, reset_token)
+            reset_rows = call_staff_request_password_reset(email, ip)  # ADDED FORGOT PASS
+        except DatabaseError as e:
+            # Do NOT reveal existence of the email to the user
+            logger.error(
+                "[DEBUG] FORGOT_PASSWORD ERROR | email=%s msg=%s",
+                email, str(e), exc_info=False
+            )  # ADDED FORGOT PASS
+            reset_rows = []  # ADDED FORGOT PASS
+
+        # Build and send one email containing links for all accounts (if any)
+        try:  # ADDED FORGOT PASS
+            if not reset_rows:
+                return  # Nothing to send; still keep response generic to user  # ADDED FORGOT PASS
+
+            accounts = []  # ADDED FORGOT PASS
+            target_email = email  # ADDED FORGOT PASS
+
+            from .models import Authentication  # ADDED FORGOT PASS
+
+            for row in reset_rows:  # ADDED FORGOT PASS
+                if len(row) < 4:
+                    continue
+                staff_id, username, row_email, reset_token = row
+                if not reset_token:
+                    continue
+
+                # Build URL: /auth/new_password/?token=<encoded-token>
+                base_url = reverse("authentication:new_password")  # ADDED FORGOT PASS
+                query = urlencode({"token": reset_token})          # ADDED FORGOT PASS
+                reset_url = request.build_absolute_uri(f"{base_url}?{query}")  # ADDED FORGOT PASS
+
+                # Optional: get role to show nicer label (e.g., "juan.clerk (Barangay Clerk)")
+                try:  # ADDED FORGOT PASS
+                    profile = Authentication.get_staff_profile_by_id(staff_id)
+                    role = profile.get('role', '').title() if profile else ''
+                    display_name = f"{username} ({role})" if role else (username or f"Account {staff_id}")
+                except Exception:
+                    display_name = username or f"Account {staff_id}"
+
+                accounts.append({
+                    "username": display_name,
+                    "reset_url": reset_url,
+                })  # ADDED FORGOT PASS
+
+            if not accounts:
+                return  # ADDED FORGOT PASS
+
+            subject = "Password Reset Request"  # ADDED FORGOT PASS
+
+            # Plain-text version  # ADDED FORGOT PASS
+            body_text = (
+                "You (or someone using this email address) requested a password reset.\n\n"
+            )
+            if len(accounts) == 1:
+                acc = accounts[0]
+                body_text += (
+                    f"To reset your password for {acc['username']}, "
+                    f"click the link below:\n{acc['reset_url']}\n\n"
+                )
+            else:
+                body_text += (
+                    "Multiple staff accounts are associated with this email. "
+                    "Choose which account you want to reset:\n\n"
+                )
+                for acc in accounts:
+                    body_text += f"• {acc['username']}: {acc['reset_url']}\n"
+                body_text += "\n"
+
+            body_text += (
+                "If you did not request this, you can safely ignore this email."
+            )
+
+            # HTML version  # ADDED FORGOT PASS
+            body_html = """
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Password Reset Request</h2>
+                <p>You (or someone using this email address) requested a password reset.</p>
+            """
+
+            if len(accounts) == 1:
+                acc = accounts[0]
+                body_html += f"""
+                <p>To reset your password for <strong>{acc['username']}</strong>, click the button below:</p>
+                <p style="text-align:center; margin: 24px 0;">
+                    <a href="{acc['reset_url']}"
+                       style="background:#dc3545;color:#fff;text-decoration:none;
+                              padding:12px 24px;border-radius:4px;display:inline-block;">
+                        Reset Password
+                    </a>
+                </p>
+                """
+            else:
+                body_html += """
+                <p>Multiple staff accounts are associated with this email. Choose the account you want to reset:</p>
+                <div style="margin: 20px 0;">
+                """
+                for acc in accounts:
+                    body_html += f"""
+                    <div style="margin: 10px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px;">
+                        <strong>{acc['username']}</strong><br>
+                        <a href="{acc['reset_url']}"
+                           style="background:#dc3545;color:#fff;text-decoration:none;
+                                  padding:8px 16px;border-radius:4px;display:inline-block;margin-top:8px;">
+                            Reset Password for this Account
+                        </a>
+                    </div>
+                    """
+                body_html += "</div>"
+
+            body_html += """
+                <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
+                <p style="color:#666;font-size:13px;">
+                    If you did not request this change, you can safely ignore this email.
+                </p>
+            </div>
+            """
+
+            # Send single email with all reset links  # ADDED FORGOT PASS
+            send_email(
+                subject=subject,
+                to=[target_email],
+                body_text=body_text,
+                body_html=body_html,
+                from_name="Barangay Sto. Niño",
+                fail_silently=True,
+            )  # ADDED FORGOT PASS
+
+        except Exception as e:
+            logger.error(
+                "[DEBUG] FORGOT_PASSWORD send_email ERROR | email=%s msg=%s",
+                email, str(e), exc_info=True
+            )  # ADDED FORGOT PASS
+
+    # ─────────────────────────────────────────────
+    # RESEND: handle "request another email" link
+    # ─────────────────────────────────────────────
+    if request.method == "GET" and request.GET.get("resend") == "1":
+        # Reuse the last email used for forgot-password in this session
+        email = (request.session.get("forgot_pass_email") or "").strip()
+        if not email:
+            flash_warning(
+                request,
+                "Please enter your email again to request another reset link."
+            )
+            return redirect("authentication:forgot_password")
+
+        ip = _get_client_ip(request)
+
+        # ADDED RATE LIMIT (resend)
+        rl_key = f"forgot:rl:{ip}"
+        attempts = cache.get(rl_key, 0)
+        if attempts >= 5:
+            flash_success(
+                request,
+                "If an account is associated with that email, you'll receive a password reset link shortly."
+            )
+            return redirect("authentication:email_sent")
+        cache.set(rl_key, attempts + 1, 15 * 60)
+        # END RATE LIMIT
+
+        _process_password_reset(email, ip)
+
+        flash_success(
+            request,
+            "If an account is associated with that email, you'll receive a password reset link shortly."
+        )
+        return redirect("authentication:email_sent")
+
+
+    # ─────────────────────────────────────────────
+    # Normal POST: user submits email in the form
+    # ─────────────────────────────────────────────
+    if request.method == "POST":
+        form = ForgotPasswordForm(request.POST)
+        if form.is_valid():
+            email = (form.cleaned_data.get("email") or "").strip()
+            ip = _get_client_ip(request)
+
+            # ADDED RATE LIMIT (initial forgot)
+            rl_key = f"forgot:rl:{ip}:{email.lower()}"
+            attempts = cache.get(rl_key, 0)
+            if attempts >= 5:
+                flash_success(
+                    request,
+                    "If an account is associated with that email, you'll receive a password reset link shortly."
+                )
+                return redirect("authentication:email_sent")
+            cache.set(rl_key, attempts + 1, 15 * 60)
+            # END RATE LIMIT
+
+            # Remember this email in session for "request another email"
+            request.session["forgot_pass_email"] = email
+
+            # Do the DB + email process via helper
+            _process_password_reset(email, ip)
+
+            flash_success(
+                request,
+                "If an account is associated with that email, you'll receive a password reset link shortly."
+            )
+            return redirect("authentication:email_sent")
+
+        return render(request, "forgot_password.html", {"form": form})
+    
+    # ─────────────────────────────────────────────
+    # Default GET – show empty forgot-password form
+    # ─────────────────────────────────────────────
     form = ForgotPasswordForm()
     return render(request, "forgot_password.html", {"form": form})
 
 
+
+
+
+
+
+# @require_http_methods(["GET", "POST"])
 def new_password(request):
-    form = NewPasswordForm()
-    return render(request, "new_password.html", {"form": form})
+    from django.utils import timezone
+    from datetime import datetime
+    
+    token = request.GET.get("token") or request.POST.get("token")
+    is_forgot_mode = bool(token)
+
+    # ─────────────────────────────────────────────
+    # FORGOT PASSWORD MODE (via email token)
+    # ─────────────────────────────────────────────
+    if is_forgot_mode:
+        # GET: validate token BEFORE showing form
+        if request.method == "GET":
+            try:
+                is_valid = call_staff_check_password_reset_token(token)
+            except DatabaseError as e:
+                logger.error(
+                    "[DEBUG] CHECK_RESET_TOKEN ERROR | token=%s msg=%s",
+                    token, str(e), exc_info=False
+                )
+                is_valid = False
+
+            if not is_valid:
+                flash_warning(
+                    request,
+                    "This password reset link is invalid or has expired. Please request a new one."
+                )
+                return redirect("authentication:forgot_password")
+
+            form = NewPasswordForm()
+            return render(
+                request,
+                "new_password.html",
+                {"form": form, "mode": "forgot", "token": token},
+            )
+
+        # POST: validate + reset via token (UNCHANGED)
+        form = NewPasswordForm(request.POST)
+        if not form.is_valid():
+            return render(
+                request,
+                "new_password.html",
+                {"form": form, "mode": "forgot", "token": token},
+            )
+
+        new_password_val = form.cleaned_data.get("new_pass")
+        confirm_password = form.cleaned_data.get("confirm_pass")
+
+        if new_password_val != confirm_password:
+            flash_warning(request, "Passwords do not match.")
+            return render(
+                request,
+                "new_password.html",
+                {"form": form, "mode": "forgot", "token": token},
+            )
+
+        try:
+            success = call_staff_reset_password_with_token(
+                token, new_password_val, confirm_password
+            )
+
+            if success:
+                flash_success(
+                    request,
+                    "Your password has been updated. Please log in with your new password."
+                )
+                return redirect("authentication:login")
+            else:
+                flash_system_error(request, "Unable to change password. Please try again.")
+
+        except DatabaseError as e:
+            msg = str(e)
+            logger.error("[DEBUG] RESET_PASSWORD ERROR | token=%s msg=%s", token, msg, exc_info=False)
+
+            lower_msg = msg.lower()
+            if "invalid" in lower_msg or "expired" in lower_msg or "token" in lower_msg:
+                flash_warning(
+                    request,
+                    "This password reset link is invalid or has expired. Please request a new one."
+                )
+                return redirect("authentication:forgot_password")
+            elif "complexity" in lower_msg:
+                flash_warning(
+                    request,
+                    "Password must be at least 8 characters with uppercase, lowercase, digit, and special character."
+                )
+            else:
+                flash_system_error(
+                    request,
+                    "Unable to change password at this time. Please try again."
+                )
+
+        return render(
+            request,
+            "new_password.html",
+            {"form": form, "mode": "forgot", "token": token},
+        )
+
+    # ─────────────────────────────────────────────
+    # PENDING ACCOUNT MODE (first login, from session)
+    # (original code, just indented under the else)
+    # ─────────────────────────────────────────────
+
+    # Check if user has force_password_change session (from PENDING login)
+    force_data = request.session.get("force_password_change")
+    if not force_data:
+        return redirect("authentication:login")
+    
+    # Check session expiration (15 minutes)
+    try:
+        created_at = datetime.fromisoformat(force_data.get("created_at", ""))
+        if (timezone.now() - created_at).total_seconds() > 900:  # 15 minutes
+            request.session.pop("force_password_change", None)
+            # flash_warning(request, "Your password reset session has expired. Please try again.")
+            return redirect("authentication:login")
+    except (ValueError, TypeError):
+        request.session.pop("force_password_change", None)
+        # flash_system_error(request, "Invalid session. Please try again.")
+        return redirect("authentication:login")
+    
+    # GET request
+    if request.method == "GET":
+        form = NewPasswordForm()
+        return render(request, "new_password.html", {"form": form, "mode": "pending"})
+    
+    # POST request
+    form = NewPasswordForm(request.POST)
+    if not form.is_valid():
+        return render(request, "new_password.html", {"form": form, "mode": "pending"})
+    
+    new_password_val = form.cleaned_data.get("new_pass")
+    confirm_password = form.cleaned_data.get("confirm_pass")
+    
+    if new_password_val != confirm_password:
+        flash_warning(request, "Passwords do not match.")
+        return render(request, "new_password.html", {"form": form, "mode": "pending"})
+    
+    try:
+        # Call secure database function
+        success = call_change_staff_password(force_data["staff_id"], new_password_val, confirm_password)
+        
+        if success:
+            # Send email notification
+            try:
+                from common.send_email import send_email
+                import pytz
+                
+                # Get staff email from force_data or database
+                staff_email = force_data.get("email")  # if available in session
+                if not staff_email:
+                    # Get from database if not in session
+                    from .models import Authentication
+                    profile = Authentication.get_staff_profile_by_id(force_data["staff_id"])
+                    staff_email = profile.get("email_address")
+                
+                if staff_email:
+                    # Get Philippines timezone
+                    ph_tz = pytz.timezone('Asia/Manila')
+                    ph_time = timezone.now().astimezone(ph_tz)
+                    
+                    # Compose full name
+                    first_name = force_data.get("first_name", "")
+                    last_name = force_data.get("last_name", "")
+                    full_name = f"{first_name} {last_name}".strip() or "Staff Member"
+                    
+                    subject = "Password Changed Successfully"
+                    body_text = f"Hello {full_name},\n\nYour password has been successfully changed on {ph_time.strftime('%B %d, %Y at %I:%M %p')}.\n\nIf you did not make this change, please contact your administrator immediately.\n\nBest regards,\nBarangay Sto. Niño"
+                    body_html = f"""
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2 style="color: #333;">Password Changed Successfully</h2>
+                        <p>Hello {full_name},</p>
+                        <p>Your password has been successfully changed on <strong>{ph_time.strftime('%B %d, %Y at %I:%M %p')}</strong>.</p>
+                        <div style="background: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #28a745;">
+                            <p style="margin: 0; color: #155724;"><strong>Security Notice:</strong> If you did not make this change, please contact your administrator immediately.</p>
+                        </div>
+                        <p>Best regards,<br>Barangay Sto. Niño</p>
+                    </div>
+                    """
+                    
+                    send_email(
+                        subject=subject,
+                        to=[staff_email],
+                        body_text=body_text,
+                        body_html=body_html,
+                        from_name="Barangay Sto. Niño",
+                        fail_silently=True
+                    )
+            except Exception as e:
+                logger.error("Failed to send password change notification: %s", str(e), exc_info=True)
+            
+            # Clear the force change session
+            request.session.pop("force_password_change", None)
+            
+            flash_success(request, "Your password has been updated. Please log in with your new password.")
+            return redirect("authentication:login")
+        else:
+            flash_system_error(request, "Unable to change password. Please try again.")
+            
+    except DatabaseError as e:
+        msg = str(e)
+        logger.error("[DEBUG] CHANGE_PASSWORD ERROR | staff=%s msg=%s", force_data["staff_id"], msg, exc_info=False)
+        
+        if "do not match" in msg:
+            flash_warning(request, "Passwords do not match.")
+        elif "complexity" in msg:
+            flash_warning(request, "Password must be at least 8 characters with uppercase, lowercase, digit, and special character.")
+        else:
+            flash_system_error(request, "Unable to change password at this time. Please try again.")
+    
+    return render(request, "new_password.html", {"form": form, "mode": "pending"})
+
+
 
 
 def email_sent(request):

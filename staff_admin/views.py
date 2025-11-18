@@ -2131,3 +2131,57 @@ def process_staff_request(request: HttpRequest) -> HttpResponse:
         flash_system_error(request, "Unable to process the request.", exc=ex)
     
     return redirect(request.META.get("HTTP_REFERER") or "staff_admin:staff_account_requests_list")
+
+@session_login_required
+@role_required(ADMIN_ROLE)
+@nocache
+def access_logs(request):
+    user_fullname, user_role, user_role_template = get_user_info(request)
+    return render(request, "staff_admin/logs/access_logs.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Access Logs',
+        'page_title': 'Access Logs',
+        'user_role_template': user_role_template,
+    })
+
+@session_login_required
+@role_required(ADMIN_ROLE)
+@nocache
+def operational_logs(request):
+    user_fullname, user_role, user_role_template = get_user_info(request)
+    return render(request, "staff_admin/logs/operational_logs.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Operational Logs',
+        'page_title': 'Operational Logs',
+        'user_role_template': user_role_template,
+    })
+
+@session_login_required
+@role_required(ADMIN_ROLE)
+@nocache
+def access_log_details(request, log_id):
+    user_fullname, user_role, user_role_template = get_user_info(request)
+    return render(request, "staff_admin/logs/access_log_details.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Access Log Details',
+        'page_title': 'Access Log Details',
+        'user_role_template': user_role_template,
+        'log_id': log_id,
+    })
+
+@session_login_required
+@role_required(ADMIN_ROLE)
+@nocache
+def operational_log_details(request, log_id):
+    user_fullname, user_role, user_role_template = get_user_info(request)
+    return render(request, "staff_admin/logs/operational_log_details.html", {
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'page_path': f'{user_role} / Operational Log Details',
+        'page_title': 'Operational Log Details',
+        'user_role_template': user_role_template,
+        'log_id': log_id,
+    })
