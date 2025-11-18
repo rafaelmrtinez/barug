@@ -28,39 +28,3 @@ class VitaminForm(forms.Form):
                     self.fields['vit_a_3'].initial = True
                     self.fields['vit_a_3'].widget.attrs['readonly'] = True
         
-    def clean(self) -> dict[str, Any]:
-        cleaned_data = super().clean()
-        # Normalize stages from repository
-        stages = self._existing_stages or []
-        if stages and isinstance(stages[0], dict):
-            stages = {s.get("vitamin_a_stage_id") for s in stages if s.get("vitamin_a_stage_id")}
-        else:
-            stages = set(stages)
-        max_existing_stage = max(stages) if stages else 0
-        # Incoming request — form checkboxes
-        requested = {
-            1: cleaned_data.get("vit_a_1"),
-            2: cleaned_data.get("vit_a_2"),
-            3: cleaned_data.get("vit_a_3"),
-        }
-        # Determine which stages user wants to give now (True)
-        requested_stages = [stage for stage, checked in requested.items() if checked]
-        if not requested_stages:
-            cleaned_data["vit_a_stage"] = None
-            return cleaned_data
-        latest_requested_stage = max(requested_stages)
-        # Rule 1: Check that all preceding stages exist or are selected
-        for stage in range(1, latest_requested_stage):
-            if stage not in stages and not requested.get(stage):
-                self.add_error(
-                    f"vit_a_{latest_requested_stage}",
-                    f"Cannot give stage {latest_requested_stage} before completing stage {stage}."
-                )
-        # Rule 2: Prevent re-adding an already existing stage
-        if latest_requested_stage in stages:
-            self.add_error(
-                f"vit_a_{latest_requested_stage}",
-                f"Vitamin A stage {latest_requested_stage} already exists in the database."
-            )
-        cleaned_data["vit_a_stage"] = latest_requested_stage
-        return cleaned_data

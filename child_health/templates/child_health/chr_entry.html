@@ -135,7 +135,7 @@
             <button type="button" class="btn btn-sm btn-outline-brand section-action" data-section="#nbs">Edit</button>
         </div>
         <div class="card-body" id="nbs">
-            <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
+            <form novalidate>
                 {{ new_born_screening.form_type }}
                 {% csrf_token %}
                 <div class="row g-3 align-items-end">
@@ -174,8 +174,7 @@
             <button type="button" class="btn btn-sm btn-outline-brand section-action"
                 data-section="#child-details">Edit</button>
         </div>
-        <form id="breastFeedingForm" action="{% url 'child_health:child_health_entry' child_health_record_id %}"
-            method="post" novalidate>
+        <form id="breastFeedingForm" novalidate>
             <div class="card-body" id="child-details">
                 {% csrf_token %}
                 {% comment %} <div class="col-md-4">
@@ -238,7 +237,7 @@
                 <tbody>
                     <!-- BCG -->
                     <tr>
-                        <form method="post" id="bcgImmunizationForm">
+                        <form id="bcgImmunizationForm">
                             {% csrf_token %}
                             <td>BCG</td>
                             <td>{{ immunizations.bcg_24hr }}</td>
@@ -253,7 +252,7 @@
 
                     <!-- Hep. BV -->
                     <tr>
-                        <form method="post" id="hepbvImmunizationForm" novalidate>
+                        <form id="hepbvImmunizationForm" novalidate>
                             {% csrf_token %}
                             <td>Hep. BV</td>
                             <td>{{ immunizations.hepbv_24hr }}</td>
@@ -268,7 +267,7 @@
 
                     <!-- PCV -->
                     <tr>
-                        <form method="post" id="pcvImmunizationForm" novalidate>
+                        <form id="pcvImmunizationForm" novalidate>
                             {% csrf_token %}
                             <td>PCV</td>
                             <td>{{ immunizations.pcv_24hr }}</td>
@@ -283,7 +282,7 @@
 
                     <!-- OPV -->
                     <tr>
-                        <form method="post" id="opvImmunizationForm" novalidate>
+                        <form id="opvImmunizationForm" novalidate>
                             {% csrf_token %}
                             <td>OPV</td>
                             <td>{{ immunizations.opv_24hr }}</td>
@@ -298,7 +297,7 @@
 
                     <!-- AMV -->
                     <tr>
-                        <form method="post" id="amvImmunizationForm" novalidate>
+                        <form id="amvImmunizationForm" novalidate>
                             {% csrf_token %}
                             <td>AMV</td>
                             <td>{{ immunizations.amv_24hr }}</td>
@@ -313,7 +312,7 @@
 
                     <!-- Pentavalent -->
                     <tr>
-                        <form method="post" id="pentavalentImmunizationForm" novalidate>
+                        <form id="pentavalentImmunizationForm" novalidate>
                             {% csrf_token %}
                             <td>Pentavalent</td>
                             <td>{{ immunizations.pentavalent_24hr }}</td>
@@ -345,7 +344,7 @@
                 data-section="#supplementation">Edit</button>
         </div>
         <div class="card-body" id="birth-and-supplementation">
-            <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
+            <form novalidate>
                 {% csrf_token %}
                 <div class="row g-3">
                     <div class="col-md-4">{{ form.data_assessed.label_tag }} {{ form.data_assessed }}</div>
@@ -379,7 +378,7 @@
                 data-section="#iron_intake">Edit</button>
         </div>
         <div class="card-body" id="iron-intake">
-            <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
+            <form novalidate>
                 {% csrf_token %}
                 <div class="row g-3">
                     <div class="col-md-3">{{ iron_intake_form.date_iron_started.label_tag }} {{ iron_intake_form.date_iron_started }}</div>
@@ -404,7 +403,7 @@
             </button>
         </div>
         <div class="card-body" id="vitamin-intake">
-            <form method="post" novalidate>
+            <form novalidate>
                 {% csrf_token %}
                 <div class="row g-3">
                     <div class="col-md-3">
@@ -439,7 +438,7 @@
         </div>
 
         <div class="card-body" id="visit-entry">
-            <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
+            <form novalidate>
                 {% csrf_token %}
 
                 <div class="row g-3">
@@ -595,5 +594,7 @@ document.addEventListener('DOMContentLoaded', function(){
     onScroll();
 });
 </script>
+<script defer src="{% static 'child_health/js/api_post_entries.js' %}"></script>
+<script src="{% static 'js/toast.js' %}"></script>
 {% endblock %}
 {% endblock %}

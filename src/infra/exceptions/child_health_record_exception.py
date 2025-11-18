@@ -16,7 +16,8 @@ class ChildHealthRecordException(QueryExecutionException):
         "P6145",  # scheduled date/time required
         "P6147",  # pending status not found
         "P6S06",  # (commented guard for duplicate exact datetime) keep for completeness
-        "P6148"   # pending schedule already exists for this child on date
+        "P6148",   # pending schedule already exists for this child on date
+        "P6133"
     }
 
     def __init__(self, message: str):
