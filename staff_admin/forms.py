@@ -622,58 +622,90 @@ class ResidentProfileform(forms.Form):
     )
 
 class AccessLogFilters(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search by name or role...',
+            'name': 'q'
+        }),
+        label='Search Access Logs',
+        required= False,
+    )
     user_type = forms.ChoiceField(
         choices=[
-            ("all", "All Users"),
+            ("", "All Users"),
             ("staff", "Staff Only"),
             ("resident", "Residents Only"),
         ],
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'name': 'user_type',
+        }),
+        label='User Type',
         required=False,
-        widget=forms.Select(attrs={"class": "form-select"}),
     )
     date_from = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control',
+            'name': 'date_from',
+        }),
+        label='Date From',
         required=False,
-        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
     )
     date_to = forms.DateField(
-        required=False,
-        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
-    )
-    search = forms.CharField(
-        required=False,
-        widget=forms.TextInput(attrs={
-            "class": "form-control",
-            "placeholder": "Search by name or role...",
-            "name": "q"
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control',
+            'name': 'date_to',
         }),
+        label='Date To',
+        required=False,
     )
 
 class OperationalLogFilters(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search by name, action, or description...',
+            'name': 'q'
+        }),
+        label='Search Operational Logs',
+        required= False,
+    )
     action_type = forms.ChoiceField(
         choices=[
-            ("all", "All Actions"),
+            ("", "All Actions"),
             ("create", "Create"),
             ("update", "Update"),
             ("delete", "Delete"),
             ("login", "Login"),
             ("logout", "Logout"),
         ],
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'name': 'action_type',
+        }),
+        label='Action Type',
         required=False,
-        widget=forms.Select(attrs={"class": "form-select"}),
     )
     date_from = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control',
+            'name': 'date_from',
+        }),
+        label='Date From',
         required=False,
-        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
     )
     date_to = forms.DateField(
-        required=False,
-        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
-    )
-    search = forms.CharField(
-        required=False,
-        widget=forms.TextInput(attrs={
-            "class": "form-control",
-            "placeholder": "Search by name, action, or description...",
-            "name": "q"
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control',
+            'name': 'date_to',
         }),
+        label='Date To',
+        required=False,
     )
