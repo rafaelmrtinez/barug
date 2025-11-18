@@ -63,7 +63,7 @@ class PostpartumRecordAPI(View):
 
         try:
             # service will validate/sanitize payload and perform insert
-            res = service.insert_postpartum_record(payload or {}, added_by_id=staff_id, attended_by_role_name=staff_role)
+            res = service.insert_postpartum_record(payload or {}, added_by_id=staff_id)
         except MaternalHealthRecordException as e:
             if request.content_type and 'application/json' in (request.content_type or ''):
                 return JsonResponse({'success': False, 'message': e.message or str(e)}, status=400)
