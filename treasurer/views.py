@@ -22,6 +22,7 @@ from src.app.bootstrap.app_containers import AppContainer
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
 from authentication.supabase_client import supabase
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, HttpResponsePermanentRedirect, HttpResponseBadRequest
 
 from .services.requests_service import (
     list_requests, list_business_requests, fetch_detail_bundle, build_auth_links
@@ -32,6 +33,9 @@ from .services.payments_service import (
 from .services.fees_service import (
     search_fee_items, recent_fee_changes, update_fee_amount,
     add_fee, fetch_fee_full, list_document_types, upsert_fee
+)
+from src.app.services.or_service import (
+    IORService,
 )
 from .utils.ui import STATUS_UI, ACTION_LABELS, titleize
 
@@ -2336,49 +2340,28 @@ from treasurer.services.finreport_service import build_financial_report_payload
 @role_required(TREASURER_ROLE)
 @require_GET
 @nocache
-def financial_report(request):
-    q = (request.GET.get("q") or "").strip() or None
-    doc_type = (request.GET.get("doc_type") or "").strip() or None
-    pm_raw = (request.GET.get("payment_method_id") or "").strip()
-    payment_method_id = int(pm_raw) if pm_raw.isdigit() else None
-    start_date = (request.GET.get("start_date") or "").strip() or None
-    end_date = (request.GET.get("end_date") or "").strip() or None
+@inject
+def financial_report(
+    request: HttpRequest,
+    or_service: IORService = Provide[AppContainer.or_service],
+) -> HttpResponseRedirect | HttpResponseRedirect | HttpResponse:
+    
+    user_role = _auth_role_name(request)
 
-    payload = build_financial_report_payload(start_date, end_date, q, doc_type, payment_method_id)
+    rows = or_service.execute()
 
-    # Paginate rows
-    try:
-        per_page = int(request.GET.get("per_page") or "25")
-    except Exception:
-        per_page = 25
-    per_page = per_page if per_page in (10, 25, 50, 100) else 25
+    paginator =Paginator(rows, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
 
-    paginator = Paginator(payload["rows"], per_page)
-    try:
-        page = int(request.GET.get("page") or "1")
-    except Exception:
-        page = 1
-
-    try:
-        page_obj = paginator.page(page)
-    except EmptyPage:
-        page_obj = paginator.page(1)
 
     return render(
         request,
         "treasurer/financial_report.html",
         {
-            "rows": page_obj.object_list,
-            "page_obj": page_obj,
-            "paginator": paginator,
-            "per_page": per_page,
-            "q": q or "",
-            "doc_type": doc_type or "",
-            "payment_method_id": payment_method_id or "",
-            "start_date": start_date or "",
-            "end_date": end_date or "",
-            "filters": payload["filters"],
-            "totals": payload["totals"],
+            'page_path': f'{user_role} / Household List',
+            'page_title': 'Household List',
+            'page_obj': page_obj,
         },
     )
 

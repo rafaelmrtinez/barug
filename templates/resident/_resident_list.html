@@ -1,0 +1,20 @@
+{% for r in rows %}
+<tr>
+  <td>
+    <span class="id-pill">{{ r.person_code|default_if_none:"" }}</span>
+  </td>
+  <td>{{ r.full_name|default_if_none:"" }}</td>
+  <td>{{ r.address|default_if_none:"" }}</td>
+  <td>{{ r.mob_num|default_if_none:"" }}</td>
+  <td>{{ r.email|default_if_none:"" }}</td>
+  <td class="text-end">
+    <a class="btn btn-outline-brand btn-sm" href="#">
+        View
+    </a>
+  </td>
+</tr>
+{% empty %}
+<tr>
+  <td colspan="9" class="text-center py-3 text-muted">No households found.</td>
+</tr>
+{% endfor %}
