@@ -70,50 +70,44 @@
   </form>
 
   <div id="formList" class="d-flex flex-column gap-2">
-    {% for code, name in forms %}
-      <div class="form-card" data-code="{{ code|upper }}" data-name="{{ name|upper }}">
-        <div class="form-meta">
-          <span class="form-code">{% bs_icon 'file-earmark-text' %} {{ code }}</span>
-          <div class="form-name" title="{{ name }}">{{ name }}</div>
-
-          {# Contextual reasons, purely visual #}
-          {% if code|upper == 'MED-ATT-2025' %}
-            <span class="badge rounded-pill hint-badge kp9 ms-1">{% bs_icon 'envelope' %} Med Attendance</span>
-          {% endif %}
-          {% if code|upper == 'KP-9' %}
-            <span class="badge rounded-pill hint-badge kp9 ms-1">{% bs_icon 'envelope' %} New Summons</span>
-          {% elif code|upper == 'KP-18' %}
-            <span class="badge rounded-pill hint-badge kp18 ms-1">{% bs_icon 'person-exclamation' %} No-show (Complainant)</span>
-          {% elif code|upper == 'KP-19' %}
-            <span class="badge rounded-pill hint-badge kp19 ms-1">{% bs_icon 'person-exclamation' %} No-show (Respondent)</span>
-          {% elif code|upper == 'KP-20' %}
-            <span class="badge rounded-pill hint-badge kp20 ms-1">{% bs_icon 'exclamation-triangle' %} Repudiation → CFA</span>
-          {% elif code|upper == 'KP-20A' %}
-            <span class="badge rounded-pill hint-badge kp20a ms-1">{% bs_icon 'check2-circle' %} No Settlement → CFA</span>
-          {% elif code|upper == 'KP-20B' %}
-            <span class="badge rounded-pill hint-badge kp20b ms-1">{% bs_icon 'person-x' %} Repeated No-Show → CFA</span>
-          {% elif code|upper == 'KP-21' %}
-            <span class="badge rounded-pill hint-badge kp21 ms-1">{% bs_icon 'ban' %} Bar Action (Compl.)</span>
-          {% elif code|upper == 'KP-22' %}
-            <span class="badge rounded-pill hint-badge kp22 ms-1">{% bs_icon 'ban' %} Bar Counterclaim (Resp.)</span>
-          {% elif code|upper == 'KP-23' %}
-            <span class="badge rounded-pill hint-badge kp23 ms-1">{% bs_icon 'gavel' %} Execution (Non-Compliance)</span>
-          {% elif code|upper == 'KP-24' %}
-            <span class="badge rounded-pill hint-badge kp24 ms-1">{% bs_icon 'calendar-event' %} Hearing on Execution</span>
-          {% elif code|upper == 'KP-25' %}
-            <span class="badge rounded-pill hint-badge kp25 ms-1">{% bs_icon 'bell' %} Notice of Execution</span>
-          {% endif %}
-        </div>
-        <div class="form-action">
-          <a class="btn btn-brand btn-sm d-flex align-items-center use-form"
-             href="{% url 'lupon_mem:form_builder_by_code' case_id code %}">
-            {% bs_icon 'plus' extra_classes='me-2' %} Use this form
-          </a>
-        </div>
+    <div class="form-card" data-code="KP-10" data-name="NOTICE FOR CONSTITUTION OF PANGKAT">
+      <div class="form-meta">
+        <span class="form-code">{% bs_icon 'file-earmark-text' %} KP-10</span>
+        <div class="form-name" title="NOTICE FOR CONSTITUTION OF PANGKAT">NOTICE FOR CONSTITUTION OF PANGKAT</div>
       </div>
-    {% empty %}
-      <div class="text-muted py-5 text-center">No forms in catalog.</div>
-    {% endfor %}
+      <div class="form-action">
+        <a class="btn btn-brand btn-sm d-flex align-items-center use-form"
+           href="{% url 'lupon_mem:form_builder_by_code' case_id 'KP-10' %}">
+          {% bs_icon 'plus' extra_classes='me-2' %} Use this form
+        </a>
+      </div>
+    </div>
+    
+    <div class="form-card" data-code="KP-11" data-name="NOTICE TO CHOSEN PANGKAT MEMBER">
+      <div class="form-meta">
+        <span class="form-code">{% bs_icon 'file-earmark-text' %} KP-11</span>
+        <div class="form-name" title="NOTICE TO CHOSEN PANGKAT MEMBER">NOTICE TO CHOSEN PANGKAT MEMBER</div>
+      </div>
+      <div class="form-action">
+        <a class="btn btn-brand btn-sm d-flex align-items-center use-form"
+           href="{% url 'lupon_mem:form_builder_by_code' case_id 'KP-11' %}">
+          {% bs_icon 'plus' extra_classes='me-2' %} Use this form
+        </a>
+      </div>
+    </div>
+    
+    <div class="form-card" data-code="KP-13" data-name="SUBPOENA LETTER">
+      <div class="form-meta">
+        <span class="form-code">{% bs_icon 'file-earmark-text' %} KP-13</span>
+        <div class="form-name" title="SUBPOENA LETTER">SUBPOENA LETTER</div>
+      </div>
+      <div class="form-action">
+        <a class="btn btn-brand btn-sm d-flex align-items-center use-form"
+           href="{% url 'lupon_mem:form_builder_by_code' case_id 'KP-13' %}">
+          {% bs_icon 'plus' extra_classes='me-2' %} Use this form
+        </a>
+      </div>
+    </div>
   </div>
 
   {% if page_obj.has_other_pages %}

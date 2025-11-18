@@ -227,6 +227,17 @@ class KP22Handler:
         for k in _KP22_FIELDS:
             out.setdefault(k, "")
 
+        # ---------------------------------------------------
+        # Send notifications for KP-22 submission
+        # ---------------------------------------------------
+        try:
+            from notifications.views import notify_kp22_certification_bar_action_respondent
+            if case_id:
+                case_num = out.get("case_num", "")
+                notify_kp22_certification_bar_action_respondent(case_id, case_num)
+        except Exception as e:
+            logger.warning("[KP22] Failed to send notifications: %s", e)
+
         self._log(out)
         return out
 
