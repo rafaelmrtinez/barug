@@ -181,8 +181,8 @@
             submitButtons.forEach(btn => {
                 btn.disabled = true;
                 btn.dataset._origText = btn.innerHTML;
-                // inject small spinner markup if available (Bootstrap)
-                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Saving...';
+                // use same spinner style as maternal (`mhr_form_submit.js`) for UI consistency
+                btn.innerHTML = '<span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span> Saving...';
             });
             form.setAttribute('aria-busy', 'true');
 
@@ -222,4 +222,6 @@
     // Expose for debugging
     globalThis.ChildHealthApi = { postJson, apiUrl };
 
+    // Button-disable feature removed per request. Previously implemented section/row completeness checks
+    // and automatic disabling of header/row save buttons; removed to restore manual control.
 })();
