@@ -43,6 +43,10 @@ from src.app.contracts.household_service_contract import (
 from src.domain.contracts.household_repository_contract import (
     IHouseholdRepository,
 )
+from src.app.contracts.resident_service_contract import ( 
+    IResidentService,
+)
+
 
 from .forms import (
     StaffFilters,
@@ -50,6 +54,7 @@ from .forms import (
     HouseholdFilters,
     AnnouncementDraftForm,
     DraftListSearch,
+    ResidentFilters,
 )
 
 
@@ -1451,24 +1456,73 @@ def resident_profile(request: HttpRequest, person_id: int) -> HttpResponse:
 # -------------------------------
 # RESIDENT
 # -------------------------------
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@csrf_protect
+@nocache
+@inject
+def resident_list(
+    request: HttpRequest,
+    resident_service: IResidentService = Provide[AppContainer.resident_service],
+):
+    user_role = _auth_role_name(request)
+    form = ResidentFilters()
+    
+    search = request.GET.get("search")
+    purok_sitio = request.GET.get("purok_sitio")
 
-def resident_list(request):
-    form = StaffFilters()
-    list = []
-    paginator = Paginator(list, 10)
-    page_number = request.GET.get('page')
+    rows = resident_service.execute(
+        search=search,
+        purok=purok_sitio,
+    )
+
+    paginator = Paginator(rows,10)
+    page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
+    
 
-    user_fullname, user_role, user_role_template = get_user_info(request)
+    if (search or purok_sitio is not None) and not form.is_valid():
+        form = ResidentFilters()
+
     return render(request, "resident/resident_list.html", {
-        'user_fullname' : user_fullname,
-        'user_role': user_role,
         'page_path': f'{user_role} / Resident List',
         'page_title': 'Resident List',
-        'user_role_template': user_role_template,
         'page_obj': page_obj,
         'form': form,
+        'search_url': 'secretary:ajax_resident_search',
     })
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@require_GET
+@inject
+def ajax_resident_search(
+    request: HttpRequest,
+    resident_service: IResidentService = Provide[AppContainer.resident_service],
+) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseBadRequest("GET only")
+
+    # only allow XHR (optional, but nice)
+    if request.headers.get("x-requested-with") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR required")
+    
+    tpl_key = (request.GET.get("tpl") or "rows").strip().lower()
+    if tpl_key != "rows":
+        return HttpResponseBadRequest("Unknown partial")
+
+    q = request.GET.get("q", "") or None
+    purok_sitio = request.GET.get("purok_sitio")
+
+    rows = resident_service.execute(
+        search=q,
+        purok=purok_sitio,
+    )[:50]
+
+    context = {"rows": rows}
+    html = render_to_string("resident/_resident_list.html", context, request=request)
+    return HttpResponse(html)
 
 def resident_map_list(request):
     form = StaffFilters()

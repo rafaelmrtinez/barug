@@ -105,6 +105,14 @@ RELIGION_CHOICES = [
     (12, "Roman Catholic"), (13, "Seventh-day Adventist"), (14, "Others"),
 ]
 
+PUROK_SITIO_CHOICES = [
+    ("", "— Select Purok/Sitio —"),
+    (1, "Kanipaan"),
+    (2, "Pampango"),
+    (3, "Lutaw-Lutaw"),
+    (4, "Mauco"),
+]
+
 VALID_ID_TYPE_CHOICES = [
     # (1,  "Philippine Passport"),
     (2,  "Philippine National ID"), 
@@ -647,5 +655,26 @@ class DraftListSearch(forms.Form):
             'placeholder' : 'Search',
         }),
         label= 'Search',
+        required= False,
+    )
+
+
+class ResidentFilters(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search',
+        }),
+        label= 'Search',
+        required= False,
+    )
+    purok_sitio = forms.ChoiceField(
+        choices= PUROK_SITIO_CHOICES,
+        widget=forms.Select(attrs={
+            'id' : 'purok_sitio',
+            'class' : 'form-select',
+        }),
+        label= 'Purok / Sitio',
         required= False,
     )

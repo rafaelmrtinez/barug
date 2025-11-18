@@ -953,3 +953,354 @@ class LuponMemDashboardRepository:
                 code="KPI_TOTAL_CASES_OPEN"
             )
 
+class BhwDashboardRepository:
+    def __init__(self, ctx: IConnectionAdapter):
+        self._ctx = ctx
+        self._clerk_repo = ClerkDashboardRepository(ctx)
+        self._secretary_repo = SecretaryDashboardRepository(ctx)
+
+    def fetch_kpi_ongoing_maternal_total(self) -> int:
+        query = """
+            SELECT COUNT(*) AS ongoing_count
+            FROM public.maternal_health_record mhr
+            JOIN public.record_status rs
+            ON mhr.record_status_id = rs.record_status_id
+            WHERE UPPER(TRIM(rs.record_status_name)) = 'ONGOING';
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('ongoing_maternal_total') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI ongoing maternal total: {str(e)}",
+                code="KPI_ONGOING_MATERNAL_TOTAL"
+            )
+        
+    def fetch_kpi_sub_ongoing_maternal_total(self, bhw_id: int) -> int:
+        query = """
+            SELECT COUNT(*) AS ongoing_recorded_count
+            FROM public.maternal_anc_visit mav
+            JOIN public.record_status rs
+            ON mav.visit_status_id = rs.record_status_id
+            WHERE mav.recorded_by_id = %s
+            AND UPPER(TRIM(rs.record_status_name)) = 'ONGOING';
+        """
+        try:
+            result = self._ctx.execute_query(query, [bhw_id])
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('ongoing_maternal_total_sub') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI ongoing maternal sub total: {str(e)}",
+                code="KPI_ONGOING_MATERNAL_SUB_TOTAL"
+            )
+        
+    def fetch_kpi_visit_today_maternal(self) -> int:
+        query = """
+            SELECT COUNT(*) AS visits_expected_today
+            FROM public.maternal_visit_schedule
+            WHERE scheduled_date = CURRENT_DATE;
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('visit_today_maternal') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI visit today maternal: {str(e)}",
+                code="KPI_VISIT_TODAY_MATERNAL"
+            )
+        
+    def fetch_kpi_visit_today_postpartum(self) -> int:
+        query = """
+            SELECT COUNT(*) AS visits_scheduled_today
+            FROM public.postpartum_visit_schedule
+            WHERE scheduled_date = CURRENT_DATE;
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('visit_today_postpartum') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI visit today postpartum: {str(e)}",
+                code="KPI_VISIT_TODAY_POSTPARTUM"
+            )
+        
+    def fetch_kpi_visit_today_child(self) -> int:
+        query = """
+            SELECT COUNT(*) AS visits_scheduled_today
+            FROM public.child_visit_schedule
+            WHERE scheduled_date = CURRENT_DATE;
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('visit_today_child') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI visit today child: {str(e)}",
+                code="KPI_VISIT_TODAY_CHILD"
+            )
+        
+    def fetch_kpi_household_to_be_visited(self, bhw_id: int) -> int:
+        query = """
+            WITH this_week AS (
+            SELECT week_id
+            FROM public.calendar_week
+            WHERE CURRENT_DATE BETWEEN week_start AND week_end
+            ORDER BY week_start DESC  -- deterministic tie-breaker
+            LIMIT 1
+            )
+            SELECT COUNT(DISTINCT household_id) AS households_to_visit_this_week
+            FROM public.bhw_schedule bs
+            WHERE bs.week_id = (SELECT week_id FROM this_week)
+            AND bs.bhw_id = %s;
+        """
+        try:
+            result = self._ctx.execute_query(query, [bhw_id])
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('household_to_be_visited') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI household to be visited: {str(e)}",
+                code="KPI_HOUSEHOLD_TO_BE_VISITED"
+            )
+    
+    def fetch_kpi_demographic_households(self) -> int:
+        return self._secretary_repo.fetch_kpi_demographics()
+    
+    def fetch_kpi_demographic_families(self) -> int:
+        return self._secretary_repo.fetch_kpi_sub_demographics()
+    
+    def fetch_kpi_demographic_residents(self) -> int:
+        return self._clerk_repo.fetch_kpi_total_residents()
+    
+    def fetch_children_vax_per_month(self) -> dict:
+        query = """
+            WITH months AS (
+            SELECT generate_series(1,12) AS month_num
+            ),
+            counts AS (
+            SELECT
+                EXTRACT(MONTH FROM date_given)::int AS month_num,
+                COUNT(DISTINCT child_record_id) AS cnt
+            FROM public.child_immunization
+            GROUP BY 1
+            )
+            SELECT
+            to_char(to_date(months.month_num::text, 'MM'), 'Mon') AS month_label,
+            COALESCE(counts.cnt, 0) AS unique_children_vaccinated
+            FROM months
+            LEFT JOIN counts USING (month_num)
+            ORDER BY months.month_num;
+        """
+        try:
+            rows = self._ctx.execute_query(query)
+            if not rows:
+                return {"labels": [], "data": []}
+
+            labels = []
+            data = []
+            for r in rows:
+                if isinstance(r, dict):
+                    labels.append(r.get("month_label"))
+                    val = r.get("child_vax_per_month")
+                else:
+                    labels.append(r[0])
+                    val = r[1]
+                try:
+                    data.append(float(val or 0))
+                except Exception:
+                    data.append(0.0)
+
+            return {"labels": labels, "data": data}
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch child vax per month: {str(e)}",
+                code="CHILD_VAX_PER_MONTH"
+            )
+    
+    def fetch_maternal_vax_per_month(self) -> dict:
+        query = """
+           WITH months AS (
+                SELECT generate_series(1,12) AS month_num
+            ),
+            counts AS (
+                SELECT
+                    EXTRACT(MONTH FROM date_given)::int AS month_num,
+                    COUNT(DISTINCT maternal_record_id) AS cnt
+                FROM public.tt_vaccine_record
+                GROUP BY 1
+            )
+            SELECT
+                to_char(to_date(months.month_num::text, 'MM'), 'Mon') AS month_label,
+                COALESCE(counts.cnt, 0) AS women_vaccinated
+            FROM months
+            LEFT JOIN counts USING (month_num)
+            ORDER BY months.month_num;
+        """
+        try:
+            rows = self._ctx.execute_query(query)
+            if not rows:
+                return {"labels": [], "data": []}
+
+            labels = []
+            data = []
+            for r in rows:
+                if isinstance(r, dict):
+                    labels.append(r.get("month_label"))
+                    val = r.get("child_vax_per_month")
+                else:
+                    labels.append(r[0])
+                    val = r[1]
+                try:
+                    data.append(float(val or 0))
+                except Exception:
+                    data.append(0.0)
+
+            return {"labels": labels, "data": data}
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch child vax per month: {str(e)}",
+                code="CHILD_VAX_PER_MONTH"
+            )
+ 
+class MidwifeDashboardRepository:
+    def __init__(self, ctx: IConnectionAdapter):
+        self._ctx = ctx
+        self._bhw_repo = BhwDashboardRepository(ctx)
+        self._clerk_repo = ClerkDashboardRepository(ctx)
+        self._secretary_repo = SecretaryDashboardRepository(ctx)
+
+    def fetch_kpi_ongoing_maternal_total(self) -> int:
+        return self._bhw_repo.fetch_kpi_ongoing_maternal_total()
+    
+    def fetch_kpi_sub_ongoing_maternal_total(self, midwife_id: int) -> int:
+        return self._bhw_repo.fetch_kpi_sub_ongoing_maternal_total(midwife_id)
+    
+    def fetch_kpi_visit_today_maternal(self) -> int:
+        return self._bhw_repo.fetch_kpi_visit_today_maternal()
+    
+    def fetch_kpi_visit_today_postpartum(self) -> int:
+        return self._bhw_repo.fetch_kpi_visit_today_postpartum()
+    
+    def fetch_kpi_visit_today_child(self) -> int:
+        return self._bhw_repo.fetch_kpi_visit_today_child()
+    
+    def fetch_kpi_demographic_households(self) -> int:
+        return self._secretary_repo.fetch_kpi_demographics()
+    
+    def fetch_kpi_demographic_families(self) -> int:
+        return self._secretary_repo.fetch_kpi_sub_demographics()
+    
+    def fetch_kpi_demographic_residents(self) -> int:
+        return self._clerk_repo.fetch_kpi_total_residents()
+    
+    def fetch_kpi_women_vaccinated_this_week(self) -> int:
+        query = """
+            SELECT
+                COUNT(DISTINCT maternal_record_id) AS women_vaccinated_this_week
+            FROM public.tt_vaccine_record
+            WHERE date_given >= date_trunc('week', CURRENT_DATE)
+            AND date_given < date_trunc('week', CURRENT_DATE) + interval '7 days';
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('women_vaccinated_this_week') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI women vaccinated this week: {str(e)}",
+            )
+
+    def fetch_kpi_children_vaccinated_this_week(self) -> int:
+        query = """
+            SELECT
+                COUNT(DISTINCT child_record_id) AS children_vaccinated_this_week
+            FROM public.child_immunization
+            WHERE date_given >= date_trunc('week', CURRENT_DATE)
+            AND date_given < date_trunc('week', CURRENT_DATE) + interval '7 days';
+        """
+        try:
+            result = self._ctx.execute_query(query)
+            if not result:
+                return 0
+            row = result[0]
+            if isinstance(row, dict):
+                return int(row.get('children_vaccinated_this_week') or 0)
+            return int(row[0] or 0)
+        except Exception as e:
+            raise QueryExecutionException(
+                f"Error executing query to fetch KPI children vaccinated this week: {str(e)}",
+            )
+
+    def fetch_children_vax_per_month(self) -> dict:
+        return self._bhw_repo.fetch_children_vax_per_month()
+    
+    def fetch_maternal_vax_per_month(self) -> dict:
+        return self._bhw_repo.fetch_maternal_vax_per_month()
+
+class AdminDashboardRepository:
+    def __init__(self, ctx: IConnectionAdapter):
+        self._ctx = ctx
+        self._clerk_repo = ClerkDashboardRepository(ctx)
+        self._captain_repo = CaptainDashboardRepository(ctx)
+        self._secretary_repo = SecretaryDashboardRepository(ctx)
+        self._midwife_repo = MidwifeDashboardRepository(ctx)
+
+    def fetch_kpi_doc_req(self) -> int:
+        return self._clerk_repo.fetch_kpi_doc_req()
+
+    def fetch_kpi_sub_doc_req(self) -> int:
+        return self._clerk_repo.fetch_kpi_sub_doc_req()
+
+    def fetch_kpi_total_residents(self) -> int:
+        return self._clerk_repo.fetch_kpi_total_residents()
+    
+    def fetch_kpi_total_households(self) -> int:
+        return self._secretary_repo.fetch_kpi_demographics()
+    
+    def fetch_kpi_total_families(self) -> int:
+        return self._secretary_repo.fetch_kpi_sub_demographics() 
+    
+    def fetch_kpi_ongoing_cases(self) -> int:
+        return self._captain_repo.fetch_kpi_ongoing_cases()
+    
+    def fetch_kpi_open_cases(self) -> int:
+        return self._captain_repo.fetch_kpi_sub_ongoing_cases()
+    
+    def fetch_kpi_women_vaccinated_this_week(self) -> int:
+        return self._midwife_repo.fetch_kpi_women_vaccinated_this_week()
+    
+    def fetch_kpi_children_vaccinated_this_week(self) -> int:
+        return self._midwife_repo.fetch_kpi_children_vaccinated_this_week()

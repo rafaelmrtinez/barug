@@ -21,6 +21,7 @@ app.wire(modules=[
     "maternal.api.complete_maternal_visit_api",
     "maternal.api.download_image_download_api",
     "maternal.api.insert_postpartum_record_api",
+    "maternal.api.risk_codes_api",
     "maternal.api.insert_postpartum_schedule_api",
     "maternal.api.insert_prenatal_schedule_api",
     "maternal.api.maternal_heal_status_api",
@@ -33,4 +34,5 @@ app.wire(modules=[
     "secretary.views",
     "lupon_mem.views",
     "lupon_pres.views",
+    "staff_admin.views",
 ])

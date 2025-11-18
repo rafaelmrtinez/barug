@@ -32,6 +32,7 @@ from maternal.utils.form_lock import FormLockUtility
 from src.infra.database.connection_adapter import ConnectionAdapter
 
 from src.app.services.laboratory_service import LaboratoryService, LaboratoryTestException
+from src.app.services.maternal_risk_service import MaternalRiskService
 
 import logging
 
@@ -261,7 +262,7 @@ def create_new_maternal_entry(request: HttpRequest) -> HttpResponse:
 def maternal_health_record_form(request, record_id : int):
     try:
         role = request.session.get("auth", {}).get("role_name")
-        assistant = request.session.get("auth", {}).get("first_name") + " " + request.session.get("auth", {}).get("last_name")
+        assistant = (request.session.get("auth", {}).get("first_name") or "") + " " + (request.session.get("auth", {}).get("last_name") or "")
         staff_id = request.session.get("auth", {}).get("staff_id")
 
         mhr_status = MHRCompletionForm(repository=REPOSITORY, mhr_id=record_id)
@@ -330,8 +331,26 @@ def maternal_health_record_form(request, record_id : int):
         risk_code_form = RiskCodeForm(
             mhr_repo=REPOSITORY,
             mhr_id=record_id,
-            assisted_by=assistant
         )
+        # Prefill risk_code_form initial values from repository
+        try:
+            _risk_rows = REPOSITORY.fetch_risk_codes_by_mhr_id(record_id) or []
+            # Map the two categories to our form fields
+            for r in _risk_rows:
+                cat = (r.get('category') or '').upper()
+                is_present = bool(r.get('is_present'))
+                if cat == 'OBSTETRIC RISKS':
+                    risk_code_form.fields['risk_obstetric_history'].initial = is_present
+                    risk_code_form.initial['risk_obstetric_history'] = is_present
+                elif cat == 'MEDICAL CONDITIONS':
+                    risk_code_form.fields['risk_medical_comorbidities'].initial = is_present
+                    risk_code_form.initial['risk_medical_comorbidities'] = is_present
+            # expose flag for template/JS to know if existing entries exist
+            risk_code_form.has_existing = any(r.get('is_present') for r in _risk_rows)
+        except Exception:
+            # If fetch fails, do not block rendering; log and continue
+            logger.exception('Unable to load existing risk codes for mhr_id=%s', record_id)
+            risk_code_form.has_existing = False
         
         pre_natal_existing_data = REPOSITORY.fetch_prenatal_information_by_mhr_id(record_id)
         
@@ -722,6 +741,127 @@ def maternal_health_record_form(request, record_id : int):
                             "mhr_status": mhr_status,
                             "is_locked": is_locked,
                         })
+                elif form_type == 'risk_code_form' or any(k.startswith('risk_') for k in request.POST.keys()):
+                    # Handle Risk Codes form submission. Accept either explicit 'risk_categories' (CSV/JSON/list)
+                    # or the visible checkbox names `risk_obstetric_history` / `risk_medical_comorbidities`.
+                    risk_form = RiskCodeForm(mhr_repo=REPOSITORY, mhr_id=record_id, data=request.POST)
+                    if risk_form.is_valid():
+                        # build categories list
+                        categories = []
+                        # explicit categories field (could be comma-separated or JSON list)
+                        raw = request.POST.get('risk_categories') or request.POST.get('categories')
+                        if raw:
+                            try:
+                                # try JSON first
+                                import json as _json
+                                parsed = _json.loads(raw)
+                                if isinstance(parsed, list):
+                                    categories = [int(x) for x in parsed]
+                                else:
+                                    # fallback to comma-separated string
+                                    categories = [int(x) for x in str(raw).split(',') if str(x).strip()]
+                            except Exception:
+                                # comma-separated fallback
+                                try:
+                                    categories = [int(x) for x in str(raw).split(',') if str(x).strip()]
+                                except Exception:
+                                    messages.error(request, 'Invalid risk_categories format.')
+                                    return render(request, "maternal/health_record_form.html", {
+                                        "risk_code_form": risk_code_form,
+                                        "formset": formset,
+                                        "identification_form": maternal_identification_form,
+                                        "obstetric_form": obstetric_form,
+                                        "medical_history_form": medical_history_form,
+                                        "tt_form": tt_form,
+                                        "present_pregnancy_form": presemt_pregnancy_form,
+                                        "lab_form": lab_form,
+                                        "check_list_form": check_list_form,
+                                        "plan_form": plan_form,
+                                        "micro_nutrients_form": micro_nutrients_form,
+                                        "prenatal_followup_entry_form": pf_entry_form,
+                                        "prenatal_followup_formset": pf_formset,
+                                        "mhr_id": record_id,
+                                        "mhr_status": mhr_status,
+                                        "is_locked": is_locked,
+                                    })
+                        else:
+                            # map visible checkboxes to category ids (defaults: 1 and 2)
+                            if request.POST.get('risk_obstetric_history'):
+                                categories.append(1)
+                            if request.POST.get('risk_medical_comorbidities'):
+                                categories.append(2)
+
+                        try:
+                            svc = MaternalRiskService(REPOSITORY)
+                            res = svc.insert_risk_codes(maternal_record_id=record_id, assessed_by_id=staff_id, risk_categories=categories)
+                        except MaternalHealthRecordException as e:
+                            messages.warning(request, e.message or str(e))
+                            return render(request, "maternal/health_record_form.html", {
+                                "risk_code_form": risk_code_form,
+                                "formset": formset,
+                                "identification_form": maternal_identification_form,
+                                "obstetric_form": obstetric_form,
+                                "medical_history_form": medical_history_form,
+                                "tt_form": tt_form,
+                                "present_pregnancy_form": presemt_pregnancy_form,
+                                "lab_form": lab_form,
+                                "check_list_form": check_list_form,
+                                "plan_form": plan_form,
+                                "micro_nutrients_form": micro_nutrients_form,
+                                "prenatal_followup_entry_form": pf_entry_form,
+                                "prenatal_followup_formset": pf_formset,
+                                "mhr_id": record_id,
+                                "mhr_status": mhr_status,
+                                "is_locked": is_locked,
+                            })
+                        except Exception as e:
+                            logger.exception('Unexpected error saving risk codes')
+                            messages.error(request, 'Unexpected error saving risk codes.')
+                            return render(request, "maternal/health_record_form.html", {
+                                "risk_code_form": risk_code_form,
+                                "formset": formset,
+                                "identification_form": maternal_identification_form,
+                                "obstetric_form": obstetric_form,
+                                "medical_history_form": medical_history_form,
+                                "tt_form": tt_form,
+                                "present_pregnancy_form": presemt_pregnancy_form,
+                                "lab_form": lab_form,
+                                "check_list_form": check_list_form,
+                                "plan_form": plan_form,
+                                "micro_nutrients_form": micro_nutrients_form,
+                                "prenatal_followup_entry_form": pf_entry_form,
+                                "prenatal_followup_formset": pf_formset,
+                                "mhr_id": record_id,
+                                "mhr_status": mhr_status,
+                                "is_locked": is_locked,
+                            })
+
+                        if not res:
+                            messages.error(request, 'Failed to save Risk Codes.')
+                            return redirect('maternal:maternal_health_record_form', record_id=record_id)
+
+                        messages.success(request, 'Risk Codes saved successfully.')
+                        return redirect('maternal:maternal_health_record_form', record_id=record_id)
+                    else:
+                        MessageUtility.push_form_errors_as_messages(request, risk_form)
+                        return render(request, "maternal/health_record_form.html", {
+                            "risk_code_form": risk_code_form,
+                            "formset": formset,
+                            "identification_form": maternal_identification_form,
+                            "obstetric_form": obstetric_form,
+                            "medical_history_form": medical_history_form,
+                            "tt_form": tt_form,
+                            "present_pregnancy_form": presemt_pregnancy_form,
+                            "lab_form": lab_form,
+                            "check_list_form": check_list_form,
+                            "plan_form": plan_form,
+                            "micro_nutrients_form": micro_nutrients_form,
+                            "prenatal_followup_entry_form": pf_entry_form,
+                            "prenatal_followup_formset": pf_formset,
+                            "mhr_id": record_id,
+                            "mhr_status": mhr_status,
+                            "is_locked": is_locked,
+                        })
                 elif form_type == 'previous_pregnancy_form':
                     
                     formset = PreviousPregnancyForm(
@@ -1091,7 +1231,7 @@ def record_detail(request: HttpRequest, person_id: int) -> HttpResponse:
     record = REPOSITORY.fetch_latest_maternal_record_by_person_and_maternal_id(person_id, maternal_record_id=maternal_health_record_id) or {}
     all_records = REPOSITORY.fetch_all_maternal_records_for_person(person_id)
     basic_info = REPOSITORY.fetch_mhr_count_and_fam_id_by_person_id(person_id)
-    staff_name = request.session.get('auth', {}).get('first_name') + ' ' + request.session.get('auth', {}).get('last_name')
+    staff_name = (request.session.get('auth', {}).get('first_name') or "") + ' ' + (request.session.get('auth', {}).get('last_name') or "")
     # prepare postpartum form pre-populated with maternal record id
     postpartum_form = PostpartumRecordForm(
         mhr_id=maternal_health_record_id,

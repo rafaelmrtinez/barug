@@ -23,6 +23,7 @@ from src.app.services.maternal_service import MaternalService
 from src.app.services.scheduling_service import SchedulingService
 from src.app.services.maternal_schedule_service import MaternalScheduleService
 from src.app.services.maternal_postpartum_service import MaternalPostpartumService
+from src.app.services.maternal_risk_service import MaternalRiskService
 from src.app.services.maternal_status_service import MaternalRecordStatusService
 from src.app.services.laboratory_service import LaboratoryService
 from src.app.services.image_download_service import ImageDownloadService
@@ -64,6 +65,9 @@ from src.app.services.dashboards_service import (
     CaptainDashboardService,
     SecretaryDashboardService,
     LuponMemberDashboardService,
+    BhwDashboardService,
+    MidwifeDashboardService,
+    AdminDashboardService,
 )
 
 
@@ -92,6 +96,18 @@ from src.app.contracts.household_service_contract import (
 )
 from src.app.services.household_service import (
     HouseholdService
+)
+from src.app.contracts.or_service_contract import (
+    IORService,
+)
+from src.app.services.or_service import (
+    ORService,
+)
+from src.app.contracts.resident_service_contract import (
+    IResidentService,
+)
+from src.app.services.resident_service import (
+    ResidentService,
 )
 
 
@@ -140,6 +156,11 @@ class AppContainer(containers.DeclarativeContainer):
 
     maternal_postpartum_service: providers.Factory[IMaternalPostpartumService] = providers.Factory(
         MaternalPostpartumService,
+        repository=infra.maternal_health_record_repository,
+    )
+
+    maternal_risk_service = providers.Factory(
+        MaternalRiskService,
         repository=infra.maternal_health_record_repository,
     )
 
@@ -242,9 +263,36 @@ class AppContainer(containers.DeclarativeContainer):
         LuponMemberDashboardService,
         dashboard_repo=infra.lupon_mem_dashboard_repository,
     )
+
+    bhw_dashboard_service: providers.Factory[BhwDashboardService] = providers.Factory(
+        BhwDashboardService,
+        dashboard_repo=infra.bhw_dashboard_repository,
+    )
+
+    midwife_dashboard_service: providers.Factory[MidwifeDashboardService] = providers.Factory(
+        MidwifeDashboardService,
+        dashboard_repo=infra.midwife_dashboard_repository,
+    )
+
+    admin_dashboard_service: providers.Factory[AdminDashboardService] = providers.Factory(
+        AdminDashboardService,
+        dashboard_repo=infra.admin_dashboard_repository,
+    )
     
     # Child health schedule service (thin orchestration service)
     child_health_schedule_service: providers.Factory[IChildHealthScheduleService] = providers.Factory(
         ChildHealthScheduleService,
         repo=infra.child_health_record_repository,
+    )
+
+    # Reports services can be added here in the app container as needed
+
+    or_service: providers.Factory[IORService] = providers.Factory(
+        ORService,
+        repo=infra.or_repository,
+    )
+
+    resident_service: providers.Factory[IResidentService] = providers.Factory(
+        ResidentService,
+        repo=infra.resident_repository,
     )

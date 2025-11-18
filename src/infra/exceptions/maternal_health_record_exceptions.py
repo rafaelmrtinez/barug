@@ -54,6 +54,13 @@ class MaternalHealthRecordException(Exception):
         "P6169",  # Record status ONGOING not found
         "P6170",  # Trimester stage lookup not found
         "P6171",  # ANC record for today's visit already exists
+        # codes from insert_risk_codes SQL function (added)
+        "P6210",  # Provide a non-empty JSON array of risk category id integers
+        "P6211",  # All risk_category_id values must be integers
+        "P6212",  # Invalid risk category id
+        "P6213",  # Risk category id not found
+        "P6214",  # Duplicate risk category in the same request
+        "P6215",  # Risk category already recorded for this maternal record
         # codes from ANC findings/notes update function
         # Only authorized staff (midwife/nurse) may update findings/notes
         "P6216",
