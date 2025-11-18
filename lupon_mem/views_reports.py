@@ -22,6 +22,7 @@ from django.views.decorators.http import require_POST
 
 from lupon_mem.utils.http import json_ok, json_err, flash_success, flash_warning, require_post_view
 from lupon_mem.utils.params import post_int, post_bool, post_str
+from lupon_mem.utils.logging import blotter_log_event
 from lupon_mem.services import hearings as svc_hear
 from django.views.decorators.csrf import csrf_protect
 import logging
@@ -471,6 +472,20 @@ def report_new(request: HttpRequest):
             ],
         )
         report_id = cur.fetchone()[0]
+        
+        # Log the report creation
+        blotter_log_event(
+            action="CREATE",
+            table_affected="blotter_report",
+            record_affected_id=report_id,
+            details={
+                "incident_subject": incident_subject,
+                "complainant_id": complainant_id,
+                "respondent_count": len(respondent_ids) if respondent_ids else 0,
+                "has_location": bool(incident_address_id)
+            },
+            performer_staff_id=staff_id
+        )
 
     messages.success(request, f"Report #{report_id} filed.")
     return redirect("lupon_mem:report_list")
@@ -656,6 +671,22 @@ def report_confirm(request: HttpRequest, report_id: int):
                 messages.error(request, "Case could not be created.")
                 return redirect("lupon_mem:report_confirm", report_id=report_id)
             case_id = int(row[0])
+            
+            # Log the case creation from report
+            blotter_log_event(
+                action="CREATE",
+                table_affected="blotter_case",
+                record_affected_id=case_id,
+                details={
+                    "source_report_id": report_id,
+                    "case_name": case_name,
+                    "complaint_title_id": complaint_title_id,
+                    "case_nature_id": case_nature_id,
+                    "with_payment": with_payment,
+                    "payment_amount": float(payment_amount) if payment_amount else 0
+                },
+                performer_staff_id=staff_id
+            )
     except DatabaseError as e:
         messages.error(request, f"Failed to create case: {e}")
         return redirect("lupon_mem:report_confirm", report_id=report_id)
@@ -836,6 +867,22 @@ def report_approve(request: HttpRequest, report_id: int):
             res = cur.fetchone()
             print("[DEBUG][APPROVE] DB result:", res)
             print(f"[DEBUG][APPROVE] Stored case details via function: complaint_title_id={complaint_title_id}, case_nature_id={case_nature_id}")
+            
+            # Log the report approval
+            blotter_log_event(
+                action="UPDATE",
+                table_affected="blotter_report",
+                record_affected_id=report_id,
+                details={
+                    "action": "APPROVED",
+                    "complaint_title_id": complaint_title_id,
+                    "case_nature_id": case_nature_id,
+                    "payment_status": "UNPAID"
+                },
+                performer_staff_id=staff_id,
+                field_changed="payment_status",
+                new_value="UNPAID"
+            )
     except Exception as e:
         print("[DEBUG][APPROVE][ERROR]", e)
         raise
@@ -868,6 +915,21 @@ def report_decline(request: HttpRequest, report_id: int):
             )
             res = cur.fetchone()  # may be None; just echo for symmetry
             print("[DEBUG][DECLINE] DB result:", res)
+            
+            # Log the report decline
+            blotter_log_event(
+                action="UPDATE",
+                table_affected="blotter_report",
+                record_affected_id=report_id,
+                details={
+                    "action": "DECLINED",
+                    "reason": reason,
+                    "payment_status": "DECLINED"
+                },
+                performer_staff_id=staff_id,
+                field_changed="payment_status",
+                new_value="DECLINED"
+            )
     except Exception as e:
         print("[DEBUG][DECLINE][ERROR]", e)
         raise
@@ -1160,6 +1222,37 @@ def report_pay_and_open_case(request: HttpRequest, report_id: int):
             cur.execute(
                 "UPDATE blotter_case SET case_state_id = 1 WHERE blotter_case_id = %s",
                 [case_id]
+            )
+            
+        # Log the payment and case creation
+        blotter_log_event(
+            action="CREATE",
+            table_affected="blotter_case",
+            record_affected_id=case_id,
+            details={
+                "source_report_id": report_id,
+                "case_name": case_name,
+                "with_payment": with_payment,
+                "payment_status": payment_status if with_payment else None,
+                "payment_amount": float(payment_amount) if with_payment and payment_amount else 0,
+                "payment_receipt": payment_receipt if with_payment else None
+            },
+            performer_staff_id=staff_id
+        )
+        
+        if with_payment:
+            blotter_log_event(
+                action="UPDATE",
+                table_affected="blotter_report",
+                record_affected_id=report_id,
+                details={
+                    "payment_recorded": True,
+                    "payment_amount": float(payment_amount) if payment_amount else 0,
+                    "payment_receipt": payment_receipt
+                },
+                performer_staff_id=staff_id,
+                field_changed="payment_status",
+                new_value=payment_status
             )
 
     messages.success(request, f"Case #{case_id} created.")

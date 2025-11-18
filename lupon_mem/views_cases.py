@@ -26,6 +26,7 @@ from django.views.decorators.http import require_GET
 
 from lupon_mem.utils.http import json_ok, json_err, flash_success, flash_warning, require_post_view
 from lupon_mem.utils.params import post_int, post_bool, post_str
+from lupon_mem.utils.logging import blotter_log_event
 from lupon_mem.services import hearings as svc_hear
 from django.views.decorators.csrf import csrf_protect
 import logging
@@ -529,6 +530,21 @@ def case_new(request: HttpRequest) -> HttpResponse:
                 ],
             )
             case_id = cur.fetchone()[0]
+            
+            # Log the case creation
+            blotter_log_event(
+                action="CREATE",
+                table_affected="blotter_case",
+                record_affected_id=case_id,
+                details={
+                    "case_name": blotter_case_name,
+                    "complaint_title_id": complaint_title_id,
+                    "case_nature_id": case_nature_id,
+                    "complainants_count": len([p for p in complainants if p and p.isdigit()]),
+                    "respondents_count": len([p for p in respondents if p and p.isdigit()])
+                },
+                performer_staff_id=staff_id
+            )
 
             for pid in complainants:
                 if pid and pid.isdigit():
@@ -591,6 +607,16 @@ def case_settlement_update(request: HttpRequest, case_id: int):
 
         ok, _case, new_status, changed_at = row if row else (False, None, None, None)
         if ok:
+            # Log the settlement status update
+            blotter_log_event(
+                action="UPDATE",
+                table_affected="blotter_case",
+                record_affected_id=case_id,
+                details={"settlement_status": new_status, "remarks": remarks},
+                performer_staff_id=staff_id,
+                field_changed="settlement_status",
+                new_value=new_status
+            )
             messages.success(request, f'Settlement status updated to "{new_status}".')
         else:
             messages.warning(request, "No change was made.")
@@ -621,6 +647,16 @@ def case_close(request: HttpRequest, case_id: int):
 
     try:
         close_case(case_id, staff_id, note)
+        # Log the case closure
+        blotter_log_event(
+            action="UPDATE",
+            table_affected="blotter_case",
+            record_affected_id=case_id,
+            details={"close_note": note},
+            performer_staff_id=staff_id,
+            field_changed="case_state",
+            new_value="CLOSED"
+        )
         messages.success(request, "Case has been closed.")
     except Exception as e:
         messages.error(request, f"Failed to close case: {e}")
@@ -644,6 +680,16 @@ def case_reopen(request: HttpRequest, case_id: int):
 
     try:
         reopen_case(case_id, staff_id, reason)
+        # Log the case reopening
+        blotter_log_event(
+            action="UPDATE",
+            table_affected="blotter_case",
+            record_affected_id=case_id,
+            details={"reopen_reason": reason},
+            performer_staff_id=staff_id,
+            field_changed="case_state",
+            new_value="OPEN"
+        )
         messages.success(request, "Case has been reopened.")
     except Exception as e:
         messages.error(request, f"Failed to reopen case: {e}")

@@ -28,6 +28,7 @@ from django.views.decorators.http import require_POST
 
 from lupon_mem.utils.http import json_ok, json_err, flash_success, flash_warning, require_post_view
 from lupon_mem.utils.params import post_int, post_bool, post_str
+from lupon_mem.utils.logging import blotter_log_event
 from lupon_mem.services import hearings as svc_hear
 from django.views.decorators.csrf import csrf_protect
 import logging
@@ -445,6 +446,15 @@ def _autogen_settled_summary(case_id: int, kp16_submission_id: int):
                 RETURNING submission_id
             """, [case_id, med_code])
             med_sid = int(cur.fetchone()[0])
+            
+            # Log the creation of the settlement summary
+            blotter_log_event(
+                action="CREATE",
+                table_affected="blotter_kp_submission",
+                record_affected_id=med_sid,
+                details={"form_code": med_code, "case_id": case_id, "auto_generated": True},
+                performer_staff_id=None  # System generated
+            )
 
             # insert answers (only for codes that exist on the form)
             for code, val in values_by_code.items():
@@ -530,6 +540,18 @@ def _autogen_settled_summary(case_id: int, kp16_submission_id: int):
             # mark submitted
             cur.execute("UPDATE blotter_kp_submission SET status='SUBMITTED', submitted_at=now() WHERE submission_id=%s",
                         [med_sid])
+            
+            # Log the submission
+            blotter_log_event(
+                action="UPDATE",
+                table_affected="blotter_kp_submission",
+                record_affected_id=med_sid,
+                details={"form_code": med_code, "case_id": case_id, "auto_submitted": True},
+                performer_staff_id=None,  # System generated
+                field_changed="status",
+                old_value="DRAFT",
+                new_value="SUBMITTED"
+            )
 
     # ---------- render + upload, return a download link ----------
     try:
@@ -666,6 +688,15 @@ def _open_kp16_draft(case_id: int) -> int:
             VALUES (%s,%s,'DRAFT') RETURNING submission_id
         """, [case_id, form_id])
         sid = int(cur.fetchone()[0])
+        
+        # Log the KP-16 draft creation
+        blotter_log_event(
+            action="CREATE",
+            table_affected="blotter_kp_submission",
+            record_affected_id=sid,
+            details={"form_code": "KP-16", "case_id": case_id, "status": "DRAFT"},
+            performer_staff_id=None  # System generated
+        )
 
         # Prefill some friendly defaults (optional)
         pre = _prefill_minimal_for_case(case_id)
@@ -1148,6 +1179,17 @@ def _create_and_submit_form_from_prefill(case_id: int, form_code: str, prefill: 
 
         # mark SUBMITTED
         cur.execute("UPDATE blotter_kp_submission SET status='SUBMITTED', submitted_at=now() WHERE submission_id=%s", [sid])
+        
+        # Log the form submission
+        blotter_log_event(
+            action="CREATE",
+            table_affected="blotter_kp_submission",
+            record_affected_id=sid,
+            details={"form_code": form_code, "case_id": case_id, "prefilled": True},
+            performer_staff_id=None,  # System generated
+            field_changed="status",
+            new_value="SUBMITTED"
+        )
 
     return sid
 
@@ -2877,6 +2919,23 @@ def mediation_complete(request, case_id: int):
                 VALUES (%s, %s, now(), %s, %s)
                 RETURNING progress_tracking_id, date_processed
             """, [case_id, progress_type_id, held_remarks, staff_id])
+            
+            progress_id = cur.fetchone()[0]
+            
+            # Log the mediation completion
+            blotter_log_event(
+                action="CREATE",
+                table_affected="case_progress_tracking",
+                record_affected_id=progress_id,
+                details={
+                    "case_id": case_id,
+                    "hearing_type": "MEDIATION",
+                    "settlement": settlement,
+                    "complainant_attended": compl_attended,
+                    "respondent_attended": resp_attended
+                },
+                performer_staff_id=staff_id
+            )
 
     # Outcome branches
     print(f"[mediation_complete] settlement={settlement}, case_id={case_id}")
@@ -3114,6 +3173,23 @@ def conciliation_complete(request, case_id: int):
                 VALUES (%s, %s, now(), %s, %s)
                 RETURNING progress_tracking_id, date_processed
             """, [case_id, progress_type_id, held_remarks, staff_id])
+            
+            progress_id = cur.fetchone()[0]
+            
+            # Log the conciliation completion
+            blotter_log_event(
+                action="CREATE",
+                table_affected="case_progress_tracking",
+                record_affected_id=progress_id,
+                details={
+                    "case_id": case_id,
+                    "hearing_type": "CONCILIATION",
+                    "settlement": settlement,
+                    "complainant_attended": compl_attended,
+                    "respondent_attended": resp_attended
+                },
+                performer_staff_id=staff_id
+            )
 
     # Outcome branches (mirror mediation_complete)
     print(f"[conciliation_complete] settlement={settlement}, case_id={case_id}")
@@ -3554,6 +3630,21 @@ def summon_set_status(request: HttpRequest, submission_id: int):
                               marked_at=EXCLUDED.marked_at,
                               no_show_party=EXCLUDED.no_show_party
             """, [submission_id, status, remarks, staff_id, party])
+            
+            # Log the summon attendance update
+            blotter_log_event(
+                action="UPDATE",
+                table_affected="kp9_attendance",
+                record_affected_id=submission_id,
+                details={
+                    "status": status,
+                    "no_show_party": party,
+                    "remarks": remarks
+                },
+                performer_staff_id=staff_id,
+                field_changed="status",
+                new_value=status
+            )
 
             cur.execute("SELECT blotter_case_id FROM blotter_kp_submission WHERE submission_id=%s", [submission_id])
             row = cur.fetchone()
@@ -3828,6 +3919,15 @@ def _open_med_attendance_draft(case_id: int) -> int:
             RETURNING submission_id
         """, [case_id, form_id])
         sid = int(cur.fetchone()[0])
+        
+        # Log the MED-ATT-2025 draft creation
+        blotter_log_event(
+            action="CREATE",
+            table_affected="blotter_kp_submission",
+            record_affected_id=sid,
+            details={"form_code": "MED-ATT-2025", "case_id": case_id, "status": "DRAFT"},
+            performer_staff_id=None  # System generated
+        )
 
         # Prefill what we can (best-effort, skip blanks)
         pre = _prefill_minimal_for_case(case_id)

@@ -22,6 +22,7 @@ from django.views.decorators.http import require_GET
 
 from lupon_mem.utils.http import json_ok, json_err, flash_success, flash_warning, require_post_view
 from lupon_mem.utils.params import post_int, post_bool, post_str
+from lupon_mem.utils.logging import blotter_log_event
 from lupon_mem.services import hearings as svc_hear
 from django.views.decorators.csrf import csrf_protect
 import logging
@@ -146,6 +147,15 @@ def save_answers(request: HttpRequest):
                     [case_id, form_id],
                 )
                 sid = cur.fetchone()[0]
+                
+                # Log the draft creation
+                blotter_log_event(
+                    action="CREATE",
+                    table_affected="blotter_kp_submission",
+                    record_affected_id=sid,
+                    details={"case_id": case_id, "form_id": form_id, "status": "DRAFT"},
+                    performer_staff_id=(request.session.get("auth") or {}).get("staff_id")
+                )
 
             for field_id, value in payload.items():
                 cur.execute(
@@ -313,19 +323,6 @@ def submit_form(request: HttpRequest):
     except Exception:
         storage_url = None
 
-    # ---------- Mark SUBMITTED ----------
-    try:
-        with connection.cursor() as cur:
-            cur.execute(
-                "UPDATE blotter_kp_submission "
-                "SET status='SUBMITTED', submitted_at=now() "
-                "WHERE submission_id=%s",
-                [submission_id]
-            )
-    except Exception:
-        log.exception("submit_form failed to mark SUBMITTED (submission_id=%s)", submission_id)
-        return JsonResponse({"ok": False, "error": "Failed to finalize submission."}, status=500)
-
     # ---------- Determine form_code + form_id ----------
     row_fc = None
     form_id_of_submission = None
@@ -344,6 +341,31 @@ def submit_form(request: HttpRequest):
                 form_id_of_submission = int(row_fc[1])
     except Exception:
         log.exception("submit_form failed to lookup form_code (submission_id=%s)", submission_id)
+
+    # ---------- Mark SUBMITTED ----------
+    try:
+        with connection.cursor() as cur:
+            cur.execute(
+                "UPDATE blotter_kp_submission "
+                "SET status='SUBMITTED', submitted_at=now() "
+                "WHERE submission_id=%s",
+                [submission_id]
+            )
+            
+            # Log the form submission
+            blotter_log_event(
+                action="UPDATE",
+                table_affected="blotter_kp_submission",
+                record_affected_id=submission_id,
+                details={"case_id": case_id, "form_code": form_code, "filename": filename},
+                performer_staff_id=(request.session.get("auth") or {}).get("staff_id"),
+                field_changed="status",
+                old_value="DRAFT",
+                new_value="SUBMITTED"
+            )
+    except Exception:
+        log.exception("submit_form failed to mark SUBMITTED (submission_id=%s)", submission_id)
+        return JsonResponse({"ok": False, "error": "Failed to finalize submission."}, status=500)
 
     # ---------- Universal: let the specific handler persist its computed answers ----------
     try:
