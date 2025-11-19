@@ -18,7 +18,6 @@ class IronIntakeForm(forms.Form):
         self._ch_repo = chr_repo
         
         intake_dates = self._ch_repo.fetch_iron_supplement_completion_by_chr_id(child_health_record_id)
-        print(f"Iron intake existing data: {intake_dates}")
         self.__ui_date_readonly_policy(intake_dates)
         
     def clean(self):

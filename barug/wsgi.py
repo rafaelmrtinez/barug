@@ -13,6 +13,8 @@ from django.core.wsgi import get_wsgi_application
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "barug.settings")
 
-from barug.containers import app
-
+# Ensure Django apps are loaded before wiring application containers which import models.
+# Call get_wsgi_application() first so AppRegistry is ready, then import containers.
 application = get_wsgi_application()
+
+from barug.containers import app
