@@ -132,7 +132,10 @@ def queue(request: HttpRequest):
         for code, meta in STATUS_UI.items()
     ]
 
+    user_role = _auth_role_name(request)
     return render(request, "treasurer/queue.html", {
+        'page_path': f'{user_role} / Queue',
+        'page_title': 'Queue',
         "rows": rows,
         "q": q or "",
         "statuses": statuses,
@@ -225,7 +228,10 @@ def detail(request: HttpRequest, doc_request_id: int):
                        if (r.get("status") or "").upper() in ("CREATED", "PENDING", "REQUESTED")]
     latest_pending_refund = refunds_pending[0] if refunds_pending else None
 
+    user_role = _auth_role_name(request)
     context = {
+        'page_path': f'{user_role} / Request Detail',
+        'page_title': 'Request Detail',
         "header": header,
         "status_ui": ui,
         "lines": lines,
@@ -352,7 +358,10 @@ def fees(request: HttpRequest):
     page_numbers = build_page_numbers(page_obj.number, paginator.num_pages)
     history = recent_fee_changes(limit=11)
 
+    user_role = _auth_role_name(request)
     ctx = {
+        'page_path': f'{user_role} / Fees',
+        'page_title': 'Fees',
         "q": q or "",
         "per_page": per_page,
         "doc_types": doc_types,
@@ -514,10 +523,13 @@ def fee_add_existing(request: HttpRequest):
     preselected = (request.GET.get("doc_type") or "").strip() or None
 
     if request.method != "POST":
+        user_role = _auth_role_name(request)
         return render(
             request,
             "treasurer/fee_purpose.html",
             {
+                'page_path': f'{user_role} / Add Fee (Existing Type)',
+                'page_title': 'Add Fee (Existing Type)',
                 "doc_types": doc_types,
                 "preselected_doc_type": preselected,  # <-- tells template to disable dropdown
             },
@@ -691,7 +703,10 @@ def fee_add_new(request: HttpRequest):
     doc_types = list_document_types()
 
     if request.method != "POST":
+        user_role = _auth_role_name(request)
         return render(request, "treasurer/fee_add.html", {
+            'page_path': f'{user_role} / Add Fee (New Type)',
+            'page_title': 'Add Fee (New Type)',
             "doc_types": doc_types,
         })
 
@@ -798,7 +813,7 @@ def fee_edit(request: HttpRequest, fee_code: str):
                 item = {
                     **e,
                     "event": raw_event,
-                    "event_display": raw_event.replace("_", " "),  # <- Option A: preformatted for template
+                    "event_display": raw_event.replace("_", " "),
                     "occur_fmt": _fmt_occured_at(occ),
                     "details": d,
                     "summary": None,
@@ -817,7 +832,10 @@ def fee_edit(request: HttpRequest, fee_code: str):
         except Exception:
             timeline = []
 
+        user_role = _auth_role_name(request)
         return render(request, "treasurer/fee_edit.html", {
+            'page_path': f'{user_role} / Edit Fee',
+            'page_title': 'Edit Fee',
             "fee_code": fee_code,
             "fee": fee,
             "purposes": purposes,
@@ -953,7 +971,10 @@ def business_queue(request: HttpRequest):
             r["doc_types"] = [d for d in docs if d in TARGET_DOCS]
             rows.append(r)
 
+    user_role = _auth_role_name(request)
     return render(request, "treasurer/business_queue.html", {
+        'page_path': f'{user_role} / Business Queue',
+        'page_title': 'Business Queue',
         "rows": rows,
         "q": q or "",
         "statuses": statuses,
@@ -1026,7 +1047,10 @@ def business_detail(request: HttpRequest, business_id: int, doc_request_id: int)
         year_status["last_changed_at"] = year_status.get("last_created_at")
     last_cleared_year = clearances[0]["year"] if clearances else None
 
+    user_role = _auth_role_name(request)
     return render(request, "treasurer/business_details.html", {
+        'page_path': f'{user_role} / Business Details',
+        'page_title': 'Business Details',
         "biz": biz,
         "doc_request_id": doc_request_id,
         "header": header,
@@ -1287,7 +1311,10 @@ def business_renewal(request: HttpRequest):
     period_type_all = sorted({(r.get("period_type") or "").upper() for r in rows if r and not r.get("is_group_header") and r.get("period_type")})
     year_all = sorted({int(r.get("period_year")) for r in rows if r and not r.get("is_group_header") and r.get("period_year")}, reverse=True)
 
+    user_role = _auth_role_name(request)
     ctx = {
+        'page_path': f'{user_role} / Business Renewal',
+        'page_title': 'Business Renewal',
         "q": q or "",
         "per_page": per_page,
         "period_types": period_types,
@@ -1387,7 +1414,10 @@ def business_renewal_detail(request: HttpRequest, renewal_request_id: int):
     # Attach status name to renewal for template checks
     r["status"] = status_name
 
+    user_role = _auth_role_name(request)
     context = {
+        'page_path': f'{user_role} / Renewal Detail',
+        'page_title': 'Renewal Detail',
         "renewal": r,
         "status_ui": status_ui,
         "biz": biz,
@@ -1545,7 +1575,10 @@ def business_renewal_group(request: HttpRequest, business_id: int):
     has_quarterly = any((r.get("period_type") or "").upper() == "QUARTERLY" for r in rows)
     default_period_type = "QUARTERLY" if has_quarterly else "ANNUAL"
 
+    user_role = _auth_role_name(request)
     ctx = {
+        'page_path': f'{user_role} / Renewal Group',
+        'page_title': 'Renewal Group',
         "biz": biz,
         "business_id": business_id,
         "quote_rows": quote_rows,
@@ -1875,7 +1908,10 @@ def closure_list(request):
     year_all = sorted({int(r.get("period_year"))
                        for r in rows if r and not r.get("is_group_header") and r.get("period_year")}, reverse=True)
 
+    user_role = _auth_role_name(request)
     ctx = {
+        'page_path': f'{user_role} / Closure List',
+        'page_title': 'Closure List',
         "q": q or "",
         "per_page": per_page,
         "period_types": period_types,
@@ -1953,7 +1989,10 @@ def closure_detail(request, closure_payment_request_id: int):
     is_paid_no_or = ((status == "PAID") or (total_paid >= amount_due)) and (latest_or == "")
     is_paid = bool(latest_or) or (status == "PAID") or is_paid_no_or
 
+    user_role = _auth_role_name(request)
     ctx = {
+        'page_path': f'{user_role} / Closure Detail',
+        'page_title': 'Closure Detail',
         "item": r,
         "status_ui": status_ui,
         "biz": biz,
@@ -2064,7 +2103,10 @@ def closure_group(request, business_id: int):
     has_quarterly = any((r.get("period_type") or "").upper() == "QUARTERLY" for r in rows)
     default_period_type = "QUARTERLY" if has_quarterly else "ANNUAL"
 
+    user_role = _auth_role_name(request)
     ctx = {
+        'page_path': f'{user_role} / Closure Group',
+        'page_title': 'Closure Group',
         "biz": biz,
         "business_id": business_id,
         "quote_rows": quote_rows,
@@ -2311,7 +2353,10 @@ def payment_refunds(request: HttpRequest):
     selected_methods = [opt for opt in method_options if opt["id"] in method_ids]
     active_count = (1 if q else 0) + (1 if statuses else 0) + (1 if method_ids else 0)
 
+    user_role = _auth_role_name(request)
     ctx = {
+        'page_path': f'{user_role} / Payment Refunds',
+        'page_title': 'Payment Refunds',
         "q": q or "",
         "rows": page_obj.object_list,
         "page_obj": page_obj,
@@ -2359,8 +2404,8 @@ def financial_report(
         request,
         "treasurer/financial_report.html",
         {
-            'page_path': f'{user_role} / Household List',
-            'page_title': 'Household List',
+            'page_path': f'{user_role} / Financial Report',
+            'page_title': 'Financial Report',
             'page_obj': page_obj,
         },
     )
@@ -2425,8 +2470,11 @@ def fees_index(request: HttpRequest):
 
     page_numbers = build_page_numbers(page_obj.number, paginator.num_pages)
     history = recent_fee_changes(limit=6)
+    user_role = _auth_role_name(request)
 
     ctx = {
+        'page_path' : f'{user_role} / Fee Catalog',
+        'page_title' : 'Fee Catalog',
         "q": q or "",
         "per_page": per_page,
         "is_paginated": paginator.num_pages > 1,
@@ -2531,8 +2579,11 @@ def fees_by_type(request, doc_type_id: int):
 
     # Use recent_fee_changes for sidebar/history (you can later replace with per-fee timeline)
     history = recent_fee_changes(limit=6) or []
+    user_role = _auth_role_name(request)
 
     ctx = {
+        'page_path' : f'{user_role} / Fee Catalog',
+        'page_title' : 'Fee Catalog',
         "q": q or "",
         "per_page": per_page,
         "is_paginated": paginator.num_pages > 1,
