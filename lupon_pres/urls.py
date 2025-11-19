@@ -142,6 +142,13 @@ urlpatterns = [
         name="report_decline"),  # added to views_reports
     path("reports/<int:report_id>/pay-open/", views_reports.report_pay_and_open_case,
         name="report_pay_and_open_case"),  # added to views_reports
+    
+    # blotter reports
+    path("blotter-reports/", views_reports.blotter_reports_menu, name="blotter_reports_menu"),
+    path("blotter-reports/total_cases_by_status/", views_reports.total_cases_by_status_report, name="total_cases_by_status_report"),
+    path("blotter-reports/case_summaries/", views_reports.case_summaries_report, name="case_summaries_report"),
+    path("blotter-reports/settlement_statistics/", views_reports.settlement_statistics_report, name="settlement_statistics_report"),
+    path("blotter-reports/monthly_activity/", views_reports.monthly_activity_report, name="monthly_activity_report"),
 
     # ===== ADDED: flow progress API (namespaced) =====
     path("api/case/<int:case_id>/flow-progress",

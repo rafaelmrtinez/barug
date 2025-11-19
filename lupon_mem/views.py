@@ -1482,6 +1482,13 @@ def dashboard(
     except Exception as exc:
         print("Error fetching lupon mem dashboard KPIs:", exc)
 
+    # Get filter options for modal
+    with connection.cursor() as cur:
+        cur.execute("SELECT complaint_title_id, complaint_title_name FROM complaint_title ORDER BY complaint_title_name")
+        complaint_titles = cur.fetchall()
+        cur.execute("SELECT case_nature_id, case_name FROM case_nature ORDER BY case_name")
+        case_natures = cur.fetchall()
+
     return render(
         request,
         "lupon_mem/dashboard.html",
@@ -1491,6 +1498,8 @@ def dashboard(
             'kpis': kpis,
             'dashboard_json': dashboard_json,
             'today': datetime.now().strftime("%B %d, %Y"),
+            'complaint_titles': complaint_titles,
+            'case_natures': case_natures,
         },
     )
 
@@ -2987,29 +2996,32 @@ def mediation_complete(request, case_id: int):
             print(f"[mediation_complete] Error setting case to ARBITRATED: {e}")
             messages.success(request, "Mediation marked HELD. (Could not update case settlement automatically.)")
 
-        # Ensure KP-14 (Agreement to Arbitrate) exists
+        # Ensure KP-14 (Agreement to Arbitrate) exists - check both DRAFT and SUBMITTED
         try:
-            with connection.cursor() as cur:
-                cur.execute("""
-                    SELECT 1
-                      FROM blotter_kp_submission s
-                      JOIN kp_form f ON f.form_id = s.form_id
-                     WHERE s.blotter_case_id = %s
-                       AND UPPER(f.form_code) = 'KP-14'
-                       AND UPPER(s.status) = 'SUBMITTED'
-                """, [case_id])
-                kp14_exists = cur.fetchone() is not None
+            with transaction.atomic():
+                with connection.cursor() as cur:
+                    # Use SELECT FOR UPDATE to prevent race conditions
+                    cur.execute("""
+                        SELECT 1
+                          FROM blotter_kp_submission s
+                          JOIN kp_form f ON f.form_id = s.form_id
+                         WHERE s.blotter_case_id = %s
+                           AND UPPER(f.form_code) = 'KP-14'
+                           AND UPPER(s.status) IN ('DRAFT', 'SUBMITTED')
+                         FOR UPDATE
+                    """, [case_id])
+                    kp14_exists = cur.fetchone() is not None
 
-            if not kp14_exists:
-                kp14_sid = _create_and_submit_form_from_prefill(
-                    case_id=case_id,
-                    form_code="KP-14",
-                    prefill=_prefill_minimal_for_case(case_id)
-                )
-                if kp14_sid:
-                    print(f"[mediation_complete] Created KP-14 submission_id={kp14_sid}")
-            else:
-                print(f"[mediation_complete] KP-14 already exists for case {case_id}")
+                if not kp14_exists:
+                    kp14_sid = _create_and_submit_form_from_prefill(
+                        case_id=case_id,
+                        form_code="KP-14",
+                        prefill=_prefill_minimal_for_case(case_id)
+                    )
+                    if kp14_sid:
+                        print(f"[mediation_complete] Created KP-14 submission_id={kp14_sid}")
+                else:
+                    print(f"[mediation_complete] KP-14 already exists for case {case_id}")
         except Exception as e:
             print(f"[mediation_complete] Error creating KP-14: {e}")
 
@@ -3241,29 +3253,32 @@ def conciliation_complete(request, case_id: int):
             print(f"[conciliation_complete] Error setting case to ARBITRATED: {e}")
             messages.success(request, "Conciliation marked HELD. (Could not update case settlement automatically.)")
 
-        # Ensure KP-14 exists
+        # Ensure KP-14 exists - check both DRAFT and SUBMITTED
         try:
-            with connection.cursor() as cur:
-                cur.execute("""
-                    SELECT 1
-                      FROM blotter_kp_submission s
-                      JOIN kp_form f ON f.form_id = s.form_id
-                     WHERE s.blotter_case_id = %s
-                       AND UPPER(f.form_code) = 'KP-14'
-                       AND UPPER(s.status) = 'SUBMITTED'
-                """, [case_id])
-                kp14_exists = cur.fetchone() is not None
+            with transaction.atomic():
+                with connection.cursor() as cur:
+                    # Use SELECT FOR UPDATE to prevent race conditions
+                    cur.execute("""
+                        SELECT 1
+                          FROM blotter_kp_submission s
+                          JOIN kp_form f ON f.form_id = s.form_id
+                         WHERE s.blotter_case_id = %s
+                           AND UPPER(f.form_code) = 'KP-14'
+                           AND UPPER(s.status) IN ('DRAFT', 'SUBMITTED')
+                         FOR UPDATE
+                    """, [case_id])
+                    kp14_exists = cur.fetchone() is not None
 
-            if not kp14_exists:
-                kp14_sid = _create_and_submit_form_from_prefill(
-                    case_id=case_id,
-                    form_code="KP-14",
-                    prefill=_prefill_minimal_for_case(case_id)
-                )
-                if kp14_sid:
-                    print(f"[conciliation_complete] Created KP-14 submission_id={kp14_sid}")
-            else:
-                print(f"[conciliation_complete] KP-14 already exists for case {case_id}")
+                if not kp14_exists:
+                    kp14_sid = _create_and_submit_form_from_prefill(
+                        case_id=case_id,
+                        form_code="KP-14",
+                        prefill=_prefill_minimal_for_case(case_id)
+                    )
+                    if kp14_sid:
+                        print(f"[conciliation_complete] Created KP-14 submission_id={kp14_sid}")
+                else:
+                    print(f"[conciliation_complete] KP-14 already exists for case {case_id}")
         except Exception as e:
             print(f"[conciliation_complete] Error creating KP-14: {e}")
 
