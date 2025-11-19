@@ -50,10 +50,8 @@ class MaternalHealthRecordStatusUpdateAPI(View):
 
         staff_id = request.session.get('auth', {}).get('staff_id')
         
-        print(f'Staff ID from session: {staff_id}')
-        
-        # if not staff_id:
-        #     return JsonResponse({'success': False, 'message': 'Unauthenticated staff id.'}, status=401)
+        if not staff_id:
+            return JsonResponse({'success': False, 'message': 'Unauthenticated staff id.'}, status=401)
 
         try:
             staff_id = int(staff_id)
