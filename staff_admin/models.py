@@ -190,3 +190,77 @@ class Admin(models.Model):
 
         except Exception:
             raise
+
+    @staticmethod
+    def get_login_logs_with_status():
+        """Get login logs with status using the database function"""
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    login_log_id, login_time, logout_time, active_status,
+                    session_duration, user_id, user_type_id, user_type_name,
+                    staff_id, staff_code, role_id, role_name, user_name, ip_add
+                FROM get_login_logs_with_status()
+            """)
+            
+            columns = [desc[0] for desc in cursor.description]
+            results = []
+            for row in cursor.fetchall():
+                results.append(dict(zip(columns, row)))
+            return results
+
+    @staticmethod
+    def get_login_logs_grouped_by_staff():
+        """Get login logs grouped by staff using the database function"""
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    staff_id, staff_code, user_name, role_id, role_name,
+                    total_sessions, active_sessions, last_login_time,
+                    last_logout_time, total_session_duration
+                FROM get_login_logs_grouped_by_staff()
+            """)
+            
+            columns = [desc[0] for desc in cursor.description]
+            results = []
+            for row in cursor.fetchall():
+                results.append(dict(zip(columns, row)))
+            return results
+
+    @staticmethod
+    def get_login_logs_with_status_for_staff(staff_id: int):
+        """Get all login logs for a specific staff member"""
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    login_log_id, login_time, logout_time, active_status,
+                    session_duration, user_id, user_type_id, user_type_name,
+                    staff_id, staff_code, role_id, role_name, user_name, ip_add,
+                    total_sessions, active_sessions, total_session_duration
+                FROM get_login_logs_with_status_for_staff(%s)
+            """, [staff_id])
+            
+            columns = [desc[0] for desc in cursor.description]
+            results = []
+            for row in cursor.fetchall():
+                results.append(dict(zip(columns, row)))
+            return results
+
+    @staticmethod
+    def get_common_logs_with_names():
+        """Get operational logs with names using the database function"""
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    common_log_id, record_affected_id, details, date_time,
+                    table_affected, action, field_changed, old_value, new_value,
+                    performer_id, performer_name, user_type_id, user_type_name,
+                    subsystem_id, subsystem_name
+                FROM get_common_logs_with_names()
+            """)
+            
+            columns = [desc[0] for desc in cursor.description]
+            results = []
+            for row in cursor.fetchall():
+                results.append(dict(zip(columns, row)))
+            return results
