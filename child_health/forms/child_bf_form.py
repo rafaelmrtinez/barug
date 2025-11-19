@@ -40,7 +40,6 @@ class ChildBreastFeedingForm(forms.Form):
         self._child_health_record_id = child_health_record_id
         self._existing_data = self._repo.fetch_child_details_bf_display_by_chr_id(child_health_record_id)
         
-        print(f"Existing BF data: {self._existing_data}")
         # If there are existing breastfeeding check rows, map them to the
         # five visit slots. The earliest visit (lowest visit_id) should map
         # to exclusive_bf_check_1, next to exclusive_bf_check_2, etc.
@@ -80,96 +79,5 @@ class ChildBreastFeedingForm(forms.Form):
             self._existing_dates = []
     
     def clean(self):
-        cleaned_data = super().clean()
-        # Quick debug (can be removed or converted to logger.debug)
-        print(f"BF Form cleaned data: {cleaned_data}")
-
-        # Build incoming dates in slot order
-        slot_fields = [f"exclusive_bf_check_{i}" for i in range(1, 6)]
-        incoming = []
-        for fname in slot_fields:
-            val = cleaned_data.get(fname)
-            # Normalize incoming values to date objects when possible
-            if isinstance(val, datetime):
-                val = val.date()
-            elif isinstance(val, str):
-                parsed = DateAndTimeUtility.parse_date(val)
-                if parsed:
-                    val = parsed
-            incoming.append(val)
-
-        # If user submitted nothing at all, prompt for at least one date
-        if all(v is None for v in incoming):
-            self.add_error(None, "Please provide at least one exclusive breastfeeding check date.")
-            return cleaned_data
-
-        # Rule: no "holes" — you cannot fill a later visit when an earlier one is empty
-        for i in range(len(incoming)):
-            if incoming[i] is None and any(incoming[j] is not None for j in range(i+1, len(incoming))):
-                self.add_error(None, f"Please fill earlier visit(s) before adding a date for Visit {i+1}.")
-                return cleaned_data
-
-        # Build compact lists of non-null incoming dates in order
-        incoming_non_null = [d for d in incoming if d is not None]
-
-        # Use timezone-aware current date if utility available
-        # DateAndTimeUtility.get_current_date returns an ISO string; parse it
-        try:
-            ph_today_str = DateAndTimeUtility.get_current_date()
-            today = DateAndTimeUtility.parse_date(ph_today_str) or date.today()
-        except Exception:
-            today = date.today()
-
-        # Prevent future dates
-        for d in incoming_non_null:
-            if d > today:
-                self.add_error(None, "One or more dates are in the future. Please use today or past dates only.")
-                return cleaned_data
-
-        existing = getattr(self, '_existing_dates', []) or []
-
-        # If there are existing entries, enforce rules around edits/additions
-        if existing:
-            # If user attempted to remove existing entries (fewer non-null than existing)
-            if len(incoming_non_null) < len(existing):
-                self.add_error(None, "Cannot remove previously recorded check dates. To modify existing entries, edit the original record.")
-                return cleaned_data
-
-            # Ensure the existing prefix wasn't changed
-            prefix = incoming_non_null[: len(existing)]
-            if prefix != existing:
-                self.add_error(None, "Existing check dates may not be modified. To change them, edit the original record.")
-                return cleaned_data
-
-            # If lengths equal and prefix equals, nothing changed
-            if len(incoming_non_null) == len(existing):
-                self.add_error(None, "No changes detected — the submitted dates match existing records.")
-                return cleaned_data
-
-            # incoming has greater length -> new entries appended
-            if len(incoming_non_null) > len(existing):
-                new_entries = incoming_non_null[len(existing):]
-                # ensure new entries are strictly after last existing date and strictly increasing
-                last_existing = existing[-1]
-                prev = last_existing
-                for d in new_entries:
-                    if d <= prev:
-                        self.add_error(None, "Newly added check dates must be after the previously recorded date.")
-                        return cleaned_data
-                    prev = d
-                # All good — expose last new entry for saving
-                cleaned_data['exclusive_bf_check_last'] = new_entries[-1]
-                return cleaned_data
-
-        else:
-            # No existing entries — validate that incoming_non_null are strictly increasing
-            for i in range(1, len(incoming_non_null)):
-                if incoming_non_null[i] <= incoming_non_null[i-1]:
-                    self.add_error(None, "Breastfeeding check dates must be in chronological order and each date must be later than the previous one.")
-                    return cleaned_data
-            # If there are incoming entries, set last
-            if incoming_non_null:
-                cleaned_data['exclusive_bf_check_last'] = incoming_non_null[-1]
-                return cleaned_data
-
-        return cleaned_data
+        # Validation moved to BFFeedingService — keep form as a simple data container
+        return super().clean()

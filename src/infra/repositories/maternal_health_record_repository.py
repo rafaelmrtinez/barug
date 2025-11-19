@@ -752,7 +752,6 @@ class MaternalHealthRecordRepository(IMaternalHealthRecordRepository):
     def insert_maternal_lab_results(self, mhr_id, staff_id, lab_results):
         sql="""SELECT * FROM add_maternal_lab_results_json(%s::INTEGER, %s::INTEGER, %s::JSONB);"""
         params = (mhr_id, staff_id, Json(lab_results))
-        print(f'INSERT LAB RESULTS PARAMS: {params}')
         try:
             rows = self.ctx.execute_query(sql, params)
             return rows[0] if rows else None

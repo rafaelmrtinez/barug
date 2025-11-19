@@ -25,10 +25,18 @@ from src.app.services.maternal_schedule_service import MaternalScheduleService
 from src.app.services.maternal_postpartum_service import MaternalPostpartumService
 from src.app.services.maternal_risk_service import MaternalRiskService
 from src.app.services.maternal_status_service import MaternalRecordStatusService
+from src.app.services.obstetric_validation_service import ObstetricValidationService
+from src.app.services.medical_history_service import MedicalHistoryService
+from src.app.services.previous_pregnancy_service import PreviousPregnancyService
 from src.app.services.laboratory_service import LaboratoryService
+from src.app.services.tetanus_toxoid_service import TetanusToxoidService
+from src.app.services.present_pregnancy_service import PresentPregnancyService
 from src.app.services.image_download_service import ImageDownloadService
 from src.app.services.faq_ingestion_service import FAQIngestionService
 from src.app.services.child_health_schedule_service import ChildHealthScheduleService
+from src.app.services.vitamin_service import VitaminService
+from src.app.services.child_visit_service import ChildVisitService
+from src.app.services.bf_feeding_service import BFFeedingService
 
 
 from src.app.contracts.business_service_contract import (
@@ -164,6 +172,53 @@ class AppContainer(containers.DeclarativeContainer):
         repository=infra.maternal_health_record_repository,
     )
 
+    obstetric_validation_service = providers.Factory(
+        ObstetricValidationService,
+        repository=infra.maternal_health_record_repository,
+    )
+
+    medical_history_service = providers.Factory(
+        MedicalHistoryService,
+        repository=infra.maternal_health_record_repository,
+    )
+
+    previous_pregnancy_service = providers.Factory(
+        PreviousPregnancyService,
+        repository=infra.maternal_health_record_repository,
+    )
+
+    tetanus_toxoid_service = providers.Factory(
+        TetanusToxoidService,
+        repository=infra.maternal_health_record_repository,
+    )
+
+    present_pregnancy_service = providers.Factory(
+        PresentPregnancyService,
+        repository=infra.maternal_health_record_repository,
+    )
+
+    plan_service = providers.Factory(
+        # lazy import to avoid potential circular imports
+        lambda repository: __import__("src.app.services.plan_service", fromlist=["PlanService"]).PlanService(repository=repository),
+        repository=infra.maternal_health_record_repository,
+    )
+
+    micronutrients_service = providers.Factory(
+        lambda repository: __import__("src.app.services.micronutrients_service", fromlist=["MicroNutrientsService"]).MicroNutrientsService(repository=repository),
+        repository=infra.maternal_health_record_repository,
+    )
+
+    checklist_service = providers.Factory(
+        # lazy import to avoid circulars in some runtimes
+        lambda repository: __import__("src.app.services.checklist_service", fromlist=["CheckListService"]).CheckListService(repository=repository),
+        repository=infra.maternal_health_record_repository,
+    )
+
+    prenatal_followup_service = providers.Factory(
+        lambda repository: __import__("src.app.services.prenatal_followup_service", fromlist=["PrenatalFollowUpService"]).PrenatalFollowUpService(repository=repository),
+        repository=infra.maternal_health_record_repository,
+    )
+
     maternal_status_service: providers.Factory[IMaternalRecordStatusService] = providers.Factory(
         MaternalRecordStatusService,
         repository=infra.maternal_health_record_repository,
@@ -283,6 +338,23 @@ class AppContainer(containers.DeclarativeContainer):
     child_health_schedule_service: providers.Factory[IChildHealthScheduleService] = providers.Factory(
         ChildHealthScheduleService,
         repo=infra.child_health_record_repository,
+    )
+
+    child_visit_service = providers.Factory(
+        ChildVisitService,
+        ch_repo=infra.child_health_record_repository,
+    )
+
+    child_bf_service = providers.Factory(
+        BFFeedingService,
+        ch_repo=infra.child_health_record_repository,
+    )
+
+
+    # Vitamin service for vitamin A orchestration
+    vitamin_service = providers.Factory(
+        VitaminService,
+        ch_repo=infra.child_health_record_repository,
     )
 
     # Reports services can be added here in the app container as needed

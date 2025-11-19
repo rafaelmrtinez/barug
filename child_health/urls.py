@@ -2,6 +2,12 @@ from django.urls import path
 from child_health import views
 from child_health.api.child_report_api import ChildReportAPI
 from child_health.api.child_health_schedule_api import ChildHealthScheduleAPI
+from child_health.api.newborn_screening_api import NewbornScreeningAPI
+from child_health.api.bf_feeding_api import BFFeedingAPI
+from child_health.api.child_visit_api import ChildVisitAPI
+from child_health.api.birth_supplementation_api import BirthSupplementationAPI
+from child_health.api.iron_intake_api import IronIntakeAPI
+from child_health.api.vitamin_api import VitaminAPI
 
 app_name = 'child_health'
 
@@ -19,4 +25,11 @@ urlpatterns = [
     path(f'api/v{API_VERSION}/chr/report/', ChildReportAPI.as_view(), name='child_report_api'),
     # API: child visit schedule create
     path(f'api/v{API_VERSION}/chr/schedule/', ChildHealthScheduleAPI.as_view(), name='child_schedule_api'),
+    # API: child entry endpoints (migrated POST handlers)
+    path(f'api/v{API_VERSION}/chr/entry/<int:child_health_record_id>/newborn-screening/', NewbornScreeningAPI.as_view(), name='api_newborn_screening'),
+    path(f'api/v{API_VERSION}/chr/entry/<int:child_health_record_id>/bf-feeding/', BFFeedingAPI.as_view(), name='api_bf_feeding'),
+    path(f'api/v{API_VERSION}/chr/entry/<int:child_health_record_id>/visit/', ChildVisitAPI.as_view(), name='api_child_visit'),
+    path(f'api/v{API_VERSION}/chr/entry/<int:child_health_record_id>/birth-supplementation/', BirthSupplementationAPI.as_view(), name='api_birth_supplementation'),
+    path(f'api/v{API_VERSION}/chr/entry/<int:child_health_record_id>/iron-intake/', IronIntakeAPI.as_view(), name='api_iron_intake'),
+    path(f'api/v{API_VERSION}/chr/entry/<int:child_health_record_id>/vitamin/', VitaminAPI.as_view(), name='api_vitamin'),
 ]

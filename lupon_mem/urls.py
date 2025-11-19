@@ -95,10 +95,28 @@ urlpatterns = [
     path("reports/<int:report_id>/decline/",  views_reports.report_decline, name="report_decline"), # added to views_reports 
     path("reports/<int:report_id>/pay-open/", views_reports.report_pay_and_open_case, name="report_pay_and_open_case"), # added to views_reports
     path("reports/<int:report_id>/payment-details/", views_reports.report_payment_details, name="report_payment_details"), # added to views_reports
+    path("store-session-values/", views_reports.store_session_values, name="store_session_values"),
+    
+    # blotter reports
+    path("blotter-reports/", views_reports.blotter_reports_menu, name="blotter_reports_menu"),
+    path("blotter-reports/total_cases_by_status/", views_reports.total_cases_by_status_report, name="total_cases_by_status_report"),
+    path("blotter-reports/case_summaries/", views_reports.case_summaries_report, name="case_summaries_report"),
+    path("blotter-reports/settlement_statistics/", views_reports.settlement_statistics_report, name="settlement_statistics_report"),
+    path("blotter-reports/monthly_activity/", views_reports.monthly_activity_report, name="monthly_activity_report"),
+    path("blotter-reports/blotter_reports_summary/", views_reports.blotter_reports_summary, name="blotter_reports_summary"),
+    path("blotter-reports/incident_by_location/", views_reports.incident_by_location_report, name="incident_by_location_report"),
+    
+    # case-specific PDF reports
+    path("cases/<int:case_id>/timeline-pdf/", views_reports.case_timeline_pdf, name="case_timeline_pdf"),
+    path("cases/<int:case_id>/forms-pdf/", views_reports.case_forms_pdf, name="case_forms_pdf"),
+    path("cases/<int:case_id>/hearings-pdf/", views_reports.case_hearings_pdf, name="case_hearings_pdf"),
 
     # ===== ADDED: flow progress API (namespaced) =====
     path("api/case/<int:case_id>/flow-progress", views_progress.flow_progress_api, name="flow_progress_api"),
     path("api/hearing-status/<int:case_id>/", views_hearing_api.hearing_status_api, name="hearing_status_api"),
+    path("api/kp16-date/<int:case_id>/", views_api.kp16_date_api, name="kp16_date_api"),
+    path("api/case-kp7-details/<int:case_id>/", views_api.kp7_details_api, name="kp7_details_api"),
+    path("api/upcoming-hearings/<int:case_id>/", views_api.upcoming_hearings_api, name="upcoming_hearings_api"),
 
     # apis
     path("api/mediation-hearings/<int:case_id>/", views_cases.mediation_hearings_api, name="mediation_hearings_api"),
@@ -122,4 +140,5 @@ urlpatterns = [
     path("dashboard/", views.dashboard, name="dashboard"),
     path("incident-heatmap/", views.incident_heatmap, name="incident_heatmap"),
     path("mobile/residents/search/", residents_search, name="residents_search"),
+    
 ]

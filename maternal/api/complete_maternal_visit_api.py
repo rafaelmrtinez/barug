@@ -51,6 +51,18 @@ class CompleteMaternalVisitAPI(View):
         except (TypeError, ValueError):
             return JsonResponse({'success': False, 'message': 'Invalid staff id in session.'}, status=400)
 
+        # Sometimes wiring may not have replaced the `Provide` default (e.g. import-time
+        # ordering or decorator wrapping). If `repo` is still a `Provide` object or does
+        # not expose the expected method, resolve it explicitly from the application
+        # container so the call below works reliably.
+        if not hasattr(repo, 'insert_maternal_visit_and_schedule_completion'):
+            try:
+                repo = app.infra.maternal_health_record_repository()
+            except Exception:
+                import logging
+                logging.exception('Failed to resolve maternal_health_record_repository from container')
+                return JsonResponse({'success': False, 'message': 'Server configuration error.'}, status=500)
+
         try:
             res = repo.insert_maternal_visit_and_schedule_completion(mhr_id, staff_id)
         except MaternalHealthRecordException as e:

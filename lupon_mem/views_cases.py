@@ -26,6 +26,7 @@ from django.views.decorators.http import require_GET
 
 from lupon_mem.utils.http import json_ok, json_err, flash_success, flash_warning, require_post_view
 from lupon_mem.utils.params import post_int, post_bool, post_str
+from lupon_mem.utils.logging import blotter_log_event
 from lupon_mem.services import hearings as svc_hear
 from django.views.decorators.csrf import csrf_protect
 import logging
@@ -223,6 +224,8 @@ def case_list(request: HttpRequest):
                 SELECT COUNT(*) FROM blotter_case bc
                 LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
                 LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+                LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
+                LEFT JOIN case_nature cn ON cn.case_nature_id = bc.case_nature_id
                 {where_sql}
             """
         else:
@@ -241,18 +244,22 @@ def case_list(request: HttpRequest):
                 TO_CHAR(bc.time_filed, 'HH12:MI AM')   AS time_filed_fmt,   -- 4
                 COALESCE(cs.case_state_name, 'PENDING')        AS case_state,         -- 5
                 COALESCE(ss.settlement_status_name, 'Pending') AS settlement_status,  -- 6
+                COALESCE(ct.complaint_title_name, '')          AS complaint_title,    -- 7
+                COALESCE(cn.case_name, '')                     AS case_nature,        -- 8
 
                 -- ===== fn_case_hearing_window extras (may be NULL if no KP-8 yet) =====
-                hw.window_end_date_text,      -- 7  e.g., "November 12, 2025"
-                hw.window_end_time_text,      -- 8  e.g., "10:09 pm"
-                hw.days_left,                 -- 9
-                hw.can_set_mediation,         -- 10
-                hw.can_set_conciliation,      -- 11
-                COALESCE(hw.mediation_hearings_set,  0) AS mediation_hearings_set,   -- 12
-                COALESCE(hw.mediation_hearings_held, 0) AS mediation_hearings_held   -- 13
+                hw.window_end_date_text,      -- 9  e.g., "November 12, 2025"
+                hw.window_end_time_text,      -- 10  e.g., "10:09 pm"
+                hw.days_left,                 -- 11
+                hw.can_set_mediation,         -- 12
+                hw.can_set_conciliation,      -- 13
+                COALESCE(hw.mediation_hearings_set,  0) AS mediation_hearings_set,   -- 14
+                COALESCE(hw.mediation_hearings_held, 0) AS mediation_hearings_held   -- 15
             FROM blotter_case bc
             LEFT JOIN case_state       cs ON cs.case_state_id = bc.case_state_id
             LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+            LEFT JOIN complaint_title   ct ON ct.complaint_title_id = bc.complaint_title_id
+            LEFT JOIN case_nature       cn ON cn.case_nature_id = bc.case_nature_id
 
             -- Pull the 15-day mediation window + counters for each row
             LEFT JOIN LATERAL fn_case_hearing_window(bc.blotter_case_id) hw ON TRUE
@@ -277,8 +284,8 @@ def case_list(request: HttpRequest):
         cur.execute("""
             SELECT 
                 COUNT(*) as total_cases,
-                COUNT(*) FILTER (WHERE COALESCE(cs.case_state_name, 'PENDING') IN ('PENDING', 'OPEN')) as open_cases,
-                COUNT(*) FILTER (WHERE ss.settlement_status_name = 'Settled') as settled_cases
+                COUNT(*) FILTER (WHERE UPPER(COALESCE(cs.case_state_name, 'PENDING')) = 'OPEN') as open_cases,
+                COUNT(*) FILTER (WHERE UPPER(COALESCE(ss.settlement_status_name, '')) = 'SETTLED') as settled_cases
             FROM blotter_case bc
             LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
             LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
@@ -411,6 +418,9 @@ def case_detail(request: HttpRequest, case_id: int):
 
     lookup_cache = _fetch_lookups()
 
+    auth = request.session.get("auth") or {}
+    user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
+    
     context = {
         "case": case_row,
         "forms": [
@@ -440,6 +450,8 @@ def case_detail(request: HttpRequest, case_id: int):
         "has_hearing": False,
         "submitted_form_codes": list(submitted_form_codes),
         "progress_percentage": progress_percentage,
+        'page_path': f'{user_role} / Case Detail',
+        'page_title': f'Case #{case_row[1]}' if case_row else 'Case Detail',
     }
 
     return render(request, "lupon_mem/case_detail.html", context)
@@ -451,10 +463,13 @@ def case_detail(request: HttpRequest, case_id: int):
 @role_required(*LUPON_ROLES, "barangay treasurer")
 def case_new(request: HttpRequest) -> HttpResponse:
     if request.method == "GET":
+        auth = request.session.get("auth") or {}
+        user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
         ctx = {
             "lookups": _fetch_lookups(),
             "initial": {},
-            "page_title": "New Blotter Case",
+            'page_path': f'{user_role} / New Case',
+            'page_title': 'New Blotter Case',
         }
         return render(request, "lupon_mem/case_new.html", ctx)
 
@@ -515,6 +530,21 @@ def case_new(request: HttpRequest) -> HttpResponse:
                 ],
             )
             case_id = cur.fetchone()[0]
+            
+            # Log the case creation
+            blotter_log_event(
+                action="CREATE",
+                table_affected="blotter_case",
+                record_affected_id=case_id,
+                details={
+                    "case_name": blotter_case_name,
+                    "complaint_title_id": complaint_title_id,
+                    "case_nature_id": case_nature_id,
+                    "complainants_count": len([p for p in complainants if p and p.isdigit()]),
+                    "respondents_count": len([p for p in respondents if p and p.isdigit()])
+                },
+                performer_staff_id=staff_id
+            )
 
             for pid in complainants:
                 if pid and pid.isdigit():
@@ -577,6 +607,16 @@ def case_settlement_update(request: HttpRequest, case_id: int):
 
         ok, _case, new_status, changed_at = row if row else (False, None, None, None)
         if ok:
+            # Log the settlement status update
+            blotter_log_event(
+                action="UPDATE",
+                table_affected="blotter_case",
+                record_affected_id=case_id,
+                details={"settlement_status": new_status, "remarks": remarks},
+                performer_staff_id=staff_id,
+                field_changed="settlement_status",
+                new_value=new_status
+            )
             messages.success(request, f'Settlement status updated to "{new_status}".')
         else:
             messages.warning(request, "No change was made.")
@@ -607,6 +647,16 @@ def case_close(request: HttpRequest, case_id: int):
 
     try:
         close_case(case_id, staff_id, note)
+        # Log the case closure
+        blotter_log_event(
+            action="UPDATE",
+            table_affected="blotter_case",
+            record_affected_id=case_id,
+            details={"close_note": note},
+            performer_staff_id=staff_id,
+            field_changed="case_state",
+            new_value="CLOSED"
+        )
         messages.success(request, "Case has been closed.")
     except Exception as e:
         messages.error(request, f"Failed to close case: {e}")
@@ -630,6 +680,16 @@ def case_reopen(request: HttpRequest, case_id: int):
 
     try:
         reopen_case(case_id, staff_id, reason)
+        # Log the case reopening
+        blotter_log_event(
+            action="UPDATE",
+            table_affected="blotter_case",
+            record_affected_id=case_id,
+            details={"reopen_reason": reason},
+            performer_staff_id=staff_id,
+            field_changed="case_state",
+            new_value="OPEN"
+        )
         messages.success(request, "Case has been reopened.")
     except Exception as e:
         messages.error(request, f"Failed to reopen case: {e}")

@@ -13,7 +13,16 @@ urlpatterns = [
     path("create/", views.create_new_maternal_entry, name="create_maternal_entry"),
     path("find-mother-basic-info/<int:person_id>/", views.find_mother_basic_info, name="find_mother_basic_info"),
     path("form/prenatal/<int:mhr_id>/", views.health_worker_prenatal_form_view, name="bhw_prenatal_form"),
-    path("api/form/prenatal/", views.prenatal_api, name="bhw_prenatal_api"),
+    path("api/form/prenatal/", __import__('maternal.api.prenatal_followup_api', fromlist=['']).PrenatalFollowUpEntryAPI.as_view(), name="bhw_prenatal_api"),
+    # New class-based API endpoints for forms (migrated from the monolithic POST handler)
+    path(f'api/v{API_VERSION}/mhr/obstetric/', __import__('maternal.api.obstetric_api', fromlist=['']).ObstetricHistoryAPI.as_view(), name='mhr_obstetric_api'),
+    path(f'api/v{API_VERSION}/mhr/medical-history/', __import__('maternal.api.medical_history_api', fromlist=['']).MedicalHistoryAPI.as_view(), name='mhr_medical_history_api'),
+    path(f'api/v{API_VERSION}/mhr/previous-pregnancy/', __import__('maternal.api.previous_pregnancy_api', fromlist=['']).PreviousPregnancyAPI.as_view(), name='mhr_previous_pregnancy_api'),
+    path(f'api/v{API_VERSION}/mhr/tetanus-toxoid/', __import__('maternal.api.tetanus_toxoid_api', fromlist=['']).TetanusToxoidAPI.as_view(), name='mhr_tetanus_api'),
+    path(f'api/v{API_VERSION}/mhr/present-pregnancy/', __import__('maternal.api.present_pregnancy_api', fromlist=['']).PresentPregnancyAPI.as_view(), name='mhr_present_pregnancy_api'),
+    path(f'api/v{API_VERSION}/mhr/checklist/', __import__('maternal.api.checklist_api', fromlist=['']).CheckListAPI.as_view(), name='mhr_checklist_api'),
+    path(f'api/v{API_VERSION}/mhr/plans/', __import__('maternal.api.plans_api', fromlist=['']).PlansAPI.as_view(), name='mhr_plans_api'),
+    path(f'api/v{API_VERSION}/mhr/micronutrients/', __import__('maternal.api.micronutrients_api', fromlist=['']).MicroNutrientsAPI.as_view(), name='mhr_micronutrients_api'),
     path("api/form/postpartum/bhw/", __import__('maternal.api.postpartum_bhw_api', fromlist=['']).PostpartumVisitBHWAPI.as_view(), name='postpartum_bhw_api'),
     path("api/form/postpartum/midwife/", __import__('maternal.api.postpartum_midwife_api', fromlist=['']).PostpartumFollowupMidwifeAPI.as_view(), name='postpartum_midwife_api'),
     # v1 API to update maternal health record status
