@@ -27,47 +27,99 @@
         const d3 = parseDate(document.getElementById(`id_${prefix}_3rd`)?.value);
 
         if (d2 && !d1) {
-            alert(`${immunizationName}: 2nd dose entered but 1st dose missing.`);
+            CustomToast && CustomToast.show && CustomToast.show(`${immunizationName}: 2nd dose entered but 1st dose missing.`, { type: 'error' });
             return false;
         }
         if (d3 && !d2) {
-            alert(`${immunizationName}: 3rd dose entered but 2nd dose missing.`);
+            CustomToast && CustomToast.show && CustomToast.show(`${immunizationName}: 3rd dose entered but 2nd dose missing.`, { type: 'error' });
             return false;
         }
         if (d1 && d2 && d2 < d1) {
-            alert(`${immunizationName}: 2nd dose date cannot be before 1st dose.`);
+            CustomToast && CustomToast.show && CustomToast.show(`${immunizationName}: 2nd dose date cannot be before 1st dose.`, { type: 'error' });
             return false;
         }
         if (d2 && d3 && d3 < d2) {
-            alert(`${immunizationName}: 3rd dose date cannot be before 2nd dose.`);
+            CustomToast && CustomToast.show && CustomToast.show(`${immunizationName}: 3rd dose date cannot be before 2nd dose.`, { type: 'error' });
             return false;
         }
         return true;
     };
 
     // --- POST helper ---
+    const IMMUNIZATION_URL = "/child-health/child-immunization/request/";
+
+    const _extractSuccessText = (body) => {
+        if (body == null) return null;
+        // if server returned a plain string, use it
+        if (typeof body === 'string') return body;
+        // prefer message field when it's textual
+        if (body && body.message) {
+            if (typeof body.message === 'string') return body.message;
+            if (Array.isArray(body.message)) {
+                // try to find any non-numeric textual content
+                const flat = body.message.flat(Infinity);
+                const textParts = flat.filter(el => typeof el === 'string');
+                if (textParts.length) return textParts.join(' ');
+                // no textual parts found — don't return numeric ids
+                return null;
+            }
+        }
+        return null;
+    };
+
+    const _extractErrorMsg = (body) => {
+        if (!body) return 'Submission failed (no error provided).';
+        if (typeof body === 'string') return body;
+        if (typeof body.message === 'string') return body.message;
+        if (Array.isArray(body.message)) return JSON.stringify(body.message);
+        if (typeof body.error === 'string') return body.error;
+        return 'Submission failed (no error provided).';
+    };
+
+    const _isNestedNumericMessage = (body) => {
+        if (!body) return false;
+        const msg = body.message;
+        if (!Array.isArray(msg)) return false;
+        // flatten and check that at least one numeric exists and no textual parts
+        const flat = msg.flat(Infinity);
+        const hasNumber = flat.some(el => typeof el === 'number');
+        const hasText = flat.some(el => typeof el === 'string');
+        return hasNumber && !hasText;
+    };
+
     const postImmunizationData = async (payload, immunizationName) => {
         try {
-            const response = await fetch("/child-health/child-immunization/request/", {
-                method: "POST",
+            // Perform request locally so this module shows its own toasts
+            const response = await fetch(IMMUNIZATION_URL, {
+                method: 'POST',
+                credentials: 'same-origin',
                 headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRFToken": csrfToken
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,
+                    'Accept': 'application/json'
                 },
                 body: JSON.stringify(payload)
             });
 
-            const data = await response.json();
+            let data = null;
+            try { data = await response.json(); } catch (_) { data = null; }
 
-            if (!response.ok) {
-                alert(`${immunizationName} submission failed: ${data.message || "Unknown error."}`);
+            if (response.ok) {
+                // If server returned a textual message, show it; if message is numeric-only (e.g. [[62]]), show generic success
+                const text = _extractSuccessText(data);
+                if (text) {
+                    CustomToast && CustomToast.show && CustomToast.show(text, { type: 'success' });
+                } else {
+                    CustomToast && CustomToast.show && CustomToast.show(`${immunizationName} data submitted successfully!`, { type: 'success' });
+                }
                 return;
             }
 
-            alert(`${immunizationName} data submitted successfully!`);
+            const err = _extractErrorMsg(data);
+            CustomToast && CustomToast.show && CustomToast.show(`${immunizationName} submission failed: ${err}`, { type: 'error' });
         } catch (error) {
             console.error(`Error submitting ${immunizationName}:`, error);
-            alert(`Failed to submit ${immunizationName}. Please try again.`);
+            CustomToast && CustomToast.show && CustomToast.show(`Failed to submit ${immunizationName}. Please try again.`, { type: 'error' });
         }
     };
 
@@ -88,7 +140,7 @@
             const immunizationStage = stageOverride ?? getImmunizationStage(prefix);
 
             if (!immunizationStage) {
-                alert(`No immunization date provided for ${immunizationName}.`);
+                CustomToast && CustomToast.show && CustomToast.show(`No immunization date provided for ${immunizationName}.`, { type: 'error' });
                 return;
             }
 

@@ -34,6 +34,9 @@ from src.app.services.present_pregnancy_service import PresentPregnancyService
 from src.app.services.image_download_service import ImageDownloadService
 from src.app.services.faq_ingestion_service import FAQIngestionService
 from src.app.services.child_health_schedule_service import ChildHealthScheduleService
+from src.app.services.vitamin_service import VitaminService
+from src.app.services.child_visit_service import ChildVisitService
+from src.app.services.bf_feeding_service import BFFeedingService
 
 
 from src.app.contracts.business_service_contract import (
@@ -335,6 +338,23 @@ class AppContainer(containers.DeclarativeContainer):
     child_health_schedule_service: providers.Factory[IChildHealthScheduleService] = providers.Factory(
         ChildHealthScheduleService,
         repo=infra.child_health_record_repository,
+    )
+
+    child_visit_service = providers.Factory(
+        ChildVisitService,
+        ch_repo=infra.child_health_record_repository,
+    )
+
+    child_bf_service = providers.Factory(
+        BFFeedingService,
+        ch_repo=infra.child_health_record_repository,
+    )
+
+
+    # Vitamin service for vitamin A orchestration
+    vitamin_service = providers.Factory(
+        VitaminService,
+        ch_repo=infra.child_health_record_repository,
     )
 
     # Reports services can be added here in the app container as needed
