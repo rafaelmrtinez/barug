@@ -2,7 +2,15 @@
 {% load static %}
 
 {% block css %}
+<link rel="stylesheet" href="{% static 'child_health/css/chr-sidebar.css' %}">
 <link rel="stylesheet" href="{% static 'child_health/css/chr-theme.css' %}">
+<style>
+/* Back-to-top floating button for child health page */
+.back-to-top{ position: fixed; right: 1rem; bottom: 1rem; width:48px; height:48px; border-radius:50%; background:#6d2932; color:#fff; border:none; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 6px 18px rgba(0,0,0,0.18); cursor:pointer; opacity:0; transform:translateY(8px); transition:opacity .2s ease, transform .2s ease; z-index:2050; }
+.back-to-top:focus{ outline: 2px solid rgba(255,255,255,0.12); }
+.back-to-top.visible{ opacity:1; transform:translateY(0); }
+.back-to-top svg{ width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -10,8 +18,45 @@
 
     {% include "messages.html" %}
 
-    <h1 class="mb-3">Child Health Record</h1>
-    <input type="hidden" id="child_id" value="{{ child_id }}">
+    <div class="row">
+        <!-- Sidebar -->
+        <aside class="col-md-3 d-none d-md-block child-sidebar">
+            <nav class="sticky-top pt-4">
+                <div class="card">
+                    <div class="card-body small">
+                        <ul class="nav flex-column">
+                            <li class="nav-item"><a class="nav-link" href="#identification">Identification</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#place-of-delivery">Place of Delivery</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#parent-info">Parent Info</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#nbs">New Born Screening</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#child-details">Child Details</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#immunization">Immunization</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#birth-and-supplementation">Birth and Supplementation</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#iron-intake">Iron Intake</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#vitamin-intake">Vitamin Intake</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#visit-entry">Visit Entry</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main -->
+        <main class="col-md-9">
+
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h1 class="mb-0">Child Health Record</h1>
+                <input type="hidden" id="child_id" value="{{ child_id }}">
+            </div>
+
+            <!-- Mobile sidebar toggle -->
+            <div class="d-md-none mb-3">
+                <button id="child-sidebar-toggle" class="btn btn-sm btn-chi" aria-label="Open menu">
+                    <svg class="sidebar-toggle-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </button>
+            </div>
 
     <!-- Identification (NO header button) -->
     <div class="card mb-3 card-brand">
@@ -299,7 +344,7 @@
             <button type="button" class="btn btn-sm btn-outline-brand section-action"
                 data-section="#supplementation">Edit</button>
         </div>
-        <div class="card-body" id="supplementation">
+        <div class="card-body" id="birth-and-supplementation">
             <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
                 {% csrf_token %}
                 <div class="row g-3">
@@ -333,7 +378,7 @@
             <button type="button" class="btn btn-sm btn-outline-brand section-action"
                 data-section="#iron_intake">Edit</button>
         </div>
-        <div class="card-body" id="iron_intake">
+        <div class="card-body" id="iron-intake">
             <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
                 {% csrf_token %}
                 <div class="row g-3">
@@ -358,7 +403,7 @@
                 Edit
             </button>
         </div>
-        <div class="card-body" id="supplementation">
+        <div class="card-body" id="vitamin-intake">
             <form method="post" novalidate>
                 {% csrf_token %}
                 <div class="row g-3">
@@ -519,15 +564,36 @@
         </div>
     </div>
 
+    </main>
+    </div>
+
 </div>
 
+<!-- Back to top button -->
+<button id="child-back-to-top" class="back-to-top" aria-label="Back to top">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 5l-7 7" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="M12 5l7 7" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="M5 12h14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+</button>
+
 {% block script %}
+<script defer src="{% static 'child_health/js/chr-sidebar.js' %}"></script>
 <script defer src="{% static 'child_health/js/sectionActions.js' %}"></script>
-{% comment %}
-<script defer src="{% static 'child_health/js/insertBF.js' %}"></script> {% endcomment %}
-<!-- <script defer src="{% static 'child_health/js/selector.js' %}"></script> -->
 <script defer src="{% static 'child_health/js/weightCalculator.js' %}"></script>
 <script defer src="{% static 'child_health/js/immunizationRequest.js' %}"></script>
-{% comment %} <script defer src="{% static 'child_health/js/vitaminCheckcboxPolicy.js' %}"></script> {% endcomment %}
+<script>
+// Back-to-top behaviour for child health page
+document.addEventListener('DOMContentLoaded', function(){
+    // create safe reference if button already exists in template
+    const btn = document.getElementById('child-back-to-top');
+    if(!btn) return;
+    function onScroll(){ if(window.scrollY > 200) btn.classList.add('visible'); else btn.classList.remove('visible'); }
+    window.addEventListener('scroll', onScroll, {passive:true});
+    btn.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+    onScroll();
+});
+</script>
 {% endblock %}
 {% endblock %}

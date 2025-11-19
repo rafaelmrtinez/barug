@@ -9,6 +9,16 @@
     return null;
   }
 
+  function showToast(msg, success = true) {
+    try {
+      if (globalThis.CustomToast && typeof globalThis.CustomToast.show === 'function') {
+        return globalThis.CustomToast.show(String(msg || ''), { type: success ? 'success' : 'error' });
+      }
+    } catch (__) { /* ignore */ }
+    // Avoid using blocking `alert()`/`confirm()` in production code.
+    try { console.log(String(msg)); } catch (__2) { /* ignore logging errors */ }
+  }
+
   // Basic front-end sanitization for integers
   function toPositiveInt(value) {
     const n = Number.parseInt(String(value).trim(), 10);
@@ -39,7 +49,7 @@
         const mhrIdRaw = form.getAttribute('data-mhr-id');
         const mhrId = toPositiveInt(mhrIdRaw);
         if (!mhrId) {
-          confirm('Cannot determine maternal record id. Please reload the page and try again.');
+          showToast('Cannot determine maternal record id. Please reload the page and try again.', false);
           return;
         }
 
@@ -47,7 +57,7 @@
         const csrftoken = getCookie('csrftoken');
         if (!csrftoken) {
           // Generic message only
-          confirm('Unable to perform action due to missing CSRF token. Please reload and try again.');
+          showToast('Unable to perform action due to missing CSRF token. Please reload and try again.', false);
           return;
         }
 
@@ -76,7 +86,7 @@
           if (!resp.ok) {
             // Show server-provided message if safe, otherwise generic
             const userMsg = (body && body.message) ? String(body.message) : 'Unable to complete visit. Please try again later.';
-            confirm(userMsg);
+            showToast(userMsg, false);
             // keep internal details in console for developers
             console.error('Prenatal visit complete API error', resp.status, body);
             return;
@@ -84,10 +94,10 @@
 
           // success
           const successMsg = (body && body.message) ? String(body.message) : 'Visit marked complete.';
-          confirm(successMsg);
+          showToast(successMsg, true);
         } catch (err) {
           // network/unexpected error: show generic message only
-          confirm('An unexpected error occurred. Please try again later.');
+          showToast('An unexpected error occurred. Please try again later.', false);
           console.error('Error calling prenatal visit complete API', err);
         } finally {
           markBtn.disabled = false;

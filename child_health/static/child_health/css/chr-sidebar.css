@@ -1,0 +1,31 @@
+/* Child health sidebar and theme adjustments (based on maternal layout)
+   - Sidebar styling
+   - Button sizing and brand colors
+*/
+:root{
+  --chr-msb-width: 240px;
+  --chr-brand: var(--brand-700, #6d2932);
+  --chr-brand-dark: #24593f;
+  --chr-contrast: #fff;
+}
+
+.child-sidebar { padding-top: 0.5rem; }
+.child-sidebar > nav > .card, .child-sidebar nav.card { background: var(--chr-brand) !important; color: var(--chr-contrast) !important; border-radius: .5rem; }
+
+/* mirror maternal sidebar structure to ensure visual parity and avoid global overrides */
+.child-sidebar .card{ background: linear-gradient(180deg, rgba(0,0,0,0.08), transparent); border-radius: .5rem; }
+.child-sidebar .card-body{ padding: .75rem; }
+.child-sidebar{ padding-top: .75rem; }
+.child-sidebar .card .small{ color: rgba(255,255,255,0.9); }
+.child-sidebar .nav-link{ display: block; padding: .35rem .5rem; border-radius: .25rem; color: var(--chr-contrast) !important; }
+.child-sidebar .nav-link:hover, .child-sidebar .nav-link:focus{ color: rgba(255,255,255,0.9) !important; text-decoration: none; }
+.child-sidebar .nav{ gap: .25rem; }
+.child-sidebar .nav-link.active{ background: rgba(255,255,255,0.06) !important; }
+.child-sidebar .nav-link, .child-sidebar .dropdown-item{ color: var(--chr-contrast) !important; }
+
+@media (max-width:767.98px){
+  .child-sidebar{ position: fixed; top: 56px; left: calc(-1 * var(--chr-msb-width)); width: var(--chr-msb-width); height: calc(100% - 56px); z-index:1050; transition:left .25s ease; }
+  .child-sidebar.open{ left: 0; }
+  .child-sidebar .card{ height:100%; box-shadow:0 6px 20px rgba(0,0,0,0.12); }
+  .child-sidebar .card-body{ overflow-y:auto; max-height: calc(100vh - 120px); }
+}

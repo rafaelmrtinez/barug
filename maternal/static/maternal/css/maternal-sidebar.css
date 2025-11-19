@@ -1,0 +1,34 @@
+/* Deprecated: styles moved to static/css/static_style.css */
+/* Keep this file for backward compatibility; contents migrated to `static_style.css` */
+/* General Styles */
+
+/* ===== Maternal sidebar (moved from maternal-sidebar.css) ===== */
+:root{
+    --msb-width: 260px;
+    --msb-bg: var(--brand-700, #6d2932);
+    --msb-bg-contrast: #ffffff;
+    --msb-link-hover: var(--brand-300, #f8d7da);
+}
+
+.maternal-sidebar .card{ background: transparent; border: none; }
+.maternal-sidebar .card-body{ padding: .75rem; }
+.maternal-sidebar{ padding-top: .75rem; }
+.maternal-sidebar .nav-link{ color: var(--msb-bg-contrast) !important; padding-left: 0; padding-right: 0; }
+.maternal-sidebar .nav-link:hover, .maternal-sidebar .nav-link:focus{ color: var(--msb-link-hover) !important; text-decoration: none; }
+.maternal-sidebar .nav{ gap: .25rem; }
+.maternal-sidebar .card{ background: linear-gradient(180deg, rgba(0,0,0,0.08), transparent); border-radius: .5rem; }
+.maternal-sidebar .card .small{ color: rgba(255,255,255,0.9); }
+.maternal-sidebar > nav > .card{ background: var(--msb-bg); color: var(--msb-bg-contrast); }
+
+@media (max-width: 767.98px){
+    .maternal-sidebar{ position: fixed; top: 56px; left: calc(-1 * var(--msb-width)); width: var(--msb-width); height: calc(100% - 56px); z-index: 1050; transition: left .25s ease-in-out; }
+    .maternal-sidebar .card{ height: 100%; box-shadow: 0 6px 20px rgba(0,0,0,0.12); }
+    .maternal-sidebar.open{ left: 0; }
+    .maternal-sidebar .card-body{ overflow-y: auto; max-height: calc(100vh - 120px); }
+}
+
+.maternal-sidebar .nav-link{ display: block; padding: .35rem .5rem; border-radius: .25rem; }
+.maternal-sidebar .nav-link.active{ background: rgba(255,255,255,0.06) !important; }
+.maternal-sidebar .nav-link, .maternal-sidebar .dropdown-item{ color: var(--msb-bg-contrast) !important; }
+.maternal-sidebar-backdrop{ display:none; }
+.maternal-sidebar-backdrop.open{ display:block; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:1040; }
