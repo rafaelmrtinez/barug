@@ -136,6 +136,17 @@ def roles_required(*role_names):
 
 @csrf_protect
 def login(request):
+    # Redirect authenticated users to their dashboard
+    auth = request.session.get("auth")
+    if auth:
+        role_lower = (auth.get("role_lower") or auth.get("role_name") or "").strip().lower()
+        if role_lower:
+            try:
+                dest = _role_home(role_lower)
+                return redirect(dest)
+            except Exception:
+                pass
+    
     # Clear any existing force_password_change session
     if "force_password_change" in request.session:
         request.session.pop("force_password_change", None)
@@ -266,7 +277,13 @@ def login(request):
     # GET or invalid form
     if request.method == "POST":
         logger.debug("FORM INVALID | errors=%s", dict(form.errors))
-    return render(request, "authentication_index.html", {"form": form})
+    
+    response = render(request, "authentication_index.html", {"form": form})
+    # Prevent caching of login page
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+    return response
 
 
 def logout(request):
@@ -293,6 +310,17 @@ def forgot_password(request):  # ADDED FORGOT PASS
     - Sends a single email listing reset links for each account.
     - Always shows a generic success message to avoid email enumeration.
     """  # ADDED FORGOT PASS
+    
+    # Redirect authenticated users to their dashboard
+    auth = request.session.get("auth")
+    if auth:
+        role_lower = (auth.get("role_lower") or auth.get("role_name") or "").strip().lower()
+        if role_lower:
+            try:
+                dest = _role_home(role_lower)
+                return redirect(dest)
+            except Exception:
+                pass
 
     # ADDED FORGOT PASS (helper): shared logic for initial + resend flows
     def _process_password_reset(email: str, ip: str):  # ADDED FORGOT PASS
@@ -507,13 +535,23 @@ def forgot_password(request):  # ADDED FORGOT PASS
             )
             return redirect("authentication:email_sent")
 
-        return render(request, "forgot_password.html", {"form": form})
+        response = render(request, "forgot_password.html", {"form": form})
+        # Prevent caching
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        return response
     
     # ─────────────────────────────────────────────
     # Default GET – show empty forgot-password form
     # ─────────────────────────────────────────────
     form = ForgotPasswordForm()
-    return render(request, "forgot_password.html", {"form": form})
+    response = render(request, "forgot_password.html", {"form": form})
+    # Prevent caching of forgot password page
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+    return response
 
 
 
@@ -528,6 +566,19 @@ def new_password(request):
     
     token = request.GET.get("token") or request.POST.get("token")
     is_forgot_mode = bool(token)
+    
+    # Only redirect authenticated users if they're not in forgot password mode
+    # (they might be resetting password via email link)
+    if not is_forgot_mode:
+        auth = request.session.get("auth")
+        if auth and not request.session.get("force_password_change"):
+            role_lower = (auth.get("role_lower") or auth.get("role_name") or "").strip().lower()
+            if role_lower:
+                try:
+                    dest = _role_home(role_lower)
+                    return redirect(dest)
+                except Exception:
+                    pass
 
     # ─────────────────────────────────────────────
     # FORGOT PASSWORD MODE (via email token)
