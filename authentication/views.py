@@ -207,8 +207,8 @@ def login(request):
             messages.error(request, "Invalid username or password.", extra_tags="auth")
             return render(request, "authentication_index.html", {"form": form})
 
-        # 4) Success — unpack row
-        staff_id, person_id, user_type, role_name_db, first_name, middle_name, last_name, account_status_name = row
+        # 4) Success — unpack row (now includes login_log_id)
+        staff_id, person_id, user_type, role_name_db, first_name, middle_name, last_name, account_status_name, login_log_id = row
         role_lower = (role_name_db or "").strip().lower()
         acc_status_upper = (account_status_name or "").strip().upper()
 
@@ -263,6 +263,7 @@ def login(request):
             "username": username,
             "display_name": "",
             "login_at": timezone.now().isoformat(),
+            "login_log_id": login_log_id,     # <<< store login log ID for logout tracking
         }
         request.session.set_expiry(60 * 60 * 8)
 
@@ -286,18 +287,41 @@ def login(request):
     return response
 
 
+
+
 def logout(request):
-    # Clear session
+    from .db import call_staff_logout
+    
+    # Get session data before clearing
     auth = request.session.get("auth")
     username = auth.get("username") if auth else None
     ip = request.META.get("REMOTE_ADDR", "")
+    staff_id = auth.get("staff_id") if auth else None
+    login_log_id = auth.get("login_log_id") if auth else None
+    ip = _get_client_ip(request)
+    
+    # Clear rate-limit counter
     if username:
         rl_key = f"login:rl:{ip}:{username.lower()}"
-        cache.delete(rl_key)  # clear rate-limit counter for this user/ip
+        cache.delete(rl_key)
+    
+    # Call database logout function if we have the necessary data
+    if login_log_id and staff_id:
+        try:
+            call_staff_logout(login_log_id, staff_id, ip)
+            logger.debug("LOGOUT OK | staff_id=%s login_log_id=%s", staff_id, login_log_id)
+        except DatabaseError as e:
+            # Log the error but don't prevent logout
+            logger.error("LOGOUT DB ERROR | staff_id=%s login_log_id=%s msg=%s", staff_id, login_log_id, str(e))
+        except Exception as e:
+            # Log any other errors but don't prevent logout
+            logger.error("LOGOUT ERROR | staff_id=%s login_log_id=%s msg=%s", staff_id, login_log_id, str(e))
 
+    # Clear session
     request.session.flush()
     messages.success(request, "You have been logged out.", extra_tags="auth")
     return redirect("authentication:login")
+
 
 
 @csrf_protect  # ADDED FORGOT PASS
@@ -1243,6 +1267,14 @@ def account_settings(request):
     is_account_active = account_status == 'active'
     is_secure_pass = profile.get('is_secure_pass', False)
     
+    # Get access logs for the current user
+    access_logs = []
+    try:
+        from staff_admin.models import Admin
+        access_logs = Admin.get_login_logs_with_status_for_staff(staff_id)
+    except Exception as e:
+        logger.error(f"Error loading access logs: {str(e)}", exc_info=True)
+    
     return render(request, "account_settings.html", {
         'user_fullname': user_fullname,
         'user_role': role_title,
@@ -1256,4 +1288,5 @@ def account_settings(request):
         'is_secure_pass': is_secure_pass,
         'change_password_form': ChangePasswordForm(),
         'verification_code_form': VerificationCodeForm(),
+        'access_logs': access_logs,
     })  

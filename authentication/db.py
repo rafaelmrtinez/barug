@@ -58,3 +58,14 @@ def call_staff_check_password_reset_token(token: str):
         cur.execute(sql, [token])
         result = cur.fetchone()
     return result[0] if result else False
+
+def call_staff_logout(login_log_id: int, staff_id: int, ip_address: str = None):
+    """
+    Calls the staff_logout2 function to properly log out a user session
+    Returns the updated login_log record
+    """
+    sql = "SELECT * FROM staff_logout2(%s, %s, %s);"
+    with connection.cursor() as cur:
+        cur.execute(sql, [login_log_id, staff_id, ip_address])
+        row = cur.fetchone()
+    return row

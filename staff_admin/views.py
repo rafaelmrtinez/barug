@@ -2162,10 +2162,162 @@ def process_staff_request(request: HttpRequest) -> HttpResponse:
     
     return redirect(request.META.get("HTTP_REFERER") or "staff_admin:staff_account_requests_list")
 
+ACCESS_LOG_FILTER_SESSION_KEY = "admin_access_log_filters"
+
 @session_login_required
 @role_required(ADMIN_ROLE)
 @nocache
 def access_logs(request):
+    from .forms import AccessLogFilters
+    
+    filters = request.session.get(ACCESS_LOG_FILTER_SESSION_KEY, {}) or {}
+    role_raw = (filters.get("role") or "").strip()
+    date_from_raw = (filters.get("date_from") or "").strip()
+    date_to_raw = (filters.get("date_to") or "").strip()
+    search_term = (filters.get("q") or "").strip()
+
+    updated = False
+    should_redirect = False
+
+    if "clear_filters" in request.GET:
+        role_raw = ""
+        date_from_raw = ""
+        date_to_raw = ""
+        search_term = ""
+        updated = True
+        should_redirect = True
+
+    remove_target = (request.GET.get("remove_filter") or "").strip()
+    if remove_target:
+        if remove_target == "role":
+            role_raw = ""
+        elif remove_target == "date_from":
+            date_from_raw = ""
+        elif remove_target == "date_to":
+            date_to_raw = ""
+        elif remove_target == "search":
+            search_term = ""
+        updated = True
+        should_redirect = True
+
+    if "role" in request.GET:
+        role_raw = (request.GET.get("role") or "").strip()
+        updated = True
+    if "date_from" in request.GET:
+        date_from_raw = (request.GET.get("date_from") or "").strip()
+        updated = True
+    if "date_to" in request.GET:
+        date_to_raw = (request.GET.get("date_to") or "").strip()
+        updated = True
+    if "q" in request.GET:
+        search_term = (request.GET.get("q") or "").strip()
+        updated = True
+
+    filters_state = {
+        "role": role_raw,
+        "date_from": date_from_raw,
+        "date_to": date_to_raw,
+        "q": search_term,
+    }
+    if updated or ACCESS_LOG_FILTER_SESSION_KEY not in request.session:
+        request.session[ACCESS_LOG_FILTER_SESSION_KEY] = filters_state
+        request.session.modified = True
+
+    if should_redirect:
+        return redirect(request.path)
+
+    # Get login logs from database (grouped by staff)
+    try:
+        rows = Admin.get_login_logs_grouped_by_staff()
+    except Exception as e:
+        logger.exception("Failed to load access logs: %s", e)
+        rows = []
+
+    # Apply filters
+    filtered = rows
+    
+    if role_raw and role_raw != "all":
+        try:
+            role_id = int(role_raw)
+            filtered = [r for r in filtered if r.get("role_id") == role_id]
+        except ValueError:
+            pass
+    
+    if date_from_raw:
+        from datetime import datetime
+        try:
+            date_from = datetime.strptime(date_from_raw, "%Y-%m-%d").date()
+            filtered = [r for r in filtered if r.get("last_login_time") and r["last_login_time"].date() >= date_from]
+        except ValueError:
+            pass
+
+    if date_to_raw:
+        from datetime import datetime
+        try:
+            date_to = datetime.strptime(date_to_raw, "%Y-%m-%d").date()
+            filtered = [r for r in filtered if r.get("last_login_time") and r["last_login_time"].date() <= date_to]
+        except ValueError:
+            pass
+
+    if search_term:
+        search_lower = search_term.lower()
+        filtered = [r for r in filtered if search_lower in (r.get("user_name") or "").lower() or search_lower in (r.get("role_name") or "").lower()]
+
+    try:
+        per_page = int(request.GET.get("per_page") or 10)
+        if per_page <= 0:
+            per_page = 10
+    except ValueError:
+        per_page = 10
+
+    form_initial = {
+        "role": role_raw,
+        "date_from": date_from_raw,
+        "date_to": date_to_raw,
+        "search": search_term,
+    }
+    form = AccessLogFilters(initial=form_initial)
+
+    paginator = Paginator(filtered, per_page)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    # Build active filters
+    active_filters = []
+    if role_raw and role_raw != "all":
+        # Find role name from ROLE_CHOICES
+        role_name = "Unknown Role"
+        try:
+            role_id = int(role_raw)
+            from .forms import ROLE_CHOICES
+            for choice_id, choice_name in ROLE_CHOICES:
+                if choice_id == role_id:
+                    role_name = choice_name
+                    break
+        except ValueError:
+            pass
+        active_filters.append({
+            "label": f"Role: {role_name}",
+            "remove_url": f"{request.path}?remove_filter=role",
+        })
+    if date_from_raw:
+        active_filters.append({
+            "label": f"From: {date_from_raw}",
+            "remove_url": f"{request.path}?remove_filter=date_from",
+        })
+    if date_to_raw:
+        active_filters.append({
+            "label": f"To: {date_to_raw}",
+            "remove_url": f"{request.path}?remove_filter=date_to",
+        })
+    if search_term:
+        active_filters.append({
+            "label": f"Search: \"{search_term}\"",
+            "remove_url": f"{request.path}?remove_filter=search",
+        })
+
+    clear_filters_url = f"{request.path}?clear_filters=1"
+    current_filters = filters_state
+
     user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "staff_admin/logs/access_logs.html", {
         'user_fullname': user_fullname,
@@ -2173,12 +2325,189 @@ def access_logs(request):
         'page_path': f'{user_role} / Access Logs',
         'page_title': 'Access Logs',
         'user_role_template': user_role_template,
+        'form': form,
+        'page_obj': page_obj,
+        'total_count': paginator.count,
+        'per_page': per_page,
+        'active_filters': active_filters,
+        'clear_filters_url': clear_filters_url,
+        'current_filters': current_filters,
     })
+
+OPERATIONAL_LOG_FILTER_SESSION_KEY = "admin_operational_log_filters"
 
 @session_login_required
 @role_required(ADMIN_ROLE)
 @nocache
 def operational_logs(request):
+    filters = request.session.get(OPERATIONAL_LOG_FILTER_SESSION_KEY, {}) or {}
+    action_raw = (filters.get("action") or "").strip()
+    subsystem_raw = (filters.get("subsystem") or "").strip()
+    date_from_raw = (filters.get("date_from") or "").strip()
+    date_to_raw = (filters.get("date_to") or "").strip()
+    search_term = (filters.get("q") or "").strip()
+
+    updated = False
+    should_redirect = False
+
+    if "clear_filters" in request.GET:
+        action_raw = ""
+        subsystem_raw = ""
+        date_from_raw = ""
+        date_to_raw = ""
+        search_term = ""
+        updated = True
+        should_redirect = True
+
+    remove_target = (request.GET.get("remove_filter") or "").strip()
+    if remove_target:
+        if remove_target == "action":
+            action_raw = ""
+        elif remove_target == "subsystem":
+            subsystem_raw = ""
+        elif remove_target == "date_from":
+            date_from_raw = ""
+        elif remove_target == "date_to":
+            date_to_raw = ""
+        elif remove_target == "search":
+            search_term = ""
+        updated = True
+        should_redirect = True
+
+    if "action" in request.GET:
+        action_raw = (request.GET.get("action") or "").strip()
+        updated = True
+    if "subsystem" in request.GET:
+        subsystem_raw = (request.GET.get("subsystem") or "").strip()
+        updated = True
+    if "date_from" in request.GET:
+        date_from_raw = (request.GET.get("date_from") or "").strip()
+        updated = True
+    if "date_to" in request.GET:
+        date_to_raw = (request.GET.get("date_to") or "").strip()
+        updated = True
+    if "q" in request.GET:
+        search_term = (request.GET.get("q") or "").strip()
+        updated = True
+
+    filters_state = {
+        "action": action_raw,
+        "subsystem": subsystem_raw,
+        "date_from": date_from_raw,
+        "date_to": date_to_raw,
+        "q": search_term,
+    }
+    if updated or OPERATIONAL_LOG_FILTER_SESSION_KEY not in request.session:
+        request.session[OPERATIONAL_LOG_FILTER_SESSION_KEY] = filters_state
+        request.session.modified = True
+
+    if should_redirect:
+        return redirect(request.path)
+
+    # Get operational logs from database
+    try:
+        rows = Admin.get_common_logs_with_names()
+    except Exception as e:
+        logger.exception("Failed to load operational logs: %s", e)
+        rows = []
+
+    # Apply filters
+    filtered = rows
+    
+    if action_raw and action_raw != "all":
+        filtered = [r for r in filtered if r.get("action") == action_raw]
+    
+    if subsystem_raw and subsystem_raw != "all":
+        try:
+            subsystem_id = int(subsystem_raw)
+            filtered = [r for r in filtered if r.get("subsystem_id") == subsystem_id]
+        except ValueError:
+            pass
+    
+    if date_from_raw:
+        from datetime import datetime
+        try:
+            date_from = datetime.strptime(date_from_raw, "%Y-%m-%d").date()
+            filtered = [r for r in filtered if r.get("date_time") and r["date_time"].date() >= date_from]
+        except ValueError:
+            pass
+
+    if date_to_raw:
+        from datetime import datetime
+        try:
+            date_to = datetime.strptime(date_to_raw, "%Y-%m-%d").date()
+            filtered = [r for r in filtered if r.get("date_time") and r["date_time"].date() <= date_to]
+        except ValueError:
+            pass
+
+    if search_term:
+        search_lower = search_term.lower()
+        filtered = [r for r in filtered if 
+                   search_lower in (r.get("performer_name") or "").lower() or 
+                   search_lower in (r.get("action") or "").lower() or 
+                   search_lower in (r.get("details") or "").lower()]
+
+    try:
+        per_page = int(request.GET.get("per_page") or 10)
+        if per_page <= 0:
+            per_page = 10
+    except ValueError:
+        per_page = 10
+
+    paginator = Paginator(filtered, per_page)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    # Build active filters
+    active_filters = []
+    if action_raw and action_raw != "all":
+        active_filters.append({
+            "label": f"Action: {action_raw}",
+            "remove_url": f"{request.path}?remove_filter=action",
+        })
+    if subsystem_raw and subsystem_raw != "all":
+        # Find subsystem name
+        subsystem_name = "Unknown Subsystem"
+        try:
+            subsystem_id = int(subsystem_raw)
+            for r in rows:
+                if r.get("subsystem_id") == subsystem_id:
+                    subsystem_name = r.get("subsystem_name") or f"Subsystem {subsystem_id}"
+                    break
+        except ValueError:
+            pass
+        active_filters.append({
+            "label": f"Subsystem: {subsystem_name}",
+            "remove_url": f"{request.path}?remove_filter=subsystem",
+        })
+    if date_from_raw:
+        active_filters.append({
+            "label": f"From: {date_from_raw}",
+            "remove_url": f"{request.path}?remove_filter=date_from",
+        })
+    if date_to_raw:
+        active_filters.append({
+            "label": f"To: {date_to_raw}",
+            "remove_url": f"{request.path}?remove_filter=date_to",
+        })
+    if search_term:
+        active_filters.append({
+            "label": f"Search: \"{search_term}\"",
+            "remove_url": f"{request.path}?remove_filter=search",
+        })
+
+    clear_filters_url = f"{request.path}?clear_filters=1"
+    current_filters = filters_state
+
+    # Get unique subsystems for filter dropdown
+    subsystems = []
+    seen_subsystems = set()
+    for r in rows:
+        subsystem_id = r.get("subsystem_id")
+        subsystem_name = r.get("subsystem_name")
+        if subsystem_id and subsystem_name and subsystem_id not in seen_subsystems:
+            subsystems.append({"id": subsystem_id, "name": subsystem_name})
+            seen_subsystems.add(subsystem_id)
+
     user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "staff_admin/logs/operational_logs.html", {
         'user_fullname': user_fullname,
@@ -2186,12 +2515,41 @@ def operational_logs(request):
         'page_path': f'{user_role} / Operational Logs',
         'page_title': 'Operational Logs',
         'user_role_template': user_role_template,
+        'page_obj': page_obj,
+        'total_count': paginator.count,
+        'per_page': per_page,
+        'active_filters': active_filters,
+        'clear_filters_url': clear_filters_url,
+        'current_filters': current_filters,
+        'subsystems': subsystems,
     })
 
 @session_login_required
 @role_required(ADMIN_ROLE)
 @nocache
 def access_log_details(request, log_id):
+    try:
+        # Use the new function to get all logs for the specific staff
+        rows = Admin.get_login_logs_with_status_for_staff(int(log_id))
+    except Exception as e:
+        logger.exception("Failed to load access log details: %s", e)
+        rows = []
+
+    if not rows:
+        flash_warning(request, f"No access logs found for staff ID {log_id}.")
+        return redirect("staff_admin:access_logs")
+
+    # Add pagination
+    try:
+        per_page = int(request.GET.get("per_page") or 15)
+        if per_page <= 0:
+            per_page = 15
+    except ValueError:
+        per_page = 15
+
+    paginator = Paginator(rows, per_page)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
     user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "staff_admin/logs/access_log_details.html", {
         'user_fullname': user_fullname,
@@ -2199,7 +2557,10 @@ def access_log_details(request, log_id):
         'page_path': f'{user_role} / Access Log Details',
         'page_title': 'Access Log Details',
         'user_role_template': user_role_template,
-        'log_id': log_id,
+        'logs': rows,
+        'page_obj': page_obj,
+        'total_count': paginator.count,
+        'per_page': per_page,
     })
 
 @session_login_required
