@@ -64,9 +64,9 @@
       </div>
 
       <div class="d-flex align-items-center">
-        <form action="{% url 'authentication:logout' %}" method="post" class="m-0 p-0">
+        <form action="{% url 'authentication:logout' %}" method="post" class="m-0 p-0" id="logoutForm">
           {% csrf_token %}
-          <button type="submit" id="logout" name="logout" class="btn btn-logout" title="Logout">
+          <button type="button" id="logout" name="logout" class="btn btn-logout" title="Logout" onclick="showLogoutConfirmation()">
             {% bs_icon 'arrow-bar-right' color='white' size='1.3em' %}
           </button>
         </form>
@@ -184,6 +184,41 @@
     loadInitial();
   </script>
   {# ───────────── End Supabase + Notification Script ───────────── #}
+
+  {# ───────────── Logout Confirmation Modal ───────────── #}
+  <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title text-dark" id="logoutModalLabel">Confirm Logout</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-dark">Do you really want to logout?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="cancelBtn">Cancel</button>
+          <button type="button" class="btn btn-danger" onclick="confirmLogout()" id="logoutBtn">Logout</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showLogoutConfirmation() {
+      const logoutModal = new bootstrap.Modal(document.getElementById('logoutModal'));
+      logoutModal.show();
+    }
+
+    function confirmLogout() {
+      const logoutBtn = document.getElementById('logoutBtn');
+      const cancelBtn = document.getElementById('cancelBtn');
+      logoutBtn.disabled = true;
+      cancelBtn.disabled = true;
+      document.getElementById('logoutForm').submit();
+    }
+  </script>
+  {# ───────────── End Logout Confirmation Modal ───────────── #}
 
 </header>
 {# ====== END: Header with Notifications ====== #}
