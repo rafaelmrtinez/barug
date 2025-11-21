@@ -39,6 +39,7 @@ app.wire(modules=[
     "doc_ingest.api.faq_ingest_api",
     "common.api.residents_pdf_api",
     "common.api.business_pdf_api",
+    "common.api.household_pdf_api",
     "captain.views",
     "clerk.views",
     "treasurer.views",

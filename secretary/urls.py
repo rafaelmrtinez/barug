@@ -3,6 +3,7 @@ from django.urls import path
 from . import views
 from common.api.residents_pdf_api import ResidentsPDFAPI
 from common.api.business_pdf_api import BusinessPDFAPI
+from common.api.household_pdf_api import HouseholdPDFAPI
 
 app_name = "secretary"
 
@@ -58,4 +59,5 @@ urlpatterns = [
     # PDF APIs
     path("api/residents/pdf/", ResidentsPDFAPI.as_view(), name="residents_pdf_api"),
     path("api/business/pdf/", BusinessPDFAPI.as_view(), name="business_pdf_api"),
+    path("api/household/pdf/", HouseholdPDFAPI.as_view(), name="household_pdf_api"),
 ]
