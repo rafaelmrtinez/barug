@@ -53,11 +53,11 @@ class HouseholdReportService:
                 
                 for household in household_data:
                     household_table.append([
-                        _fmt(getattr(household, 'household_no', '')),
-                        _fmt(getattr(household, 'head_name', '')),
-                        _fmt(getattr(household, 'address', '')),
-                        _fmt(getattr(household, 'house_type', '')),
-                        _fmt(getattr(household, 'house_ownership', ''))
+                        _fmt(getattr(household, 'household_num', '')),
+                        _fmt(getattr(household, 'household_head', '')),
+                        _fmt(getattr(household, 'household_address', '')),
+                        _fmt(getattr(household, 'house_type_name', '')),
+                        _fmt(getattr(household, 'household_ownership_name', ''))
                     ])
                 
                 # Wrap table cells in Paragraphs
