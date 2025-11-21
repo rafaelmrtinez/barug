@@ -79,6 +79,10 @@ from .services.residents import (
     build_address_line,
 )
 
+# Use ReportLab-based PDF generation (following maternal pattern)
+from src.app.services.resident_report_service import ResidentReportService
+from src.infra.utilities.pdf_generator_h import PdfGeneratorH
+
 # ─────────────────────────────
 # Constants (mirror clerk style)
 # ─────────────────────────────
@@ -2421,10 +2425,6 @@ class ResidentsPDFAPI(View):
                 search=search,
                 purok=purok_sitio,
             )
-            
-            # Use ReportLab-based PDF generation (following maternal pattern)
-            from src.app.services.resident_report_service import ResidentReportService
-            from src.infra.utilities.pdf_generator_h import PdfGeneratorH
             
             # Get user info for signature
             auth = request.session.get('auth', {}) if hasattr(request, 'session') else {}
