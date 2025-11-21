@@ -114,6 +114,7 @@
           <thead>
             <tr>
               <th scope="col">Request Code</th>
+              <th scope="col">Date Requested</th>
               <th scope="col">Requester</th>
               <th scope="col">Requested For</th>
               <th scope="col">Documents</th>
@@ -128,6 +129,7 @@
                 {% for r in items %}
                   <tr class="table-row-height">
                     <td><span class="code-badge">{{ r.request_code }}</span></td>
+                    <td><span class="small text-muted">{{ r.created_fmt|default:"—" }}</span></td>
                     <td>{{ r.requester_display|default:r.requested_by|default:"—" }}</td>
                     <td>{{ r.on_behalf_of|default:"Self" }}</td>
                     <td>
@@ -153,7 +155,7 @@
                   </tr>
                 {% endfor %}
               {% else %}
-                <tr><td colspan="7" class="text-center">No matching requests.</td></tr>
+                <tr><td colspan="8" class="text-center">No matching requests.</td></tr>
               {% endif %}
             {% endwith %}
           </tbody>

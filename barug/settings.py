@@ -166,6 +166,7 @@ TEMPLATES = [
                 'django.template.context_processors.media',
                 "lupon_mem.context_processors.lupon_badge_counts",
                 "clerk.context_processors.app_badge_counts",
+                "treasurer.context_processors.queue_counts",
             ],
         },
     },

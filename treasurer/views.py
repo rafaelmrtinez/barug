@@ -120,12 +120,16 @@ def queue(request: HttpRequest):
     statuses = request.GET.getlist("status") or ["FOR_TREASURER_REVIEW", "PAID", "FOR_PRINTING"]
 
     rows = list_requests(q, statuses, limit=50)
+    EXCLUDE_DOCS = {"BARANGAY BUSINESS CLEARANCE", "CERTIFIED TRUE COPY"}
+    rows = [r for r in rows if not any(dt in EXCLUDE_DOCS for dt in (r.get("doc_types") or []))]
     for r in rows:
         r["status_ui"] = STATUS_UI.get(r.get("status")) or {
             "label": r.get("status") or "—",
             "cls": "badge text-bg-secondary"
         }
         r["purposes_display"] = [titleize(p) for p in (r.get("purposes") or [])]
+        r["created_fmt"] = _fmt_occured_at(r.get("created_at"))
+        r["created_fmt"] = _fmt_occured_at(r.get("created_at"))
 
     status_options = [
         {"code": code, "label": meta["label"], "cls": meta["cls"], "checked": code in statuses}
@@ -134,8 +138,8 @@ def queue(request: HttpRequest):
 
     user_role = _auth_role_name(request)
     return render(request, "treasurer/queue.html", {
-        'page_path': f'{user_role} / Queue',
-        'page_title': 'Queue',
+        'page_path': f'{user_role} / Resident Queue',
+        'page_title': 'Resident Queue',
         "rows": rows,
         "q": q or "",
         "statuses": statuses,
@@ -969,6 +973,7 @@ def business_queue(request: HttpRequest):
             }
             r["purposes_display"] = [titleize(p) for p in (r.get("purposes") or [])]
             r["doc_types"] = [d for d in docs if d in TARGET_DOCS]
+            r["created_fmt"] = _fmt_occured_at(r.get("created_at"))
             rows.append(r)
 
     user_role = _auth_role_name(request)
@@ -1037,16 +1042,6 @@ def business_detail(request: HttpRequest, business_id: int, doc_request_id: int)
         None
     )
 
-    clr_res = supabase.rpc("list_business_clearances", {"p_business_id": business_id}).execute()
-    clearances = (clr_res.data or []) if clr_res else []
-    year = datetime.utcnow().year
-    yr_res = supabase.rpc("check_business_clearance_for_year",
-                          {"p_business_id": business_id, "p_year": year}).execute()
-    year_status = (yr_res.data[0] if (yr_res and yr_res.data) else None)
-    if year_status and "last_changed_at" not in year_status:
-        year_status["last_changed_at"] = year_status.get("last_created_at")
-    last_cleared_year = clearances[0]["year"] if clearances else None
-
     user_role = _auth_role_name(request)
     return render(request, "treasurer/business_details.html", {
         'page_path': f'{user_role} / Business Details',
@@ -1057,9 +1052,9 @@ def business_detail(request: HttpRequest, business_id: int, doc_request_id: int)
         "payments": payments,
         "methods": methods,
         "waived_method_id": waived_method_id,
-        "clearances": clearances,
-        "year_status": year_status,
-        "last_cleared_year": last_cleared_year,
+        # "clearances": clearances,
+        # "year_status": year_status,
+        # "last_cleared_year": last_cleared_year,
         "document_type_name": document_type_name,
         "status_ui": STATUS_UI.get(header.get("status") or "") or {
             "label": header.get("status") or "—",
@@ -2604,3 +2599,80 @@ def fees_by_type(request, doc_type_id: int):
         "active_count": 0,
     }
     return render(request, "treasurer/fees.html", ctx)
+
+
+# ========= PEOPLE REQUEST HISTORY =========
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_GET
+def people_requests(request: HttpRequest):
+    q = (request.GET.get("q") or "").strip() or None
+    try:
+        res = supabase.rpc("get_person_request_counts").execute()
+        rows = res.data or []
+    except Exception:
+        rows = []
+    if q:
+        q_up = q.upper()
+        rows = [r for r in rows if q_up in (r.get("person_name") or "").upper() or q in str(r.get("person_id") or "")]
+    paginator = Paginator(rows, 25)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
+    user_role = _auth_role_name(request)
+    return render(request, "treasurer/people_requests.html", {
+        'page_path': f'{user_role} / People Requests',
+        'page_title': 'People Requests',
+        "q": q or "",
+        "page_obj": page_obj,
+        "paginator": paginator,
+    })
+
+
+@session_login_required
+@role_required(TREASURER_ROLE)
+@require_GET
+def person_request_history(request: HttpRequest, person_id: int):
+    q = (request.GET.get("q") or "").strip() or None
+    statuses = request.GET.getlist("status") or []
+    doc_types_filter = request.GET.getlist("doc_type") or []
+    try:
+        res = supabase.rpc("get_document_request_history", {"p_person_id": person_id}).execute()
+        requests = res.data or []
+    except Exception:
+        messages.error(request, "Failed to load request history.")
+        return redirect("treasurer:people_requests")
+    all_doc_types = sorted(set(dt for r in requests for dt in (r.get("doc_types") or [])))
+    if statuses:
+        requests = [r for r in requests if r.get("status") in statuses]
+    if doc_types_filter:
+        requests = [r for r in requests if any(dt in doc_types_filter for dt in (r.get("doc_types") or []))]
+    if q:
+        q_up = q.upper()
+        requests = [r for r in requests if 
+            q_up in (r.get("request_code") or "").upper() or
+            q_up in (r.get("latest_or_number") or "").upper() or
+            any(q_up in (dt or "").upper() for dt in (r.get("doc_types") or [])) or
+            any(q_up in (p or "").upper() for p in (r.get("purposes") or []))]
+    person = {"person_id": person_id, "full_name": requests[0].get("requested_by_name") if requests else "Unknown"}
+    for r in requests:
+        r["status_ui"] = STATUS_UI.get(r.get("status")) or {"label": r.get("status") or "—", "cls": "badge text-bg-secondary"}
+        r["created_fmt"] = _fmt_occured_at(r.get("created_at"))
+        r["amount_due_f"] = float(r.get("amount_due") or 0)
+        r["total_paid_f"] = float(r.get("total_paid") or 0)
+        r["balance_f"] = float(r.get("balance") or 0)
+        r["doc_types_display"] = ", ".join(r.get("doc_types") or [])
+        r["purposes_display"] = ", ".join(r.get("purposes") or [])
+    paginator = Paginator(requests, 10)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
+    user_role = _auth_role_name(request)
+    return render(request, "treasurer/person_request_history.html", {
+        'page_path': f'{user_role} / Person History',
+        'page_title': 'Person History',
+        "person": person,
+        "requests": page_obj.object_list,
+        "statuses": statuses,
+        "doc_types": all_doc_types,
+        "doc_types_filter": doc_types_filter,
+        "q": q or "",
+        "page_obj": page_obj,
+        "paginator": paginator,
+    })

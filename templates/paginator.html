@@ -1,23 +1,38 @@
 {# templates/paginator.html #}
-<nav aria-label="Pagination" class="pager" role="navigation">
-  <span class="pager-results">
-    Showing {{ page_obj.end_index }}
-    of {{ page_obj.paginator.count }} result(s)
-  </span>
-
-  <div>
-  {% if page_obj.has_previous %}
-    <a class="pager-btn" href="?page={{ page_obj.previous_page_number }}">&lt;</a>
-  {% else %}
-    <span class="pager-btn is-disabled" aria-disabled="true">&lt;</span>
-  {% endif %}
-
-  <span class="pager-label">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-
-  {% if page_obj.has_next %}
-    <a class="pager-btn" href="?page={{ page_obj.next_page_number }}">></a>
-  {% else %}
-    <span class="pager-btn is-disabled" aria-disabled="true">></span>
-  {% endif %}
-  </div>
+<style>
+.pagination-wrapper{display:flex;justify-content:space-between;align-items:center;margin-top:1.5rem;padding:1rem;background:#fff;border-radius:8px;border:1px solid #dee2e6;}
+.pagination-info{color:#6c757d;font-size:.875rem;}
+.pagination{display:flex;gap:.25rem;margin:0;padding:0;list-style:none;}
+.page-link{display:flex;align-items:center;justify-content:center;min-width:2.25rem;height:2.25rem;padding:.375rem .75rem;color:#6d2932;background:#fff;border:1px solid #dee2e6;border-radius:6px;text-decoration:none;font-size:.875rem;transition:all .15s;}
+.page-link:hover:not(.disabled){background:#f3eaeb;border-color:#6d2932;color:#6d2932;}
+.page-link.active{background:#6d2932;border-color:#6d2932;color:#fff;font-weight:600;}
+.page-link.disabled{color:#adb5bd;cursor:not-allowed;background:#f8f9fa;}
+.page-link.ellipsis{border:none;background:none;cursor:default;}
+.page-link.ellipsis:hover{background:none;}
+</style>
+<nav class="pagination-wrapper" aria-label="Pagination">
+  <div class="pagination-info">Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }}</div>
+  <ul class="pagination">
+    {% if page_obj.has_previous %}
+      <li><a class="page-link" href="?page={{ page_obj.previous_page_number }}">‹</a></li>
+    {% else %}
+      <li><span class="page-link disabled">‹</span></li>
+    {% endif %}
+    {% for num in page_obj.paginator.page_range %}
+      {% if num == page_obj.number %}
+        <li><span class="page-link active">{{ num }}</span></li>
+      {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+        <li><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+      {% elif num == 1 or num == page_obj.paginator.num_pages %}
+        <li><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+      {% elif num == page_obj.number|add:'-3' or num == page_obj.number|add:'3' %}
+        <li><span class="page-link ellipsis">…</span></li>
+      {% endif %}
+    {% endfor %}
+    {% if page_obj.has_next %}
+      <li><a class="page-link" href="?page={{ page_obj.next_page_number }}">›</a></li>
+    {% else %}
+      <li><span class="page-link disabled">›</span></li>
+    {% endif %}
+  </ul>
 </nav>
