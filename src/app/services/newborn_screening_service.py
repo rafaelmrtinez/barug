@@ -18,20 +18,6 @@ class NewbornScreeningService(INewbornScreeningService):
         self.ch_repo = ch_repo
         self.domain_service = domain_service
 
-    def _parse_date(self, value: Optional[str]) -> Optional[date]:
-        if value is None or value == "":
-            return None
-        if isinstance(value, date):
-            return value
-        # Accept ISO date or common YYYY-MM-DD formats
-        try:
-            return datetime.fromisoformat(value).date()
-        except Exception:
-            try:
-                return datetime.strptime(value, "%Y-%m-%d").date()
-            except Exception:
-                raise ValueError("Invalid date format for referred_newborn_screening")
-
     def insert_newborn_screening(
         self,
         child_record_id: int,
