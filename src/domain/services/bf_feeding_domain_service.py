@@ -26,6 +26,9 @@ class BFFeedingDomainService:
             return val
         if isinstance(val, str):
             parsed = DateAndTimeUtility.parse_date(val)
+            if parsed is None:
+                # invalid date format provided
+                raise BfFeedingDomainException(f"Invalid date format: {val}")
             return parsed
         # try datetime-like
         if hasattr(val, 'date') and callable(getattr(val, 'date')):
@@ -70,8 +73,20 @@ class BFFeedingDomainService:
         except Exception:
             today = date.today()
 
-        if last_non_null and last_non_null > today:
-            raise BfFeedingDomainException('One or more dates are in the future. Please use today or past dates only.')
+        # collect all non-null candidate dates to validate them all
+        all_input_dates: List[date] = [d for d in incoming if d is not None]
+        if explicit_last is not None and not any(incoming):
+            all_input_dates = [explicit_last]
+
+        # rule 1: no future dates for any provided date
+        for d in all_input_dates:
+            if d > today:
+                raise BfFeedingDomainException('One or more dates are in the future. Please use today or past dates only.')
+
+        # rule 2: no duplicate date entries in the provided payload
+        iso_vals = [d.isoformat() for d in all_input_dates]
+        if len(iso_vals) != len(set(iso_vals)):
+            raise BfFeedingDomainException('Duplicate dates are not allowed.')
 
         # Fetch existing dates and validate additions/immutability rules
         existing_rows = self.ch_repo.fetch_child_details_bf_display_by_chr_id(chr_id) or []
@@ -90,9 +105,14 @@ class BFFeedingDomainService:
             if len(new_non_null) < len(existing_dates):
                 raise BfFeedingDomainException('Cannot remove previously recorded check dates. To modify existing entries, edit the original record.')
 
+            # prefix = new_non_null[: len(existing_dates)]
+            # if prefix != existing_dates:
+            #     raise BfFeedingDomainException('Existing check dates may not be modified. To change them, edit the original record.')
             prefix = new_non_null[: len(existing_dates)]
-            if prefix != existing_dates:
-                raise BfFeedingDomainException('Existing check dates may not be modified. To change them, edit the original record.')
+            if len(new_non_null) < len(existing_dates) or prefix != existing_dates:
+                raise BfFeedingDomainException(
+                    'Existing check dates may not be modified. To change them, edit the original record.'
+                )
 
             if len(new_non_null) == len(existing_dates):
                 raise BfFeedingDomainException('No changes detected — the submitted dates match existing records.')
@@ -101,17 +121,28 @@ class BFFeedingDomainService:
                 new_entries = new_non_null[len(existing_dates):]
                 last_existing = existing_dates[-1]
                 prev = last_existing
+                # rule 4: newly entered dates must be strictly after the previous dates
+                # and strictly increasing among themselves
+                # also disallow duplicates against existing dates
+                seen_existing = {d.isoformat() for d in existing_dates}
                 for d in new_entries:
+                    if d.isoformat() in seen_existing:
+                        raise BfFeedingDomainException('Duplicate dates are not allowed.')
                     if d <= prev:
                         raise BfFeedingDomainException('Newly added check dates must be after the previously recorded date.')
                     prev = d
                 check_date = new_entries[-1]
         else:
             new_non_null = [d for d in incoming if d is not None]
+            # rule 4 (first entry set): ensure strictly increasing sequence
             for i in range(1, len(new_non_null)):
                 if new_non_null[i] <= new_non_null[i-1]:
                     raise BfFeedingDomainException('Breastfeeding check dates must be in chronological order and each date must be later than the previous one.')
             check_date = new_non_null[-1] if new_non_null else (explicit_last or None)
+
+        # rule 5: only up to 5 entries allowed (enforced by input slots length)
+        if len([d for d in incoming if d is not None]) > 5:
+            raise BfFeedingDomainException('Only up to 5 breastfeeding check dates are allowed.')
 
         if not check_date:
             raise BfFeedingDomainException('No valid check date to save.')
