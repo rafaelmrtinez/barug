@@ -77,7 +77,3 @@ class ChildBreastFeedingForm(forms.Form):
                 pass
         else:
             self._existing_dates = []
-    
-    def clean(self):
-        # Validation moved to BFFeedingService — keep form as a simple data container
-        return super().clean()
