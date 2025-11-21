@@ -16,10 +16,10 @@ from src.app.services.business_report_service import BusinessReportService
 from src.infra.utilities.pdf_generator_h import PdfGeneratorH
 
 logger = logging.getLogger(__name__)
-SECRETARY_ROLE = "Barangay Secretary", "BARANGAY SECRETARY", "barangay secretary"
+authorized_role = "Barangay Secretary", "BARANGAY SECRETARY", "barangay secretary", "Barangay Captain", "BARANGAY CAPTAIN", "barangay captain", "Barangay Clerk", "BARANGAY CLERK", "barangay clerk"
 
 @method_decorator(session_login_required, name="dispatch")
-@method_decorator(role_required(*SECRETARY_ROLE), name="dispatch")
+@method_decorator(role_required(*authorized_role), name="dispatch")
 @method_decorator(csrf_required, name="dispatch")
 class BusinessPDFAPI(View):
     """Generate PDF report for business list with current filters.
