@@ -2718,7 +2718,9 @@ def incident_heatmap(request: HttpRequest):
         "end_date": end_date,
         'page_path': f'{user_role} / Incident Heatmap',
         'page_title': 'Barangay Incident Heatmap & Analytics',
-    })# -------------------------------
+    })
+    
+# -------------------------------
 # RESIDENTS PDF GENERATION
 # -------------------------------
 

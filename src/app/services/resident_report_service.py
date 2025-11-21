@@ -26,6 +26,33 @@ def _fmt(value) -> str:
         return s if s != "" else "N/A"
     return str(value)
 
+def _fmt_mobile(mobile_number) -> str:
+    """Format mobile number to start with +639."""
+    if not mobile_number:
+        return "N/A"
+    
+    # Convert to string and remove any spaces or dashes
+    mobile = str(mobile_number).strip().replace(" ", "").replace("-", "")
+    
+    # If already starts with +639, return as is
+    if mobile.startswith("+639"):
+        return mobile
+    
+    # If starts with 639, add +
+    if mobile.startswith("639"):
+        return "+" + mobile
+    
+    # If starts with 09, replace with +639
+    if mobile.startswith("09"):
+        return "+639" + mobile[2:]
+    
+    # If starts with 9 and is 10 digits, add +63
+    if mobile.startswith("9") and len(mobile) == 10:
+        return "+63" + mobile
+    
+    # Return N/A if format is unrecognized or empty
+    return "N/A" if not mobile or mobile == "" else mobile
+
 class ResidentReportService:
     """Service to generate resident list reports."""
 
@@ -56,7 +83,7 @@ class ResidentReportService:
                         _fmt(getattr(resident, 'person_code', '')),
                         _fmt(getattr(resident, 'full_name', '')),
                         _fmt(getattr(resident, 'address', '')),
-                        _fmt(getattr(resident, 'mob_num', '')),
+                        _fmt_mobile(getattr(resident, 'mob_num', '')),
                         _fmt(getattr(resident, 'email', ''))
                     ])
                 

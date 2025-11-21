@@ -62,7 +62,6 @@
         try {
             const directTab = globalThis.open ? globalThis.open(url, '_blank') : null;
             if (directTab) {
-                showMessage('Opening residents report in a new tab...', 'info');
                 return; // done; server will handle rendering/download
             }
         } catch (errOpen) {
