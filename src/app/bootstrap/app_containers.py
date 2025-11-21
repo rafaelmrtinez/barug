@@ -42,6 +42,9 @@ from src.domain.services.bf_feeding_domain_service import BFFeedingDomainService
 from src.app.contracts.newborn_screening_service import INewbornScreeningService
 from src.app.services.newborn_screening_service import NewbornScreeningService
 from src.domain.services.newborn_screening_domain_service import NewbornScreeningDomainService
+from src.domain.services.birth_supplementation_domain_service import BirthSupplementationDomainService
+from src.app.contracts.birth_supplementation_service import IBirthSupplementationService
+from src.app.services.birth_supplementation_service import BirthSupplementationService
 
 
 from src.app.contracts.business_service_contract import (
@@ -348,6 +351,17 @@ class AppContainer(containers.DeclarativeContainer):
     child_visit_service = providers.Factory(
         ChildVisitService,
         ch_repo=infra.child_health_record_repository,
+    )
+
+    birth_supplementation_domain_service = providers.Factory(
+        BirthSupplementationDomainService,
+        ch_repo=infra.child_health_record_repository,
+    )
+
+    birth_supplementation_service: providers.Factory[IBirthSupplementationService] = providers.Factory(
+        BirthSupplementationService,
+        ch_repo=infra.child_health_record_repository,
+        domain_service=birth_supplementation_domain_service,
     )
 
     bf_feeding_domain_service = providers.Factory(

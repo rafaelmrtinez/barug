@@ -39,6 +39,7 @@ app.wire(modules=[
     "doc_ingest.api.faq_ingest_api",
     # child health endpoints
     "child_health.api.newborn_screening_api",
+    "child_health.api.birth_supplementation_api",
     "child_health.api.bf_feeding_api",
     "captain.views",
     "clerk.views",
