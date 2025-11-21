@@ -224,11 +224,26 @@
         </form>
       </div>
 
-      <div class="mt-3 d-flex align-items-center gap-2">
+      <!-- <div class="mt-3 d-flex align-items-center gap-2">
         <a id="settleBtn" class="btn btn-outline-brand btn-sm" href="{% url 'lupon_mem:open_kp16_from_hearing' case_id %}?sid={{ picked_submission_id }}">
           <i class="bi bi-journal-check me-1"></i> Record Settlement (KP-16)
         </a>
         <div id="settleGuardNote" class="form-text text-muted d-none">Add at least one mediation attendance to enable settlement.</div>
+      </div> -->
+    </div>
+  </div>
+
+  <!-- Image preview modal -->
+  <div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true" style="margin-top: 80px;">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Image Preview</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body text-center">
+          <img id="previewImage" src="" class="img-fluid" style="max-height:70vh;">
+        </div>
       </div>
     </div>
   </div>
@@ -236,7 +251,7 @@
   <!-- Upload modal -->
   <div class="modal fade" id="uploadDocsModal" tabindex="-1" aria-hidden="true" style="margin-top:150px;">
     <div class="modal-dialog">
-      <form class="modal-content" method="post"
+      <form class="modal-content" id="uploadForm" method="post"
             action="{% url 'lupon_mem:hearing_media_upload' case_id %}"
             enctype="multipart/form-data">
         <div class="modal-header">
@@ -246,11 +261,15 @@
         <div class="modal-body">
           {% csrf_token %}
           <input type="hidden" name="submission_id" value="{{ picked_submission_id }}">
-          <input type="file" name="photos[]" accept="image/*" multiple class="form-control" required>
+          <input type="file" id="photoInput" name="photos[]" accept="image/*" multiple class="form-control">
           <div class="form-text mt-2">You can select multiple images.</div>
+          <div id="photoPreview" class="mt-3" style="display:none;">
+            <h6 class="mb-2">Preview:</h6>
+            <div id="previewGrid" class="d-flex flex-wrap gap-2"></div>
+          </div>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-brand">Upload</button>
+          <button type="submit" id="uploadBtn" class="btn btn-brand" disabled>Upload</button>
         </div>
       </form>
     </div>
@@ -394,6 +413,80 @@
       }
       return true;
     }, false);
+  }
+
+  // Photo preview functionality
+  const photoInput = document.getElementById('photoInput');
+  const photoPreview = document.getElementById('photoPreview');
+  const previewGrid = document.getElementById('previewGrid');
+  const uploadBtn = document.getElementById('uploadBtn');
+  let selectedFiles = [];
+
+  if (photoInput) {
+    photoInput.addEventListener('change', function(e) {
+      selectedFiles = Array.from(e.target.files);
+      updatePreview();
+    });
+  }
+
+  function updatePreview() {
+    if (selectedFiles.length === 0) {
+      photoPreview.style.display = 'none';
+      uploadBtn.disabled = true;
+      return;
+    }
+
+    photoPreview.style.display = 'block';
+    uploadBtn.disabled = false;
+    previewGrid.innerHTML = '';
+
+    selectedFiles.forEach((file, index) => {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const div = document.createElement('div');
+        div.className = 'position-relative';
+        div.style.width = '80px';
+        div.innerHTML = `
+          <img src="${e.target.result}" class="img-thumbnail" style="width:80px;height:80px;object-fit:cover;cursor:pointer;" 
+               onclick="showImagePreview('${e.target.result}')">
+          <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0" 
+                  style="padding:2px 6px;font-size:10px;" onclick="removePhoto(${index})">
+            <i class="bi bi-x"></i>
+          </button>
+        `;
+        previewGrid.appendChild(div);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  window.removePhoto = function(index) {
+    selectedFiles.splice(index, 1);
+    updateFileInput();
+    updatePreview();
+  };
+
+  function updateFileInput() {
+    const dt = new DataTransfer();
+    selectedFiles.forEach(file => dt.items.add(file));
+    photoInput.files = dt.files;
+  }
+
+  window.showImagePreview = function(src) {
+    document.getElementById('previewImage').src = src;
+    new bootstrap.Modal(document.getElementById('imagePreviewModal')).show();
+  };
+
+  // Upload confirmation
+  const uploadForm = document.getElementById('uploadForm');
+  if (uploadForm) {
+    uploadForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const count = selectedFiles.length;
+      if (count > 0 && confirm(`Do you really want to upload these ${count} picture${count > 1 ? 's' : ''}?`)) {
+        this.submit();
+      }
+    });
   }
 
   // If already held → concise summary chips

@@ -28,6 +28,7 @@ from django.views.decorators.http import require_POST
 
 from lupon_mem.utils.http import json_ok, json_err, flash_success, flash_warning, require_post_view
 from lupon_mem.utils.params import post_int, post_bool, post_str
+from lupon_mem.utils.logging import blotter_log_event
 from lupon_mem.services import hearings as svc_hear
 from django.views.decorators.csrf import csrf_protect
 import logging
@@ -445,6 +446,15 @@ def _autogen_settled_summary(case_id: int, kp16_submission_id: int):
                 RETURNING submission_id
             """, [case_id, med_code])
             med_sid = int(cur.fetchone()[0])
+            
+            # Log the creation of the settlement summary
+            blotter_log_event(
+                action="CREATE",
+                table_affected="blotter_kp_submission",
+                record_affected_id=med_sid,
+                details={"form_code": med_code, "case_id": case_id, "auto_generated": True},
+                performer_staff_id=None  # System generated
+            )
 
             # insert answers (only for codes that exist on the form)
             for code, val in values_by_code.items():
@@ -530,6 +540,18 @@ def _autogen_settled_summary(case_id: int, kp16_submission_id: int):
             # mark submitted
             cur.execute("UPDATE blotter_kp_submission SET status='SUBMITTED', submitted_at=now() WHERE submission_id=%s",
                         [med_sid])
+            
+            # Log the submission
+            blotter_log_event(
+                action="UPDATE",
+                table_affected="blotter_kp_submission",
+                record_affected_id=med_sid,
+                details={"form_code": med_code, "case_id": case_id, "auto_submitted": True},
+                performer_staff_id=None,  # System generated
+                field_changed="status",
+                old_value="DRAFT",
+                new_value="SUBMITTED"
+            )
 
     # ---------- render + upload, return a download link ----------
     try:
@@ -666,6 +688,15 @@ def _open_kp16_draft(case_id: int) -> int:
             VALUES (%s,%s,'DRAFT') RETURNING submission_id
         """, [case_id, form_id])
         sid = int(cur.fetchone()[0])
+        
+        # Log the KP-16 draft creation
+        blotter_log_event(
+            action="CREATE",
+            table_affected="blotter_kp_submission",
+            record_affected_id=sid,
+            details={"form_code": "KP-16", "case_id": case_id, "status": "DRAFT"},
+            performer_staff_id=None  # System generated
+        )
 
         # Prefill some friendly defaults (optional)
         pre = _prefill_minimal_for_case(case_id)
@@ -1148,6 +1179,17 @@ def _create_and_submit_form_from_prefill(case_id: int, form_code: str, prefill: 
 
         # mark SUBMITTED
         cur.execute("UPDATE blotter_kp_submission SET status='SUBMITTED', submitted_at=now() WHERE submission_id=%s", [sid])
+        
+        # Log the form submission
+        blotter_log_event(
+            action="CREATE",
+            table_affected="blotter_kp_submission",
+            record_affected_id=sid,
+            details={"form_code": form_code, "case_id": case_id, "prefilled": True},
+            performer_staff_id=None,  # System generated
+            field_changed="status",
+            new_value="SUBMITTED"
+        )
 
     return sid
 
@@ -1357,6 +1399,7 @@ def form_builder(request, case_id: int, form_id: int = None, submission_id: int 
         fields_with_values = slice_until_code(fields_with_values, "award_description")
         page2_index = None
 
+    user_role = _auth_role_name(request)
     return render(
         request,
         "lupon_mem/form_builder.html",
@@ -1373,6 +1416,8 @@ def form_builder(request, case_id: int, form_id: int = None, submission_id: int 
             **flags,
             "complainants": complainants_json,
             "respondents": respondents_json,
+            'page_path': f'{user_role} / Form Builder',
+            'page_title': f'Form Builder - {form_code}',
         },
     )
 
@@ -1437,6 +1482,13 @@ def dashboard(
     except Exception as exc:
         print("Error fetching lupon mem dashboard KPIs:", exc)
 
+    # Get filter options for modal
+    with connection.cursor() as cur:
+        cur.execute("SELECT complaint_title_id, complaint_title_name FROM complaint_title ORDER BY complaint_title_name")
+        complaint_titles = cur.fetchall()
+        cur.execute("SELECT case_nature_id, case_name FROM case_nature ORDER BY case_name")
+        case_natures = cur.fetchall()
+
     return render(
         request,
         "lupon_mem/dashboard.html",
@@ -1446,6 +1498,8 @@ def dashboard(
             'kpis': kpis,
             'dashboard_json': dashboard_json,
             'today': datetime.now().strftime("%B %d, %Y"),
+            'complaint_titles': complaint_titles,
+            'case_natures': case_natures,
         },
     )
 
@@ -1502,9 +1556,14 @@ def _toi(x):
 @session_login_required
 @role_required(*LUPON_ROLES, "barangay treasurer")
 def case_timeline(request: HttpRequest, case_id: int):
+    user_role = _auth_role_name(request)
     data = get_case_timeline(case_id)
     if not data.get("header"):
         return HttpResponseBadRequest("Case not found.")
+    data.update({
+        'page_path': f'{user_role} / Case Timeline',
+        'page_title': 'Case Timeline',
+    })
     return render(request, "lupon_mem/case_timeline.html", data)
 
 
@@ -1676,15 +1735,12 @@ def add_form_choose_static(request, case_id: int):
         'KP-23','KP-24','KP-25'
     ]
     
-    # ---- fetch all forms ----
-    with connection.cursor() as cur:
-        cur.execute("""
-            SELECT UPPER(form_code) AS code, form_name
-            FROM kp_form
-            WHERE UPPER(form_code) = ANY(%s)
-            ORDER BY array_position(%s::text[], UPPER(form_code))
-        """, [wanted_order, wanted_order])
-        all_forms = [(code, name) for code, name in cur.fetchall()]
+    # ---- return only the three specific forms ----
+    all_forms = [
+        ('KP-10', 'NOTICE FOR CONSTITUTION OF PANGKAT'),
+        ('KP-11', 'NOTICE TO CHOSEN PANGKAT MEMBER'),
+        ('KP-13', 'SUBPOENA LETTER')
+    ]
     
     # ---- pagination ----
     paginator = Paginator(all_forms, 10)  # 10 forms per page
@@ -1711,14 +1767,76 @@ def add_form_choose_static(request, case_id: int):
           f"pending_summons={pending_summons} latest_notice_outstanding={notice_outstanding} "
           f"total_forms={len(all_forms)} badge_flags={badge_flags}")
 
+    user_role = _auth_role_name(request)
     return render(request, "lupon_mem/add_form_choose_static.html", {
         "case_id": case_id,
         "forms": page_obj.object_list,
         "page_obj": page_obj,
         "gate_msg": gate_msg,
         "badge_flags": badge_flags,
+        'page_path': f'{user_role} / Add Form',
+        'page_title': 'Add Form',
     })
 
+
+
+@session_login_required
+@role_required(*LUPON_ROLES, "barangay treasurer")
+def case_detail(request: HttpRequest, case_id: int):
+    """
+    Display case details with forms and timeline.
+    """
+    with connection.cursor() as cur:
+        # Get case basic info
+        cur.execute("""
+            SELECT bc.blotter_case_id, bc.blotter_case_num, bc.blotter_case_name,
+                   bc.date_filed, bc.time_filed, bc.incident_desc,
+                   COALESCE(ct.complaint_title_name, '') AS complaint_title,
+                   COALESCE(ss.settlement_status_name, 'PENDING') AS settlement_status,
+                   COALESCE(cs.case_state_name, 'OPEN') AS case_state
+            FROM blotter_case bc
+            LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
+            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+            LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
+            WHERE bc.blotter_case_id = %s
+        """, [case_id])
+        case_row = cur.fetchone()
+        if not case_row:
+            return HttpResponseNotFound("Case not found")
+        
+        case = case_row
+        
+        # Get forms for this case
+        cur.execute("""
+            SELECT s.submission_id, UPPER(f.form_code) AS form_code, f.form_name,
+                   UPPER(s.status) AS status, s.processed_by_name, s.submitted_at, s.processed_at,
+                   s.processed_by_position
+            FROM blotter_kp_submission s
+            JOIN kp_form f ON f.form_id = s.form_id
+            WHERE s.blotter_case_id = %s
+            ORDER BY s.submitted_at DESC NULLS LAST, s.submission_id DESC
+        """, [case_id])
+        forms = cur.fetchall()
+        
+        # Get settlement statuses for modal
+        cur.execute("SELECT settlement_status_id, settlement_status_name FROM settlement_status ORDER BY settlement_status_name")
+        settlement_statuses = cur.fetchall()
+        
+        # Get case states for modal
+        cur.execute("SELECT case_state_id, case_state_name FROM case_state ORDER BY case_state_name")
+        case_states = cur.fetchall()
+    
+    user_role = _auth_role_name(request)
+    return render(request, "lupon_mem/case_detail.html", {
+        "case_id": case_id,
+        "case": case,
+        "forms": forms,
+        "settlement_statuses": settlement_statuses,
+        "case_states": case_states,
+        "case_state_name": case[8] if len(case) > 8 else "OPEN",
+        'page_path': f'{user_role} / Case Details',
+        'page_title': f'Case #{case[1]}' if case else 'Case Details',
+    })
 
 
 @session_login_required
@@ -1731,6 +1849,8 @@ def incident_heatmap(request: HttpRequest):
     time_filter = request.GET.get('time_filter', '1_year')
     case_type_filter = request.GET.get('case_type', 'all')
     settlement_filter = request.GET.get('settlement', 'all')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
 
     # Build time filter condition (reports)
     time_conditions = {
@@ -1738,19 +1858,26 @@ def incident_heatmap(request: HttpRequest):
         '3_months': "AND br.date_time_reported >= CURRENT_DATE - INTERVAL '3 months'",
         '6_months': "AND br.date_time_reported >= CURRENT_DATE - INTERVAL '6 months'",
         '1_year': "AND br.date_time_reported >= CURRENT_DATE - INTERVAL '1 year'",
-        'all': ""
+        'all': "",
+        'custom': ""
     }
-    time_condition = time_conditions.get(time_filter, time_conditions['1_year'])
-
-    # Build time filter condition (cases)
-    case_time_conditions = {
-        '1_month': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '1 month'",
-        '3_months': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '3 months'",
-        '6_months': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '6 months'",
-        '1_year': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '1 year'",
-        'all': ""
-    }
-    case_time_condition = case_time_conditions.get(time_filter, case_time_conditions['1_year'])
+    
+    # Handle custom date range
+    if time_filter == 'custom' and start_date and end_date:
+        time_condition = f"AND br.date_time_reported::date BETWEEN '{start_date}' AND '{end_date}'"
+        case_time_condition = f"AND bc.date_filed::date BETWEEN '{start_date}' AND '{end_date}'"
+    else:
+        time_condition = time_conditions.get(time_filter, time_conditions['1_year'])
+        # Build time filter condition (cases)
+        case_time_conditions = {
+            '1_month': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '1 month'",
+            '3_months': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '3 months'",
+            '6_months': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '6 months'",
+            '1_year': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '1 year'",
+            'all': "",
+            'custom': ""
+        }
+        case_time_condition = case_time_conditions.get(time_filter, case_time_conditions['1_year'])
 
     # Build case type filter (parameterized)
     case_type_condition = ""
@@ -1789,7 +1916,8 @@ def incident_heatmap(request: HttpRequest):
                     'Not Applicable' as settlement_status,
                     COALESCE(pst.payment_status_name, 'Unpaid') as payment_status,
                     'Low' as severity_level,
-                    br.date_time_reported as created_at
+                    br.date_time_reported as created_at,
+                    '' as case_nature
                 FROM blotter_report br
                 LEFT JOIN addresss a ON a.address_id = br.incident_address_id
                 LEFT JOIN purok_sitio ps ON ps.purok_sitio_id = a.purok_sitio_id
@@ -1800,7 +1928,7 @@ def incident_heatmap(request: HttpRequest):
                   
                 UNION ALL
                 
-                -- Blotter Cases (converted from reports or direct cases)
+                -- Blotter Cases (converted from reports or direct cases) - DEFAULT TO BARANGAY CASES ONLY
                 SELECT 
                     'BC-' || bc.blotter_case_id as incident_id,
                     COALESCE(bc.blotter_case_name, 'Unnamed Case') as incident_name,
@@ -1822,7 +1950,8 @@ def incident_heatmap(request: HttpRequest):
                         WHEN bc.date_filed < CURRENT_DATE - INTERVAL '6 months' AND UPPER(ss.settlement_status_name) != 'SETTLED' THEN 'High'
                         ELSE 'Medium'
                     END as severity_level,
-                    COALESCE(bc.date_filed::timestamp, CURRENT_TIMESTAMP) as created_at
+                    COALESCE(bc.date_filed::timestamp, CURRENT_TIMESTAMP) as created_at,
+                    COALESCE(cn.case_name, '') as case_nature
                 FROM blotter_case bc
                 LEFT JOIN addresss a ON a.address_id = (
                     SELECT br.incident_address_id 
@@ -1848,6 +1977,11 @@ def incident_heatmap(request: HttpRequest):
         """
         cur.execute(sql_incidents, case_type_params)
         incidents = cur.fetchall()
+        print(f"[DEBUG] SQL query returned {len(incidents)} incidents")
+        if incidents:
+            print(f"[DEBUG] Sample incident: {incidents[0]}")
+        else:
+            print(f"[DEBUG] No incidents found. SQL: {sql_incidents[:200]}...")
 
         # ---------- 2) Stats by incident type ----------
         # FIX: remove EXTRACT(... from integer). Just average the integer day-difference.
@@ -1952,8 +2086,9 @@ def incident_heatmap(request: HttpRequest):
     # -------- Format payloads for the template --------
     import json
     incident_data = []
+    print(f"[DEBUG] Processing {len(incidents)} incidents from database")
     for incident in incidents:
-        incident_data.append({
+        incident_item = {
             'id': incident[0],
             'name': incident[1] or 'Unnamed Incident',
             'description': incident[2] or 'No description',
@@ -1969,8 +2104,27 @@ def incident_heatmap(request: HttpRequest):
             'settlement_status': incident[12] or 'Pending',
             'payment_status': incident[13] or 'Unknown',
             'severity': incident[14] or 'Medium',
-            'created_at': incident[15].strftime('%Y-%m-%d %H:%M') if incident[15] else ''
-        })
+            'created_at': incident[15].strftime('%Y-%m-%d %H:%M') if incident[15] else '',
+            'case_nature': incident[16] if len(incident) > 16 else ''
+        }
+        incident_data.append(incident_item)
+    print(f"[DEBUG] First incident: {incident_data[0] if incident_data else 'No incidents'}")
+    
+    # Print what should be displayed for BELLOSILLO vs. ARRANCHADO case
+    bellosillo_case = next((item for item in incident_data if 'BELLOSILLO' in item.get('name', '')), None)
+    if bellosillo_case:
+        print(f"[DEBUG] BELLOSILLO case data: {bellosillo_case}")
+        print(f"[DEBUG] Expected display:")
+        print(f"  - ID: {bellosillo_case.get('id', 'N/A')}")
+        print(f"  - Name: {bellosillo_case.get('name', 'N/A')}")
+        print(f"  - Type: {bellosillo_case.get('type', 'N/A')}")
+        print(f"  - Case Nature: {bellosillo_case.get('case_nature', 'N/A')}")
+        print(f"  - Status: {bellosillo_case.get('settlement_status', 'N/A')}")
+        print(f"  - Description: {bellosillo_case.get('description', 'N/A')}")
+    else:
+        print(f"[DEBUG] BELLOSILLO case not found in incident_data")
+    
+
 
     stats_data = []
     for stat in incident_stats:
@@ -2002,6 +2156,7 @@ def incident_heatmap(request: HttpRequest):
             'risk_level': 'High' if street[4] >= 3 else 'Medium' if street[4] >= 1 else 'Low'
         })
 
+    user_role = _auth_role_name(request)
     return render(request, "lupon_mem/incident_heatmap.html", {
         "incident_data_json": json.dumps(incident_data),
         "incident_data": incident_data,
@@ -2013,8 +2168,13 @@ def incident_heatmap(request: HttpRequest):
         "time_filter": time_filter,
         "case_type_filter": case_type_filter,
         "settlement_filter": settlement_filter,
-        "page_title": "Barangay Incident Heatmap & Analytics"
+        "start_date": start_date,
+        "end_date": end_date,
+        'page_path': f'{user_role} / Incident Heatmap',
+        'page_title': 'Barangay Incident Heatmap & Analytics',
     })
+
+
 
 
 @session_login_required
@@ -2112,9 +2272,12 @@ def case_hearing_list(request: HttpRequest, case_id: int):
             "held_at_fmt": held_at_fmt,
         })
 
+    user_role = _auth_role_name(request)
     return render(request, "lupon_mem/hearing_list.html", {
         "items": items,
         "dev_mode": bool(getattr(settings, "DEBUG", False) or (request.GET.get("dev") == "1")),
+        'page_path': f'{user_role} / Case Hearings',
+        'page_title': f'Case #{case_num} Hearings' if items and items[0].get('case_num') else 'Case Hearings',
     })
 
 
@@ -2346,6 +2509,7 @@ def case_hearing_schedule(request, case_id: int):
     # Build KP-14 link for the UI (used when ARBITRATION)
     kp14_url = reverse("lupon_mem:form_builder_by_code", args=[case_id, "KP-14"])
 
+    user_role = _auth_role_name(request)
     return render(request, "lupon_mem/case_hearing_schedule.html", {
         "case_id": case_id,
         "hearing_source": hearing_source,
@@ -2378,7 +2542,11 @@ def case_hearing_schedule(request, case_id: int):
         "compl_attended_last": compl_attended_last,       # bool for JS
         "resp_attended_last": resp_attended_last,         # bool for JS
         "kp14_url": kp14_url,                             # link to build KP-14
+        'page_path': f'{user_role} / Hearing Schedule',
+        'page_title': 'Hearing Schedule',
     })
+
+
 
 @session_login_required
 @role_required(*LUPON_ROLES, "barangay treasurer")
@@ -2537,9 +2705,12 @@ def hearing_list(request: HttpRequest):
                     "held_at_fmt": held_at_fmt,
                 })
 
+    user_role = _auth_role_name(request)
     return render(request, "lupon_mem/hearing_list.html", {
         "items": items,
         "dev_mode": bool(getattr(settings, "DEBUG", False) or (request.GET.get("dev") == "1")),
+        'page_path': f'{user_role} / All Hearings',
+        'page_title': 'All Hearings',
     })
 
 
@@ -2757,6 +2928,23 @@ def mediation_complete(request, case_id: int):
                 VALUES (%s, %s, now(), %s, %s)
                 RETURNING progress_tracking_id, date_processed
             """, [case_id, progress_type_id, held_remarks, staff_id])
+            
+            progress_id = cur.fetchone()[0]
+            
+            # Log the mediation completion
+            blotter_log_event(
+                action="CREATE",
+                table_affected="case_progress_tracking",
+                record_affected_id=progress_id,
+                details={
+                    "case_id": case_id,
+                    "hearing_type": "MEDIATION",
+                    "settlement": settlement,
+                    "complainant_attended": compl_attended,
+                    "respondent_attended": resp_attended
+                },
+                performer_staff_id=staff_id
+            )
 
     # Outcome branches
     print(f"[mediation_complete] settlement={settlement}, case_id={case_id}")
@@ -2808,29 +2996,32 @@ def mediation_complete(request, case_id: int):
             print(f"[mediation_complete] Error setting case to ARBITRATED: {e}")
             messages.success(request, "Mediation marked HELD. (Could not update case settlement automatically.)")
 
-        # Ensure KP-14 (Agreement to Arbitrate) exists
+        # Ensure KP-14 (Agreement to Arbitrate) exists - check both DRAFT and SUBMITTED
         try:
-            with connection.cursor() as cur:
-                cur.execute("""
-                    SELECT 1
-                      FROM blotter_kp_submission s
-                      JOIN kp_form f ON f.form_id = s.form_id
-                     WHERE s.blotter_case_id = %s
-                       AND UPPER(f.form_code) = 'KP-14'
-                       AND UPPER(s.status) = 'SUBMITTED'
-                """, [case_id])
-                kp14_exists = cur.fetchone() is not None
+            with transaction.atomic():
+                with connection.cursor() as cur:
+                    # Use SELECT FOR UPDATE to prevent race conditions
+                    cur.execute("""
+                        SELECT 1
+                          FROM blotter_kp_submission s
+                          JOIN kp_form f ON f.form_id = s.form_id
+                         WHERE s.blotter_case_id = %s
+                           AND UPPER(f.form_code) = 'KP-14'
+                           AND UPPER(s.status) IN ('DRAFT', 'SUBMITTED')
+                         FOR UPDATE
+                    """, [case_id])
+                    kp14_exists = cur.fetchone() is not None
 
-            if not kp14_exists:
-                kp14_sid = _create_and_submit_form_from_prefill(
-                    case_id=case_id,
-                    form_code="KP-14",
-                    prefill=_prefill_minimal_for_case(case_id)
-                )
-                if kp14_sid:
-                    print(f"[mediation_complete] Created KP-14 submission_id={kp14_sid}")
-            else:
-                print(f"[mediation_complete] KP-14 already exists for case {case_id}")
+                if not kp14_exists:
+                    kp14_sid = _create_and_submit_form_from_prefill(
+                        case_id=case_id,
+                        form_code="KP-14",
+                        prefill=_prefill_minimal_for_case(case_id)
+                    )
+                    if kp14_sid:
+                        print(f"[mediation_complete] Created KP-14 submission_id={kp14_sid}")
+                else:
+                    print(f"[mediation_complete] KP-14 already exists for case {case_id}")
         except Exception as e:
             print(f"[mediation_complete] Error creating KP-14: {e}")
 
@@ -2994,6 +3185,23 @@ def conciliation_complete(request, case_id: int):
                 VALUES (%s, %s, now(), %s, %s)
                 RETURNING progress_tracking_id, date_processed
             """, [case_id, progress_type_id, held_remarks, staff_id])
+            
+            progress_id = cur.fetchone()[0]
+            
+            # Log the conciliation completion
+            blotter_log_event(
+                action="CREATE",
+                table_affected="case_progress_tracking",
+                record_affected_id=progress_id,
+                details={
+                    "case_id": case_id,
+                    "hearing_type": "CONCILIATION",
+                    "settlement": settlement,
+                    "complainant_attended": compl_attended,
+                    "respondent_attended": resp_attended
+                },
+                performer_staff_id=staff_id
+            )
 
     # Outcome branches (mirror mediation_complete)
     print(f"[conciliation_complete] settlement={settlement}, case_id={case_id}")
@@ -3045,29 +3253,32 @@ def conciliation_complete(request, case_id: int):
             print(f"[conciliation_complete] Error setting case to ARBITRATED: {e}")
             messages.success(request, "Conciliation marked HELD. (Could not update case settlement automatically.)")
 
-        # Ensure KP-14 exists
+        # Ensure KP-14 exists - check both DRAFT and SUBMITTED
         try:
-            with connection.cursor() as cur:
-                cur.execute("""
-                    SELECT 1
-                      FROM blotter_kp_submission s
-                      JOIN kp_form f ON f.form_id = s.form_id
-                     WHERE s.blotter_case_id = %s
-                       AND UPPER(f.form_code) = 'KP-14'
-                       AND UPPER(s.status) = 'SUBMITTED'
-                """, [case_id])
-                kp14_exists = cur.fetchone() is not None
+            with transaction.atomic():
+                with connection.cursor() as cur:
+                    # Use SELECT FOR UPDATE to prevent race conditions
+                    cur.execute("""
+                        SELECT 1
+                          FROM blotter_kp_submission s
+                          JOIN kp_form f ON f.form_id = s.form_id
+                         WHERE s.blotter_case_id = %s
+                           AND UPPER(f.form_code) = 'KP-14'
+                           AND UPPER(s.status) IN ('DRAFT', 'SUBMITTED')
+                         FOR UPDATE
+                    """, [case_id])
+                    kp14_exists = cur.fetchone() is not None
 
-            if not kp14_exists:
-                kp14_sid = _create_and_submit_form_from_prefill(
-                    case_id=case_id,
-                    form_code="KP-14",
-                    prefill=_prefill_minimal_for_case(case_id)
-                )
-                if kp14_sid:
-                    print(f"[conciliation_complete] Created KP-14 submission_id={kp14_sid}")
-            else:
-                print(f"[conciliation_complete] KP-14 already exists for case {case_id}")
+                if not kp14_exists:
+                    kp14_sid = _create_and_submit_form_from_prefill(
+                        case_id=case_id,
+                        form_code="KP-14",
+                        prefill=_prefill_minimal_for_case(case_id)
+                    )
+                    if kp14_sid:
+                        print(f"[conciliation_complete] Created KP-14 submission_id={kp14_sid}")
+                else:
+                    print(f"[conciliation_complete] KP-14 already exists for case {case_id}")
         except Exception as e:
             print(f"[conciliation_complete] Error creating KP-14: {e}")
 
@@ -3380,6 +3591,7 @@ def summon_attendance(request: HttpRequest, case_id: int):
     # nice caption like "BELLOSILLO vs. SANAOL"
     case_caption = case_title
 
+    user_role = _auth_role_name(request)
     return render(request, "lupon_mem/summon_attendance.html", {
         "case_id": case_id,
         "case_num": case_num,
@@ -3388,6 +3600,8 @@ def summon_attendance(request: HttpRequest, case_id: int):
         "complaint_title": complaint_title,
         "case_nature": case_nature,
         "items": items,
+        'page_path': f'{user_role} / Summon Attendance',
+        'page_title': f'Summon Attendance - {case_num}',
     })
 
 
@@ -3431,6 +3645,21 @@ def summon_set_status(request: HttpRequest, submission_id: int):
                               marked_at=EXCLUDED.marked_at,
                               no_show_party=EXCLUDED.no_show_party
             """, [submission_id, status, remarks, staff_id, party])
+            
+            # Log the summon attendance update
+            blotter_log_event(
+                action="UPDATE",
+                table_affected="kp9_attendance",
+                record_affected_id=submission_id,
+                details={
+                    "status": status,
+                    "no_show_party": party,
+                    "remarks": remarks
+                },
+                performer_staff_id=staff_id,
+                field_changed="status",
+                new_value=status
+            )
 
             cur.execute("SELECT blotter_case_id FROM blotter_kp_submission WHERE submission_id=%s", [submission_id])
             row = cur.fetchone()
@@ -3705,6 +3934,15 @@ def _open_med_attendance_draft(case_id: int) -> int:
             RETURNING submission_id
         """, [case_id, form_id])
         sid = int(cur.fetchone()[0])
+        
+        # Log the MED-ATT-2025 draft creation
+        blotter_log_event(
+            action="CREATE",
+            table_affected="blotter_kp_submission",
+            record_affected_id=sid,
+            details={"form_code": "MED-ATT-2025", "case_id": case_id, "status": "DRAFT"},
+            performer_staff_id=None  # System generated
+        )
 
         # Prefill what we can (best-effort, skip blanks)
         pre = _prefill_minimal_for_case(case_id)

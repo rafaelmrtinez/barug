@@ -9,8 +9,9 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
 
     <link rel="stylesheet" href="{% static 'css/static_style.css' %}">
     <link rel="stylesheet" href="{% static 'css/form.css' %}">
@@ -185,6 +186,14 @@
 <!-- Minimal JS just for toggling password + preventing double submit -->
 <script>
 (function () {
+    // Prevent browser back button from showing login page after successful login
+    if (window.history && window.history.pushState) {
+        window.history.pushState(null, null, window.location.href);
+        window.addEventListener('popstate', function() {
+            window.history.pushState(null, null, window.location.href);
+        });
+    }
+    
     // toggle password show/hide
     document.querySelectorAll('.toggle-password').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -210,4 +219,5 @@
 </script>
 </body>
 
+{% include 'partials/modal_messages.html' %}
 </html>

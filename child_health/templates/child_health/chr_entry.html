@@ -2,7 +2,15 @@
 {% load static %}
 
 {% block css %}
+<link rel="stylesheet" href="{% static 'child_health/css/chr-sidebar.css' %}">
 <link rel="stylesheet" href="{% static 'child_health/css/chr-theme.css' %}">
+<style>
+/* Back-to-top floating button for child health page */
+.back-to-top{ position: fixed; right: 1rem; bottom: 1rem; width:48px; height:48px; border-radius:50%; background:#6d2932; color:#fff; border:none; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 6px 18px rgba(0,0,0,0.18); cursor:pointer; opacity:0; transform:translateY(8px); transition:opacity .2s ease, transform .2s ease; z-index:2050; }
+.back-to-top:focus{ outline: 2px solid rgba(255,255,255,0.12); }
+.back-to-top.visible{ opacity:1; transform:translateY(0); }
+.back-to-top svg{ width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -10,8 +18,45 @@
 
     {% include "messages.html" %}
 
-    <h1 class="mb-3">Child Health Record</h1>
-    <input type="hidden" id="child_id" value="{{ child_id }}">
+    <div class="row">
+        <!-- Sidebar -->
+        <aside class="col-md-3 d-none d-md-block child-sidebar">
+            <nav class="sticky-top pt-4">
+                <div class="card">
+                    <div class="card-body small">
+                        <ul class="nav flex-column">
+                            <li class="nav-item"><a class="nav-link" href="#identification">Identification</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#place-of-delivery">Place of Delivery</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#parent-info">Parent Info</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#nbs">New Born Screening</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#child-details">Child Details</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#immunization">Immunization</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#birth-and-supplementation">Birth and Supplementation</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#iron-intake">Iron Intake</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#vitamin-intake">Vitamin Intake</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#visit-entry">Visit Entry</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main -->
+        <main class="col-md-9">
+
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h1 class="mb-0">Child Health Record</h1>
+                <input type="hidden" id="child_id" value="{{ child_id }}">
+            </div>
+
+            <!-- Mobile sidebar toggle -->
+            <div class="d-md-none mb-3">
+                <button id="child-sidebar-toggle" class="btn btn-sm btn-chi" aria-label="Open menu">
+                    <svg class="sidebar-toggle-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </button>
+            </div>
 
     <!-- Identification (NO header button) -->
     <div class="card mb-3 card-brand">
@@ -90,7 +135,7 @@
             <button type="button" class="btn btn-sm btn-outline-brand section-action" data-section="#nbs">Edit</button>
         </div>
         <div class="card-body" id="nbs">
-            <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
+            <form novalidate>
                 {{ new_born_screening.form_type }}
                 {% csrf_token %}
                 <div class="row g-3 align-items-end">
@@ -129,8 +174,7 @@
             <button type="button" class="btn btn-sm btn-outline-brand section-action"
                 data-section="#child-details">Edit</button>
         </div>
-        <form id="breastFeedingForm" action="{% url 'child_health:child_health_entry' child_health_record_id %}"
-            method="post" novalidate>
+        <form id="breastFeedingForm" novalidate>
             <div class="card-body" id="child-details">
                 {% csrf_token %}
                 {% comment %} <div class="col-md-4">
@@ -193,7 +237,7 @@
                 <tbody>
                     <!-- BCG -->
                     <tr>
-                        <form method="post" id="bcgImmunizationForm">
+                        <form id="bcgImmunizationForm">
                             {% csrf_token %}
                             <td>BCG</td>
                             <td>{{ immunizations.bcg_24hr }}</td>
@@ -208,7 +252,7 @@
 
                     <!-- Hep. BV -->
                     <tr>
-                        <form method="post" id="hepbvImmunizationForm" novalidate>
+                        <form id="hepbvImmunizationForm" novalidate>
                             {% csrf_token %}
                             <td>Hep. BV</td>
                             <td>{{ immunizations.hepbv_24hr }}</td>
@@ -223,7 +267,7 @@
 
                     <!-- PCV -->
                     <tr>
-                        <form method="post" id="pcvImmunizationForm" novalidate>
+                        <form id="pcvImmunizationForm" novalidate>
                             {% csrf_token %}
                             <td>PCV</td>
                             <td>{{ immunizations.pcv_24hr }}</td>
@@ -238,7 +282,7 @@
 
                     <!-- OPV -->
                     <tr>
-                        <form method="post" id="opvImmunizationForm" novalidate>
+                        <form id="opvImmunizationForm" novalidate>
                             {% csrf_token %}
                             <td>OPV</td>
                             <td>{{ immunizations.opv_24hr }}</td>
@@ -253,7 +297,7 @@
 
                     <!-- AMV -->
                     <tr>
-                        <form method="post" id="amvImmunizationForm" novalidate>
+                        <form id="amvImmunizationForm" novalidate>
                             {% csrf_token %}
                             <td>AMV</td>
                             <td>{{ immunizations.amv_24hr }}</td>
@@ -268,7 +312,7 @@
 
                     <!-- Pentavalent -->
                     <tr>
-                        <form method="post" id="pentavalentImmunizationForm" novalidate>
+                        <form id="pentavalentImmunizationForm" novalidate>
                             {% csrf_token %}
                             <td>Pentavalent</td>
                             <td>{{ immunizations.pentavalent_24hr }}</td>
@@ -299,8 +343,8 @@
             <button type="button" class="btn btn-sm btn-outline-brand section-action"
                 data-section="#supplementation">Edit</button>
         </div>
-        <div class="card-body" id="supplementation">
-            <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
+        <div class="card-body" id="birth-and-supplementation">
+            <form novalidate>
                 {% csrf_token %}
                 <div class="row g-3">
                     <div class="col-md-4">{{ form.data_assessed.label_tag }} {{ form.data_assessed }}</div>
@@ -333,8 +377,8 @@
             <button type="button" class="btn btn-sm btn-outline-brand section-action"
                 data-section="#iron_intake">Edit</button>
         </div>
-        <div class="card-body" id="iron_intake">
-            <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
+        <div class="card-body" id="iron-intake">
+            <form novalidate>
                 {% csrf_token %}
                 <div class="row g-3">
                     <div class="col-md-3">{{ iron_intake_form.date_iron_started.label_tag }} {{ iron_intake_form.date_iron_started }}</div>
@@ -358,8 +402,8 @@
                 Edit
             </button>
         </div>
-        <div class="card-body" id="supplementation">
-            <form method="post" novalidate>
+        <div class="card-body" id="vitamin-intake">
+            <form novalidate>
                 {% csrf_token %}
                 <div class="row g-3">
                     <div class="col-md-3">
@@ -394,7 +438,7 @@
         </div>
 
         <div class="card-body" id="visit-entry">
-            <form method="post" action="{% url 'child_health:child_health_entry' child_health_record_id %}" novalidate>
+            <form novalidate>
                 {% csrf_token %}
 
                 <div class="row g-3">
@@ -519,15 +563,38 @@
         </div>
     </div>
 
+    </main>
+    </div>
+
 </div>
 
+<!-- Back to top button -->
+<button id="child-back-to-top" class="back-to-top" aria-label="Back to top">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 5l-7 7" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="M12 5l7 7" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="M5 12h14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+</button>
+
 {% block script %}
+<script defer src="{% static 'child_health/js/chr-sidebar.js' %}"></script>
 <script defer src="{% static 'child_health/js/sectionActions.js' %}"></script>
-{% comment %}
-<script defer src="{% static 'child_health/js/insertBF.js' %}"></script> {% endcomment %}
-<!-- <script defer src="{% static 'child_health/js/selector.js' %}"></script> -->
 <script defer src="{% static 'child_health/js/weightCalculator.js' %}"></script>
 <script defer src="{% static 'child_health/js/immunizationRequest.js' %}"></script>
-{% comment %} <script defer src="{% static 'child_health/js/vitaminCheckcboxPolicy.js' %}"></script> {% endcomment %}
+<script>
+// Back-to-top behaviour for child health page
+document.addEventListener('DOMContentLoaded', function(){
+    // create safe reference if button already exists in template
+    const btn = document.getElementById('child-back-to-top');
+    if(!btn) return;
+    function onScroll(){ if(window.scrollY > 200) btn.classList.add('visible'); else btn.classList.remove('visible'); }
+    window.addEventListener('scroll', onScroll, {passive:true});
+    btn.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+    onScroll();
+});
+</script>
+<script defer src="{% static 'child_health/js/api_post_entries.js' %}"></script>
+<script src="{% static 'js/toast.js' %}"></script>
 {% endblock %}
 {% endblock %}

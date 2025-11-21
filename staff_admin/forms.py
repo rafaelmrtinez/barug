@@ -620,3 +620,92 @@ class ResidentProfileform(forms.Form):
         label= 'Proof of Employment',
         required= True,
     )
+
+class AccessLogFilters(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search by name or role...',
+            'name': 'q'
+        }),
+        label='Search Access Logs',
+        required= False,
+    )
+    user_type = forms.ChoiceField(
+        choices=[
+            ("", "All Users"),
+            ("staff", "Staff Only"),
+            ("resident", "Residents Only"),
+        ],
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'name': 'user_type',
+        }),
+        label='User Type',
+        required=False,
+    )
+    date_from = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control',
+            'name': 'date_from',
+        }),
+        label='Date From',
+        required=False,
+    )
+    date_to = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control',
+            'name': 'date_to',
+        }),
+        label='Date To',
+        required=False,
+    )
+
+class OperationalLogFilters(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search by name, action, or description...',
+            'name': 'q'
+        }),
+        label='Search Operational Logs',
+        required= False,
+    )
+    action_type = forms.ChoiceField(
+        choices=[
+            ("", "All Actions"),
+            ("create", "Create"),
+            ("update", "Update"),
+            ("delete", "Delete"),
+            ("login", "Login"),
+            ("logout", "Logout"),
+        ],
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'name': 'action_type',
+        }),
+        label='Action Type',
+        required=False,
+    )
+    date_from = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control',
+            'name': 'date_from',
+        }),
+        label='Date From',
+        required=False,
+    )
+    date_to = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control',
+            'name': 'date_to',
+        }),
+        label='Date To',
+        required=False,
+    )

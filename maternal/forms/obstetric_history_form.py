@@ -65,99 +65,38 @@ class ObstetricHistoryForm(forms.Form):
 
         self._method__ui_display_if_data_exist(self._existing_data)
         self.__ui_access_policy()
-        
-    def clean(self):
-        cleaned_data = super().clean()
-
-        # If an obstetric history already exists for this maternal health record,
-        # prevent re-entry and provide a clear, user-friendly message.
-        # This server-side check complements the UI-level readonly/disabled controls.
-        if self._existing_data and isinstance(self._existing_data, dict):
-            # If the user submitted any of the main fields, treat this as an attempt
-            # to re-enter an already-saved obstetric history and block it.
-            submitted_fields = [
-                cleaned_data.get('children_born_alive'),
-                cleaned_data.get('living_children'),
-                cleaned_data.get('abortions'),
-                cleaned_data.get('stillbirths'),
-                cleaned_data.get('history_large_babies'),
-            ]
-
-            if any(value is not None and value != '' for value in submitted_fields):
-                # Add a non-field error so it appears at the top of the form
-                # and is clearly visible to the user.
-                # self.add_error(
-                #     None,
-                #     "An obstetric history for this record already exists. "
-                #     "To change those values, please open the existing record and use the 'Edit' action or contact your administrator."
-                # )
-                self.add_error(
-                    None,
-                    "An obstetric history for this record already exists. ")
-
-                # Stop further validation since duplicate entry is not allowed
-                return cleaned_data
-
-        # Helpful cross-field validations with clear error messages
-        children_born_alive = cleaned_data.get('children_born_alive')
-        living_children = cleaned_data.get('living_children')
-        abortions = cleaned_data.get('abortions')
-        stillbirths = cleaned_data.get('stillbirths')
-        history_large_babies = cleaned_data.get('history_large_babies')
-
-        # living_children should not exceed children_born_alive
-        if children_born_alive is not None and living_children is not None:
-            try:
-                if living_children > children_born_alive:
-                    self.add_error(
-                        'living_children',
-                        'Number of living children cannot be greater than number of children born alive.'
-                    )
-            except TypeError:
-                # If values are not integers (should be caught by field validators), skip here
-                pass
-
-        # history_large_babies should not exceed children_born_alive
-        if children_born_alive is not None and history_large_babies is not None:
-            try:
-                if history_large_babies > children_born_alive:
-                    self.add_error(
-                        'history_large_babies',
-                        'Number of large babies cannot be greater than number of children born alive.'
-                    )
-            except TypeError:
-                pass
-
-        # Simple sanity check: abortions and stillbirths shouldn't be unreasonably large relative to births
-        if children_born_alive is not None:
-            # if abortions is provided and seems higher than a reasonable threshold compared to births, warn user
-            if abortions is not None and abortions > (children_born_alive + 20):
-                self.add_error('abortions', 'Please confirm the number of abortions — it looks unusually high relative to births.')
-            if stillbirths is not None and stillbirths > (children_born_alive + 20):
-                self.add_error('stillbirths', 'Please confirm the number of stillbirths — it looks unusually high relative to births.')
-
-        return cleaned_data
 
     def _method__ui_display_if_data_exist(self, existing_data):
         if existing_data and isinstance(existing_data, dict):
-            self.fields['children_born_alive'].initial = existing_data.get('num_children_born_alive', 'N/A')
-            self.fields['living_children'].initial = existing_data.get('num_children_living', 'N/A')
-            self.fields['abortions'].initial = existing_data.get('num_abortion', 'N/A')
-            self.fields['stillbirths'].initial = existing_data.get('num_stillbirth_or_fetal_death', 'N/A')
-            self.fields['history_large_babies'].initial = existing_data.get('num_large_babies', 'N/A')
-            if existing_data.get('has_diabetes', None):
+            def _coerce(v):
+                if v is None:
+                    return None
+                # coerce numeric strings to int
+                try:
+                    return int(v)
+                except Exception:
+                    # coerce common truthy strings to bool
+                    if isinstance(v, str) and v.lower() in ('t', 'true', '1'):
+                        return True
+                    return v
+
+            # Repository returns keys matching column names; map them here.
+            self.fields['children_born_alive'].initial = _coerce(existing_data.get('num_children_born_alive'))
+            self.fields['living_children'].initial = _coerce(existing_data.get('num_children_living'))
+            self.fields['abortions'].initial = _coerce(existing_data.get('num_abortion'))
+            # repository uses `num_stillbirth`; map to the form field
+            self.fields['stillbirths'].initial = _coerce(existing_data.get('num_stillbirth'))
+            self.fields['history_large_babies'].initial = _coerce(existing_data.get('num_large_babies'))
+            if _coerce(existing_data.get('has_diabetes')):
                 self.fields['diabetes_history'].initial = True
 
     def __ui_access_policy(self):
-        if self.fields['children_born_alive'].initial:
-            self.fields['children_born_alive'].widget.attrs['readonly'] = True
-        if self.fields['living_children'].initial:
-            self.fields['living_children'].widget.attrs['readonly'] = True
-        if self.fields['abortions'].initial:
-            self.fields['abortions'].widget.attrs['readonly'] = True
-        if self.fields['stillbirths'].initial:
-            self.fields['stillbirths'].widget.attrs['readonly'] = True
-        if self.fields['history_large_babies'].initial:
-            self.fields['history_large_babies'].widget.attrs['readonly'] = True
-        if self.fields['diabetes_history'].initial:
+        # If initial is set (including zero-values), make the field readonly.
+        for fname in ('children_born_alive', 'living_children', 'abortions', 'stillbirths', 'history_large_babies'):
+            init = self.fields[fname].initial
+            if init is not None:
+                self.fields[fname].widget.attrs['readonly'] = True
+        # For boolean fields, disable if initial is truthy
+        if self.fields['diabetes_history'].initial is not None:
+            # Use disabled attribute for checkbox
             self.fields['diabetes_history'].widget.attrs['disabled'] = True

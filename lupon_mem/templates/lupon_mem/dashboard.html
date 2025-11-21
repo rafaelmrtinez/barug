@@ -148,13 +148,13 @@
             <div class="text-muted small mt-1">{{ today|default:"" }}</div>
           </div>
           <div class="d-flex flex-wrap gap-2">
-            <a href="" class="btn btn-outline-brand">
-              {% bs_icon 'shield-check' %}<span class="ms-1">Blottler Reports</span>
+            <a href="{% url 'lupon_mem:blotter_reports_menu' %}" class="btn btn-outline-brand">
+              {% bs_icon 'shield-check' %}<span class="ms-1">Blotter Reports</span>
             </a>
-            <a href="" class="btn btn-brand">
+            <a href="{% url 'lupon_mem:case_list' %}" class="btn btn-brand">
               {% bs_icon 'file-earmark-text' %}<span class="ms-1">Barangay Cases</span>
             </a>
-            <a href="" class="btn btn-brand-subtle">
+            <a href="{% url 'lupon_mem:resident_records_list' %}" class="btn btn-brand-subtle">
               {% bs_icon 'buildings' %}<span class="ms-1">Resident Records</span>
             </a>
           </div>
@@ -206,6 +206,42 @@
           <div class="flex-grow-1">
             <div class="kpi-label">Settlement Percentage</div>
             <div class="kpi-value">{{ kpis.settlement_rate|default_if_none:"-" }}<span class="kpi-sub">%</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Reports Section -->
+  <div class="row g-3 mt-1">
+    <div class="col-12">
+      <div class="card section shadow-sm">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <h5 class="mb-0">Quick Reports</h5>
+          <a href="{% url 'lupon_mem:blotter_reports_menu' %}" class="btn btn-sm btn-outline-brand">View All Reports</a>
+        </div>
+        <div class="card-body">
+          <div class="row g-2">
+            <div class="col-md-3">
+              <button class="btn btn-outline-primary btn-sm w-100" onclick="showFilterModal('total_cases_by_status')">
+                <i class="bi bi-bar-chart me-1"></i> Cases by Status
+              </button>
+            </div>
+            <div class="col-md-3">
+              <button class="btn btn-outline-success btn-sm w-100" onclick="showFilterModal('case_summaries')">
+                <i class="bi bi-file-text me-1"></i> Case Summaries
+              </button>
+            </div>
+            <div class="col-md-3">
+              <button class="btn btn-outline-warning btn-sm w-100" onclick="showFilterModal('settlement_statistics')">
+                <i class="bi bi-pie-chart me-1"></i> Settlement Stats
+              </button>
+            </div>
+            <div class="col-md-3">
+              <button class="btn btn-outline-info btn-sm w-100" onclick="showFilterModal('monthly_activity')">
+                <i class="bi bi-calendar-month me-1"></i> Monthly Activity
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -273,7 +309,74 @@
       });
     }
   })();
+
+  function showFilterModal(reportType) {
+    document.getElementById('filterForm').action = `/lupon_mem/blotter-reports/${reportType}/`;
+    new bootstrap.Modal(document.getElementById('filterModal')).show();
+  }
 </script>
 
 </div>
+
+<!-- Filter Modal -->
+<div class="modal fade" id="filterModal" tabindex="-1" style="margin-top: 150px;">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Report Filters</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="filterForm" method="post">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label>Complaint Title (Optional)</label>
+                                <select class="form-control" name="complaint_title_id">
+                                    <option value="">All Complaint Types</option>
+                                    {% for ct_id, ct_name in complaint_titles %}
+                                        <option value="{{ ct_id }}">{{ ct_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label>Case Nature (Optional)</label>
+                                <select class="form-control" name="case_nature_id">
+                                    <option value="">All Case Natures</option>
+                                    {% for cn_id, cn_name in case_natures %}
+                                        <option value="{{ cn_id }}">{{ cn_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label>Date From (Optional)</label>
+                                <input type="date" class="form-control" name="date_from">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label>Date To (Optional)</label>
+                                <input type="date" class="form-control" name="date_to">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-download me-2"></i>Generate PDF
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% endblock %}

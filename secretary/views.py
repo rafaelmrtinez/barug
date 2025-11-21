@@ -2398,7 +2398,327 @@ def api_business_pins(
     )
     return JsonResponse(pins, safe=False)
 
+
 # -------------------------------
+# INCIDENT HEATMAP
+# -------------------------------
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+def incident_heatmap(request: HttpRequest):
+    """
+    Display comprehensive barangay incident heatmap with advanced analytics and filtering.
+    """
+    from django.db import connection
+    import json
+    
+    # Get filter parameters
+    time_filter = request.GET.get('time_filter', '1_year')
+    case_type_filter = request.GET.get('case_type', 'all')
+    settlement_filter = request.GET.get('settlement', 'all')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
+
+    # Build time filter condition (reports)
+    time_conditions = {
+        '1_month': "AND br.date_time_reported >= CURRENT_DATE - INTERVAL '1 month'",
+        '3_months': "AND br.date_time_reported >= CURRENT_DATE - INTERVAL '3 months'",
+        '6_months': "AND br.date_time_reported >= CURRENT_DATE - INTERVAL '6 months'",
+        '1_year': "AND br.date_time_reported >= CURRENT_DATE - INTERVAL '1 year'",
+        'all': "",
+        'custom': ""
+    }
+    
+    # Handle custom date range
+    if time_filter == 'custom' and start_date and end_date:
+        time_condition = f"AND br.date_time_reported::date BETWEEN '{start_date}' AND '{end_date}'"
+        case_time_condition = f"AND bc.date_filed::date BETWEEN '{start_date}' AND '{end_date}'"
+    else:
+        time_condition = time_conditions.get(time_filter, time_conditions['1_year'])
+        # Build time filter condition (cases)
+        case_time_conditions = {
+            '1_month': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '1 month'",
+            '3_months': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '3 months'",
+            '6_months': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '6 months'",
+            '1_year': "AND bc.date_filed >= CURRENT_DATE - INTERVAL '1 year'",
+            'all': "",
+            'custom': ""
+        }
+        case_time_condition = case_time_conditions.get(time_filter, case_time_conditions['1_year'])
+
+    # Build case type filter (parameterized)
+    case_type_condition = ""
+    case_type_params = []
+    if case_type_filter != 'all':
+        case_type_condition = "AND ct.complaint_title_name = %s"
+        case_type_params.append(case_type_filter)
+
+    # Build settlement filter
+    settlement_condition = ""
+    if settlement_filter == 'settled':
+        settlement_condition = "AND UPPER(ss.settlement_status_name) = 'SETTLED'"
+    elif settlement_filter == 'pending':
+        settlement_condition = "AND (ss.settlement_status_name IS NULL OR UPPER(ss.settlement_status_name) = 'PENDING')"
+    elif settlement_filter == 'not_settled':
+        settlement_condition = "AND UPPER(ss.settlement_status_name) = 'NOT SETTLED'"
+
+    with connection.cursor() as cur:
+        # ---------- 1) Incident rows ----------
+        sql_incidents = f"""
+            WITH incident_data AS (
+                -- Blotter Reports (not yet converted to cases)
+                SELECT 
+                    'BR-' || br.blotter_report_id as incident_id,
+                    COALESCE(br.incident_subject, 'Unnamed Incident') as incident_name,
+                    COALESCE(br.incident_desc, 'No description') as incident_desc,
+                    br.date_time_reported::date as date_filed,
+                    br.date_time_reported::time as time_filed,
+                    a.latitude,
+                    a.longitude,
+                    COALESCE(a.street, 'Unknown Street') as street,
+                    COALESCE(a.barangay, 'Unknown Barangay') as barangay,
+                    COALESCE(ps.purok_sitio_name, 'Unknown Purok') as purok,
+                    'Blotter Report' as incident_type,
+                    'Pending Review' as case_status,
+                    'Not Applicable' as settlement_status,
+                    COALESCE(pst.payment_status_name, 'Unpaid') as payment_status,
+                    'Low' as severity_level,
+                    br.date_time_reported as created_at,
+                    '' as case_nature
+                FROM blotter_report br
+                LEFT JOIN addresss a ON a.address_id = br.incident_address_id
+                LEFT JOIN purok_sitio ps ON ps.purok_sitio_id = a.purok_sitio_id
+                LEFT JOIN payment_status pst ON pst.payment_status_id = br.payment_status_id
+                WHERE a.latitude IS NOT NULL 
+                  AND a.longitude IS NOT NULL
+                  {time_condition}
+                  
+                UNION ALL
+                
+                -- Blotter Cases (converted from reports or direct cases) - DEFAULT TO BARANGAY CASES ONLY
+                SELECT 
+                    'BC-' || bc.blotter_case_id as incident_id,
+                    COALESCE(bc.blotter_case_name, 'Unnamed Case') as incident_name,
+                    COALESCE(bc.incident_desc, 'No description') as incident_desc,
+                    bc.date_filed::date as date_filed,
+                    bc.time_filed as time_filed,
+                    a.latitude,
+                    a.longitude,
+                    COALESCE(a.street, 'Unknown Street') as street,
+                    COALESCE(a.barangay, 'Unknown Barangay') as barangay,
+                    COALESCE(ps.purok_sitio_name, 'Unknown Purok') as purok,
+                    COALESCE(ct.complaint_title_name, 'General Complaint') as incident_type,
+                    COALESCE(cs.case_state_name, 'Open') as case_status,
+                    COALESCE(ss.settlement_status_name, 'Pending') as settlement_status,
+                    'Paid' as payment_status,
+                    CASE 
+                        WHEN UPPER(ss.settlement_status_name) = 'SETTLED' THEN 'Low'
+                        WHEN UPPER(cs.case_state_name) = 'CLOSED' THEN 'Medium'
+                        WHEN bc.date_filed < CURRENT_DATE - INTERVAL '6 months' AND UPPER(ss.settlement_status_name) != 'SETTLED' THEN 'High'
+                        ELSE 'Medium'
+                    END as severity_level,
+                    COALESCE(bc.date_filed::timestamp, CURRENT_TIMESTAMP) as created_at,
+                    COALESCE(cn.case_name, '') as case_nature
+                FROM blotter_case bc
+                LEFT JOIN addresss a ON a.address_id = (
+                    SELECT br.incident_address_id 
+                    FROM blotter_report br 
+                    WHERE br.blotter_report_id = bc.blotter_report_id
+                    LIMIT 1
+                )
+                LEFT JOIN purok_sitio ps ON ps.purok_sitio_id = a.purok_sitio_id
+                LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
+                LEFT JOIN case_nature cn ON cn.case_nature_id = bc.case_nature_id
+                LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
+                LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+                WHERE a.latitude IS NOT NULL 
+                  AND a.longitude IS NOT NULL
+                  AND bc.date_filed >= CURRENT_DATE - INTERVAL '2 years'
+                  {case_time_condition}
+                  {case_type_condition}
+                  {settlement_condition}
+            )
+            SELECT * FROM incident_data
+            ORDER BY created_at DESC, incident_id
+            LIMIT 1000
+        """
+
+        cur.execute(sql_incidents, case_type_params)
+        incidents = cur.fetchall()
+
+        # ---------- 2) Stats by incident type ----------
+        sql_stats = f"""
+            WITH stats_data AS (
+                SELECT 
+                    COALESCE(ct.complaint_title_name, 'General Complaint') as incident_type,
+                    COUNT(*) as total_count,
+                    COUNT(CASE WHEN UPPER(ss.settlement_status_name) = 'SETTLED' THEN 1 END) as settled_count,
+                    COUNT(CASE WHEN UPPER(cs.case_state_name) = 'CLOSED' THEN 1 END) as closed_count,
+                    COUNT(CASE WHEN a.latitude IS NOT NULL AND a.longitude IS NOT NULL THEN 1 END) as mapped_count,
+                    AVG(
+                        CASE 
+                            WHEN bc.date_filed IS NOT NULL AND ss.settlement_status_id IS NOT NULL
+                            THEN (CURRENT_DATE::date - bc.date_filed::date)
+                            ELSE NULL
+                        END
+                    ) AS avg_resolution_days
+                FROM blotter_case bc
+                LEFT JOIN addresss a ON a.address_id = (
+                    SELECT br.incident_address_id 
+                    FROM blotter_report br 
+                    WHERE br.blotter_report_id = bc.blotter_report_id
+                    LIMIT 1
+                )
+                LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
+                LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
+                LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+                WHERE bc.date_filed >= CURRENT_DATE - INTERVAL '2 years'
+                {case_time_condition}
+                GROUP BY ct.complaint_title_name
+                
+                UNION ALL
+                
+                SELECT 
+                    'Blotter Report' as incident_type,
+                    COUNT(*) as total_count,
+                    0 as settled_count,
+                    0 as closed_count,
+                    COUNT(CASE WHEN a.latitude IS NOT NULL AND a.longitude IS NOT NULL THEN 1 END) as mapped_count,
+                    NULL as avg_resolution_days
+                FROM blotter_report br
+                LEFT JOIN addresss a ON a.address_id = br.incident_address_id
+                WHERE 1=1
+                {time_condition}
+            )
+            SELECT incident_type, total_count, settled_count, closed_count, mapped_count, avg_resolution_days
+            FROM stats_data
+            WHERE total_count > 0
+            ORDER BY total_count DESC
+        """
+
+        cur.execute(sql_stats)
+        incident_stats = cur.fetchall()
+
+        # ---------- 2b) Summary counts for headers ----------
+        # Total blotter reports (apply selected time filter)
+        cur.execute(f"SELECT COUNT(*) FROM blotter_report br WHERE 1=1 {time_condition}")
+        blotter_reports_count = cur.fetchone()[0]
+
+        # Total blotter cases (base window 2 years + selected time filter)
+        cur.execute(f"SELECT COUNT(*) FROM blotter_case bc WHERE bc.date_filed >= CURRENT_DATE - INTERVAL '2 years' {case_time_condition}")
+        blotter_cases_count = cur.fetchone()[0]
+
+        # ---------- 3) Street-level stats ----------
+        sql_streets = """
+            SELECT 
+                COALESCE(a.street, 'Unknown Street') as street_name,
+                COALESCE(a.barangay, 'Unknown Barangay') as barangay_name,
+                COUNT(*) as incident_count,
+                COUNT(CASE WHEN UPPER(ss.settlement_status_name) = 'SETTLED' THEN 1 END) as settled_count,
+                COUNT(CASE WHEN bc.date_filed >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as recent_count,
+                MAX(bc.date_filed) as last_incident_date
+            FROM blotter_case bc
+            LEFT JOIN addresss a ON a.address_id = (
+                SELECT br.incident_address_id 
+                FROM blotter_report br 
+                WHERE br.blotter_report_id = bc.blotter_report_id
+                LIMIT 1
+            )
+            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+            WHERE a.latitude IS NOT NULL 
+              AND a.longitude IS NOT NULL
+              AND bc.date_filed >= CURRENT_DATE - INTERVAL '1 year'
+            GROUP BY a.street, a.barangay
+            HAVING COUNT(*) >= 1
+            ORDER BY incident_count DESC, recent_count DESC
+            LIMIT 25
+        """
+
+        cur.execute(sql_streets)
+        street_stats = cur.fetchall()
+
+        # ---------- 4) Case type options ----------
+        cur.execute("""
+            SELECT DISTINCT ct.complaint_title_name
+            FROM complaint_title ct
+            JOIN blotter_case bc ON bc.complaint_title_id = ct.complaint_title_id
+            WHERE bc.date_filed >= CURRENT_DATE - INTERVAL '2 years'
+            ORDER BY ct.complaint_title_name
+        """)
+        case_types = [row[0] for row in cur.fetchall()]
+
+    # -------- Format payloads for the template --------
+    incident_data = []
+
+    for incident in incidents:
+        incident_item = {
+            'id': incident[0],
+            'name': incident[1] or 'Unnamed Incident',
+            'description': incident[2] or 'No description',
+            'date': incident[3].strftime('%Y-%m-%d') if incident[3] else '',
+            'time': str(incident[4]) if incident[4] else '',
+            'lat': float(incident[5]) if incident[5] else 0,
+            'lng': float(incident[6]) if incident[6] else 0,
+            'street': incident[7] or 'Unknown Street',
+            'barangay': incident[8] or 'Unknown Barangay',
+            'purok': incident[9] or 'Unknown Purok',
+            'type': incident[10] or 'Unknown Type',
+            'case_status': incident[11] or 'Unknown Status',
+            'settlement_status': incident[12] or 'Pending',
+            'payment_status': incident[13] or 'Unknown',
+            'severity': incident[14] or 'Medium',
+            'created_at': incident[15].strftime('%Y-%m-%d %H:%M') if incident[15] else '',
+            'case_nature': incident[16] if len(incident) > 16 else ''
+        }
+        incident_data.append(incident_item)
+    
+    stats_data = []
+    for stat in incident_stats:
+        settlement_rate = round((stat[2] / stat[1] * 100) if stat[1] > 0 else 0, 1)
+        avg_days = round(stat[5]) if stat[5] is not None else None
+        stats_data.append({
+            'type': stat[0],
+            'total_count': stat[1],
+            'settled_count': stat[2],
+            'closed_count': stat[3],
+            'mapped_count': stat[4],
+            'settlement_rate': settlement_rate,
+            'avg_resolution_days': avg_days,
+            'efficiency_score': min(100, max(0, 100 - (avg_days or 30) + settlement_rate)) if avg_days is not None else settlement_rate
+        })
+
+    street_data = []
+    for street in street_stats:
+        settlement_rate = round((street[3] / street[2] * 100) if street[2] > 0 else 0, 1)
+        street_data.append({
+            'street': street[0],
+            'barangay': street[1],
+            'incident_count': street[2],
+            'settled_count': street[3],
+            'recent_count': street[4],
+            'settlement_rate': settlement_rate,
+            'last_incident': street[5].strftime('%Y-%m-%d') if street[5] else 'N/A',
+            'risk_level': 'High' if street[4] >= 3 else 'Medium' if street[4] >= 1 else 'Low'
+        })
+
+    user_role = _auth_role_name(request)
+    return render(request, "secretary/incident_heatmap.html", {
+        "incident_data_json": json.dumps(incident_data),
+        "incident_data": incident_data,
+        "incident_stats": json.dumps(stats_data),  # For JavaScript charts
+        "street_stats": street_data,
+        "blotter_reports_count": blotter_reports_count,
+        "blotter_cases_count": blotter_cases_count,
+        "case_types": case_types,
+        "time_filter": time_filter,
+        "case_type_filter": case_type_filter,
+        "settlement_filter": settlement_filter,
+        "start_date": start_date,
+        "end_date": end_date,
+        'page_path': f'{user_role} / Incident Heatmap',
+        'page_title': 'Barangay Incident Heatmap & Analytics',
+    })# -------------------------------
 # RESIDENTS PDF GENERATION
 # -------------------------------
 
