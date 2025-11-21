@@ -49,4 +49,7 @@ urlpatterns = [
     # ANNOUNCEMENT
     path("announcement/create_draft/", views.annoucement_draf, name="announcement_draft"),
     path("announcement/draft_list/", views.announcement_draft_list, name="announcement_draft_list"),
+    
+    # RESIDENTS PDF
+    path("api/residents/pdf/", views.ResidentsPDFAPI.as_view(), name="residents_pdf_api"),
 ]
