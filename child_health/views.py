@@ -15,7 +15,7 @@ from django.views.decorators.csrf import csrf_protect
 
 from authentication.guards import role_required, session_login_required
 from authentication.utils import nocache
-from barug.utility.custom_date_time_util import DateAndTimeUtility
+from src.infra.utilities.custom_date_time_util import DateAndTimeUtility
 from barug.utility.lazy_repository import LazyRepositoryProxy
 from barug.utility.messages_util import MessageUtility
 from src.infra.exceptions.child_health_record_exception import ChildHealthRecordException

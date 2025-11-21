@@ -4,7 +4,7 @@ from datetime import datetime, date
 from src.infra.repositories.child_health_record_repository import ChildHealthRecordRepository
 from maternal.forms.maternal_identification_form import add_bootstrap_classes
 from maternal.forms.form_utils import FormUtils
-from barug.utility.custom_date_time_util import DateAndTimeUtility
+from src.infra.utilities.custom_date_time_util import DateAndTimeUtility
 
 class BirthAndSupplentationForm(forms.Form):
     # Immunization fields: these map to a table, so use per field for each dose.

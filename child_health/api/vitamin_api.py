@@ -11,7 +11,7 @@ from authentication.utils import nocache
 from src.infra.exceptions.child_health_record_exception import ChildHealthRecordException
 from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.repositories.child_health_record_repository import ChildHealthRecordRepository
-from barug.utility.custom_date_time_util import DateAndTimeUtility
+from src.infra.utilities.custom_date_time_util import DateAndTimeUtility
 from barug.containers import app
 from src.app.services.vitamin_service import VitaminService
 

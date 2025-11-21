@@ -1,7 +1,7 @@
 from typing import List, Optional, Tuple
 from src.infra.repositories.child_health_record_repository import ChildHealthRecordRepository
 from src.infra.exceptions.child_health_record_exception import ChildHealthRecordException
-from barug.utility.custom_date_time_util import DateAndTimeUtility
+from src.infra.utilities.custom_date_time_util import DateAndTimeUtility
 
 
 class VitaminService:
