@@ -11,7 +11,7 @@ from authentication.utils import nocache
 from src.infra.exceptions.child_health_record_exception import ChildHealthRecordException
 from dependency_injector.wiring import inject, Provide
 from src.app.bootstrap.app_containers import AppContainer
-from src.app.services.bf_feeding_service import BFFeedingService
+from src.app.contracts.bf_feeding_service import IBFFeedingService
 from src.domain.exceptions.bf_feeding_domain_exception import BfFeedingDomainException
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ ACCESS = ("MIDWIFE", "Midwife", "midwife", "Barangay Health Worker", "bhw", "Sup
 @method_decorator([session_login_required, role_required(*ACCESS), nocache, csrf_protect, require_http_methods(["POST"])], name='dispatch')
 class BFFeedingAPI(View):
     @inject
-    def __init__(self, bf_service: BFFeedingService = Provide[AppContainer.child_bf_service], **kwargs):
+    def __init__(self, bf_service: IBFFeedingService = Provide[AppContainer.child_bf_service], **kwargs):
         super().__init__(**kwargs)
         self.bf_service = bf_service
 
@@ -33,7 +33,7 @@ class BFFeedingAPI(View):
             staff_id = request.session.get("auth").get("staff_id")
 
             # Delegate validation and insertion to service layer (injected)
-            bf_service: BFFeedingService = self.bf_service
+            bf_service: IBFFeedingService = self.bf_service
             res = bf_service.process_and_insert(chr_id=child_health_record_id, staff_id=staff_id, payload=data)
             if res:
                 return JsonResponse({"ok": True, "message": "Breast feeding saved"})

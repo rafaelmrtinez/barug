@@ -4,7 +4,7 @@ from datetime import datetime, date
 from typing import Any, Dict, List, Optional
 
 from src.infra.utilities.custom_date_time_util import DateAndTimeUtility
-from src.infra.repositories.child_health_record_repository import ChildHealthRecordRepository
+from src.domain.contracts.child_health_record_repository import IChildHealthRecordRepository
 from src.domain.exceptions.bf_feeding_domain_exception import BfFeedingDomainException
 
 
@@ -16,7 +16,7 @@ class BFFeedingDomainService:
     invalid payloads or rule violations.
     """
 
-    def __init__(self, ch_repo: ChildHealthRecordRepository):
+    def __init__(self, ch_repo: IChildHealthRecordRepository):
         self.ch_repo = ch_repo
 
     def _parse_single(self, val: Any) -> Optional[date]:

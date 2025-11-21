@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 from datetime import datetime
 
 from src.infra.utilities.custom_date_time_util import DateAndTimeUtility
-from src.infra.repositories.child_health_record_repository import ChildHealthRecordRepository
+from src.domain.contracts.child_health_record_repository import IChildHealthRecordRepository
 from src.domain.exceptions.newborn_screening_domain_exception import NewbornScreeningDomainException
 
 
@@ -17,7 +17,7 @@ class NewbornScreeningDomainService:
     - only one newborn screening record may exist per child record
     """
 
-    def __init__(self, ch_repo: ChildHealthRecordRepository):
+    def __init__(self, ch_repo: IChildHealthRecordRepository):
         self.ch_repo = ch_repo
 
     def validate_and_prepare(

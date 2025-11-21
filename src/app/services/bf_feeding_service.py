@@ -2,7 +2,8 @@ import logging
 from datetime import date
 from typing import Any, Dict, List, Optional
 
-from src.infra.repositories.child_health_record_repository import ChildHealthRecordRepository
+from src.domain.contracts.child_health_record_repository import IChildHealthRecordRepository
+from src.app.contracts.bf_feeding_service import IBFFeedingService
 from src.infra.exceptions.child_health_record_exception import ChildHealthRecordException
 from src.domain.services.bf_feeding_domain_service import BFFeedingDomainService
 from src.domain.exceptions.bf_feeding_domain_exception import BfFeedingDomainException
@@ -10,7 +11,7 @@ from src.domain.exceptions.bf_feeding_domain_exception import BfFeedingDomainExc
 logger = logging.getLogger(__name__)
 
 
-class BFFeedingService:
+class BFFeedingService(IBFFeedingService):
     """Service to validate and persist exclusive breastfeeding check dates.
 
     Moves the validation logic previously in `ChildBreastFeedingForm.clean()` into
@@ -18,7 +19,7 @@ class BFFeedingService:
     raises `ChildHealthRecordException` with a helpful message on validation errors.
     """
 
-    def __init__(self, ch_repo: ChildHealthRecordRepository, domain_service: BFFeedingDomainService):
+    def __init__(self, ch_repo: IChildHealthRecordRepository, domain_service: BFFeedingDomainService):
         self._repo = ch_repo
         self._domain = domain_service
 

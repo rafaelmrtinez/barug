@@ -5,7 +5,7 @@ from datetime import datetime, date
 from typing import Optional, Dict
 
 from src.app.contracts.newborn_screening_service import INewbornScreeningService
-from src.infra.repositories.child_health_record_repository import ChildHealthRecordRepository
+from src.domain.contracts.child_health_record_repository import IChildHealthRecordRepository
 from src.infra.exceptions.child_health_record_exception import ChildHealthRecordException
 from src.domain.services.newborn_screening_domain_service import NewbornScreeningDomainService
 from src.domain.exceptions.newborn_screening_domain_exception import NewbornScreeningDomainException
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class NewbornScreeningService(INewbornScreeningService):
-    def __init__(self, ch_repo: ChildHealthRecordRepository, domain_service: NewbornScreeningDomainService):
+    def __init__(self, ch_repo: IChildHealthRecordRepository, domain_service: NewbornScreeningDomainService):
         self.ch_repo = ch_repo
         self.domain_service = domain_service
 
