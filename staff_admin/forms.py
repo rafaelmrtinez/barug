@@ -632,17 +632,13 @@ class AccessLogFilters(forms.Form):
         label='Search Access Logs',
         required= False,
     )
-    user_type = forms.ChoiceField(
-        choices=[
-            ("", "All Users"),
-            ("staff", "Staff Only"),
-            ("resident", "Residents Only"),
-        ],
+    role = forms.ChoiceField(
+        choices=[("all", "All Roles")] + ROLE_CHOICES,
         widget=forms.Select(attrs={
             'class': 'form-select',
-            'name': 'user_type',
+            'name': 'role',
         }),
-        label='User Type',
+        label='Role',
         required=False,
     )
     date_from = forms.DateField(

@@ -5,6 +5,7 @@
 {% block css %}
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
 <link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
 <style>
   .settings-nav {
     background: var(--bs-danger-text-emphasis);
@@ -115,6 +116,20 @@
     border-color: var(--bs-danger-text-emphasis);
     box-shadow: 0 0 0 0.2rem rgba(139, 21, 56, 0.15);
   }
+  .status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+  .status-active {
+    background-color: #d4edda;
+    color: #155724;
+  }
+  .status-inactive {
+    background-color: #f8d7da;
+    color: #721c24;
+  }
 
   /* Crop modal tweaks (smaller, tidy stage) */
   #cropModal .modal-dialog {
@@ -132,6 +147,29 @@
     max-width: 100%;
     max-height: 100%;
     display: block;
+  }
+  
+  /* Activity log sub-tabs styling */
+  #activity-tabs .nav-link {
+    color: #ffffff;
+    border: 2px solid #6c757d;
+    border-radius: 12px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    background: #6c757d;
+    margin-right: 0.5rem;
+  }
+  #activity-tabs .nav-link:hover {
+    color: var(--bs-danger-text-emphasis);
+    background: rgba(139, 21, 56, 0.1);
+    border-color: rgba(139, 21, 56, 0.2);
+  }
+  #activity-tabs .nav-link.active {
+    color: white;
+    background: var(--bs-danger-text-emphasis);
+    border-color: var(--bs-danger-text-emphasis);
+    box-shadow: 0 2px 8px rgba(139, 21, 56, 0.2);
   }
 </style>
 {% endblock %}
@@ -766,70 +804,130 @@
             <!-- Activity Log Tab -->
             <div class="tab-pane fade" id="activity">
               <div class="row g-4">
-                <!-- Access Log -->
                 <div class="col-12">
                   <div class="settings-card card">
                     <div class="card-body">
-                      <h6 class="card-title d-flex align-items-center gap-2 mb-4">
-                        {% bs_icon 'door-open' %} Access Log
-                      </h6>
-                      <div class="d-flex flex-column gap-3" style="max-height: 400px; overflow-y: auto;">
-                        {% for log in access_logs|slice:":10" %}
-                        <div class="d-flex align-items-center p-3 rounded-4" style="background: linear-gradient(135deg, {% if log.action == 'login' %}#e8f5e8, #f0f9f0{% else %}#f8f9fa, #e9ecef{% endif %}); border-left: 4px solid {% if log.action == 'login' %}#198754{% else %}#6c757d{% endif %};">
-                          <div class="me-3">
-                            <div class="d-flex align-items-center justify-content-center rounded-circle" style="width: 40px; height: 40px; background: {% if log.action == 'login' %}#198754{% else %}#6c757d{% endif %}; color: white;">
-                              {% if log.action == 'login' %}{% bs_icon 'box-arrow-in-right' %}{% else %}{% bs_icon 'box-arrow-right' %}{% endif %}
+                      <!-- Sub-tabs for Access and Operation logs -->
+                      <ul class="nav nav-pills mb-4" id="activity-tabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                          <button class="nav-link active" id="access-log-tab" data-bs-toggle="pill" data-bs-target="#access-log" type="button" role="tab" aria-controls="access-log" aria-selected="true">
+                            {% bs_icon 'door-open' extra_classes='me-2' %} Access Log
+                          </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                          <button class="nav-link" id="operation-log-tab" data-bs-toggle="pill" data-bs-target="#operation-log" type="button" role="tab" aria-controls="operation-log" aria-selected="false">
+                            {% bs_icon 'gear' extra_classes='me-2' %} Operation Log
+                          </button>
+                        </li>
+                      </ul>
+                      
+                      <div class="tab-content" id="activity-tab-content">
+                        <!-- Access Log Tab -->
+                        <div class="tab-pane fade show active" id="access-log" role="tabpanel" aria-labelledby="access-log-tab">
+                          <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                              <thead>
+                                <tr>
+                                  <th>{% bs_icon 'calendar-event' extra_classes='me-1' %} Login Time</th>
+                                  <th>{% bs_icon 'calendar-x' extra_classes='me-1' %} Logout Time</th>
+                                  <th>{% bs_icon 'circle-fill' extra_classes='me-1' %} Status</th>
+                                  <th>{% bs_icon 'clock' extra_classes='me-1' %} Duration</th>
+                                  <th>{% bs_icon 'globe' extra_classes='me-1' %} IP Address</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {% if access_logs %}
+                                  {% for log in access_logs %}
+                                <tr>
+                                  <td>
+                                    {% if log.login_time %}
+                                      <div class="fw-medium">{{ log.login_time|date:"M d, Y" }}</div>
+                                      <small class="text-muted">{{ log.login_time|date:"g:i A" }}</small>
+                                    {% else %}
+                                      <span class="text-muted">—</span>
+                                    {% endif %}
+                                  </td>
+                                  <td>
+                                    {% if log.logout_time %}
+                                      <div class="fw-medium">{{ log.logout_time|date:"M d, Y" }}</div>
+                                      <small class="text-muted">{{ log.logout_time|date:"g:i A" }}</small>
+                                    {% else %}
+                                      <span class="badge bg-success">Still active</span>
+                                    {% endif %}
+                                  </td>
+                                  <td>
+                                    <span class="status-badge {% if log.active_status == 'ACTIVE' %}status-active{% else %}status-inactive{% endif %}">
+                                      {% if log.active_status == 'ACTIVE' %}
+                                        {% bs_icon 'check-circle-fill' extra_classes='me-1' %}
+                                      {% else %}
+                                        {% bs_icon 'x-circle-fill' extra_classes='me-1' %}
+                                      {% endif %}
+                                      {{ log.active_status|title }}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    <span class="fw-medium">{{ log.session_duration|default:"—" }}</span>
+                                  </td>
+                                  <td>
+                                    <code class="bg-light px-2 py-1 rounded">{{ log.ip_add|default:"—" }}</code>
+                                  </td>
+                                </tr>
+                                  {% endfor %}
+                                {% else %}
+                                  <tr>
+                                    <td colspan="5" class="text-center py-4">
+                                      <div class="text-muted">No access logs available</div>
+                                    </td>
+                                  </tr>
+                                {% endif %}
+                              </tbody>
+                            </table>
+                          </div>
+                          {% if access_logs|length > 10 %}
+                          <div class="mt-3">
+                            <div class="page-pagination">
+                              <nav aria-label="Pagination" class="pager" role="navigation">
+                                <span class="pager-results" id="access-page-info">
+                                  Showing 1-10 of {{ access_logs|length }} result(s)
+                                </span>
+                              
+                                <div>
+                                  <a class="pager-btn" id="access-prev-btn" href="#" onclick="changeAccessPage(-1)">&lt;</a>
+                                  <span class="pager-label" id="access-page-label">Page 1 of <span id="total-pages"></span></span>
+                                  <a class="pager-btn" id="access-next-btn" href="#" onclick="changeAccessPage(1)">></a>
+                                </div>
+                              </nav>
                             </div>
                           </div>
-                          <div class="flex-grow-1">
-                            <div class="fw-bold text-dark">{{ log.action|title }}</div>
-                            <small class="text-muted">{{ log.timestamp|date:"M d, Y - g:i A" }}</small>
-                          </div>
+                          {% endif %}
                         </div>
-                        {% empty %}
-                        <div class="text-center text-muted py-4">No access logs available</div>
-                        {% endfor %}
-                      </div>
-                      {% if access_logs|length > 10 %}
-                      <div class="text-center mt-3">
-                        <small class="text-muted">Showing latest 10 of {{ access_logs|length }} entries</small>
-                      </div>
-                      {% endif %}
-
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Operations Log -->
-                <div class="col-12">
-                  <div class="settings-card card">
-                    <div class="card-body">
-                      <h6 class="card-title d-flex align-items-center gap-2 mb-4">
-                        {% bs_icon 'gear' %} Operation Log
-                      </h6>
-                      <div class="d-flex flex-column gap-3" style="max-height: 400px; overflow-y: auto;">
-                        {% for log in operation_logs|slice:":10" %}
-                        <div class="d-flex align-items-center p-3 rounded-4" style="background: linear-gradient(135deg, {% if log.type == 'profile' %}#e7f3ff, #f0f8ff{% else %}#fff3cd, #fef9e7{% endif %}); border-left: 4px solid {% if log.type == 'profile' %}#0d6efd{% else %}#ffc107{% endif %};">
-                          <div class="me-3">
-                            <div class="d-flex align-items-center justify-content-center rounded-circle" style="width: 40px; height: 40px; background: {% if log.type == 'profile' %}#0d6efd{% else %}#ffc107{% endif %}; color: {% if log.type == 'profile' %}white{% else %}#212529{% endif %};">
-                              {% if log.type == 'profile' %}{% bs_icon 'person-gear' %}{% else %}{% bs_icon 'shield-lock' %}{% endif %}
+                        
+                        <!-- Operation Log Tab -->
+                        <div class="tab-pane fade" id="operation-log" role="tabpanel" aria-labelledby="operation-log-tab">
+                          <div class="d-flex flex-column gap-3" style="max-height: 400px; overflow-y: auto;">
+                            {% for log in operation_logs|slice:":10" %}
+                            <div class="d-flex align-items-center p-3 rounded-4" style="background: linear-gradient(135deg, {% if log.type == 'profile' %}#e7f3ff, #f0f8ff{% else %}#fff3cd, #fef9e7{% endif %}); border-left: 4px solid {% if log.type == 'profile' %}#0d6efd{% else %}#ffc107{% endif %};">
+                              <div class="me-3">
+                                <div class="d-flex align-items-center justify-content-center rounded-circle" style="width: 40px; height: 40px; background: {% if log.type == 'profile' %}#0d6efd{% else %}#ffc107{% endif %}; color: {% if log.type == 'profile' %}white{% else %}#212529{% endif %};">
+                                  {% if log.type == 'profile' %}{% bs_icon 'person-gear' %}{% else %}{% bs_icon 'shield-lock' %}{% endif %}
+                                </div>
+                              </div>
+                              <div class="flex-grow-1">
+                                <div class="fw-bold text-dark">{{ log.operation }}</div>
+                                <small class="text-muted">{{ log.timestamp|date:"M d, Y - g:i A" }} • {{ log.details }}</small>
+                              </div>
                             </div>
+                            {% empty %}
+                            <div class="text-center text-muted py-4">No operation logs available</div>
+                            {% endfor %}
                           </div>
-                          <div class="flex-grow-1">
-                            <div class="fw-bold text-dark">{{ log.operation }}</div>
-                            <small class="text-muted">{{ log.timestamp|date:"M d, Y - g:i A" }} • {{ log.details }}</small>
+                          {% if operation_logs|length > 10 %}
+                          <div class="text-center mt-3">
+                            <small class="text-muted">Showing latest 10 of {{ operation_logs|length }} entries</small>
                           </div>
+                          {% endif %}
                         </div>
-                        {% empty %}
-                        <div class="text-center text-muted py-4">No operation logs available</div>
-                        {% endfor %}
                       </div>
-                      {% if operation_logs|length > 10 %}
-                      <div class="text-center mt-3">
-                        <small class="text-muted">Showing latest 10 of {{ operation_logs|length }} entries</small>
-                      </div>
-                      {% endif %}
-
                     </div>
                   </div>
                 </div>
@@ -1847,6 +1945,90 @@
       req.element.querySelector('span').textContent = '✗';
     });
   });
+
+  // Access logs pagination
+  let currentAccessPage = 1;
+  const accessLogsPerPage = 10;
+  let allAccessRows = [];
+  let totalAccessPages = 1;
+  
+  function initAccessLogsPagination() {
+    const tbody = document.querySelector('#activity tbody');
+    if (!tbody) return;
+    
+    allAccessRows = Array.from(tbody.querySelectorAll('tr')).filter(row => !row.querySelector('.text-center'));
+    if (allAccessRows.length <= accessLogsPerPage) return;
+    
+    totalAccessPages = Math.ceil(allAccessRows.length / accessLogsPerPage);
+    document.getElementById('total-pages').textContent = totalAccessPages;
+    
+    showAccessPage(1);
+  }
+  
+  function showAccessPage(page) {
+    if (!allAccessRows.length) return;
+    
+    currentAccessPage = Math.max(1, Math.min(page, totalAccessPages));
+    
+    const startIndex = (currentAccessPage - 1) * accessLogsPerPage;
+    const endIndex = startIndex + accessLogsPerPage;
+    
+    // Hide all rows
+    allAccessRows.forEach(row => row.style.display = 'none');
+    
+    // Show current page rows
+    for (let i = startIndex; i < endIndex && i < allAccessRows.length; i++) {
+      allAccessRows[i].style.display = '';
+    }
+    
+    // Update pagination info
+    const start = startIndex + 1;
+    const end = Math.min(endIndex, allAccessRows.length);
+    document.getElementById('access-page-info').textContent = `Showing ${start}-${end} of ${allAccessRows.length} result(s)`;
+    document.getElementById('access-page-label').innerHTML = `Page ${currentAccessPage} of <span id="total-pages">${totalAccessPages}</span>`;
+    
+    // Update button states
+    const prevBtn = document.getElementById('access-prev-btn');
+    const nextBtn = document.getElementById('access-next-btn');
+    
+    if (prevBtn) {
+      if (currentAccessPage === 1) {
+        prevBtn.className = 'pager-btn is-disabled';
+        prevBtn.setAttribute('aria-disabled', 'true');
+      } else {
+        prevBtn.className = 'pager-btn';
+        prevBtn.removeAttribute('aria-disabled');
+      }
+    }
+    
+    if (nextBtn) {
+      if (currentAccessPage === totalAccessPages) {
+        nextBtn.className = 'pager-btn is-disabled';
+        nextBtn.setAttribute('aria-disabled', 'true');
+      } else {
+        nextBtn.className = 'pager-btn';
+        nextBtn.removeAttribute('aria-disabled');
+      }
+    }
+  }
+  
+  window.changeAccessPage = function(direction) {
+    const newPage = currentAccessPage + direction;
+    if (newPage >= 1 && newPage <= totalAccessPages) {
+      showAccessPage(newPage);
+    }
+    return false;
+  };
+  
+  // Initialize when activity tab is shown
+  document.querySelector('[data-bs-target="#activity"]')?.addEventListener('shown.bs.tab', function() {
+    setTimeout(initAccessLogsPagination, 100);
+  });
+  
+  // Initialize if activity tab is already active
+  if (document.querySelector('#activity.active')) {
+    setTimeout(initAccessLogsPagination, 100);
+  }
 
 })();
 </script>
