@@ -112,11 +112,12 @@
                 } else {
                     CustomToast && CustomToast.show && CustomToast.show(`${immunizationName} data submitted successfully!`, { type: 'success' });
                 }
-                return;
+                return true;
             }
 
             const err = _extractErrorMsg(data);
             CustomToast && CustomToast.show && CustomToast.show(`${immunizationName} submission failed: ${err}`, { type: 'error' });
+            return false;
         } catch (error) {
             console.error(`Error submitting ${immunizationName}:`, error);
             CustomToast && CustomToast.show && CustomToast.show(`Failed to submit ${immunizationName}. Please try again.`, { type: 'error' });
@@ -147,12 +148,19 @@
             // Select latest date among filled
             const latestDate = [d3, d2, d1, d24].find(Boolean);
 
-            await postImmunizationData({
+            const ok = await postImmunizationData({
                 child_health_record_id: recordId,
                 immunization_type_id: typeId,
                 immunization_stage_given_id: immunizationStage,
                 date_given: latestDate
             }, immunizationName);
+
+            if (ok) {
+                try {
+                    const evt = new CustomEvent('immunization:submitted', { detail: { prefix, immunizationName, latestDate }, bubbles: true });
+                    document.dispatchEvent(evt);
+                } catch (_e) { /* ignore */ }
+            }
         });
     };
 

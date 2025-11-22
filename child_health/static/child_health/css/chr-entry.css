@@ -1,0 +1,116 @@
+/* Back-to-top floating button for child health page */
+.back-to-top{ position: fixed; right: 1rem; bottom: 1rem; width:48px; height:48px; border-radius:50%; background:#6d2932; color:#fff; border:none; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 6px 18px rgba(0,0,0,0.18); cursor:pointer; opacity:0; transform:translateY(8px); transition:opacity .2s ease, transform .2s ease; z-index:2050; }
+.back-to-top:focus{ outline: 2px solid rgba(255,255,255,0.12); }
+.back-to-top.visible{ opacity:1; transform:translateY(0); }
+.back-to-top svg{ width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; }
+
+/* Center content in tables within child health cards/tables */
+.card-body table th,
+.card-body table td,
+.table th,
+.table td {
+    text-align: center;
+    vertical-align: middle;
+}
+
+/* Button icon helper */
+.btn .btn-icon {
+    width: 14px;
+    height: 14px;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 8px;
+}
+.btn .btn-icon path {
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+}
+
+/* Equal column allocation for specific tables */
+.card-body table,
+.card-body .table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+/* Immunization table has 6 columns */
+#immunization table th,
+#immunization table td {
+    width: calc(100% / 6);
+}
+
+/* Visits table has 7 columns */
+#visits-table th,
+#visits-table td {
+    width: calc(100% / 7);
+}
+
+/* Visit Entry: make the four fields equally divide available width */
+#visit-entry > form .row.g-3 > .col-md-2 {
+    /* allow Bootstrap column to flex and take equal share */
+    -ms-flex: 1 1 0%;
+    flex: 1 1 0%;
+    max-width: none;
+}
+
+/* Ensure inputs/selects inside the visit entry stretch to full width of their column */
+#visit-entry input,
+#visit-entry select,
+#visit-entry textarea {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Identification: 3 equal fields per row at md and up */
+@media (min-width: 768px) {
+    #identification .row.g-3 {
+        display: flex;
+        flex-wrap: wrap;
+        margin-right: -0.5rem; /* align with bootstrap gutters */
+        margin-left: -0.5rem;
+    }
+    #identification .row.g-3 > div {
+        box-sizing: border-box;
+        padding-right: 0.5rem;
+        padding-left: 0.5rem;
+        -ms-flex: 0 0 33.3333%;
+        flex: 0 0 33.3333%;
+        max-width: 33.3333%;
+    }
+}
+
+/* Ensure inputs/selects inside the identification section stretch to full width */
+#identification input,
+#identification select,
+#identification textarea {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Parent Information: 3 equal fields per row at md and up.
+   Address row is outside `#parent-info` so it remains full-width. */
+@media (min-width: 768px) {
+    #parent-info {
+        display: flex;
+        flex-wrap: wrap;
+        margin-right: -0.5rem;
+        margin-left: -0.5rem;
+    }
+    #parent-info > div {
+        box-sizing: border-box;
+        padding-right: 0.5rem;
+        padding-left: 0.5rem;
+        -ms-flex: 0 0 33.3333%;
+        flex: 0 0 33.3333%;
+        max-width: 33.3333%;
+    }
+}
+
+/* Ensure inputs/selects inside the parent-info section stretch to full width */
+#parent-info input,
+#parent-info select,
+#parent-info textarea {
+    width: 100%;
+    box-sizing: border-box;
+}
