@@ -17,6 +17,9 @@ urlpatterns = [
     
     # Account settings
     path("account-settings/", views.account_settings, name="account_settings"),
+    
+    # Debug endpoint (TEMPORARY - remove in production)
+    path("debug-login-log/", views.debug_login_log, name="debug_login_log"),
 ]
 
 # (Optional) In your project root urls.py you can also set:
