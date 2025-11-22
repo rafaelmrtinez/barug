@@ -56,7 +56,12 @@
         if (searchValue) params.set('search', searchValue);
         if (payMethValue) params.set('pay_meth', payMethValue);
 
-        const url = `/treasurer/api/financial/pdf/?${params.toString()}`;
+        // Detect role from current URL path
+        const currentPath = window.location.pathname;
+        let rolePrefix = '/treasurer';
+        if (currentPath.startsWith('/captain/')) rolePrefix = '/captain';
+        
+        const url = `${rolePrefix}/api/financial/pdf/?${params.toString()}`;
 
         // First try: open the real endpoint in a new tab
         try {

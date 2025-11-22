@@ -56,7 +56,12 @@
         if (searchValue) params.set('search', searchValue);
         if (purokSitioValue) params.set('purok_sitio', purokSitioValue);
 
-        const url = `/secretary/api/residents/pdf/?${params.toString()}`;
+        // Detect role from current URL path
+        const currentPath = window.location.pathname;
+        let rolePrefix = '/secretary';
+        if (currentPath.startsWith('/captain/')) rolePrefix = '/captain';
+        
+        const url = `${rolePrefix}/api/residents/pdf/?${params.toString()}`;
 
         // First try: open the real endpoint in a new tab
         try {
