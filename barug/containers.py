@@ -41,6 +41,7 @@ app.wire(modules=[
     "child_health.api.newborn_screening_api",
     "child_health.api.birth_supplementation_api",
     "child_health.api.vitamin_api",
+    "child_health.api.child_visit_api",
     "child_health.api.iron_intake_api",
     "child_health.api.bf_feeding_api",
     "captain.views",

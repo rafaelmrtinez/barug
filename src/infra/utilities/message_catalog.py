@@ -27,6 +27,27 @@ class MessageCatalog:
         "max_three": "Cannot add more than three Vitamin A stages",
     }
 
+    # child visit messages
+    _MESSAGES.update({
+        "age_required": "Please provide the age.",
+        "age_invalid": "Enter a valid age in years (numbers only).",
+        "age_limit": "Age must be less than 5 years for child center visits.",
+        "age_integer_required": "Age must be an integer for children 1 year or older.",
+        "weight_required": "Please provide the weight.",
+        "weight_invalid": "Enter a valid weight (numbers only).",
+        "weight_range": "Weight must be between {min} and {max} kg.",
+        "temp_required": "Please provide the temperature.",
+        "temp_invalid": "Enter a valid temperature (numbers only).",
+        "temp_range": "Temperature must be between {min} and {max} °C.",
+        "height_required": "Please provide the height.",
+        "height_invalid": "Enter a valid height in centimeters (numbers only).",
+        "height_range": "Height must be between {min} and {max} cm.",
+        "findings_required": "Please provide the findings.",
+        "emoji_not_allowed": "Emoji characters are not allowed in text fields.",
+        "age_negative": "Age cannot be negative.",
+        "notes_na": "N/A",
+    })
+
     @classmethod
     def translate(cls, key: str, **kwargs) -> str:
         tpl = cls._MESSAGES.get(key, key)
