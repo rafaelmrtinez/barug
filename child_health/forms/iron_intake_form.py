@@ -19,34 +19,7 @@ class IronIntakeForm(forms.Form):
         
         intake_dates = self._ch_repo.fetch_iron_supplement_completion_by_chr_id(child_health_record_id)
         self.__ui_date_readonly_policy(intake_dates)
-        
-    def clean(self):
-        cleaned_data = super().clean()
-
-        date_started = cleaned_data.get("date_iron_started")
-        date_completed = cleaned_data.get("date_iron_completed")
-
-        # Get Philippine date (timezone-aware)
-        today_str = DateAndTimeUtility.get_current_date()
-        today = datetime.strptime(today_str, "%Y-%m-%d").date()
-        started = DateAndTimeUtility.parse_date(date_started)
-        completed = DateAndTimeUtility.parse_date(date_completed)
-
-        # --- Validation rules ---
-        self.__date_input_policy(today, started, completed)
-
-        return cleaned_data
-
-    def __date_input_policy(self, today, started, completed):
-        if started and started > today:
-            self.add_error("date_iron_started", "Date started cannot be in the future.")
-
-        if completed and completed > today:
-            self.add_error("date_iron_completed", "Completion date cannot be in the future.")
-
-        if started and completed and completed < started:
-            self.add_error("date_iron_completed", "Completion date cannot be before start date.")
-
+    
     def __ui_date_readonly_policy(self, intake_dates):
         if intake_dates and isinstance(intake_dates, list):
             if intake_dates[0].__len__() > 0:

@@ -45,6 +45,10 @@ from src.domain.services.newborn_screening_domain_service import NewbornScreenin
 from src.domain.services.birth_supplementation_domain_service import BirthSupplementationDomainService
 from src.app.contracts.birth_supplementation_service import IBirthSupplementationService
 from src.app.services.birth_supplementation_service import BirthSupplementationService
+from src.app.contracts.iron_intake_service import IIronIntakeService
+from src.app.services.iron_intake_service import IronIntakeService
+from src.domain.services.iron_intake_domain_service import IronIntakeDomainService
+from src.domain.exceptions.iron_intake_domain_exception import IronIntakeDomainException
 
 
 from src.app.contracts.business_service_contract import (
@@ -391,6 +395,12 @@ class AppContainer(containers.DeclarativeContainer):
     vitamin_service = providers.Factory(
         VitaminService,
         ch_repo=infra.child_health_record_repository,
+    )
+
+    iron_intake_service: providers.Factory[IIronIntakeService] = providers.Factory(
+        IronIntakeService,
+        ch_repo=infra.child_health_record_repository,
+        domain_service=providers.Factory(IronIntakeDomainService, ch_repo=infra.child_health_record_repository),
     )
 
     # Reports services can be added here in the app container as needed
