@@ -9,6 +9,8 @@ class IORService(ABC):
     @abstractmethod
     def execute(
         self,
+        search: Optional[str] = None,
+        payment_method: Optional[int] = None
     ) -> list[ORDTO]:
         """
         Returns:

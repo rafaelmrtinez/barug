@@ -1,3 +1,4 @@
+{% load choiceextras %}
 {% for r in rows %}
 <tr>
   <td>
@@ -5,7 +6,7 @@
   </td>
   <td>{{ r.full_name|default_if_none:"" }}</td>
   <td>{{ r.address|default_if_none:"" }}</td>
-  <td>{{ r.mob_num|default_if_none:"" }}</td>
+  <td>{{ r.mob_num|format_mobile|default_if_none:"" }}</td>
   <td>{{ r.email|default_if_none:"" }}</td>
   <td class="text-end">
     <a class="btn btn-outline-brand btn-sm" href="#">

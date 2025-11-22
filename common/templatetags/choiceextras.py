@@ -15,6 +15,41 @@ def _flatten_choices(choices):
     return flat
 
 @register.filter
+def format_mobile(mobile_number):
+    """
+    Format mobile number to start with +639.
+    Handles various input formats:
+    - 09123456789 -> +639123456789
+    - 9123456789 -> +639123456789
+    - +639123456789 -> +639123456789 (no change)
+    - 639123456789 -> +639123456789
+    """
+    if not mobile_number:
+        return ""
+    
+    # Convert to string and remove any spaces or dashes
+    mobile = str(mobile_number).strip().replace(" ", "").replace("-", "")
+    
+    # If already starts with +639, return as is
+    if mobile.startswith("+639"):
+        return mobile
+    
+    # If starts with 639, add +
+    if mobile.startswith("639"):
+        return "+" + mobile
+    
+    # If starts with 09, replace with +639
+    if mobile.startswith("09"):
+        return "+639" + mobile[2:]
+    
+    # If starts with 9 and is 10 digits, add +63
+    if mobile.startswith("9") and len(mobile) == 10:
+        return "+63" + mobile
+    
+    # Return original if format is unrecognized
+    return mobile_number
+
+@register.filter
 def choice_label(bound_field, raw_value):
     """
     Usage in template:

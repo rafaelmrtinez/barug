@@ -35,8 +35,24 @@ from src.app.services.image_download_service import ImageDownloadService
 from src.app.services.faq_ingestion_service import FAQIngestionService
 from src.app.services.child_health_schedule_service import ChildHealthScheduleService
 from src.app.services.vitamin_service import VitaminService
+from src.domain.services.vitamin_domain_service import VitaminDomainService
+from src.app.contracts.vitamin_service import IVitaminService
 from src.app.services.child_visit_service import ChildVisitService
+from src.app.contracts.child_visit_service import IChildVisitService
+from src.domain.services.child_visit_domain_service import ChildVisitDomainService
 from src.app.services.bf_feeding_service import BFFeedingService
+from src.app.contracts.bf_feeding_service import IBFFeedingService
+from src.domain.services.bf_feeding_domain_service import BFFeedingDomainService
+from src.app.contracts.newborn_screening_service import INewbornScreeningService
+from src.app.services.newborn_screening_service import NewbornScreeningService
+from src.domain.services.newborn_screening_domain_service import NewbornScreeningDomainService
+from src.domain.services.birth_supplementation_domain_service import BirthSupplementationDomainService
+from src.app.contracts.birth_supplementation_service import IBirthSupplementationService
+from src.app.services.birth_supplementation_service import BirthSupplementationService
+from src.app.contracts.iron_intake_service import IIronIntakeService
+from src.app.services.iron_intake_service import IronIntakeService
+from src.domain.services.iron_intake_domain_service import IronIntakeDomainService
+from src.domain.exceptions.iron_intake_domain_exception import IronIntakeDomainException
 
 
 from src.app.contracts.business_service_contract import (
@@ -340,28 +356,74 @@ class AppContainer(containers.DeclarativeContainer):
         repo=infra.child_health_record_repository,
     )
 
-    child_visit_service = providers.Factory(
-        ChildVisitService,
+    child_visit_domain_service = providers.Factory(
+        ChildVisitDomainService,
         ch_repo=infra.child_health_record_repository,
     )
 
-    child_bf_service = providers.Factory(
+    child_visit_service: providers.Factory[IChildVisitService] = providers.Factory(
+        ChildVisitService,
+        ch_repo=infra.child_health_record_repository,
+        domain_service=child_visit_domain_service,
+    )
+
+    birth_supplementation_domain_service = providers.Factory(
+        BirthSupplementationDomainService,
+        ch_repo=infra.child_health_record_repository,
+    )
+
+    birth_supplementation_service: providers.Factory[IBirthSupplementationService] = providers.Factory(
+        BirthSupplementationService,
+        ch_repo=infra.child_health_record_repository,
+        domain_service=birth_supplementation_domain_service,
+    )
+
+    bf_feeding_domain_service = providers.Factory(
+        BFFeedingDomainService,
+        ch_repo=infra.child_health_record_repository,
+    )
+
+    child_bf_service: providers.Factory[IBFFeedingService] = providers.Factory(
         BFFeedingService,
         ch_repo=infra.child_health_record_repository,
+        domain_service=bf_feeding_domain_service,
+    )
+
+    newborn_screening_domain_service = providers.Factory(
+        NewbornScreeningDomainService,
+        ch_repo=infra.child_health_record_repository,
+    )
+
+    newborn_screening_service: providers.Factory[INewbornScreeningService] = providers.Factory(
+        NewbornScreeningService,
+        ch_repo=infra.child_health_record_repository,
+        domain_service=newborn_screening_domain_service,
     )
 
 
     # Vitamin service for vitamin A orchestration
-    vitamin_service = providers.Factory(
+    vitamin_domain_service = providers.Factory(
+        VitaminDomainService,
+        ch_repo=infra.child_health_record_repository,
+    )
+
+    vitamin_service: providers.Factory[IVitaminService] = providers.Factory(
         VitaminService,
         ch_repo=infra.child_health_record_repository,
+        domain_service=vitamin_domain_service,
+    )
+
+    iron_intake_service: providers.Factory[IIronIntakeService] = providers.Factory(
+        IronIntakeService,
+        ch_repo=infra.child_health_record_repository,
+        domain_service=providers.Factory(IronIntakeDomainService, ch_repo=infra.child_health_record_repository),
     )
 
     # Reports services can be added here in the app container as needed
 
     or_service: providers.Factory[IORService] = providers.Factory(
         ORService,
-        repo=infra.or_repository,
+        or_repository=infra.or_repository,
     )
 
     resident_service: providers.Factory[IResidentService] = providers.Factory(

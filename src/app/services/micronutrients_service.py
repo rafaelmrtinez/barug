@@ -3,7 +3,7 @@ import logging
 
 from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
 from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
-from barug.utility.custom_date_time_util import DateAndTimeUtility
+from src.infra.utilities.custom_date_time_util import DateAndTimeUtility
 
 LOG = logging.getLogger(__name__)
 
