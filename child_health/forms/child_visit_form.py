@@ -3,7 +3,7 @@ from maternal.forms.maternal_identification_form import add_bootstrap_classes
 from decimal import Decimal
 from datetime import date
 from maternal.forms.form_utils import FormUtils
-from barug.utility.custom_date_time_util import DateAndTimeUtility
+from src.infra.utilities.custom_date_time_util import DateAndTimeUtility
 
 class ChildVisitForm(forms.Form):
     date = forms.DateField(

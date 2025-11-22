@@ -37,6 +37,13 @@ app.wire(modules=[
     "maternal.api.present_pregnancy_api",
     "maternal.api.tetanus_toxoid_api",
     "doc_ingest.api.faq_ingest_api",
+    # child health endpoints
+    "child_health.api.newborn_screening_api",
+    "child_health.api.birth_supplementation_api",
+    "child_health.api.vitamin_api",
+    "child_health.api.child_visit_api",
+    "child_health.api.iron_intake_api",
+    "child_health.api.bf_feeding_api",
     "common.api.residents_pdf_api",
     "common.api.business_pdf_api",
     "common.api.household_pdf_api",
