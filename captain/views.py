@@ -73,6 +73,9 @@ from src.domain.contracts.household_repository_contract import (
 from src.app.contracts.resident_service_contract import ( 
     IResidentService,
 )
+from src.app.services.or_service import (
+    IORService,
+)
 
 
 from .forms import (
@@ -81,6 +84,7 @@ from .forms import (
     BusinessFilters,
     HouseholdFilters,
     ResidentFilters,
+    ORFilters,
 )
 
 
@@ -2638,3 +2642,56 @@ def incident_heatmap(request: HttpRequest):
         'page_path': f'{user_role} / Incident Heatmap',
         'page_title': 'Barangay Incident Heatmap & Analytics',
     })
+
+
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@require_GET
+@nocache
+@inject
+def financial_report(
+    request: HttpRequest,
+    or_service: IORService = Provide[AppContainer.or_service],
+) -> HttpResponseRedirect | HttpResponseRedirect | HttpResponse:
+    
+    user_role = _auth_role_name(request)
+    form = ORFilters(request.GET or None)
+
+    search = request.GET.get("search") or request.GET.get("q")
+    pay_meth = _to_int_or_none(request.GET.get("pay_meth"))
+    
+    # Check if this is an AJAX request for rows only
+    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    template_mode = request.GET.get("tpl")
+
+    rows = or_service.execute(
+        search=search,
+        payment_method=pay_meth
+    )
+
+    if (search or pay_meth is not None):
+        form = ORFilters()
+
+    paginator = Paginator(rows, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    # Return only rows template for AJAX requests
+    if is_ajax and template_mode == "rows":
+        return render(
+            request,
+            "financial/_financial_report_rows.html",
+            {"rows": page_obj.object_list}
+        )
+
+    return render(
+        request,
+        "financial/financial_report.html",
+        {
+            'page_path': f'{user_role} / Financial Report',
+            'page_title': 'Financial Report',
+            'form': form,
+            'page_obj': page_obj,
+            'search_url': 'captain:financial_report_search',
+        },
+    )

@@ -2429,13 +2429,13 @@ def financial_report(
     if is_ajax and template_mode == "rows":
         return render(
             request,
-            "treasurer/_financial_report_rows.html",
+            "financial/_financial_report_rows.html",
             {"rows": page_obj.object_list}
         )
 
     return render(
         request,
-        "treasurer/financial_report.html",
+        "financial/financial_report.html",
         {
             'page_path': f'{user_role} / Financial Report',
             'page_title': 'Financial Report',

@@ -4,6 +4,7 @@ from doc_ingest.api.faq_ingest_api import FAQIngestAPI
 from common.api.residents_pdf_api import ResidentsPDFAPI
 from common.api.business_pdf_api import BusinessPDFAPI
 from common.api.household_pdf_api import HouseholdPDFAPI
+from common.api.financial_pdf_api import FinancialPDFAPI
 
 app_name = 'captain'
 
@@ -52,8 +53,13 @@ urlpatterns = [
     # FAQ upload endpoint used by captain UI (multipart or JSON)
     path("api/upload_faqs/", FAQIngestAPI.as_view(), name="upload_faqs"),
 
+    # FINANCIAL REPORT
+    path("financial-report/", views.financial_report, name="financial_report"),
+    path("financial-report/search/", views.financial_report, name="financial_report_search"),
+
     # PDF APIs
     path("api/residents/pdf/", ResidentsPDFAPI.as_view(), name="residents_pdf_api"),
     path("api/business/pdf/", BusinessPDFAPI.as_view(), name="business_pdf_api"),
     path("api/household/pdf/", HouseholdPDFAPI.as_view(), name="household_pdf_api"),
+    path("api/financial/pdf/", FinancialPDFAPI.as_view(), name="financial_pdf_api"),
 ]
