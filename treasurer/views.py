@@ -2404,8 +2404,8 @@ def financial_report(
         request,
         "treasurer/financial_report.html",
         {
-            'page_path': f'{user_role} / Financial Report',
-            'page_title': 'Financial Report',
+            'page_path': f'{user_role} / Household List',
+            'page_title': 'Household List',
             'page_obj': page_obj,
         },
     )

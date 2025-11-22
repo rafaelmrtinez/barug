@@ -1,6 +1,9 @@
 from django.urls import path
 from . import views
 from doc_ingest.api.faq_ingest_api import FAQIngestAPI
+from common.api.residents_pdf_api import ResidentsPDFAPI
+from common.api.business_pdf_api import BusinessPDFAPI
+from common.api.household_pdf_api import HouseholdPDFAPI
 
 app_name = 'captain'
 
@@ -25,8 +28,9 @@ urlpatterns = [
     path("api/staff_account_requests/search/", views.staff_account_requests_search_api, name="staff_account_requests_search_api"),
 
     # RESIDENT
-    path("resident/resident_list/", views.resident_list , name="resident_list"),
-    path("resident/resident_map/", views.resident_map_list , name="resident_map"),
+    path("resident/resident_list/", views.resident_list, name="resident_list"),
+    path("resident/resident_map/", views.resident_map_list, name="resident_map"),
+    path("ajax/resident_search/", views.ajax_resident_search, name="ajax_resident_search"),
 
     # HOUSEHOLD 
     path("household/household_list/", views.household_list , name="household_list"),
@@ -47,4 +51,9 @@ urlpatterns = [
     path("staff-requests/process/", views.process_staff_request, name="process_staff_request"),
     # FAQ upload endpoint used by captain UI (multipart or JSON)
     path("api/upload_faqs/", FAQIngestAPI.as_view(), name="upload_faqs"),
+
+    # PDF APIs
+    path("api/residents/pdf/", ResidentsPDFAPI.as_view(), name="residents_pdf_api"),
+    path("api/business/pdf/", BusinessPDFAPI.as_view(), name="business_pdf_api"),
+    path("api/household/pdf/", HouseholdPDFAPI.as_view(), name="household_pdf_api"),
 ]
