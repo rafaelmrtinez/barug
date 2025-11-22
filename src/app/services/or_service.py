@@ -17,5 +17,12 @@ class ORService(IORService):
 
     def execute(
         self,
+        search: str = None,
+        payment_method: int = None
     ) -> list[ORDTO]:
+        if search:
+            return self._or_repo.search_or_list(search)
+        if payment_method is not None:
+            return self._or_repo.filter_by_payment_method(payment_method)
+        
         return self._or_repo.fetch_or_list()

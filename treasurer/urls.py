@@ -28,6 +28,7 @@ urlpatterns = [
 
     # FINANCIAL REPORT
     path("financial-report/", views.financial_report, name="financial_report"),
+    path("financial-report/search/", views.financial_report, name="financial_report_search"),
 
     # REFUND
     path("refunds/", views.payment_refunds, name="payment_refunds"),

@@ -5,6 +5,7 @@ from decimal import Decimal
 from datetime import datetime, date
 import json
 import re
+from typing import Optional
 
 from django.conf import settings
 from django.contrib import messages
@@ -47,6 +48,10 @@ from .utils.helpers import (
     _extract_payment_method_label,
     build_page_numbers,
     split_name_main_sub,
+)
+
+from .forms import (
+    ORFilters
 )
 
 TREASURER_ROLE = "Barangay Treasurer"
@@ -2379,7 +2384,14 @@ def payment_refunds(request: HttpRequest):
     return render(request, "treasurer/payment_refunds.html", ctx)
 
 
-from treasurer.services.finreport_service import build_financial_report_payload
+def _to_int_or_none(val) -> Optional[int]:
+    try:
+        if val in (None, "", "None"):
+            return None
+        return int(val)
+    except Exception:
+        return None
+
 
 @session_login_required
 @role_required(TREASURER_ROLE)
@@ -2392,21 +2404,44 @@ def financial_report(
 ) -> HttpResponseRedirect | HttpResponseRedirect | HttpResponse:
     
     user_role = _auth_role_name(request)
+    form = ORFilters(request.GET or None)
 
-    rows = or_service.execute()
+    search = request.GET.get("search") or request.GET.get("q")
+    pay_meth = _to_int_or_none(request.GET.get("pay_meth"))
+    
+    # Check if this is an AJAX request for rows only
+    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    template_mode = request.GET.get("tpl")
 
-    paginator =Paginator(rows, 10)
+    rows = or_service.execute(
+        search=search,
+        payment_method=pay_meth
+    )
+
+    if (search or pay_meth is not None):
+        form = ORFilters()
+
+    paginator = Paginator(rows, 10)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
+    # Return only rows template for AJAX requests
+    if is_ajax and template_mode == "rows":
+        return render(
+            request,
+            "treasurer/_financial_report_rows.html",
+            {"rows": page_obj.object_list}
+        )
 
     return render(
         request,
         "treasurer/financial_report.html",
         {
-            'page_path': f'{user_role} / Household List',
-            'page_title': 'Household List',
+            'page_path': f'{user_role} / Financial Report',
+            'page_title': 'Financial Report',
+            'form': form,
             'page_obj': page_obj,
+            'search_url': 'treasurer:financial_report_search',
         },
     )
 
