@@ -126,6 +126,35 @@ PUROK_SITIO_CHOICES = [
     (4, "Mauco"),
 ]
 
+PAYMENT_METHOD_CHOICES = [
+    ("", "— Select Payment Method —"),
+    (1, "CASH"),
+    (2, "GCASH"),
+    (3, "CARD"),
+    (4, "WAIVED"),
+    (5, "ONLINE GCASH"),
+]
+
+class ORFilters(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search',
+        }),
+        label= 'Search',
+        required= False,
+    )
+    pay_meth = forms.ChoiceField(
+        choices= PAYMENT_METHOD_CHOICES,
+        widget=forms.Select(attrs={
+            'id' : 'pay_meth',
+            'class' : 'form-select',
+        }),
+        label= 'Payment Method',
+        required= False,
+    )
+
 class Schedule(forms.Form):
     day = forms.TypedChoiceField(
         label="Select a Day",

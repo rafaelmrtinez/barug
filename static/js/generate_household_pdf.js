@@ -59,7 +59,12 @@
         if (houseTypeValue) params.set('house_type', houseTypeValue);
         if (houseOwnershipValue) params.set('house_ownership', houseOwnershipValue);
 
-        const url = `/secretary/api/household/pdf/?${params.toString()}`;
+        // Detect role from current URL path
+        const currentPath = window.location.pathname;
+        let rolePrefix = '/secretary';
+        if (currentPath.startsWith('/captain/')) rolePrefix = '/captain';
+        
+        const url = `${rolePrefix}/api/household/pdf/?${params.toString()}`;
 
         // First try: open the real endpoint in a new tab
         try {

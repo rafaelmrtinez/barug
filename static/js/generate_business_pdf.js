@@ -62,7 +62,13 @@
         if (ownershipTypeValue) params.set('ownership_type', ownershipTypeValue);
         if (statusValue) params.set('status', statusValue);
 
-        const url = `/secretary/api/business/pdf/?${params.toString()}`;
+        // Detect role from current URL path
+        const currentPath = window.location.pathname;
+        let rolePrefix = '/clerk';
+        if (currentPath.startsWith('/captain/')) rolePrefix = '/captain';
+        else if (currentPath.startsWith('/secretary/')) rolePrefix = '/secretary';
+        
+        const url = `${rolePrefix}/api/business/pdf/?${params.toString()}`;
 
         // First try: open the real endpoint in a new tab
         try {

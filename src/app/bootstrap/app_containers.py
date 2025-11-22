@@ -423,7 +423,7 @@ class AppContainer(containers.DeclarativeContainer):
 
     or_service: providers.Factory[IORService] = providers.Factory(
         ORService,
-        repo=infra.or_repository,
+        or_repository=infra.or_repository,
     )
 
     resident_service: providers.Factory[IResidentService] = providers.Factory(
