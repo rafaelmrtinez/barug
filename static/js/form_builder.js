@@ -138,7 +138,7 @@ async function doSave(){
         hid.type="hidden"; hid.name="submission_id"; hid.value=j.submission_id;
         formEl.appendChild(hid);
       }
-      showOk("Draft saved.");
+      // showOk("Draft saved.");
       return j;
     }
     throw new Error("Save failed.");
@@ -886,7 +886,7 @@ function bindCloseOnEscape(input, closeFn){
   if (cardBody) {
     const messageDiv = document.createElement('div');
     messageDiv.className = 'mb-3 p-3 rounded-3';
-    messageDiv.style.background = '#28a745';
+    messageDiv.style.background = '#680404ff';
     messageDiv.style.color = '#fff';
     messageDiv.innerHTML = `
       <div class="d-flex align-items-center gap-2">
