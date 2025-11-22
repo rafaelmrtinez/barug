@@ -35,6 +35,8 @@ from src.app.services.image_download_service import ImageDownloadService
 from src.app.services.faq_ingestion_service import FAQIngestionService
 from src.app.services.child_health_schedule_service import ChildHealthScheduleService
 from src.app.services.vitamin_service import VitaminService
+from src.domain.services.vitamin_domain_service import VitaminDomainService
+from src.app.contracts.vitamin_service import IVitaminService
 from src.app.services.child_visit_service import ChildVisitService
 from src.app.services.bf_feeding_service import BFFeedingService
 from src.app.contracts.bf_feeding_service import IBFFeedingService
@@ -392,9 +394,15 @@ class AppContainer(containers.DeclarativeContainer):
 
 
     # Vitamin service for vitamin A orchestration
-    vitamin_service = providers.Factory(
+    vitamin_domain_service = providers.Factory(
+        VitaminDomainService,
+        ch_repo=infra.child_health_record_repository,
+    )
+
+    vitamin_service: providers.Factory[IVitaminService] = providers.Factory(
         VitaminService,
         ch_repo=infra.child_health_record_repository,
+        domain_service=vitamin_domain_service,
     )
 
     iron_intake_service: providers.Factory[IIronIntakeService] = providers.Factory(

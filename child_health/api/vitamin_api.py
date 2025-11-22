@@ -9,6 +9,10 @@ from django.utils.decorators import method_decorator
 from authentication.guards import role_required, session_login_required
 from authentication.utils import nocache
 from src.infra.exceptions.child_health_record_exception import ChildHealthRecordException
+from src.domain.exceptions.vitamin_domain_exception import VitaminDomainException
+from dependency_injector.wiring import inject, Provide
+from src.app.bootstrap.app_containers import AppContainer
+from src.app.contracts.vitamin_service import IVitaminService
 from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.repositories.child_health_record_repository import ChildHealthRecordRepository
 from src.infra.utilities.custom_date_time_util import DateAndTimeUtility
@@ -26,6 +30,10 @@ def _repo():
 
 @method_decorator([session_login_required, role_required(*ACCESS), nocache, csrf_protect, require_http_methods(["POST"])], name='dispatch')
 class VitaminAPI(View):
+    @inject
+    def __init__(self, vitamin_service: IVitaminService = Provide[AppContainer.vitamin_service], **kwargs):
+        super().__init__(**kwargs)
+        self.vitamin_service = vitamin_service
     def post(self, request: HttpRequest, child_health_record_id: int) -> JsonResponse:
         try:
             data = request.POST.dict() if request.POST else (json.loads(request.body or "{}") or {})
@@ -40,13 +48,10 @@ class VitaminAPI(View):
                 if val in (True, "True", "true", "on", "1", 1) or str(val).lower() in ("true", "on", "1"):
                     requested_stages.append(s)
 
-            # Resolve service via DI container
-            vitamin_service: VitaminService = app.vitamin_service()
-
-            print(f"Applying Vitamin A stage {stage_id} for CHR ID {child_health_record_id} by staff {staff_id}")
-            # Let the service orchestrate validation and persistence. It will
-            # raise ChildHealthRecordException on validation errors.
-            response = vitamin_service.apply_stage(
+            # Let the service orchestrate validation and persistence. The
+            # domain/service layer will raise `VitaminDomainException` on
+            # validation errors or `ChildHealthRecordException` on repo errors.
+            response = self.vitamin_service.apply_stage(
                 child_health_record_id=child_health_record_id,
                 staff_id=staff_id,
                 stage_id=(int(stage_id) if stage_id else None),
@@ -55,6 +60,9 @@ class VitaminAPI(View):
             if response:
                 return JsonResponse({"ok": True, "message": "Vitamin A data saved"})
             return JsonResponse({"ok": False, "message": "Failed to save Vitamin A data"}, status=500)
+        except VitaminDomainException as vde:
+            logger.warning("VitaminDomainException in VitaminAPI: %s", getattr(vde, 'message', str(vde)))
+            return JsonResponse({"ok": False, "error": getattr(vde, 'message', str(vde))}, status=400)
         except ChildHealthRecordException as chre:
             logger.warning("ChildHealthRecordException in VitaminAPI: %s", getattr(chre, 'message', str(chre)))
             return JsonResponse({"ok": False, "error": getattr(chre, 'message', str(chre))}, status=400)
