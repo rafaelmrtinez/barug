@@ -15,7 +15,7 @@ from django.views.decorators.csrf import csrf_protect
 
 from authentication.guards import role_required, session_login_required
 from authentication.utils import nocache
-from barug.utility.custom_date_time_util import DateAndTimeUtility
+from src.infra.utilities.custom_date_time_util import DateAndTimeUtility
 from barug.utility.lazy_repository import LazyRepositoryProxy
 from barug.utility.messages_util import MessageUtility
 from src.infra.exceptions.child_health_record_exception import ChildHealthRecordException
@@ -247,6 +247,35 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
             if v_errors:
                 for e in v_errors:
                     messages.error(request, e)
+                return render(
+                    request,
+                    "child_health/create_chr.html",
+                    {
+                        "form": child_information_form,
+                    },
+                )
+
+            # Additional validation: birth_order must be present and >= 1
+            # First check: not empty
+            raw_birth_order = child_information_form.cleaned_data.get('birth_order')
+            if raw_birth_order in (None, ""):
+                messages.error(request, "Birth order is required and cannot be empty.")
+                return render(
+                    request,
+                    "child_health/create_chr.html",
+                    {
+                        "form": child_information_form,
+                    },
+                )
+
+            # Now ensure it's an integer >= 1
+            try:
+                birth_order_int = int(raw_birth_order)
+            except Exception:
+                birth_order_int = None
+
+            if birth_order_int is None or birth_order_int < 1:
+                messages.error(request, "Birth order must be a number 1 or greater.")
                 return render(
                     request,
                     "child_health/create_chr.html",

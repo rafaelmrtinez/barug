@@ -179,31 +179,26 @@ class ChildHealthRecordRepository(IChildHealthRecordRepository):
             raise e
 
     def fetch_new_born_screening_date_by_chr_id(self, chr_id: int) -> dict | None:
-        # Pick the single most relevant feeding_type / newborn screening
-        # entry for this child. We resolve the latest visit for the child
-        # (by visit_date, falling back to visit_id) and return at most one
-        # row containing the feeding_type_name and referred_newborn_screening_date.
+        # Return the most relevant feeding_type / newborn screening
+        # entry for this child by selecting directly from visits that
+        # have feeding entries. Order by visit date (falling back to
+        # visit_id) and limit to a single row so only one DB row is fetched.
         sql = """
-        WITH latest_visit AS (
-            SELECT cv.visit_id
-            FROM child_visit cv
-            WHERE cv.child_record_id = %s
-            ORDER BY cv.visit_date DESC NULLS LAST, cv.visit_id DESC
-            LIMIT 1
-        )
         SELECT
             ft.feeding_type_name,
             ftns.referred_newborn_screening_date::date AS referred_newborn_screening_date
-        FROM feeding_type_nwbrn_scrnng ftns
+        FROM child_visit cv
+        JOIN feeding_type_nwbrn_scrnng ftns ON ftns.visit_id = cv.visit_id
         LEFT JOIN feeding_type ft ON ft.feeding_type_id = ftns.feeding_type_id
-        WHERE ftns.visit_id = (SELECT visit_id FROM latest_visit)
+        WHERE cv.child_record_id = %s
+        ORDER BY cv.visit_date DESC NULLS LAST, cv.visit_id DESC
         LIMIT 1;
         """
         params = [chr_id]
-        result = self.ctx.execute_query_to_dict(sql, params)
-        if not result:
+        rows = self.ctx.execute_query_to_dict(sql, params)
+        if not rows:
             return None
-        return result[0]
+        return rows[0]
 
     def insert_new_born_screening_date(self, p_child_record_id, p_assessed_by_id, p_referred_nbs_date, feeding_type_id):
         sql = """SELECT * FROM add_referred_newborn_screening_date(%s, %s, %s, %s);"""

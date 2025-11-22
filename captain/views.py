@@ -1865,7 +1865,7 @@ def resident_list(
         'page_title': 'Resident List',
         'page_obj': page_obj,
         'form': form,
-        'search_url': 'secretary:ajax_resident_search',
+        'search_url': 'captain:ajax_resident_search',
     })
 
 @session_login_required

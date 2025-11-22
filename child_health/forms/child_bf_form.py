@@ -1,7 +1,7 @@
 from django import forms
 from datetime import datetime, date
 
-from barug.utility.custom_date_time_util import DateAndTimeUtility
+from src.infra.utilities.custom_date_time_util import DateAndTimeUtility
 from src.infra.repositories.child_health_record_repository import ChildHealthRecordRepository
 from maternal.forms.maternal_identification_form import add_bootstrap_classes
 
@@ -77,7 +77,3 @@ class ChildBreastFeedingForm(forms.Form):
                 pass
         else:
             self._existing_dates = []
-    
-    def clean(self):
-        # Validation moved to BFFeedingService — keep form as a simple data container
-        return super().clean()
