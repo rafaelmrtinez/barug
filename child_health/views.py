@@ -255,6 +255,35 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
                     },
                 )
 
+            # Additional validation: birth_order must be present and >= 1
+            # First check: not empty
+            raw_birth_order = child_information_form.cleaned_data.get('birth_order')
+            if raw_birth_order in (None, ""):
+                messages.error(request, "Birth order is required and cannot be empty.")
+                return render(
+                    request,
+                    "child_health/create_chr.html",
+                    {
+                        "form": child_information_form,
+                    },
+                )
+
+            # Now ensure it's an integer >= 1
+            try:
+                birth_order_int = int(raw_birth_order)
+            except Exception:
+                birth_order_int = None
+
+            if birth_order_int is None or birth_order_int < 1:
+                messages.error(request, "Birth order must be a number 1 or greater.")
+                return render(
+                    request,
+                    "child_health/create_chr.html",
+                    {
+                        "form": child_information_form,
+                    },
+                )
+
             res = CHILD_HEALTH_REPOSITORY.insert_chr_record(
                 p_staff_id=cleaned_vals.get('staff_id'),
                 p_person_id=cleaned_vals.get('child_id'),
