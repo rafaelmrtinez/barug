@@ -134,6 +134,13 @@ def roles_required(*role_names):
     return _decorator
 
 
+def debug_login_log(request):
+    """Temporary debug view to show latest login log"""
+    from .db import get_latest_login_log
+    from django.http import JsonResponse
+    log = get_latest_login_log()
+    return JsonResponse(log if log else {"error": "No login logs found"}, json_dumps_params={'indent': 2, 'default': str})
+
 @csrf_protect
 def login(request):
     # Redirect authenticated users to their dashboard
@@ -265,6 +272,7 @@ def login(request):
             "login_at": timezone.now().isoformat(),
             "login_log_id": login_log_id,     # <<< store login log ID for logout tracking
         }
+        request.session['last_activity'] = timezone.now().isoformat()  # Track session activity
         request.session.set_expiry(60 * 60 * 8)
 
         # Clear rate-limit counter

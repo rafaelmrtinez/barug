@@ -6,6 +6,8 @@ from common.send_sms import send_sms
 from datetime import datetime
 import os
 import uuid
+import pytz
+from zoneinfo import ZoneInfo
 
 from lupon_mem.services.forms.kp8 import KP8Handler  # reuse its normalization
 from lupon_mem.services.forms.kp10 import KP10Handler
@@ -246,27 +248,26 @@ def report_list(request: HttpRequest):
     payment_options = ["", "PAID", "UNPAID", "DECLINED"]
     blotter_options = ["", "FOR LUPON REVIEW", "REVIEWED"]
 
+    # Get Philippine timezone
+    ph_tz = pytz.timezone('Asia/Manila')
+    
     with connection.cursor() as cur:
-        # DEBUG: Direct query for report 71 to check actual payment status
-        cur.execute("""
-            SELECT br.blotter_report_id, ps.payment_status_name
-            FROM blotter_report br
-            LEFT JOIN payment_status ps ON ps.payment_status_id = br.payment_status_id
-            WHERE br.blotter_report_id = 71
-        """)
-        direct_result = cur.fetchone()
-        if direct_result:
-            print(f"[DEBUG] Direct query - Report 71 payment_status: '{direct_result[1]}'")
+        # Query raw timestamps and convert to Philippine Time
+        cur.execute("SELECT blotter_report_id, date_time_reported, incident_subject, payment_status_id FROM blotter_report ORDER BY blotter_report_id DESC")
+        raw_reports = cur.fetchall()
         
         cur.execute("SELECT * FROM get_all_report_details()")
         columns = [col[0] for col in cur.description]
         all_reports = cur.fetchall()
         
-        # DEBUG: Check what payment status we're getting for report 71
-        for row in all_reports:
-            row_dict = dict(zip(columns, row))
-            if row_dict.get('blotter_report_id') == 71:
-                print(f"[DEBUG] Report 71 payment_status_name: '{row_dict.get('payment_status_name')}'")
+        # Create a map of report_id to Philippine Time formatted string
+        ph_time_map = {}
+        for row in raw_reports:
+            report_id, dt_utc = row[0], row[1]
+            if dt_utc:
+                # Convert UTC to Philippine Time
+                dt_ph = dt_utc.astimezone(ph_tz)
+                ph_time_map[report_id] = dt_ph.strftime('%B %d, %Y %I:%M %p')
         
         # Convert to tuples for template compatibility
         reports_data = []
@@ -275,11 +276,15 @@ def report_list(request: HttpRequest):
             payment_status = row_dict.get('payment_status_name') or ''
             blotter_status = 'REVIEWED' if payment_status and str(payment_status).upper() in ('PAID','UNPAID','DECLINED') else 'FOR LUPON REVIEW'
             
+            # Use Philippine Time from our map
+            report_id = row_dict.get('blotter_report_id')
+            reported_at = ph_time_map.get(report_id, row_dict.get('date_time_reported'))
+            
             # Create tuple: (id, subject, reported_at, payment_status, blotter_status, complainant_names, respondent_names, current_status_name, has_case)
             report_tuple = (
                 row_dict.get('blotter_report_id'),
                 row_dict.get('incident_subject') or '(no subject)',
-                row_dict.get('date_time_reported'),
+                reported_at,
                 payment_status,
                 blotter_status,
                 row_dict.get('complainant_names') or '',
@@ -473,17 +478,56 @@ def report_new(request: HttpRequest):
         )
         report_id = cur.fetchone()[0]
         
+        # Get staff name and person names for logging
+        staff_name = None
+        complainant_name = None
+        respondent_names = []
+        
+        if staff_id:
+            cur.execute(
+                "SELECT TRIM(CONCAT_WS(' ', p.first_name, NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), p.last_name, NULLIF(p.suffix, ''))) FROM staff s JOIN person p ON p.person_id = s.person_id WHERE s.staff_id = %s",
+                [staff_id]
+            )
+            staff_row = cur.fetchone()
+            staff_name = staff_row[0] if staff_row else None
+        
+        if complainant_id:
+            cur.execute(
+                "SELECT TRIM(CONCAT_WS(' ', first_name, NULLIF(SUBSTRING(COALESCE(middle_name, '') FROM 1 FOR 1) || '.', '.'), last_name, NULLIF(suffix, ''))) FROM person WHERE person_id = %s",
+                [complainant_id]
+            )
+            comp_row = cur.fetchone()
+            complainant_name = comp_row[0] if comp_row else None
+        
+        if respondent_ids:
+            for resp_id in respondent_ids:
+                cur.execute(
+                    "SELECT TRIM(CONCAT_WS(' ', first_name, NULLIF(SUBSTRING(COALESCE(middle_name, '') FROM 1 FOR 1) || '.', '.'), last_name, NULLIF(suffix, ''))) FROM person WHERE person_id = %s",
+                    [resp_id]
+                )
+                resp_row = cur.fetchone()
+                if resp_row and resp_row[0]:
+                    respondent_names.append(resp_row[0])
+        
+        # Build human-readable message
+        message = f"{staff_name or f'Staff ID {staff_id}'} filed blotter report #{report_id} – {incident_subject or '(no subject)'}"
+        if complainant_name:
+            message += f" (complainant: {complainant_name}"
+            if respondent_names:
+                message += f", respondent(s): {', '.join(respondent_names)}"
+            message += ")"
+        elif respondent_names:
+            message += f" (respondent(s): {', '.join(respondent_names)})"
+        
+        if incident_address_id:
+            message += " with location"
+        
         # Log the report creation
         blotter_log_event(
             action="CREATE",
             table_affected="blotter_report",
             record_affected_id=report_id,
-            details={
-                "incident_subject": incident_subject,
-                "complainant_id": complainant_id,
-                "respondent_count": len(respondent_ids) if respondent_ids else 0,
-                "has_location": bool(incident_address_id)
-            },
+            details=message,
             performer_staff_id=staff_id
         )
 
@@ -887,7 +931,6 @@ def report_approve(request: HttpRequest, report_id: int):
         print("[DEBUG][APPROVE][ERROR]", e)
         raise
 
-    messages.success(request, f"Report #{report_id} approved. Payment status set to UNPAID.")
     return redirect("lupon_mem:report_review", report_id=report_id)
 
 
@@ -934,7 +977,6 @@ def report_decline(request: HttpRequest, report_id: int):
         print("[DEBUG][DECLINE][ERROR]", e)
         raise
 
-    messages.success(request, f"Report #{report_id} declined. Payment status set to DECLINED.")
     return redirect("lupon_mem:report_review", report_id=report_id)
 
 

@@ -240,8 +240,8 @@ def case_list(request: HttpRequest):
                 bc.blotter_case_id,                    -- 0
                 bc.blotter_case_num,                   -- 1
                 bc.blotter_case_name,                  -- 2
-                TO_CHAR(bc.date_filed, 'Mon DD, YYYY') AS date_filed_fmt,   -- 3
-                TO_CHAR(bc.time_filed, 'HH12:MI AM')   AS time_filed_fmt,   -- 4
+                TO_CHAR(bc.date_time_added AT TIME ZONE 'Asia/Manila', 'Mon DD, YYYY') AS date_filed_fmt,   -- 3
+                TO_CHAR(bc.date_time_added AT TIME ZONE 'Asia/Manila', 'HH12:MI AM')   AS time_filed_fmt,   -- 4
                 COALESCE(cs.case_state_name, 'PENDING')        AS case_state,         -- 5
                 COALESCE(ss.settlement_status_name, 'Pending') AS settlement_status,  -- 6
                 COALESCE(ct.complaint_title_name, '')          AS complaint_title,    -- 7
@@ -531,18 +531,29 @@ def case_new(request: HttpRequest) -> HttpResponse:
             )
             case_id = cur.fetchone()[0]
             
-            # Log the case creation
+            # Get staff name and case number for logging
+            staff_name = None
+            case_num = None
+            if staff_id:
+                cur.execute(
+                    "SELECT TRIM(CONCAT_WS(' ', p.first_name, NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), p.last_name, NULLIF(p.suffix, ''))) FROM staff s JOIN person p ON p.person_id = s.person_id WHERE s.staff_id = %s",
+                    [staff_id]
+                )
+                staff_row = cur.fetchone()
+                staff_name = staff_row[0] if staff_row else None
+            cur.execute("SELECT blotter_case_num FROM blotter_case WHERE blotter_case_id = %s", [case_id])
+            case_row = cur.fetchone()
+            case_num = case_row[0] if case_row else None
+            
+            complainants_count = len([p for p in complainants if p and p.isdigit()])
+            respondents_count = len([p for p in respondents if p and p.isdigit()])
+            message = f"{staff_name or f'Staff ID {staff_id}'} created new case {case_num or f'#{case_id}'} – {blotter_case_name} ({complainants_count} complainant(s), {respondents_count} respondent(s))"
+            
             blotter_log_event(
-                action="CREATE",
+                action="CREATE_CASE",
                 table_affected="blotter_case",
                 record_affected_id=case_id,
-                details={
-                    "case_name": blotter_case_name,
-                    "complaint_title_id": complaint_title_id,
-                    "case_nature_id": case_nature_id,
-                    "complainants_count": len([p for p in complainants if p and p.isdigit()]),
-                    "respondents_count": len([p for p in respondents if p and p.isdigit()])
-                },
+                details=message,
                 performer_staff_id=staff_id
             )
 
@@ -596,6 +607,13 @@ def case_settlement_update(request: HttpRequest, case_id: int):
 
     try:
         with connection.cursor() as cur:
+            cur.execute(
+                "SELECT ss.settlement_status_name FROM blotter_case bc LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id WHERE bc.blotter_case_id = %s",
+                [case_id]
+            )
+            old_row = cur.fetchone()
+            old_settlement = old_row[0] if old_row else None
+            
             print("[SETTLEMENT][SQL] calling fn_set_case_settlement(%s,%s,%s,%s)")
             cur.execute(
                 "SELECT * FROM fn_set_case_settlement(%s,%s,%s,%s)",
@@ -607,14 +625,35 @@ def case_settlement_update(request: HttpRequest, case_id: int):
 
         ok, _case, new_status, changed_at = row if row else (False, None, None, None)
         if ok:
-            # Log the settlement status update
+            # Get staff name and case details for logging
+            staff_name = None
+            case_num = None
+            case_name = None
+            with connection.cursor() as cur:
+                if staff_id:
+                    cur.execute(
+                        "SELECT TRIM(CONCAT_WS(' ', p.first_name, NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), p.last_name, NULLIF(p.suffix, ''))) FROM staff s JOIN person p ON p.person_id = s.person_id WHERE s.staff_id = %s",
+                        [staff_id]
+                    )
+                    staff_row = cur.fetchone()
+                    staff_name = staff_row[0] if staff_row else None
+                cur.execute("SELECT blotter_case_num, blotter_case_name FROM blotter_case WHERE blotter_case_id = %s", [case_id])
+                case_row = cur.fetchone()
+                case_num = case_row[0] if case_row else None
+                case_name = case_row[1] if case_row else None
+            
+            message = f"{staff_name or f'Staff ID {staff_id}'} updated settlement status to {new_status} for Case {case_num or f'#{case_id}'} – {case_name or 'Unnamed Case'}"
+            if remarks:
+                message += f" (remarks: {remarks})"
+            
             blotter_log_event(
-                action="UPDATE",
+                action="UPDATE_SETTLEMENT",
                 table_affected="blotter_case",
                 record_affected_id=case_id,
-                details={"settlement_status": new_status, "remarks": remarks},
+                details=message,
                 performer_staff_id=staff_id,
                 field_changed="settlement_status",
+                old_value=old_settlement,
                 new_value=new_status
             )
             messages.success(request, f'Settlement status updated to "{new_status}".')
@@ -646,15 +685,45 @@ def case_close(request: HttpRequest, case_id: int):
         return redirect("lupon_mem:case_detail", case_id=case_id)
 
     try:
+        with connection.cursor() as cur:
+            cur.execute(
+                "SELECT cs.case_state_name FROM blotter_case bc LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id WHERE bc.blotter_case_id = %s",
+                [case_id]
+            )
+            old_row = cur.fetchone()
+            old_state = old_row[0] if old_row else None
+        
         close_case(case_id, staff_id, note)
-        # Log the case closure
+        
+        # Get staff name and case details for logging
+        staff_name = None
+        case_num = None
+        case_name = None
+        with connection.cursor() as cur:
+            if staff_id:
+                cur.execute(
+                    "SELECT TRIM(CONCAT_WS(' ', p.first_name, NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), p.last_name, NULLIF(p.suffix, ''))) FROM staff s JOIN person p ON p.person_id = s.person_id WHERE s.staff_id = %s",
+                    [staff_id]
+                )
+                staff_row = cur.fetchone()
+                staff_name = staff_row[0] if staff_row else None
+            cur.execute("SELECT blotter_case_num, blotter_case_name FROM blotter_case WHERE blotter_case_id = %s", [case_id])
+            case_row = cur.fetchone()
+            case_num = case_row[0] if case_row else None
+            case_name = case_row[1] if case_row else None
+        
+        message = f"{staff_name or f'Staff ID {staff_id}'} closed Case {case_num or f'#{case_id}'} – {case_name or 'Unnamed Case'}"
+        if note:
+            message += f" (note: {note})"
+        
         blotter_log_event(
-            action="UPDATE",
+            action="CLOSE_CASE",
             table_affected="blotter_case",
             record_affected_id=case_id,
-            details={"close_note": note},
+            details=message,
             performer_staff_id=staff_id,
             field_changed="case_state",
+            old_value=old_state,
             new_value="CLOSED"
         )
         messages.success(request, "Case has been closed.")
@@ -679,15 +748,45 @@ def case_reopen(request: HttpRequest, case_id: int):
         return redirect("lupon_mem:case_detail", case_id=case_id)
 
     try:
+        with connection.cursor() as cur:
+            cur.execute(
+                "SELECT cs.case_state_name FROM blotter_case bc LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id WHERE bc.blotter_case_id = %s",
+                [case_id]
+            )
+            old_row = cur.fetchone()
+            old_state = old_row[0] if old_row else None
+        
         reopen_case(case_id, staff_id, reason)
-        # Log the case reopening
+        
+        # Get staff name and case details for logging
+        staff_name = None
+        case_num = None
+        case_name = None
+        with connection.cursor() as cur:
+            if staff_id:
+                cur.execute(
+                    "SELECT TRIM(CONCAT_WS(' ', p.first_name, NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), p.last_name, NULLIF(p.suffix, ''))) FROM staff s JOIN person p ON p.person_id = s.person_id WHERE s.staff_id = %s",
+                    [staff_id]
+                )
+                staff_row = cur.fetchone()
+                staff_name = staff_row[0] if staff_row else None
+            cur.execute("SELECT blotter_case_num, blotter_case_name FROM blotter_case WHERE blotter_case_id = %s", [case_id])
+            case_row = cur.fetchone()
+            case_num = case_row[0] if case_row else None
+            case_name = case_row[1] if case_row else None
+        
+        message = f"{staff_name or f'Staff ID {staff_id}'} reopened Case {case_num or f'#{case_id}'} – {case_name or 'Unnamed Case'}"
+        if reason:
+            message += f" (reason: {reason})"
+        
         blotter_log_event(
-            action="UPDATE",
+            action="REOPEN_CASE",
             table_affected="blotter_case",
             record_affected_id=case_id,
-            details={"reopen_reason": reason},
+            details=message,
             performer_staff_id=staff_id,
             field_changed="case_state",
+            old_value=old_state,
             new_value="OPEN"
         )
         messages.success(request, "Case has been reopened.")

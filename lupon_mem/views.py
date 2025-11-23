@@ -2931,18 +2931,44 @@ def mediation_complete(request, case_id: int):
             
             progress_id = cur.fetchone()[0]
             
+            # Get staff name and case details for logging
+            staff_name = None
+            case_num = None
+            case_name = None
+            if staff_id:
+                cur.execute(
+                    "SELECT TRIM(CONCAT_WS(' ', p.first_name, NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), p.last_name, NULLIF(p.suffix, ''))) FROM staff s JOIN person p ON p.person_id = s.person_id WHERE s.staff_id = %s",
+                    [staff_id]
+                )
+                staff_row = cur.fetchone()
+                staff_name = staff_row[0] if staff_row else None
+            cur.execute("SELECT blotter_case_num, blotter_case_name FROM blotter_case WHERE blotter_case_id = %s", [case_id])
+            case_row = cur.fetchone()
+            case_num = case_row[0] if case_row else None
+            case_name = case_row[1] if case_row else None
+            
+            # Build attendance message
+            attendance_parts = []
+            if compl_attended and resp_attended:
+                attendance_parts.append("both parties attended")
+            elif compl_attended:
+                attendance_parts.append("complainant attended")
+            elif resp_attended:
+                attendance_parts.append("respondent attended")
+            else:
+                attendance_parts.append("no parties attended")
+            
+            attendance_text = ", ".join(attendance_parts)
+            outcome_text = f", outcome: {settlement}" if settlement else ""
+            
+            message = f"{staff_name or f'Staff ID {staff_id}'} marked mediation hearing as HELD for Case {case_num or f'#{case_id}'} – {case_name or 'Unnamed Case'} ({attendance_text}{outcome_text})"
+            
             # Log the mediation completion
             blotter_log_event(
-                action="CREATE",
+                action="MEDIATION_HELD",
                 table_affected="case_progress_tracking",
                 record_affected_id=progress_id,
-                details={
-                    "case_id": case_id,
-                    "hearing_type": "MEDIATION",
-                    "settlement": settlement,
-                    "complainant_attended": compl_attended,
-                    "respondent_attended": resp_attended
-                },
+                details=message,
                 performer_staff_id=staff_id
             )
 
@@ -3188,18 +3214,44 @@ def conciliation_complete(request, case_id: int):
             
             progress_id = cur.fetchone()[0]
             
+            # Get staff name and case details for logging
+            staff_name = None
+            case_num = None
+            case_name = None
+            if staff_id:
+                cur.execute(
+                    "SELECT TRIM(CONCAT_WS(' ', p.first_name, NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), p.last_name, NULLIF(p.suffix, ''))) FROM staff s JOIN person p ON p.person_id = s.person_id WHERE s.staff_id = %s",
+                    [staff_id]
+                )
+                staff_row = cur.fetchone()
+                staff_name = staff_row[0] if staff_row else None
+            cur.execute("SELECT blotter_case_num, blotter_case_name FROM blotter_case WHERE blotter_case_id = %s", [case_id])
+            case_row = cur.fetchone()
+            case_num = case_row[0] if case_row else None
+            case_name = case_row[1] if case_row else None
+            
+            # Build attendance message
+            attendance_parts = []
+            if compl_attended and resp_attended:
+                attendance_parts.append("both parties attended")
+            elif compl_attended:
+                attendance_parts.append("complainant attended")
+            elif resp_attended:
+                attendance_parts.append("respondent attended")
+            else:
+                attendance_parts.append("no parties attended")
+            
+            attendance_text = ", ".join(attendance_parts)
+            outcome_text = f", outcome: {settlement}" if settlement else ""
+            
+            message = f"{staff_name or f'Staff ID {staff_id}'} marked conciliation hearing as HELD for Case {case_num or f'#{case_id}'} – {case_name or 'Unnamed Case'} ({attendance_text}{outcome_text})"
+            
             # Log the conciliation completion
             blotter_log_event(
-                action="CREATE",
+                action="CONCILIATION_HELD",
                 table_affected="case_progress_tracking",
                 record_affected_id=progress_id,
-                details={
-                    "case_id": case_id,
-                    "hearing_type": "CONCILIATION",
-                    "settlement": settlement,
-                    "complainant_attended": compl_attended,
-                    "respondent_attended": resp_attended
-                },
+                details=message,
                 performer_staff_id=staff_id
             )
 

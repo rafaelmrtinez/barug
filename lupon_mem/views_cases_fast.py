@@ -220,7 +220,7 @@ def case_list(request: HttpRequest):
                 bc.blotter_case_id,
                 bc.blotter_case_num,
                 bc.blotter_case_name,
-                TO_CHAR(bc.date_filed, 'Mon DD, YYYY') as date_filed_fmt,
+                TO_CHAR(bc.date_filed AT TIME ZONE 'Asia/Manila', 'Mon DD, YYYY') as date_filed_fmt,
                 TO_CHAR(bc.time_filed, 'HH12:MI AM') as time_filed_fmt,
                 COALESCE(cs.case_state_name, 'PENDING') as case_state,
                 COALESCE(ss.settlement_status_name, 'Pending') as settlement_status
@@ -306,7 +306,7 @@ def case_detail(request: HttpRequest, case_id: int):
                     bc.blotter_case_id,
                     bc.blotter_case_num,
                     bc.blotter_case_name,
-                    TO_CHAR(bc.date_filed,'Mon DD, YYYY') AS date_filed,
+                    TO_CHAR(bc.date_filed AT TIME ZONE 'Asia/Manila','Mon DD, YYYY') AS date_filed,
                     bc.incident_desc,
                     COALESCE(ct.complaint_title_name,'—') AS type_name,
                     COALESCE(cn.case_name,'—') AS nature_name,
