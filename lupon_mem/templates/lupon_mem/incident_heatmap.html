@@ -679,7 +679,10 @@ function initializeMap() {
         } else {
             // Multiple incidents at same location
             const incidents = JSON.parse(props.incidents);
-            const settledCount = incidents.filter(i => i.settlement_status === 'Settled').length;
+            const settledCount = incidents.filter(i => {
+                const s = (i.settlement_status || '').toUpperCase();
+                return s === 'SETTLED' || s === 'SETTLED THROUGH MEDIATION' || s === 'SETTLED THROUGH CONCILIATION';
+            }).length;
             
             popupContent = `
                 <div class="incident-popup">
@@ -744,8 +747,8 @@ function updateStatistics() {
     );
     
     const settledCount = incidentData.filter(incident => {
-        const s = (incident.settlement_status || '').trim().toLowerCase();
-        return s === 'settled';
+        const s = (incident.settlement_status || '').trim().toUpperCase();
+        return s === 'SETTLED' || s === 'SETTLED THROUGH MEDIATION' || s === 'SETTLED THROUGH CONCILIATION';
     }).length;
     
     const settlementRate = incidentData.length > 0 ? 

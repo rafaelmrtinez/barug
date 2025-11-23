@@ -426,6 +426,11 @@ def _autogen_settled_summary(case_id: int, kp16_submission_id: int):
     put("text box 1",        settlement_statement)
     put("point_agreement",   settlement_statement)
     put("point_of_agreement", settlement_statement)
+    
+    # Determine settlement type (MEDIATED vs CONCILIATED)
+    from lupon_mem.views_reports import _get_settlement_type
+    settlement_type = _get_settlement_type(case_id)
+    put("settlement_type", settlement_type)  # Will be 'MEDIATED' or 'CONCILIATED'
 
     # monitors – safe defaults
     put("monitoring_date", _date_cls.today().isoformat())
@@ -1889,7 +1894,7 @@ def incident_heatmap(request: HttpRequest):
     # Build settlement filter
     settlement_condition = ""
     if settlement_filter == 'settled':
-        settlement_condition = "AND UPPER(ss.settlement_status_name) = 'SETTLED'"
+        settlement_condition = "AND (ss.settlement_status_id IN (2, 15, 16) OR UPPER(ss.settlement_status_name) IN ('SETTLED', 'SETTLED THROUGH MEDIATION', 'SETTLED THROUGH CONCILIATION'))"
     elif settlement_filter == 'pending':
         settlement_condition = "AND (ss.settlement_status_name IS NULL OR UPPER(ss.settlement_status_name) = 'PENDING')"
     elif settlement_filter == 'not_settled':
@@ -1945,9 +1950,9 @@ def incident_heatmap(request: HttpRequest):
                     COALESCE(ss.settlement_status_name, 'Pending') as settlement_status,
                     'Paid' as payment_status,
                     CASE 
-                        WHEN UPPER(ss.settlement_status_name) = 'SETTLED' THEN 'Low'
+                        WHEN ss.settlement_status_id IN (2, 15, 16) OR UPPER(ss.settlement_status_name) IN ('SETTLED', 'SETTLED THROUGH MEDIATION', 'SETTLED THROUGH CONCILIATION') THEN 'Low'
                         WHEN UPPER(cs.case_state_name) = 'CLOSED' THEN 'Medium'
-                        WHEN bc.date_filed < CURRENT_DATE - INTERVAL '6 months' AND UPPER(ss.settlement_status_name) != 'SETTLED' THEN 'High'
+                        WHEN bc.date_filed < CURRENT_DATE - INTERVAL '6 months' AND NOT (ss.settlement_status_id IN (2, 15, 16) OR UPPER(ss.settlement_status_name) IN ('SETTLED', 'SETTLED THROUGH MEDIATION', 'SETTLED THROUGH CONCILIATION')) THEN 'High'
                         ELSE 'Medium'
                     END as severity_level,
                     COALESCE(bc.date_filed::timestamp, CURRENT_TIMESTAMP) as created_at,
@@ -1990,7 +1995,7 @@ def incident_heatmap(request: HttpRequest):
                 SELECT 
                     COALESCE(ct.complaint_title_name, 'General Complaint') as incident_type,
                     COUNT(*) as total_count,
-                    COUNT(CASE WHEN UPPER(ss.settlement_status_name) = 'SETTLED' THEN 1 END) as settled_count,
+                    COUNT(CASE WHEN ss.settlement_status_id IN (2, 15, 16) OR UPPER(ss.settlement_status_name) IN ('SETTLED', 'SETTLED THROUGH MEDIATION', 'SETTLED THROUGH CONCILIATION') THEN 1 END) as settled_count,
                     COUNT(CASE WHEN UPPER(cs.case_state_name) = 'CLOSED' THEN 1 END) as closed_count,
                     COUNT(CASE WHEN a.latitude IS NOT NULL AND a.longitude IS NOT NULL THEN 1 END) as mapped_count,
                     AVG(
@@ -2051,7 +2056,7 @@ def incident_heatmap(request: HttpRequest):
                 COALESCE(a.street, 'Unknown Street') as street_name,
                 COALESCE(a.barangay, 'Unknown Barangay') as barangay_name,
                 COUNT(*) as incident_count,
-                COUNT(CASE WHEN UPPER(ss.settlement_status_name) = 'SETTLED' THEN 1 END) as settled_count,
+                COUNT(CASE WHEN ss.settlement_status_id IN (2, 15, 16) OR UPPER(ss.settlement_status_name) IN ('SETTLED', 'SETTLED THROUGH MEDIATION', 'SETTLED THROUGH CONCILIATION') THEN 1 END) as settled_count,
                 COUNT(CASE WHEN bc.date_filed >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as recent_count,
                 MAX(bc.date_filed) as last_incident_date
             FROM blotter_case bc

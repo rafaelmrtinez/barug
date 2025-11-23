@@ -162,7 +162,42 @@
             <form id="filterForm" method="post">
                 {% csrf_token %}
                 <div class="modal-body">
-                    <div class="row">
+                    <div class="row" id="monthYearFilters" style="display: none;">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label>Month</label>
+                                <select class="form-control" name="month" required>
+                                    <option value="">Select Month</option>
+                                    <option value="1">January</option>
+                                    <option value="2">February</option>
+                                    <option value="3">March</option>
+                                    <option value="4">April</option>
+                                    <option value="5">May</option>
+                                    <option value="6">June</option>
+                                    <option value="7">July</option>
+                                    <option value="8">August</option>
+                                    <option value="9">September</option>
+                                    <option value="10">October</option>
+                                    <option value="11">November</option>
+                                    <option value="12">December</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label>Year</label>
+                                <select class="form-control" name="year" required>
+                                    <option value="">Select Year</option>
+                                    <option value="2022">2022</option>
+                                    <option value="2023">2023</option>
+                                    <option value="2024">2024</option>
+                                    <option value="2025">2025</option>
+                                    <option value="2026">2026</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row" id="otherFilters">
                         <div class="col-md-6">
                             <div class="form-group mb-3">
                                 <label>Complaint Title (Optional)</label>
@@ -186,7 +221,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="row">
+                    <div class="row" id="dateFilters">
                         <div class="col-md-6">
                             <div class="form-group mb-3">
                                 <label>Date From (Optional)</label>
@@ -217,7 +252,26 @@ let complaint_titles = {{ complaint_titles|safe }};
 let case_natures = {{ case_natures|safe }};
 
 function showFilterModal(reportType) {
-    document.getElementById('filterForm').action = `/lupon_mem/blotter-reports/${reportType}/`;
+    const form = document.getElementById('filterForm');
+    const monthYearFilters = document.getElementById('monthYearFilters');
+    const otherFilters = document.getElementById('otherFilters');
+    const dateFilters = document.getElementById('dateFilters');
+    
+    form.method = 'post';
+    
+    if (reportType === 'case_summaries') {
+        monthYearFilters.style.display = 'flex';
+        otherFilters.style.display = 'none';
+        dateFilters.style.display = 'none';
+        monthYearFilters.querySelectorAll('select').forEach(s => s.required = true);
+    } else {
+        monthYearFilters.style.display = 'none';
+        otherFilters.style.display = 'flex';
+        dateFilters.style.display = 'flex';
+        monthYearFilters.querySelectorAll('select').forEach(s => s.required = false);
+    }
+    
+    form.action = `/lupon_mem/blotter-reports/${reportType}/`;
     new bootstrap.Modal(document.getElementById('filterModal')).show();
 }
 </script>

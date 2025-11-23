@@ -285,7 +285,7 @@ def case_list(request: HttpRequest):
             SELECT 
                 COUNT(*) as total_cases,
                 COUNT(*) FILTER (WHERE UPPER(COALESCE(cs.case_state_name, 'PENDING')) = 'OPEN') as open_cases,
-                COUNT(*) FILTER (WHERE UPPER(COALESCE(ss.settlement_status_name, '')) = 'SETTLED') as settled_cases
+                COUNT(*) FILTER (WHERE ss.settlement_status_id IN (2, 15, 16) OR UPPER(COALESCE(ss.settlement_status_name, '')) IN ('SETTLED', 'SETTLED THROUGH MEDIATION', 'SETTLED THROUGH CONCILIATION')) as settled_cases
             FROM blotter_case bc
             LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
             LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
