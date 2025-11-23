@@ -67,6 +67,7 @@ from .forms import (
     AnnouncementDraftForm,
     DraftListSearch,
     ResidentFilters,
+    AudienceScope,
 )
 
 
@@ -2087,6 +2088,20 @@ def ajax_announcement_draft_search(
     html = render_to_string("announcement/_draft_list.html", context, request=request)
     return HttpResponse(html)
 
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+def announcement_audience_scope(request: HttpRequest) -> HttpResponse:
+    """View to display audience scope with dynamic subchoices"""
+    user_role = _auth_role_name(request)
+    form = AudienceScope()
+    
+    return render(request, "secretary/announcement/audience_scope.html", {
+        'page_path': f'{user_role} / Announcements / Audience Scope',
+        'page_title': 'Audience Scope',
+        'form': form,
+    })
+
 def resident_map_list(request):
     form = StaffFilters()
     list = []
@@ -2095,11 +2110,7 @@ def resident_map_list(request):
     page_obj = paginator.get_page(page_number)
 
     return render(request, "resident/resident_map_list.html", {
-        'user_fullname' : user_fullname,
-        'user_role': user_role,
-        'page_path': f'{user_role} / Resident Map',
         'page_title': 'Resident Map',
-        'user_role_template': user_role_template,
         'page_obj': page_obj,
         'form': form,
     })

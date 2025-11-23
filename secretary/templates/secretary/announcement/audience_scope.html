@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+<style>
+  .audience-panel { border-radius: 12px; background: #fff; padding: 1rem; border: 1px solid #e6e6e6; }
+  .badge-purok { border-radius:999px; padding: .25rem .5rem; border:1px solid #e6e6e6; background:#fff; font-size:.75rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="margin-top: 40px;">
+  <div class="row g-4">
+    <!-- Left column: rules + controls -->
+    <div class="col-lg-8">
+      <div class="audience-panel mb-3">
+        <h4 class="mb-2"><i class="bi bi-people"></i> Audience</h4>
+        <p class="small text-muted">Add one or more targeting rules. Use <strong>Person list</strong> to select many recipients at once.</p>
+
+        <form method="post" action="#">
+          {% csrf_token %}
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label small">Scope</label>
+              {{ form.scope }}
+            </div>
+
+            <!-- Purok/Sitio subchoice -->
+            <div class="col-md-4" id="purok-section" style="display:none;">
+              <label class="form-label small">Purok</label>
+              {{ form.purok_sitio }}
+            </div>
+
+            <!-- Staff Role subchoice -->
+            <div class="col-md-4" id="staff-section" style="display:none;">
+              <label class="form-label small">Role</label>
+              {{ form.staff_role }}
+            </div>
+
+            <!-- Person Search subchoice -->
+            <div class="col-md-6" id="person-section" style="display:none;">
+              <label class="form-label small">Person</label>
+              {{ form.search_person }}
+            </div>
+
+            <div class="col-12 text-end mt-2">
+              <button type="submit" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-person-plus"></i> Add Rule
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- Rules list -->
+      <div class="audience-panel mb-3">
+        <h5 class="mb-2">Rules Applied</h5>
+        <ul class="small" id="rules-list">
+          <li class="text-muted">No rules added yet</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Right column: preview / summary -->
+    <div class="col-lg-4">
+      <div class="audience-panel mb-3">
+        <h5 class="mb-2">Audience Preview</h5>
+        <div class="small mb-2">
+          Total: <strong id="total-count">0</strong><br>
+          Residents: <strong id="resident-count">0</strong><br>
+          Staff: <strong id="staff-count">0</strong>
+        </div>
+
+        <div class="small text-muted mb-2">By Purok</div>
+        <div class="d-flex gap-2 flex-wrap" id="purok-breakdown">
+          <span class="text-muted small">No data</span>
+        </div>
+      </div>
+
+      <div class="audience-panel">
+        <h5 class="mb-2">Quick tips</h5>
+        <ul class="small mb-0">
+          <li>Use <strong>PUROK</strong> to target a specific purok.</li>
+          <li>Use <strong>STAFF</strong> to target staff roles (e.g., BHW, Captain).</li>
+          <li><strong>PERSON LIST</strong> allows selecting multiple individuals.</li>
+          <li><strong>ALL</strong> targets everyone in the barangay.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+    const scopeSelect = document.getElementById('scope');
+    const purokSection = document.getElementById('purok-section');
+    const staffSection = document.getElementById('staff-section');
+    const personSection = document.getElementById('person-section');
+    const rulesList = document.getElementById('rules-list');
+    
+    let appliedRules = [];
+    
+    function toggleSections() {
+        const selectedValue = scopeSelect.value;
+        
+        // Hide all sections first
+        purokSection.style.display = 'none';
+        staffSection.style.display = 'none';
+        personSection.style.display = 'none';
+        
+        // Show relevant section based on selection
+        if (selectedValue === '8') {
+            // PUROK
+            purokSection.style.display = 'block';
+        } else if (selectedValue === '3') {
+            // STAFF
+            staffSection.style.display = 'block';
+        } else if (selectedValue === '6') {
+            // PERSON LIST
+            personSection.style.display = 'block';
+        }
+    }
+    
+    function updateRulesList() {
+        if (appliedRules.length === 0) {
+            rulesList.innerHTML = '<li class="text-muted">No rules added yet</li>';
+        } else {
+            rulesList.innerHTML = appliedRules.map(rule => 
+                `<li><code>${rule.type}</code> — ${rule.value}</li>`
+            ).join('');
+        }
+    }
+    
+    function updatePreview() {
+        // Mock data - replace with actual counts
+        const totalCount = appliedRules.length * 15; // Mock calculation
+        document.getElementById('total-count').textContent = totalCount;
+        document.getElementById('resident-count').textContent = Math.floor(totalCount * 0.8);
+        document.getElementById('staff-count').textContent = Math.floor(totalCount * 0.2);
+        
+        // Mock purok breakdown
+        const purokBreakdown = document.getElementById('purok-breakdown');
+        if (totalCount > 0) {
+            purokBreakdown.innerHTML = `
+                <span class="badge-purok">KANIPAAN: ${Math.floor(totalCount * 0.4)}</span>
+                <span class="badge-purok">PAMPANGO: ${Math.floor(totalCount * 0.3)}</span>
+                <span class="badge-purok">LUTAW-LUTAW: ${Math.floor(totalCount * 0.2)}</span>
+                <span class="badge-purok">MAUCO: ${Math.floor(totalCount * 0.1)}</span>
+            `;
+        } else {
+            purokBreakdown.innerHTML = '<span class="text-muted small">No data</span>';
+        }
+    }
+    
+    // Mock add rule functionality
+    document.querySelector('form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const scopeValue = scopeSelect.value;
+        const scopeText = scopeSelect.options[scopeSelect.selectedIndex].text;
+        
+        if (scopeValue) {
+            let ruleValue = scopeText;
+            
+            // Get subchoice values if applicable
+            if (scopeValue === '8' && purokSection.style.display !== 'none') {
+                const purokSelect = document.getElementById('purok_sitio');
+                if (purokSelect.value) {
+                    ruleValue = purokSelect.options[purokSelect.selectedIndex].text;
+                }
+            } else if (scopeValue === '3' && staffSection.style.display !== 'none') {
+                const staffSelect = document.getElementById('staff_role');
+                if (staffSelect.value) {
+                    ruleValue = staffSelect.options[staffSelect.selectedIndex].text;
+                }
+            }
+            
+            appliedRules.push({
+                type: scopeText,
+                value: ruleValue
+            });
+            
+            updateRulesList();
+            updatePreview();
+        }
+    });
+    
+    // Initial setup
+    toggleSections();
+    updateRulesList();
+    updatePreview();
+    
+    // Listen for changes
+    scopeSelect.addEventListener('change', toggleSections);
+})();
+</script>
+{% endblock %}

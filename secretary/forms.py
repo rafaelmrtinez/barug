@@ -113,6 +113,34 @@ PUROK_SITIO_CHOICES = [
     (4, "Mauco"),
 ]
 
+STAFF_ROLE_CHOICES = [
+    ("", "— Select Staff Role —"),
+    (1, "SUPER ADMIN"),
+    (2, "ADMIN"),
+    (3, "BARANGAY CAPTAIN"),
+    (4, "BARANGAY SECRETARY"),
+    (5, "BARANGAY TREASURER"),
+    (6, "BARANGAY CLERK"),
+    (7, "BARANGAY LUPON PRESIDENT"),
+    (8, "BARANGAY LUPON MEMBER"),
+    (9, "BARANGAY HEALTH WORKER"),
+    (10, "NURSE"),
+    (11, "MIDWIFE"),
+    (12, "SYSTEM"),
+]
+
+AUDIENCE_SCOPE =[
+    ("", "— Select Audience Scope —"),
+    (1, "ALL"),
+    (2, "RESIDENTS"),
+    (8, "PUROK"),
+    (3, "STAFF"),
+    (4, "HOUSEHOLD HEAD"),
+    (5, "FAMILY HEAD"),
+    (7, "BUSINESS OWNER"),
+    (6, "PERSON LIST"),
+]
+
 VALID_ID_TYPE_CHOICES = [
     # (1,  "Philippine Passport"),
     (2,  "Philippine National ID"), 
@@ -658,6 +686,43 @@ class DraftListSearch(forms.Form):
         required= False,
     )
 
+class AudienceScope(forms.Form):
+    scope = forms.ChoiceField(
+        choices= AUDIENCE_SCOPE,
+        widget=forms.Select(attrs={
+            'id' : 'scope',
+            'class' : 'form-select',
+        }),
+        label= 'Audience Scope',
+        required= True,
+    )
+    staff_role = forms.ChoiceField(
+        choices= STAFF_ROLE_CHOICES,
+        widget=forms.Select(attrs={
+            'id' : 'staff_role',
+            'class' : 'form-select',
+        }),
+        label= 'Role',
+        required= False,
+    )
+    purok_sitio = forms.ChoiceField(
+        choices= PUROK_SITIO_CHOICES,
+        widget=forms.Select(attrs={
+            'id' : 'purok_sitio',
+            'class' : 'form-select',
+        }),
+        label= 'Purok / Sitio',
+        required= False,
+    )
+    search_person = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search_person',
+            'class' : 'form-control', 
+            'placeholder' : 'Search Person',
+        }),
+        label= 'Search Person',
+        required= False,
+    )
 
 class ResidentFilters(forms.Form):
     search = forms.CharField(
