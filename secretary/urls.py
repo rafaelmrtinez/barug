@@ -53,8 +53,9 @@ urlpatterns = [
     path("incident-heatmap/", views.incident_heatmap, name="incident_heatmap"),
 
     # ANNOUNCEMENT
-    path("announcement/create_draft/", views.annoucement_draf, name="announcement_draft"),
+    path("announcement/create_draft/", views.announcement_draft, name="announcement_draft"),
     path("announcement/draft_list/", views.announcement_draft_list, name="announcement_draft_list"),
+    path("ajax/announcement_draft_search/", views.ajax_announcement_draft_search, name="ajax_announcement_draft_search"),
     
     # PDF APIs
     path("api/residents/pdf/", ResidentsPDFAPI.as_view(), name="residents_pdf_api"),

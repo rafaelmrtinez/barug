@@ -76,6 +76,12 @@ from src.domain.contracts.resident_repository_contract import (
 from src.infra.repositories.resident_repository import (
     ResidentRepository,
 )
+from src.domain.contracts.announcement_repository_contract import (
+    IAnnouncementRepository,
+)
+from src.infra.repositories.announcement_repository import (
+    AnnouncementRepository,
+)
 
 
 class InfraContainer(containers.DeclarativeContainer):
@@ -264,5 +270,10 @@ class InfraContainer(containers.DeclarativeContainer):
 
     resident_repository: providers.Factory[IResidentRepository] = providers.Factory(
         ResidentRepository,
+        ctx=context
+    )
+
+    announcement_repository: providers.Factory[IAnnouncementRepository] = providers.Factory(
+        AnnouncementRepository,
         ctx=context
     )

@@ -133,6 +133,12 @@ from src.app.contracts.resident_service_contract import (
 from src.app.services.resident_service import (
     ResidentService,
 )
+from src.app.contracts.announcement_service_contract import (
+    IAnnouncementService,
+)
+from src.app.services.announcement_service import (
+    AnnouncementService,
+)
 
 
 class AppContainer(containers.DeclarativeContainer):
@@ -429,4 +435,9 @@ class AppContainer(containers.DeclarativeContainer):
     resident_service: providers.Factory[IResidentService] = providers.Factory(
         ResidentService,
         repo=infra.resident_repository,
+    )
+
+    announcement_service: providers.Factory[IAnnouncementService] = providers.Factory(
+        AnnouncementService,
+        announcement_repository=infra.announcement_repository,
     )

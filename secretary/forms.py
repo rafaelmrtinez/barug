@@ -620,7 +620,7 @@ class AnnouncementDraftForm(forms.Form):
             "type": "datetime-local",
         }),
         label="Publish at",
-        required=True,
+        required=False,
         input_formats=["%Y-%m-%dT%H:%M"],
         help_text="Optional. Leave empty to keep as draft."
     )
@@ -631,7 +631,7 @@ class AnnouncementDraftForm(forms.Form):
             "type": "datetime-local",
         }),
         label="Expire at",
-        required=True,
+        required=False,
         input_formats=["%Y-%m-%dT%H:%M"],
         help_text="Optional. If set, must be after Publish at."
     )

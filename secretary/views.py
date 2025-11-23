@@ -49,6 +49,12 @@ from src.domain.contracts.household_repository_contract import (
 from src.app.contracts.resident_service_contract import ( 
     IResidentService,
 )
+from src.app.transfer_objects.commands.announcement_cmd import (
+    CreateAnnouncementDraftCMD,
+)
+from src.app.contracts.announcement_service_contract import (
+    IAnnouncementService,
+)
 
 
 from .forms import (
@@ -1952,27 +1958,124 @@ def api_business_pins(
 # ANNOUNCEMENT
 # -------------------------------
 
-def annoucement_draf(request):
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@csrf_protect
+@nocache
+@inject
+def announcement_draft(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    """Create or edit an announcement draft"""
     user_role = _auth_role_name(request)
-
-    form = AnnouncementDraftForm()
-
-    return render(request, "announcement/draft.html", {
-        'page_path': f'{user_role} / Resident List',
-        'page_title': 'Resident List',
+    auth = request.session.get('auth', {})
+    staff_id = auth.get('staff_id')
+    
+    if not staff_id:
+        messages.error(request, "Your session is missing staff credentials.")
+        return redirect('secretary:dashboard')
+    
+    form = AnnouncementDraftForm(request.POST or None)
+    
+    if request.method == 'POST' and form.is_valid():
+        try:
+            
+            command = CreateAnnouncementDraftCMD(
+                title=form.cleaned_data['title'],
+                body=form.cleaned_data['body'],
+                created_by_id=staff_id,
+                publish_at=form.cleaned_data.get('publish_at'),
+                expire_at=form.cleaned_data.get('expire_at')
+            )
+            
+            announcement_id = announcement_service.create_draft(command)
+            messages.success(request, f"Announcement draft created successfully! ID: {announcement_id}")
+            return redirect('secretary:announcement_draft_list')
+            
+        except ValueError as e:
+            messages.error(request, str(e))
+        except Exception as e:
+            messages.error(request, "An error occurred while creating the announcement draft.")
+            logger.exception("Failed to create announcement draft: %s", e)
+    
+    return render(request, "secretary/announcement/draft.html", {
+        'page_path': f'{user_role} / Announcements / Create Draft',
+        'page_title': 'Create Announcement Draft',
         'form': form,
     })
 
-def announcement_draft_list(request):
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def announcement_draft_list(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    """List all announcement drafts"""
     user_role = _auth_role_name(request)
+    auth = request.session.get('auth', {})
+    
+    form = DraftListSearch(request.GET or None)
+    search_query = request.GET.get('search', '').strip()
+    
+    try:
+        # Get all drafts (you can modify this to filter by creator if needed)
+        drafts = announcement_service.execute(
+            search= search_query
+        )
+        
+        paginator = Paginator(drafts, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
 
-    form = DraftListSearch()
-
-    return render(request, "announcement/draft_list.html", {
-        'page_path': f'{user_role} / Resident List',
-        'page_title': 'Resident List',
+        if search_query is not None and not form.is_valid:
+            form = DraftListSearch()
+        
+    except Exception as e:
+        messages.error(request, "An error occurred while loading announcement drafts.")
+        logger.exception("Failed to load announcement drafts: %s", e)
+        page_obj = None
+    
+    return render(request, "secretary/announcement/draft_list.html", {
+        'page_path': f'{user_role} / Announcements / Draft List',
+        'page_title': 'Announcement Drafts',
         'form': form,
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'search_url': 'secretary:ajax_announcement_draft_search',
     })
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@require_GET
+@inject
+def ajax_announcement_draft_search(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR only")
+    
+    tpl_key = (request.GET.get("tpl") or "rows").strip().lower()
+    if tpl_key != "rows":
+        return HttpResponseBadRequest("Unknown partial")
+
+    q = request.GET.get("q", "") or None
+    
+    try:
+        rows = announcement_service.execute(
+            search=q,
+        )[:50]
+        
+    except Exception as e:
+        logger.exception("ajax_announcement_draft_search error: %s", e)
+        rows = []
+
+    context = {"rows": rows}
+    html = render_to_string("announcement/_draft_list.html", context, request=request)
+    return HttpResponse(html)
 
 def resident_map_list(request):
     form = StaffFilters()
