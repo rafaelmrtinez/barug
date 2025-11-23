@@ -49,6 +49,9 @@ from src.domain.contracts.household_repository_contract import (
 from src.app.contracts.resident_service_contract import ( 
     IResidentService,
 )
+from common.logging_utils import (
+    log_announcement_action
+)
 from src.app.transfer_objects.commands.announcement_cmd import (
     CreateAnnouncementDraftCMD,
 )
@@ -1990,6 +1993,13 @@ def announcement_draft(
             )
             
             announcement_id = announcement_service.create_draft(command)
+            log_announcement_action(
+                announcement_id=announcement_id,
+                table_affected= 'ANNOUNCEMENT',
+                action='INSERT',
+                performer_id=staff_id,
+                details=f'Created a new announcement draft. ID :{announcement_id}',
+            )
             messages.success(request, f"Announcement draft created successfully! ID: {announcement_id}")
             return redirect('secretary:announcement_draft_list')
             

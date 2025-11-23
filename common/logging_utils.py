@@ -44,7 +44,18 @@ def log_business_action(business_id: int, table_affected: str, action: str, perf
         table_affected=table_affected,
         action=action,
         performer_id=performer_id,
-        user_type_id=3,
+        user_type_id=2,
         subsystem=3,
+        details=details,
+    )
+
+def log_announcement_action(announcement_id: int, table_affected: str, action: str, performer_id: int, details: str = None):
+    log_action (
+        record_affected_id=announcement_id,
+        table_affected=table_affected,
+        action=action,
+        performer_id=performer_id,
+        user_type_id=2,
+        subsystem=11,
         details=details,
     )
