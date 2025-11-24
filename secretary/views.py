@@ -2098,6 +2098,40 @@ def ajax_announcement_draft_search(
 @role_required(SECRETARY_ROLE)
 @nocache
 @inject
+def announcement_draft_view(
+    request: HttpRequest,
+    announcement_id: int,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+    audience_service: IAudienceService = Provide[AppContainer.audience_service],
+) -> HttpResponse:
+    """View announcement draft details"""
+    user_role = _auth_role_name(request)
+    
+    try:
+        draft = announcement_service.get_draft_by_id(announcement_id)
+        
+        if not draft:
+            messages.error(request, "Announcement not found.")
+            return redirect('secretary:announcement_draft_list')
+        
+        audiences = audience_service.get_announcement_audiences(announcement_id)
+        
+    except Exception as e:
+        messages.error(request, "Failed to load announcement details.")
+        logger.exception("Failed to load announcement: %s", e)
+        return redirect('secretary:announcement_draft_list')
+    
+    return render(request, "secretary/announcement/draft_view.html", {
+        'page_path': f'{user_role} / Announcements / View Draft',
+        'page_title': f'View Draft: {draft.announcement_title}',
+        'draft': draft,
+        'audiences': audiences,
+    })
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
 def announcement_audience_scope(
     request: HttpRequest,
     audience_service: IAudienceService = Provide[AppContainer.audience_service],

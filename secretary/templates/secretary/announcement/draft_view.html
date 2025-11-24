@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="page-wrap" style="margin-top: 40px;">
+  <div class="container-fluid pt-3 page-main">
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">{{ draft.announcement_title }}</h5>
+            <a href="{% url 'secretary:announcement_draft_list' %}" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-arrow-left"></i> Back to List
+            </a>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-8">
+                <h6>Content</h6>
+                <div class="border rounded p-3 mb-3" style="background-color: #f8f9fa;">
+                  {{ draft.announcement_body|linebreaks }}
+                </div>
+                
+                <div class="row">
+                  <div class="col-md-6">
+                    <h6>Publish Date</h6>
+                    <p class="text-muted">
+                      {% if draft.announcement_published_at %}
+                        {{ draft.announcement_published_at|date:"M d, Y g:i A" }}
+                      {% else %}
+                        Not scheduled
+                      {% endif %}
+                    </p>
+                  </div>
+                  <div class="col-md-6">
+                    <h6>Expire Date</h6>
+                    <p class="text-muted">
+                      {% if draft.announcement_expire_at %}
+                        {{ draft.announcement_expire_at|date:"M d, Y g:i A" }}
+                      {% else %}
+                        No expiry
+                      {% endif %}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="col-md-4">
+                <h6>Audiences</h6>
+                {% if audiences %}
+                  <div class="list-group">
+                    {% for audience in audiences %}
+                      <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                          <div>
+                            <strong>{{ audience.audience_scope_name }}</strong>
+                            <br>
+                            <small class="text-muted">{{ audience.inserted_persons }} persons</small>
+                          </div>
+                          <span class="badge bg-primary rounded-pill">{{ audience.inserted_persons }}</span>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <p class="text-muted">No audiences added yet.</p>
+                  <a href="{% url 'secretary:announcement_audience_scope' %}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-plus"></i> Add Audience
+                  </a>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <small class="text-muted">
+              Created: {{ draft.announcement_created_at|date:"M d, Y g:i A" }} | 
+              Status: {{ draft.announcement_status_name|default:"Draft" }}
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -55,7 +55,8 @@ urlpatterns = [
     # ANNOUNCEMENT
     path("announcement/create_draft/", views.announcement_draft, name="announcement_draft"),
     path("announcement/draft_list/", views.announcement_draft_list, name="announcement_draft_list"),
-    path("announcement/audience_scope/", views.announcement_audience_scope, name="audience_scope_view"),
+    path("announcement/draft_view/<int:announcement_id>/", views.announcement_draft_view, name="announcement_draft_view"),
+    path("announcement/audience_scope/", views.announcement_audience_scope, name="announcement_audience_scope"),
     path("ajax/announcement_draft_search/", views.ajax_announcement_draft_search, name="ajax_announcement_draft_search"),
     
     # PDF APIs
