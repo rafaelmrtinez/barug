@@ -6,8 +6,6 @@ from common.send_sms import send_sms
 from datetime import datetime
 import os
 import uuid
-import pytz
-from zoneinfo import ZoneInfo
 
 from lupon_mem.services.forms.kp8 import KP8Handler  # reuse its normalization
 from lupon_mem.services.forms.kp10 import KP10Handler
@@ -248,26 +246,27 @@ def report_list(request: HttpRequest):
     payment_options = ["", "PAID", "UNPAID", "DECLINED"]
     blotter_options = ["", "FOR LUPON REVIEW", "REVIEWED"]
 
-    # Get Philippine timezone
-    ph_tz = pytz.timezone('Asia/Manila')
-    
     with connection.cursor() as cur:
-        # Query raw timestamps and convert to Philippine Time
-        cur.execute("SELECT blotter_report_id, date_time_reported, incident_subject, payment_status_id FROM blotter_report ORDER BY blotter_report_id DESC")
-        raw_reports = cur.fetchall()
+        # DEBUG: Direct query for report 71 to check actual payment status
+        cur.execute("""
+            SELECT br.blotter_report_id, ps.payment_status_name
+            FROM blotter_report br
+            LEFT JOIN payment_status ps ON ps.payment_status_id = br.payment_status_id
+            WHERE br.blotter_report_id = 71
+        """)
+        direct_result = cur.fetchone()
+        if direct_result:
+            print(f"[DEBUG] Direct query - Report 71 payment_status: '{direct_result[1]}'")
         
         cur.execute("SELECT * FROM get_all_report_details()")
         columns = [col[0] for col in cur.description]
         all_reports = cur.fetchall()
         
-        # Create a map of report_id to Philippine Time formatted string
-        ph_time_map = {}
-        for row in raw_reports:
-            report_id, dt_utc = row[0], row[1]
-            if dt_utc:
-                # Convert UTC to Philippine Time
-                dt_ph = dt_utc.astimezone(ph_tz)
-                ph_time_map[report_id] = dt_ph.strftime('%B %d, %Y %I:%M %p')
+        # DEBUG: Check what payment status we're getting for report 71
+        for row in all_reports:
+            row_dict = dict(zip(columns, row))
+            if row_dict.get('blotter_report_id') == 71:
+                print(f"[DEBUG] Report 71 payment_status_name: '{row_dict.get('payment_status_name')}'")
         
         # Convert to tuples for template compatibility
         reports_data = []
@@ -276,9 +275,8 @@ def report_list(request: HttpRequest):
             payment_status = row_dict.get('payment_status_name') or ''
             blotter_status = 'REVIEWED' if payment_status and str(payment_status).upper() in ('PAID','UNPAID','DECLINED') else 'FOR LUPON REVIEW'
             
-            # Use Philippine Time from our map
-            report_id = row_dict.get('blotter_report_id')
-            reported_at = ph_time_map.get(report_id, row_dict.get('date_time_reported'))
+            # date_time_reported is already formatted by the DB function
+            reported_at = row_dict.get('date_time_reported')
             
             # Create tuple: (id, subject, reported_at, payment_status, blotter_status, complainant_names, respondent_names, current_status_name, has_case)
             report_tuple = (
@@ -478,56 +476,17 @@ def report_new(request: HttpRequest):
         )
         report_id = cur.fetchone()[0]
         
-        # Get staff name and person names for logging
-        staff_name = None
-        complainant_name = None
-        respondent_names = []
-        
-        if staff_id:
-            cur.execute(
-                "SELECT TRIM(CONCAT_WS(' ', p.first_name, NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), p.last_name, NULLIF(p.suffix, ''))) FROM staff s JOIN person p ON p.person_id = s.person_id WHERE s.staff_id = %s",
-                [staff_id]
-            )
-            staff_row = cur.fetchone()
-            staff_name = staff_row[0] if staff_row else None
-        
-        if complainant_id:
-            cur.execute(
-                "SELECT TRIM(CONCAT_WS(' ', first_name, NULLIF(SUBSTRING(COALESCE(middle_name, '') FROM 1 FOR 1) || '.', '.'), last_name, NULLIF(suffix, ''))) FROM person WHERE person_id = %s",
-                [complainant_id]
-            )
-            comp_row = cur.fetchone()
-            complainant_name = comp_row[0] if comp_row else None
-        
-        if respondent_ids:
-            for resp_id in respondent_ids:
-                cur.execute(
-                    "SELECT TRIM(CONCAT_WS(' ', first_name, NULLIF(SUBSTRING(COALESCE(middle_name, '') FROM 1 FOR 1) || '.', '.'), last_name, NULLIF(suffix, ''))) FROM person WHERE person_id = %s",
-                    [resp_id]
-                )
-                resp_row = cur.fetchone()
-                if resp_row and resp_row[0]:
-                    respondent_names.append(resp_row[0])
-        
-        # Build human-readable message
-        message = f"{staff_name or f'Staff ID {staff_id}'} filed blotter report #{report_id} – {incident_subject or '(no subject)'}"
-        if complainant_name:
-            message += f" (complainant: {complainant_name}"
-            if respondent_names:
-                message += f", respondent(s): {', '.join(respondent_names)}"
-            message += ")"
-        elif respondent_names:
-            message += f" (respondent(s): {', '.join(respondent_names)})"
-        
-        if incident_address_id:
-            message += " with location"
-        
         # Log the report creation
         blotter_log_event(
             action="CREATE",
             table_affected="blotter_report",
             record_affected_id=report_id,
-            details=message,
+            details={
+                "incident_subject": incident_subject,
+                "complainant_id": complainant_id,
+                "respondent_count": len(respondent_ids) if respondent_ids else 0,
+                "has_location": bool(incident_address_id)
+            },
             performer_staff_id=staff_id
         )
 
@@ -931,6 +890,7 @@ def report_approve(request: HttpRequest, report_id: int):
         print("[DEBUG][APPROVE][ERROR]", e)
         raise
 
+    messages.success(request, f"Report #{report_id} approved. Payment status set to UNPAID.")
     return redirect("lupon_mem:report_review", report_id=report_id)
 
 
@@ -977,6 +937,7 @@ def report_decline(request: HttpRequest, report_id: int):
         print("[DEBUG][DECLINE][ERROR]", e)
         raise
 
+    messages.success(request, f"Report #{report_id} declined. Payment status set to DECLINED.")
     return redirect("lupon_mem:report_review", report_id=report_id)
 
 
@@ -1624,170 +1585,217 @@ def total_cases_by_status_report(request: HttpRequest):
 @session_login_required
 @role_required(*LUPON_ROLES)
 def case_summaries_report(request: HttpRequest):
-    if request.method == "GET":
+    """Generate PDF report of case summaries with filters"""
+    print("\n" + "="*80)
+    print("[CASE_SUMMARIES_REPORT] Function called!")
+    print(f"[CASE_SUMMARIES_REPORT] Method: {request.method}")
+    print(f"[CASE_SUMMARIES_REPORT] GET params: {dict(request.GET)}")
+    print(f"[CASE_SUMMARIES_REPORT] POST params: {dict(request.POST)}")
+    print("="*80 + "\n")
+    
+    # Check if filters are provided (either GET or POST)
+    month = request.GET.get('month') or request.POST.get('month')
+    year = request.GET.get('year') or request.POST.get('year')
+    print(f"[CASE_SUMMARIES_REPORT] Extracted month={month}, year={year}")
+    
+    # If no filters provided, this shouldn't happen from the menu, but handle it
+    if not month and not year and request.method == "GET":
+        # Show filter form
+        with connection.cursor() as cur:
+            cur.execute("SELECT complaint_title_id, complaint_title_name FROM complaint_title ORDER BY complaint_title_name")
+            complaint_titles = cur.fetchall()
+            cur.execute("SELECT case_nature_id, case_name FROM case_nature ORDER BY case_name")
+            case_natures = cur.fetchall()
+        
         auth = request.session.get("auth") or {}
         user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
-        return render(request, "lupon_mem/case_summaries_filters.html", {
-            'page_path': f'{user_role} / Reports / Case Summaries',
-            'page_title': 'Case Summaries Report'
+        
+        return render(request, "lupon_mem/report_filters.html", {
+            'complaint_titles': complaint_titles,
+            'case_natures': case_natures,
+            'report_type': 'case_summaries',
+            'page_path': f'{user_role} / Reports / Filters',
+            'page_title': 'Report Filters'
         })
     
+    # Generate PDF with filters
     from django.http import HttpResponse
-    from reportlab.lib.pagesizes import landscape, letter
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
     from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
-    from reportlab.lib.styles import ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
     from io import BytesIO
-    import calendar, os
     
-    month = _toi(request.POST.get('month'))
-    year = _toi(request.POST.get('year'))
+    # Get filters from either GET or POST
+    complaint_title_id = _toi(request.GET.get('complaint_title_id') or request.POST.get('complaint_title_id'))
+    case_nature_id = _toi(request.GET.get('case_nature_id') or request.POST.get('case_nature_id'))
+    
+    # Handle month/year filters for case_summaries
+    date_from = request.GET.get('date_from') or request.POST.get('date_from')
+    date_to = request.GET.get('date_to') or request.POST.get('date_to')
+    
+    # If month and year are provided, convert to date range
+    if month and year:
+        from datetime import datetime
+        try:
+            month_int = int(month)
+            year_int = int(year)
+            # First day of the month
+            date_from = f"{year_int}-{month_int:02d}-01"
+            # Last day of the month
+            if month_int == 12:
+                date_to = f"{year_int}-12-31"
+            else:
+                from calendar import monthrange
+                last_day = monthrange(year_int, month_int)[1]
+                date_to = f"{year_int}-{month_int:02d}-{last_day}"
+        except (ValueError, TypeError):
+            pass
+    
+    # Build query with filters
     where_conditions = []
     params = []
     
-    if month and year:
-        where_conditions.append("EXTRACT(MONTH FROM bc.date_filed) = %s")
-        where_conditions.append("EXTRACT(YEAR FROM bc.date_filed) = %s")
-        params.extend([month, year])
-    elif year:
-        where_conditions.append("EXTRACT(YEAR FROM bc.date_filed) = %s")
-        params.append(year)
+    if complaint_title_id:
+        where_conditions.append("bc.complaint_title_id = %s")
+        params.append(complaint_title_id)
+    
+    if case_nature_id:
+        where_conditions.append("bc.case_nature_id = %s")
+        params.append(case_nature_id)
+    
+    if date_from:
+        where_conditions.append("bc.date_filed >= %s")
+        params.append(date_from)
+    
+    if date_to:
+        where_conditions.append("bc.date_filed <= %s")
+        params.append(date_to)
     
     where_clause = " AND " + " AND ".join(where_conditions) if where_conditions else ""
     
+    # Get case summaries with filters
     with connection.cursor() as cur:
         cur.execute(f"""
-            SELECT bc.blotter_case_num, bc.blotter_case_name,
-                   STRING_AGG(DISTINCT UPPER(comp.last_name || ' ' || comp.first_name), ', ') as complainants,
-                   STRING_AGG(DISTINCT UPPER(resp.last_name || ' ' || resp.first_name), ', ') as respondents,
-                   bc.complaint_title_id, bc.settlement_status_id
+            SELECT 
+                bc.blotter_case_id,
+                bc.blotter_case_name,
+                bc.date_filed,
+                bc.incident_date,
+                bc.incident_location,
+                bc.incident_desc,
+                cs.case_state_name,
+                ss.settlement_status_name,
+                ct.complaint_title_name,
+                cn.case_name as case_nature,
+                STRING_AGG(DISTINCT comp.first_name || ' ' || comp.last_name, ', ') as complainants,
+                STRING_AGG(DISTINCT resp.first_name || ' ' || resp.last_name, ', ') as respondents
             FROM blotter_case bc
+            LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
+            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+            LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
+            LEFT JOIN case_nature cn ON cn.case_nature_id = bc.case_nature_id
             LEFT JOIN complainant_case cc ON cc.blotter_case_id = bc.blotter_case_id
             LEFT JOIN person comp ON comp.person_id = cc.person_id
             LEFT JOIN respondent_case rc ON rc.blotter_case_id = bc.blotter_case_id
             LEFT JOIN person resp ON resp.person_id = rc.person_id
             WHERE 1=1 {where_clause}
-            GROUP BY bc.blotter_case_id, bc.blotter_case_num, bc.blotter_case_name, bc.complaint_title_id, bc.settlement_status_id
-            ORDER BY bc.blotter_case_num
+            GROUP BY bc.blotter_case_id, bc.blotter_case_name, bc.date_filed, bc.incident_date, 
+                     bc.incident_location, bc.incident_desc, cs.case_state_name, ss.settlement_status_name,
+                     ct.complaint_title_name, cn.case_name
+            ORDER BY bc.date_filed DESC
+            LIMIT 50
         """, params)
         cases_data = cur.fetchall()
     
+    # Create PDF
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter), topMargin=0.5*inch, bottomMargin=0.5*inch, leftMargin=0.5*inch, rightMargin=0.5*inch)
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch)
     elements = []
+    styles = getSampleStyleSheet()
     
-    # Header
-    logo_left = os.path.join(settings.BASE_DIR, 'static', 'images', 'brgy-sto-nino.png')
-    logo_right = os.path.join(settings.BASE_DIR, 'static', 'images', 'lupon-tagapamayapa.png')
+    # Add professional header
+    add_barangay_header(elements, styles, "CASE SUMMARIES REPORT")
     
-    header_data = [[
-        Image(logo_left, width=0.9*inch, height=0.9*inch) if os.path.exists(logo_left) else '',
-        Paragraph("Republic of the Philippines<br/>Office of the Barangay Captain<br/><b>BARANGAY SEÑOR SANTO NIÑO</b><br/>032 Legaspi Street, Cebu City<br/>Telephone No. (032) 254-9250/346-8802", 
-                 ParagraphStyle('hdr', fontSize=11, alignment=TA_CENTER, leading=14)),
-        Image(logo_right, width=0.9*inch, height=0.9*inch) if os.path.exists(logo_right) else ''
-    ]]
-    header_table = Table(header_data, colWidths=[1*inch, 8*inch, 1*inch])
-    header_table.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (0,0), (0,0), 'RIGHT'), ('ALIGN', (1,0), (1,0), 'CENTER'), ('ALIGN', (2,0), (2,0), 'LEFT'), ('RIGHTPADDING', (0,0), (0,0), 5), ('LEFTPADDING', (2,0), (2,0), 5)]))
-    elements.append(header_table)
-    elements.append(Spacer(1, 20))
+    # Case details
+    case_style = ParagraphStyle(
+        'CaseStyle',
+        parent=styles['Normal'],
+        fontSize=9,
+        spaceAfter=10
+    )
     
-    # Province/City
-    month_name = calendar.month_name[month] if month else "All Months"
-    info_data = [[
-        Paragraph(f"Province: <u>CEBU</u>", ParagraphStyle('i', fontSize=10)),
-        Paragraph(f"For the Month of: <u>{month_name}</u>", ParagraphStyle('i', fontSize=10, alignment=2))
-    ], [
-        Paragraph(f"City of: <u>CEBU</u>", ParagraphStyle('i', fontSize=10)),
-        Paragraph(f"Calendar Year: <u>{year}</u>", ParagraphStyle('i', fontSize=10, alignment=2))
-    ]]
-    info_table = Table(info_data, colWidths=[3.5*inch, 5.5*inch])
-    elements.append(info_table)
-    elements.append(Spacer(1, 15))
+    header_style = ParagraphStyle(
+        'HeaderStyle',
+        parent=styles['Heading2'],
+        fontSize=12,
+        spaceAfter=5
+    )
     
-    # Title
-    elements.append(Paragraph("<b>LUPONG TAGAPAMAYAPA REPORT: Cases Filed / Action Taken and Problems Encountered on KP Implementation</b>", 
-                             ParagraphStyle('t', fontSize=11, alignment=TA_CENTER)))
-    elements.append(Spacer(1, 10))
-    elements.append(Paragraph("<b>PART I. NATURE OF CASES AND ACTIONS TAKEN</b>", 
-                             ParagraphStyle('st', fontSize=10, alignment=TA_CENTER)))
-    elements.append(Spacer(1, 10))
-    
-    # Table
-    h = ParagraphStyle('h', fontSize=6.5, alignment=TA_CENTER, leading=7)
-    h2 = ParagraphStyle('h2', fontSize=5.5, alignment=TA_CENTER, leading=6.5, splitLongWords=False)
-    c = ParagraphStyle('c', fontSize=7, leading=9)
-    
-    table_data = [[
-        Paragraph('<b>CASE NO.<br/>(1)</b>', h),
-        Paragraph('<b>CASE TITLE<br/>(2)</b>', h),
-        Paragraph('<b>COMPLAINANT\'S VS<br/>RESPONDENTS<br/>(3)</b>', h),
-        Paragraph('<b>NATURE OF CASE<br/>(4)</b>', h), '', '',
-        Paragraph('<b>ACTIONS TAKEN<br/>(5)</b>', h), '', '', '', '', '', '',
-        Paragraph('<b>REMARKS<br/>(5h)</b>', h)
-    ], [
-        '', '', '',
-        Paragraph('<b>CRIMINAL<br/>(4a)</b>', h2),
-        Paragraph('<b>CIVIL<br/>(4b)</b>', h2),
-        Paragraph('<b>OTHERS<br/>(4c)</b>', h2),
-        Paragraph('<b>MEDIATED<br/>(5a)</b>', h2),
-        Paragraph('<b>CONCILIATED<br/>(5b)</b>', h2),
-        Paragraph('<b>ARBITRATED<br/>(5c)</b>', h2),
-        Paragraph('<b>REPUDIATED<br/>(5d)</b>', h2),
-        Paragraph('<b>DISMISSED<br/>(5e)</b>', h2),
-        Paragraph('<b>CERTIFIED<br/>(5f)</b>', h2),
-        Paragraph('<b>PENDING<br/>(5g)</b>', h2),
-        ''
-    ]]
-    
-    cell_data = ParagraphStyle('cd', fontSize=6, leading=8)
-    check_style = ParagraphStyle('chk', fontSize=8, alignment=TA_CENTER)
-    
-    for case in cases_data:
-        complaint_title_id = case[4]
-        settlement_status_id = case[5]
+    for i, case in enumerate(cases_data):
+        if i > 0:
+            elements.append(Spacer(1, 15))
+            
+        # Case header
+        elements.append(Paragraph(f"Case #{case[0]}: {case[1] or 'Untitled'}", header_style))
         
-        criminal = Paragraph('✓', check_style) if complaint_title_id == 2 else ''
-        civil = Paragraph('✓', check_style) if complaint_title_id == 1 else ''
+        # Case details table
+        case_details = [
+            ['Date Filed:', case[2].strftime('%B %d, %Y') if case[2] else 'N/A'],
+            ['Incident Date:', case[3].strftime('%B %d, %Y') if case[3] else 'N/A'],
+            ['Location:', case[4] or 'N/A'],
+            ['Status:', case[6] or 'N/A'],
+            ['Settlement:', case[7] or 'N/A'],
+            ['Complaint Type:', case[8] or 'N/A'],
+            ['Case Nature:', case[9] or 'N/A'],
+            ['Complainants:', case[10] or 'N/A'],
+            ['Respondents:', case[11] or 'N/A']
+        ]
         
-        mediated = Paragraph('✓', check_style) if settlement_status_id == 15 else ''
-        conciliated = Paragraph('✓', check_style) if settlement_status_id == 16 else ''
-        arbitrated = Paragraph('✓', check_style) if settlement_status_id == 8 else ''
-        repudiated = Paragraph('✓', check_style) if settlement_status_id == 9 else ''
-        dismissed = Paragraph('✓', check_style) if settlement_status_id in (10, 11, 12) else ''
-        certified = Paragraph('✓', check_style) if settlement_status_id == 5 else ''
-        pending = Paragraph('✓', check_style) if settlement_status_id == 1 else ''
+        detail_table = Table(case_details, colWidths=[1.5*inch, 4.5*inch])
+        detail_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 5)
+        ]))
         
-        table_data.append([
-            Paragraph(f"BC# {case[0]}" if case[0] else '', cell_data),
-            Paragraph((case[1] or '').upper(), c),
-            Paragraph(f"{case[2] or ''} vs {case[3] or ''}", c),
-            criminal, civil, '', mediated, conciliated, arbitrated, repudiated, dismissed, certified, pending, ''
-        ])
+        elements.append(detail_table)
+        
+        # Description
+        if case[5]:
+            elements.append(Spacer(1, 5))
+            elements.append(Paragraph(f"<b>Description:</b> {case[5]}", case_style))
+        
+        # Add page break every 3 cases to avoid overcrowding
+        if (i + 1) % 3 == 0 and i < len(cases_data) - 1:
+            elements.append(PageBreak())
     
-    t = Table(table_data, colWidths=[0.85*inch, 1.3*inch, 1.7*inch, 0.45*inch, 0.4*inch, 0.45*inch, 0.55*inch, 0.65*inch, 0.65*inch, 0.65*inch, 0.6*inch, 0.6*inch, 0.55*inch, 0.85*inch])
-    t.setStyle(TableStyle([
-        ('GRID', (0,0), (-1,-1), 0.5, colors.black),
-        ('BACKGROUND', (0,0), (-1,1), colors.lightgrey),
-        ('SPAN', (0,0), (0,1)),
-        ('SPAN', (1,0), (1,1)),
-        ('SPAN', (2,0), (2,1)),
-        ('SPAN', (3,0), (5,0)),
-        ('SPAN', (6,0), (12,0)),
-        ('SPAN', (13,0), (13,1)),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('FONTNAME', (0,0), (-1,1), 'Helvetica-Bold')
-    ]))
-    elements.append(t)
-    
+    # Build PDF
     doc.build(elements)
     buffer.seek(0)
     
+    from datetime import datetime
+    month_str = f"{_toi(month):02d}" if _toi(month) else "00"
+    year_val = _toi(year) if _toi(year) else datetime.now().year
+    month_name = ""
+    if _toi(month):
+        import calendar
+        month_name = calendar.month_name[_toi(month)][:3].upper()
+    else:
+        month_name = "ALL"
+    
+    print(f"[FILENAME] month={month}, year={year}, month_str={month_str}, year_val={year_val}, month_name={month_name}")
+    filename = f"lupong_tagapamayapa_report_{year_val}_{month_str}%20({month_name}).pdf"
+    print(f"[FILENAME] Final: {filename}")
+    
     response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
-    month_str = f"{month:02d}" if month else "00"
-    response['Content-Disposition'] = f'attachment; filename="lupong_tagapamayapa_report_{year}_{month_str}%20({month_name[:3].upper() if month else "ALL"}).pdf"'
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
 
 
