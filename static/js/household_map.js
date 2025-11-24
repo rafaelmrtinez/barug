@@ -83,6 +83,8 @@
   let markers = [];                     // array of mapboxgl.Marker
   const markerById = new Map();         // household_id -> Marker
   let focusMarker = null;
+  let allPins = [];                     // store all pins for filtering
+  let activeFilter = null;              // track active filter
 
   function buildPinsUrl() {
     const base = window.__PINS_URL__ || "/api/household/pins/";
@@ -95,11 +97,11 @@
   }
 
   function popupHtml(p) {
+    console.log('[popupHtml] Pin data:', p);
     const esc = s => (s ?? "").toString().replace(/[&<>"']/g, m =>
       ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])
     );
 
-    // Prefer canonical field names, with graceful fallbacks
     const hhNum   = p.household_num || p.hh_num || p.number || "";
     const head    = p.household_head || p.head_name || p.title || "";
     const address = p.address_line || p.household_address ||
@@ -107,8 +109,12 @@
     const htype   = p.house_type_name || p.house_type || "";
     const hown    = p.household_ownership_name || p.ownership_type_name ||
                     p.house_ownership_name || p.house_ownership || "";
+    const hasVisitData = p.visited !== undefined;
+    const visited = p.visited ? "Visited" : "Not Visited";
+    const visitColor = p.visited ? "#16a34a" : "#dc2626";
+    const famVisited = p.families_visited || 0;
+    const famNotVisited = p.families_not_visited || 0;
 
-    // Household No., Head, Address, Type, Ownership
     return `
       <div style="min-width:240px; line-height:1.25">
         ${hhNum ? `<div><strong>${esc(hhNum)}</strong></div>` : ``}
@@ -116,7 +122,13 @@
         ${address ? `<div class="text-muted">${esc(address)}</div>` : ``}
         ${(htype || hown) ? `<div style="margin-top:6px">
           ${htype ? `Type: ${esc(htype)}<br/>` : ``}
-          ${hown  ? `Ownership: ${esc(hown)}` : ``}
+          ${hown  ? `Ownership: ${esc(hown)}<br/>` : ``}
+        </div>` : ``}
+        ${hasVisitData ? `<div style="margin-top:6px; color:${visitColor}; font-weight:bold">${visited}</div>` : ``}
+        ${hasVisitData ? `<div style="margin-top:4px; font-size:0.9em">
+          ${famVisited > 0 ? `<span style="color:#16a34a">${famVisited} ${famVisited === 1 ? 'family' : 'families'} visited</span>` : `<span style="color:#999">0 families visited</span>`}
+          <br/>
+          ${famNotVisited > 0 ? `<span style="color:#dc2626">${famNotVisited} ${famNotVisited === 1 ? 'family' : 'families'} not visited</span>` : `<span style="color:#999">0 families not visited</span>`}
         </div>` : ``}
       </div>
     `;
@@ -136,6 +148,20 @@
     markers.forEach(m => m.remove());
     markers = [];
     markerById.clear();
+  }
+
+  function showMarkers(pinsToShow) {
+    clearMarkers();
+    const spreadPins = spiderfyIfNeeded(
+      pinsToShow.filter(p => p.lat != null && p.lng != null)
+    );
+    spreadPins.forEach(p => {
+      const m = makeMarker(p, p.__lng, p.__lat);
+      markers.push(m);
+      const hid = p.household_id != null ? p.household_id : p.id;
+      if (hid != null) markerById.set(String(hid), m);
+    });
+    if (spreadPins.length > 0) fitTo(spreadPins);
   }
 
   function fitTo(points) {
@@ -206,7 +232,7 @@
     return out;
   }
 
-  async function loadPins() {
+  window.loadPins = async function() {
     clearMarkers();
     try {
       const res = await fetch(buildPinsUrl(), { headers: { "X-Requested-With": "XMLHttpRequest" } });
@@ -214,26 +240,12 @@
       const pins = await res.json();
 
       console.log("[household_map] pins (raw):", pins.length, pins);
-
-      const spreadPins = spiderfyIfNeeded(
-        pins.filter(p => p.lat != null && p.lng != null)
-      );
-
-      console.log("[household_map] pins (spread):", spreadPins.length, spreadPins);
-
-      spreadPins.forEach(p => {
-        const m = makeMarker(p, p.__lng, p.__lat);
-        markers.push(m);
-        // Map by household_id → marker (string key for consistency)
-        const hid = p.household_id != null ? p.household_id : p.id;
-        if (hid != null) markerById.set(String(hid), m);
-      });
-
-      fitTo(spreadPins);
+      allPins = pins;
+      showMarkers(pins);
     } catch (e) {
       console.error("[household_map] loadPins failed:", e);
     }
-  }
+  };
 
   function wireLocateClicks() {
     // Works for:
@@ -265,6 +277,117 @@
       }
     });
   }
+
+  let currentPins = allPins;
+  
+  function handleCardClick(type) {
+    const cards = document.querySelectorAll('.visit-card');
+    cards.forEach(c => {
+      const small = c.querySelector('small');
+      if (small && small.textContent.includes('Showing')) {
+        small.innerHTML = small.innerHTML.replace('check-circle', 'eye').replace('Showing', 'View on map');
+      }
+    });
+
+    let filtered;
+    if (type === 'households_visited') {
+      filtered = currentPins.filter(p => p.visited === true);
+    } else if (type === 'households_not_visited') {
+      filtered = currentPins.filter(p => p.visited === false);
+    } else if (type === 'families_visited') {
+      filtered = currentPins.filter(p => (p.families_visited || 0) > 0);
+    } else if (type === 'families_not_visited') {
+      filtered = currentPins.filter(p => (p.families_not_visited || 0) > 0);
+    } else {
+      filtered = currentPins;
+    }
+
+    activeFilter = type;
+    showMarkers(filtered);
+
+    const card = document.querySelector(`.visit-card[data-filter="${type}"]`);
+    if (card) {
+      const small = card.querySelector('small');
+      if (small) {
+        small.innerHTML = small.innerHTML.replace('eye', 'check-circle').replace('View on map', 'Showing');
+      }
+    }
+  }
+
+  window.showOnMap = handleCardClick;
+  
+  window.filterByPurok = function(purok) {
+    myAreaActive = false;
+    const btn = document.getElementById('showMyAreaBtn');
+    if (btn) {
+      const icon = btn.querySelector('.bi');
+      if (icon) icon.className = 'bi bi-geo-alt-fill';
+      btn.style.background = '';
+    }
+    
+    if (purok) {
+      const filtered = allPins.filter(p => (p.purok || '').toUpperCase() === purok.toUpperCase());
+      currentPins = filtered;
+      showMarkers(filtered);
+      updateCardCounts(filtered);
+    } else {
+      currentPins = allPins;
+      showMarkers(allPins);
+      updateCardCounts(allPins);
+    }
+  };
+  
+  let myAreaActive = false;
+  
+  window.showMyArea = function(purokNames) {
+    if (myAreaActive) {
+      myAreaActive = false;
+      currentPins = allPins;
+      showMarkers(allPins);
+      const btn = document.getElementById('showMyAreaBtn');
+      if (btn) {
+        const icon = btn.querySelector('.bi');
+        if (icon) icon.className = 'bi bi-geo-alt-fill';
+        btn.style.background = '';
+      }
+      updateCardCounts(allPins);
+      return;
+    }
+    
+    myAreaActive = true;
+    const filtered = allPins.filter(p => {
+      const purokUpper = (p.purok || '').toUpperCase();
+      return purokNames.some(name => purokUpper === name.toUpperCase());
+    });
+    currentPins = filtered;
+    showMarkers(filtered);
+    
+    const btn = document.getElementById('showMyAreaBtn');
+    if (btn) {
+      const icon = btn.querySelector('.bi');
+      if (icon) icon.className = 'bi bi-check-circle';
+      btn.style.background = '#16a34a';
+    }
+    updateCardCounts(filtered);
+  };
+  
+  function updateCardCounts(pins) {
+    const hh_v = pins.filter(p => p.visited === true).length;
+    const hh_nv = pins.filter(p => p.visited === false).length;
+    const fam_v = pins.reduce((sum, p) => sum + (p.families_visited || 0), 0);
+    const fam_nv = pins.reduce((sum, p) => sum + (p.families_not_visited || 0), 0);
+    
+    document.querySelectorAll('.visit-card').forEach(card => {
+      const filter = card.getAttribute('data-filter');
+      const count = card.querySelector('.count');
+      if (filter === 'households_visited') count.textContent = hh_v;
+      else if (filter === 'households_not_visited') count.textContent = hh_nv;
+      else if (filter === 'families_visited') count.textContent = fam_v;
+      else if (filter === 'families_not_visited') count.textContent = fam_nv;
+    });
+  }
+
+
 
   map.on("load", () => {
     // Fit to barangay boundary and draw layers
@@ -303,7 +426,13 @@
       paint: { 'text-halo-color': '#fff', 'text-halo-width': 1 }
     });
 
-    loadPins();
+    window.loadPins();
     wireLocateClicks();
+    
+    if (window.__pendingFilter) {
+      console.log('[household_map] Applying pending filter:', window.__pendingFilter);
+      setTimeout(() => handleCardClick(window.__pendingFilter), 500);
+      window.__pendingFilter = null;
+    }
   });
 })();

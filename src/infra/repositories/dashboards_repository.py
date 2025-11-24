@@ -881,23 +881,17 @@ class LuponMemDashboardRepository:
             WITH status_counts AS (
                 SELECT
                     SUM(CASE 
-                            WHEN ss.settlement_status_name = 'SETTLED' 
-                                AND cs.case_state_name = 'CLOSED'
-                            THEN 1 ELSE 0 END) AS settled_closed_count,
-                    SUM(CASE 
-                            WHEN ss.settlement_status_name = 'NOT SETTLED' 
-                                AND cs.case_state_name = 'CLOSED'
-                            THEN 1 ELSE 0 END) AS not_settled_closed_count
+                            WHEN ss.settlement_status_name IN ('SETTLED', 'SETTLED THROUGH MEDIATION', 'SETTLED THROUGH CONCILIATION')
+                            THEN 1 ELSE 0 END) AS settled_count,
+                    COUNT(*) AS total_count
                 FROM public.blotter_case bc
                 LEFT JOIN public.settlement_status ss
                     ON bc.settlement_status_id = ss.settlement_status_id
-                LEFT JOIN public.case_state cs
-                    ON bc.case_state_id = cs.case_state_id
             )
             SELECT
                 CASE 
-                    WHEN not_settled_closed_count = 0 THEN NULL
-                    ELSE ROUND(100.0 * settled_closed_count / not_settled_closed_count, 2)
+                    WHEN total_count = 0 THEN 0
+                    ELSE ROUND(100.0 * settled_count / total_count, 0)
                 END AS settlement_percentage
             FROM status_counts;
         """
