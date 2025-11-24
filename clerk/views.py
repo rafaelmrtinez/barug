@@ -436,11 +436,15 @@ def queue(request: HttpRequest):
         raw_dt = (request.GET.get("doc_type") or "").strip()
         doc_types = [s for s in raw_dt.split(",") if s]
 
+    # sort order filter
+    sort_order = (request.GET.get("sort") or "oldest").strip().lower()
+    desc_order = (sort_order == "newest")
+
     # base query
     query = (
         supabase.table("v_doc_request_list_ex")
         .select("*")
-        .order("doc_request_id", desc=True)
+        .order("doc_request_id", desc=desc_order)
     )
     if statuses:
         query = query.in_("status", statuses)
@@ -500,6 +504,7 @@ def queue(request: HttpRequest):
         "statuses_all": CLERK_STATUSES_ALL,
         "doc_types": doc_types,
         "doc_types_all": doc_types_all,
+        "sort_order": sort_order,
         "active_count": len(statuses) + len(doc_types),
     })
 
