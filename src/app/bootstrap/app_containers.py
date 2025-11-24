@@ -139,6 +139,12 @@ from src.app.contracts.announcement_service_contract import (
 from src.app.services.announcement_service import (
     AnnouncementService,
 )
+from src.app.contracts.audience_service_contract import (
+    IAudienceService,
+)
+from src.app.services.audience_service import (
+    AudienceService,
+)
 
 
 class AppContainer(containers.DeclarativeContainer):
@@ -437,7 +443,14 @@ class AppContainer(containers.DeclarativeContainer):
         repo=infra.resident_repository,
     )
 
+    # Announcement
+
     announcement_service: providers.Factory[IAnnouncementService] = providers.Factory(
         AnnouncementService,
         announcement_repository=infra.announcement_repository,
+    )
+
+    audience_service: providers.Factory[IAudienceService] = providers.Factory(
+        AudienceService,
+        audience_repository=infra.audience_repository,
     )

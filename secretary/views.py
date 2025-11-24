@@ -58,6 +58,12 @@ from src.app.transfer_objects.commands.announcement_cmd import (
 from src.app.contracts.announcement_service_contract import (
     IAnnouncementService,
 )
+from src.app.contracts.audience_service_contract import (
+    IAudienceService,
+)
+from src.app.transfer_objects.commands.audience_cmd import (
+    AddAnnouncementAudienceCMD
+)
 
 
 from .forms import (
@@ -2091,10 +2097,35 @@ def ajax_announcement_draft_search(
 @session_login_required
 @role_required(SECRETARY_ROLE)
 @nocache
-def announcement_audience_scope(request: HttpRequest) -> HttpResponse:
-    """View to display audience scope with dynamic subchoices"""
+@inject
+def announcement_audience_scope(
+    request: HttpRequest,
+    audience_service: IAudienceService = Provide[AppContainer.audience_service],
+) -> HttpResponse:
+    """Add audience scope to announcement"""
     user_role = _auth_role_name(request)
-    form = AudienceScope()
+    form = AudienceScope(request.POST or None)
+    
+    if request.method == 'POST' and form.is_valid():
+        try:
+            
+            command = AddAnnouncementAudienceCMD(
+                announcement_id=form.cleaned_data['announcement_id'],
+                audience_scope_id=form.cleaned_data['audience_scope_id'],
+                role_id=form.cleaned_data.get('role_id'),
+                purok_sitio_id=form.cleaned_data.get('purok_sitio_id'),
+                person_ids=form.cleaned_data.get('person_ids')
+            )
+            
+            audience_id, inserted_persons = audience_service.add_announcement_audience(command)
+            messages.success(request, f"Audience added successfully! {inserted_persons} persons added.")
+            return redirect('secretary:announcement_draft_list')
+            
+        except ValueError as e:
+            messages.error(request, str(e))
+        except Exception as e:
+            messages.error(request, "Failed to add audience scope.")
+            logger.exception("Failed to add audience scope: %s", e)
     
     return render(request, "secretary/announcement/audience_scope.html", {
         'page_path': f'{user_role} / Announcements / Audience Scope',
