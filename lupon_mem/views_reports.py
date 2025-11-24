@@ -1503,115 +1503,189 @@ def add_barangay_header(elements, styles, report_title):
 def total_cases_by_status_report(request: HttpRequest):
     """Generate PDF report of total cases by status with filters"""
     if request.method == "GET":
-        # Show filter form
-        with connection.cursor() as cur:
-            cur.execute("SELECT complaint_title_id, complaint_title_name FROM complaint_title ORDER BY complaint_title_name")
-            complaint_titles = cur.fetchall()
-            cur.execute("SELECT case_nature_id, case_name FROM case_nature ORDER BY case_name")
-            case_natures = cur.fetchall()
-        
         auth = request.session.get("auth") or {}
         user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
-        
-        return render(request, "lupon_mem/report_filters.html", {
-            'complaint_titles': complaint_titles,
-            'case_natures': case_natures,
-            'report_type': 'total_cases_by_status',
-            'page_path': f'{user_role} / Reports / Filters',
-            'page_title': 'Report Filters'
+        return render(request, "lupon_mem/total_cases_filters.html", {
+            'page_path': f'{user_role} / Reports / Total Cases by Status',
+            'page_title': 'Total Cases by Status Report'
         })
     
-    # Generate PDF with filters
     from django.http import HttpResponse
-    from reportlab.pdfgen import canvas
     from reportlab.lib.pagesizes import letter
     from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER
     from reportlab.lib.units import inch
     from io import BytesIO
+    import calendar, os
     
-    # Get filters
-    complaint_title_id = _toi(request.POST.get('complaint_title_id'))
-    case_nature_id = _toi(request.POST.get('case_nature_id'))
-    date_from = request.POST.get('date_from')
-    date_to = request.POST.get('date_to')
+    month = _toi(request.POST.get('month'))
+    year = _toi(request.POST.get('year'))
     
-    # Build query with filters
     where_conditions = []
     params = []
     
-    if complaint_title_id:
-        where_conditions.append("bc.complaint_title_id = %s")
-        params.append(complaint_title_id)
-    
-    if case_nature_id:
-        where_conditions.append("bc.case_nature_id = %s")
-        params.append(case_nature_id)
-    
-    if date_from:
-        where_conditions.append("bc.date_filed >= %s")
-        params.append(date_from)
-    
-    if date_to:
-        where_conditions.append("bc.date_filed <= %s")
-        params.append(date_to)
+    if month and year:
+        where_conditions.append("EXTRACT(MONTH FROM bc.date_filed) = %s")
+        where_conditions.append("EXTRACT(YEAR FROM bc.date_filed) = %s")
+        params.extend([month, year])
+    elif year:
+        where_conditions.append("EXTRACT(YEAR FROM bc.date_filed) = %s")
+        params.append(year)
     
     where_clause = " AND " + " AND ".join(where_conditions) if where_conditions else ""
     
-    # Get case statistics with filters
     with connection.cursor() as cur:
+        # Case state breakdown
         cur.execute(f"""
-            SELECT 
-                cs.case_state_name,
-                COUNT(bc.blotter_case_id) as case_count
+            SELECT cs.case_state_name, COUNT(bc.blotter_case_id) as case_count
             FROM case_state cs
             LEFT JOIN blotter_case bc ON bc.case_state_id = cs.case_state_id
             WHERE 1=1 {where_clause}
             GROUP BY cs.case_state_id, cs.case_state_name
-            ORDER BY cs.case_state_name
+            ORDER BY case_count DESC
         """, params)
         status_data = cur.fetchall()
+        
+        # Settlement status breakdown
+        cur.execute(f"""
+            SELECT ss.settlement_status_name, COUNT(bc.blotter_case_id) as case_count
+            FROM settlement_status ss
+            LEFT JOIN blotter_case bc ON bc.settlement_status_id = ss.settlement_status_id
+            WHERE 1=1 {where_clause}
+            GROUP BY ss.settlement_status_id, ss.settlement_status_name
+            ORDER BY case_count DESC
+        """, params)
+        settlement_data = cur.fetchall()
+        
+        # Complaint type breakdown
+        cur.execute(f"""
+            SELECT ct.complaint_title_name, COUNT(bc.blotter_case_id) as case_count
+            FROM complaint_title ct
+            LEFT JOIN blotter_case bc ON bc.complaint_title_id = ct.complaint_title_id
+            WHERE 1=1 {where_clause}
+            GROUP BY ct.complaint_title_id, ct.complaint_title_name
+            HAVING COUNT(bc.blotter_case_id) > 0
+            ORDER BY case_count DESC
+        """, params)
+        complaint_data = cur.fetchall()
         
         cur.execute(f"SELECT COUNT(*) FROM blotter_case bc WHERE 1=1 {where_clause}", params)
         total_cases = cur.fetchone()[0]
     
-    # Create PDF
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch)
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
     elements = []
-    styles = getSampleStyleSheet()
     
-    # Add professional header
-    add_barangay_header(elements, styles, "TOTAL CASES BY STATUS REPORT")
+    # Header with logos
+    logo_left = os.path.join(settings.BASE_DIR, 'static', 'images', 'brgy-sto-nino.png')
+    logo_right = os.path.join(settings.BASE_DIR, 'static', 'images', 'lupon-tagapamayapa.png')
     
-    # Table data
-    table_data = [['Status', 'Number of Cases', 'Percentage']]
-    for status, count in status_data:
-        percentage = (count / total_cases * 100) if total_cases > 0 else 0
-        table_data.append([status or 'Unknown', str(count), f"{percentage:.1f}%"])
+    header_data = [[
+        Image(logo_left, width=0.9*inch, height=0.9*inch) if os.path.exists(logo_left) else '',
+        Paragraph("Republic of the Philippines<br/>Office of the Barangay Captain<br/><b>BARANGAY SEÑOR SANTO NIÑO</b><br/>032 Legaspi Street, Cebu City<br/>Telephone No. (032) 254-9250/346-8802", 
+                 ParagraphStyle('hdr', fontSize=11, alignment=TA_CENTER, leading=14)),
+        Image(logo_right, width=0.9*inch, height=0.9*inch) if os.path.exists(logo_right) else ''
+    ]]
+    header_table = Table(header_data, colWidths=[1*inch, 3.5*inch, 1*inch])
+    header_table.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (0,0), (0,0), 'RIGHT'), ('ALIGN', (1,0), (1,0), 'CENTER'), ('ALIGN', (2,0), (2,0), 'LEFT'), ('RIGHTPADDING', (0,0), (0,0), 0), ('LEFTPADDING', (2,0), (2,0), 0)]))
+    elements.append(header_table)
+    elements.append(Spacer(1, 20))
     
-    # Add total row
-    table_data.append(['TOTAL', str(total_cases), '100.0%'])
+    # Province/City/Month/Year info
+    month_name = calendar.month_name[month] if month else "All Months"
+    info_data = [[
+        Paragraph(f"Province: <u>CEBU</u>", ParagraphStyle('i', fontSize=10)),
+        Paragraph(f"For the Month of: <u>{month_name}</u>", ParagraphStyle('i', fontSize=10, alignment=2))
+    ], [
+        Paragraph(f"City of: <u>CEBU</u>", ParagraphStyle('i', fontSize=10)),
+        Paragraph(f"Calendar Year: <u>{year}</u>", ParagraphStyle('i', fontSize=10, alignment=2))
+    ]]
+    info_table = Table(info_data, colWidths=[2.5*inch, 3*inch])
+    info_table.setStyle(TableStyle([('LEFTPADDING', (0,0), (0,-1), 10), ('RIGHTPADDING', (1,0), (1,-1), 10)]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 15))
     
-    # Create table
-    table = Table(table_data, colWidths=[3*inch, 1.5*inch, 1.5*inch])
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -2), colors.beige),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
-        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
-    ]))
+    # Title
+    elements.append(Paragraph("<b>TOTAL CASES BY STATUS REPORT</b>", ParagraphStyle('t', fontSize=14, alignment=TA_CENTER, spaceAfter=10)))
+    elements.append(Spacer(1, 20))
     
-    elements.append(table)
+    # Check if no cases
+    if total_cases == 0:
+        elements.append(Paragraph("<b>NO CASE FILED</b>", ParagraphStyle('nc', fontSize=16, alignment=TA_CENTER, textColor=colors.red)))
+    else:
+        # Case State Status
+        elements.append(Paragraph("<b>CASE STATE BREAKDOWN</b>", ParagraphStyle('st', fontSize=12, alignment=TA_CENTER)))
+        elements.append(Spacer(1, 10))
+        
+        state_table_data = [['Case State', 'Number of Cases', 'Percentage']]
+        for status, count in status_data:
+            percentage = (count / total_cases * 100) if total_cases > 0 else 0
+            state_table_data.append([status or 'Unknown', str(count), f"{percentage:.1f}%"])
+        state_table_data.append(['TOTAL', str(total_cases), '100.0%'])
     
-    # Build PDF
+        state_table = Table(state_table_data, colWidths=[3*inch, 1.5*inch, 1.5*inch])
+        state_table.setStyle(TableStyle([
+            ('GRID', (0,0), (-1,-1), 0.5, colors.black),
+            ('BACKGROUND', (0,0), (-1,0), colors.grey),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,0), 11),
+            ('BACKGROUND', (0,1), (-1,-2), colors.beige),
+            ('BACKGROUND', (0,-1), (-1,-1), colors.lightgrey),
+            ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold')
+        ]))
+        elements.append(state_table)
+        elements.append(Spacer(1, 25))
+        
+        # Settlement Status
+        elements.append(Paragraph("<b>SETTLEMENT STATUS BREAKDOWN</b>", ParagraphStyle('st', fontSize=12, alignment=TA_CENTER)))
+        elements.append(Spacer(1, 10))
+        
+        settlement_table_data = [['Settlement Status', 'Number of Cases', 'Percentage']]
+        settlement_total = sum(count for _, count in settlement_data)
+        for status, count in settlement_data:
+            percentage = (count / settlement_total * 100) if settlement_total > 0 else 0
+            settlement_table_data.append([status or 'Unknown', str(count), f"{percentage:.1f}%"])
+        
+        settlement_table = Table(settlement_table_data, colWidths=[3*inch, 1.5*inch, 1.5*inch])
+        settlement_table.setStyle(TableStyle([
+            ('GRID', (0,0), (-1,-1), 0.5, colors.black),
+            ('BACKGROUND', (0,0), (-1,0), colors.grey),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,0), 9),
+            ('FONTSIZE', (0,1), (-1,-1), 8),
+            ('BACKGROUND', (0,1), (-1,-1), colors.beige)
+        ]))
+        elements.append(settlement_table)
+        elements.append(Spacer(1, 25))
+        
+        # Complaint Type
+        elements.append(Paragraph("<b>COMPLAINT TYPE BREAKDOWN</b>", ParagraphStyle('st', fontSize=12, alignment=TA_CENTER)))
+        elements.append(Spacer(1, 10))
+        
+        complaint_table_data = [['Complaint Type', 'Number of Cases', 'Percentage']]
+        complaint_total = sum(count for _, count in complaint_data)
+        for complaint_type, count in complaint_data:
+            percentage = (count / complaint_total * 100) if complaint_total > 0 else 0
+            complaint_table_data.append([complaint_type or 'Unknown', str(count), f"{percentage:.1f}%"])
+        
+        complaint_table = Table(complaint_table_data, colWidths=[3*inch, 1.5*inch, 1.5*inch])
+        complaint_table.setStyle(TableStyle([
+            ('GRID', (0,0), (-1,-1), 0.5, colors.black),
+            ('BACKGROUND', (0,0), (-1,0), colors.grey),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,0), 11),
+            ('BACKGROUND', (0,1), (-1,-1), colors.beige)
+        ]))
+        elements.append(complaint_table)
+    
     doc.build(elements)
     buffer.seek(0)
     
@@ -1688,8 +1762,8 @@ def case_summaries_report(request: HttpRequest):
                  ParagraphStyle('hdr', fontSize=11, alignment=TA_CENTER, leading=14)),
         Image(logo_right, width=0.9*inch, height=0.9*inch) if os.path.exists(logo_right) else ''
     ]]
-    header_table = Table(header_data, colWidths=[1*inch, 8*inch, 1*inch])
-    header_table.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (0,0), (0,0), 'RIGHT'), ('ALIGN', (1,0), (1,0), 'CENTER'), ('ALIGN', (2,0), (2,0), 'LEFT'), ('RIGHTPADDING', (0,0), (0,0), 5), ('LEFTPADDING', (2,0), (2,0), 5)]))
+    header_table = Table(header_data, colWidths=[1*inch, 3.5*inch, 1*inch])
+    header_table.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (0,0), (0,0), 'RIGHT'), ('ALIGN', (1,0), (1,0), 'CENTER'), ('ALIGN', (2,0), (2,0), 'LEFT'), ('RIGHTPADDING', (0,0), (0,0), 0), ('LEFTPADDING', (2,0), (2,0), 0)]))
     elements.append(header_table)
     elements.append(Spacer(1, 20))
     
@@ -1952,14 +2026,15 @@ def settlement_statistics_report(request: HttpRequest):
 def monthly_activity_report(request: HttpRequest):
     """Generate PDF report of monthly lupon activities"""
     from django.http import HttpResponse
-    from reportlab.pdfgen import canvas
     from reportlab.lib.pagesizes import letter
     from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER
     from reportlab.lib.units import inch
     from io import BytesIO
     from datetime import datetime, timedelta
+    import os
     
     # Get current month data
     current_month = datetime.now().replace(day=1)
@@ -2023,15 +2098,30 @@ def monthly_activity_report(request: HttpRequest):
     
     # Create PDF
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch)
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
     elements = []
-    styles = getSampleStyleSheet()
     
-    # Add professional header
-    add_barangay_header(elements, styles, f"MONTHLY ACTIVITY REPORT - {current_month.strftime('%B %Y')}")
+    # Header with logos
+    logo_left = os.path.join(settings.BASE_DIR, 'static', 'images', 'brgy-sto-nino.png')
+    logo_right = os.path.join(settings.BASE_DIR, 'static', 'images', 'lupon-tagapamayapa.png')
+    
+    header_data = [[
+        Image(logo_left, width=0.9*inch, height=0.9*inch) if os.path.exists(logo_left) else '',
+        Paragraph("Republic of the Philippines<br/>Office of the Barangay Captain<br/><b>BARANGAY SEÑOR SANTO NIÑO</b><br/>032 Legaspi Street, Cebu City<br/>Telephone No. (032) 254-9250/346-8802", 
+                 ParagraphStyle('hdr', fontSize=11, alignment=TA_CENTER, leading=14)),
+        Image(logo_right, width=0.9*inch, height=0.9*inch) if os.path.exists(logo_right) else ''
+    ]]
+    header_table = Table(header_data, colWidths=[1*inch, 3.5*inch, 1*inch])
+    header_table.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (0,0), (0,0), 'RIGHT'), ('ALIGN', (1,0), (1,0), 'CENTER'), ('ALIGN', (2,0), (2,0), 'LEFT'), ('RIGHTPADDING', (0,0), (0,0), 0), ('LEFTPADDING', (2,0), (2,0), 0)]))
+    elements.append(header_table)
+    elements.append(Spacer(1, 20))
+    
+    # Title
+    elements.append(Paragraph(f"<b>MONTHLY ACTIVITY REPORT - {current_month.strftime('%B %Y')}</b>", ParagraphStyle('t', fontSize=14, alignment=TA_CENTER, spaceAfter=10)))
+    elements.append(Spacer(1, 20))
     
     # Monthly Summary
-    elements.append(Paragraph("Monthly Summary", styles['Heading2']))
+    elements.append(Paragraph("<b>MONTHLY SUMMARY</b>", ParagraphStyle('st', fontSize=12, alignment=TA_CENTER)))
     elements.append(Spacer(1, 10))
     
     summary_data = [
@@ -2044,46 +2134,21 @@ def monthly_activity_report(request: HttpRequest):
     
     summary_table = Table(summary_data, colWidths=[3*inch, 2*inch])
     summary_table.setStyle(TableStyle([
+        ('GRID', (0,0), (-1,-1), 0.5, colors.black),
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ('FONTSIZE', (0, 0), (-1, 0), 11),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige)
     ]))
     
     elements.append(summary_table)
     elements.append(Spacer(1, 30))
     
-    # Forms Processed
-    if forms_data:
-        elements.append(Paragraph("Forms Processed This Month", styles['Heading2']))
-        elements.append(Spacer(1, 10))
-        
-        forms_table_data = [['Form Code', 'Count']]
-        for form_code, count in forms_data:
-            forms_table_data.append([form_code, str(count)])
-        
-        forms_table = Table(forms_table_data, colWidths=[3*inch, 2*inch])
-        forms_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 12),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        
-        elements.append(forms_table)
-        elements.append(Spacer(1, 30))
-    
     # Daily Activity Breakdown
     if daily_activity:
-        elements.append(Paragraph("Daily Activity Breakdown", styles['Heading2']))
+        elements.append(Paragraph("<b>DAILY ACTIVITY BREAKDOWN</b>", ParagraphStyle('st', fontSize=12, alignment=TA_CENTER)))
         elements.append(Spacer(1, 10))
         
         daily_table_data = [['Date', 'Cases Filed']]
@@ -2092,14 +2157,13 @@ def monthly_activity_report(request: HttpRequest):
         
         daily_table = Table(daily_table_data, colWidths=[3*inch, 2*inch])
         daily_table.setStyle(TableStyle([
+            ('GRID', (0,0), (-1,-1), 0.5, colors.black),
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 12),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige)
         ]))
         
         elements.append(daily_table)

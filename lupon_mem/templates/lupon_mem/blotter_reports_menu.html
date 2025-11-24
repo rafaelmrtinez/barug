@@ -259,7 +259,7 @@ function showFilterModal(reportType) {
     
     form.method = 'post';
     
-    if (reportType === 'case_summaries') {
+    if (reportType === 'case_summaries' || reportType === 'total_cases_by_status') {
         monthYearFilters.style.display = 'flex';
         otherFilters.style.display = 'none';
         dateFilters.style.display = 'none';
