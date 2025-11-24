@@ -17,39 +17,43 @@
         <h4 class="mb-2"><i class="bi bi-people"></i> Audience</h4>
         <p class="small text-muted">Add one or more targeting rules. Use <strong>Person list</strong> to select many recipients at once.</p>
 
-        <form method="post" action="#">
-          {% csrf_token %}
-          <div class="row g-2">
-            <div class="col-md-4">
-              <label class="form-label small">Scope</label>
-              {{ form.scope }}
-            </div>
-
-            <!-- Purok/Sitio subchoice -->
-            <div class="col-md-4" id="purok-section" style="display:none;">
-              <label class="form-label small">Purok</label>
-              {{ form.purok_sitio }}
-            </div>
-
-            <!-- Staff Role subchoice -->
-            <div class="col-md-4" id="staff-section" style="display:none;">
-              <label class="form-label small">Role</label>
-              {{ form.staff_role }}
-            </div>
-
-            <!-- Person Search subchoice -->
-            <div class="col-md-6" id="person-section" style="display:none;">
-              <label class="form-label small">Person</label>
-              {{ form.search_person }}
-            </div>
-
-            <div class="col-12 text-end mt-2">
-              <button type="submit" class="btn btn-outline-primary btn-sm">
-                <i class="bi bi-person-plus"></i> Add Rule
-              </button>
-            </div>
+        <div class="row g-2">
+          <div class="col-md-4">
+            <label class="form-label small">Announcement ID</label>
+            <input type="number" id="announcement_id" class="form-control" value="{{ announcement_id }}" {% if announcement_id %}readonly{% endif %} placeholder="Enter announcement ID" required>
           </div>
-        </form>
+          <div class="col-md-4">
+            <label class="form-label small">Scope</label>
+            {{ form.scope }}
+          </div>
+
+          <!-- Purok/Sitio subchoice -->
+          <div class="col-md-4" id="purok-section" style="display:none;">
+            <label class="form-label small">Purok</label>
+            {{ form.purok_sitio }}
+          </div>
+
+          <!-- Staff Role subchoice -->
+          <div class="col-md-4" id="staff-section" style="display:none;">
+            <label class="form-label small">Role</label>
+            {{ form.staff_role }}
+          </div>
+
+          <!-- Person Search subchoice -->
+          <div class="col-md-6" id="person-section" style="display:none;">
+            <label class="form-label small">Person</label>
+            {{ form.search_person }}
+          </div>
+
+          <div class="col-12 text-end mt-2">
+            <button type="button" id="add-rule-btn" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-person-plus"></i> Add Rule
+            </button>
+            <button type="button" id="save-rules-btn" class="btn btn-success btn-sm" disabled>
+              <i class="bi bi-check-lg"></i> Save All Rules
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Rules list -->
@@ -91,7 +95,7 @@
 </div>
 
 <script>
-(function () {
+document.addEventListener('DOMContentLoaded', function() {
     const scopeSelect = document.getElementById('scope');
     const purokSection = document.getElementById('purok-section');
     const staffSection = document.getElementById('staff-section');
@@ -101,89 +105,158 @@
     let appliedRules = [];
     
     function toggleSections() {
+        if (!scopeSelect) return;
         const selectedValue = scopeSelect.value;
         
         // Hide all sections first
-        purokSection.style.display = 'none';
-        staffSection.style.display = 'none';
-        personSection.style.display = 'none';
+        if (purokSection) purokSection.style.display = 'none';
+        if (staffSection) staffSection.style.display = 'none';
+        if (personSection) personSection.style.display = 'none';
         
         // Show relevant section based on selection
-        if (selectedValue === '8') {
-            // PUROK
+        if (selectedValue === '8' && purokSection) {
             purokSection.style.display = 'block';
-        } else if (selectedValue === '3') {
-            // STAFF
+        } else if (selectedValue === '3' && staffSection) {
             staffSection.style.display = 'block';
-        } else if (selectedValue === '6') {
-            // PERSON LIST
+        } else if (selectedValue === '6' && personSection) {
             personSection.style.display = 'block';
         }
     }
     
     function updateRulesList() {
+        if (!rulesList) return;
         if (appliedRules.length === 0) {
             rulesList.innerHTML = '<li class="text-muted">No rules added yet</li>';
         } else {
             rulesList.innerHTML = appliedRules.map(rule => 
-                `<li><code>${rule.type}</code> — ${rule.value}</li>`
+                `<li><strong>${rule.type}</strong>: ${rule.value}</li>`
             ).join('');
         }
     }
     
     function updatePreview() {
-        // Mock data - replace with actual counts
-        const totalCount = appliedRules.length * 15; // Mock calculation
-        document.getElementById('total-count').textContent = totalCount;
-        document.getElementById('resident-count').textContent = Math.floor(totalCount * 0.8);
-        document.getElementById('staff-count').textContent = Math.floor(totalCount * 0.2);
-        
-        // Mock purok breakdown
+        const totalCountEl = document.getElementById('total-count');
+        const residentCountEl = document.getElementById('resident-count');
+        const staffCountEl = document.getElementById('staff-count');
         const purokBreakdown = document.getElementById('purok-breakdown');
-        if (totalCount > 0) {
-            purokBreakdown.innerHTML = `
-                <span class="badge-purok">KANIPAAN: ${Math.floor(totalCount * 0.4)}</span>
-                <span class="badge-purok">PAMPANGO: ${Math.floor(totalCount * 0.3)}</span>
-                <span class="badge-purok">LUTAW-LUTAW: ${Math.floor(totalCount * 0.2)}</span>
-                <span class="badge-purok">MAUCO: ${Math.floor(totalCount * 0.1)}</span>
-            `;
-        } else {
-            purokBreakdown.innerHTML = '<span class="text-muted small">No data</span>';
+        
+        if (appliedRules.length === 0) {
+            if (totalCountEl) totalCountEl.textContent = '0';
+            if (residentCountEl) residentCountEl.textContent = '0';
+            if (staffCountEl) staffCountEl.textContent = '0';
+            if (purokBreakdown) purokBreakdown.innerHTML = '<span class="text-muted small">No data</span>';
+            return;
         }
+        
+        // Show preview based on selected rules
+        let previewText = appliedRules.map(rule => {
+            if (rule.type === 'ALL') return 'All residents and staff';
+            if (rule.type === 'RESIDENTS') return 'All residents';
+            if (rule.type === 'STAFF') return `Staff: ${rule.value}`;
+            if (rule.type === 'PUROK') return `Purok: ${rule.value}`;
+            return rule.value;
+        }).join(', ');
+        
+        if (totalCountEl) totalCountEl.textContent = `Selected: ${appliedRules.length} rule(s)`;
+        if (residentCountEl) residentCountEl.textContent = previewText;
+        if (staffCountEl) staffCountEl.textContent = '';
+        if (purokBreakdown) purokBreakdown.innerHTML = `<span class="badge-purok">${previewText}</span>`;
     }
     
-    // Mock add rule functionality
-    document.querySelector('form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const scopeValue = scopeSelect.value;
-        const scopeText = scopeSelect.options[scopeSelect.selectedIndex].text;
-        
-        if (scopeValue) {
+    // Add rule to UI only
+    const addRuleBtn = document.getElementById('add-rule-btn');
+    if (addRuleBtn) {
+        addRuleBtn.addEventListener('click', function() {
+            if (!scopeSelect || !scopeSelect.value || scopeSelect.value === '') {
+                alert('Please select a scope first');
+                return;
+            }
+            
+            const scopeValue = scopeSelect.value;
+            const scopeText = scopeSelect.options[scopeSelect.selectedIndex].text;
+            
             let ruleValue = scopeText;
+            let rule = {
+                scope_id: parseInt(scopeValue),
+                type: scopeText,
+                value: ruleValue,
+                role_id: null,
+                purok_id: null
+            };
             
             // Get subchoice values if applicable
-            if (scopeValue === '8' && purokSection.style.display !== 'none') {
+            if (scopeValue === '8' && purokSection && purokSection.style.display !== 'none') {
                 const purokSelect = document.getElementById('purok_sitio');
-                if (purokSelect.value) {
-                    ruleValue = purokSelect.options[purokSelect.selectedIndex].text;
+                if (purokSelect && purokSelect.value) {
+                    rule.purok_id = parseInt(purokSelect.value);
+                    rule.value = purokSelect.options[purokSelect.selectedIndex].text;
                 }
-            } else if (scopeValue === '3' && staffSection.style.display !== 'none') {
+            } else if (scopeValue === '3' && staffSection && staffSection.style.display !== 'none') {
                 const staffSelect = document.getElementById('staff_role');
-                if (staffSelect.value) {
-                    ruleValue = staffSelect.options[staffSelect.selectedIndex].text;
+                if (staffSelect && staffSelect.value) {
+                    rule.role_id = parseInt(staffSelect.value);
+                    rule.value = staffSelect.options[staffSelect.selectedIndex].text;
                 }
             }
             
-            appliedRules.push({
-                type: scopeText,
-                value: ruleValue
-            });
-            
+            appliedRules.push(rule);
             updateRulesList();
             updatePreview();
-        }
-    });
+            
+            // Enable save button
+            const saveBtn = document.getElementById('save-rules-btn');
+            if (saveBtn) saveBtn.disabled = false;
+        });
+    }
+    
+    // Save all rules to database
+    const saveRulesBtn = document.getElementById('save-rules-btn');
+    if (saveRulesBtn) {
+        saveRulesBtn.addEventListener('click', async function() {
+            const announcementIdEl = document.getElementById('announcement_id');
+            const announcementId = announcementIdEl ? announcementIdEl.value : '';
+            
+            if (!announcementId) {
+                alert('Please enter an announcement ID');
+                return;
+            }
+            
+            if (appliedRules.length === 0) {
+                alert('Please add at least one rule');
+                return;
+            }
+            
+            try {
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+                const response = await fetch('{% url "secretary:save_audience_rules" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken ? csrfToken.value : ''
+                    },
+                    body: JSON.stringify({
+                        announcement_id: parseInt(announcementId),
+                        rules: appliedRules
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(result.message);
+                    // Reset form
+                    appliedRules = [];
+                    updateRulesList();
+                    updatePreview();
+                    saveRulesBtn.disabled = true;
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to save rules: ' + error.message);
+            }
+        });
+    }
     
     // Initial setup
     toggleSections();
@@ -191,7 +264,9 @@
     updatePreview();
     
     // Listen for changes
-    scopeSelect.addEventListener('change', toggleSections);
-})();
+    if (scopeSelect) {
+        scopeSelect.addEventListener('change', toggleSections);
+    }
+});
 </script>
 {% endblock %}

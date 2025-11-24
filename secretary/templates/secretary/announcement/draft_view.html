@@ -64,7 +64,7 @@
                   </div>
                 {% else %}
                   <p class="text-muted">No audiences added yet.</p>
-                  <a href="{% url 'secretary:announcement_audience_scope' %}" class="btn btn-outline-primary btn-sm">
+                  <a href="{% url 'secretary:announcement_audience_scope' %}?announcement_id={{ draft.announcement_id }}" class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-plus"></i> Add Audience
                   </a>
                 {% endif %}

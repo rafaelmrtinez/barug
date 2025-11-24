@@ -2140,32 +2140,57 @@ def announcement_audience_scope(
     user_role = _auth_role_name(request)
     form = AudienceScope(request.POST or None)
     
-    if request.method == 'POST' and form.is_valid():
-        try:
-            
-            command = AddAnnouncementAudienceCMD(
-                announcement_id=form.cleaned_data['announcement_id'],
-                audience_scope_id=form.cleaned_data['audience_scope_id'],
-                role_id=form.cleaned_data.get('role_id'),
-                purok_sitio_id=form.cleaned_data.get('purok_sitio_id'),
-                person_ids=form.cleaned_data.get('person_ids')
-            )
-            
-            audience_id, inserted_persons = audience_service.add_announcement_audience(command)
-            messages.success(request, f"Audience added successfully! {inserted_persons} persons added.")
-            return redirect('secretary:announcement_draft_list')
-            
-        except ValueError as e:
-            messages.error(request, str(e))
-        except Exception as e:
-            messages.error(request, "Failed to add audience scope.")
-            logger.exception("Failed to add audience scope: %s", e)
+    announcement_id = request.GET.get('announcement_id')
     
     return render(request, "secretary/announcement/audience_scope.html", {
         'page_path': f'{user_role} / Announcements / Audience Scope',
         'page_title': 'Audience Scope',
         'form': form,
+        'announcement_id': announcement_id,
     })
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def save_audience_rules(
+    request: HttpRequest,
+    audience_service: IAudienceService = Provide[AppContainer.audience_service],
+) -> JsonResponse:
+    """Save all audience rules to database"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        announcement_id = data.get('announcement_id')
+        rules = data.get('rules', [])
+        
+        if not announcement_id:
+            return JsonResponse({'error': 'Announcement ID required'}, status=400)
+        
+        saved_count = 0
+        for rule in rules:
+            command = AddAnnouncementAudienceCMD(
+                announcement_id=announcement_id,
+                audience_scope_id=rule.get('scope_id'),
+                role_id=rule.get('role_id'),
+                purok_sitio_id=rule.get('purok_id'),
+                person_ids=rule.get('person_ids')
+            )
+            
+            audience_id, inserted_persons = audience_service.add_announcement_audience(command)
+            saved_count += inserted_persons
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'{len(rules)} rules saved, {saved_count} persons added'
+        })
+        
+    except Exception as e:
+        logger.exception("Failed to save audience rules: %s", e)
+        return JsonResponse({'error': str(e)}, status=500)
 
 def resident_map_list(request):
     form = StaffFilters()
