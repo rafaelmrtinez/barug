@@ -1,7 +1,7 @@
 # lupon_mem/urls.py
 from django.urls import path
 from . import views
-from . import views_reports
+from lupon_mem import views_reports
 from . import views_api
 from . import views_cases
 from . import views_progress  # ← ADDED: import for flow progress API
