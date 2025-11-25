@@ -57,7 +57,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-wrap" style="margin-top: 40px;">
+<div class="page-wrap">
   <div class="container-fluid pt-3 page-main">
     <div class="row">
       <div>
@@ -112,8 +112,12 @@
         <table class="table">
           <thead>
             <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Date &amp; Time Submitted</th>
+              <th scope="col">Request Code</th>
+              <th scope="col">Date Requested</th>
+              <th scope="col">Requester</th>
+              <th scope="col">Requested For</th>
+              <th scope="col">Documents</th>
+              <th scope="col">Purposes</th>
               <th scope="col">Status</th>
               <th scope="col">Action</th>
             </tr>
@@ -122,38 +126,42 @@
             {% if page_obj.object_list %}
               {% for r in page_obj.object_list %}
                 <tr class="table-row-height">
-                  <td>
-                    <div class="text-muted small">
-                      <b>{{ r.request_code }}</b>
-                      {% if r.doc_types %}
-                        •
-                        {% for t in r.doc_types %}
-                          <span class="badge rounded-pill" style="background:var(--brand-100); color:var(--brand-700); border:1px solid rgba(109,41,50,.18);">
-                            {{ t }}
-                          </span>
-                        {% endfor %}
-                      {% endif %}
-                    </div>
-                  </td>
+                  <td><span class="badge" style="background:var(--brand-100); color:var(--brand-700); border:1px solid rgba(109,41,50,.18); font-family:monospace;">{{ r.request_code }}</span></td>
                   <td>
                     {% with raw=r.created_at|default:r.created_fmt %}
                       {% if raw and raw != '.' %}
-                        <span class="dt-cell" data-ts="{{ raw|escape }}">{{ raw }}</span>
+                        <span class="dt-cell small text-muted" data-ts="{{ raw|escape }}">{{ raw }}</span>
                       {% else %}
                         —
                       {% endif %}
                     {% endwith %}
                   </td>
+                  <td>{{ r.requester_display|default:r.requested_by|default:"—" }}</td>
+                  <td>{{ r.on_behalf_of|default:"Self" }}</td>
+                  <td>
+                    {% if r.doc_types %}
+                      {% for t in r.doc_types %}
+                        <span class="badge rounded-pill" style="background:var(--brand-100); color:var(--brand-700); border:1px solid rgba(109,41,50,.18); font-size:.75rem;">{{ t }}</span>
+                      {% endfor %}
+                    {% else %} — {% endif %}
+                  </td>
+                  <td>
+                    {% if r.purposes_display %}
+                      {% for p in r.purposes_display %}
+                        <span class="badge rounded-pill" style="background:var(--brand-050); color:var(--brand-700); border:1px solid rgba(109,41,50,.12); font-size:.75rem;">{{ p }}</span>
+                      {% endfor %}
+                    {% else %} — {% endif %}
+                  </td>
                   <td><span class="{{ r.status_ui.cls }}">{{ r.status_ui.label }}</span></td>
                   <td>
                     <a class="btn btn-outline-brand btn-sm" href="{% url 'clerk:detail' r.doc_request_id %}">
-                      {% bs_icon 'person-lines-fill' extra_classes='me-1' %} Open
+                      {% bs_icon 'person-lines-fill' extra_classes='me-1' %} View
                     </a>
                   </td>
                 </tr>
               {% endfor %}
             {% else %}
-              <tr><td colspan="4" class="text-center">No matching requests.</td></tr>
+              <tr><td colspan="8" class="text-center">No matching requests.</td></tr>
             {% endif %}
           </tbody>
         </table>

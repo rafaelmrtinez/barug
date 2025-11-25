@@ -31,4 +31,5 @@ def auth_context(request):
         "user_role": role_name,
         "user_role_template": role_name.lower().replace(" ", "_") if role_name else "",
         "header_profile": header_profile,
+        "lupon_sched": auth.get("lupon_sched", []),
     }
