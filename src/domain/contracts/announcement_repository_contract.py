@@ -4,11 +4,13 @@ from src.app.transfer_objects.dto.announcement_dto import (
     AnnouncementDTO,
     AnnouncementStatusDTO,
 )
+from src.app.transfer_objects.dto.publish_result_dto import PublishResultDTO
 from src.app.transfer_objects.commands.announcement_cmd import (
     CreateAnnouncementDraftCMD,
     UpdateAnnouncementDraftCMD,
     PublishAnnouncementCMD,
 )
+from src.app.transfer_objects.commands.publish_now_cmd import PublishAnnouncementNowCMD
 
 
 class IAnnouncementRepository(ABC):
@@ -42,6 +44,11 @@ class IAnnouncementRepository(ABC):
     @abstractmethod
     def publish_announcement(self, announcement_id: int, published_by_id: int) -> bool:
         """Publish an announcement"""
+        pass
+    
+    @abstractmethod
+    def publish_announcement_now(self, command: PublishAnnouncementNowCMD) -> PublishResultDTO:
+        """Publish an announcement immediately using the database function"""
         pass
 
     @abstractmethod

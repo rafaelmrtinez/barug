@@ -10,6 +10,10 @@ from src.app.transfer_objects.commands.announcement_cmd import (
     PublishAnnouncementCMD,
     UpdateAnnouncementDraftCMD,
 )
+from src.app.transfer_objects.commands.publish_now_cmd import PublishAnnouncementNowCMD
+from src.app.transfer_objects.dto.publish_result_dto import PublishResultDTO
+from common.send_email import send_email
+from common.send_sms import send_sms
 from src.infra.contracts.connection_adapter import IConnectionAdapter
 
 
@@ -182,6 +186,87 @@ class AnnouncementRepository(IAnnouncementRepository):
         
         result = self.ctx.execute_query(sql, params)
         return result is not None
+    
+    def publish_announcement_now(self, command: PublishAnnouncementNowCMD) -> PublishResultDTO:
+        """Publish an announcement immediately using the database function"""
+        sql = "SELECT * FROM publish_announcement_now(%s, %s)"
+        params = (command.announcement_id, command.published_by_id)
+        
+        result = self.ctx.execute_query(sql, params)
+        if not result:
+            raise ValueError("Failed to publish announcement")
+        
+        row = result[0]
+        announcement_id = row[0]
+        total_recipients = row[1]
+        
+        # Send notifications based on enabled channels
+        self._send_notifications(announcement_id)
+        
+        return PublishResultDTO(
+            announcement_id=announcement_id,
+            total_recipients=total_recipients
+        )
+    
+    def _send_notifications(self, announcement_id: int) -> None:
+        """Send email/SMS notifications based on enabled channels"""
+        # Get announcement details
+        announcement_sql = "SELECT announcement_title, announcement_body FROM announcement WHERE announcement_id = %s"
+        announcement_result = self.ctx.execute_query(announcement_sql, (announcement_id,))
+        if not announcement_result:
+            return
+        
+        title, body = announcement_result[0]
+        
+        # Get recipients by channel type
+        recipients_sql = """
+            SELECT ar.channel_type_id, p.email, p.mobile_num, p.first_name, p.last_name
+            FROM announcement_recipient ar
+            JOIN person p ON p.person_id = ar.person_id
+            WHERE ar.announcement_id = %s 
+            AND ar.announcement_deliver_status_id IN (2, 3, 4)
+        """
+        recipients = self.ctx.execute_query(recipients_sql, (announcement_id,))
+        
+        if not recipients:
+            return
+        
+        # Group recipients by channel type
+        email_recipients = []
+        sms_recipients = []
+        
+        for channel_type_id, email, mobile, first_name, last_name in recipients:
+            if channel_type_id == 2 and email:  # EMAIL
+                name = f"{first_name or ''} {last_name or ''}".strip()
+                email_recipients.append((name, email) if name else email)
+            elif channel_type_id == 1 and mobile:  # SMS
+                sms_recipients.append(mobile)
+        
+        # Send emails
+        if email_recipients:
+            try:
+                send_email(
+                    subject=f"Announcement: {title}",
+                    to=email_recipients,
+                    body_text=body,
+                    fail_silently=True
+                )
+            except Exception:
+                pass  # Log if needed, but don't fail the publish
+        
+        # # Send SMS
+        # if sms_recipients:
+        #     try:
+        #         sms_message = f"{title}\n\n{body}"
+        #         if len(sms_message) > 160:
+        #             sms_message = sms_message[:157] + "..."
+        #         send_sms(
+        #             to=sms_recipients,
+        #             message=sms_message,
+        #             fail_silently=True
+        #         )
+        #     except Exception:
+        #         pass  # Log if needed, but don't fail the publish
 
     def get_announcement_statuses(self) -> List[AnnouncementStatusDTO]:
         """Get all announcement statuses"""

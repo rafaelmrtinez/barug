@@ -71,6 +71,7 @@ from src.app.transfer_objects.commands.channel_cmd import (
     UpsertAnnouncementChannelsCMD,
     CreateAnnouncementRecipientsCMD
 )
+from src.app.transfer_objects.commands.publish_now_cmd import PublishAnnouncementNowCMD
 
 
 from .forms import (
@@ -2291,6 +2292,57 @@ def announcement_channels_api(
     except Exception as e:
         logger.exception("Failed to get channels: %s", e)
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def publish_announcement_now(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> JsonResponse:
+    """Publish an announcement immediately"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        announcement_id = data.get('announcement_id')
+        
+        if not announcement_id:
+            return JsonResponse({'error': 'Announcement ID required'}, status=400)
+        
+        auth = request.session.get('auth', {})
+        staff_id = auth.get('staff_id')
+        
+        command = PublishAnnouncementNowCMD(
+            announcement_id=announcement_id,
+            published_by_id=staff_id
+        )
+        
+        result = announcement_service.publish_announcement_now(command)
+        
+        log_announcement_action(
+            announcement_id=result.announcement_id,
+            table_affected='ANNOUNCEMENT',
+            action='UPDATE',
+            performer_id=staff_id,
+            details=f'Published announcement immediately. Recipients: {result.total_recipients}',
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Announcement published successfully to {result.total_recipients} recipients',
+            'announcement_id': result.announcement_id,
+            'total_recipients': result.total_recipients
+        })
+        
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+    except Exception as e:
+        logger.exception("Failed to publish announcement: %s", e)
+        return JsonResponse({'error': 'Failed to publish announcement'}, status=500)
 
 
 # -------------------------------

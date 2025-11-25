@@ -39,6 +39,15 @@
               <a href="{% url 'secretary:announcement_draft_list' %}" class="btn btn-outline-secondary btn-sm me-2">
                 <i class="bi bi-arrow-left"></i> Back to List
               </a>
+              <!-- Publish Now button -->
+            <button id="publish-now-btn" type="button" class="btn btn-primary btn-sm" onclick="publishNow()">
+              <i class="bi bi-send-fill"></i> Publish Now
+            </button>
+
+            <!-- Schedule button -->
+            <button id="schedule-btn" type="button" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-calendar-event"></i> Schedule
+            </button>
               <!-- Save button (only saves when form visible and channels chosen) -->
               <button id="save-channels-btn" class="btn btn-success btn-sm" type="button" onclick="saveChannels()" disabled>
                 <i class="bi bi-save"></i> Save Channels
@@ -195,6 +204,46 @@
   // Internal stores
   let selectedChannels = [];  // for chips in form
   let appliedChannels = [];   // latest fetched channels for applied list
+
+  // Publish Now functionality
+  window.publishNow = async function() {
+    if (!confirm('Are you sure you want to publish this announcement now? This action cannot be undone.')) {
+      return;
+    }
+
+    const publishBtn = document.getElementById('publish-now-btn');
+    const originalText = publishBtn.innerHTML;
+    publishBtn.disabled = true;
+    publishBtn.innerHTML = '<i class="spinner-border spinner-border-sm me-1"></i> Publishing...';
+
+    try {
+      const response = await fetch('{% url "secretary:publish_announcement_now" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+          announcement_id: announcementId
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert(`Success! ${data.message}`);
+        window.location.href = '{% url "secretary:announcement_draft_list" %}';
+      } else {
+        alert('Error: ' + (data.error || 'Failed to publish announcement'));
+      }
+    } catch (error) {
+      console.error('Publish error:', error);
+      alert('Error: Failed to publish announcement');
+    } finally {
+      publishBtn.disabled = false;
+      publishBtn.innerHTML = originalText;
+    }
+  };
 
   // Utility
   function show(el) { el.classList.remove('hidden'); }

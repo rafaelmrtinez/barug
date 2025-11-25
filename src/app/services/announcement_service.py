@@ -9,6 +9,8 @@ from src.app.transfer_objects.commands.announcement_cmd import (
     UpdateAnnouncementDraftCMD, 
     PublishAnnouncementCMD,
 )
+from src.app.transfer_objects.commands.publish_now_cmd import PublishAnnouncementNowCMD
+from src.app.transfer_objects.dto.publish_result_dto import PublishResultDTO
 
 
 class AnnouncementService(IAnnouncementService):
@@ -126,6 +128,21 @@ class AnnouncementService(IAnnouncementService):
             return self.get_all_drafts()
         
         return self.announcement_repository.search_drafts(search_query.strip())
+    
+    def publish_announcement_now(self, command: PublishAnnouncementNowCMD) -> PublishResultDTO:
+        """Publish an announcement immediately using the database function"""
+        if not command.announcement_id:
+            raise ValueError("Announcement ID is required")
+        
+        # Check if announcement exists and is a draft
+        existing = self.announcement_repository.get_by_id(command.announcement_id)
+        if not existing:
+            raise ValueError("Announcement not found")
+        
+        if existing.announcement_status_id != 1:  # Not a draft
+            raise ValueError("Can only publish draft announcements")
+        
+        return self.announcement_repository.publish_announcement_now(command)
     
     def execute(
             self,
