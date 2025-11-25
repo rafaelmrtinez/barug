@@ -1,0 +1,51 @@
+{% for r in rows %}
+<tr class="table-row-height">
+  <td>
+    <div class="fw-semibold">{{ r.announcement_title|truncatechars:50 }}</div>
+    <div class="text-muted small">{{ r.announcement_body|truncatechars:80 }}</div>
+  </td>
+  <td>
+    <div class="small">{{ r.announcement_created_at|date:"M d, Y" }}</div>
+    <div class="text-muted small">{{ r.announcement_created_at|time:"g:i A" }}</div>
+  </td>
+  <td>
+    {% if r.announcement_published_at %}
+      <div class="small">{{ r.announcement_published_at|date:"M d, Y" }}</div>
+      <div class="text-muted small">{{ r.announcement_published_at|time:"g:i A" }}</div>
+    {% else %}
+      <span class="text-muted">Not scheduled</span>
+    {% endif %}
+  </td>
+  <td>
+    {% if r.announcement_expire_at %}
+      <div class="small">{{ r.announcement_expire_at|date:"M d, Y" }}</div>
+      <div class="text-muted small">{{ r.announcement_expire_at|time:"g:i A" }}</div>
+    {% else %}
+      <span class="text-muted">No expiry</span>
+    {% endif %}
+  </td>
+  <td>
+    <span>{{ r.announcement_status_name|default:"Draft" }}</span>
+  </td>
+  <td>
+    <div class="btn-group btn-group-sm">
+      <a href="{% url 'secretary:announcement_draft_view' r.announcement_id %}" class="btn btn-outline-secondary" title="View">
+        <i class="bi bi-eye"></i>
+      </a>
+      <button type="button" class="btn btn-outline-primary" title="Edit">
+        <i class="bi bi-pencil"></i>
+      </button>
+      <button type="button" class="btn btn-outline-success" title="Publish">
+        <i class="bi bi-send"></i>
+      </button>
+      <button type="button" class="btn btn-outline-danger" title="Delete">
+        <i class="bi bi-trash"></i>
+      </button>
+    </div>
+  </td>
+</tr>
+{% empty %}
+<tr>
+  <td colspan="6" class="text-center py-4 text-muted">No announcements found.</td>
+</tr>
+{% endfor %}

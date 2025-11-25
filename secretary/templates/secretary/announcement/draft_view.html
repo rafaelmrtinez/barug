@@ -1,0 +1,429 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+<style>
+  .channel-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .25rem .5rem;
+    border-radius: 999px;
+    background: #f1f3f5;
+    margin: .15rem;
+    font-size: .9rem;
+  }
+  .channel-chip .remove {
+    cursor: pointer;
+    font-weight: 700;
+    padding: 0 .25rem;
+  }
+
+  /* small helper to visually hide the form area when collapsed */
+  .hidden { display: none !important; }
+
+  /* spacing for applied channels list */
+  #applied-channels .list-group-item { padding: .5rem .75rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap" style="margin-top: 40px;">
+  <div class="container-fluid pt-3 page-main">
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">{{ draft.announcement_title }}</h5>
+            <div>
+              <a href="{% url 'secretary:announcement_draft_list' %}" class="btn btn-outline-secondary btn-sm me-2">
+                <i class="bi bi-arrow-left"></i> Back to List
+              </a>
+              <!-- Publish Now button -->
+            <button id="publish-now-btn" type="button" class="btn btn-primary btn-sm" onclick="publishNow()">
+              <i class="bi bi-send-fill"></i> Publish Now
+            </button>
+
+            <!-- Schedule button -->
+            <button id="schedule-btn" type="button" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-calendar-event"></i> Schedule
+            </button>
+              <!-- Save button (only saves when form visible and channels chosen) -->
+              <button id="save-channels-btn" class="btn btn-success btn-sm" type="button" onclick="saveChannels()" disabled>
+                <i class="bi bi-save"></i> Save Channels
+              </button>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-8">
+                <h6>Content</h6>
+                <div class="border rounded p-3 mb-3" style="background-color: #f8f9fa;">
+                  {{ draft.announcement_body|linebreaks }}
+                </div>
+
+                <div class="row">
+                  <div class="col-md-6">
+                    <h6>Publish Date</h6>
+                    <p class="text-muted">
+                      {% if draft.announcement_published_at %}
+                        {{ draft.announcement_published_at|date:"M d, Y g:i A" }}
+                      {% else %}
+                        Not scheduled
+                      {% endif %}
+                    </p>
+                  </div>
+                  <div class="col-md-6">
+                    <h6>Expire Date</h6>
+                    <p class="text-muted">
+                      {% if draft.announcement_expire_at %}
+                        {{ draft.announcement_expire_at|date:"M d, Y g:i A" }}
+                      {% else %}
+                        No expiry
+                      {% endif %}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-md-4">
+                <h6>Audiences</h6>
+                {% if audiences %}
+                  <div class="list-group mb-3">
+                    {% for audience in audiences %}
+                      <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                          <div>
+                            <strong>{{ audience.audience_scope_name }}</strong>
+                            <br>
+                            <small class="text-muted">{{ audience.inserted_persons }} persons</small>
+                          </div>
+                          <span class="badge bg-primary rounded-pill">{{ audience.inserted_persons }}</span>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <p class="text-muted">No audiences added yet.</p>
+                  <a href="{% url 'secretary:announcement_audience_scope' %}?announcement_id={{ draft.announcement_id }}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-plus"></i> Add Audience
+                  </a>
+                {% endif %}
+
+                <hr>
+
+                <h6>Channel Types</h6>
+
+                <!-- Applied channels area (shows existing channels if any) -->
+                <div id="applied-channels" class="mb-3">
+                  <!-- Filled by JS on load -->
+                </div>
+
+                <!-- action buttons: Add or Update; toggled by JS depending on applied channels -->
+                <div id="channel-action-area" class="mb-3">
+                  <button id="add-channels-btn" type="button" class="btn btn-outline-primary btn-sm me-2 hidden">
+                    <i class="bi bi-plus"></i> Add Channel
+                  </button>
+                  <button id="update-channels-btn" type="button" class="btn btn-outline-secondary btn-sm hidden">
+                    <i class="bi bi-pencil"></i> Update Channels
+                  </button>
+                </div>
+
+                <!-- Channel form area (initially hidden) -->
+                <div id="channel-form-area" class="card p-3 hidden">
+                  <div id="selected-channels" class="mb-3"></div>
+
+                  <form id="channelForm" onsubmit="return false;">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                      {{ form.channel }}
+                    </div>
+
+                    <div class="d-flex gap-2 mb-2">
+                      <button type="button" class="btn btn-outline-success btn-sm" onclick="addChannel()">
+                        <i class="bi bi-plus"></i> Add to Selection
+                      </button>
+                      <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearChannels()">
+                        <i class="bi bi-x-circle"></i> Clear Selection
+                      </button>
+
+                      <button id="cancel-channels-btn" type="button" class="btn btn-light btn-sm ms-auto" onclick="hideChannelForm()">
+                        Cancel
+                      </button>
+                    </div>
+
+                    <small class="form-text text-muted mt-2">
+                      Add channel types and click <strong>Save Channels</strong> to persist.
+                    </small>
+                  </form>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <div class="card-footer d-flex justify-content-between align-items-center">
+            <small class="text-muted">
+              Created: {{ draft.announcement_created_at|date:"M d, Y g:i A" }} |
+              Status: {{ draft.announcement_status_name|default:"Draft" }}
+            </small>
+            <small id="save-status" class="text-muted"></small>
+          </div>
+
+          <!-- data container for JS -->
+          <div id="draft-data"
+              data-announcement-id="{{ draft.announcement_id }}"
+              data-upsert-url="{% url 'secretary:upsert_announcement_channels' %}"
+              data-channels-url="{% url 'secretary:announcement_channels_api' draft.announcement_id %}">
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // Read data attributes
+  const dataEl = document.getElementById('draft-data');
+  const announcementId = Number(dataEl.dataset.announcementId);
+  const upsertUrl = dataEl.dataset.upsertUrl;
+
+  // UI references
+  const appliedContainer = document.getElementById('applied-channels');
+  const addBtn = document.getElementById('add-channels-btn');
+  const updateBtn = document.getElementById('update-channels-btn');
+  const channelFormArea = document.getElementById('channel-form-area');
+  const selectedEl = document.getElementById('selected-channels');
+  const selectEl = document.querySelector('select[name="channel"]');
+  const saveBtn = document.getElementById('save-channels-btn');
+  const saveStatus = document.getElementById('save-status');
+
+  // Internal stores
+  let selectedChannels = [];  // for chips in form
+  let appliedChannels = [];   // latest fetched channels for applied list
+
+  // Publish Now functionality
+  window.publishNow = async function() {
+    if (!confirm('Are you sure you want to publish this announcement now? This action cannot be undone.')) {
+      return;
+    }
+
+    const publishBtn = document.getElementById('publish-now-btn');
+    const originalText = publishBtn.innerHTML;
+    publishBtn.disabled = true;
+    publishBtn.innerHTML = '<i class="spinner-border spinner-border-sm me-1"></i> Publishing...';
+
+    try {
+      const response = await fetch('{% url "secretary:publish_announcement_now" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+          announcement_id: announcementId
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert(`Success! ${data.message}`);
+        window.location.href = '{% url "secretary:announcement_draft_list" %}';
+      } else {
+        alert('Error: ' + (data.error || 'Failed to publish announcement'));
+      }
+    } catch (error) {
+      console.error('Publish error:', error);
+      alert('Error: Failed to publish announcement');
+    } finally {
+      publishBtn.disabled = false;
+      publishBtn.innerHTML = originalText;
+    }
+  };
+
+  // Utility
+  function show(el) { el.classList.remove('hidden'); }
+  function hide(el) { el.classList.add('hidden'); }
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  // Load applied channels from server
+  async function loadAppliedChannels() {
+    appliedContainer.innerHTML = '<div class="text-muted">Loading channels...</div>';
+    try {
+      const resp = await fetch(`/secretary/api/announcement_channels/${announcementId}/`, { credentials: 'same-origin' });
+      if (!resp.ok) throw new Error(resp.statusText);
+      const payload = await resp.json();
+      appliedChannels = payload.channels || [];
+
+      if (!appliedChannels.length) {
+        appliedContainer.innerHTML = '<p class="text-muted">No channels applied yet.</p>';
+      } else {
+        let html = '';
+        appliedChannels.forEach(ch => {
+          html += `<div class="list-group-item d-flex justify-content-between align-items-center">
+                     <strong>${escapeHtml(ch.channel_type_name)}</strong>
+                     <span class="btn btn-sm btn-outline-danger remove-applied" data-id="${ch.channel_type_id}" title="Remove channel">&times;</span>
+                   </div>`;
+        });
+        appliedContainer.innerHTML = html;
+
+        // Attach remove handlers
+        appliedContainer.querySelectorAll('.remove-applied').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            const channelId = Number(btn.dataset.id);
+            if (!confirm('Remove this channel?')) return;
+
+            const remainingIds = appliedChannels
+              .filter(ch => Number(ch.channel_type_id) !== channelId)
+              .map(ch => Number(ch.channel_type_id));
+
+            try {
+              const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+              const res = await fetch(upsertUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                  announcement_id: announcementId,
+                  channel_type_ids: remainingIds
+                })
+              });
+              const result = await res.json();
+              if (!res.ok || !result.success) throw new Error(result.error || 'Failed to remove channel');
+
+              // Refresh applied channels
+              await loadAppliedChannels();
+            } catch (err) {
+              console.error('Remove channel failed', err);
+              alert('Failed to remove channel.');
+            }
+          });
+        });
+      }
+
+      configureActionButtons(appliedChannels);
+    } catch (err) {
+      console.error('Failed to load applied channels', err);
+      appliedContainer.innerHTML = '<p class="text-muted">Failed to load channels.</p>';
+      configureActionButtons([]);
+    }
+  }
+
+  // Add / Update buttons logic
+  function configureActionButtons(channels) {
+    if (channels && channels.length) {
+      show(updateBtn); hide(addBtn);
+      updateBtn.onclick = () => {
+        showChannelForm();
+        clearChannels();
+        channels.forEach(ch => {
+          const id = Number(ch.channel_type_id);
+          if (!selectedChannels.some(s => s.id === id)) {
+            selectedChannels.push({ id, name: ch.channel_type_name });
+            addChannelToUI(id, ch.channel_type_name);
+          }
+        });
+        updateSaveButtonState();
+      };
+    } else {
+      show(addBtn); hide(updateBtn);
+      addBtn.onclick = () => {
+        showChannelForm();
+        clearChannels();
+        updateSaveButtonState();
+      };
+    }
+  }
+
+  // Show/hide form
+  function showChannelForm() {
+    show(channelFormArea);
+    channelFormArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    updateSaveButtonState();
+  }
+  window.hideChannelForm = () => { hide(channelFormArea); clearChannels(); updateSaveButtonState(); };
+
+  // Chip handling
+  function addChannelToUI(id, name) {
+    const chip = document.createElement('span');
+    chip.className = 'channel-chip badge rounded-pill';
+    chip.dataset.channelId = id;
+    chip.innerHTML = `<span class="channel-name">${escapeHtml(name)}</span>
+                      <span class="remove ms-2" title="Remove">&times;</span>`;
+    chip.querySelector('.remove').addEventListener('click', () => removeChannel(id));
+    selectedEl.appendChild(chip);
+  }
+  window.addChannel = () => {
+    if (!selectEl) { alert('Channel select not found'); return; }
+    const chosen = Array.from(selectEl.selectedOptions).map(o => ({ id: Number(o.value), name: o.text.trim() }));
+    if (!chosen.length) { alert('Please choose a channel.'); return; }
+    chosen.forEach(c => { if (!selectedChannels.some(s => s.id === c.id)) { selectedChannels.push(c); addChannelToUI(c.id, c.name); } });
+    if (!selectEl.multiple) selectEl.selectedIndex = -1;
+    updateSaveButtonState();
+  };
+  window.removeChannel = (id) => {
+    selectedChannels = selectedChannels.filter(c => c.id !== id);
+    const chip = selectedEl.querySelector(`span.channel-chip[data-channel-id="${id}"]`);
+    if (chip) chip.remove();
+    updateSaveButtonState();
+  };
+  window.clearChannels = () => { selectedChannels = []; selectedEl.innerHTML = ''; updateSaveButtonState(); };
+  function updateSaveButtonState() { saveBtn.disabled = selectedChannels.length === 0; }
+
+  // Save selected channels to server
+  window.saveChannels = async () => {
+    if (!selectedChannels.length) { alert('Add at least one channel.'); return; }
+    const channelIds = selectedChannels.map(c => c.id);
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    saveStatus.textContent = 'Saving channels...'; saveBtn.disabled = true;
+
+    try {
+      const resp = await fetch(upsertUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ announcement_id: announcementId, channel_type_ids: channelIds })
+      });
+      const payload = await resp.json();
+      if (!resp.ok || !payload.success) throw new Error(payload.error || 'Failed to save channels');
+
+      saveStatus.textContent = 'Channels saved.';
+      await loadAppliedChannels();
+      hideChannelForm();
+      clearChannels();
+      setTimeout(() => { saveStatus.textContent = ''; }, 3000);
+    } catch (err) {
+      console.error(err);
+      saveStatus.textContent = 'Error saving channels.';
+      saveBtn.disabled = false;
+    }
+  };
+
+  // Init
+  document.addEventListener('DOMContentLoaded', () => {
+    loadAppliedChannels();
+    hide(channelFormArea);
+    updateSaveButtonState();
+  });
+
+  // Expose helpers
+  window.showChannelForm = showChannelForm;
+  window.loadAppliedChannels = loadAppliedChannels;
+})();
+</script>
+
+{% endblock %}

@@ -49,6 +49,29 @@ from src.domain.contracts.household_repository_contract import (
 from src.app.contracts.resident_service_contract import ( 
     IResidentService,
 )
+from common.logging_utils import (
+    log_announcement_action
+)
+from src.app.transfer_objects.commands.announcement_cmd import (
+    CreateAnnouncementDraftCMD,
+)
+from src.app.contracts.announcement_service_contract import (
+    IAnnouncementService,
+)
+from src.app.contracts.audience_service_contract import (
+    IAudienceService,
+)
+from src.app.transfer_objects.commands.audience_cmd import (
+    AddAnnouncementAudienceCMD
+)
+from src.app.contracts.channel_service_contract import (
+    IChannelService,
+)
+from src.app.transfer_objects.commands.channel_cmd import (
+    UpsertAnnouncementChannelsCMD,
+    CreateAnnouncementRecipientsCMD
+)
+from src.app.transfer_objects.commands.publish_now_cmd import PublishAnnouncementNowCMD
 
 
 from .forms import (
@@ -58,6 +81,8 @@ from .forms import (
     AnnouncementDraftForm,
     DraftListSearch,
     ResidentFilters,
+    AudienceScope,
+    AddChannelForm,
 )
 
 
@@ -124,6 +149,8 @@ BUCKET_STAFF_PROOF = getattr(settings, "SUPABASE_STAFF_PROOF_BUCKET", "staff-pro
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
 from django.shortcuts import redirect
+from django.db import transaction
+import json
 
 def _smart_redirect(request, url_name, *args, **kwargs):
     url = reverse(url_name, args=args, kwargs=kwargs)
@@ -1962,45 +1989,360 @@ def api_business_pins(
 # ANNOUNCEMENT
 # -------------------------------
 
-def annoucement_draf(request):
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@csrf_protect
+@nocache
+@inject
+def announcement_draft(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    """Create or edit an announcement draft"""
     user_role = _auth_role_name(request)
-
-    form = AnnouncementDraftForm()
-
-    return render(request, "announcement/draft.html", {
-        'page_path': f'{user_role} / Resident List',
-        'page_title': 'Resident List',
+    auth = request.session.get('auth', {})
+    staff_id = auth.get('staff_id')
+    
+    if not staff_id:
+        messages.error(request, "Your session is missing staff credentials.")
+        return redirect('secretary:dashboard')
+    
+    form = AnnouncementDraftForm(request.POST or None)
+    
+    if request.method == 'POST' and form.is_valid():
+        try:
+            
+            command = CreateAnnouncementDraftCMD(
+                title=form.cleaned_data['title'],
+                body=form.cleaned_data['body'],
+                created_by_id=staff_id,
+                publish_at=form.cleaned_data.get('publish_at'),
+                expire_at=form.cleaned_data.get('expire_at')
+            )
+            
+            announcement_id = announcement_service.create_draft(command)
+            log_announcement_action(
+                announcement_id=announcement_id,
+                table_affected= 'ANNOUNCEMENT',
+                action='INSERT',
+                performer_id=staff_id,
+                details=f'Created a new announcement draft. ID :{announcement_id}',
+            )
+            messages.success(request, f"Announcement draft created successfully! ID: {announcement_id}")
+            return redirect('secretary:announcement_draft_list')
+            
+        except ValueError as e:
+            messages.error(request, str(e))
+        except Exception as e:
+            messages.error(request, "An error occurred while creating the announcement draft.")
+            logger.exception("Failed to create announcement draft: %s", e)
+    
+    return render(request, "secretary/announcement/draft.html", {
+        'page_path': f'{user_role} / Announcements / Create Draft',
+        'page_title': 'Create Announcement Draft',
         'form': form,
     })
 
-def announcement_draft_list(request):
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def announcement_draft_list(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    """List all announcement drafts"""
     user_role = _auth_role_name(request)
+    auth = request.session.get('auth', {})
+    
+    form = DraftListSearch(request.GET or None)
+    search_query = request.GET.get('search', '').strip()
+    
+    try:
+        # Get all drafts (you can modify this to filter by creator if needed)
+        drafts = announcement_service.execute(
+            search= search_query
+        )
+        
+        paginator = Paginator(drafts, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
 
-    form = DraftListSearch()
-
-    return render(request, "announcement/draft_list.html", {
-        'page_path': f'{user_role} / Resident List',
-        'page_title': 'Resident List',
+        if search_query is not None and not form.is_valid:
+            form = DraftListSearch()
+        
+    except Exception as e:
+        messages.error(request, "An error occurred while loading announcement drafts.")
+        logger.exception("Failed to load announcement drafts: %s", e)
+        page_obj = None
+    
+    return render(request, "secretary/announcement/draft_list.html", {
+        'page_path': f'{user_role} / Announcements / Draft List',
+        'page_title': 'Announcement Drafts',
         'form': form,
-    })
-
-def resident_map_list(request):
-    form = StaffFilters()
-    list = []
-    paginator = Paginator(list, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-
-    return render(request, "resident/resident_map_list.html", {
-        'user_fullname' : user_fullname,
-        'user_role': user_role,
-        'page_path': f'{user_role} / Resident Map',
-        'page_title': 'Resident Map',
-        'user_role_template': user_role_template,
         'page_obj': page_obj,
-        'form': form,
+        'search_query': search_query,
+        'search_url': 'secretary:ajax_announcement_draft_search',
     })
 
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@require_GET
+@inject
+def ajax_announcement_draft_search(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR only")
+    
+    tpl_key = (request.GET.get("tpl") or "rows").strip().lower()
+    if tpl_key != "rows":
+        return HttpResponseBadRequest("Unknown partial")
+
+    q = request.GET.get("q", "") or None
+    
+    try:
+        rows = announcement_service.execute(
+            search=q,
+        )[:50]
+        
+    except Exception as e:
+        logger.exception("ajax_announcement_draft_search error: %s", e)
+        rows = []
+
+    context = {"rows": rows}
+    html = render_to_string("announcement/_draft_list.html", context, request=request)
+    return HttpResponse(html)
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def announcement_draft_view(
+    request: HttpRequest,
+    announcement_id: int,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+    audience_service: IAudienceService = Provide[AppContainer.audience_service],
+) -> HttpResponse:
+    """View announcement draft details"""
+    user_role = _auth_role_name(request)
+
+    form = AddChannelForm()
+    
+    try:
+        draft = announcement_service.get_draft_by_id(announcement_id)
+        
+        if not draft:
+            messages.error(request, "Announcement not found.")
+            return redirect('secretary:announcement_draft_list')
+        
+        audiences = audience_service.get_announcement_audiences(announcement_id)
+        
+    except Exception as e:
+        messages.error(request, "Failed to load announcement details.")
+        logger.exception("Failed to load announcement: %s", e)
+        return redirect('secretary:announcement_draft_list')
+    
+    return render(request, "secretary/announcement/draft_view.html", {
+        'page_path': f'{user_role} / Announcements / View Draft',
+        'page_title': f'View Draft: {draft.announcement_title}',
+        'form' : form,
+        'draft': draft,
+        'audiences': audiences,
+    })
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def announcement_audience_scope(
+    request: HttpRequest,
+    audience_service: IAudienceService = Provide[AppContainer.audience_service],
+) -> HttpResponse:
+    """Add audience scope to announcement"""
+    user_role = _auth_role_name(request)
+    form = AudienceScope(request.POST or None)
+    
+    announcement_id = request.GET.get('announcement_id')
+    
+    return render(request, "secretary/announcement/audience_scope.html", {
+        'page_path': f'{user_role} / Announcements / Audience Scope',
+        'page_title': 'Audience Scope',
+        'form': form,
+        'announcement_id': announcement_id,
+    })
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def save_audience_rules(
+    request: HttpRequest,
+    audience_service: IAudienceService = Provide[AppContainer.audience_service],
+) -> JsonResponse:
+    """Save all audience rules to database"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        announcement_id = data.get('announcement_id')
+        rules = data.get('rules', [])
+        
+        if not announcement_id:
+            return JsonResponse({'error': 'Announcement ID required'}, status=400)
+        
+        saved_count = 0
+        for rule in rules:
+            command = AddAnnouncementAudienceCMD(
+                announcement_id=announcement_id,
+                audience_scope_id=rule.get('scope_id'),
+                role_id=rule.get('role_id'),
+                purok_sitio_id=rule.get('purok_id'),
+                person_ids=rule.get('person_ids')
+            )
+            
+            audience_id, inserted_persons = audience_service.add_announcement_audience(command)
+            saved_count += inserted_persons
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'{len(rules)} rules saved, {saved_count} persons added'
+        })
+        
+    except Exception as e:
+        logger.exception("Failed to save audience rules: %s", e)
+        return JsonResponse({'error': str(e)}, status=500)
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def upsert_announcement_channels(
+    request: HttpRequest,
+    channel_service: IChannelService = Provide[AppContainer.channel_service],
+) -> JsonResponse:
+    """Upsert channels for an announcement and create recipients in the same transaction"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        announcement_id = data.get('announcement_id')
+        channel_type_ids = data.get('channel_type_ids', [])
+
+        if not announcement_id:
+            return JsonResponse({'error': 'Announcement ID required'}, status=400)
+
+        if not channel_type_ids:
+            return JsonResponse({'error': 'At least one channel type is required'}, status=400)
+
+        # Use DB transaction to ensure atomicity
+        with transaction.atomic():
+            upsert_cmd = UpsertAnnouncementChannelsCMD(
+                announcement_id=announcement_id,
+                channel_type_ids=channel_type_ids
+            )
+            upsert_success = channel_service.upsert_announcement_channels(upsert_cmd)
+
+            if not upsert_success:
+                return JsonResponse({'error': 'Failed to upsert channels'}, status=500)
+
+            create_cmd = CreateAnnouncementRecipientsCMD(announcement_id=announcement_id)
+            recipients_count = channel_service.create_announcement_recipients(create_cmd)
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Channels updated and {recipients_count} recipients created for announcement {announcement_id}',
+            'recipients_count': recipients_count
+        })
+
+    except Exception as e:
+        logger.exception("Failed to upsert channels and create recipients: %s", e)
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def announcement_channels_api(
+    request: HttpRequest,
+    announcement_id: int,
+    channel_service: IChannelService = Provide[AppContainer.channel_service],
+) -> JsonResponse:
+    """Return applied channels for an announcement"""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'GET required'}, status=405)
+
+    try:
+        channels = channel_service.get_announcement_channels(announcement_id)
+        data = [
+            {
+                'announcement_channel_id': ch.announcement_channel_id,
+                'channel_type_id': ch.channel_type_id,
+                'channel_type_name': ch.channel_type_name,
+                'is_enabled': ch.is_enabled,
+            }
+            for ch in channels
+        ]
+        return JsonResponse({'success': True, 'channels': data})
+    except Exception as e:
+        logger.exception("Failed to get channels: %s", e)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def publish_announcement_now(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> JsonResponse:
+    """Publish an announcement immediately"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        announcement_id = data.get('announcement_id')
+        
+        if not announcement_id:
+            return JsonResponse({'error': 'Announcement ID required'}, status=400)
+        
+        auth = request.session.get('auth', {})
+        staff_id = auth.get('staff_id')
+        
+        command = PublishAnnouncementNowCMD(
+            announcement_id=announcement_id,
+            published_by_id=staff_id
+        )
+        
+        result = announcement_service.publish_announcement_now(command)
+        
+        log_announcement_action(
+            announcement_id=result.announcement_id,
+            table_affected='ANNOUNCEMENT',
+            action='UPDATE',
+            performer_id=staff_id,
+            details=f'Published announcement immediately. Recipients: {result.total_recipients}',
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Announcement published successfully to {result.total_recipients} recipients',
+            'announcement_id': result.announcement_id,
+            'total_recipients': result.total_recipients
+        })
+        
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+    except Exception as e:
+        logger.exception("Failed to publish announcement: %s", e)
+        return JsonResponse({'error': 'Failed to publish announcement'}, status=500)
 
 
 # -------------------------------

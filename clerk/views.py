@@ -50,6 +50,10 @@ from .forms import (
     BusinessDetails, BusinessFilters, RequestedDocsFilters, SelectOwnerForm, RenewalFilters
 )
 
+from common.logging_utils import (
+    log_business_action
+)
+
 # ---- email helper (uses your custom Gmail SMTP backend) ----
 from common.send_email import send_email
 
@@ -2936,6 +2940,14 @@ def business_information_review(
 
             try:
                 business_id, owner_person_id = business_registration_service.business_registration(cmd)
+                
+                log_business_action(
+                    business_id=business_id,
+                    table_affected= 'BUSINESS',
+                    action='INSERT',
+                    performer_id=_auth_staff_id(request),
+                    details=f'Registered a new business #{business_id} for owner #{owner_person_id}',
+                )
 
                 for p in (business or {}).get("proof_tmp_pairs", []) or []:
                     spath = p.get("path")
@@ -3437,6 +3449,14 @@ def create_renewal_request(
                     request,
                     f"No unpaid {period_type} items found up to {period_year}. Nothing to create."
                 )
+            
+            log_business_action(
+                business_id=business_id,
+                table_affected= 'RENEWAL_REQUEST',
+                action='INSERT',
+                performer_id=_auth_staff_id(request),
+                details=f'Created a renewal request for business #{business_id}',
+            )
 
             print(f"[create_renewal_request] Redirecting to business_information(b_id={business_id})", flush=True)
             return redirect("clerk:business_information", b_id=business_id)
@@ -3620,6 +3640,14 @@ def create_closure_payment_request(
                 )
             else:
                 messages.info(request, "No unpaid items found. Nothing to create.")
+
+            log_business_action(
+                business_id=business_id,
+                table_affected= 'CLOSURE_PAYMENT_REQUEST',
+                action='INSERT',
+                performer_id=_auth_staff_id(request),
+                details=f'Created a closure request for business #{business_id}',
+            )
 
             return redirect("clerk:initiate_business_closure", b_id=business_id)
         except Exception as e:
