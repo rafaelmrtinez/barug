@@ -256,6 +256,21 @@ def login(request):
 
         # 5) Session (store normalized role; keep original in case you ever need it)
         request.session.cycle_key()
+        
+        # Fetch assigned puroks for BHW
+        assigned_puroks = []
+        assigned_purok_names = []
+        if role_lower in {"barangay health worker", "bhw"}:
+            try:
+                from common.supabase_client import supabase
+                resp = supabase.table("staff_purok_assignment").select("purok_sitio_id, purok_sitio(purok_sitio_name)").eq("staff_id", staff_id).eq("is_active", True).execute()
+                for row in (resp.data or []):
+                    assigned_puroks.append(row["purok_sitio_id"])
+                    if row.get("purok_sitio") and row["purok_sitio"].get("purok_sitio_name"):
+                        assigned_purok_names.append(row["purok_sitio"]["purok_sitio_name"])
+            except Exception:
+                pass
+        
         request.session["auth"] = {
             "staff_id": staff_id,
             "person_id": person_id,
@@ -271,6 +286,8 @@ def login(request):
             "display_name": "",
             "login_at": timezone.now().isoformat(),
             "login_log_id": login_log_id,     # <<< store login log ID for logout tracking
+            "assigned_puroks": assigned_puroks,  # <<< BHW assigned purok IDs
+            "assigned_purok_names": assigned_purok_names,  # <<< BHW assigned purok names
         }
         request.session['last_activity'] = timezone.now().isoformat()  # Track session activity
         request.session.set_expiry(60 * 60 * 8)
