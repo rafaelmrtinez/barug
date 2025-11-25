@@ -240,8 +240,8 @@ def case_list(request: HttpRequest):
                 bc.blotter_case_id,                    -- 0
                 bc.blotter_case_num,                   -- 1
                 bc.blotter_case_name,                  -- 2
-                TO_CHAR(bc.date_filed, 'Mon DD, YYYY') AS date_filed_fmt,   -- 3
-                TO_CHAR(bc.time_filed, 'HH12:MI AM')   AS time_filed_fmt,   -- 4
+                TO_CHAR(bc.date_time_added AT TIME ZONE 'Asia/Manila', 'Mon DD, YYYY') AS date_filed_fmt,   -- 3
+                TO_CHAR(bc.date_time_added AT TIME ZONE 'Asia/Manila', 'HH12:MI AM')   AS time_filed_fmt,   -- 4
                 COALESCE(cs.case_state_name, 'PENDING')        AS case_state,         -- 5
                 COALESCE(ss.settlement_status_name, 'Pending') AS settlement_status,  -- 6
                 COALESCE(ct.complaint_title_name, '')          AS complaint_title,    -- 7
@@ -285,7 +285,7 @@ def case_list(request: HttpRequest):
             SELECT 
                 COUNT(*) as total_cases,
                 COUNT(*) FILTER (WHERE UPPER(COALESCE(cs.case_state_name, 'PENDING')) = 'OPEN') as open_cases,
-                COUNT(*) FILTER (WHERE UPPER(COALESCE(ss.settlement_status_name, '')) = 'SETTLED') as settled_cases
+                COUNT(*) FILTER (WHERE ss.settlement_status_id IN (2, 15, 16) OR UPPER(COALESCE(ss.settlement_status_name, '')) IN ('SETTLED', 'SETTLED THROUGH MEDIATION', 'SETTLED THROUGH CONCILIATION')) as settled_cases
             FROM blotter_case bc
             LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
             LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
@@ -329,12 +329,39 @@ def case_list(request: HttpRequest):
 
 # lupon_mem/views_cases.py (or wherever your case detail view lives)
 from lupon_mem.services.hearings_window import get_hearing_window
+from lupon_mem.services.fields_util import get_latest_form_fields, get_field_text
+from datetime import datetime, timedelta
 
 @session_login_required 
 @role_required(*LUPON_ROLES, "barangay treasurer")
 def case_detail(request: HttpRequest, case_id: int):
     flow_steps = ['KP-7', 'KP-8', 'KP-9', 'KP-10', 'KP-11', 'KP-12', 'KP-16']
     hearing_window = get_hearing_window(case_id)
+    
+    # Calculate repudiation window if KP-16 exists
+    repudiation_window = None
+    try:
+        kp16_fields = get_latest_form_fields(case_id, 'KP-16')
+        if kp16_fields:
+            processed_date_str = get_field_text(kp16_fields, 'processed_on_date')
+            if processed_date_str:
+                processed_date = datetime.strptime(processed_date_str, '%Y-%m-%d').date()
+                repudiation_end = processed_date + timedelta(days=10)
+                days_left = (repudiation_end - datetime.now().date()).days
+                repudiation_window = {
+                    'end_date': repudiation_end.strftime('%B %d, %Y'),
+                    'days_left': days_left
+                }
+    except Exception:
+        pass
+
+    # Pagination
+    try:
+        page = max(int(request.GET.get("page", "1")), 1)
+    except ValueError:
+        page = 1
+    per_page = 10
+    offset = (page - 1) * per_page
 
     with connection.cursor() as cur:
         cur.execute("""
@@ -366,7 +393,13 @@ def case_detail(request: HttpRequest, case_id: int):
         if not case_row:
             return HttpResponseNotFound("Case not found")
 
-        # Get ALL forms without pagination
+        # Count total forms
+        cur.execute("""
+            SELECT COUNT(*) FROM blotter_kp_submission WHERE blotter_case_id = %s
+        """, [case_id])
+        total_forms = cur.fetchone()[0]
+
+        # Get paginated forms
         cur.execute("""
             WITH all_forms AS (
                 SELECT s.submission_id,
@@ -376,6 +409,7 @@ def case_detail(request: HttpRequest, case_id: int):
                   FROM blotter_kp_submission s
                  WHERE s.blotter_case_id = %s
                  ORDER BY s.submission_id DESC
+                 LIMIT %s OFFSET %s
             ),
             audit AS (
                 SELECT b.submission_id,
@@ -399,7 +433,7 @@ def case_detail(request: HttpRequest, case_id: int):
             JOIN kp_form kf ON kf.form_id = r.form_id
             LEFT JOIN audit a ON a.submission_id = r.submission_id
             ORDER BY r.submission_id DESC
-        """, [case_id])
+        """, [case_id, per_page, offset])
         forms = cur.fetchall()
 
         cur.execute("""
@@ -411,6 +445,16 @@ def case_detail(request: HttpRequest, case_id: int):
               AND UPPER(kf.form_code) IN %s
         """, [case_id, tuple(flow_steps)])
         submitted_form_codes = {row[0] for row in cur.fetchall()}
+        
+        # Get ALL form codes for flow guide (not paginated)
+        cur.execute("""
+            SELECT UPPER(kf.form_code)
+            FROM blotter_kp_submission s
+            JOIN kp_form kf ON kf.form_id = s.form_id
+            WHERE s.blotter_case_id = %s
+            ORDER BY s.submission_id DESC
+        """, [case_id])
+        all_form_codes = [row[0] for row in cur.fetchall()]
 
     submitted_forms = submitted_form_codes
     completed_count = sum(1 for step in flow_steps if step in submitted_forms)
@@ -420,6 +464,14 @@ def case_detail(request: HttpRequest, case_id: int):
 
     auth = request.session.get("auth") or {}
     user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
+    
+    # Pagination calculations
+    total_pages = max((total_forms + per_page - 1) // per_page, 1)
+    has_prev = page > 1
+    has_next = page < total_pages
+    start_p = max(1, page - 2)
+    end_p = min(total_pages, page + 2)
+    page_numbers = list(range(start_p, end_p + 1))
     
     context = {
         "case": case_row,
@@ -452,6 +504,18 @@ def case_detail(request: HttpRequest, case_id: int):
         "progress_percentage": progress_percentage,
         'page_path': f'{user_role} / Case Detail',
         'page_title': f'Case #{case_row[1]}' if case_row else 'Case Detail',
+        # Pagination
+        "page": page,
+        "per_page": per_page,
+        "total_forms": total_forms,
+        "total_pages": total_pages,
+        "has_prev": has_prev,
+        "has_next": has_next,
+        "prev_page": page - 1,
+        "next_page": page + 1,
+        "page_numbers": page_numbers,
+        "all_form_codes": all_form_codes,
+        "repudiation_window": repudiation_window,
     }
 
     return render(request, "lupon_mem/case_detail.html", context)
@@ -531,18 +595,29 @@ def case_new(request: HttpRequest) -> HttpResponse:
             )
             case_id = cur.fetchone()[0]
             
-            # Log the case creation
+            # Get staff name and case number for logging
+            staff_name = None
+            case_num = None
+            if staff_id:
+                cur.execute(
+                    "SELECT TRIM(CONCAT_WS(' ', p.first_name, NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), p.last_name, NULLIF(p.suffix, ''))) FROM staff s JOIN person p ON p.person_id = s.person_id WHERE s.staff_id = %s",
+                    [staff_id]
+                )
+                staff_row = cur.fetchone()
+                staff_name = staff_row[0] if staff_row else None
+            cur.execute("SELECT blotter_case_num FROM blotter_case WHERE blotter_case_id = %s", [case_id])
+            case_row = cur.fetchone()
+            case_num = case_row[0] if case_row else None
+            
+            complainants_count = len([p for p in complainants if p and p.isdigit()])
+            respondents_count = len([p for p in respondents if p and p.isdigit()])
+            message = f"{staff_name or f'Staff ID {staff_id}'} created new case {case_num or f'#{case_id}'} – {blotter_case_name} ({complainants_count} complainant(s), {respondents_count} respondent(s))"
+            
             blotter_log_event(
-                action="CREATE",
+                action="CREATE_CASE",
                 table_affected="blotter_case",
                 record_affected_id=case_id,
-                details={
-                    "case_name": blotter_case_name,
-                    "complaint_title_id": complaint_title_id,
-                    "case_nature_id": case_nature_id,
-                    "complainants_count": len([p for p in complainants if p and p.isdigit()]),
-                    "respondents_count": len([p for p in respondents if p and p.isdigit()])
-                },
+                details=message,
                 performer_staff_id=staff_id
             )
 
@@ -596,6 +671,13 @@ def case_settlement_update(request: HttpRequest, case_id: int):
 
     try:
         with connection.cursor() as cur:
+            cur.execute(
+                "SELECT ss.settlement_status_name FROM blotter_case bc LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id WHERE bc.blotter_case_id = %s",
+                [case_id]
+            )
+            old_row = cur.fetchone()
+            old_settlement = old_row[0] if old_row else None
+            
             print("[SETTLEMENT][SQL] calling fn_set_case_settlement(%s,%s,%s,%s)")
             cur.execute(
                 "SELECT * FROM fn_set_case_settlement(%s,%s,%s,%s)",
@@ -607,14 +689,35 @@ def case_settlement_update(request: HttpRequest, case_id: int):
 
         ok, _case, new_status, changed_at = row if row else (False, None, None, None)
         if ok:
-            # Log the settlement status update
+            # Get staff name and case details for logging
+            staff_name = None
+            case_num = None
+            case_name = None
+            with connection.cursor() as cur:
+                if staff_id:
+                    cur.execute(
+                        "SELECT TRIM(CONCAT_WS(' ', p.first_name, NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), p.last_name, NULLIF(p.suffix, ''))) FROM staff s JOIN person p ON p.person_id = s.person_id WHERE s.staff_id = %s",
+                        [staff_id]
+                    )
+                    staff_row = cur.fetchone()
+                    staff_name = staff_row[0] if staff_row else None
+                cur.execute("SELECT blotter_case_num, blotter_case_name FROM blotter_case WHERE blotter_case_id = %s", [case_id])
+                case_row = cur.fetchone()
+                case_num = case_row[0] if case_row else None
+                case_name = case_row[1] if case_row else None
+            
+            message = f"{staff_name or f'Staff ID {staff_id}'} updated settlement status to {new_status} for Case {case_num or f'#{case_id}'} – {case_name or 'Unnamed Case'}"
+            if remarks:
+                message += f" (remarks: {remarks})"
+            
             blotter_log_event(
-                action="UPDATE",
+                action="UPDATE_SETTLEMENT",
                 table_affected="blotter_case",
                 record_affected_id=case_id,
-                details={"settlement_status": new_status, "remarks": remarks},
+                details=message,
                 performer_staff_id=staff_id,
                 field_changed="settlement_status",
+                old_value=old_settlement,
                 new_value=new_status
             )
             messages.success(request, f'Settlement status updated to "{new_status}".')
@@ -646,15 +749,45 @@ def case_close(request: HttpRequest, case_id: int):
         return redirect("lupon_mem:case_detail", case_id=case_id)
 
     try:
+        with connection.cursor() as cur:
+            cur.execute(
+                "SELECT cs.case_state_name FROM blotter_case bc LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id WHERE bc.blotter_case_id = %s",
+                [case_id]
+            )
+            old_row = cur.fetchone()
+            old_state = old_row[0] if old_row else None
+        
         close_case(case_id, staff_id, note)
-        # Log the case closure
+        
+        # Get staff name and case details for logging
+        staff_name = None
+        case_num = None
+        case_name = None
+        with connection.cursor() as cur:
+            if staff_id:
+                cur.execute(
+                    "SELECT TRIM(CONCAT_WS(' ', p.first_name, NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), p.last_name, NULLIF(p.suffix, ''))) FROM staff s JOIN person p ON p.person_id = s.person_id WHERE s.staff_id = %s",
+                    [staff_id]
+                )
+                staff_row = cur.fetchone()
+                staff_name = staff_row[0] if staff_row else None
+            cur.execute("SELECT blotter_case_num, blotter_case_name FROM blotter_case WHERE blotter_case_id = %s", [case_id])
+            case_row = cur.fetchone()
+            case_num = case_row[0] if case_row else None
+            case_name = case_row[1] if case_row else None
+        
+        message = f"{staff_name or f'Staff ID {staff_id}'} closed Case {case_num or f'#{case_id}'} – {case_name or 'Unnamed Case'}"
+        if note:
+            message += f" (note: {note})"
+        
         blotter_log_event(
-            action="UPDATE",
+            action="CLOSE_CASE",
             table_affected="blotter_case",
             record_affected_id=case_id,
-            details={"close_note": note},
+            details=message,
             performer_staff_id=staff_id,
             field_changed="case_state",
+            old_value=old_state,
             new_value="CLOSED"
         )
         messages.success(request, "Case has been closed.")
@@ -679,15 +812,45 @@ def case_reopen(request: HttpRequest, case_id: int):
         return redirect("lupon_mem:case_detail", case_id=case_id)
 
     try:
+        with connection.cursor() as cur:
+            cur.execute(
+                "SELECT cs.case_state_name FROM blotter_case bc LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id WHERE bc.blotter_case_id = %s",
+                [case_id]
+            )
+            old_row = cur.fetchone()
+            old_state = old_row[0] if old_row else None
+        
         reopen_case(case_id, staff_id, reason)
-        # Log the case reopening
+        
+        # Get staff name and case details for logging
+        staff_name = None
+        case_num = None
+        case_name = None
+        with connection.cursor() as cur:
+            if staff_id:
+                cur.execute(
+                    "SELECT TRIM(CONCAT_WS(' ', p.first_name, NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), p.last_name, NULLIF(p.suffix, ''))) FROM staff s JOIN person p ON p.person_id = s.person_id WHERE s.staff_id = %s",
+                    [staff_id]
+                )
+                staff_row = cur.fetchone()
+                staff_name = staff_row[0] if staff_row else None
+            cur.execute("SELECT blotter_case_num, blotter_case_name FROM blotter_case WHERE blotter_case_id = %s", [case_id])
+            case_row = cur.fetchone()
+            case_num = case_row[0] if case_row else None
+            case_name = case_row[1] if case_row else None
+        
+        message = f"{staff_name or f'Staff ID {staff_id}'} reopened Case {case_num or f'#{case_id}'} – {case_name or 'Unnamed Case'}"
+        if reason:
+            message += f" (reason: {reason})"
+        
         blotter_log_event(
-            action="UPDATE",
+            action="REOPEN_CASE",
             table_affected="blotter_case",
             record_affected_id=case_id,
-            details={"reopen_reason": reason},
+            details=message,
             performer_staff_id=staff_id,
             field_changed="case_state",
+            old_value=old_state,
             new_value="OPEN"
         )
         messages.success(request, "Case has been reopened.")

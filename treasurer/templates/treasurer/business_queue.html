@@ -57,7 +57,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-wrap" style="margin-top: 40px;">
+<div class="page-wrap">
   <div class="container-fluid pt-3 page-main">
     <div class="row">
       <div>
@@ -91,6 +91,7 @@
           <thead>
             <tr>
               <th scope="col">Request Code</th>
+              <th scope="col">Date Requested</th>
               <th scope="col">Requester</th>
               <th scope="col">Requested For</th>
               <th scope="col">Documents</th>
@@ -105,6 +106,7 @@
               {% for r in items %}
                 <tr class="table-row-height">
                   <td><span class="code-badge">{{ r.request_code }}</span></td>
+                  <td><span class="small text-muted">{{ r.created_fmt|default:"—" }}</span></td>
                   <td>{{ r.requester_display|default:r.requested_by|default:"—" }}</td>
                   <td>{{ r.on_behalf_of|default:"SELF" }}</td>
 
@@ -124,9 +126,8 @@
                       {% endfor %}
                     {% else %} — {% endif %}
                   </td>
-
-                  <td><span class="{{ r.status_ui.cls }}">{{ r.status_ui.label }} ID: {{ r.business_id }}</span></td>
-
+                  <!-- <td><span class="{{ r.status_ui.cls }}">{{ r.status_ui.label }} {{ r.business_id }}</span></td> -->
+                  <td><span class="{{ r.status_ui.cls }}">{{ r.status_ui.label }}</span></td>
                 <td class="text-end">
                   <div class="row-actions">
                     {% if r.business_id %}
@@ -146,7 +147,7 @@
                 </tr>
               {% endfor %}
             {% else %}
-              <tr><td colspan="7" class="text-center">No matching requests.</td></tr>
+              <tr><td colspan="8" class="text-center">No matching requests.</td></tr>
             {% endif %}
           {% endwith %}
           </tbody>

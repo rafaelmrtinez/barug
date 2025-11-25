@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="{% static 'css/form.css' %}">
     <link rel="stylesheet" href="{% static 'css/button.css' %}">
     <link rel="stylesheet" href="{% static 'css/modal.css' %}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
@@ -196,11 +197,140 @@
     });
   }
 
+  // Form persistence key
+  const STORAGE_KEY = 'secretary_staff_nonres_form_data';
+
+  // Save form data to sessionStorage
+  function saveFormData() {
+    const formData = {};
+    const formElements = form.querySelectorAll('input, select, textarea');
+    
+    formElements.forEach(el => {
+      if (el.name === 'csrfmiddlewaretoken') return;
+      
+      const tag = el.tagName.toLowerCase();
+      const type = (el.type || '').toLowerCase();
+      
+      if (tag === 'select') {
+        formData[el.name] = el.value;
+      } else if (tag === 'textarea') {
+        formData[el.name] = el.value;
+      } else if (tag === 'input') {
+        if (['radio', 'checkbox'].includes(type)) {
+          if (el.checked) {
+            formData[el.name] = el.value;
+          }
+        } else {
+          formData[el.name] = el.value;
+        }
+      }
+    });
+    
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
+  }
+
+  // Restore form data from sessionStorage
+  function restoreFormData() {
+    try {
+      const savedData = sessionStorage.getItem(STORAGE_KEY);
+      if (!savedData) return;
+      
+      const formData = JSON.parse(savedData);
+      const formElements = form.querySelectorAll('input, select, textarea');
+      let restoredCount = 0;
+      
+      formElements.forEach(el => {
+        if (el.name === 'csrfmiddlewaretoken') return;
+        if (!formData.hasOwnProperty(el.name)) return;
+        
+        const tag = el.tagName.toLowerCase();
+        const type = (el.type || '').toLowerCase();
+        const savedValue = formData[el.name];
+        
+        if (savedValue) {
+          if (tag === 'select') {
+            el.value = savedValue;
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            restoredCount++;
+          } else if (tag === 'textarea') {
+            el.value = savedValue;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            restoredCount++;
+          } else if (tag === 'input') {
+            if (['radio', 'checkbox'].includes(type)) {
+              el.checked = (el.value === savedValue);
+              if (el.checked) {
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                restoredCount++;
+              }
+            } else {
+              el.value = savedValue;
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              restoredCount++;
+            }
+          }
+        }
+      });
+      
+      if (restoredCount > 0) {
+        console.log(`Form data restored: ${restoredCount} fields`);
+        const indicator = document.createElement('div');
+        indicator.className = 'alert alert-info alert-dismissible fade show';
+        indicator.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 300px;';
+        indicator.innerHTML = `
+          <small><i class="bi bi-info-circle"></i> Form data restored (${restoredCount} fields)</small>
+          <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(indicator);
+        setTimeout(() => {
+          if (indicator.parentNode) {
+            indicator.remove();
+          }
+        }, 3000);
+      }
+    } catch (e) {
+      console.warn('Failed to restore form data:', e);
+    }
+  }
+
+  // Auto-save form data on input changes
+  form.addEventListener('input', saveFormData);
+  form.addEventListener('change', saveFormData);
+
   clearBtn.addEventListener('click', (e) => {
-    e.preventDefault();         // do not submit
-    form.reset();               // back to initial defaults
-    clearFormFields(form);      // force to empty & update floating labels
+    e.preventDefault();
+    form.reset();
+    clearFormFields(form);
+    sessionStorage.removeItem(STORAGE_KEY);
+    
+    const indicator = document.createElement('div');
+    indicator.className = 'alert alert-success alert-dismissible fade show';
+    indicator.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 300px;';
+    indicator.innerHTML = `
+      <small><i class="bi bi-check-circle"></i> Form cleared</small>
+      <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(indicator);
+    setTimeout(() => {
+      if (indicator.parentNode) {
+        indicator.remove();
+      }
+    }, 2000);
   });
+
+  // Clear saved data on successful form submission
+  form.addEventListener('submit', (e) => {
+    if (!e.defaultPrevented) {
+      sessionStorage.removeItem(STORAGE_KEY);
+    }
+  });
+
+  // Restore form data when page loads
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', restoreFormData);
+  } else {
+    setTimeout(restoreFormData, 100);
+  }
 })();
 </script>
 

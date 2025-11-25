@@ -413,7 +413,13 @@
             </form>
           {% endif %}
 
-          {% if status != 'FOR_PRINTING' and status != 'READY_FOR_PICKUP' and status != 'RELEASED' %}
+          {% if status == 'FOR_TREASURER_REVIEW' %}
+            <hr class="my-3">
+            <div class="alert alert-info py-2 mb-0">
+              <i class="bi bi-info-circle me-1"></i>
+              <strong>This request is already for treasurer payment.</strong>
+            </div>
+          {% elif status != 'FOR_PRINTING' and status != 'READY_FOR_PICKUP' and status != 'RELEASED' %}
             <hr class="my-3">
 
             <!-- Decline -->

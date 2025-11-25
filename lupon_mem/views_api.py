@@ -148,14 +148,7 @@ def save_answers(request: HttpRequest):
                 )
                 sid = cur.fetchone()[0]
                 
-                # Log the draft creation
-                blotter_log_event(
-                    action="CREATE",
-                    table_affected="blotter_kp_submission",
-                    record_affected_id=sid,
-                    details={"case_id": case_id, "form_id": form_id, "status": "DRAFT"},
-                    performer_staff_id=(request.session.get("auth") or {}).get("staff_id")
-                )
+                # Draft creation - no logging needed
 
             for field_id, value in payload.items():
                 cur.execute(
@@ -352,13 +345,29 @@ def submit_form(request: HttpRequest):
                 [submission_id]
             )
             
-            # Log the form submission
+            # Get staff name and case details for logging
+            staff_id = (request.session.get("auth") or {}).get("staff_id")
+            staff_name = None
+            case_num = None
+            if staff_id:
+                cur.execute(
+                    "SELECT TRIM(CONCAT_WS(' ', p.first_name, NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), p.last_name, NULLIF(p.suffix, ''))) FROM staff s JOIN person p ON p.person_id = s.person_id WHERE s.staff_id = %s",
+                    [staff_id]
+                )
+                staff_row = cur.fetchone()
+                staff_name = staff_row[0] if staff_row else None
+            cur.execute("SELECT blotter_case_num FROM blotter_case WHERE blotter_case_id = %s", [case_id])
+            case_row = cur.fetchone()
+            case_num = case_row[0] if case_row else None
+            
+            message = f"{staff_name or f'Staff ID {staff_id}'} submitted form {form_code or 'Unknown'} for Case {case_num or f'#{case_id}'} (File: {filename})"
+            
             blotter_log_event(
-                action="UPDATE",
+                action="SUBMIT_FORM",
                 table_affected="blotter_kp_submission",
                 record_affected_id=submission_id,
-                details={"case_id": case_id, "form_code": form_code, "filename": filename},
-                performer_staff_id=(request.session.get("auth") or {}).get("staff_id"),
+                details=message,
+                performer_staff_id=staff_id,
                 field_changed="status",
                 old_value="DRAFT",
                 new_value="SUBMITTED"
@@ -469,6 +478,81 @@ def submit_form(request: HttpRequest):
             messages.success(request, "Settlement finalized (KP-16 submitted).")
     except Exception:
         log.exception("Failed to set case SETTLED on KP-16 submit")
+
+    # ---------- KP-20/KP-20A/KP-20B: set case to ISSUANCE OF CFA and CLOSED on submit ----------
+    try:
+        if form_code and form_code.upper() in ("KP-20", "KP-20A", "KP-20B"):
+            staff_id = (request.session.get("auth") or {}).get("staff_id")
+            with connection.cursor() as cur:
+                # Get old values for logging
+                cur.execute("""
+                    SELECT ss.settlement_status_name, cs.case_state_name
+                    FROM blotter_case bc
+                    LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+                    LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
+                    WHERE bc.blotter_case_id = %s
+                """, [case_id])
+                old_row = cur.fetchone()
+                old_settlement = old_row[0] if old_row else None
+                old_state = old_row[1] if old_row else None
+                
+                # Set settlement status to ISSUANCE OF CFA
+                cur.execute("SELECT * FROM fn_set_case_settlement(%s,%s,%s,%s)",
+                            [case_id, 'ISSUANCE OF CFA', f'Certificate to File Action issued via {form_code}', staff_id])
+                
+                # Get staff name and case details for logging
+                staff_name = None
+                case_num = None
+                case_name = None
+                if staff_id:
+                    cur.execute(
+                        "SELECT TRIM(CONCAT_WS(' ', p.first_name, NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), p.last_name, NULLIF(p.suffix, ''))) FROM staff s JOIN person p ON p.person_id = s.person_id WHERE s.staff_id = %s",
+                        [staff_id]
+                    )
+                    staff_row = cur.fetchone()
+                    staff_name = staff_row[0] if staff_row else None
+                cur.execute("SELECT blotter_case_num, blotter_case_name FROM blotter_case WHERE blotter_case_id = %s", [case_id])
+                case_row = cur.fetchone()
+                case_num = case_row[0] if case_row else None
+                case_name = case_row[1] if case_row else None
+                
+                message = f"{staff_name or f'Staff ID {staff_id}'} updated settlement status to ISSUANCE OF CFA for Case {case_num or f'#{case_id}'} – {case_name or 'Unnamed Case'} (triggered by {form_code} submission)"
+                
+                blotter_log_event(
+                    action="UPDATE_SETTLEMENT",
+                    table_affected="blotter_case",
+                    record_affected_id=case_id,
+                    details=message,
+                    performer_staff_id=staff_id,
+                    field_changed="settlement_status",
+                    old_value=old_settlement,
+                    new_value="ISSUANCE OF CFA"
+                )
+                
+                # Set case state to CLOSED
+                cur.execute("""
+                    UPDATE blotter_case 
+                    SET case_state_id = (SELECT case_state_id FROM case_state WHERE UPPER(case_state_name) = 'CLOSED' LIMIT 1)
+                    WHERE blotter_case_id = %s
+                """, [case_id])
+                
+                message = f"{staff_name or f'Staff ID {staff_id}'} closed case (Case {case_num or f'#{case_id}'} – {case_name or 'Unnamed Case'}) via {form_code} submission"
+                
+                blotter_log_event(
+                    action="CLOSE_CASE",
+                    table_affected="blotter_case",
+                    record_affected_id=case_id,
+                    details=message,
+                    performer_staff_id=staff_id,
+                    field_changed="case_state",
+                    old_value=old_state,
+                    new_value="CLOSED"
+                )
+                
+            messages.success(request, f"Case closed with ISSUANCE OF CFA status ({form_code} submitted).")
+            log.info(f"Case {case_id} set to CLOSED with ISSUANCE OF CFA via {form_code} submission {submission_id}")
+    except Exception:
+        log.exception(f"Failed to set case to CLOSED/ISSUANCE OF CFA on {form_code} submit")
 
     # ---------- KP-16: optional MEDx settled summary (feature-flag) ----------
     try:

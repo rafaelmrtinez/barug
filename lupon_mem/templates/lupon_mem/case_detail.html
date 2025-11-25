@@ -124,6 +124,11 @@
   /* Notification Bubble */
   .btn-with-badge{ position:relative; }
   .btn-badge{ position:absolute; top:-6px; right:-6px; background:#dc3545; color:#fff; border-radius:50%; width:18px; height:18px; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; border:2px solid #fff; }
+  
+  /* Pagination Styles */
+  .pagination .page-link{ transition:all 0.2s ease; }
+  .pagination .page-link:hover:not(.disabled):not([aria-disabled="true"]){ transform:translateY(-2px); box-shadow:0 4px 12px rgba(109,41,50,0.2); }
+  .pagination .page-item.active .page-link{ box-shadow:0 2px 8px rgba(109,41,50,0.3); }
 </style>
 {% endblock css %}
 
@@ -242,14 +247,36 @@
       {% bs_icon 'file-earmark-text' %} Complaint Details
     </div>
     <div class="card-body">
-      <div class="row">
-        <div class="col-md-8">
-          <h6 class="text-muted mb-2">Complaint Details:</h6>
-          <div id="kp7ComplaintDetails" class="mb-3" style="white-space: pre-wrap; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem; font-size: 0.9rem;"></div>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="complaint-card">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-chat-left-text" style="color:var(--brand-700);font-size:1.1rem;"></i>
+              <h6 class="mb-0" style="color:var(--brand-700);font-weight:700;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;">What Happened</h6>
+            </div>
+            <div id="kp7ComplaintDetails" class="complaint-content" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:0.85rem;font-size:0.9rem;line-height:1.6;color:#334155;min-height:120px;max-height:120px;overflow:hidden;position:relative;">
+              <div class="complaint-text" style="white-space:pre-wrap;"></div>
+              <div class="complaint-fade" style="position:absolute;bottom:0;left:0;right:0;height:40px;background:linear-gradient(transparent,#f8fafc);display:none;"></div>
+            </div>
+            <button class="btn btn-sm btn-outline-brand mt-2" onclick="toggleComplaint()" id="complaintToggle" style="display:none;font-size:0.8rem;">
+              <i class="bi bi-chevron-down"></i> View More
+            </button>
+          </div>
         </div>
-        <div class="col-md-4">
-          <h6 class="text-muted mb-2">Solutions Sought:</h6>
-          <div id="kp7SolutionsSought" style="white-space: pre-wrap; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.75rem; font-size: 0.9rem;"></div>
+        <div class="col-md-6">
+          <div class="solutions-card">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-lightbulb" style="color:var(--accent);font-size:1.1rem;"></i>
+              <h6 class="mb-0" style="color:var(--brand-700);font-weight:700;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em;">Solutions Sought</h6>
+            </div>
+            <div id="kp7SolutionsSought" class="solutions-content" style="background:#fffaf0;border:1px solid #fde68a;border-radius:10px;padding:0.85rem;font-size:0.9rem;line-height:1.6;color:#92400e;min-height:120px;max-height:120px;overflow:hidden;position:relative;">
+              <div class="solutions-text" style="white-space:pre-wrap;"></div>
+              <div class="solutions-fade" style="position:absolute;bottom:0;left:0;right:0;height:40px;background:linear-gradient(transparent,#fffaf0);display:none;"></div>
+            </div>
+            <button class="btn btn-sm btn-outline-brand mt-2" onclick="toggleSolutions()" id="solutionsToggle" style="display:none;font-size:0.8rem;">
+              <i class="bi bi-chevron-down"></i> View More
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -273,9 +300,11 @@
     </div>
 
     <div class="ms-auto d-flex align-items-center gap-2">
+      {% if case_state_name|lower != 'closed' and case_state_name|lower != 'dismissed' %}
       <a class="btn btn-outline-brand" href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
         {% bs_icon 'plus-circle' extra_classes='me-1' %} Add Form
       </a>
+      {% endif %}
     </div>
   </div>
 
@@ -341,26 +370,36 @@
     </div>
   </div>
 
-  {% if forms_total_pages > 1 %}
+  {% if total_pages > 1 %}
   <nav aria-label="KP forms pagination" class="mt-3">
-    <ul class="pagination pagination-sm justify-content-end mb-0">
-      <li class="page-item{% if not forms_has_prev %} disabled{% endif %}">
-        {% if forms_has_prev %}
-          <a class="page-link" href="{{ forms_prev_url }}" tabindex="-1" aria-label="Previous">Previous</a>
+    <ul class="pagination justify-content-center mb-0" style="gap:0.35rem;">
+      <li class="page-item{% if not has_prev %} disabled{% endif %}">
+        {% if has_prev %}
+          <a class="page-link" href="?page={{ prev_page }}" style="border-radius:8px;border:1px solid var(--brand-700);color:var(--brand-700);padding:0.5rem 0.85rem;font-weight:600;" aria-label="Previous">
+            <i class="bi bi-chevron-left"></i> Previous
+          </a>
         {% else %}
-          <span class="page-link" tabindex="-1" aria-disabled="true">Previous</span>
+          <span class="page-link" style="border-radius:8px;border:1px solid #e5e7eb;color:#9ca3af;padding:0.5rem 0.85rem;font-weight:600;background:#f9fafb;" aria-disabled="true">
+            <i class="bi bi-chevron-left"></i> Previous
+          </span>
         {% endif %}
       </li>
-      {% for item in forms_page_links %}
-        <li class="page-item{% if item.active %} active{% endif %}">
-          <a class="page-link" href="{{ item.url }}">{{ item.number }}</a>
+      {% for num in page_numbers %}
+        <li class="page-item{% if num == page %} active{% endif %}">
+          <a class="page-link" href="?page={{ num }}" style="border-radius:8px;{% if num == page %}background:var(--brand-700);border-color:var(--brand-700);color:#fff;{% else %}border:1px solid var(--brand-700);color:var(--brand-700);{% endif %}padding:0.5rem 0.75rem;font-weight:600;min-width:42px;text-align:center;">
+            {{ num }}
+          </a>
         </li>
       {% endfor %}
-      <li class="page-item{% if not forms_has_next %} disabled{% endif %}">
-        {% if forms_has_next %}
-          <a class="page-link" href="{{ forms_next_url }}" aria-label="Next">Next</a>
+      <li class="page-item{% if not has_next %} disabled{% endif %}">
+        {% if has_next %}
+          <a class="page-link" href="?page={{ next_page }}" style="border-radius:8px;border:1px solid var(--brand-700);color:var(--brand-700);padding:0.5rem 0.85rem;font-weight:600;" aria-label="Next">
+            Next <i class="bi bi-chevron-right"></i>
+          </a>
         {% else %}
-          <span class="page-link" aria-disabled="true">Next</span>
+          <span class="page-link" style="border-radius:8px;border:1px solid #e5e7eb;color:#9ca3af;padding:0.5rem 0.85rem;font-weight:600;background:#f9fafb;" aria-disabled="true">
+            Next <i class="bi bi-chevron-right"></i>
+          </span>
         {% endif %}
       </li>
     </ul>
@@ -404,11 +443,13 @@
     </div>
   </div> -->
 
+  {% if case_state_name|lower != 'closed' and case_state_name|lower != 'dismissed' %}
   <div class="sticky-add d-md-none mt-3">
     <a class="btn btn-outline-brand btn-lg rounded-pill" href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
       {% bs_icon 'plus-circle' extra_classes='me-1' %} Add Form
     </a>
   </div>
+  {% endif %}
 
 </div>
 
@@ -449,22 +490,38 @@
   <div class="offcanvas-body">
 
     {% if hearing_window %}
-      <div class="hw-bar mb-3" id="hearingWindowBar">
-        <span class="hw-phase {% if hearing_window.can_set_conciliation and not hearing_window.can_set_mediation %}conc{% endif %}">
-          {% if hearing_window.can_set_mediation and not hearing_window.can_set_conciliation %}
-            Mediation Window
-          {% elif hearing_window.can_set_conciliation %}
-            Conciliation Phase
-          {% else %}
-            Hearing Window
-          {% endif %}
+      {% with settlement=case.7|lower %}
+        {% if 'settled' not in settlement %}
+          <div class="hw-bar mb-3" id="hearingWindowBar">
+            <span class="hw-phase {% if hearing_window.can_set_conciliation and not hearing_window.can_set_mediation %}conc{% endif %}">
+              {% if hearing_window.can_set_mediation and not hearing_window.can_set_conciliation %}
+                Mediation Window
+              {% elif hearing_window.can_set_conciliation %}
+                Conciliation Phase
+              {% else %}
+                Hearing Window
+              {% endif %}
+            </span>
+            <span class="hw-dot"></span>
+            <div class="hw-kv"><strong>{{ hearing_window.days_left }}</strong> days left</div>
+            <span class="hw-dot"></span>
+            <div class="hw-kv">Ends <strong>{{ hearing_window.window_end_date_text }} {{ hearing_window.window_end_time_text }}</strong></div>
+            <div class="hw-stat">Set: {{ hearing_window.mediation_hearings_set }} • Held: {{ hearing_window.mediation_hearings_held }}
+              {% if hearing_window.attendees %} • Attended: {{ hearing_window.attendees }}{% endif %}</div>
+          </div>
+        {% endif %}
+      {% endwith %}
+    {% endif %}
+
+    {% if repudiation_window %}
+      <div class="hw-bar mb-3" style="background:#fffaf0;border-color:#fde68a;">
+        <span class="hw-phase" style="background:#fef3c7;border-color:#fbbf24;color:#92400e;">
+          Repudiation Window
         </span>
         <span class="hw-dot"></span>
-        <div class="hw-kv"><strong>{{ hearing_window.days_left }}</strong> days left</div>
+        <div class="hw-kv"><strong>{{ repudiation_window.days_left }}</strong> day{{ repudiation_window.days_left|pluralize }} left</div>
         <span class="hw-dot"></span>
-        <div class="hw-kv">Ends <strong>{{ hearing_window.window_end_date_text }} {{ hearing_window.window_end_time_text }}</strong></div>
-        <div class="hw-stat">Set: {{ hearing_window.mediation_hearings_set }} • Held: {{ hearing_window.mediation_hearings_held }}
-          {% if hearing_window.attendees %} • Attended: {{ hearing_window.attendees }}{% endif %}</div>
+        <div class="hw-kv">Ends <strong>{{ repudiation_window.end_date }}</strong></div>
       </div>
     {% endif %}
 
@@ -666,18 +723,7 @@
   }
 
   /* ===== Attached forms scanner ===== */
-  function collectAttached(){
-    const forms = [];
-    const table = document.getElementById('formsTable');
-    if (!table) return forms;
-    table.querySelectorAll('tbody tr .code-chip').forEach(chip=>{
-      const text = (chip.textContent || "").trim();
-      const m = text.match(/\bKP-\d+[AB]?\b/i);
-      if (m) forms.push(m[0].toUpperCase());
-    });
-    return forms;
-  }
-  let ATTACHED = collectAttached();
+  let ATTACHED = {{ all_form_codes|safe }};
   function haveForm(code){ 
     const upperCode = String(code || "").toUpperCase();
     return ATTACHED.includes(upperCode);
@@ -688,6 +734,11 @@
   }
 
   /* ===== KP-7 Complaint Details Display ===== */
+  function formatComplaintDetails(text) {
+    if (!text) return 'No complaint details provided.';
+    return text.replace(/\b(WHAT|WHEN|WHERE):/gi, '<strong>$1:</strong>');
+  }
+  
   async function loadKP7Details(){
     if (!haveForm('KP-7')) return;
     
@@ -701,12 +752,64 @@
       const solutionsDiv = document.getElementById('kp7SolutionsSought');
       
       if (data.complaint_details || data.solutions_seeked) {
-        detailsDiv.textContent = data.complaint_details || 'No complaint details provided.';
-        solutionsDiv.textContent = data.solutions_seeked || 'No solutions specified.';
+        const complaintText = detailsDiv.querySelector('.complaint-text');
+        const solutionsText = solutionsDiv.querySelector('.solutions-text');
+        const complaintFade = detailsDiv.querySelector('.complaint-fade');
+        const solutionsFade = solutionsDiv.querySelector('.solutions-fade');
+        const complaintToggle = document.getElementById('complaintToggle');
+        const solutionsToggle = document.getElementById('solutionsToggle');
+        
+        complaintText.innerHTML = formatComplaintDetails(data.complaint_details);
+        solutionsText.textContent = data.solutions_seeked || 'No solutions specified.';
+        
+        // Check if content overflows
+        if (detailsDiv.scrollHeight > 120) {
+          complaintFade.style.display = 'block';
+          complaintToggle.style.display = 'inline-block';
+        }
+        if (solutionsDiv.scrollHeight > 120) {
+          solutionsFade.style.display = 'block';
+          solutionsToggle.style.display = 'inline-block';
+        }
+        
         section.style.display = 'block';
       }
     } catch (error) {
       console.warn('Failed to load KP-7 details:', error);
+    }
+  }
+  
+  function toggleComplaint(){
+    const div = document.getElementById('kp7ComplaintDetails');
+    const btn = document.getElementById('complaintToggle');
+    const fade = div.querySelector('.complaint-fade');
+    const isExpanded = div.style.maxHeight !== '120px';
+    
+    if (isExpanded) {
+      div.style.maxHeight = '120px';
+      fade.style.display = 'block';
+      btn.innerHTML = '<i class="bi bi-chevron-down"></i> View More';
+    } else {
+      div.style.maxHeight = 'none';
+      fade.style.display = 'none';
+      btn.innerHTML = '<i class="bi bi-chevron-up"></i> View Less';
+    }
+  }
+  
+  function toggleSolutions(){
+    const div = document.getElementById('kp7SolutionsSought');
+    const btn = document.getElementById('solutionsToggle');
+    const fade = div.querySelector('.solutions-fade');
+    const isExpanded = div.style.maxHeight !== '120px';
+    
+    if (isExpanded) {
+      div.style.maxHeight = '120px';
+      fade.style.display = 'block';
+      btn.innerHTML = '<i class="bi bi-chevron-down"></i> View More';
+    } else {
+      div.style.maxHeight = 'none';
+      fade.style.display = 'none';
+      btn.innerHTML = '<i class="bi bi-chevron-up"></i> View Less';
     }
   }
 
@@ -844,7 +947,10 @@
     kp18_pangkat_2:{code:"KP-18",title:"Failure to Appear (2nd Pangkat)",note:"Complainant failed to appear for 2nd Pangkat hearing. Issue Certificate to File Action.",next:"kp20"},
     kp18_kp19_first:{code:"KP-18 & KP-19",title:"Both Parties Failed to Appear (1st Mediation)",note:"Both complainant and respondent failed to appear. Issue KP-18 (complainant) and KP-19 (respondent) notices.",next:"mediation_choice"},
     kp18_kp19_second:{code:"KP-18 & KP-19",title:"Both Parties Failed to Appear (2nd Mediation)",note:"Both parties failed to appear for 2nd mediation. Issue both failure notices.",next:"mediation_choice_2"},
-    kp18_kp19_third:{code:"KP-18 & KP-19",title:"Both Parties Failed to Appear (3rd Mediation)",note:"Both parties failed to appear for final mediation. Issue both notices, then constitute Pangkat.",next:"kp10"},
+    kp18_kp19_third:{code:"KP-18 & KP-19",title:"Both Parties Failed to Appear (3rd Mediation)",note:"Both parties failed to appear for final mediation. Issue both notices.",next:"bar_action_choice"},
+    bar_action_choice:{code:"—",title:"Bar Complainant or/and Respondent",note:"Optionally issue KP-21 and/or KP-22 to bar parties from filing action/counterclaim, then dismiss case.",next:"close_case"},
+    kp21:{code:"KP-21",title:"Certification to Bar Action (Complainant)",note:"Issue certification to bar complainant from filing action in court due to repeated failure to appear.",next:"close_case"},
+    kp22:{code:"KP-22",title:"Certification to Bar Counterclaim (Respondent)",note:"Issue certification to bar respondent from filing counterclaim due to repeated failure to appear.",next:"close_case"},
     kp18_kp19_pangkat_1:{code:"KP-18 & KP-19",title:"Both Parties Failed to Appear (1st Pangkat)",note:"Both parties failed to appear for 1st Pangkat hearing. Issue both failure notices.",next:"pangkat_choice_1"},
     kp18_kp19_pangkat_2:{code:"KP-18 & KP-19",title:"Both Parties Failed to Appear (2nd Pangkat)",note:"Both parties failed to appear for final Pangkat hearing. Issue both notices, then CFA.",next:"kp20"},
     kp10:{code:"KP-10",title:"Notice for Constitution of Pangkat",note:"PB mediation failed or window expired. Constitute Pangkat within 3 days. Select 3 members.",next:"kp11",enter:()=>{hearingNo=2;}},
@@ -883,8 +989,6 @@
     if (!mount || !FLOW_STEPS[currentStep]) return;
     const step = FLOW_STEPS[currentStep];
 
-    // Refresh attached forms list to detect newly added forms
-    ATTACHED = collectAttached();
     highlightStage();
 
     if (typeof step.enter === 'function' && !step.__entered) {
@@ -937,8 +1041,20 @@
             
             // Handle KP-18 & KP-19 steps
             if (step.code === 'KP-18 & KP-19') {
-              const hasKp18 = haveForm('KP-18');
-              const hasKp19 = haveForm('KP-19');
+              // Determine required count based on current step
+              let requiredKp18Count = 1;
+              let requiredKp19Count = 1;
+              
+              if (currentStep === 'kp18_kp19_second') {
+                requiredKp18Count = 2;
+                requiredKp19Count = 2;
+              } else if (currentStep === 'kp18_kp19_third') {
+                requiredKp18Count = 3;
+                requiredKp19Count = 3;
+              }
+              
+              const hasKp18 = countForms('KP-18') >= requiredKp18Count;
+              const hasKp19 = countForms('KP-19') >= requiredKp19Count;
               let html = '';
               
               if (hasKp18) {
@@ -1053,11 +1169,16 @@
             
             // Check specific no-show outcomes
             if (currentHearing.settlement_outcome === 'BOTH_NO_SHOW') {
-              branchDiv.appendChild(mkBtn('Issue KP-18 & KP-19', () => {
-                if (currentStep === 'kp9_first') goToStep('kp18_kp19_first');
-                else if (currentStep === 'kp9_second') goToStep('kp18_kp19_second');
-                else if (currentStep === 'kp9_third') goToStep('kp18_kp19_third');
-              }));
+              // For 2nd mediation, only show the button if KP-18 and KP-19 actually exist
+              if (currentStep === 'kp9_second' && (!haveForm('KP-18') || !haveForm('KP-19'))) {
+                branchDiv.innerHTML += '<div class="alert alert-info mt-2"><small>KP-18 and KP-19 will be automatically generated. Please refresh the page after recording the outcome.</small></div>';
+              } else {
+                branchDiv.appendChild(mkBtn('Issue KP-18 & KP-19', () => {
+                  if (currentStep === 'kp9_first') goToStep('kp18_kp19_first');
+                  else if (currentStep === 'kp9_second') goToStep('kp18_kp19_second');
+                  else if (currentStep === 'kp9_third') goToStep('kp18_kp19_third');
+                }));
+              }
             } else if (currentHearing.settlement_outcome === 'COMPLAINANT_NO_SHOW') {
               branchDiv.appendChild(mkBtn('Issue KP-18', () => {
                 if (currentStep === 'kp9_first') goToStep('kp18_first');
@@ -1181,7 +1302,15 @@
             nextDiv.appendChild(mkBtn('Schedule 3rd Mediation', () => goToStep('kp8_third')));
             nextDiv.appendChild(mkBtn('Constitute Pangkat', () => goToStep('kp10')));
           } else if (currentStep === 'kp18_kp19_third') {
-            nextDiv.appendChild(mkBtn('Constitute Pangkat', () => goToStep('kp10')));
+            nextDiv.appendChild(mkBtn('Next Step', () => goToStep('bar_action_choice')));
+          } else if (currentStep === 'bar_action_choice') {
+            const hasKp21 = haveForm('KP-21');
+            const hasKp22 = haveForm('KP-22');
+            if (!hasKp21) nextDiv.appendChild(mkBtn('Add KP-21 (Optional)', () => openFormBuilder('KP-21')));
+            else nextDiv.innerHTML += '<span class="badge bg-success me-2 mb-2">KP-21 Added</span>';
+            if (!hasKp22) nextDiv.appendChild(mkBtn('Add KP-22 (Optional)', () => openFormBuilder('KP-22')));
+            else nextDiv.innerHTML += '<span class="badge bg-success me-2 mb-2">KP-22 Added</span>';
+            nextDiv.appendChild(mkBtn('Dismiss Case', () => goToStep('close_case')));
           } else if (currentStep === 'kp18_kp19_pangkat_1') {
             nextDiv.appendChild(mkBtn('Schedule 2nd Conciliation', () => goToStep('kp12_second')));
             nextDiv.appendChild(mkBtn('Issue Certificate to File Action', () => goToStep('kp20')));
@@ -1261,6 +1390,11 @@
     'KP-23':25,'KP-24':26,'KP-25':27,'KP-26':28
   };
   function openFormBuilder(formCode){
+    const caseState = '{{ case_state_name|lower }}';
+    if (caseState === 'closed' || caseState === 'dismissed') {
+      alert('Cannot add forms to a closed or dismissed case.');
+      return;
+    }
     const formId = FORM_MAP[formCode];
     if (formId) window.location.href = `/lupon_mem/cases/{{ case_id }}/forms/${formId}/build/`;
     else window.location.href = `{% url 'lupon_mem:add_form_choose_static' case_id %}`;
@@ -1393,6 +1527,7 @@
     const canvasEl = document.getElementById('luponFlowCanvas');
     if (canvasEl && window.bootstrap?.Offcanvas) {
       canvasEl.addEventListener('shown.bs.offcanvas', async () => {
+        ATTACHED = {{ all_form_codes|safe }};
         HEARING_STATUS = await checkHearingStatus();
         HEARING_HELD = HEARING_STATUS.hearing_held;
         if (HEARING_STATUS.current_step && HEARING_STATUS.current_step !== 'start') {

@@ -130,6 +130,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "authentication.middleware.NoCacheMiddleware",
     "authentication.middleware.AttachProfileMiddleware",  # <— add
+    "authentication.session_timeout_middleware.SessionTimeoutMiddleware",  # <— auto-logout expired sessions
     "corsheaders.middleware.CorsMiddleware"
 ]
 
@@ -166,6 +167,7 @@ TEMPLATES = [
                 'django.template.context_processors.media',
                 "lupon_mem.context_processors.lupon_badge_counts",
                 "clerk.context_processors.app_badge_counts",
+                "treasurer.context_processors.queue_counts",
             ],
         },
     },
@@ -372,7 +374,7 @@ TIME_ZONE = "Asia/Manila"
 USE_TZ = True
 
 # --- Sessions ---
-SESSION_COOKIE_AGE = 60 * 60 * 8          # 8 hours
+SESSION_COOKIE_AGE = 3600                 # 1 minute (TESTING - change back to 60 * 60 * 8 for production)
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False   # keep until age unless browser quits (your call)
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"           # consider "Strict" if your flows allow

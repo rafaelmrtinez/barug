@@ -619,3 +619,206 @@ def maternal_new(request: HttpRequest) -> HttpResponse:
         "page_title": "New Maternal Record (BHW Intake)",
         "form": form,
     })
+
+
+# -------------------------------
+# HOUSEHOLD MAP
+# -------------------------------
+
+def _to_int_or_none(val) -> Optional[int]:
+    try:
+        if val in (None, "", "None"):
+            return None
+        return int(val)
+    except Exception:
+        return None
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@csrf_protect
+@nocache
+@inject
+def household_map_list(
+    request: HttpRequest,
+    household_service = Provide[AppContainer.household_service],
+) -> HttpResponse:
+    from django.urls import reverse
+    
+    user_role = _auth_role_name(request)
+    
+    from captain.forms import HouseholdFilters
+    form = HouseholdFilters(request.GET or None)
+
+    search = request.GET.get("search")
+    house_type = _to_int_or_none(request.GET.get("house_type"))
+    house_ownership = _to_int_or_none(request.GET.get("house_ownership"))
+
+    rows = household_service.execute(
+        search=search,
+        house_type=house_type,
+        ownership_type=house_ownership,
+    )
+
+    paginator = Paginator(rows, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    if (search or house_type is not None or house_ownership is not None) and not form.is_valid():
+        form = HouseholdFilters()
+
+    assigned_puroks = request.session.get("auth", {}).get("assigned_puroks", [])
+    assigned_purok_names = request.session.get("auth", {}).get("assigned_purok_names", [])
+    
+    try:
+        resp_hh_visited = supabase.rpc("get_household_visited").execute()
+        resp_hh_not_visited = supabase.rpc("get_household_not_visited").execute()
+        resp_fam_visited = supabase.rpc("get_family_visited").execute()
+        resp_fam_not_visited = supabase.rpc("get_family_not_visited").execute()
+        
+        visit_counts = {
+            'households_visited': len(resp_hh_visited.data or []),
+            'households_not_visited': len(resp_hh_not_visited.data or []),
+            'families_visited': len(resp_fam_visited.data or []),
+            'families_not_visited': len(resp_fam_not_visited.data or []),
+        }
+    except Exception:
+        visit_counts = {'households_visited': 0, 'households_not_visited': 0, 'families_visited': 0, 'families_not_visited': 0}
+    
+    all_puroks = [{'id': 1, 'name': 'KANIPAAN'}, {'id': 2, 'name': 'PAMPANGO'}, {'id': 3, 'name': 'LUTAW-LUTAW'}, {'id': 4, 'name': 'MAUCO'}]
+
+    return render(
+        request,
+        "household/household_map_list.html",
+        {
+            'page_path': f'{user_role} / Household Map',
+            'page_title': 'Household Map',
+            'page_obj': page_obj,
+            'form': form,
+            'filters': {
+                'search': search,
+                'house_type': house_type,
+                'house_ownership': house_ownership,
+            },
+            "pins_url": reverse("bhw:api_household_pins"),
+            'search_url': 'bhw:ajax_household_search',
+            'visit_counts': visit_counts,
+            'assigned_puroks': assigned_puroks,
+            'assigned_purok_names': assigned_purok_names,
+            'all_puroks': all_puroks,
+        },
+    )
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@nocache
+@inject
+def ajax_household_search(
+    request: HttpRequest,
+    household_service = Provide[AppContainer.household_service],
+) -> HttpResponse:
+    from django.http import HttpResponseBadRequest
+    
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR only")
+
+    tpl_key = (request.GET.get("tpl") or "cards").strip().lower()
+    if tpl_key == "cards":
+        template_name = "household/_households.html"
+        ctx_key = "cards"
+    else:
+        return HttpResponseBadRequest("Unknown partial")
+
+    q = request.GET.get("q")
+    house_type = _to_int_or_none(request.GET.get("house_type"))
+    house_ownership = _to_int_or_none(request.GET.get("house_ownership"))
+
+    rows = household_service.execute(
+        search=q,
+        house_type=house_type,
+        ownership_type=house_ownership,
+    )[:50]
+
+    html = render_to_string(
+        template_name,
+        {ctx_key: rows},
+        request=request,
+    )
+    return HttpResponse(html)
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@csrf_protect
+@nocache
+@inject
+def api_household_pins(
+    request: HttpRequest,
+    household_repo = Provide[AppContainer.household_repository],
+):
+    from django.http import HttpResponseBadRequest
+    
+    if request.method != "GET":
+        return HttpResponseBadRequest("GET only")
+
+    pins = household_repo.fetch_household_pins(
+        search=(request.GET.get("search") or None),
+        house_type=_to_int_or_none(request.GET.get("house_type")),
+        ownership_type=_to_int_or_none(request.GET.get("house_ownership")),
+    )
+    
+    # Add visit status and family counts
+    try:
+        resp_visited = supabase.rpc("get_household_visited").execute()
+        resp_not_visited = supabase.rpc("get_household_not_visited").execute()
+        resp_fam_visited = supabase.rpc("get_family_visited").execute()
+        resp_fam_not_visited = supabase.rpc("get_family_not_visited").execute()
+        
+        visited_data = resp_visited.data or []
+        not_visited_data = resp_not_visited.data or []
+        fam_visited_data = resp_fam_visited.data or []
+        fam_not_visited_data = resp_fam_not_visited.data or []
+        
+        visited_ids = {row['household_id'] for row in visited_data}
+        
+        # Build household map from RPC data
+        household_map = {}
+        for row in visited_data + not_visited_data:
+            if row.get('household_id'):
+                household_map[row['household_id']] = row
+        
+        # Count families per household
+        from collections import defaultdict
+        fam_visited_counts = defaultdict(int)
+        fam_not_visited_counts = defaultdict(int)
+        
+        for row in fam_visited_data:
+            hid = row.get('household_id')
+            if hid:
+                fam_visited_counts[hid] += 1
+        
+        for row in fam_not_visited_data:
+            hid = row.get('household_id')
+            if hid:
+                fam_not_visited_counts[hid] += 1
+        
+        # Update pins with visit status and family counts
+        for pin in pins:
+            hid = pin.get('household_id') or pin.get('id')
+            pin['visited'] = hid in visited_ids
+            pin['families_visited'] = fam_visited_counts.get(hid, 0)
+            pin['families_not_visited'] = fam_not_visited_counts.get(hid, 0)
+            
+            # Merge RPC data if available
+            if hid in household_map:
+                rpc_data = household_map[hid]
+                if rpc_data.get('latitude') and rpc_data.get('longitude'):
+                    pin['lat'] = float(rpc_data['latitude'])
+                    pin['lng'] = float(rpc_data['longitude'])
+    except Exception as e:
+        print(f"[api_household_pins] Error: {e}")
+        for pin in pins:
+            pin['visited'] = False
+            pin['families_visited'] = 0
+            pin['families_not_visited'] = 0
+    
+    return JsonResponse(pins, safe=False)
+
