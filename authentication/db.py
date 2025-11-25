@@ -70,6 +70,29 @@ def call_staff_logout(login_log_id: int, staff_id: int, ip_address: str = None):
         row = cur.fetchone()
     return row
 
+def get_staff_common_logs_with_names(staff_id: int):
+    """
+    Gets operational logs for a staff member with formatted names
+    Returns list of dictionaries with log details
+    """
+    sql = "SELECT * FROM get_staff_common_logs_with_names(%s);"
+    with connection.cursor() as cur:
+        cur.execute(sql, [staff_id])
+        columns = [col[0] for col in cur.description]
+        rows = cur.fetchall()
+    return [dict(zip(columns, row)) for row in rows]
+
+def call_staff_logout(login_log_id: int, staff_id: int, ip_address: str = None):
+    """
+    Calls the staff_logout2 function to properly log out a user session
+    Returns the updated login_log record
+    """
+    sql = "SELECT * FROM staff_logout2(%s, %s, %s);"
+    with connection.cursor() as cur:
+        cur.execute(sql, [login_log_id, staff_id, ip_address])
+        row = cur.fetchone()
+    return row
+
 def call_staff_logout_with_time(login_log_id: int, staff_id: int, ip_address: str = None, logout_time = None):
     """
     Calls staff_logout with specific logout time for expired sessions

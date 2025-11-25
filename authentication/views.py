@@ -13,6 +13,7 @@ from .forms import LoginForm, ForgotPasswordForm, NewPasswordForm, ChangePasswor
 from .db import call_staff_login, call_change_staff_password, call_staff_request_password_reset, call_staff_reset_password_with_token, call_staff_check_password_reset_token
 from common.flash import flash_warning, flash_success, flash_system_error, flash_db_error
 from common.send_email import send_email 
+from common.email_validator import verify_email_deliverable_abstract
 from urllib.parse import urlencode
 
 
@@ -355,7 +356,6 @@ def logout(request):
         except Exception as e:
             # Log any other errors but don't prevent logout
             logger.error("LOGOUT ERROR | staff_id=%s login_log_id=%s msg=%s", staff_id, login_log_id, str(e))
-
     # Clear session
     request.session.flush()
     messages.success(request, "You have been logged out.", extra_tags="auth")
@@ -572,6 +572,13 @@ def forgot_password(request):  # ADDED FORGOT PASS
         form = ForgotPasswordForm(request.POST)
         if form.is_valid():
             email = (form.cleaned_data.get("email") or "").strip()
+            
+            # Validate email deliverability
+            is_valid, reason = verify_email_deliverable_abstract(email)
+            if not is_valid:
+                flash_warning(request, f"Email validation failed: {reason}. Please provide a valid email address.")
+                return render(request, "forgot_password.html", {"form": form})
+            
             ip = _get_client_ip(request)
 
             # ADDED RATE LIMIT (initial forgot)
@@ -791,6 +798,12 @@ def new_password(request):
                     profile = Authentication.get_staff_profile_by_id(force_data["staff_id"])
                     staff_email = profile.get("email_address")
                 
+                # Validate email if available
+                if staff_email:
+                    is_valid, reason = verify_email_deliverable_abstract(staff_email)
+                    if not is_valid:
+                        logger.warning(f"Email validation failed for staff {force_data['staff_id']}: {reason}")
+                
                 if staff_email:
                     # Get Philippines timezone
                     ph_tz = pytz.timezone('Asia/Manila')
@@ -893,6 +906,7 @@ def account_settings(request):
     from supabase import create_client
     from django.db import DatabaseError, OperationalError, IntegrityError
     from common.flash import flash_success, flash_system_error, flash_db_error
+    from django.core.cache import cache
     
     auth = request.session.get("auth", {})
     staff_id = auth.get('staff_id')
@@ -933,6 +947,11 @@ def account_settings(request):
             
             if not email:
                 return JsonResponse({'success': False, 'error': 'No email address found'})
+            
+            # Validate email deliverability
+            is_valid, reason = verify_email_deliverable_abstract(email)
+            if not is_valid:
+                return JsonResponse({'success': False, 'error': f'Email validation failed: {reason}. Please update your email address.'})
             
             # Send email
             subject = 'Password Change Verification Code'
@@ -989,6 +1008,11 @@ def account_settings(request):
             
             if not email:
                 return JsonResponse({'success': False, 'error': 'No email address found'})
+            
+            # Validate email deliverability
+            is_valid, reason = verify_email_deliverable_abstract(email)
+            if not is_valid:
+                return JsonResponse({'success': False, 'error': f'Email validation failed: {reason}. Please update your email address.'})
             
             # Send email
             subject = 'Password Change Verification Code'
@@ -1256,6 +1280,10 @@ def account_settings(request):
             # Update database
             Authentication.set_staff_photo(staff_id, public_url)
             
+            # Clear profile cache
+            cache_key = f"staff_profile_{staff_id}"
+            cache.delete(cache_key)
+            
             return JsonResponse({
                 'success': True, 
                 'message': 'Profile photo updated successfully!',
@@ -1269,20 +1297,26 @@ def account_settings(request):
             logger.error(f"Profile photo upload failed: {str(e)}", exc_info=True)
             return JsonResponse({'success': False, 'error': 'Failed to update profile photo'})
     
-    # Get profile from database
-    try:
-        profile = Authentication.get_staff_profile_by_id(staff_id)
-        if not profile:
-            flash_system_error(request, "Profile not found.")
+    # Get profile from cache or database
+    cache_key = f"staff_profile_{staff_id}"
+    profile = cache.get(cache_key)
+    
+    if not profile:
+        try:
+            profile = Authentication.get_staff_profile_by_id(staff_id)
+            if not profile:
+                flash_system_error(request, "Profile not found.")
+                return redirect("authentication:login")
+            # Cache for 5 minutes
+            cache.set(cache_key, profile, 300)
+        except (DatabaseError, OperationalError, IntegrityError) as e:
+            logger.error(f"Database error loading profile: {str(e)}", exc_info=True)
+            flash_db_error(request, e)
             return redirect("authentication:login")
-    except (DatabaseError, OperationalError, IntegrityError) as e:
-        logger.error(f"Database error loading profile: {str(e)}", exc_info=True)
-        flash_db_error(request, e)
-        return redirect("authentication:login")
-    except Exception as e:
-        logger.error(f"Error loading profile: {str(e)}", exc_info=True)
-        flash_system_error(request, "Failed to load profile data", exc=e)
-        return redirect("authentication:login")
+        except Exception as e:
+            logger.error(f"Error loading profile: {str(e)}", exc_info=True)
+            flash_system_error(request, "Failed to load profile data", exc=e)
+            return redirect("authentication:login")
     
     # Format name: First Middle_Initial Last Suffix
     first = (profile.get('first_name') or '').strip().title()
@@ -1306,13 +1340,35 @@ def account_settings(request):
     is_account_active = account_status == 'active'
     is_secure_pass = profile.get('is_secure_pass', False)
     
-    # Get access logs for the current user
-    access_logs = []
-    try:
-        from staff_admin.models import Admin
-        access_logs = Admin.get_login_logs_with_status_for_staff(staff_id)
-    except Exception as e:
-        logger.error(f"Error loading access logs: {str(e)}", exc_info=True)
+    # Get access logs from cache or database (limit to recent 20 entries)
+    logs_cache_key = f"access_logs_{staff_id}"
+    access_logs = cache.get(logs_cache_key)
+    
+    if access_logs is None:
+        try:
+            from staff_admin.models import Admin
+            # Limit to recent 20 entries for better performance
+            access_logs = Admin.get_login_logs_with_status_for_staff(staff_id)[:20]
+            # Cache for 2 minutes
+            cache.set(logs_cache_key, access_logs, 120)
+        except Exception as e:
+            logger.error(f"Error loading access logs: {str(e)}", exc_info=True)
+            access_logs = []
+    
+    # Get operation logs from cache or database (limit to recent 20 entries)
+    op_logs_cache_key = f"operation_logs_{staff_id}"
+    operation_logs = cache.get(op_logs_cache_key)
+    
+    if operation_logs is None:
+        try:
+            from .db import get_staff_common_logs_with_names
+            # Limit to recent 20 entries for better performance
+            operation_logs = get_staff_common_logs_with_names(staff_id)[:20]
+            # Cache for 2 minutes
+            cache.set(op_logs_cache_key, operation_logs, 120)
+        except Exception as e:
+            logger.error(f"Error loading operation logs: {str(e)}", exc_info=True)
+            operation_logs = []
     
     return render(request, "account_settings.html", {
         'user_fullname': user_fullname,
@@ -1327,5 +1383,6 @@ def account_settings(request):
         'is_secure_pass': is_secure_pass,
         'change_password_form': ChangePasswordForm(),
         'verification_code_form': VerificationCodeForm(),
-        'access_logs': access_logs,
+        'access_logs': access_logs[:5],  # Show only 5 in template
+        'operation_logs': operation_logs[:5],  # Show only 5 in template
     })  

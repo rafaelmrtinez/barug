@@ -626,7 +626,7 @@ class AccessLogFilters(forms.Form):
         widget=forms.TextInput(attrs={
             'id' : 'search',
             'class' : 'form-control', 
-            'placeholder' : 'Search by name or role...',
+            'placeholder' : 'Search by name',
             'name': 'q'
         }),
         label='Search Access Logs',
@@ -641,22 +641,17 @@ class AccessLogFilters(forms.Form):
         label='Role',
         required=False,
     )
-    date_from = forms.DateField(
-        widget=forms.DateInput(attrs={
-            'type': 'date',
-            'class': 'form-control',
-            'name': 'date_from',
+    login_status = forms.ChoiceField(
+        choices=[
+            ("", "All Status"),
+            ("active", "Active"),
+            ("inactive", "Inactive"),
+        ],
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'name': 'login_status',
         }),
-        label='Date From',
-        required=False,
-    )
-    date_to = forms.DateField(
-        widget=forms.DateInput(attrs={
-            'type': 'date',
-            'class': 'form-control',
-            'name': 'date_to',
-        }),
-        label='Date To',
+        label='Log In Status',
         required=False,
     )
 
@@ -665,7 +660,7 @@ class OperationalLogFilters(forms.Form):
         widget=forms.TextInput(attrs={
             'id' : 'search',
             'class' : 'form-control', 
-            'placeholder' : 'Search by name, action, or description...',
+            'placeholder' : 'Search by name',
             'name': 'q'
         }),
         label='Search Operational Logs',

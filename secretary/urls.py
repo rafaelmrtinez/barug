@@ -53,8 +53,17 @@ urlpatterns = [
     path("incident-heatmap/", views.incident_heatmap, name="incident_heatmap"),
 
     # ANNOUNCEMENT
-    path("announcement/create_draft/", views.annoucement_draf, name="announcement_draft"),
+    path("announcement/create_draft/", views.announcement_draft, name="announcement_draft"),
     path("announcement/draft_list/", views.announcement_draft_list, name="announcement_draft_list"),
+    path("announcement/draft_view/<int:announcement_id>/", views.announcement_draft_view, name="announcement_draft_view"),
+    path("announcement/audience_scope/", views.announcement_audience_scope, name="announcement_audience_scope"),
+    path("ajax/save_audience_rules/", views.save_audience_rules, name="save_audience_rules"),
+    path("ajax/announcement_draft_search/", views.ajax_announcement_draft_search, name="ajax_announcement_draft_search"),
+    
+    # CHANNEL MANAGEMENT
+    path("ajax/upsert_announcement_channels/", views.upsert_announcement_channels, name="upsert_announcement_channels"),
+    path('api/announcement_channels/<int:announcement_id>/', views.announcement_channels_api, name='announcement_channels_api'),
+    path('ajax/publish_announcement_now/', views.publish_announcement_now, name='publish_announcement_now'),
     
     # PDF APIs
     path("api/residents/pdf/", ResidentsPDFAPI.as_view(), name="residents_pdf_api"),

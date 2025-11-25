@@ -133,6 +133,24 @@ from src.app.contracts.resident_service_contract import (
 from src.app.services.resident_service import (
     ResidentService,
 )
+from src.app.contracts.announcement_service_contract import (
+    IAnnouncementService,
+)
+from src.app.services.announcement_service import (
+    AnnouncementService,
+)
+from src.app.contracts.audience_service_contract import (
+    IAudienceService,
+)
+from src.app.services.audience_service import (
+    AudienceService,
+)
+from src.app.contracts.channel_service_contract import (
+    IChannelService,
+)
+from src.app.services.channel_service import (
+    ChannelService,
+)
 
 
 class AppContainer(containers.DeclarativeContainer):
@@ -429,4 +447,21 @@ class AppContainer(containers.DeclarativeContainer):
     resident_service: providers.Factory[IResidentService] = providers.Factory(
         ResidentService,
         repo=infra.resident_repository,
+    )
+
+    # Announcement
+
+    announcement_service: providers.Factory[IAnnouncementService] = providers.Factory(
+        AnnouncementService,
+        announcement_repository=infra.announcement_repository,
+    )
+
+    audience_service: providers.Factory[IAudienceService] = providers.Factory(
+        AudienceService,
+        audience_repository=infra.audience_repository,
+    )
+
+    channel_service: providers.Factory[IChannelService] = providers.Factory(
+        ChannelService,
+        channel_repository=infra.channel_repository,
     )

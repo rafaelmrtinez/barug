@@ -264,3 +264,22 @@ class Admin(models.Model):
             for row in cursor.fetchall():
                 results.append(dict(zip(columns, row)))
             return results
+
+    @staticmethod
+    def get_common_log_detail(common_log_id: int):
+        """Get detailed information for a specific operational log entry"""
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    common_log_id, record_affected_id, details, date_time,
+                    table_affected, action, field_changed, old_value, new_value,
+                    reason, performer_id, performer_name, performer_person_code, performer_staff_code,
+                    user_type_id, user_type_name, subsystem_id, subsystem_name
+                FROM get_common_log_detail(%s)
+            """, [common_log_id])
+            
+            columns = [desc[0] for desc in cursor.description]
+            row = cursor.fetchone()
+            if row:
+                return dict(zip(columns, row))
+            return None

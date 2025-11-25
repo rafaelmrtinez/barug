@@ -76,6 +76,24 @@ from src.domain.contracts.resident_repository_contract import (
 from src.infra.repositories.resident_repository import (
     ResidentRepository,
 )
+from src.domain.contracts.announcement_repository_contract import (
+    IAnnouncementRepository,
+)
+from src.infra.repositories.announcement_repository import (
+    AnnouncementRepository,
+)
+from src.domain.contracts.audience_repository_contract import (
+    IAudienceRepository,
+)
+from src.infra.repositories.audience_repository import (
+    AudienceRepository,
+)
+from src.domain.contracts.channel_repository_contract import (
+    IChannelRepository,
+)
+from src.infra.repositories.channel_repository import (
+    ChannelRepository,
+)
 
 
 class InfraContainer(containers.DeclarativeContainer):
@@ -264,5 +282,22 @@ class InfraContainer(containers.DeclarativeContainer):
 
     resident_repository: providers.Factory[IResidentRepository] = providers.Factory(
         ResidentRepository,
+        ctx=context
+    )
+
+    # Announcement
+
+    announcement_repository: providers.Factory[IAnnouncementRepository] = providers.Factory(
+        AnnouncementRepository,
+        ctx=context
+    )
+
+    audience_repository: providers.Factory[IAudienceRepository] = providers.Factory(
+        AudienceRepository,
+        ctx=context
+    )
+
+    channel_repository: providers.Factory[IChannelRepository] = providers.Factory(
+        ChannelRepository,
         ctx=context
     )
