@@ -14,6 +14,7 @@ from src.app.transfer_objects.commands.publish_now_cmd import PublishAnnouncemen
 from src.app.transfer_objects.dto.publish_result_dto import PublishResultDTO
 from common.send_email import send_email
 from common.send_sms import send_sms
+from common.email_validator import verify_email_deliverable_abstract
 from src.infra.contracts.connection_adapter import IConnectionAdapter
 
 
@@ -237,8 +238,10 @@ class AnnouncementRepository(IAnnouncementRepository):
         
         for channel_type_id, email, mobile, first_name, last_name in recipients:
             if channel_type_id == 2 and email:  # EMAIL
-                name = f"{first_name or ''} {last_name or ''}".strip()
-                email_recipients.append((name, email) if name else email)
+                is_valid, _ = verify_email_deliverable_abstract(email)
+                if is_valid:
+                    name = f"{first_name or ''} {last_name or ''}".strip()
+                    email_recipients.append((name, email) if name else email)
             elif channel_type_id == 1 and mobile:  # SMS
                 sms_recipients.append(mobile)
         
