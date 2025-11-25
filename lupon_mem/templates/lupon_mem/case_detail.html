@@ -124,6 +124,11 @@
   /* Notification Bubble */
   .btn-with-badge{ position:relative; }
   .btn-badge{ position:absolute; top:-6px; right:-6px; background:#dc3545; color:#fff; border-radius:50%; width:18px; height:18px; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; border:2px solid #fff; }
+  
+  /* Pagination Styles */
+  .pagination .page-link{ transition:all 0.2s ease; }
+  .pagination .page-link:hover:not(.disabled):not([aria-disabled="true"]){ transform:translateY(-2px); box-shadow:0 4px 12px rgba(109,41,50,0.2); }
+  .pagination .page-item.active .page-link{ box-shadow:0 2px 8px rgba(109,41,50,0.3); }
 </style>
 {% endblock css %}
 
@@ -365,26 +370,36 @@
     </div>
   </div>
 
-  {% if forms_total_pages > 1 %}
+  {% if total_pages > 1 %}
   <nav aria-label="KP forms pagination" class="mt-3">
-    <ul class="pagination pagination-sm justify-content-end mb-0">
-      <li class="page-item{% if not forms_has_prev %} disabled{% endif %}">
-        {% if forms_has_prev %}
-          <a class="page-link" href="{{ forms_prev_url }}" tabindex="-1" aria-label="Previous">Previous</a>
+    <ul class="pagination justify-content-center mb-0" style="gap:0.35rem;">
+      <li class="page-item{% if not has_prev %} disabled{% endif %}">
+        {% if has_prev %}
+          <a class="page-link" href="?page={{ prev_page }}" style="border-radius:8px;border:1px solid var(--brand-700);color:var(--brand-700);padding:0.5rem 0.85rem;font-weight:600;" aria-label="Previous">
+            <i class="bi bi-chevron-left"></i> Previous
+          </a>
         {% else %}
-          <span class="page-link" tabindex="-1" aria-disabled="true">Previous</span>
+          <span class="page-link" style="border-radius:8px;border:1px solid #e5e7eb;color:#9ca3af;padding:0.5rem 0.85rem;font-weight:600;background:#f9fafb;" aria-disabled="true">
+            <i class="bi bi-chevron-left"></i> Previous
+          </span>
         {% endif %}
       </li>
-      {% for item in forms_page_links %}
-        <li class="page-item{% if item.active %} active{% endif %}">
-          <a class="page-link" href="{{ item.url }}">{{ item.number }}</a>
+      {% for num in page_numbers %}
+        <li class="page-item{% if num == page %} active{% endif %}">
+          <a class="page-link" href="?page={{ num }}" style="border-radius:8px;{% if num == page %}background:var(--brand-700);border-color:var(--brand-700);color:#fff;{% else %}border:1px solid var(--brand-700);color:var(--brand-700);{% endif %}padding:0.5rem 0.75rem;font-weight:600;min-width:42px;text-align:center;">
+            {{ num }}
+          </a>
         </li>
       {% endfor %}
-      <li class="page-item{% if not forms_has_next %} disabled{% endif %}">
-        {% if forms_has_next %}
-          <a class="page-link" href="{{ forms_next_url }}" aria-label="Next">Next</a>
+      <li class="page-item{% if not has_next %} disabled{% endif %}">
+        {% if has_next %}
+          <a class="page-link" href="?page={{ next_page }}" style="border-radius:8px;border:1px solid var(--brand-700);color:var(--brand-700);padding:0.5rem 0.85rem;font-weight:600;" aria-label="Next">
+            Next <i class="bi bi-chevron-right"></i>
+          </a>
         {% else %}
-          <span class="page-link" aria-disabled="true">Next</span>
+          <span class="page-link" style="border-radius:8px;border:1px solid #e5e7eb;color:#9ca3af;padding:0.5rem 0.85rem;font-weight:600;background:#f9fafb;" aria-disabled="true">
+            Next <i class="bi bi-chevron-right"></i>
+          </span>
         {% endif %}
       </li>
     </ul>
@@ -475,22 +490,38 @@
   <div class="offcanvas-body">
 
     {% if hearing_window %}
-      <div class="hw-bar mb-3" id="hearingWindowBar">
-        <span class="hw-phase {% if hearing_window.can_set_conciliation and not hearing_window.can_set_mediation %}conc{% endif %}">
-          {% if hearing_window.can_set_mediation and not hearing_window.can_set_conciliation %}
-            Mediation Window
-          {% elif hearing_window.can_set_conciliation %}
-            Conciliation Phase
-          {% else %}
-            Hearing Window
-          {% endif %}
+      {% with settlement=case.7|lower %}
+        {% if 'settled' not in settlement %}
+          <div class="hw-bar mb-3" id="hearingWindowBar">
+            <span class="hw-phase {% if hearing_window.can_set_conciliation and not hearing_window.can_set_mediation %}conc{% endif %}">
+              {% if hearing_window.can_set_mediation and not hearing_window.can_set_conciliation %}
+                Mediation Window
+              {% elif hearing_window.can_set_conciliation %}
+                Conciliation Phase
+              {% else %}
+                Hearing Window
+              {% endif %}
+            </span>
+            <span class="hw-dot"></span>
+            <div class="hw-kv"><strong>{{ hearing_window.days_left }}</strong> days left</div>
+            <span class="hw-dot"></span>
+            <div class="hw-kv">Ends <strong>{{ hearing_window.window_end_date_text }} {{ hearing_window.window_end_time_text }}</strong></div>
+            <div class="hw-stat">Set: {{ hearing_window.mediation_hearings_set }} • Held: {{ hearing_window.mediation_hearings_held }}
+              {% if hearing_window.attendees %} • Attended: {{ hearing_window.attendees }}{% endif %}</div>
+          </div>
+        {% endif %}
+      {% endwith %}
+    {% endif %}
+
+    {% if repudiation_window %}
+      <div class="hw-bar mb-3" style="background:#fffaf0;border-color:#fde68a;">
+        <span class="hw-phase" style="background:#fef3c7;border-color:#fbbf24;color:#92400e;">
+          Repudiation Window
         </span>
         <span class="hw-dot"></span>
-        <div class="hw-kv"><strong>{{ hearing_window.days_left }}</strong> days left</div>
+        <div class="hw-kv"><strong>{{ repudiation_window.days_left }}</strong> day{{ repudiation_window.days_left|pluralize }} left</div>
         <span class="hw-dot"></span>
-        <div class="hw-kv">Ends <strong>{{ hearing_window.window_end_date_text }} {{ hearing_window.window_end_time_text }}</strong></div>
-        <div class="hw-stat">Set: {{ hearing_window.mediation_hearings_set }} • Held: {{ hearing_window.mediation_hearings_held }}
-          {% if hearing_window.attendees %} • Attended: {{ hearing_window.attendees }}{% endif %}</div>
+        <div class="hw-kv">Ends <strong>{{ repudiation_window.end_date }}</strong></div>
       </div>
     {% endif %}
 
@@ -692,18 +723,7 @@
   }
 
   /* ===== Attached forms scanner ===== */
-  function collectAttached(){
-    const forms = [];
-    const table = document.getElementById('formsTable');
-    if (!table) return forms;
-    table.querySelectorAll('tbody tr .code-chip').forEach(chip=>{
-      const text = (chip.textContent || "").trim();
-      const m = text.match(/\bKP-\d+[AB]?\b/i);
-      if (m) forms.push(m[0].toUpperCase());
-    });
-    return forms;
-  }
-  let ATTACHED = collectAttached();
+  let ATTACHED = {{ all_form_codes|safe }};
   function haveForm(code){ 
     const upperCode = String(code || "").toUpperCase();
     return ATTACHED.includes(upperCode);
@@ -969,8 +989,6 @@
     if (!mount || !FLOW_STEPS[currentStep]) return;
     const step = FLOW_STEPS[currentStep];
 
-    // Refresh attached forms list to detect newly added forms
-    ATTACHED = collectAttached();
     highlightStage();
 
     if (typeof step.enter === 'function' && !step.__entered) {
@@ -1509,6 +1527,7 @@
     const canvasEl = document.getElementById('luponFlowCanvas');
     if (canvasEl && window.bootstrap?.Offcanvas) {
       canvasEl.addEventListener('shown.bs.offcanvas', async () => {
+        ATTACHED = {{ all_form_codes|safe }};
         HEARING_STATUS = await checkHearingStatus();
         HEARING_HELD = HEARING_STATUS.hearing_held;
         if (HEARING_STATUS.current_step && HEARING_STATUS.current_step !== 'start') {

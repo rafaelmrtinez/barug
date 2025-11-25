@@ -329,12 +329,39 @@ def case_list(request: HttpRequest):
 
 # lupon_mem/views_cases.py (or wherever your case detail view lives)
 from lupon_mem.services.hearings_window import get_hearing_window
+from lupon_mem.services.fields_util import get_latest_form_fields, get_field_text
+from datetime import datetime, timedelta
 
 @session_login_required 
 @role_required(*LUPON_ROLES, "barangay treasurer")
 def case_detail(request: HttpRequest, case_id: int):
     flow_steps = ['KP-7', 'KP-8', 'KP-9', 'KP-10', 'KP-11', 'KP-12', 'KP-16']
     hearing_window = get_hearing_window(case_id)
+    
+    # Calculate repudiation window if KP-16 exists
+    repudiation_window = None
+    try:
+        kp16_fields = get_latest_form_fields(case_id, 'KP-16')
+        if kp16_fields:
+            processed_date_str = get_field_text(kp16_fields, 'processed_on_date')
+            if processed_date_str:
+                processed_date = datetime.strptime(processed_date_str, '%Y-%m-%d').date()
+                repudiation_end = processed_date + timedelta(days=10)
+                days_left = (repudiation_end - datetime.now().date()).days
+                repudiation_window = {
+                    'end_date': repudiation_end.strftime('%B %d, %Y'),
+                    'days_left': days_left
+                }
+    except Exception:
+        pass
+
+    # Pagination
+    try:
+        page = max(int(request.GET.get("page", "1")), 1)
+    except ValueError:
+        page = 1
+    per_page = 10
+    offset = (page - 1) * per_page
 
     with connection.cursor() as cur:
         cur.execute("""
@@ -366,7 +393,13 @@ def case_detail(request: HttpRequest, case_id: int):
         if not case_row:
             return HttpResponseNotFound("Case not found")
 
-        # Get ALL forms without pagination
+        # Count total forms
+        cur.execute("""
+            SELECT COUNT(*) FROM blotter_kp_submission WHERE blotter_case_id = %s
+        """, [case_id])
+        total_forms = cur.fetchone()[0]
+
+        # Get paginated forms
         cur.execute("""
             WITH all_forms AS (
                 SELECT s.submission_id,
@@ -376,6 +409,7 @@ def case_detail(request: HttpRequest, case_id: int):
                   FROM blotter_kp_submission s
                  WHERE s.blotter_case_id = %s
                  ORDER BY s.submission_id DESC
+                 LIMIT %s OFFSET %s
             ),
             audit AS (
                 SELECT b.submission_id,
@@ -399,7 +433,7 @@ def case_detail(request: HttpRequest, case_id: int):
             JOIN kp_form kf ON kf.form_id = r.form_id
             LEFT JOIN audit a ON a.submission_id = r.submission_id
             ORDER BY r.submission_id DESC
-        """, [case_id])
+        """, [case_id, per_page, offset])
         forms = cur.fetchall()
 
         cur.execute("""
@@ -411,6 +445,16 @@ def case_detail(request: HttpRequest, case_id: int):
               AND UPPER(kf.form_code) IN %s
         """, [case_id, tuple(flow_steps)])
         submitted_form_codes = {row[0] for row in cur.fetchall()}
+        
+        # Get ALL form codes for flow guide (not paginated)
+        cur.execute("""
+            SELECT UPPER(kf.form_code)
+            FROM blotter_kp_submission s
+            JOIN kp_form kf ON kf.form_id = s.form_id
+            WHERE s.blotter_case_id = %s
+            ORDER BY s.submission_id DESC
+        """, [case_id])
+        all_form_codes = [row[0] for row in cur.fetchall()]
 
     submitted_forms = submitted_form_codes
     completed_count = sum(1 for step in flow_steps if step in submitted_forms)
@@ -420,6 +464,14 @@ def case_detail(request: HttpRequest, case_id: int):
 
     auth = request.session.get("auth") or {}
     user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
+    
+    # Pagination calculations
+    total_pages = max((total_forms + per_page - 1) // per_page, 1)
+    has_prev = page > 1
+    has_next = page < total_pages
+    start_p = max(1, page - 2)
+    end_p = min(total_pages, page + 2)
+    page_numbers = list(range(start_p, end_p + 1))
     
     context = {
         "case": case_row,
@@ -452,6 +504,18 @@ def case_detail(request: HttpRequest, case_id: int):
         "progress_percentage": progress_percentage,
         'page_path': f'{user_role} / Case Detail',
         'page_title': f'Case #{case_row[1]}' if case_row else 'Case Detail',
+        # Pagination
+        "page": page,
+        "per_page": per_page,
+        "total_forms": total_forms,
+        "total_pages": total_pages,
+        "has_prev": has_prev,
+        "has_next": has_next,
+        "prev_page": page - 1,
+        "next_page": page + 1,
+        "page_numbers": page_numbers,
+        "all_form_codes": all_form_codes,
+        "repudiation_window": repudiation_window,
     }
 
     return render(request, "lupon_mem/case_detail.html", context)

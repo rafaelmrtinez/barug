@@ -2034,10 +2034,13 @@ def monthly_activity_report(request: HttpRequest):
     from reportlab.lib.units import inch
     from io import BytesIO
     from datetime import datetime, timedelta
-    import os
+    import calendar, os
     
-    # Get current month data
-    current_month = datetime.now().replace(day=1)
+    month = _toi(request.POST.get('month')) if request.method == 'POST' else datetime.now().month
+    year = _toi(request.POST.get('year')) if request.method == 'POST' else datetime.now().year
+    
+    # Get month data
+    current_month = datetime(year, month, 1)
     next_month = (current_month + timedelta(days=32)).replace(day=1)
     
     with connection.cursor() as cur:
@@ -2115,6 +2118,20 @@ def monthly_activity_report(request: HttpRequest):
     header_table.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (0,0), (0,0), 'RIGHT'), ('ALIGN', (1,0), (1,0), 'CENTER'), ('ALIGN', (2,0), (2,0), 'LEFT'), ('RIGHTPADDING', (0,0), (0,0), 0), ('LEFTPADDING', (2,0), (2,0), 0)]))
     elements.append(header_table)
     elements.append(Spacer(1, 20))
+    
+    # Province/City/Month/Year info
+    month_name = calendar.month_name[month]
+    info_data = [[
+        Paragraph(f"Province: <u>CEBU</u>", ParagraphStyle('i', fontSize=10)),
+        Paragraph(f"For the Month of: <u>{month_name}</u>", ParagraphStyle('i', fontSize=10, alignment=2))
+    ], [
+        Paragraph(f"City of: <u>CEBU</u>", ParagraphStyle('i', fontSize=10)),
+        Paragraph(f"Calendar Year: <u>{year}</u>", ParagraphStyle('i', fontSize=10, alignment=2))
+    ]]
+    info_table = Table(info_data, colWidths=[2.5*inch, 3*inch])
+    info_table.setStyle(TableStyle([('LEFTPADDING', (0,0), (0,-1), 10), ('RIGHTPADDING', (1,0), (1,-1), 10)]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 15))
     
     # Title
     elements.append(Paragraph(f"<b>MONTHLY ACTIVITY REPORT - {current_month.strftime('%B %Y')}</b>", ParagraphStyle('t', fontSize=14, alignment=TA_CENTER, spaceAfter=10)))
@@ -2572,78 +2589,144 @@ def case_hearings_pdf(request: HttpRequest, case_id: int):
 def blotter_reports_summary(request: HttpRequest):
     """Generate PDF report of blotter reports summary"""
     from django.http import HttpResponse
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet
     from reportlab.lib.pagesizes import letter
     from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
     from reportlab.lib.units import inch
     from io import BytesIO
+    from datetime import datetime as dt
+    import calendar, os
     
-    # Get filters if POST
-    where_conditions = []
-    params = []
-    if request.method == "POST":
-        date_from = request.POST.get('date_from')
-        date_to = request.POST.get('date_to')
-        if date_from:
-            where_conditions.append("br.date_time_reported >= %s")
-            params.append(date_from)
-        if date_to:
-            where_conditions.append("br.date_time_reported <= %s")
-            params.append(date_to)
+    month = _toi(request.POST.get('month')) if request.method == 'POST' else dt.now().month
+    year = _toi(request.POST.get('year')) if request.method == 'POST' else dt.now().year
     
-    where_clause = " AND " + " AND ".join(where_conditions) if where_conditions else ""
-    
+    # Use get_all_report_details() to avoid duplicates
     with connection.cursor() as cur:
-        cur.execute(f"""
-            SELECT br.blotter_report_id, br.incident_subject, br.date_time_reported,
-                   ps.payment_status_name, rs.report_status_name
-            FROM blotter_report br
-            LEFT JOIN payment_status ps ON ps.payment_status_id = br.payment_status_id
-            LEFT JOIN report_status_detail rsd ON rsd.blotter_report_id = br.blotter_report_id
-            LEFT JOIN report_status rs ON rs.report_status_id = rsd.report_status_id
-            WHERE 1=1 {where_clause}
-            ORDER BY br.date_time_reported DESC
-            LIMIT 100
-        """, params)
-        reports_data = cur.fetchall()
+        cur.execute("""
+            SELECT * FROM get_all_report_details() 
+            WHERE EXTRACT(MONTH FROM date_time_reported::timestamp) = %s 
+            AND EXTRACT(YEAR FROM date_time_reported::timestamp) = %s
+            ORDER BY blotter_report_id DESC LIMIT 100
+        """, [month, year])
+        columns = [col[0] for col in cur.description]
+        reports_data = [dict(zip(columns, row)) for row in cur.fetchall()]
     
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch)
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
     elements = []
-    styles = getSampleStyleSheet()
     
-    add_barangay_header(elements, styles, "BLOTTER REPORTS SUMMARY")
+    # Header with logos
+    logo_left = os.path.join(settings.BASE_DIR, 'static', 'images', 'brgy-sto-nino.png')
+    logo_right = os.path.join(settings.BASE_DIR, 'static', 'images', 'lupon-tagapamayapa.png')
     
-    table_data = [['Report ID', 'Subject', 'Date Reported', 'Payment Status', 'Review Status']]
+    header_data = [[
+        Image(logo_left, width=0.9*inch, height=0.9*inch) if os.path.exists(logo_left) else '',
+        Paragraph("Republic of the Philippines<br/>Office of the Barangay Captain<br/><b>BARANGAY SEÑOR SANTO NIÑO</b><br/>032 Legaspi Street, Cebu City<br/>Telephone No. (032) 254-9250/346-8802", 
+                 ParagraphStyle('hdr', fontSize=11, alignment=TA_CENTER, leading=14)),
+        Image(logo_right, width=0.9*inch, height=0.9*inch) if os.path.exists(logo_right) else ''
+    ]]
+    header_table = Table(header_data, colWidths=[1*inch, 3.5*inch, 1*inch])
+    header_table.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (0,0), (0,0), 'RIGHT'), ('ALIGN', (1,0), (1,0), 'CENTER'), ('ALIGN', (2,0), (2,0), 'LEFT'), ('RIGHTPADDING', (0,0), (0,0), 0), ('LEFTPADDING', (2,0), (2,0), 0)]))
+    elements.append(header_table)
+    elements.append(Spacer(1, 20))
+    
+    # Province/City/Month/Year info
+    month_name = calendar.month_name[month] if month else "All Months"
+    info_data = [[
+        Paragraph(f"Province: <u>CEBU</u>", ParagraphStyle('i', fontSize=10)),
+        Paragraph(f"For the Month of: <u>{month_name}</u>", ParagraphStyle('i', fontSize=10, alignment=2))
+    ], [
+        Paragraph(f"City of: <u>CEBU</u>", ParagraphStyle('i', fontSize=10)),
+        Paragraph(f"Calendar Year: <u>{year}</u>", ParagraphStyle('i', fontSize=10, alignment=2))
+    ]]
+    info_table = Table(info_data, colWidths=[3.5*inch, 4*inch])
+    info_table.setStyle(TableStyle([('LEFTPADDING', (0,0), (0,-1), 10), ('RIGHTPADDING', (1,0), (1,-1), 10)]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 15))
+    
+    # Title
+    elements.append(Paragraph("<b>BLOTTER REPORTS SUMMARY</b>", ParagraphStyle('t', fontSize=14, alignment=TA_CENTER, spaceAfter=10)))
+    elements.append(Spacer(1, 20))
+    
+    # Check if no reports
+    total_reports = len(reports_data)
+    if total_reports == 0:
+        elements.append(Paragraph("<b>NO BLOTTER REPORT FILED</b>", ParagraphStyle('nc', fontSize=16, alignment=TA_CENTER, textColor=colors.red)))
+        doc.build(elements)
+        buffer.seek(0)
+        response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="blotter_reports_summary_{dt.now().strftime("%Y%m%d")}.pdf"'
+        return response
+    
+    # Summary statistics
+    paid_count = sum(1 for r in reports_data if r.get('payment_status_name') == 'PAID')
+    unpaid_count = sum(1 for r in reports_data if r.get('payment_status_name') == 'UNPAID')
+    with_case = sum(1 for r in reports_data if r.get('has_case'))
+    
+    elements.append(Paragraph("<b>SUMMARY STATISTICS</b>", ParagraphStyle('st', fontSize=12, alignment=TA_CENTER)))
+    elements.append(Spacer(1, 10))
+    
+    summary_data = [
+        ['Total Reports', str(total_reports)],
+        ['With Case Filed', str(with_case)],
+        ['Paid', str(paid_count)],
+        ['Unpaid', str(unpaid_count)]
+    ]
+    
+    summary_table = Table(summary_data, colWidths=[3*inch, 2*inch])
+    summary_table.setStyle(TableStyle([
+        ('GRID', (0,0), (-1,-1), 0.5, colors.black),
+        ('BACKGROUND', (0,0), (-1,-1), colors.beige),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('FONTSIZE', (0,0), (-1,-1), 10)
+    ]))
+    elements.append(summary_table)
+    elements.append(Spacer(1, 20))
+    
+    # Reports table
+    elements.append(Paragraph("<b>DETAILED REPORTS</b>", ParagraphStyle('st', fontSize=12, alignment=TA_CENTER)))
+    elements.append(Spacer(1, 10))
+    
+    # Cell style for wrapping text
+    cell_style = ParagraphStyle('cell', fontSize=7, leading=8, alignment=TA_CENTER)
+    
+    table_data = [[
+        Paragraph('<b>ID</b>', ParagraphStyle('hdr', fontSize=8, alignment=TA_CENTER)),
+        Paragraph('<b>Subject</b>', ParagraphStyle('hdr', fontSize=8, alignment=TA_CENTER)),
+        Paragraph('<b>Complainant</b>', ParagraphStyle('hdr', fontSize=8, alignment=TA_CENTER)),
+        Paragraph('<b>Respondent</b>', ParagraphStyle('hdr', fontSize=8, alignment=TA_CENTER)),
+        Paragraph('<b>Status</b>', ParagraphStyle('hdr', fontSize=8, alignment=TA_CENTER)),
+        Paragraph('<b>Payment</b>', ParagraphStyle('hdr', fontSize=8, alignment=TA_CENTER))
+    ]]
+    
     for report in reports_data:
         table_data.append([
-            str(report[0]),
-            (report[1] or 'No Subject')[:30] + '...' if report[1] and len(report[1]) > 30 else (report[1] or 'No Subject'),
-            report[2].strftime('%m/%d/%Y') if report[2] else 'N/A',
-            report[3] or 'Pending',
-            report[4] or 'For Review'
+            Paragraph(str(report.get('blotter_report_id')), cell_style),
+            Paragraph(report.get('incident_subject') or 'No Subject', cell_style),
+            Paragraph(report.get('complainant_names') or 'N/A', cell_style),
+            Paragraph(report.get('respondent_names') or 'N/A', cell_style),
+            Paragraph(report.get('current_status_name') or 'N/A', cell_style),
+            Paragraph(report.get('payment_status_name') or 'N/A', cell_style)
         ])
     
-    table = Table(table_data, colWidths=[1*inch, 2.5*inch, 1.2*inch, 1.2*inch, 1.1*inch])
+    table = Table(table_data, colWidths=[0.5*inch, 1.8*inch, 1.5*inch, 1.5*inch, 1.2*inch, 0.8*inch])
     table.setStyle(TableStyle([
+        ('GRID', (0,0), (-1,-1), 0.5, colors.black),
         ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('FONTSIZE', (0, 1), (-1, -1), 9),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige)
     ]))
     
     elements.append(table)
     doc.build(elements)
     buffer.seek(0)
     
-    from datetime import datetime
     response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="blotter_reports_summary_{datetime.now().strftime("%Y%m%d")}.pdf"'
+    response['Content-Disposition'] = f'attachment; filename="blotter_reports_summary_{dt.now().strftime("%Y%m%d")}.pdf"'
     return response
 
 
@@ -2652,12 +2735,14 @@ def blotter_reports_summary(request: HttpRequest):
 def incident_by_location_report(request: HttpRequest):
     """Generate PDF report of incidents by location"""
     from django.http import HttpResponse
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+    from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.pagesizes import letter
     from reportlab.lib import colors
     from reportlab.lib.units import inch
+    from reportlab.lib.enums import TA_CENTER
     from io import BytesIO
+    import os
     
     # Get filters if POST
     where_conditions = []
@@ -2692,11 +2777,44 @@ def incident_by_location_report(request: HttpRequest):
         location_data = cur.fetchall()
     
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch)
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
     elements = []
-    styles = getSampleStyleSheet()
     
-    add_barangay_header(elements, styles, "INCIDENT REPORTS BY LOCATION")
+    # Header with logos
+    logo_left = os.path.join(settings.BASE_DIR, 'static', 'images', 'brgy-sto-nino.png')
+    logo_right = os.path.join(settings.BASE_DIR, 'static', 'images', 'lupon-tagapamayapa.png')
+    
+    header_data = [[
+        Image(logo_left, width=0.9*inch, height=0.9*inch) if os.path.exists(logo_left) else '',
+        Paragraph("Republic of the Philippines<br/>Office of the Barangay Captain<br/><b>BARANGAY SEÑOR SANTO NIÑO</b><br/>032 Legaspi Street, Cebu City<br/>Telephone No. (032) 254-9250/346-8802", 
+                 ParagraphStyle('hdr', fontSize=11, alignment=TA_CENTER, leading=14)),
+        Image(logo_right, width=0.9*inch, height=0.9*inch) if os.path.exists(logo_right) else ''
+    ]]
+    header_table = Table(header_data, colWidths=[1*inch, 3.5*inch, 1*inch])
+    header_table.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (0,0), (0,0), 'RIGHT'), ('ALIGN', (1,0), (1,0), 'CENTER'), ('ALIGN', (2,0), (2,0), 'LEFT'), ('RIGHTPADDING', (0,0), (0,0), 0), ('LEFTPADDING', (2,0), (2,0), 0)]))
+    elements.append(header_table)
+    elements.append(Spacer(1, 20))
+    
+    # Province/City info
+    from datetime import datetime
+    import calendar
+    current_date = datetime.now()
+    month_name = calendar.month_name[current_date.month]
+    info_data = [[
+        Paragraph(f"Province: <u>CEBU</u>", ParagraphStyle('i', fontSize=10)),
+        Paragraph(f"For the Month of: <u>{month_name}</u>", ParagraphStyle('i', fontSize=10, alignment=2))
+    ], [
+        Paragraph(f"City of: <u>CEBU</u>", ParagraphStyle('i', fontSize=10)),
+        Paragraph(f"Calendar Year: <u>{current_date.year}</u>", ParagraphStyle('i', fontSize=10, alignment=2))
+    ]]
+    info_table = Table(info_data, colWidths=[2.5*inch, 3*inch])
+    info_table.setStyle(TableStyle([('LEFTPADDING', (0,0), (0,-1), 10), ('RIGHTPADDING', (1,0), (1,-1), 10)]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 15))
+    
+    # Title
+    elements.append(Paragraph("<b>INCIDENT REPORTS BY LOCATION</b>", ParagraphStyle('t', fontSize=14, alignment=TA_CENTER, spaceAfter=10)))
+    elements.append(Spacer(1, 20))
     
     table_data = [['Street', 'Barangay', 'Incidents', 'Settled', 'Rate']]
     total_incidents = sum(row[2] for row in location_data)

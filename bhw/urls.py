@@ -24,4 +24,9 @@ urlpatterns = [
 
     path("child/new/", views.child_new, name="child_new"),
     path("add-child/", views.add_child, name="add_child"),
+
+    # HOUSEHOLD MAP
+    path("household/household_map/", views.household_map_list, name="household_map"),
+    path("ajax/household_search/", views.ajax_household_search, name="ajax_household_search"),
+    path("api/household/pins", views.api_household_pins, name="api_household_pins"),
 ]

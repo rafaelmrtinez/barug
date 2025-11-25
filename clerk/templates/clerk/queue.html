@@ -71,6 +71,7 @@
 
           {% for s in statuses %}<input type="hidden" name="status" value="{{ s }}">{% endfor %}
           {% for dt in doc_types %}<input type="hidden" name="doc_type" value="{{ dt }}">{% endfor %}
+          <input type="hidden" name="sort" value="{{ sort_order }}">
 
           <button type="submit" class="btn btn-brand d-flex align-items-center">
             {% bs_icon 'search' extra_classes='me-2' %} Search
@@ -119,8 +120,7 @@
           </thead>
           <tbody>
             {% if page_obj.object_list %}
-              {# oldest first #}
-              {% for r in page_obj.object_list reversed %}
+              {% for r in page_obj.object_list %}
                 <tr class="table-row-height">
                   <td>
                     <div class="text-muted small">
@@ -181,6 +181,14 @@
   <div class="offcanvas-body">
     <form method="get" id="filterForm">
       <input type="hidden" name="q" value="{{ q }}">
+
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Sort Order</label>
+        <select class="form-select" name="sort">
+          <option value="newest" {% if sort_order == 'newest' %}selected{% endif %}>Newest to Oldest</option>
+          <option value="oldest" {% if sort_order == 'oldest' %}selected{% endif %}>Oldest to Newest</option>
+        </select>
+      </div>
 
       <div class="mb-4">
         <div class="form-label fw-semibold d-flex justify-content-between align-items-center">
