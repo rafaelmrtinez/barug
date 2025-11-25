@@ -62,6 +62,7 @@ urlpatterns = [
     
     # CHANNEL MANAGEMENT
     path("ajax/upsert_announcement_channels/", views.upsert_announcement_channels, name="upsert_announcement_channels"),
+    path('api/announcement_channels/<int:announcement_id>/', views.announcement_channels_api, name='announcement_channels_api'),
     
     # PDF APIs
     path("api/residents/pdf/", ResidentsPDFAPI.as_view(), name="residents_pdf_api"),

@@ -2238,7 +2238,7 @@ def upsert_announcement_channels(
         if not channel_type_ids:
             return JsonResponse({'error': 'At least one channel type is required'}, status=400)
 
-        # Use DB transaction to ensure atomicity (both upsert and recipients creation)
+        # Use DB transaction to ensure atomicity
         with transaction.atomic():
             upsert_cmd = UpsertAnnouncementChannelsCMD(
                 announcement_id=announcement_id,
@@ -2247,14 +2247,11 @@ def upsert_announcement_channels(
             upsert_success = channel_service.upsert_announcement_channels(upsert_cmd)
 
             if not upsert_success:
-                # Let the caller know upsert failed; transaction will rollback on exception or return
                 return JsonResponse({'error': 'Failed to upsert channels'}, status=500)
 
-            # After successfully upserting channels, create the announcement recipients
             create_cmd = CreateAnnouncementRecipientsCMD(announcement_id=announcement_id)
             recipients_count = channel_service.create_announcement_recipients(create_cmd)
 
-        # If we reach here transaction committed
         return JsonResponse({
             'success': True,
             'message': f'Channels updated and {recipients_count} recipients created for announcement {announcement_id}',
@@ -2266,6 +2263,34 @@ def upsert_announcement_channels(
         return JsonResponse({'error': str(e)}, status=500)
 
 
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def announcement_channels_api(
+    request: HttpRequest,
+    announcement_id: int,
+    channel_service: IChannelService = Provide[AppContainer.channel_service],
+) -> JsonResponse:
+    """Return applied channels for an announcement"""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'GET required'}, status=405)
+
+    try:
+        channels = channel_service.get_announcement_channels(announcement_id)
+        data = [
+            {
+                'announcement_channel_id': ch.announcement_channel_id,
+                'channel_type_id': ch.channel_type_id,
+                'channel_type_name': ch.channel_type_name,
+                'is_enabled': ch.is_enabled,
+            }
+            for ch in channels
+        ]
+        return JsonResponse({'success': True, 'channels': data})
+    except Exception as e:
+        logger.exception("Failed to get channels: %s", e)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
 # -------------------------------
