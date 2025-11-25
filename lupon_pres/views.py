@@ -43,6 +43,7 @@ from common.services.storage import upload_to_storage
 
 # Flash helpers
 from common.flash import flash_success, flash_warning, flash_db_error, flash_system_error
+from common.email_validator import verify_email_deliverable_abstract
 from django.db import DatabaseError, OperationalError, IntegrityError
 from common.db_errors import _pg_err_tuple
 
@@ -790,6 +791,15 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         if form.is_valid():
             cd = form.cleaned_data
+            
+            # Validate email if provided
+            email_value = cd.get("email") or ""
+            if email_value:
+                is_valid, reason = verify_email_deliverable_abstract(email_value)
+                if not is_valid:
+                    flash_warning(request, f"Email validation failed: {reason}. Please provide a valid email address.")
+                    return redirect(request.path)
+            
             def _label(field, val):
                 return _label_from_choices(form.fields[field].choices, val)
             _wiz_set(request, "personal", {

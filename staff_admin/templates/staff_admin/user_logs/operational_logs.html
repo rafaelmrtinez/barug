@@ -1,0 +1,229 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<link rel="stylesheet" href="{% static 'css/filters.css' %}">
+<style>
+  #filterForm input[type="date"] {
+    border: 2px solid black;
+    border-radius: 24px;
+    padding: 0.375rem 0.75rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    background-color: #fff;
+    width: 100%;
+  }
+  #filterForm input[type="date"]:focus {
+    border-color: var(--bs-danger-text-emphasis);
+    box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+    outline: none;
+  }
+  .status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    background-color: #d4edda;
+    color: #155724;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <div class="container-fluid pt-3 page-main" style="margin-top: 40px;">
+    <div class="row">
+      <div>
+
+        {# ─── Toolbar: search + filters ─── #}
+        <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+          {% csrf_token %}
+          <div class="searchbox">
+            {% bs_icon 'search' extra_classes='bi' %}
+            <input type="text" name="q" class="form-control" placeholder="Search by user name" id="search" value="{{ current_filters.q }}">
+          </div>
+
+          {# preserve selected filters when searching #}
+          <input type="hidden" name="user_type" value="{{ current_filters.user_type }}">
+          <input type="hidden" name="action" value="{{ current_filters.action }}">
+          <input type="hidden" name="subsystem" value="{{ current_filters.subsystem }}">
+          <input type="hidden" name="date_from" value="{{ current_filters.date_from }}">
+          <input type="hidden" name="date_to" value="{{ current_filters.date_to }}">
+
+           <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
+              type="button" data-bs-toggle="offcanvas" data-bs-target="#filterPanel" aria-controls="filterPanel">
+              {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+              {% if active_filters %}
+                <span class="badge rounded-pill text-bg-light ms-2">{{ active_filters|length }}</span>
+              {% endif %}
+            </button>
+        </form>
+
+        {# ─── Active filter chips (show selected labels) ─── #}
+        <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
+          {% if active_filters %}
+            <span class="text-muted me-1">Active:</span>
+            {% for filt in active_filters %}
+              <a class="filter-chip" href="{{ filt.remove_url }}">
+                {{ filt.label }}
+                <span class="x" aria-hidden="true">×</span>
+              </a>
+            {% endfor %}
+            <a class="btn btn-sm btn-outline-brand ms-1" href="{{ clear_filters_url }}">
+              {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
+            </a>
+          {% else %}
+            <span class="text-muted small">No active filters.</span>
+          {% endif %}
+        </div>
+        
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">User</th>
+              <th scope="col">User Type</th>
+              <th scope="col">Action</th>
+              <!-- <th scope="col">Table</th> -->
+              <th scope="col">Details</th>
+              <th scope="col">Timestamp</th>
+              <th scope="col">View</th>
+            </tr>
+          </thead>
+          <tbody id="operational-logs-tbody">
+            {% if page_obj.object_list %}
+              {% for log in page_obj.object_list %}
+                <tr class="table-row-height">
+                  <td>{{ log.performer_name|default:"Unknown User"|title }}</td>
+                  <td>
+                    {% if log.user_type_name %}
+                      {{ log.user_type_name|title }}
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="status-badge">{{ log.action|default:"—"|title }}</span>
+                  </td>
+                  <!-- <td>
+                    <code class="bg-light px-2 py-1 rounded">{{ log.table_affected|default:"—" }}</code>
+                  </td> -->
+                  <td>
+                    <div style="max-width: 250px;">
+                      {% if log.details %}
+                        <div class="text-truncate" title="{{ log.details }}">
+                          {{ log.details|lower|capfirst }}{% if not log.details|last == '.' %}.{% endif %}
+                        </div>
+                        {% if log.reason %}
+                          <small class="text-muted d-block mt-1" title="{{ log.reason }}">
+                            Reason: {{ log.reason|lower|capfirst }}{% if not log.reason|last == '.' %}.{% endif %}
+                          </small>
+                        {% endif %}
+                      {% else %}
+                        —
+                      {% endif %}
+                    </div>
+                  </td>
+                  <td>
+                    {% if log.date_time %}
+                      {{ log.date_time|date:"M d, Y g:i A" }}
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <div class="d-flex gap-1">
+                      <a class="btn btn-icon" href="{% url 'staff_admin:operational_log_details' log_id=log.common_log_id %}" title="View Details">
+                        {% bs_icon 'eye' size='1em' %}
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr><td colspan="7" class="text-center">No operational logs found</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div class="page-pagination"> 
+      {% include 'paginator.html' %}
+    </div>
+  {% endif %}
+
+  {# ─── Offcanvas: Role filter ─── #}
+{# ─── Offcanvas Filters (HARDCODED options) ─── #}
+<div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
+     aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150;">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+
+  <div class="offcanvas-body">
+  <form method="get" id="filterForm">
+    <div>
+      <label class="form-label">User Type</label>
+      <select name="user_type" class="form-select">
+        <option value="all">All User Types</option>
+        <option value="staff" {% if current_filters.user_type == 'staff' %}selected{% endif %}>Staff</option>
+        <option value="person" {% if current_filters.user_type == 'person' %}selected{% endif %}>Person</option>
+        <option value="system" {% if current_filters.user_type == 'system' %}selected{% endif %}>System</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="form-label">Action</label>
+      <select name="action" class="form-select">
+        <option value="all">All Actions</option>
+        <option value="INSERT" {% if current_filters.action == 'INSERT' %}selected{% endif %}>Insert</option>
+        <option value="UPDATE" {% if current_filters.action == 'UPDATE' %}selected{% endif %}>Update</option>
+        <option value="DELETE" {% if current_filters.action == 'DELETE' %}selected{% endif %}>Delete</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="form-label">Subsystem</label>
+      <select name="subsystem" class="form-select">
+        <option value="all">All Subsystems</option>
+        {% for subsystem in subsystems %}
+          <option value="{{ subsystem.id }}" {% if current_filters.subsystem == subsystem.id|stringformat:'s' %}selected{% endif %}>{{ subsystem.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="form-label">Date From</label>
+      <input type="date" name="date_from" class="form-control" value="{{ current_filters.date_from }}">
+    </div>
+
+    <div>
+      <label class="form-label">Date To</label>
+      <input type="date" name="date_to" class="form-control" value="{{ current_filters.date_to }}">
+    </div>
+
+    {# keep search term when applying role #}
+    <input type="hidden" name="q" value="{{ current_filters.q }}"/>
+
+    <div class="offcanvas-footer">
+      <div class="d-flex justify-content-between">
+        <a class="btn btn-outline-brand" href="{{ clear_filters_url }}">Clear</a>
+        <button type="submit" class="btn btn-brand">Apply Filters</button>
+      </div>
+    </div>
+  </form>
+  </div>
+</div>
+  
+</div>
+
+{% endblock %}
