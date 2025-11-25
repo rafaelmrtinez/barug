@@ -64,6 +64,13 @@ from src.app.contracts.audience_service_contract import (
 from src.app.transfer_objects.commands.audience_cmd import (
     AddAnnouncementAudienceCMD
 )
+from src.app.contracts.channel_service_contract import (
+    IChannelService,
+)
+from src.app.transfer_objects.commands.channel_cmd import (
+    UpsertAnnouncementChannelsCMD,
+    CreateAnnouncementRecipientsCMD
+)
 
 
 from .forms import (
@@ -140,6 +147,8 @@ BUCKET_STAFF_PROOF = getattr(settings, "SUPABASE_STAFF_PROOF_BUCKET", "staff-pro
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
 from django.shortcuts import redirect
+from django.db import transaction
+import json
 
 def _smart_redirect(request, url_name, *args, **kwargs):
     url = reverse(url_name, args=args, kwargs=kwargs)
@@ -2196,18 +2205,56 @@ def save_audience_rules(
         logger.exception("Failed to save audience rules: %s", e)
         return JsonResponse({'error': str(e)}, status=500)
 
-def resident_map_list(request):
-    form = StaffFilters()
-    list = []
-    paginator = Paginator(list, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def upsert_announcement_channels(
+    request: HttpRequest,
+    channel_service: IChannelService = Provide[AppContainer.channel_service],
+) -> JsonResponse:
+    """Upsert channels for an announcement and create recipients in the same transaction"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
 
-    return render(request, "resident/resident_map_list.html", {
-        'page_title': 'Resident Map',
-        'page_obj': page_obj,
-        'form': form,
-    })
+    try:
+        data = json.loads(request.body)
+        announcement_id = data.get('announcement_id')
+        channel_type_ids = data.get('channel_type_ids', [])
+
+        if not announcement_id:
+            return JsonResponse({'error': 'Announcement ID required'}, status=400)
+
+        if not channel_type_ids:
+            return JsonResponse({'error': 'At least one channel type is required'}, status=400)
+
+        # Use DB transaction to ensure atomicity (both upsert and recipients creation)
+        with transaction.atomic():
+            upsert_cmd = UpsertAnnouncementChannelsCMD(
+                announcement_id=announcement_id,
+                channel_type_ids=channel_type_ids
+            )
+            upsert_success = channel_service.upsert_announcement_channels(upsert_cmd)
+
+            if not upsert_success:
+                # Let the caller know upsert failed; transaction will rollback on exception or return
+                return JsonResponse({'error': 'Failed to upsert channels'}, status=500)
+
+            # After successfully upserting channels, create the announcement recipients
+            create_cmd = CreateAnnouncementRecipientsCMD(announcement_id=announcement_id)
+            recipients_count = channel_service.create_announcement_recipients(create_cmd)
+
+        # If we reach here transaction committed
+        return JsonResponse({
+            'success': True,
+            'message': f'Channels updated and {recipients_count} recipients created for announcement {announcement_id}',
+            'recipients_count': recipients_count
+        })
+
+    except Exception as e:
+        logger.exception("Failed to upsert channels and create recipients: %s", e)
+        return JsonResponse({'error': str(e)}, status=500)
+
 
 
 

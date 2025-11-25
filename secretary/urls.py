@@ -60,6 +60,9 @@ urlpatterns = [
     path("ajax/save_audience_rules/", views.save_audience_rules, name="save_audience_rules"),
     path("ajax/announcement_draft_search/", views.ajax_announcement_draft_search, name="ajax_announcement_draft_search"),
     
+    # CHANNEL MANAGEMENT
+    path("ajax/upsert_announcement_channels/", views.upsert_announcement_channels, name="upsert_announcement_channels"),
+    
     # PDF APIs
     path("api/residents/pdf/", ResidentsPDFAPI.as_view(), name="residents_pdf_api"),
     path("api/business/pdf/", BusinessPDFAPI.as_view(), name="business_pdf_api"),

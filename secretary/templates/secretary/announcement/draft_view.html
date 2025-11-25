@@ -9,10 +9,16 @@
         <div class="card">
           <div class="card-header d-flex justify-content-between align-items-center">
             <h5 class="mb-0">{{ draft.announcement_title }}</h5>
-            <a href="{% url 'secretary:announcement_draft_list' %}" class="btn btn-outline-secondary btn-sm">
-              <i class="bi bi-arrow-left"></i> Back to List
-            </a>
+            <div>
+              <a href="{% url 'secretary:announcement_draft_list' %}" class="btn btn-outline-secondary btn-sm me-2">
+                <i class="bi bi-arrow-left"></i> Back to List
+              </a>
+              <button id="save-channels-btn" class="btn btn-success btn-sm" type="button" onclick="saveChannels()">
+                <i class="bi bi-save"></i> Save Channels
+              </button>
+            </div>
           </div>
+
           <div class="card-body">
             <div class="row">
               <div class="col-md-8">
@@ -20,7 +26,7 @@
                 <div class="border rounded p-3 mb-3" style="background-color: #f8f9fa;">
                   {{ draft.announcement_body|linebreaks }}
                 </div>
-                
+
                 <div class="row">
                   <div class="col-md-6">
                     <h6>Publish Date</h6>
@@ -44,11 +50,11 @@
                   </div>
                 </div>
               </div>
-              
+
               <div class="col-md-4">
                 <h6>Audiences</h6>
                 {% if audiences %}
-                  <div class="list-group">
+                  <div class="list-group mb-3">
                     {% for audience in audiences %}
                       <div class="list-group-item">
                         <div class="d-flex justify-content-between align-items-center">
@@ -68,18 +74,117 @@
                     <i class="bi bi-plus"></i> Add Audience
                   </a>
                 {% endif %}
+
+                <hr>
+
+                <h6>Channel Types</h6>
+                <div id="channel-types-section">
+                  <div id="selected-channels" class="mb-3"></div>
+
+                  <form id="channelForm" onsubmit="return false;">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                      {{ form.channel }}
+                    </div>
+
+                    <div class="d-flex gap-2">
+                      <button type="button" class="btn btn-outline-success btn-sm" onclick="addChannel()">
+                        <i class="bi bi-plus"></i> Add Channel Type
+                      </button>
+                      <button id="clear-channels-btn" type="button" class="btn btn-outline-danger btn-sm" onclick="clearChannels()">
+                        <i class="bi bi-x-circle"></i> Clear
+                      </button>
+                    </div>
+
+                    <small class="form-text text-muted mt-2">
+                      Add channel types and click <strong>Save Channels</strong> to persist.
+                    </small>
+                  </form>
+                </div>
               </div>
             </div>
           </div>
-          <div class="card-footer">
+
+          <div class="card-footer d-flex justify-content-between align-items-center">
             <small class="text-muted">
-              Created: {{ draft.announcement_created_at|date:"M d, Y g:i A" }} | 
+              Created: {{ draft.announcement_created_at|date:"M d, Y g:i A" }} |
               Status: {{ draft.announcement_status_name|default:"Draft" }}
             </small>
+            <small id="save-status" class="text-muted"></small>
           </div>
+          <div id="draft-data" data-announcement-id="{{ draft.announcement_id }}"></div>
         </div>
       </div>
     </div>
   </div>
 </div>
+
+<script>
+const announcementId = Number(document.getElementById('draft-data').dataset.announcementId);
+async function saveChannels() {
+  // Collect selected channel_type_ids — adapt depending on your form control(s)
+  // Example: if form.channel is a multiple select with name 'channel'
+  const select = document.querySelector('select[name="channel"]');
+  const channelTypeIds = [];
+  if (select) {
+    for (const opt of select.options) {
+      if (opt.selected) channelTypeIds.push(Number(opt.value));
+    }
+  }
+
+  if (!channelTypeIds.length) {
+    alert('Please choose at least one channel type.');
+    return;
+  }
+
+  // show saving state
+  const statusEl = document.getElementById('save-status');
+  statusEl.textContent = 'Saving channels...';
+
+  try {
+    const res = await fetch("{% url 'secretary:upsert_announcement_channels' %}", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken') // helper below
+      },
+      body: JSON.stringify({
+        announcement_id: announcementId,
+        channel_type_ids: channelTypeIds
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      statusEl.textContent = `Error: ${data.error || 'Unknown error'}`;
+      console.error(data);
+      return;
+    }
+
+    // success: show recipients count returned by server
+    if (data.success) {
+      statusEl.textContent = `Saved. ${data.recipients_count ?? 0} recipients created.`;
+    } else {
+      statusEl.textContent = `Unexpected response.`;
+      console.log(data);
+    }
+
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = 'Network error while saving channels.';
+  }
+}
+
+// helper to read cookie (CSRF)
+function getCookie(name) {
+  const parts = document.cookie.split(';').map(c => c.trim());
+  for (const p of parts) {
+    if (p.startsWith(name + '=')) return decodeURIComponent(p.split('=')[1]);
+  }
+  return null;
+}
+</script>
+
+
 {% endblock %}
