@@ -21,6 +21,9 @@ from django.contrib import messages
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, HttpResponsePermanentRedirect, HttpResponseBadRequest
 from django.template.loader import render_to_string
 from django.http import JsonResponse
+from django.views import View
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_protect as csrf_required
 from django.shortcuts import render, redirect
 from django.views.decorators.http import require_GET, require_http_methods
 from django.views.decorators.csrf import csrf_protect
@@ -2722,3 +2725,4 @@ def incident_heatmap(request: HttpRequest):
         'page_path': f'{user_role} / Incident Heatmap',
         'page_title': 'Barangay Incident Heatmap & Analytics',
     })
+    

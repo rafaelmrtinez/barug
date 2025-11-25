@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple
-from datetime import datetime
+from datetime import datetime, timezone as dt_timezone
 from zoneinfo import ZoneInfo
 
 from django.utils import timezone
@@ -40,7 +40,7 @@ def _fmt_occured_at(val) -> str:
     if not dt:
         return str(val)
     if timezone.is_naive(dt):
-        dt = timezone.make_aware(dt, timezone.utc)
+        dt = timezone.make_aware(dt, dt_timezone.utc)
     dt_local = timezone.localtime(dt, PH_TZ)
     return dt_local.strftime("%b %d, %Y • %I:%M %p")
 

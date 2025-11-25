@@ -31,15 +31,18 @@
   .ctc-chip{ border-radius:999px; padding:6px 12px; font-weight:800; background:#0000000d; border:1px solid #0000001a; color:#5a3e00; }
 </style>
 
-<div class="container py-3" style="margin-top: 40;">
+<div class="container py-3">
 
   {% if ctc_mode %}
   <!-- =================== CTC VARIANT =================== -->
   <div class="ctc-hero mb-3 d-flex align-items-center gap-3">
     <div class="me-auto">
       <div class="fw-bold">CTC — {{ biz.business_name|default:"—" }}</div>
-      <div class="small">
+      <!-- <div class="small">
         Business ID: {{ biz.business_id|default:"—" }} • Request ID: {{ doc_request_id|default:"—" }} • Code: {{ header.request_code|default:"—" }}
+      </div> -->
+      <div class="small">
+        {{ header.request_code|default:"—" }}
       </div>
     </div>
     <span class="ctc-chip">CERTIFIED TRUE COPY</span>
@@ -61,7 +64,7 @@
           {% if ctc_ref_header %}
             <ul class="kv">
               <li><span class="label">Original Request Code</span><span class="value">{{ ctc_ref_header.request_code|default:"—" }}</span></li>
-              <li><span class="label">Original Status</span><span class="value">{{ ctc_ref_header.status|default:"—" }}</span></li>
+              <!-- <li><span class="label">Original Status</span><span class="value">{{ ctc_ref_header.status|default:"—" }}</span></li> -->
               <li><span class="label">Requested By</span><span class="value">{{ ctc_ref_header.requester_full_name|default:"—" }}</span></li>
             </ul>
 
@@ -109,7 +112,8 @@
         </div>
       </div>
 
-      <!-- Compliance (short) -->
+    </div>
+    <!-- Compliance (short) - HIDDEN
       <div class="card card-soft mb-3">
         <div class="card-body">
           <div class="section-title"><span class="dot"></span> Compliance</div>
@@ -119,7 +123,7 @@
           </div>
         </div>
       </div>
-    </div>
+     -->
 
     <!-- RIGHT: PAYMENT (unchanged) -->
     <div class="col-lg-4">
@@ -143,24 +147,19 @@
             <div class="mb-3 text-muted">None yet</div>
           {% endif %}
 
-          {% if status_ui.label == "PAID" %}
+          {% if status_ui.label == "PAID" or status_ui.label == "For Printing" and payments.latest_or_number or status_ui.label == "Released" %}
             <div class="alert alert-success mb-0">Payment complete. Request may be printed.</div>
           {% else %}
-            <form method="post" action="{% url 'treasurer:business_pay_and_print' biz.business_id doc_request_id %}">
+            <form method="post" action="{% url 'treasurer:business_pay_and_print' biz.business_id doc_request_id %}" onsubmit="return confirm('Are you sure you want to process this payment and move to printing?');">
               {% csrf_token %}
               <div class="mb-2">
                 <label class="form-label">Payment Method</label>
-                <select class="form-select" name="payment_method_id" required>
-                  <option value="">Select…</option>
-                  {% for m in methods %}
-                    <option value="{{ m.payment_method_id }}">{{ m.method_name }}</option>
-                  {% endfor %}
-                </select>
+                <input class="form-control" name="payment_method_id" value="CASH" readonly style="background:#f8f9fa;">
               </div>
               <div class="mb-3">
                 <label class="form-label">Amount Paid (₱)</label>
-                <input class="form-control" name="amount_paid" type="number" step="0.01" min="0"
-                       value="{{ header.amount_due|default:0 }}">
+                <input class="form-control" name="amount_paid" type="text"
+                       value="₱{{ header.amount_due|default:0|floatformat:2 }}" readonly style="background:#f8f9fa;">
                 <div class="form-text">Amount due: ₱{{ header.amount_due|default:0|floatformat:2 }}</div>
               </div>
               <button class="btn btn-brand w-100">
@@ -178,9 +177,12 @@
   <div class="hero mb-3 d-flex align-items-center gap-3">
     <div class="me-auto">
       <div class="fw-bold">{{ biz.business_name|default:"—" }}</div>
-      <div class="text-white-50 small">
+      <!-- <div class="text-white-50 small">
         Business ID: {{ biz.business_id|default:"—" }} • Request ID: {{ doc_request_id|default:"—" }} Code: {{ header.request_code }}
         Requested Document: {{ document_type_name }}
+      </div> -->
+      <div class="text-white-50 small">
+        {{ header.request_code }}
       </div>
     </div>
     <span class="chip">{% if biz.has_business_clearance %}HAS CLEARANCE{% else %}NO CLEARANCE{% endif %}</span>
@@ -233,7 +235,7 @@
       </div>
 
       <!-- Compliance -->
-      <div class="card card-soft mb-3">
+      <div class="card card-soft mb-3" style="display:none;">
         <div class="card-body">
           <div class="section-title"><span class="dot"></span> Compliance</div>
 
@@ -306,7 +308,7 @@
             <div class="mb-3 text-muted">None yet</div>
           {% endif %}
 
-          {% if status_ui.label == "PAID" %}
+          {% if status_ui.label == "PAID" or status_ui.label == "For Printing" and payments.latest_or_number or status_ui.label == "Released" %}
             <div class="alert alert-success mb-0">Payment complete. Request may be printed.</div>
           {% else %}
             <form method="post" action="{% url 'treasurer:business_pay_and_print' biz.business_id doc_request_id %}">

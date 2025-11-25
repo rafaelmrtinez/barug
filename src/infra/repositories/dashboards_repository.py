@@ -802,7 +802,7 @@ class LuponMemDashboardRepository:
             FROM public.blotter_case bc
             JOIN public.settlement_status ss
             ON bc.settlement_status_id = ss.settlement_status_id
-            WHERE ss.settlement_status_name = 'SETTLED';
+            WHERE ss.settlement_status_name IN ('SETTLED', 'SETTLED THROUGH MEDIATION', 'SETTLED THROUGH CONCILIATION');
         """
         try:
             result = self._ctx.execute_query(query)

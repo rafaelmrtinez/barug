@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from common.api.financial_pdf_api import FinancialPDFAPI
 
 app_name = "treasurer"
 
@@ -28,6 +29,10 @@ urlpatterns = [
 
     # FINANCIAL REPORT
     path("financial-report/", views.financial_report, name="financial_report"),
+    path("financial-report/search/", views.financial_report, name="financial_report_search"),
+    
+    # PDF API
+    path("api/financial/pdf/", FinancialPDFAPI.as_view(), name="financial_pdf_api"),
 
     # REFUND
     path("refunds/", views.payment_refunds, name="payment_refunds"),
@@ -49,4 +54,8 @@ urlpatterns = [
     path("closure/<int:business_id>/group/", views.closure_group, name="closure_group"),
     path("closure/<int:closure_payment_request_id>/take-payment/", views.closure_take_payment, name="closure_take_payment"),
     path("closure/<int:business_id>/take-payment-all/", views.closure_take_payment_all, name="closure_take_payment_all"),
+    
+    # People request history
+    path("people/requests/", views.people_requests, name="people_requests"),
+    path("people/<int:person_id>/requests/", views.person_request_history, name="person_request_history"),
 ]

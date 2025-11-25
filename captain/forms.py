@@ -118,6 +118,43 @@ STAFF_ACCOUNT_STATUS = [
     (1, "Active"), (2, "Inactive"), (3, "Deactivated"), (4, "Pending"),
 ]
 
+PUROK_SITIO_CHOICES = [
+    ("", "— Select Purok/Sitio —"),
+    (1, "Kanipaan"),
+    (2, "Pampango"),
+    (3, "Lutaw-Lutaw"),
+    (4, "Mauco"),
+]
+
+PAYMENT_METHOD_CHOICES = [
+    ("", "— Select Payment Method —"),
+    (1, "CASH"),
+    (2, "GCASH"),
+    (3, "CARD"),
+    (4, "WAIVED"),
+    (5, "ONLINE GCASH"),
+]
+
+class ORFilters(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search',
+        }),
+        label= 'Search',
+        required= False,
+    )
+    pay_meth = forms.ChoiceField(
+        choices= PAYMENT_METHOD_CHOICES,
+        widget=forms.Select(attrs={
+            'id' : 'pay_meth',
+            'class' : 'form-select',
+        }),
+        label= 'Payment Method',
+        required= False,
+    )
+
 class Schedule(forms.Form):
     day = forms.TypedChoiceField(
         label="Select a Day",
@@ -612,4 +649,25 @@ class ResidentProfileform(forms.Form):
     }),
         label= 'Proof of Employment',
         required= True,
+    )
+
+
+class ResidentFilters(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search',
+        }),
+        label= 'Search',
+        required= False,
+    )
+    purok_sitio = forms.ChoiceField(
+        choices= PUROK_SITIO_CHOICES,
+        widget=forms.Select(attrs={
+            'id' : 'purok_sitio',
+            'class' : 'form-select',
+        }),
+        label= 'Purok / Sitio',
+        required= False,
     )

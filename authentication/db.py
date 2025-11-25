@@ -81,3 +81,39 @@ def get_staff_common_logs_with_names(staff_id: int):
         columns = [col[0] for col in cur.description]
         rows = cur.fetchall()
     return [dict(zip(columns, row)) for row in rows]
+
+def call_staff_logout(login_log_id: int, staff_id: int, ip_address: str = None):
+    """
+    Calls the staff_logout2 function to properly log out a user session
+    Returns the updated login_log record
+    """
+    sql = "SELECT * FROM staff_logout2(%s, %s, %s);"
+    with connection.cursor() as cur:
+        cur.execute(sql, [login_log_id, staff_id, ip_address])
+        row = cur.fetchone()
+    return row
+
+def call_staff_logout_with_time(login_log_id: int, staff_id: int, ip_address: str = None, logout_time = None):
+    """
+    Calls staff_logout with specific logout time for expired sessions
+    If logout_time is provided, uses it; otherwise uses current time
+    """
+    if logout_time:
+        sql = "UPDATE login_log SET logout_time = %s, ip_add = %s WHERE login_log_id = %s AND user_id = %s;"
+        with connection.cursor() as cur:
+            cur.execute(sql, [logout_time, ip_address, login_log_id, staff_id])
+    else:
+        return call_staff_logout(login_log_id, staff_id, ip_address)
+
+def get_latest_login_log():
+    """
+    Get the latest login log entry for debugging
+    """
+    sql = "SELECT * FROM login_log ORDER BY login_log_id DESC LIMIT 1;"
+    with connection.cursor() as cur:
+        cur.execute(sql)
+        cols = [col[0] for col in cur.description]
+        row = cur.fetchone()
+        if row:
+            return dict(zip(cols, row))
+    return None

@@ -3,6 +3,9 @@ from . import views
 from . import web_views
 from django.conf import settings
 from django.conf.urls.static import static
+from common.api.residents_pdf_api import ResidentsPDFAPI
+from common.api.business_pdf_api import BusinessPDFAPI
+from common.api.household_pdf_api import HouseholdPDFAPI
 
 app_name = 'clerk'
 
@@ -64,4 +67,7 @@ urlpatterns = [
     path("ajax/resident_owner_search/", views.ajax_owner_search, name="ajax_owner_search"),
     path("ajax/nonresident_owner_search/", views.ajax_nonresident_owner_search, name="ajax_nonresident_owner_search"),
     path("api/business/pins", views.api_business_pins, name="api_business_pins"),
+
+    # PDF APIs
+    path("api/business/pdf/", BusinessPDFAPI.as_view(), name="business_pdf_api"),
 ]

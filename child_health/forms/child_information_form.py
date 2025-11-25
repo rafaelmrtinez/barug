@@ -14,7 +14,7 @@ class ChildInformationForm(forms.Form):
     sex = forms.ChoiceField(
         label="Sex", choices=SEX_CHOICES, required=False, error_messages={'required': 'Sex is required.'})
     birth_order = forms.IntegerField(
-        label="Birth Order", required=False, min_value=1, error_messages={'required': 'Birth Order is required.'})
+        label="Birth Order", required=True, min_value=1, error_messages={'required': 'Birth Order is required.'})
     date_of_birth = forms.DateField(label="Date of Birth", required=False, widget=forms.DateInput(
         attrs={'type': 'date'}), error_messages={'required': 'Date of Birth is required.'})
     place_of_delivery = forms.ChoiceField(
