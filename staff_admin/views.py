@@ -41,6 +41,7 @@ from authentication.utils import nocache
 from captain.models import Captain
 from common.flash import flash_db_error, flash_success, flash_system_error, flash_warning
 from common.send_email import send_email
+from common.email_validator import verify_email_deliverable_abstract
 from common.services.storage import upload_to_storage
 from common.supabase_client import supabase
 from secretary.models import Secretary
@@ -646,6 +647,14 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
             temp_password = _rand_password(8)
 
             email_to = (request.POST.get("email") or "").strip() or (srow.get("email") or "").strip()
+            
+            # Validate email if provided
+            if email_to:
+                is_valid, reason = verify_email_deliverable_abstract(email_to)
+                if not is_valid:
+                    flash_warning(request, f"Email validation failed: {reason}. Staff account created but credentials not sent.")
+                    email_to = None
+            
             sent_flag = bool(email_to)
 
             ok_upsert = Captain.upsert_staff_credentials_and_log(
@@ -786,7 +795,40 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
 @nocache
 @require_http_methods(["GET","POST"])
 def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
-    form = ResidentProfileform(request.POST or None)
+    # Get existing wizard data for form initialization
+    wiz = _wiz_get(request)
+    personal = wiz.get("personal") or {}
+    
+    # Prepare initial data for form
+    initial_data = {}
+    if personal and request.method == "GET":
+        initial_data = {
+            "first_name": personal.get("first_name", ""),
+            "last_name": personal.get("last_name", ""),
+            "middle_name": personal.get("middle_name", ""),
+            "suffix": personal.get("suffix", ""),
+            "sex": personal.get("sex_id"),
+            "civil_status": personal.get("civil_status_id"),
+            "nationality": personal.get("nationality_id"),
+            "religion": personal.get("religion_id"),
+            "email": personal.get("email", ""),
+            "mob_num": personal.get("mobile_num", ""),
+            "street": personal.get("street", ""),
+            "purok_sitio": personal.get("sitio_purok", ""),
+            "barangay": personal.get("barangay", ""),
+            "city": personal.get("city", ""),
+        }
+        # Handle date field separately
+        if personal.get("birthdate"):
+            try:
+                from datetime import datetime
+                birthdate_str = personal.get("birthdate")
+                if isinstance(birthdate_str, str):
+                    initial_data["dob"] = datetime.fromisoformat(birthdate_str).date()
+            except (ValueError, TypeError):
+                pass
+    
+    form = ResidentProfileform(request.POST or None, initial=initial_data)
     for f in (
         "res_code", "username", "temp_pass", "res_status", "reg_method",
         "reg_date", "acc_status", "added_by", "home_address",
@@ -799,6 +841,15 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
         if form.is_valid():
             cd = form.cleaned_data
             dob = cd.get("dob")
+            
+            # Validate email if provided
+            email_value = cd.get("email") or ""
+            if email_value:
+                is_valid, reason = verify_email_deliverable_abstract(email_value)
+                if not is_valid:
+                    flash_warning(request, f"Email validation failed: {reason}. Please provide a valid email address.")
+                    return redirect(request.path)
+            
             _wiz_set(request, "personal", {
                 "first_name":  cd.get("first_name") or "",
                 "last_name":   cd.get("last_name") or "",
@@ -806,7 +857,7 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
                 "suffix":      (cd.get("suffix") or "").strip() or None,
                 "birthdate":   (dob.isoformat() if dob else None),
                 "birthdate_label": (dob.strftime("%B %d, %Y") if dob else ""),
-                "email":       cd.get("email") or "",
+                "email":       email_value,
                 "mobile_num":  cd.get("mob_num") or "",
                 "sex_id":          int(cd["sex"]) if str(cd.get("sex") or "").isdigit() else None,
                 "civil_status_id": int(cd["civil_status"]) if str(cd["civil_status"]).isdigit() else None,
@@ -835,6 +886,7 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
         'user_role_template': user_role_template,
         'form' : form,
         'redirect': 'staff_admin:staff_selection_nonres_docs',
+        'has_saved_data': bool(personal),  # Indicate if there's saved data
     })
 
 # ── Non-resident Step 2 (docs preview) ───────────────────────────────────────
@@ -843,15 +895,24 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
 @nocache
 @require_http_methods(["GET","POST"])
 def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
-    form = ResidentProfileform(request.POST or None, request.FILES or None)
+    wiz = _wiz_get(request)
+    personal = wiz.get("personal") or {}
+    docs = wiz.get("docs") or {}
+    
+    # Prepare initial data for form when navigating back
+    initial_data = {}
+    if docs and request.method == "GET":
+        initial_data = {
+            "type_of_id": docs.get("valid_id_type_id"),
+        }
+    
+    form = ResidentProfileform(request.POST or None, request.FILES or None, initial=initial_data)
     for f in ("last_name","first_name","middle_name","suffix","sex","dob",
               "civil_status","nationality","religion","email","mob_num",
               "street","purok_sitio","barangay","city"):
         if f in form.fields:
             form.fields[f].required = False
 
-    wiz = _wiz_get(request)
-    personal = wiz.get("personal") or {}
     if request.method == "GET":
         if not personal:
             flash_warning(request, "Personal information is missing. Please complete Step 1.")
@@ -1183,6 +1244,13 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
     # Send emails
     applicant_email = (personal.get("email") or "").strip()
     if applicant_email:
+        # Validate email before sending
+        is_valid, reason = verify_email_deliverable_abstract(applicant_email)
+        if not is_valid:
+            flash_warning(request, f"Staff account created successfully but email validation failed: {reason}. Credentials not sent.")
+            applicant_email = None
+    
+    if applicant_email:
         try:
             role_label = None
             try:
@@ -1481,6 +1549,13 @@ def staff_dets(request, staff_code: str):
             username = (request.POST.get("username") or "").strip() or None
             password = (request.POST.get("password") or "").strip() or None
             email = (request.POST.get("email_address") or "").strip() or None
+            
+            # Validate email if provided
+            if email:
+                is_valid, reason = verify_email_deliverable_abstract(email)
+                if not is_valid:
+                    flash_warning(request, f"Email validation failed: {reason}. Please provide a valid email address.")
+                    return redirect(request.path)
             
             # Extract purok IDs
             purok_ids = []
@@ -2045,6 +2120,13 @@ def process_staff_request(request: HttpRequest) -> HttpResponse:
 
     remarks = (request.POST.get("remarks") or "").strip() or None
     email_from_form = (request.POST.get("email") or "").strip()
+    
+    # Validate email if provided
+    if email_from_form:
+        is_valid, reason = verify_email_deliverable_abstract(email_from_form)
+        if not is_valid:
+            flash_warning(request, f"Email validation failed: {reason}. Request will be processed but email notifications may not be sent.")
+            email_from_form = ""
 
     try:
         result_text = Captain.process_staff_account_request(
@@ -2108,6 +2190,14 @@ def process_staff_request(request: HttpRequest) -> HttpResponse:
                     temp_password = _rand_password(8)
 
                     email_to = email_from_form or (staff_row.get("email") or "").strip()
+                    
+                    # Validate email if provided
+                    if email_to:
+                        is_valid, reason = verify_email_deliverable_abstract(email_to)
+                        if not is_valid:
+                            flash_warning(request, f"Email validation failed: {reason}. Staff approved but credentials email not sent.")
+                            email_to = None
+                    
                     sent_flag = bool(email_to)
 
                     ok_upsert = Captain.upsert_staff_credentials_and_log(
@@ -2172,8 +2262,7 @@ def access_logs(request):
     
     filters = request.session.get(ACCESS_LOG_FILTER_SESSION_KEY, {}) or {}
     role_raw = (filters.get("role") or "").strip()
-    date_from_raw = (filters.get("date_from") or "").strip()
-    date_to_raw = (filters.get("date_to") or "").strip()
+    login_status_raw = (filters.get("login_status") or "").strip()
     search_term = (filters.get("q") or "").strip()
 
     updated = False
@@ -2181,8 +2270,7 @@ def access_logs(request):
 
     if "clear_filters" in request.GET:
         role_raw = ""
-        date_from_raw = ""
-        date_to_raw = ""
+        login_status_raw = ""
         search_term = ""
         updated = True
         should_redirect = True
@@ -2191,10 +2279,8 @@ def access_logs(request):
     if remove_target:
         if remove_target == "role":
             role_raw = ""
-        elif remove_target == "date_from":
-            date_from_raw = ""
-        elif remove_target == "date_to":
-            date_to_raw = ""
+        elif remove_target == "login_status":
+            login_status_raw = ""
         elif remove_target == "search":
             search_term = ""
         updated = True
@@ -2203,11 +2289,8 @@ def access_logs(request):
     if "role" in request.GET:
         role_raw = (request.GET.get("role") or "").strip()
         updated = True
-    if "date_from" in request.GET:
-        date_from_raw = (request.GET.get("date_from") or "").strip()
-        updated = True
-    if "date_to" in request.GET:
-        date_to_raw = (request.GET.get("date_to") or "").strip()
+    if "login_status" in request.GET:
+        login_status_raw = (request.GET.get("login_status") or "").strip()
         updated = True
     if "q" in request.GET:
         search_term = (request.GET.get("q") or "").strip()
@@ -2215,8 +2298,7 @@ def access_logs(request):
 
     filters_state = {
         "role": role_raw,
-        "date_from": date_from_raw,
-        "date_to": date_to_raw,
+        "login_status": login_status_raw,
         "q": search_term,
     }
     if updated or ACCESS_LOG_FILTER_SESSION_KEY not in request.session:
@@ -2243,21 +2325,11 @@ def access_logs(request):
         except ValueError:
             pass
     
-    if date_from_raw:
-        from datetime import datetime
-        try:
-            date_from = datetime.strptime(date_from_raw, "%Y-%m-%d").date()
-            filtered = [r for r in filtered if r.get("last_login_time") and r["last_login_time"].date() >= date_from]
-        except ValueError:
-            pass
-
-    if date_to_raw:
-        from datetime import datetime
-        try:
-            date_to = datetime.strptime(date_to_raw, "%Y-%m-%d").date()
-            filtered = [r for r in filtered if r.get("last_login_time") and r["last_login_time"].date() <= date_to]
-        except ValueError:
-            pass
+    if login_status_raw:
+        if login_status_raw == "active":
+            filtered = [r for r in filtered if r.get("active_sessions", 0) > 0]
+        elif login_status_raw == "inactive":
+            filtered = [r for r in filtered if r.get("active_sessions", 0) == 0]
 
     if search_term:
         search_lower = search_term.lower()
@@ -2272,8 +2344,7 @@ def access_logs(request):
 
     form_initial = {
         "role": role_raw,
-        "date_from": date_from_raw,
-        "date_to": date_to_raw,
+        "login_status": login_status_raw,
         "search": search_term,
     }
     form = AccessLogFilters(initial=form_initial)
@@ -2299,15 +2370,11 @@ def access_logs(request):
             "label": f"Role: {role_name}",
             "remove_url": f"{request.path}?remove_filter=role",
         })
-    if date_from_raw:
+    if login_status_raw:
+        status_label = "Active" if login_status_raw == "active" else "Inactive" if login_status_raw == "inactive" else login_status_raw
         active_filters.append({
-            "label": f"From: {date_from_raw}",
-            "remove_url": f"{request.path}?remove_filter=date_from",
-        })
-    if date_to_raw:
-        active_filters.append({
-            "label": f"To: {date_to_raw}",
-            "remove_url": f"{request.path}?remove_filter=date_to",
+            "label": f"Status: {status_label}",
+            "remove_url": f"{request.path}?remove_filter=login_status",
         })
     if search_term:
         active_filters.append({
@@ -2341,6 +2408,7 @@ OPERATIONAL_LOG_FILTER_SESSION_KEY = "admin_operational_log_filters"
 @nocache
 def operational_logs(request):
     filters = request.session.get(OPERATIONAL_LOG_FILTER_SESSION_KEY, {}) or {}
+    user_type_raw = (filters.get("user_type") or "").strip()
     action_raw = (filters.get("action") or "").strip()
     subsystem_raw = (filters.get("subsystem") or "").strip()
     date_from_raw = (filters.get("date_from") or "").strip()
@@ -2351,6 +2419,7 @@ def operational_logs(request):
     should_redirect = False
 
     if "clear_filters" in request.GET:
+        user_type_raw = ""
         action_raw = ""
         subsystem_raw = ""
         date_from_raw = ""
@@ -2361,7 +2430,9 @@ def operational_logs(request):
 
     remove_target = (request.GET.get("remove_filter") or "").strip()
     if remove_target:
-        if remove_target == "action":
+        if remove_target == "user_type":
+            user_type_raw = ""
+        elif remove_target == "action":
             action_raw = ""
         elif remove_target == "subsystem":
             subsystem_raw = ""
@@ -2374,6 +2445,9 @@ def operational_logs(request):
         updated = True
         should_redirect = True
 
+    if "user_type" in request.GET:
+        user_type_raw = (request.GET.get("user_type") or "").strip()
+        updated = True
     if "action" in request.GET:
         action_raw = (request.GET.get("action") or "").strip()
         updated = True
@@ -2391,6 +2465,7 @@ def operational_logs(request):
         updated = True
 
     filters_state = {
+        "user_type": user_type_raw,
         "action": action_raw,
         "subsystem": subsystem_raw,
         "date_from": date_from_raw,
@@ -2413,6 +2488,9 @@ def operational_logs(request):
 
     # Apply filters
     filtered = rows
+    
+    if user_type_raw and user_type_raw != "all":
+        filtered = [r for r in filtered if (r.get("user_type_name") or "").lower() == user_type_raw.lower()]
     
     if action_raw and action_raw != "all":
         filtered = [r for r in filtered if r.get("action") == action_raw]
@@ -2459,6 +2537,11 @@ def operational_logs(request):
 
     # Build active filters
     active_filters = []
+    if user_type_raw and user_type_raw != "all":
+        active_filters.append({
+            "label": f"User Type: {user_type_raw.title()}",
+            "remove_url": f"{request.path}?remove_filter=user_type",
+        })
     if action_raw and action_raw != "all":
         active_filters.append({
             "label": f"Action: {action_raw}",
@@ -2567,6 +2650,16 @@ def access_log_details(request, log_id):
 @role_required(ADMIN_ROLE)
 @nocache
 def operational_log_details(request, log_id):
+    try:
+        log_detail = Admin.get_common_log_detail(int(log_id))
+    except Exception as e:
+        logger.exception("Failed to load operational log details: %s", e)
+        log_detail = None
+
+    if not log_detail:
+        flash_warning(request, f"No operational log found with ID {log_id}.")
+        return redirect("staff_admin:operational_logs")
+
     user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "staff_admin/logs/operational_log_details.html", {
         'user_fullname': user_fullname,
@@ -2574,5 +2667,5 @@ def operational_log_details(request, log_id):
         'page_path': f'{user_role} / Operational Log Details',
         'page_title': 'Operational Log Details',
         'user_role_template': user_role_template,
-        'log_id': log_id,
+        'log_detail': log_detail,
     })

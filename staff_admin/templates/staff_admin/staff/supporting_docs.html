@@ -84,4 +84,81 @@
     </form>
 
 </div>
+
+<script>
+(() => {
+  const form = document.querySelector('form[action*="staff_selection_nonres_docs"]');
+  if (!form) return;
+
+  const STORAGE_KEY = 'staff_nonres_docs_data';
+
+  function saveFormData() {
+    const formData = {};
+    const formElements = form.querySelectorAll('input, select');
+    
+    formElements.forEach(el => {
+      if (el.name === 'csrfmiddlewaretoken') return;
+      if (el.type === 'file') {
+        // Don't save file inputs to storage, but track if they have files
+        if (el.files && el.files.length > 0) {
+          formData[el.name + '_has_file'] = true;
+        }
+      } else {
+        formData[el.name] = el.value;
+      }
+    });
+    
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
+  }
+
+  function restoreFormData() {
+    try {
+      const savedData = sessionStorage.getItem(STORAGE_KEY);
+      if (!savedData) return;
+      
+      const formData = JSON.parse(savedData);
+      const formElements = form.querySelectorAll('input, select');
+      let restoredCount = 0;
+      
+      formElements.forEach(el => {
+        if (el.name === 'csrfmiddlewaretoken') return;
+        if (el.type === 'file') return; // Skip file inputs
+        if (!formData.hasOwnProperty(el.name)) return;
+        
+        const savedValue = formData[el.name];
+        if (savedValue) {
+          el.value = savedValue;
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          restoredCount++;
+        }
+      });
+      
+      if (restoredCount > 0) {
+        console.log(`Docs form data restored: ${restoredCount} fields`);
+      }
+    } catch (e) {
+      console.warn('Failed to restore docs form data:', e);
+    }
+  }
+
+  // Auto-save on changes
+  form.addEventListener('input', saveFormData);
+  form.addEventListener('change', saveFormData);
+
+  // Clear on successful submission
+  form.addEventListener('submit', (e) => {
+    if (!e.defaultPrevented) {
+      sessionStorage.removeItem(STORAGE_KEY);
+    }
+  });
+
+  // Restore on page load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', restoreFormData);
+  } else {
+    setTimeout(restoreFormData, 100);
+  }
+})();
+</script>
+
 {% endblock %}
