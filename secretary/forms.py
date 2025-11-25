@@ -141,6 +141,13 @@ AUDIENCE_SCOPE =[
     (6, "PERSON LIST"),
 ]
 
+CHANNEL_CHOICES = [
+    ("", "— Select Channel —"),
+    (1, "SMS"),
+    (2, "EMAIL"),
+    (3, "IN-APP"),
+]
+
 VALID_ID_TYPE_CHOICES = [
     # (1,  "Philippine Passport"),
     (2,  "Philippine National ID"), 
@@ -742,4 +749,15 @@ class ResidentFilters(forms.Form):
         }),
         label= 'Purok / Sitio',
         required= False,
+    )
+
+class AddChannelForm(forms.Form):
+    channel = forms.ChoiceField(
+        choices=CHANNEL_CHOICES,
+        widget=forms.Select(attrs={
+            'id': 'channel',
+            'class': 'form-select',
+        }),
+        label='Channel',
+        required=True,
     )

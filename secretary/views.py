@@ -74,6 +74,7 @@ from .forms import (
     DraftListSearch,
     ResidentFilters,
     AudienceScope,
+    AddChannelForm,
 )
 
 
@@ -2106,6 +2107,8 @@ def announcement_draft_view(
 ) -> HttpResponse:
     """View announcement draft details"""
     user_role = _auth_role_name(request)
+
+    form = AddChannelForm()
     
     try:
         draft = announcement_service.get_draft_by_id(announcement_id)
@@ -2124,6 +2127,7 @@ def announcement_draft_view(
     return render(request, "secretary/announcement/draft_view.html", {
         'page_path': f'{user_role} / Announcements / View Draft',
         'page_title': f'View Draft: {draft.announcement_title}',
+        'form' : form,
         'draft': draft,
         'audiences': audiences,
     })
