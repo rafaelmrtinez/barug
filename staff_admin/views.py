@@ -2386,7 +2386,7 @@ def access_logs(request):
     current_filters = filters_state
 
     user_fullname, user_role, user_role_template = get_user_info(request)
-    return render(request, "staff_admin/logs/access_logs.html", {
+    return render(request, "staff_admin/user_logs/access_logs.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
         'page_path': f'{user_role} / Access Logs',
@@ -2592,7 +2592,7 @@ def operational_logs(request):
             seen_subsystems.add(subsystem_id)
 
     user_fullname, user_role, user_role_template = get_user_info(request)
-    return render(request, "staff_admin/logs/operational_logs.html", {
+    return render(request, "staff_admin/user_logs/operational_logs.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
         'page_path': f'{user_role} / Operational Logs',
@@ -2634,7 +2634,7 @@ def access_log_details(request, log_id):
     page_obj = paginator.get_page(request.GET.get("page"))
 
     user_fullname, user_role, user_role_template = get_user_info(request)
-    return render(request, "staff_admin/logs/access_log_details.html", {
+    return render(request, "staff_admin/user_logs/access_log_details.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
         'page_path': f'{user_role} / Access Log Details',
@@ -2661,7 +2661,7 @@ def operational_log_details(request, log_id):
         return redirect("staff_admin:operational_logs")
 
     user_fullname, user_role, user_role_template = get_user_info(request)
-    return render(request, "staff_admin/logs/operational_log_details.html", {
+    return render(request, "staff_admin/user_logs/operational_log_details.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
         'page_path': f'{user_role} / Operational Log Details',
