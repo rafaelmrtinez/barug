@@ -33,5 +33,9 @@ def lupon_badge_counts(request):
         except Exception:
             # If you don't have a payment_status on cases yet, just show 0
             counts["unpaid_cases_count"] = 0
+    
+    # Add lupon schedule from session
+    auth = request.session.get("auth", {})
+    counts["lupon_sched"] = auth.get("lupon_sched", [])
 
     return counts

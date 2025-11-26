@@ -61,6 +61,9 @@
       <span class="navbar-text d-none d-sm-inline"> - </span>
       <div class="user-type text-end">
         <span class="navbar-text">{{ user_role }}</span>
+        <!-- {% if lupon_sched %}
+          <br><small class="text-white-50">{% for sched in lupon_sched %}{% if sched.day == 0 %}Sun{% elif sched.day == 1 %}Mon{% elif sched.day == 2 %}Tue{% elif sched.day == 3 %}Wed{% elif sched.day == 4 %}Thu{% elif sched.day == 5 %}Fri{% elif sched.day == 6 %}Sat{% endif %} {{ sched.time_start|slice:":5" }}-{{ sched.time_end|slice:":5" }}{% if not forloop.last %}, {% endif %}{% endfor %}</small>
+        {% endif %} -->
       </div>
 
       <div class="d-flex align-items-center">

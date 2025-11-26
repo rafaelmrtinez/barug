@@ -419,6 +419,23 @@
               <i class="bi bi-info-circle me-1"></i>
               <strong>This request is already for treasurer payment.</strong>
             </div>
+          {% elif status == 'DECLINED' %}
+            <hr class="my-3">
+            <div class="alert alert-danger py-2 mb-0">
+              <div class="fw-bold"><i class="bi bi-x-circle me-1"></i> Declined</div>
+              {% for e in timeline reversed %}
+                {% if e.action|upper == 'STATUS_CHANGED' and e.to_status|upper == 'DECLINED' %}
+                  {% if e.display_actor %}
+                    <div class="mt-2 small"><strong>Declined By:</strong> {{ e.display_actor }}</div>
+                  {% endif %}
+                  {% if e.reason %}
+                    <div class="small"><strong>Reason:</strong> {{ e.reason }}</div>
+                  {% endif %}
+                  {% comment %}Found the decline event, stop checking{% endcomment %}
+                  {% if forloop.first %}{% endif %}
+                {% endif %}
+              {% endfor %}
+            </div>
           {% elif status != 'FOR_PRINTING' and status != 'READY_FOR_PICKUP' and status != 'RELEASED' %}
             <hr class="my-3">
 

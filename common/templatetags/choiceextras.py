@@ -1,4 +1,5 @@
 from django import template
+from django.http import QueryDict
 
 register = template.Library()
 
@@ -90,3 +91,14 @@ def choice_label(bound_field, raw_value):
             if str(val) == target:
                 return label
         return ""
+
+@register.simple_tag(takes_context=True)
+def query_transform(context, **kwargs):
+    """
+    Preserves existing query parameters and updates/adds new ones.
+    Usage: {% query_transform page=2 %}
+    """
+    query = context['request'].GET.copy()
+    for key, value in kwargs.items():
+        query[key] = value
+    return query.urlencode()
