@@ -3,9 +3,14 @@ from typing import Optional
 from datetime import date as _date, datetime as _datetime
 
 from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
+from src.infra.repositories.maternal_report_repository import MaternalReportRepository
 from src.app.contracts.maternal_schedule_service import IMaternalScheduleService
 from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
 from src.domain.services.maternal_schedule_domain_service import MaternalScheduleDomainService
+from notifications.service import NotifierService, NotifyTarget, STAFF, PERSON
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class MaternalScheduleService(IMaternalScheduleService):
@@ -49,7 +54,38 @@ class MaternalScheduleService(IMaternalScheduleService):
             if latest_pr_status and int(latest_pr_status.get('status_id') or 0) == 1:
                 raise MaternalHealthRecordException('A pending prenatal schedule already exists. Complete or cancel it before adding a new prenatal schedule.')
 
-            return self.repo.insert_maternal_visit_schedule(mhr_id, date, time, staff_id, purpose, notes)
+            result = self.repo.insert_maternal_visit_schedule(mhr_id, date, time, staff_id, purpose, notes)
+
+            # Dispatch notification to the staff who created the schedule
+            try:
+                notifier = NotifierService()
+                # Attempt to resolve the patient (person_id) for this maternal record
+                try:
+                    report_repo = MaternalReportRepository(self.repo.ctx)
+                    patient = report_repo.fetch_patient_info(mhr_id)
+                    person_id = patient.get('person_id') if patient else None
+                except Exception:
+                    logger.exception('Failed to fetch patient info for mhr %s', mhr_id)
+                    person_id = None
+
+                if person_id is None:
+                    logger.info('No person_id found for mhr %s; skipping person notification', mhr_id)
+                else:
+                    target = NotifyTarget(user_type_id=PERSON, person_id=person_id)
+                    title = 'Prenatal schedule created'
+                    date_str = date.isoformat() if hasattr(date, 'isoformat') else str(date)
+                    time_str = time.strftime('%I:%M %p') if hasattr(time, 'strftime') else str(time)
+                    body = f'Prenatal visit scheduled on {date_str} at {time_str} — {purpose}'
+                    logger.info("Sending prenatal schedule notification to target=%s title=%s", target, title)
+                    try:
+                        sent = notifier.notify_user(target=target, title=title, body=body)
+                        logger.info("Prenatal notification sent=%s to target=%s", sent, target)
+                    except Exception:
+                        logger.exception("Error while sending prenatal notification to target=%s", target)
+            except Exception:
+                logger.exception('Failed to dispatch prenatal schedule notification (setup)')
+
+            return result
         except MaternalHealthRecordException:
             raise
 
@@ -72,6 +108,37 @@ class MaternalScheduleService(IMaternalScheduleService):
 
             # repository expects (mhr_id, date, time, staff_id, purpose, notes)
             # map: visit -> purpose (short label), purpose -> notes (description)
-            return self.repo.insert_postpartum_visit_schedule(mhr_id, date, time, staff_id, visit, purpose)
+            result = self.repo.insert_postpartum_visit_schedule(mhr_id, date, time, staff_id, visit, purpose)
+
+            # Dispatch notification to the staff who created the schedule
+            try:
+                notifier = NotifierService()
+                # Attempt to resolve the patient (person_id) for this maternal record
+                try:
+                    report_repo = MaternalReportRepository(self.repo.ctx)
+                    patient = report_repo.fetch_patient_info(mhr_id)
+                    person_id = patient.get('person_id') if patient else None
+                except Exception:
+                    logger.exception('Failed to fetch patient info for mhr %s', mhr_id)
+                    person_id = None
+
+                if person_id is None:
+                    logger.info('No person_id found for mhr %s; skipping person notification', mhr_id)
+                else:
+                    target = NotifyTarget(user_type_id=PERSON, person_id=person_id)
+                    title = 'Postpartum schedule created'
+                    date_str = date.isoformat() if hasattr(date, 'isoformat') else str(date)
+                    time_str = time.strftime('%I:%M %p') if hasattr(time, 'strftime') else str(time)
+                    body = f'Postpartum visit scheduled on {date_str} at {time_str} — {visit}'
+                    logger.info("Sending postpartum schedule notification to target=%s title=%s", target, title)
+                    try:
+                        sent = notifier.notify_user(target=target, title=title, body=body)
+                        logger.info("Postpartum notification sent=%s to target=%s", sent, target)
+                    except Exception:
+                        logger.exception("Error while sending postpartum notification to target=%s", target)
+            except Exception:
+                logger.exception('Failed to dispatch postpartum schedule notification (setup)')
+
+            return result
         except MaternalHealthRecordException:
             raise
