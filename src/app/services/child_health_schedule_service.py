@@ -83,8 +83,9 @@ class ChildHealthScheduleService(IChildHealthScheduleService):
                     time_str = time_obj.strftime('%I:%M %p') if hasattr(time_obj, 'strftime') else str(time_obj)
                     title = 'Child health visit scheduled'
                     body = f'Visit scheduled on {date_str} at {time_str} — {purpose}'
+                    deep_link = "/(bhw)/(tabs)/postpartum"
                     try:
-                        notify_user(user_type_id=PERSON, person_id=mother_id, staff_id=None, title=title, body=body)
+                        notify_user(user_type_id=PERSON, person_id=mother_id, staff_id=None, title=title, body=body, deep_link=deep_link)
                     except Exception:
                         logger.exception('Failed to send child visit notification to person_id=%s', mother_id)
                 else:
