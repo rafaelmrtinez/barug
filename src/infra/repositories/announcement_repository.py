@@ -285,8 +285,7 @@ class AnnouncementRepository(IAnnouncementRepository):
         row = result[0]
         announcement_id = row[0]
         
-        # Create recipients for scheduled announcement
-        self._create_recipients_for_scheduled(announcement_id)
+        self._send_notifications(announcement_id)
         
         return ScheduleResultDTO(
             announcement_id=announcement_id,
