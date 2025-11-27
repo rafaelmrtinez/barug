@@ -1,8 +1,10 @@
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.repositories.announcement_repository import AnnouncementRepository
 
+@csrf_exempt
 @require_http_methods(["POST"])
 def process_scheduled_deliveries(request):
     """Endpoint to process scheduled deliveries - call this from your cron job or manually"""
