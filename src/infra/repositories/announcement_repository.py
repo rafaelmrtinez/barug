@@ -11,7 +11,9 @@ from src.app.transfer_objects.commands.announcement_cmd import (
     UpdateAnnouncementDraftCMD,
 )
 from src.app.transfer_objects.commands.publish_now_cmd import PublishAnnouncementNowCMD
+from src.app.transfer_objects.commands.schedule_cmd import ScheduleAnnouncementCMD
 from src.app.transfer_objects.dto.publish_result_dto import PublishResultDTO
+from src.app.transfer_objects.dto.schedule_result_dto import ScheduleResultDTO
 from common.send_email import send_email
 from common.send_sms import send_sms
 from common.email_validator import verify_email_deliverable_abstract
@@ -270,6 +272,109 @@ class AnnouncementRepository(IAnnouncementRepository):
         #         )
         #     except Exception:
         #         pass  # Log if needed, but don't fail the publish
+    
+    def schedule_announcement(self, command: ScheduleAnnouncementCMD) -> ScheduleResultDTO:
+        """Schedule an announcement using the database function"""
+        sql = "SELECT * FROM schedule_announcement(%s, %s)"
+        params = (command.announcement_id, command.scheduled_by_id)
+        
+        result = self.ctx.execute_query(sql, params)
+        if not result:
+            raise ValueError("Failed to schedule announcement")
+        
+        row = result[0]
+        announcement_id = row[0]
+        
+        return ScheduleResultDTO(
+            announcement_id=announcement_id,
+            new_status=row[1],
+            publish_at=row[2]
+        )
+    
+    def _process_pending_deliveries(self, announcement_id: int) -> None:
+        """Process deliveries and send actual notifications"""
+        # Get ALL recipients for this announcement (not just pending)
+        sql = """
+            SELECT ar.announcement_recipient_id, ar.channel_type_id, ar.announcement_deliver_status_id,
+                   p.email, p.mobile_num, p.first_name, p.last_name,
+                   a.announcement_title, a.announcement_body
+            FROM announcement_recipient ar
+            JOIN person p ON p.person_id = ar.person_id
+            JOIN announcement a ON a.announcement_id = ar.announcement_id
+            WHERE ar.announcement_id = %s
+            AND ar.channel_type_id = 2
+            AND p.email IS NOT NULL
+        """
+        
+        recipients = self.ctx.execute_query(sql, (announcement_id,))
+        
+        print(f"   Found {len(recipients)} email recipients for announcement {announcement_id}")
+        
+        for recipient in recipients:
+            recipient_id, channel_type, current_status, email, mobile, first_name, last_name, title, body = recipient
+            
+            print(f"     Processing recipient: {email} (current status: {current_status})")
+            
+            try:
+                success = self._send_email_notification(email, first_name, last_name, title, body)
+                
+                if success:
+                    print(f"       ✅ Email sent successfully")
+                    self._update_delivery_status(recipient_id, 3, None)  # SENT EMAIL
+                else:
+                    print(f"       ❌ Email sending failed")
+                    self._update_delivery_status(recipient_id, 5, "Email delivery failed")
+                    
+            except Exception as e:
+                print(f"       ❌ Error: {e}")
+                self._update_delivery_status(recipient_id, 5, str(e))
+                success = self._send_email_notification(email, first_name, last_name, title, body)
+                
+                # Update delivery status
+                if success:
+                    status_id = 2 if channel_type == 1 else 3 if channel_type == 2 else 4
+                    self._update_delivery_status(recipient_id, status_id, None)
+                else:
+                    self._update_delivery_status(recipient_id, 5, "Delivery failed")
+                
+    
+    def _send_email_notification(self, email: str, first_name: str, last_name: str, title: str, body: str) -> bool:
+        try:
+            is_valid, _ = verify_email_deliverable_abstract(email)
+            if not is_valid:
+                return False
+            
+            name = f"{first_name or ''} {last_name or ''}".strip()
+            recipient = (name, email) if name else email
+            
+            send_email(
+                subject=f"Announcement: {title}",
+                to=[recipient],
+                body_text=body,
+                fail_silently=False
+            )
+            return True
+        except:
+            return False
+    
+    def _send_sms_notification(self, mobile: str, title: str, body: str) -> bool:
+        # SMS is commented out in your code, so just return True for now
+        return True
+    
+    def _update_delivery_status(self, recipient_id: int, status_id: int, error: str):
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE announcement_recipient 
+                SET announcement_deliver_status_id = %s,
+                    delivery_error = %s,
+                    delivered_at = CASE WHEN %s IN (2,3,4) THEN now() ELSE NULL END,
+                    updated_at = now()
+                WHERE announcement_recipient_id = %s
+                """,
+                [status_id, error, status_id, recipient_id]
+            )
 
     def get_announcement_statuses(self) -> List[AnnouncementStatusDTO]:
         """Get all announcement statuses"""

@@ -45,7 +45,7 @@
             </button>
 
             <!-- Schedule button -->
-            <button id="schedule-btn" type="button" class="btn btn-outline-primary btn-sm">
+            <button id="schedule-btn" type="button" class="btn btn-outline-primary btn-sm" onclick="scheduleAnnouncement()">
               <i class="bi bi-calendar-event"></i> Schedule
             </button>
               <!-- Save button (only saves when form visible and channels chosen) -->
@@ -242,6 +242,46 @@
     } finally {
       publishBtn.disabled = false;
       publishBtn.innerHTML = originalText;
+    }
+  };
+
+  // Schedule functionality
+  window.scheduleAnnouncement = async function() {
+    if (!confirm('Are you sure you want to schedule this announcement? Make sure publish and expire dates are set.')) {
+      return;
+    }
+
+    const scheduleBtn = document.getElementById('schedule-btn');
+    const originalText = scheduleBtn.innerHTML;
+    scheduleBtn.disabled = true;
+    scheduleBtn.innerHTML = '<i class="spinner-border spinner-border-sm me-1"></i> Scheduling...';
+
+    try {
+      const response = await fetch('{% url "secretary:schedule_announcement" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+          announcement_id: announcementId
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert(`Success! ${data.message}`);
+        window.location.reload();
+      } else {
+        alert('Error: ' + (data.error || 'Failed to schedule announcement'));
+      }
+    } catch (error) {
+      console.error('Schedule error:', error);
+      alert('Error: Failed to schedule announcement');
+    } finally {
+      scheduleBtn.disabled = false;
+      scheduleBtn.innerHTML = originalText;
     }
   };
 
