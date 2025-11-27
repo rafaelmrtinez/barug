@@ -199,6 +199,7 @@
         </form>
     </div>
 
+    {% if request.session.auth.role_name != "barangay health worker" %}
     <!-- Immunization (per-row forms) -->
     <div class="card mb-3 card-brand">
         <div class="card-header d-flex justify-content-between align-items-center">
@@ -312,6 +313,7 @@
             </table>
         </div>
     </div>
+    {% endif %}
 
 
     <!-- Birth & Supplementation (WITH header button) -->
@@ -441,10 +443,10 @@
 
                 <div class="row g-3 mt-2">
                     <!-- Findings -->
-                    <div class="col-md-6">
+                    {% comment %} <div class="col-md-6">
                         {{ visit_form.findings.label_tag }}
                         {{ visit_form.findings }}
-                    </div>
+                    </div> {% endcomment %}
 
                     <!-- Notes -->
                     <div class="col-md-6">
@@ -482,7 +484,7 @@
                         <th>Wt</th>
                         <th>Temp</th>
                         <th>Ht</th>
-                        <th>Findings</th>
+                        {% comment %} <th>Findings</th> {% endcomment %}
                         <th>Notes</th>
                     </tr>
                 </thead>
@@ -494,7 +496,7 @@
                         <td>{{ v.weight|default_if_none:"—"|floatformat:"-2" }}</td>
                         <td>{{ v.temperature|default_if_none:"—"|floatformat:"-1" }}</td>
                         <td>{{ v.height|default_if_none:"—"|floatformat:"-2" }}</td>
-                        <td>{{ v.findings|default_if_none:"" }}</td>
+                        {% comment %} <td>{{ v.findings|default_if_none:"" }}</td> {% endcomment %}
                         <td>{{ v.notes|default_if_none:"" }}</td>
                     </tr>
                     {% empty %}
@@ -525,7 +527,9 @@
 <script defer src="{% static 'child_health/js/chr-sidebar.js' %}"></script>
 <script defer src="{% static 'child_health/js/sectionActions.js' %}"></script>
 <script defer src="{% static 'child_health/js/weightCalculator.js' %}"></script>
-<script defer src="{% static 'child_health/js/immunizationRequest.js' %}"></script>
+{% if request.session.auth.role_name != "barangay health worker" %}
+    <script defer src="{% static 'child_health/js/immunizationRequest.js' %}"></script>
+{% endif %}
 <script defer src="{% static 'child_health/js/back_to_top.js' %}"></script>
 <script defer src="{% static 'child_health/js/auto_disable_sections.js' %}"></script>
 <script defer src="{% static 'child_health/js/api_post_entries.js' %}"></script>

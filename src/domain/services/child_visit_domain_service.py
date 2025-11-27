@@ -111,17 +111,17 @@ class ChildVisitDomainService:
         data["height"] = height
 
         # Findings
-        findings = data.get("findings")
-        if findings in (None, ""):
-            msg = MessageCatalog.translate("findings_required")
-            raise ChildVisitDomainException(msg, code="findings_required")
-        # sanitize and prevent emoji
-        try:
-            findings_clean = ValidationUtils.sanitize_no_emoji(str(findings))
-        except ValueError:
-            msg = MessageCatalog.translate("emoji_not_allowed")
-            raise ChildVisitDomainException(msg, code="emoji_not_allowed")
-        data["findings"] = findings_clean
+        # findings = data.get("findings")
+        # if findings in (None, ""):
+        #     msg = MessageCatalog.translate("findings_required")
+        #     raise ChildVisitDomainException(msg, code="findings_required")
+        # # sanitize and prevent emoji
+        # try:
+        #     findings_clean = ValidationUtils.sanitize_no_emoji(str(findings))
+        # except ValueError:
+        #     msg = MessageCatalog.translate("emoji_not_allowed")
+        #     raise ChildVisitDomainException(msg, code="emoji_not_allowed")
+        # data["findings"] = findings_clean
 
         # Notes optional; if missing, set to 'N/A'
         notes = data.get("notes")

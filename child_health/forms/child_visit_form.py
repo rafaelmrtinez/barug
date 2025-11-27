@@ -32,10 +32,10 @@ class ChildVisitForm(forms.Form):
         label="Height (cm)", required=True, min_value=Decimal('0.1'), max_digits=5, decimal_places=2,
         error_messages={'required': 'Please provide the height.', 'min_value': 'Height must be positive.'}
     )
-    findings = forms.CharField(
-        label="Findings", required=True, max_length=500,
-        error_messages={'required': 'Please provide the findings.'}
-    )
+    # findings = forms.CharField(
+    #     label="Findings", required=True, max_length=500,
+    #     error_messages={'required': 'Please provide the findings.'}
+    # )
     notes = forms.CharField(label="Notes", required=False, max_length=1000)
     form_type = forms.CharField(widget=forms.HiddenInput(attrs={'id': 'id_form_type_cv'}), initial='child_visit_form')
 
