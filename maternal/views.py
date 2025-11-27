@@ -170,7 +170,7 @@ def create_new_maternal_entry(request: HttpRequest) -> HttpResponse:
         })
 
 @session_login_required
-@role_required(*MIDWIFE_ACCESS)
+@role_required(*ACCESS)
 @nocache
 @csrf_protect
 def maternal_health_record_form(request, record_id : int):

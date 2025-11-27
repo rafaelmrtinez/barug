@@ -109,8 +109,13 @@
                           </button>
                           <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="actionsDropdownBHW{{ r.maternal_record_id }}">
                             <li>
+                              <a class="dropdown-item" href="{% url 'maternal:maternal_health_record_form' r.maternal_record_id %}">
+                                <i class="bi bi-folder2-open me-2"></i> Open
+                              </a>
+                            </li>
+                            <li>
                               <a class="dropdown-item" href="{% url 'maternal:bhw_prenatal_form' r.maternal_record_id %}">
-                                <i class="bi bi-folder2-open me-2"></i> Prenatal Follow-up Schedule
+                                <i class="bi bi-calendar2-check me-2"></i> Prenatal Follow-up Schedule
                               </a>
                             </li>
                             <li>

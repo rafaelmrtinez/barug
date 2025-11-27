@@ -59,10 +59,12 @@
                     <h1 class="mb-0">Maternal Health Record</h1>
                 </div>
                 <input type="hidden" id="mhr-id" value="{{ mhr_id }}">
+                {% if request.session.auth.role_name == 'barangay health worker' %}
                 <div class="mhr-action-group d-flex align-items-center gap-2">
                     {{ mhr_status.confirm_complete }}
                     <button id="btn-mark-complete" type="button" class="btn btn-brand btn-sm">Record Status</button>
                 </div>
+                {% endif %}
             </div>
 
                 <!-- Mobile sidebar toggle (icon button) -->
@@ -106,16 +108,10 @@
                     <div class="col-md-2">{{ identification_form.bmi_category.label_tag }} {{ identification_form.bmi_category }}</div>
                 </div>
             </div>
-            {% if request.session.auth.role_name == "barangay health worker" %}
-            <div class="card-footer text-end">
-                <button type="submit" class="btn btn-brand">Save Identification</button>
-            </div>
-            {% endif %}
         </div>
     </form>
     </section>
 
-    {% if request.session.auth.role_name == "midwife" %}
         <!-- Obstetric -->
         <section id="obstetric-section" class="mb-3">
         <form method="post" class="card mb-3 card-brand" id="form-obstetric" action="">
@@ -135,9 +131,11 @@
                     </div>
                 </div>
             </div>
+            {% if request.session.auth.role_name == 'midwife' %}
             <div class="card-footer text-end">
                 <button type="submit" class="btn btn-brand">Save Obstetric</button>
             </div>
+            {% endif %}
         </form>
         </section>
 
@@ -156,9 +154,11 @@
                     </div>
                 </div>
             </div>
+            {% if request.session.auth.role_name == 'midwife' %}
             <div class="card-footer text-end">
-                <button type="submit" class="btn btn-brand">Save Medical History</button>
+                <button type="submit" class="btn btn-brand">Save</button>
             </div>
+            {% endif %}
         </form>
         </section>
 
@@ -240,9 +240,11 @@
                         </div>
                     </div>
                 </div>
+                {% if request.session.auth.role_name == 'midwife' %}
                 <div class="card-footer text-end">
-                    <button type="submit" class="btn btn-brand">Add Previous Pregnancy</button>
+                    <button type="submit" class="btn btn-brand">Save</button>
                 </div>
+                {% endif %}
             </form>
         </section>
 
@@ -308,9 +310,11 @@
                     </div>
                 </div>
             </div>
+            {% if request.session.auth.role_name == 'midwife' %}
             <div class="card-footer text-end">
-                <button type="submit" class="btn btn-brand">Save Tetanus Toxoid</button>
+                <button type="submit" class="btn btn-brand">Save</button>
             </div>
+            {% endif %}
         </form>
         </section>
 
@@ -335,9 +339,11 @@
                     </div>
                 </div>
             </div>
+            {% if request.session.auth.role_name == 'barangay health worker' %}
             <div class="card-footer text-end">
-                <button type="submit" class="btn btn-brand">Save Present Pregnancy</button>
+                <button type="submit" class="btn btn-brand">Save</button>
             </div>
+            {% endif %}
         </form>
         </section>
 
@@ -348,7 +354,6 @@
                 <span>Laboratory Results</span>
                 <div class="d-flex gap-2">
                     <button id="btn-download-all-lab-images" type="button" class="btn btn-sm btn-outline-secondary">Download all images</button>
-                    <button type="button" class="btn btn-sm btn-brand section-action" data-section="#labs">Edit</button>
                 </div>
             </div>
 
@@ -417,9 +422,11 @@
                         </a>
                         </div>
                         <div id="gallery-cbc" class="upload-gallery collapse mt-2"></div>
+                        {% if request.session.auth.role_name == 'midwife' %}
                         <div class="mt-2 d-flex justify-content-end">
                             <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
                         </div>
+                        {% endif %}
                     </div>
                 </form>
                 <hr class="my-3" />
@@ -441,9 +448,11 @@
                         </a>
                         </div>
                         <div id="gallery-sgotsgpt" class="upload-gallery collapse mt-2"></div>
+                        {% if request.session.auth.role_name == 'midwife' %}
                         <div class="mt-2 d-flex justify-content-end">
                             <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
                         </div>
+                        {% endif %}
                     </div>
                 </form>
                 <hr class="my-3" />
@@ -465,9 +474,11 @@
                         </a>
                         </div>
                         <div id="gallery-creatinine" class="upload-gallery collapse mt-2"></div>
+                        {% if request.session.auth.role_name == 'midwife' %}
                         <div class="mt-2 d-flex justify-content-end">
                             <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
                         </div>
+                        {% endif %}
                     </div>
                 </form>
                 <hr class="my-3" />
@@ -489,9 +500,11 @@
                         </a>
                         </div>
                         <div id="gallery-buabun" class="upload-gallery collapse mt-2"></div>
+                        {% if request.session.auth.role_name == 'midwife' %}
                         <div class="mt-2 d-flex justify-content-end">
                             <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
                         </div>
+                        {% endif %}
                     </div>
                 </form>
                 <hr class="my-3" />
@@ -513,9 +526,11 @@
                         </a>
                         </div>
                         <div id="gallery-syphilis" class="upload-gallery collapse mt-2"></div>
+                        {% if request.session.auth.role_name == 'midwife' %}
                         <div class="mt-2 d-flex justify-content-end">
                             <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
                         </div>
+                        {% endif %}
                     </div>
                 </form>
                 <hr class="my-3" />
@@ -537,9 +552,11 @@
                         </a>
                         </div>
                         <div id="gallery-hiv" class="upload-gallery collapse mt-2"></div>
+                        {% if request.session.auth.role_name == 'midwife' %}
                         <div class="mt-2 d-flex justify-content-end">
                             <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
                         </div>
+                        {% endif %}
                     </div>
                 </form>
                 <hr class="my-3" />
@@ -561,9 +578,11 @@
                         </a>
                         </div>
                         <div id="gallery-hepa" class="upload-gallery collapse mt-2"></div>
+                        {% if request.session.auth.role_name == 'midwife' %}
                         <div class="mt-2 d-flex justify-content-end">
                             <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
                         </div>
+                        {% endif %}
                     </div>
                 </form>
                 <hr class="my-3" />
@@ -585,9 +604,11 @@
                         </a>
                         </div>
                         <div id="gallery-bloodtyping" class="upload-gallery collapse mt-2"></div>
+                        {% if request.session.auth.role_name == 'midwife' %}
                         <div class="mt-2 d-flex justify-content-end">
                             <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
                         </div>
+                        {% endif %}
                     </div>
                 </form>
 
@@ -608,9 +629,11 @@
                         </a>
                         </div>
                         <div id="gallery-ogct" class="upload-gallery collapse mt-2"></div>
+                        {% if request.session.auth.role_name == 'midwife' %}
                         <div class="mt-2 d-flex justify-content-end">
                             <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
                         </div>
+                        {% endif %}
                     </div>
                 </form>
                 </div>
@@ -631,7 +654,6 @@
             {{ check_list_form.form_type }}
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span>Checklist</span>
-                <button type="button" class="btn btn-sm btn-brand section-action" data-section="#checklist">Edit</button>
             </div>
             <div id="checklist" class="card-body">
                 <div class="row">
@@ -659,9 +681,11 @@
                     </div>
                 </div>
             </div>
+            {% if request.session.auth.role_name == 'midwife' %}
             <div class="card-footer text-end">
-                <button type="submit" class="btn btn-brand">Save Checklist</button>
+                <button type="submit" class="btn btn-brand">Save</button>
             </div>
+            {% endif %}
         </form>
         </section>
 
@@ -679,9 +703,11 @@
                     </div>
                 </div>
             </div>
+            {% if request.session.auth.role_name == 'midwife' %}
             <div class="card-footer text-end">
-                <button type="submit" class="btn btn-brand">Save Plans</button>
+                <button type="submit" class="btn btn-brand">Save</button>
             </div>
+            {% endif %}
         </form>
         </section>
 
@@ -701,10 +727,12 @@
                     </div>
                 </div>
             </div>
+            {% if request.session.auth.role_name == 'midwife' %}
             <div class="card-footer d-flex justify-content-between align-items-center">
                 <div class="text-muted small">Tip: Micronutrients are per maternal record (not per visit).</div>
-                <button type="submit" class="btn btn-brand">Save Micronutrients</button>
+                <button type="submit" class="btn btn-brand">Save</button>
             </div>
+            {% endif %}
         </form>
         </section>
         <!-- Risk Code Form (displayed after Micronutrients) -->
@@ -726,18 +754,21 @@
                     </div>
                 </div>
             </div>
+            {% if request.session.auth.role_name == 'midwife' %}
             <div class="card-footer text-end">
                 {% if risk_code_form.has_existing %}
                     <span class="text-muted me-3">Risk codes already recorded for this record.</span>
                 {% endif %}
-                <button type="submit" class="btn btn-brand" {% if risk_code_form.has_existing %}disabled{% endif %}>Save Risk Codes</button>
+                <button type="submit" class="btn btn-brand" {% if risk_code_form.has_existing %}disabled{% endif %}>Save</button>
             </div>
+            {% endif %}
         </form>
         </section>
-    {% endif %}
+    {% if request.session.auth.role_name == "midwife" %}
     <section id="prenatal-logs-section" class="mb-3">
-    {% include 'maternal/partial/prenatal_logs_and_entry.html' with mhr_id=mhr_id prenatal_form=prenatal_followup_entry_form %}
+        {% include 'maternal/partial/prenatal_logs_and_entry.html' with mhr_id=mhr_id prenatal_form=prenatal_followup_entry_form %}
     </section>
+    {% endif %}
         </main>
     </div>
 </div>

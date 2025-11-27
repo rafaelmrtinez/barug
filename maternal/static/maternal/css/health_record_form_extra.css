@@ -51,3 +51,22 @@
 
 /* Fallback: allow the labs card to scroll horizontally if unavoidable */
 .card-body.table-responsive { overflow-x: auto; }
+
+/* Uniform action button sizing for maternal forms
+   - targets common Save/download buttons used across sections
+   - uses !important so template inline `style="min-width:..."` is overridden
+   - responsive fallback reduces size on small screens
+*/
+.card-footer .btn, .btn-brand, .btn-sm.btn-brand, .mt-2 .btn {
+  min-width: 120px !important;
+  max-width: 14rem;
+  text-align: center;
+}
+
+@media (max-width: 576px) {
+  .card-footer .btn, .btn-brand, .btn-sm.btn-brand, .mt-2 .btn {
+    min-width: 96px !important;
+    padding-left: .5rem;
+    padding-right: .5rem;
+  }
+}
