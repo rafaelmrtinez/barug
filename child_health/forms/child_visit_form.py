@@ -36,7 +36,15 @@ class ChildVisitForm(forms.Form):
     #     label="Findings", required=True, max_length=500,
     #     error_messages={'required': 'Please provide the findings.'}
     # )
-    notes = forms.CharField(label="Notes", required=False, max_length=1000)
+    notes = forms.CharField(
+        label="Notes",
+        required=True,
+        max_length=1000,
+        error_messages={'required': 'Please provide the notes.'},
+        widget=forms.Textarea(attrs={
+            'rows': 4,
+        }),
+    )
     form_type = forms.CharField(widget=forms.HiddenInput(attrs={'id': 'id_form_type_cv'}), initial='child_visit_form')
 
     def __init__(self, *args, **kwargs):

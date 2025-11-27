@@ -19,16 +19,29 @@
                 <div class="card">
                     <div class="card-body small">
                         <ul class="nav flex-column">
+                            {# Identification, Place of Delivery and Parent Info are visible to all roles #}
                             <li class="nav-item"><a class="nav-link" href="#identification">Identification</a></li>
                             <li class="nav-item"><a class="nav-link" href="#place-of-delivery">Place of Delivery</a></li>
                             <li class="nav-item"><a class="nav-link" href="#parent-info">Parent Info</a></li>
-                            <li class="nav-item"><a class="nav-link" href="#nbs">New Born Screening</a></li>
-                            <li class="nav-item"><a class="nav-link" href="#child-details">Child Details</a></li>
-                            <li class="nav-item"><a class="nav-link" href="#immunization">Immunization</a></li>
-                            <li class="nav-item"><a class="nav-link" href="#birth-and-supplementation">Birth and Supplementation</a></li>
-                            <li class="nav-item"><a class="nav-link" href="#iron-intake">Iron Intake</a></li>
-                            <li class="nav-item"><a class="nav-link" href="#vitamin-intake">Vitamin Intake</a></li>
-                            <li class="nav-item"><a class="nav-link" href="#visit-entry">Visit Entry</a></li>
+
+                            {# The following sections are hidden for `midwife` users - show to others #}
+                            {% if request.session.auth.role_name != "midwife" %}
+                                <li class="nav-item"><a class="nav-link" href="#nbs">New Born Screening</a></li>
+                                <li class="nav-item"><a class="nav-link" href="#child-details">Child Details</a></li>
+                            {% endif %}
+
+                            {# Immunization: visible to everyone except barangay health worker #}
+                            {% if request.session.auth.role_name != "barangay health worker" %}
+                                <li class="nav-item"><a class="nav-link" href="#immunization">Immunization</a></li>
+                            {% endif %}
+
+                            {# The following sections are hidden for `midwife` users - show to others #}
+                            {% if request.session.auth.role_name != "midwife" %}
+                                <li class="nav-item"><a class="nav-link" href="#birth-and-supplementation">Birth and Supplementation</a></li>
+                                <li class="nav-item"><a class="nav-link" href="#iron-intake">Iron Intake</a></li>
+                                <li class="nav-item"><a class="nav-link" href="#vitamin-intake">Vitamin Intake</a></li>
+                                <li class="nav-item"><a class="nav-link" href="#visit-entry">Visit Entry</a></li>
+                            {% endif %}
                         </ul>
                     </div>
                 </div>
@@ -123,6 +136,7 @@
     </div>
 
     <!-- New Born Screening (WITH header button) -->
+    {% if request.session.auth.role_name != "midwife" %}
     <div class="card mb-3 card-brand">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span>New Born Screening</span>
@@ -161,8 +175,10 @@
             </form>
         </div>
     </div>
+    {% endif %}
 
     <!-- Breastfeeding Check -->
+    {% if request.session.auth.role_name != "midwife" %}
     <div class="card mb-3 card-brand">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span>Breastfeeding Check</span>
@@ -198,6 +214,7 @@
             </div>
         </form>
     </div>
+    {% endif %}
 
     {% if request.session.auth.role_name != "barangay health worker" %}
     <!-- Immunization (per-row forms) -->
@@ -316,6 +333,7 @@
     {% endif %}
 
 
+    {% if request.session.auth.role_name != "midwife" %}
     <!-- Birth & Supplementation (WITH header button) -->
     <div class="card mb-3 card-brand">
         <div class="card-header d-flex justify-content-between align-items-center">
@@ -349,7 +367,9 @@
             </form>
         </div>
     </div>
+    {% endif %}
 
+    {% if request.session.auth.role_name != "midwife" %}
      <!-- Birth & Supplementation (WITH header button) -->
     <div class="card mb-3 card-brand">
         <div class="card-header d-flex justify-content-between align-items-center">
@@ -372,7 +392,9 @@
             </form>
         </div>
     </div>
+    {% endif %}
 
+    {% if request.session.auth.role_name != "midwife" %}
     <!-- Birth & Supplementation (WITH header button) -->
     <div class="card mb-3 card-brand">
         <div class="card-header d-flex justify-content-between align-items-center">
@@ -404,7 +426,9 @@
             </form>
         </div>
     </div>
+    {% endif %}
 
+    {% if request.session.auth.role_name != "midwife" %}
     <!-- Add Visit Entry (WITH header button) -->
     <div class="card mb-3 card-brand">
         <div class="card-header d-flex justify-content-between align-items-center">
@@ -442,16 +466,20 @@
                 </div>
 
                 <div class="row g-3 mt-2">
-                    <!-- Findings -->
+                    <!-- Findings (hidden) -->
                     {% comment %} <div class="col-md-6">
                         {{ visit_form.findings.label_tag }}
                         {{ visit_form.findings }}
                     </div> {% endcomment %}
 
-                    <!-- Notes -->
-                    <div class="col-md-6">
-                        {{ visit_form.notes.label_tag }}
-                        {{ visit_form.notes }}
+                    <!-- Notes: expand to full-width row for easier typing -->
+                    <div class="col-12">
+                        <div class="mb-2">
+                            {{ visit_form.notes.label_tag }}
+                        </div>
+                        <div>
+                            {{ visit_form.notes }}
+                        </div>
                     </div>
                 </div>
 
@@ -469,7 +497,9 @@
         </div>
 
     </div>
+    {% endif %}
 
+    {% if request.session.auth.role_name != "midwife" %}
     <!-- Visits (WITH header button just to jump down) -->
     <div class="card mb-3 card-brand">
         <div class="card-header d-flex justify-content-between align-items-center">
@@ -508,6 +538,7 @@
             </table>
         </div>
     </div>
+    {% endif %}
 
     </main>
     </div>
