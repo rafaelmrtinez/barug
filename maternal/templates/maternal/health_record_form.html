@@ -697,9 +697,16 @@
             <div class="card card-brand mb-3">
                 <span class="card-header">Plans</span>
                 <div class="card-body">
-                    <div id="plans" class="row g-3">
-                        <div class="col-md-6">{{ plan_form.plan_place_of_delivery.label_tag }} {{ plan_form.plan_place_of_delivery }}</div>
-                        <div class="col-md-6 form-check mt-2">{{ plan_form.plan_newborn_screening }} {{ plan_form.plan_newborn_screening.label_tag }}</div>
+                    <div id="plans" class="row g-3 align-items-center">
+                        <div class="col-md-6">
+                            {{ plan_form.plan_place_of_delivery.label_tag }} {{ plan_form.plan_place_of_delivery }}
+                        </div>
+                        <div class="col-md-6 d-flex align-items-center">
+                            <div class="form-check d-flex align-items-center">
+                                {{ plan_form.plan_newborn_screening }}
+                                <div class="ms-2">{{ plan_form.plan_newborn_screening.label_tag }}</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
