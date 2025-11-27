@@ -519,6 +519,7 @@
             <table class="table table-striped table-sm align-middle" id="visits-table">
                 <thead>
                     <tr>
+                        <th>ID</th>
                         <th>Date</th>
                         <th>Age</th>
                         <th>Wt</th>
@@ -531,6 +532,7 @@
                 <tbody>
                     {% for v in visit_log %}
                     <tr>
+                        <td>{{ v.child_monitoring_id|default_if_none:"—" }}</td>
                         <td>{{ v.check_date|date:"Y-m-d" }}</td>
                         <td>{{ v.age|default_if_none:"—" }}</td>
                         <td>{{ v.weight|default_if_none:"—"|floatformat:"-2" }}</td>

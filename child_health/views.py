@@ -113,6 +113,7 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
         visit_form = ChildVisitForm()
         new_born_screening = NewbornScreeningForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
         visit_log = CHILD_HEALTH_REPOSITORY.fetch_child_monitoring_logs(child_health_record_id)
+        print(f"Visit Logs Data {visit_log}")
         if request.method == "GET":
             return render(
                 request,

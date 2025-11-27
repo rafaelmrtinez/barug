@@ -82,6 +82,38 @@
         return `${yyyy}-${mm}-${dd}`;
     }
 
+    // Helper: find the most recent visit row in the visits table and return
+    // its numeric id, findings and notes if present. Returns an object
+    // { id: Number, findings: String|null, notes: String|null } or null.
+    function getLatestVisitRowData() {
+        try {
+            const rows = document.querySelectorAll('#visits-table tbody tr');
+            let max = null;
+            let chosen = null;
+            rows.forEach(row => {
+                const firstCell = row.querySelector('td');
+                if (!firstCell) return;
+                const txt = (firstCell.textContent || '').trim();
+                if (!txt) return;
+                if (txt === '—') return;
+                const n = parseInt(txt.replace(/[^0-9]/g, ''), 10);
+                if (!isNaN(n)) {
+                    if (max === null || n > max) {
+                        max = n;
+                        const tds = row.querySelectorAll('td');
+                        const findings = tds[6] ? (tds[6].textContent || '').trim() : null;
+                        const notes = tds[7] ? (tds[7].textContent || '').trim() : null;
+                        chosen = { id: n, findings: findings || null, notes: notes || null };
+                    }
+                }
+            });
+            return chosen;
+        } catch (e) {
+            console.warn('getLatestVisitRowData failed', e);
+            return null;
+        }
+    }
+
     function newbornBuilder(form) {
         return {
             type_of_feeding: (form.querySelector('[name="type_of_feeding"]') || {}).value || null,
@@ -104,7 +136,7 @@
 
     function visitBuilder(form) {
         const get = (n) => (form.querySelector(`[name="${n}"]`) || {}).value || null;
-        return {
+        const payload = {
             date: normalizeDate(get('date')),
             age: get('age'),
             weight: get('weight'),
@@ -113,6 +145,27 @@
             findings: get('findings'),
             notes: get('notes')
         };
+
+
+        // If the current user is a midwife, include the id of the most recent visit
+        // and prefer the findings/notes from that latest row when present.
+        try {
+            const role = (typeof globalThis !== 'undefined' && globalThis.__USER_ROLE) ? String(globalThis.__USER_ROLE).toLowerCase() : null;
+            if (role === 'midwife') {
+                const latest = getLatestVisitRowData();
+                if (latest && latest.id) {
+                    payload.child_monitoring_id = latest.id;
+                    // Prefer findings/notes from the visits table row if available
+                    if (latest.findings) payload.findings = latest.findings;
+                    if (latest.notes) payload.notes = latest.notes;
+                }
+            }
+        } catch (e) {
+            // non-fatal: if DOM access fails, proceed without id/overrides
+            console.warn('visitBuilder: could not determine latest visit row data', e);
+        }
+
+        return payload;
     }
 
     function birthSuppBuilder(form) {

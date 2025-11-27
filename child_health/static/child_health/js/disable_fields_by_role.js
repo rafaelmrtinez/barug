@@ -69,18 +69,18 @@ document.addEventListener('DOMContentLoaded', function () {
         setDisabled(findingsSelectors, false);
     }
 
-    // Also disable submit buttons for visit entry if all fields are disabled for the role
-    // (prevents accidental submissions)
-    try {
-        const visitForm = document.querySelector('#visit-entry form');
-        if (visitForm) {
-            const allDisabled = role === 'midwife';
-            visitForm.querySelectorAll('button[type="submit"]').forEach(btn => {
-                btn.disabled = allDisabled;
-            });
-        }
-    } catch (e) {
-        // ignore
-        console.error('disable_fields_by_role error', e);
-    }
+    // // Also disable submit buttons for visit entry if all fields are disabled for the role
+    // // (prevents accidental submissions)
+    // try {
+    //     const visitForm = document.querySelector('#visit-entry form');
+    //     if (visitForm) {
+    //         const allDisabled = role === 'midwife';
+    //         visitForm.querySelectorAll('button[type="submit"]').forEach(btn => {
+    //             btn.disabled = allDisabled;
+    //         });
+    //     }
+    // } catch (e) {
+    //     // ignore
+    //     console.error('disable_fields_by_role error', e);
+    // }
 });

@@ -34,9 +34,24 @@ class ChildVisitDomainService:
         # Accept repository dependency for future use (not required now)
         self._repo = ch_repo
 
-    def validate_and_normalize(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_and_normalize(self, payload: Dict[str, Any], role: str | None = None) -> Dict[str, Any]:
         data = dict(payload or {})
 
+        # Short-circuit validation for midwife role: only findings required
+        if role and str(role).lower() == 'midwife':
+            findings = data.get('findings')
+            notes = data.get('notes')
+            if findings in (None, ''):
+                msg = MessageCatalog.translate('findings_required')
+                logger.warning('ChildVisit validation failed (midwife): %s', msg)
+                raise ChildVisitDomainException(msg, code='findings_required')
+            try:
+                findings_clean = ValidationUtils.sanitize_no_emoji(str(findings))
+                notes_clean = ValidationUtils.sanitize_no_emoji(str(notes)) if notes is not None else None
+            except ValueError:
+                msg = MessageCatalog.translate('emoji_not_allowed')
+                raise ChildVisitDomainException(msg, code='emoji_not_allowed')
+            return {'findings': findings_clean, 'notes': notes_clean}
         # Age
         age_raw = data.get("age")
         if age_raw in (None, ""):
@@ -110,18 +125,15 @@ class ChildVisitDomainService:
             raise ChildVisitDomainException(msg, code="height_range")
         data["height"] = height
 
-        # Findings
-        # findings = data.get("findings")
-        # if findings in (None, ""):
-        #     msg = MessageCatalog.translate("findings_required")
-        #     raise ChildVisitDomainException(msg, code="findings_required")
-        # # sanitize and prevent emoji
-        # try:
-        #     findings_clean = ValidationUtils.sanitize_no_emoji(str(findings))
-        # except ValueError:
-        #     msg = MessageCatalog.translate("emoji_not_allowed")
-        #     raise ChildVisitDomainException(msg, code="emoji_not_allowed")
-        # data["findings"] = findings_clean
+        # Findings (optional for non-midwife flows). If present, sanitize.
+        findings = data.get('findings')
+        if findings not in (None, ''):
+            try:
+                findings_clean = ValidationUtils.sanitize_no_emoji(str(findings))
+            except ValueError:
+                msg = MessageCatalog.translate('emoji_not_allowed')
+                raise ChildVisitDomainException(msg, code='emoji_not_allowed')
+            data['findings'] = findings_clean
 
         # Notes optional; if missing, set to 'N/A'
         notes = data.get("notes")
