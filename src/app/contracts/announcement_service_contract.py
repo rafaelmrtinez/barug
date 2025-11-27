@@ -10,6 +10,7 @@ from src.app.transfer_objects.commands.announcement_cmd import (
     PublishAnnouncementCMD,
 )
 from src.app.transfer_objects.commands.publish_now_cmd import PublishAnnouncementNowCMD
+from src.app.transfer_objects.commands.schedule_cmd import ScheduleAnnouncementCMD
 
 
 class IAnnouncementService(ABC):
@@ -48,6 +49,11 @@ class IAnnouncementService(ABC):
     @abstractmethod
     def publish_announcement_now(self, command: PublishAnnouncementNowCMD) -> PublishResultDTO:
         """Publish an announcement immediately using the database function"""
+        pass
+    
+    @abstractmethod
+    def schedule_announcement(self, command: ScheduleAnnouncementCMD):
+        """Schedule an announcement for future publishing"""
         pass
 
     @abstractmethod

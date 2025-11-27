@@ -11,7 +11,9 @@ from src.app.transfer_objects.commands.announcement_cmd import (
     UpdateAnnouncementDraftCMD,
 )
 from src.app.transfer_objects.commands.publish_now_cmd import PublishAnnouncementNowCMD
+from src.app.transfer_objects.commands.schedule_cmd import ScheduleAnnouncementCMD
 from src.app.transfer_objects.dto.publish_result_dto import PublishResultDTO
+from src.app.transfer_objects.dto.schedule_result_dto import ScheduleResultDTO
 from common.send_email import send_email
 from common.send_sms import send_sms
 from common.email_validator import verify_email_deliverable_abstract
@@ -270,6 +272,36 @@ class AnnouncementRepository(IAnnouncementRepository):
         #         )
         #     except Exception:
         #         pass  # Log if needed, but don't fail the publish
+    
+    def schedule_announcement(self, command: ScheduleAnnouncementCMD) -> ScheduleResultDTO:
+        """Schedule an announcement using the database function"""
+        sql = "SELECT * FROM schedule_announcement(%s, %s)"
+        params = (command.announcement_id, command.scheduled_by_id)
+        
+        result = self.ctx.execute_query(sql, params)
+        if not result:
+            raise ValueError("Failed to schedule announcement")
+        
+        row = result[0]
+        announcement_id = row[0]
+        
+        # Create recipients for scheduled announcement
+        self._create_recipients_for_scheduled(announcement_id)
+        
+        return ScheduleResultDTO(
+            announcement_id=announcement_id,
+            new_status=row[1],
+            publish_at=row[2]
+        )
+    
+    def _create_recipients_for_scheduled(self, announcement_id: int) -> None:
+        """Create recipients and send notifications for scheduled announcement"""
+        # Create recipients using the database function
+        create_sql = "SELECT create_announcement_recipients(%s)"
+        self.ctx.execute_query(create_sql, (announcement_id,))
+        
+        # Send notifications
+        self._send_notifications(announcement_id)
 
     def get_announcement_statuses(self) -> List[AnnouncementStatusDTO]:
         """Get all announcement statuses"""

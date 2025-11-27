@@ -10,7 +10,9 @@ from src.app.transfer_objects.commands.announcement_cmd import (
     PublishAnnouncementCMD,
 )
 from src.app.transfer_objects.commands.publish_now_cmd import PublishAnnouncementNowCMD
+from src.app.transfer_objects.commands.schedule_cmd import ScheduleAnnouncementCMD
 from src.app.transfer_objects.dto.publish_result_dto import PublishResultDTO
+from src.app.transfer_objects.dto.schedule_result_dto import ScheduleResultDTO
 
 
 class AnnouncementService(IAnnouncementService):
@@ -143,6 +145,20 @@ class AnnouncementService(IAnnouncementService):
             raise ValueError("Can only publish draft announcements")
         
         return self.announcement_repository.publish_announcement_now(command)
+    
+    def schedule_announcement(self, command: ScheduleAnnouncementCMD) -> ScheduleResultDTO:
+        """Schedule an announcement for future publishing"""
+        if not command.announcement_id:
+            raise ValueError("Announcement ID is required")
+        
+        existing = self.announcement_repository.get_by_id(command.announcement_id)
+        if not existing:
+            raise ValueError("Announcement not found")
+        
+        if existing.announcement_status_id != 1:
+            raise ValueError("Can only schedule draft announcements")
+        
+        return self.announcement_repository.schedule_announcement(command)
     
     def execute(
             self,
