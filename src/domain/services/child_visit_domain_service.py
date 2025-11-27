@@ -30,15 +30,36 @@ class ChildVisitDomainService:
     MIN_HEIGHT = Decimal("30")
     MAX_HEIGHT = Decimal("150")
 
-    def __init__(self, ch_repo=None):
+    def __init__(self, ch_repo=None, child_monitoring_query=None):
         # Accept repository dependency for future use (not required now)
         self._repo = ch_repo
+        # optional query helper to read existing monitoring rows
+        self._monitoring_query = child_monitoring_query
 
     def validate_and_normalize(self, payload: Dict[str, Any], role: str | None = None) -> Dict[str, Any]:
         data = dict(payload or {})
 
         # Short-circuit validation for midwife role: only findings required
         if role and str(role).lower() == 'midwife':
+            # If a monitoring id is provided, ensure the existing row doesn't already
+            # have findings recorded. Prevent midwife updates if findings exist.
+            monitor_id = (
+                data.get('child_monitoring_id')
+                or data.get('monitoring_id')
+                or data.get('child_monitor_id')
+                or data.get('id')
+            )
+            if monitor_id and self._monitoring_query:
+                try:
+                    existing = self._monitoring_query.fetch_by_monitoring_id(int(monitor_id))
+                except Exception as e:
+                    logger.warning('Failed to fetch existing monitoring row: %s', e)
+                    existing = None
+                if existing and existing.get('findings') not in (None, ''):
+                    msg = MessageCatalog.translate('findings_already_present')
+                    logger.warning('ChildVisit validation failed (midwife): %s', msg)
+                    raise ChildVisitDomainException(msg, code='findings_already_present')
+
             findings = data.get('findings')
             notes = data.get('notes')
             if findings in (None, ''):

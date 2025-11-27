@@ -538,8 +538,20 @@
                         <td>{{ v.weight|default_if_none:"—"|floatformat:"-2" }}</td>
                         <td>{{ v.temperature|default_if_none:"—"|floatformat:"-1" }}</td>
                         <td>{{ v.height|default_if_none:"—"|floatformat:"-2" }}</td>
-                        <td>{{ v.findings|default_if_none:"" }}</td>
-                        <td>{{ v.notes|default_if_none:"" }}</td>
+                        <td>
+                            {% if v.notes %}
+                                <button type="button" class="btn btn-sm btn-outline-secondary visit-text-toggle" data-type="notes" data-notes="{{ v.notes|default_if_none:''|escapejs }}" data-id="{{ v.child_monitoring_id }}">…</button>
+                            {% else %}
+                                &nbsp;
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if v.findings %}
+                                <button type="button" class="btn btn-sm btn-outline-secondary visit-text-toggle" data-type="findings" data-findings="{{ v.findings|default_if_none:''|escapejs }}" data-id="{{ v.child_monitoring_id }}">…</button>
+                            {% else %}
+                                &nbsp;
+                            {% endif %}
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
@@ -566,6 +578,19 @@
     </svg>
 </button>
 
+<!-- Modal used to display full Findings or Notes when the ellipsis is clicked -->
+<div class="modal fade" id="visitTextModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="visitTextModalLabel">Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="visitTextModalBody" style="white-space:pre-wrap;"></div>
+        </div>
+    </div>
+</div>
+
 <script>window.__USER_ROLE = "{{ request.session.auth.role_name|escapejs }}";</script>
 
 {% block script %}
@@ -579,6 +604,7 @@
 <script defer src="{% static 'child_health/js/back_to_top.js' %}"></script>
 <script defer src="{% static 'child_health/js/auto_disable_sections.js' %}"></script>
 <script defer src="{% static 'child_health/js/api_post_entries.js' %}"></script>
+<script defer src="{% static 'child_health/js/visit_text_modal.js' %}"></script>
 <script src="{% static 'js/toast.js' %}"></script>
 {% endblock %}
 {% endblock %}

@@ -98,13 +98,30 @@
                 if (txt === '—') return;
                 const n = parseInt(txt.replace(/[^0-9]/g, ''), 10);
                 if (!isNaN(n)) {
-                    if (max === null || n > max) {
-                        max = n;
-                        const tds = row.querySelectorAll('td');
-                        const findings = tds[6] ? (tds[6].textContent || '').trim() : null;
-                        const notes = tds[7] ? (tds[7].textContent || '').trim() : null;
-                        chosen = { id: n, findings: findings || null, notes: notes || null };
-                    }
+                            if (max === null || n > max) {
+                                max = n;
+                                const tds = row.querySelectorAll('td');
+                                // Prefer data attributes on the visit-text-toggle button if present
+                                let findings = null;
+                                let notes = null;
+                                if (tds[6]) {
+                                    const btn = tds[6].querySelector('.visit-text-toggle');
+                                    if (btn && btn.dataset && btn.dataset.findings !== undefined) {
+                                        findings = (btn.dataset.findings || '').trim() || null;
+                                    } else {
+                                        findings = (tds[6].textContent || '').trim() || null;
+                                    }
+                                }
+                                if (tds[7]) {
+                                    const btn2 = tds[7].querySelector('.visit-text-toggle');
+                                    if (btn2 && btn2.dataset && btn2.dataset.notes !== undefined) {
+                                        notes = (btn2.dataset.notes || '').trim() || null;
+                                    } else {
+                                        notes = (tds[7].textContent || '').trim() || null;
+                                    }
+                                }
+                                chosen = { id: n, findings: findings, notes: notes };
+                            }
                 }
             });
             return chosen;

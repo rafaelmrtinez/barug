@@ -94,6 +94,7 @@ from src.domain.contracts.channel_repository_contract import (
 from src.infra.repositories.channel_repository import (
     ChannelRepository,
 )
+from src.infra.repositories.queries.child_monitoring_query import ChildMonitoringQuery
 
 
 class InfraContainer(containers.DeclarativeContainer):
@@ -300,4 +301,10 @@ class InfraContainer(containers.DeclarativeContainer):
     channel_repository: providers.Factory[IChannelRepository] = providers.Factory(
         ChannelRepository,
         ctx=context
+    )
+
+    # Query objects (read-only query responsibility)
+    child_monitoring_query = providers.Factory(
+        ChildMonitoringQuery,
+        db=context,
     )
