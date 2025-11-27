@@ -539,15 +539,15 @@
                         <td>{{ v.temperature|default_if_none:"—"|floatformat:"-1" }}</td>
                         <td>{{ v.height|default_if_none:"—"|floatformat:"-2" }}</td>
                         <td>
-                            {% if v.notes %}
-                                <button type="button" class="btn btn-sm btn-outline-secondary visit-text-toggle" data-type="notes" data-notes="{{ v.notes|default_if_none:''|escapejs }}" data-id="{{ v.child_monitoring_id }}">…</button>
+                            {% if v.findings %}
+                                <button type="button" class="btn btn-sm btn-outline-secondary visit-text-toggle" data-type="findings" data-findings="{{ v.findings|default_if_none:''|escapejs }}" data-id="{{ v.child_monitoring_id }}" title="View findings" aria-label="View findings for visit {{ v.child_monitoring_id }}">…</button>
                             {% else %}
                                 &nbsp;
                             {% endif %}
                         </td>
                         <td>
-                            {% if v.findings %}
-                                <button type="button" class="btn btn-sm btn-outline-secondary visit-text-toggle" data-type="findings" data-findings="{{ v.findings|default_if_none:''|escapejs }}" data-id="{{ v.child_monitoring_id }}">…</button>
+                            {% if v.notes %}
+                                <button type="button" class="btn btn-sm btn-outline-secondary visit-text-toggle" data-type="notes" data-notes="{{ v.notes|default_if_none:''|escapejs }}" data-id="{{ v.child_monitoring_id }}" title="View notes" aria-label="View notes for visit {{ v.child_monitoring_id }}">…</button>
                             {% else %}
                                 &nbsp;
                             {% endif %}

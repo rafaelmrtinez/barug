@@ -1,8 +1,9 @@
-/* Small helper to show findings/notes text in a modal when the ellipsis button is clicked
-   - Looks for elements with class `visit-text-toggle` and reads `data-findings` or `data-notes`.
-   - Uses Bootstrap's Modal if available, otherwise falls back to alert().
+/* visit_text_modal.js
+   Shows full Findings/Notes in a Bootstrap modal when a .visit-text-toggle button is clicked.
+   - Buttons must include `data-type` ('findings'|'notes'), `data-id` and `data-findings`/`data-notes`.
+   - Modal element expected in template with ids: #visitTextModal, #visitTextModalLabel, #visitTextModalBody
 */
-(function(){
+(function () {
     'use strict';
 
     function showModal(title, content) {
@@ -10,33 +11,59 @@
         const body = document.getElementById('visitTextModalBody');
         if (label) label.textContent = title;
         if (body) {
-            // keep plain text to avoid executing HTML
+            // use textContent to preserve original text and avoid executing HTML
             body.textContent = content || '(no content)';
         }
 
-        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-            const modalEl = document.getElementById('visitTextModal');
-            if (modalEl) {
-                const modal = new bootstrap.Modal(modalEl);
-                modal.show();
-            } else {
-                alert(content || '(no content)');
-            }
-        } else {
+        const modalEl = document.getElementById('visitTextModal');
+        if (!modalEl) {
+            // fallback: alert
             alert(content || '(no content)');
+            return;
         }
+
+        // Use Bootstrap Modal if available
+        try {
+            if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                let inst = bootstrap.Modal.getInstance(modalEl);
+                if (!inst) inst = new bootstrap.Modal(modalEl);
+                inst.show();
+                return;
+            }
+        } catch (err) {
+            // ignore and fallback to alert below
+            console.warn('bootstrap modal show failed', err);
+        }
+
+        alert(content || '(no content)');
     }
 
+    // Delegate click handler for .visit-text-toggle buttons
     document.addEventListener('click', function (ev) {
-        const btn = ev.target.closest && ev.target.closest('.visit-text-toggle');
+        const btn = ev.target && ev.target.closest && ev.target.closest('.visit-text-toggle');
         if (!btn) return;
         ev.preventDefault();
-        const type = btn.dataset.type || 'notes';
-        const id = btn.dataset.id || '';
+
+        const type = (btn.dataset && btn.dataset.type) ? String(btn.dataset.type) : 'notes';
+        const id = (btn.dataset && btn.dataset.id) ? String(btn.dataset.id) : '';
         let content = '';
-        if (type === 'findings') content = btn.dataset.findings || '';
-        else content = btn.dataset.notes || '';
+        if (type === 'findings') content = (btn.dataset && btn.dataset.findings) ? btn.dataset.findings : '';
+        else content = (btn.dataset && btn.dataset.notes) ? btn.dataset.notes : '';
+
         const title = (type === 'findings' ? 'Findings' : 'Notes') + (id ? ` (Visit ${id})` : '');
+
+        // store metadata on modal for other scripts (optional)
+        const modalEl = document.getElementById('visitTextModal');
+        if (modalEl) {
+            try {
+                modalEl.dataset.lastType = type;
+                modalEl.dataset.lastId = id;
+                modalEl.dataset.lastContent = content || '';
+            } catch (_e) {
+                // ignore
+            }
+        }
+
         showModal(title, content);
     });
 
