@@ -170,7 +170,14 @@
               <tr>
                 <td class="fw-semibold"><span class="code-badge">{{ f.fee_code }}</span></td>
                 <td>
-                  <div class="fee-name">{{ f.name_main|default:f.name }}</div>
+                  <div class="fee-name">
+                    {{ f.name_main|default:f.name }}
+                    {% if f.is_active %}
+                      <span class="badge bg-success-subtle text-success-emphasis ms-2">Active</span>
+                    {% else %}
+                      <span class="badge bg-secondary-subtle text-secondary-emphasis ms-2">Inactive</span>
+                    {% endif %}
+                  </div>
                   {% if f.name_sub %}<div class="fee-sub">{{ f.name_sub }}</div>{% endif %}
                 </td>
                 <td class="col-type">

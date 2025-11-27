@@ -30,7 +30,7 @@
 </style>
 
 <div class="container page py-4" style="margin-top: 40px;">
-  <h4 class="mb-3">Add Fee (Add as NEW Document Type)</h4>
+  <!-- <h4 class="mb-3">Add Fee (Add as NEW Document Type)</h4> -->
 
   <form method="post" novalidate>
     {% csrf_token %}
@@ -96,9 +96,60 @@
     </div>
 
     <div class="d-flex gap-2 mt-3">
-      <button type="submit" class="btn btn-primary">Save Fee</button>
+      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#confirmModal">Save Fee</button>
       <a href="{% url 'treasurer:fees' %}" class="btn btn-outline-secondary">Cancel</a>
     </div>
   </form>
 </div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmModalLabel">Confirm Save Fee</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to save this fee?</p>
+        <!-- <div class="mt-2">
+          <strong>Document Type:</strong> <span id="confirmDocType"></span><br>
+          <strong>Fee Code:</strong> <span id="confirmFeeCode"></span><br>
+          <strong>Fee Name:</strong> <span id="confirmFeeName"></span><br>
+          <strong>Amount:</strong> ₱<span id="confirmAmount"></span>
+        </div> -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="confirmSaveBtn">Confirm Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.querySelector('form');
+  const confirmModal = document.getElementById('confirmModal');
+  const confirmSaveBtn = document.getElementById('confirmSaveBtn');
+  
+  // Populate modal with form values when shown
+  confirmModal.addEventListener('show.bs.modal', function() {
+    const docType = form.querySelector('[name="doc_type_name_new"]').value || 'N/A';
+    const feeCode = form.querySelector('[name="fee_code"]').value || 'N/A';
+    const feeName = form.querySelector('[name="fee_name"]').value || 'N/A';
+    const amount = form.querySelector('[name="current_amount"]').value || '0';
+    
+    document.getElementById('confirmDocType').textContent = docType;
+    document.getElementById('confirmFeeCode').textContent = feeCode;
+    document.getElementById('confirmFeeName').textContent = feeName;
+    document.getElementById('confirmAmount').textContent = parseFloat(amount).toFixed(2);
+  });
+  
+  // Submit form when confirmed
+  confirmSaveBtn.addEventListener('click', function() {
+    form.submit();
+  });
+});
+</script>
 {% endblock %}

@@ -123,8 +123,9 @@ def dashboard_api(request: HttpRequest):
 def queue(request: HttpRequest):
     q = (request.GET.get("q") or "").strip() or None
     statuses = request.GET.getlist("status") or ["FOR_TREASURER_REVIEW", "PAID", "FOR_PRINTING"]
+    sort_order = (request.GET.get("sort") or "newest").strip()
 
-    rows = list_requests(q, statuses, limit=50)
+    rows = list_requests(q, statuses, limit=500)
     EXCLUDE_DOCS = {"BARANGAY BUSINESS CLEARANCE", "CERTIFIED TRUE COPY"}
     rows = [r for r in rows if not any(dt in EXCLUDE_DOCS for dt in (r.get("doc_types") or []))]
     for r in rows:
@@ -134,7 +135,29 @@ def queue(request: HttpRequest):
         }
         r["purposes_display"] = [titleize(p) for p in (r.get("purposes") or [])]
         r["created_fmt"] = _fmt_occured_at(r.get("created_at"))
-        r["created_fmt"] = _fmt_occured_at(r.get("created_at"))
+
+    # Apply sorting
+    if sort_order == "oldest":
+        rows = sorted(rows, key=lambda x: x.get("created_at") or "")
+    else:  # newest (default)
+        rows = sorted(rows, key=lambda x: x.get("created_at") or "", reverse=True)
+
+    # Pagination
+    paginator = Paginator(rows, 10)
+    try:
+        page = int(request.GET.get("page", "1") or "1")
+    except Exception:
+        page = 1
+    if page < 1:
+        page = 1
+    if paginator.num_pages >= 1 and page > paginator.num_pages:
+        page = paginator.num_pages
+    try:
+        page_obj = paginator.page(page)
+    except EmptyPage:
+        page_obj = paginator.page(1)
+
+    page_numbers = build_page_numbers(page_obj.number, paginator.num_pages)
 
     status_options = [
         {"code": code, "label": meta["label"], "cls": meta["cls"], "checked": code in statuses}
@@ -145,10 +168,14 @@ def queue(request: HttpRequest):
     return render(request, "treasurer/queue.html", {
         'page_path': f'{user_role} / Resident Queue',
         'page_title': 'Resident Queue',
-        "rows": rows,
+        "page_obj": page_obj,
+        "paginator": paginator,
+        "page_numbers": page_numbers,
+        "is_paginated": paginator.num_pages > 1,
         "q": q or "",
         "statuses": statuses,
         "status_options": status_options,
+        "sort_order": sort_order,
     })
 
 
@@ -2589,6 +2616,8 @@ def fees_by_type(request, doc_type_id: int):
             main, sub = (r.get("name") or r.get("fee_name") or ""), ""
         r["name_main"] = main
         r["name_sub"] = sub
+        if "is_active" not in r:
+            r["is_active"] = True
 
     # Pagination
     paginator = Paginator(items_all, per_page)

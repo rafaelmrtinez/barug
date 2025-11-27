@@ -111,7 +111,7 @@
 {% block content %}
 <div class="container py-3" margin>
 
-  <form id="walkinForm" method="post" action="{% url 'clerk:walkin_create' %}" autocomplete="off">
+  <form id="walkinForm" method="post" action="{% url 'clerk:walkin_create' %}" enctype="multipart/form-data" autocomplete="off">
     {% csrf_token %}
 
     <div id="formAlert" class="alert alert-danger d-hidden" role="alert"></div>
@@ -155,16 +155,31 @@
             <hr class="my-3">
 
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="is_on_behalf" name="is_on_behalf" hidden>
-              <label class="form-check-label" for="is_on_behalf" hidden>File on behalf of another resident</label>
+              <input class="form-check-input" type="checkbox" id="is_on_behalf" name="is_on_behalf">
+              <label class="form-check-label" for="is_on_behalf">File on behalf of another resident</label>
             </div>
 
             <div id="onBehalfRow" class="row g-3 mt-1 d-hidden">
-              <div class="col-md-6">
-                <label class="form-label">On-behalf Person ID</label>
-                <input class="form-control" name="on_behalf_of_person_id" inputmode="numeric" pattern="[0-9]*" placeholder="Person ID">
+              <div class="col-12">
+                <label class="form-label label-req">Find person (on behalf of)</label>
+                <input type="search" id="onBehalfSearch" class="form-control" placeholder="Search by name or code (min 2 chars)" autocomplete="off">
+                <div id="onBehalfSpinner" class="position-absolute top-50 end-0 translate-middle-y me-3 d-hidden">
+                  <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+                </div>
+                <div id="onBehalfResults" class="mt-2 help">Type to search…</div>
               </div>
-              <!-- Business input moved to its own section below -->
+              <div class="col-12 d-hidden" id="onBehalfSelected">
+                <div class="alert alert-info mb-0">
+                  <strong>Selected:</strong> <span id="onBehalfLabel">—</span>
+                  <button type="button" class="btn btn-sm btn-outline-secondary float-end" id="clearOnBehalf">Change</button>
+                </div>
+                <input type="hidden" name="on_behalf_of_person_id" id="on_behalf_of_person_id">
+              </div>
+              <div class="col-12">
+                <label class="form-label label-req">Authorization Letter</label>
+                <input type="file" class="form-control" id="authLetter" name="auth_letter" accept="image/*,.pdf">
+                <div class="help mt-1">Upload a signed authorization letter (JPG, PNG, or PDF)</div>
+              </div>
             </div>
           </div>
         </section>
@@ -253,6 +268,26 @@
       </aside>
     </div>
   </form>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true" style="margin-top:40px">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background: var(--brand-700); color: white;">
+        <h5 class="modal-title" id="confirmModalLabel">Confirm Walk-in Request</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3">Please review the details before creating this request:</p>
+        <ul class="list-unstyled" id="confirmDetails" style="line-height: 1.8;"></ul>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-brand" id="confirmSubmitBtn">Create Request</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -352,8 +387,7 @@
     sumQty.textContent       = qtyInput.value || '1';
     if (sumOffense) sumOffense.textContent = offenseInput.value || 'auto';
 
-    const ob = onBehalfRow.querySelector('[name="on_behalf_of_person_id"]');
-    sumBehalf.textContent = (isOnBehalf.checked && ob?.value) ? ob.value : (isOnBehalf.checked ? '—' : 'n/a');
+    sumBehalf.textContent = (isOnBehalf.checked && onBehalfHidden?.value) ? onBehalfLabel.textContent : (isOnBehalf.checked ? '—' : 'n/a');
 
     const opt = bizSel.options[bizSel.selectedIndex];
     sumBiz.textContent = (!businessRow.classList.contains('d-hidden') && opt && opt.value) ? (opt.text || `ID ${opt.value}`) : (businessRow.classList.contains('d-hidden') ? 'n/a' : '—');
@@ -543,15 +577,72 @@
   qtyInput.addEventListener('input', updateSummary);
   offenseInput.addEventListener('input', updateSummary);
 
+  // on-behalf search elements
+  const onBehalfSearch = document.getElementById('onBehalfSearch');
+  const onBehalfResults = document.getElementById('onBehalfResults');
+  const onBehalfSpinner = document.getElementById('onBehalfSpinner');
+  const onBehalfSelected = document.getElementById('onBehalfSelected');
+  const onBehalfLabel = document.getElementById('onBehalfLabel');
+  const onBehalfHidden = document.getElementById('on_behalf_of_person_id');
+  const clearOnBehalfBtn = document.getElementById('clearOnBehalf');
+
   // on-behalf toggling
   isOnBehalf.addEventListener('change', () => {
     onBehalfRow.classList.toggle('d-hidden', !isOnBehalf.checked);
     if (!isOnBehalf.checked){
-      const ob = onBehalfRow.querySelector('[name="on_behalf_of_person_id"]');
-      if (ob) ob.value = '';
+      if (onBehalfHidden) onBehalfHidden.value = '';
+      onBehalfSelected.classList.add('d-hidden');
+      onBehalfSearch.value = '';
+      onBehalfResults.innerHTML = '<div class="help">Type to search…</div>';
     }
     updateSummary();
   });
+
+  // on-behalf search (debounced)
+  async function doOnBehalfSearch(q) {
+    if (!q || q.trim().length < 2) {
+      onBehalfResults.innerHTML = '<div class="help">Type at least 2 characters…</div>';
+      onBehalfSpinner.classList.add('d-hidden');
+      return;
+    }
+    onBehalfSpinner.classList.remove('d-hidden');
+    try {
+      const resp = await fetch(`${URL_SEARCH}?q=${encodeURIComponent(q)}`, { headers: { "X-Requested-With":"fetch" } });
+      const html = await resp.text();
+      onBehalfResults.innerHTML = html || '<div class="help">No results.</div>';
+    } catch {
+      onBehalfResults.innerHTML = '<div class="text-danger small">Search failed.</div>';
+    } finally {
+      onBehalfSpinner.classList.add('d-hidden');
+    }
+  }
+  if (onBehalfSearch) onBehalfSearch.addEventListener('input', debounce(e => doOnBehalfSearch(e.target.value), 250));
+
+  // pick on-behalf person
+  onBehalfResults.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('.pick-resident');
+    if (!btn) return;
+    const id = btn.getAttribute('data-person-id');
+    const txt = btn.getAttribute('data-display');
+    onBehalfHidden.value = id || '';
+    onBehalfLabel.textContent = (txt && txt.trim()) ? txt : `ID ${id}`;
+    onBehalfSelected.classList.remove('d-hidden');
+    onBehalfSearch.value = '';
+    onBehalfResults.innerHTML = '<div class="help">Selected.</div>';
+    updateSummary();
+  });
+
+  // clear on-behalf
+  if (clearOnBehalfBtn) {
+    clearOnBehalfBtn.addEventListener('click', () => {
+      onBehalfHidden.value = '';
+      onBehalfSelected.classList.add('d-hidden');
+      onBehalfSearch.value = '';
+      onBehalfResults.innerHTML = '<div class="help">Type to search…</div>';
+      updateSummary();
+    });
+  }
+
   onBehalfRow.addEventListener('input', updateSummary);
 
   // business change → set hidden + summary + auto-pick purpose
@@ -563,6 +654,15 @@
     autoPickPurposeByCategory();
   });
 
+  // Modal confirm button handler
+  document.getElementById('confirmSubmitBtn').addEventListener('click', () => {
+    console.log('[WALKIN] User confirmed, submitting form');
+    const modal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
+    modal.hide();
+    startBtnLoading();
+    form.submit();
+  });
+
   // init
   updateDocDependentToggles();
   indexPurposes();   // build once if options already present
@@ -570,6 +670,9 @@
 
   // ------- Validation & submit -------
   form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    console.log('[WALKIN] Form submit triggered');
+    
     clearAlert();
     const errors = [];
 
@@ -583,6 +686,14 @@
     if (!qtyInput.value || Number(qtyInput.value) < 1){ errors.push('Quantity must be at least 1.'); qtyInput.classList.add('is-invalid'); }
     else{ qtyInput.classList.remove('is-invalid'); }
 
+    // Check on-behalf selection
+    if (isOnBehalf.checked && !onBehalfHidden.value){
+      errors.push('Please select a person for on-behalf request.');
+    }
+    if (isOnBehalf.checked && !document.getElementById('authLetter').files.length){
+      errors.push('Please upload an authorization letter.');
+    }
+
     // If requires business (Business Clearance or CTC), require a selected business
     const selectedText = docSel.options[docSel.selectedIndex]?.text || '';
     const needsBusiness = isBusinessDoc(selectedText) || isCTCDoc(selectedText);
@@ -593,12 +704,38 @@
     }
 
     if (errors.length){
-      e.preventDefault();
+      console.log('[WALKIN] Validation errors:', errors);
       setAlert(errors.join(' '));
       form.scrollIntoView({ behavior:'smooth', block:'start' });
       return;
     }
-    startBtnLoading();
+
+    // Build confirmation details
+    const requesterName = residentLabel.textContent.trim() || 'Unknown';
+    const docName = docSel.options[docSel.selectedIndex]?.text || 'Unknown';
+    const purposeName = purSel.options[purSel.selectedIndex]?.text || 'Unknown';
+    const qty = qtyInput.value || '1';
+    
+    let detailsHTML = `<li><strong>Requester:</strong> ${requesterName}</li>`;
+    detailsHTML += `<li><strong>Document:</strong> ${docName}</li>`;
+    detailsHTML += `<li><strong>Purpose:</strong> ${purposeName}</li>`;
+    detailsHTML += `<li><strong>Quantity:</strong> ${qty}</li>`;
+    
+    if (isOnBehalf.checked && onBehalfHidden?.value) {
+      detailsHTML += `<li><strong>On behalf of:</strong> ${onBehalfLabel.textContent}</li>`;
+    }
+    
+    if (needsBusiness && bizHidden.value) {
+      const bizName = bizSel.options[bizSel.selectedIndex]?.text || 'Unknown';
+      detailsHTML += `<li><strong>Business:</strong> ${bizName}</li>`;
+    }
+    
+    console.log('[WALKIN] Showing confirmation modal');
+    
+    // Populate modal and show
+    document.getElementById('confirmDetails').innerHTML = detailsHTML;
+    const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    modal.show();
   });
 })();
 </script>
