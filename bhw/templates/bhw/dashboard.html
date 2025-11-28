@@ -133,8 +133,8 @@
             <a href="{% url 'child_health:child_record_list' %}" class="btn btn-brand">
               {% bs_icon 'person-heart' %}<span class="ms-1">Child Health Record</span>
             </a>
-            <a href="{% url 'bhw:records' %}" class="btn btn-outline-brand">
-              {% bs_icon 'journal-text' %}<span class="ms-1">Open Registries</span>
+            <a href="#" class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#reportGenerationModal">
+              {% bs_icon 'journal-text' %}<span class="ms-1">Report Generation</span>
             </a>
             <a href="#" class="btn btn-brand-subtle">
               {% bs_icon 'calendar-event' %}<span class="ms-1">View Schedules</span>
@@ -263,6 +263,9 @@
   {% if dashboard_json %}
     {{ dashboard_json|json_script:"dash-data" }}
   {% endif %}
+
+<!-- Include Report Generation Modal -->
+{% include 'bhw/partials/report_generation_modal.html' %}
 
 <script src="{% static 'js/dashboard-charts.js' %}"></script>
 <script>

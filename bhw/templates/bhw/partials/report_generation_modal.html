@@ -1,0 +1,237 @@
+{% load bootstrap_icons %}
+
+<!-- Report Generation Modal -->
+<div class="modal fade mt-5" id="reportGenerationModal" tabindex="-1" aria-labelledby="reportGenerationModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background: linear-gradient(135deg, #fbf7f4, #fff); border-bottom: 1px solid #ece7e1;">
+        <h5 class="modal-title fw-bold" id="reportGenerationModalLabel">
+          {% bs_icon 'file-earmark-bar-graph' size='1.2em' %}
+          <span class="ms-2">Generate Child Health Report</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <form id="reportForm" method="get" action="{% url 'child_health:child_report_api' %}" target="_blank">
+          <!-- Report Type Selection -->
+          <div class="mb-4">
+            <label class="form-label fw-bold">Select Report Type</label>
+            <select class="form-select form-select-lg" id="reportType" name="report_type" required>
+              <option value="">-- Choose a report --</option>
+              <option value="2">Monthly Immunization Coverage & Compliance</option>
+              <option value="3">Monthly Visit Completion & Missed Visits</option>
+              <option value="4">Monthly Growth & Nutrition Monitoring</option>
+              <option value="5">Annual Screening & Risk Factor Summary</option>
+              <option value="6">Annual Immunization Performance Dashboard</option>
+              <option value="7">Annual Growth & Development Trend</option>
+              <option value="8">All-in-One Analytics Report</option>
+            </select>
+            <div class="form-text">
+              Select the type of analytics report you want to generate
+            </div>
+          </div>
+
+          <!-- Year Input (for all reports) -->
+          <div class="mb-4" id="yearSection">
+            <label for="year" class="form-label fw-bold">Year</label>
+            <input type="number" class="form-control" id="year" name="year" 
+                   min="2020" max="2030" placeholder="e.g., 2024" required>
+            <div class="form-text">Enter the year for the report</div>
+          </div>
+
+          <!-- Month Input (for monthly reports) -->
+          <div class="mb-4 d-none" id="monthSection">
+            <label for="month" class="form-label fw-bold">Month</label>
+            <select class="form-select" id="month" name="month">
+              <option value="">-- Select month --</option>
+              <option value="1">January</option>
+              <option value="2">February</option>
+              <option value="3">March</option>
+              <option value="4">April</option>
+              <option value="5">May</option>
+              <option value="6">June</option>
+              <option value="7">July</option>
+              <option value="8">August</option>
+              <option value="9">September</option>
+              <option value="10">October</option>
+              <option value="11">November</option>
+              <option value="12">December</option>
+            </select>
+            <div class="form-text">Select the month for monthly reports</div>
+          </div>
+
+          <!-- Report Description -->
+          <div class="alert alert-light border" id="reportDescription" style="display: none;">
+            <h6 class="fw-bold mb-2">Report Details:</h6>
+            <p class="mb-0 small" id="reportDescText"></p>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer" style="background-color: #faf9f7; border-top: 1px solid #ece7e1;">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          {% bs_icon 'x-circle' %}
+          <span class="ms-1">Cancel</span>
+        </button>
+        <button type="submit" form="reportForm" class="btn" style="background: #6d2932; color: #fff;">
+          {% bs_icon 'file-earmark-pdf' %}
+          <span class="ms-1">Generate PDF Report</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const reportType = document.getElementById('reportType');
+  const monthSection = document.getElementById('monthSection');
+  const yearSection = document.getElementById('yearSection');
+  const monthInput = document.getElementById('month');
+  const yearInput = document.getElementById('year');
+  const reportDescription = document.getElementById('reportDescription');
+  const reportDescText = document.getElementById('reportDescText');
+
+  const reportDescriptions = {
+    '2': {
+      desc: 'Monthly report showing immunization coverage percentage, vaccine type breakdown, and children falling behind schedule. Requires year and month.',
+      requiresMonth: true
+    },
+    '3': {
+      desc: 'Monthly report analyzing visit completion rates, missed visits, household performance, and worker performance metrics. Requires year and month.',
+      requiresMonth: true
+    },
+    '4': {
+      desc: 'Monthly report tracking growth patterns, nutrition status (underweight/stunted cases), and geographic hotspots. Requires year and month.',
+      requiresMonth: true
+    },
+    '5': {
+      desc: 'Annual summary of screening results, low birth weight cases, anemia tracking, and high-risk populations. Requires year only.',
+      requiresMonth: false
+    },
+    '6': {
+      desc: 'Annual dashboard showing full-year vaccine coverage, seasonal trends, year-over-year comparison, and herd immunity indicators. Requires year only.',
+      requiresMonth: false
+    },
+    '7': {
+      desc: 'Annual report analyzing growth by age group, chronic malnutrition cases, purok disparities, and program correlation. Requires year only.',
+      requiresMonth: false
+    },
+    '8': {
+      desc: 'Consolidated report combining multiple analytics. If month is provided: includes monthly immunization, visits, and nutrition. If month is omitted: includes all annual reports (screening, immunization performance, growth development).',
+      requiresMonth: false,
+      monthOptional: true
+    }
+  };
+
+  reportType.addEventListener('change', function() {
+    const selected = this.value;
+    
+    if (selected && reportDescriptions[selected]) {
+      const config = reportDescriptions[selected];
+      
+      // Show/hide month section
+      if (config.requiresMonth) {
+        monthSection.classList.remove('d-none');
+        monthInput.required = true;
+      } else if (config.monthOptional) {
+        monthSection.classList.remove('d-none');
+        monthInput.required = false;
+        const monthHelp = monthSection.querySelector('.form-text');
+        monthHelp.textContent = 'Optional: Select month for monthly analytics, leave blank for annual analytics';
+      } else {
+        monthSection.classList.add('d-none');
+        monthInput.required = false;
+        monthInput.value = '';
+      }
+      
+      // Show description
+      reportDescText.textContent = config.desc;
+      reportDescription.style.display = 'block';
+      
+      // Set current year as default
+      if (!yearInput.value) {
+        yearInput.value = new Date().getFullYear();
+      }
+    } else {
+      monthSection.classList.add('d-none');
+      monthInput.required = false;
+      reportDescription.style.display = 'none';
+    }
+  });
+
+  // Reset form when modal is closed
+  document.getElementById('reportGenerationModal').addEventListener('hidden.bs.modal', function() {
+    document.getElementById('reportForm').reset();
+    monthSection.classList.add('d-none');
+    reportDescription.style.display = 'none';
+    monthInput.required = false;
+  });
+
+  // Form validation before submit
+  document.getElementById('reportForm').addEventListener('submit', function(e) {
+    const selectedType = reportType.value;
+    const yearValue = yearInput.value;
+    const monthValue = monthInput.value;
+
+    if (!selectedType) {
+      e.preventDefault();
+      alert('Please select a report type');
+      return;
+    }
+
+    if (!yearValue) {
+      e.preventDefault();
+      alert('Please enter a year');
+      return;
+    }
+
+    const config = reportDescriptions[selectedType];
+    if (config && config.requiresMonth && !monthValue) {
+      e.preventDefault();
+      alert('Please select a month for this report type');
+      return;
+    }
+
+    // Show loading indicator
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generating...';
+    
+    // Re-enable button after 3 seconds (PDF will open in new tab)
+    setTimeout(function() {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalText;
+    }, 3000);
+  });
+})();
+</script>
+
+<style>
+#reportGenerationModal .modal-content {
+  border-radius: 16px;
+  border: 1px solid #ece7e1;
+}
+
+#reportGenerationModal .form-select,
+#reportGenerationModal .form-control {
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
+}
+
+#reportGenerationModal .form-select:focus,
+#reportGenerationModal .form-control:focus {
+  border-color: #6d2932;
+  box-shadow: 0 0 0 0.2rem rgba(109, 41, 50, 0.15);
+}
+
+#reportGenerationModal .alert-light {
+  background-color: #fbf7f4;
+  border-color: #e8d8c4;
+  border-radius: 12px;
+}
+
+#reportGenerationModal .btn {
+  border-radius: 12px;
+}
+</style>
