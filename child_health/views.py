@@ -15,7 +15,6 @@ from django.views.decorators.csrf import csrf_protect
 
 from authentication.guards import role_required, session_login_required
 from authentication.utils import nocache
-from src.infra.utilities.custom_date_time_util import DateAndTimeUtility
 from barug.utility.lazy_repository import LazyRepositoryProxy
 from barug.utility.messages_util import MessageUtility
 from src.infra.exceptions.child_health_record_exception import ChildHealthRecordException
@@ -200,8 +199,12 @@ def find_person_http(request: HttpRequest) -> JsonResponse:
     if len(q) < 2:
         return JsonResponse({"ok": True, "count": 0, "results": []})
     try:
-        rows = CHILD_HEALTH_REPOSITORY.match_person_by_key(q)  # [{'person_id':..., 'full_name':..., 'address':...}, ...]
-        results = [{"id": r["person_id"], "name": r["full_name"], "address": r.get("address") or ""} for r in rows]
+        from src.infra.repositories.queries.person_queries import PersonQuery
+        from src.app.adapters.resident_service_adapter import ResidentServiceAdapter
+        from src.app.services.resident_service import ResidentService
+        from src.infra.repositories.resident_repository import ResidentRepository
+        p = ResidentServiceAdapter(ResidentService(ResidentRepository(CONNECTION)), PersonQuery(CONNECTION))
+        results = [{"id": r["person_id"], "name": r["full_name"], "address": r.get("address") or ""} for r in p.get_minors_under5_active()]
         return JsonResponse({"ok": True, "count": len(results), "results": results})
     except Exception as e:
         logger.exception("find_person failed: %s", e)
