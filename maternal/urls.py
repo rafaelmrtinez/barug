@@ -38,4 +38,6 @@ urlpatterns = [
     path(f'api/v{API_VERSION}/mhr/report/', __import__('maternal.api.maternal_report_api', fromlist=['']).MaternalReportAPI.as_view(), name='mhr_report_api'),
     # v1 API to insert risk codes for a maternal health record
     path(f'api/v{API_VERSION}/mhr/risk-codes/', __import__('maternal.api.risk_codes_api', fromlist=['']).RiskCodesAPI.as_view(), name='mhr_risk_codes_api'),
+    # AJAX search endpoint for finding persons (minors under 5 / autosuggest)
+    path(f'api/v{API_VERSION}/find-person/', __import__('maternal.api.search_mother_api', fromlist=['']).SearchMotherAPI.as_view(), name='ajax_find_person'),
 ]

@@ -133,6 +133,8 @@ from src.app.contracts.resident_service_contract import (
 from src.app.services.resident_service import (
     ResidentService,
 )
+from src.infra.repositories.queries.person_queries import PersonQuery
+from src.app.adapters.resident_service_adapter import ResidentServiceAdapter
 from src.app.contracts.announcement_service_contract import (
     IAnnouncementService,
 )
@@ -449,6 +451,18 @@ class AppContainer(containers.DeclarativeContainer):
     resident_service: providers.Factory[IResidentService] = providers.Factory(
         ResidentService,
         repo=infra.resident_repository,
+    )
+
+    # Query and adapter providers for resident/person lookups
+    person_query = providers.Factory(
+        PersonQuery,
+        db=infra.context,
+    )
+
+    resident_service_adapter = providers.Factory(
+        ResidentServiceAdapter,
+        resident_service=resident_service,
+        person_query=person_query,
     )
 
     # Announcement

@@ -8,6 +8,8 @@ from src.infra.exceptions.query_exec_exception import QueryExecutionException
 from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
 import logging
 
+from src.infra.utilities.age_calculator import AgeCalculator
+
 logger = logging.getLogger(__name__)
 
 class MaternalHealthRecordRepository(IMaternalHealthRecordRepository):
@@ -1071,6 +1073,7 @@ class MaternalHealthRecordRepository(IMaternalHealthRecordRepository):
         """
         params = (id,)
         rows = self.ctx.execute_query_to_dict(sql, params)
+        rows[0]['age'] = AgeCalculator().float_age_to_years(rows[0]['age'])
         return rows[0] if rows else None
 
     def fetch_risk_codes_by_mhr_id(self, maternal_record_id: int):

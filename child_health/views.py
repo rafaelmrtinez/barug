@@ -204,7 +204,7 @@ def find_person_http(request: HttpRequest) -> JsonResponse:
         from src.app.services.resident_service import ResidentService
         from src.infra.repositories.resident_repository import ResidentRepository
         p = ResidentServiceAdapter(ResidentService(ResidentRepository(CONNECTION)), PersonQuery(CONNECTION))
-        results = [{"id": r["person_id"], "name": r["full_name"], "address": r.get("address") or ""} for r in p.get_minors_under5_active()]
+        results = [{"id": r["person_id"], "name": r["full_name"], "address": r.get("address") or ""} for r in p.get_minors_under5_active(key=q, limit=15)]
         return JsonResponse({"ok": True, "count": len(results), "results": results})
     except Exception as e:
         logger.exception("find_person failed: %s", e)
