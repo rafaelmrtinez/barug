@@ -457,6 +457,83 @@ class PersonQuery:
         rows = self.db.execute_query_to_dict(query, params)
         return rows or []
 
+    def search_female_active_resident_by_key(self, key: str, limit: int | None = None) -> list:
+        """Search active female residents who are also marked as RESIDENT using a free-text `key` matched with ILIKE.
+
+        This is a copy of `search_female_active_by_key` but adds a condition that the
+        residential status name equals 'RESIDENT' (case-insensitive).
+        """
+        pattern = f"%{key}%"
+        query = """
+        SELECT DISTINCT
+            p.*,
+            CONCAT(p.first_name, ' ',
+                   CASE WHEN p.middle_name IS NOT NULL AND p.middle_name <> '' THEN
+                       SUBSTRING(p.middle_name FROM 1 FOR 1) || '. '
+                   ELSE '' END,
+                   p.last_name,
+                   CASE WHEN p.suffix IS NOT NULL AND p.suffix <> '' THEN
+                       ' ' || p.suffix
+                   ELSE '' END) AS full_name,
+            ir.income_range_amnt AS income_range,
+            a.street, a.barangay, a.city, a.latitude, a.longitude, a.purok_sitio_id AS address_purok_id,
+            CONCAT(a.street, ', ',
+                   CASE WHEN ps.purok_sitio_name IS NOT NULL AND ps.purok_sitio_name <> '' THEN
+                       ps.purok_sitio_name || ', '
+                   ELSE '' END,
+                   CASE WHEN a.barangay IS NOT NULL AND a.barangay <> '' THEN
+                       'Brgy ' || a.barangay || ', '
+                   ELSE '' END,
+                   CASE WHEN a.city IS NOT NULL AND a.city <> '' THEN
+                       a.city
+                   ELSE '' END) AS full_address,
+            ps.purok_sitio_code AS purok_code, ps.purok_sitio_name AS purok_name,
+            s.sex_name,
+            pst.person_status_name,
+            rs.residential_status_name,
+            cs.civil_status_name,
+            n.nationality_name,
+            r.religion_name,
+            ea.educ_level AS education_level,
+            es.employment_status_name,
+            rm.registration_method_name,
+            fu.family_id, fu.family_num, fu.ufc_num
+        FROM person p
+        LEFT JOIN income_range ir ON p.mnthly_personal_income_id = ir.income_range_id
+        LEFT JOIN addresss a ON p.address_id = a.address_id
+        LEFT JOIN purok_sitio ps ON a.purok_sitio_id = ps.purok_sitio_id
+        LEFT JOIN sex s ON p.sex_id = s.sex_id
+        LEFT JOIN person_status pst ON p.person_status_id = pst.person_status_id
+        LEFT JOIN residential_status rs ON p.residential_status_id = rs.residential_status_id
+        LEFT JOIN civil_status cs ON p.civil_status_id = cs.civil_status_id
+        LEFT JOIN nationality n ON p.nationality_id = n.nationality_id
+        LEFT JOIN religion r ON p.religion_id = r.religion_id
+        LEFT JOIN educational_attainment ea ON p.education_id = ea.education_id
+        LEFT JOIN employment_status es ON p.employment_status_id = es.employment_status_id
+        LEFT JOIN registration_method rm ON p.registration_method_id = rm.registration_method_id
+        LEFT JOIN family_unit fu ON fu.family_head_id = p.person_id
+        WHERE p.person_status_id = 1
+          AND p.sex_id = 2
+          AND UPPER(rs.residential_status_name) = 'RESIDENT'
+          AND (
+            CONCAT_WS(' ', p.first_name, p.middle_name, p.last_name, p.suffix) ILIKE %s OR
+            p.person_code ILIKE %s OR
+            a.street ILIKE %s OR
+            ps.purok_sitio_name ILIKE %s OR
+            a.barangay ILIKE %s OR
+            a.city ILIKE %s
+          )
+        ORDER BY p.last_name, p.first_name
+        """
+
+        params = (pattern, pattern, pattern, pattern, pattern, pattern)
+        if limit is not None:
+            query = query + "\nLIMIT %s"
+            params = params + (limit,)
+
+        rows = self.db.execute_query_to_dict(query, params)
+        return rows or []
+
     def search_minors_under5_active_by_key(self, key: str, limit: int | None = None) -> list:
         """Search active minors under 5 using a free-text `key` matched with ILIKE."""
         pattern = f"%{key}%"
@@ -532,4 +609,83 @@ class PersonQuery:
         rows = self.db.execute_query_to_dict(query, params)
         return rows or []
         
+    def search_minors_under5_active_resident_by_key(self, key: str, limit: int | None = None) -> list:
+        """Search active minors under 5 who are also marked as RESIDENT using a free-text `key` matched with ILIKE.
+
+        This is a copy of `search_minors_under5_active_by_key` but adds a condition that the
+        residential status name equals 'RESIDENT' (case-insensitive).
+        """
+        pattern = f"%{key}%"
+        query = """
+        SELECT DISTINCT
+            p.*,
+            CONCAT(p.first_name, ' ',
+                   CASE WHEN p.middle_name IS NOT NULL AND p.middle_name <> '' THEN
+                       SUBSTRING(p.middle_name FROM 1 FOR 1) || '. '
+                   ELSE '' END,
+                   p.last_name,
+                   CASE WHEN p.suffix IS NOT NULL AND p.suffix <> '' THEN
+                       ' ' || p.suffix
+                   ELSE '' END) AS full_name,
+            CONCAT(a.street, ', ',
+                   CASE WHEN ps.purok_sitio_name IS NOT NULL AND ps.purok_sitio_name <> '' THEN
+                       ps.purok_sitio_name || ', '
+                   ELSE '' END,
+                   CASE WHEN a.barangay IS NOT NULL AND a.barangay <> '' THEN
+                       'Brgy ' || a.barangay || ', '
+                   ELSE '' END,
+                   CASE WHEN a.city IS NOT NULL AND a.city <> '' THEN
+                       a.city
+                   ELSE '' END) AS full_address,
+            ir.income_range_amnt AS income_range,
+            a.street, a.barangay, a.city, a.latitude, a.longitude, a.purok_sitio_id AS address_purok_id,
+            ps.purok_sitio_code AS purok_code, ps.purok_sitio_name AS purok_name,
+            s.sex_name,
+            pst.person_status_name,
+            rs.residential_status_name,
+            cs.civil_status_name,
+            n.nationality_name,
+            r.religion_name,
+            ea.educ_level AS education_level,
+            es.employment_status_name,
+            rm.registration_method_name,
+            fu.family_id, fu.family_num, fu.ufc_num,
+            EXTRACT(YEAR FROM AGE(CURRENT_DATE, p.birthdate))::INT AS age_years
+        FROM person p
+        LEFT JOIN income_range ir ON p.mnthly_personal_income_id = ir.income_range_id
+        LEFT JOIN addresss a ON p.address_id = a.address_id
+        LEFT JOIN purok_sitio ps ON a.purok_sitio_id = ps.purok_sitio_id
+        LEFT JOIN sex s ON p.sex_id = s.sex_id
+        LEFT JOIN person_status pst ON p.person_status_id = pst.person_status_id
+        LEFT JOIN residential_status rs ON p.residential_status_id = rs.residential_status_id
+        LEFT JOIN civil_status cs ON p.civil_status_id = cs.civil_status_id
+        LEFT JOIN nationality n ON p.nationality_id = n.nationality_id
+        LEFT JOIN religion r ON p.religion_id = r.religion_id
+        LEFT JOIN educational_attainment ea ON p.education_id = ea.education_id
+        LEFT JOIN employment_status es ON p.employment_status_id = es.employment_status_id
+        LEFT JOIN registration_method rm ON p.registration_method_id = rm.registration_method_id
+        LEFT JOIN family_unit fu ON fu.family_head_id = p.person_id
+        WHERE p.person_status_id = 1
+          AND p.birthdate IS NOT NULL
+          AND p.birthdate <= CURRENT_DATE
+          AND EXTRACT(YEAR FROM AGE(CURRENT_DATE, p.birthdate))::INT < 5
+          AND UPPER(rs.residential_status_name) = 'RESIDENT'
+          AND (
+            CONCAT_WS(' ', p.first_name, p.middle_name, p.last_name, p.suffix) ILIKE %s OR
+            p.person_code ILIKE %s OR
+            a.street ILIKE %s OR
+            ps.purok_sitio_name ILIKE %s OR
+            a.barangay ILIKE %s OR
+            a.city ILIKE %s
+          )
+        ORDER BY p.last_name, p.first_name
+        """
+
+        params = (pattern, pattern, pattern, pattern, pattern, pattern)
+        if limit is not None:
+            query = query + "\nLIMIT %s"
+            params = params + (limit,)
+
+        rows = self.db.execute_query_to_dict(query, params)
+        return rows or []
     

@@ -223,7 +223,7 @@ class ChildHealthRecordRepository(IChildHealthRecordRepository):
         JOIN feeding_type_nwbrn_scrnng ftns ON ftns.visit_id = cv.visit_id
         LEFT JOIN feeding_type ft ON ft.feeding_type_id = ftns.feeding_type_id
         WHERE cv.child_record_id = %s
-        ORDER BY cv.visit_date DESC NULLS LAST, cv.visit_id DESC
+        ORDER BY cv.visit_date DESC, cv.visit_id DESC
         LIMIT 1;
         """
         params = [chr_id]

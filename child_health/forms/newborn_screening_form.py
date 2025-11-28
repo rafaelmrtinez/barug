@@ -42,7 +42,7 @@ class NewbornScreeningForm(forms.Form):
         self._chr_id = child_health_record_id
         self._existing_data = self._repo.fetch_new_born_screening_date_by_chr_id(self._chr_id)
         self._feeding_types = self._repo.fetch_all_feeding_type_tuple() or []
-
+        print(f"DEBUG: Fetched feeding types: {self._existing_data}")
         # Populate feeding choices
         self.fields['type_of_feeding'].choices = [('', 'Select Feeding Type')] + list(self._feeding_types)
 

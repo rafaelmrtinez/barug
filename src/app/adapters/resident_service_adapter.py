@@ -16,7 +16,7 @@ class ResidentServiceAdapter:
         - address: `street, purok_name, Brgy {barangay}, city` (parts omitted when empty)
         Deduplicates by `person_id` and prefers records that contain an address.
         """
-        rows = self._person_query.search_minors_under5_active_by_key(
+        rows = self._person_query.search_minors_under5_active_resident_by_key(
             key=key, 
             limit=limit if limit is not None else 10)
         result_map: dict[int, dict] = {}
@@ -74,7 +74,7 @@ class ResidentServiceAdapter:
         payload into a list of dicts with keys `person_id`, `full_name`,
         and `address`.
         """
-        rows = self._person_query.search_female_active_by_key(key=key, limit=limit)
+        rows = self._person_query.search_female_active_resident_by_key(key=key, limit=limit)
         result_map: dict[int, dict] = {}
 
         for r in rows:
