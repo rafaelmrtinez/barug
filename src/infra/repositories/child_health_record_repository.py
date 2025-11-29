@@ -191,12 +191,11 @@ class ChildHealthRecordRepository(IChildHealthRecordRepository):
         Invokes the DB function `update_monitoring_log_midwife` which expects
         (child_record_id, child_monitoring_id, findings, notes, performed_by_id).
         """
-        sql = """SELECT * FROM update_monitoring_log_midwife(%s, %s, %s, %s, %s);"""
+        sql = """SELECT * FROM update_monitoring_log_midwife(%s, %s, %s, %s);"""
         params = [
             p_child_record_id,
             p_child_monitoring_id,
             p_findings,
-            p_notes,
             p_performed_by_id,
         ]
         try:
