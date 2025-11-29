@@ -40,10 +40,34 @@
     width: calc(100% / 6);
 }
 
-/* Visits table has 7 columns */
+/* Visits table has 8 columns (ID, Date, Age, Wt, Temp, Ht, Findings, Notes) */
 #visits-table th,
 #visits-table td {
-    width: calc(100% / 7);
+    width: calc(100% / 8);
+}
+
+/* Make table containers horizontally scrollable to avoid layout breakage on small screens */
+.card-body.table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Ensure tables have a sensible minimum width so columns don't collapse entirely.
+   Uses per-table min-widths approximated from column counts to improve UX on narrow viewports. */
+#immunization table {
+    min-width: 600px; /* 6 cols ≈ 100px each */
+}
+#visits-table {
+    min-width: 800px; /* 8 cols ≈ 100px each */
+}
+
+/* Truncate long cell content with ellipsis to avoid overflowing the layout;
+   users can open the modal (findings/notes) to view full text. */
+#immunization table th, #immunization table td,
+#visits-table th, #visits-table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* Visit Entry: make the four fields equally divide available width */

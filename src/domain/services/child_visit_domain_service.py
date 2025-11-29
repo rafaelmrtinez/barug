@@ -30,13 +30,49 @@ class ChildVisitDomainService:
     MIN_HEIGHT = Decimal("30")
     MAX_HEIGHT = Decimal("150")
 
-    def __init__(self, ch_repo=None):
+    def __init__(self, ch_repo=None, child_monitoring_query=None):
         # Accept repository dependency for future use (not required now)
         self._repo = ch_repo
+        # optional query helper to read existing monitoring rows
+        self._monitoring_query = child_monitoring_query
 
-    def validate_and_normalize(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_and_normalize(self, payload: Dict[str, Any], role: str | None = None) -> Dict[str, Any]:
         data = dict(payload or {})
 
+        # Short-circuit validation for midwife role: only findings required
+        if role and str(role).lower() == 'midwife':
+            # If a monitoring id is provided, ensure the existing row doesn't already
+            # have findings recorded. Prevent midwife updates if findings exist.
+            monitor_id = (
+                data.get('child_monitoring_id')
+                or data.get('monitoring_id')
+                or data.get('child_monitor_id')
+                or data.get('id')
+            )
+            if monitor_id and self._monitoring_query:
+                try:
+                    existing = self._monitoring_query.fetch_by_monitoring_id(int(monitor_id))
+                except Exception as e:
+                    logger.warning('Failed to fetch existing monitoring row: %s', e)
+                    existing = None
+                if existing and existing.get('findings') not in (None, ''):
+                    msg = MessageCatalog.translate('findings_already_present')
+                    logger.warning('ChildVisit validation failed (midwife): %s', msg)
+                    raise ChildVisitDomainException(msg, code='findings_already_present')
+
+            findings = data.get('findings')
+            notes = data.get('notes')
+            if findings in (None, ''):
+                msg = MessageCatalog.translate('findings_required')
+                logger.warning('ChildVisit validation failed (midwife): %s', msg)
+                raise ChildVisitDomainException(msg, code='findings_required')
+            try:
+                findings_clean = ValidationUtils.sanitize_no_emoji(str(findings))
+                notes_clean = ValidationUtils.sanitize_no_emoji(str(notes)) if notes is not None else None
+            except ValueError:
+                msg = MessageCatalog.translate('emoji_not_allowed')
+                raise ChildVisitDomainException(msg, code='emoji_not_allowed')
+            return {'findings': findings_clean, 'notes': notes_clean}
         # Age
         age_raw = data.get("age")
         if age_raw in (None, ""):
@@ -110,18 +146,15 @@ class ChildVisitDomainService:
             raise ChildVisitDomainException(msg, code="height_range")
         data["height"] = height
 
-        # Findings
-        findings = data.get("findings")
-        if findings in (None, ""):
-            msg = MessageCatalog.translate("findings_required")
-            raise ChildVisitDomainException(msg, code="findings_required")
-        # sanitize and prevent emoji
-        try:
-            findings_clean = ValidationUtils.sanitize_no_emoji(str(findings))
-        except ValueError:
-            msg = MessageCatalog.translate("emoji_not_allowed")
-            raise ChildVisitDomainException(msg, code="emoji_not_allowed")
-        data["findings"] = findings_clean
+        # Findings (optional for non-midwife flows). If present, sanitize.
+        findings = data.get('findings')
+        if findings not in (None, ''):
+            try:
+                findings_clean = ValidationUtils.sanitize_no_emoji(str(findings))
+            except ValueError:
+                msg = MessageCatalog.translate('emoji_not_allowed')
+                raise ChildVisitDomainException(msg, code='emoji_not_allowed')
+            data['findings'] = findings_clean
 
         # Notes optional; if missing, set to 'N/A'
         notes = data.get("notes")

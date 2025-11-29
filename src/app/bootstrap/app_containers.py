@@ -377,12 +377,14 @@ class AppContainer(containers.DeclarativeContainer):
     child_visit_domain_service = providers.Factory(
         ChildVisitDomainService,
         ch_repo=infra.child_health_record_repository,
+        child_monitoring_query=infra.child_monitoring_query,
     )
 
     child_visit_service: providers.Factory[IChildVisitService] = providers.Factory(
         ChildVisitService,
         ch_repo=infra.child_health_record_repository,
         domain_service=child_visit_domain_service,
+        child_monitoring_query=infra.child_monitoring_query,
     )
 
     birth_supplementation_domain_service = providers.Factory(

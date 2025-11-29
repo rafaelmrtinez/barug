@@ -38,8 +38,14 @@ class ChildVisitAPI(View):
         try:
             data = request.POST.dict() if request.POST else (json.loads(request.body or "{}") or {})
             staff_id = request.session.get("auth").get("staff_id")
+            staff_role = request.session.get("auth").get("role_name")
             # Delegate validation/normalization and persistence to service layer
-            res = self.child_visit_service.process_and_insert(chr_id=child_health_record_id, staff_id=staff_id, payload=data)
+            res = self.child_visit_service.process_and_insert(
+                chr_id=child_health_record_id,
+                staff_id=staff_id,
+                staff_role=staff_role,
+                payload=data,
+            )
             return JsonResponse({"ok": True, "message": "Child monitoring log saved"})
         except ChildVisitDomainException as dv:
             logger.warning("ChildVisitDomainException in ChildVisitAPI: %s", getattr(dv, 'message', str(dv)))

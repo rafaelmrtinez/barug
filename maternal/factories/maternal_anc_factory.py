@@ -37,7 +37,7 @@ class MaternalANCFactory:
         self.staff_id = staff_id
 
     def create_identification_form(self, role: str, maternal_id: Optional[int] = None, data: Optional[Dict] = None):
-        return MaternalIdentificationForm(role=role, maternal_repository=self.repository, maternal_id=maternal_id, data=data)
+        return MaternalIdentificationForm(role=role, maternal_repository=self.repository, maternal_id=maternal_id, data=data, is_read_only=True)
 
     def create_obstetric_form(self, mhr_id: int, data: Optional[Dict] = None):
         return ObstetricHistoryForm(maternal_repository=self.repository, mhr_id=mhr_id, data=data)

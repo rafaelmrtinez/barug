@@ -41,12 +41,11 @@ from src.infra.repositories.child_health_repository import ChildHealthRepository
 
 logger = logging.getLogger(__name__)
 
-ACCESS = ("MIDWIFE", "Midwife", "midwife", "Barangay Health Worker", "bhw", "Super Admin")
+ACCESS = ("MIDWIFE", "Midwife", "midwife", "Barangay Health Worker", "bhw", "Super Admin", "barangay health worker")
 CONNECTION = ConnectionAdapter()
 CHILD_HEALTH_REPOSITORY: ChildHealthRecordRepository = LazyRepositoryProxy(repo_factory=lambda: ChildHealthRecordRepository(CONNECTION))
 
 # Create your views here.
-
 @session_login_required
 @role_required(*ACCESS)
 @nocache
@@ -105,7 +104,7 @@ def child_immunization_http(request: HttpRequest) -> HttpResponse:
 def child_health_entry(request: HttpRequest, child_health_record_id: int) -> HttpResponse:
     try:
         role = request.session.get("auth").get("role_name").lower()
-        child_information_form = ChildInformationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, role=role)
+        child_information_form = ChildInformationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, role=role, is_readonly=True)
         bf_form = ChildBreastFeedingForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
         immunizations = ChildImmunizationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
         birth_and_supplementation = BirthAndSupplentationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
@@ -218,7 +217,8 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
             chr_repo=CHILD_HEALTH_REPOSITORY,
             child_health_record_id=None,
             role=request.session.get("auth").get("role_name"),
-            data=request.POST
+            data=request.POST,
+            is_readonly=False,
             )
             if not child_information_form.is_valid():
                 MessageUtility.push_form_errors_as_messages(request, child_information_form)
@@ -305,6 +305,7 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
             chr_repo=CHILD_HEALTH_REPOSITORY,
             child_health_record_id=None,
             role=request.session.get("auth").get("role_name"),
+            is_readonly=False,
         )
         return render(
             request,
