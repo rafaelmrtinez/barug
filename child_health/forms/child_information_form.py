@@ -84,9 +84,6 @@ class ChildInformationForm(forms.Form):
         is_readonly: bool | None, *args, **kwargs):
         """Initialize the form.
 
-    def __init__(self, chr_repo: ChildHealthRecordRepository | None, child_health_record_id: int | None, role: str | None, is_readonly: bool | None, *args, **kwargs):
-        """Initialize the form.
-
         Parameters:
         - chr_repo: a ChildHealthRecordRepository used to fetch existing data.
         - child_health_record_id: the id used when fetching record/person data.
