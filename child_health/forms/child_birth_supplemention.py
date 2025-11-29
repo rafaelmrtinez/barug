@@ -102,6 +102,6 @@ class BirthAndSupplentationForm(forms.Form):
                     if name:
                         sanitized, err = FormUtils.sanitize_text(str(name), "TT Status")
                         self.fields['tt_status_mother'].initial = sanitized if not err else str(name)
-                        self.fields['tt_status_mother'].widget.attrs['readonly'] = True
             except Exception:
                 pass
+        self.fields['tt_status_mother'].widget.attrs['readonly'] = True

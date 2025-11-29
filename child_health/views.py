@@ -37,6 +37,7 @@ from child_health.utilities.repository_payload_validator import RepositoryPayloa
 import logging
 
 from src.infra.repositories.child_health_repository import ChildHealthRepository
+from src.infra.repositories.queries.maternal_health_record_queries import MaternalHealthRecordQueries
 
 logger = logging.getLogger(__name__)
 
@@ -102,8 +103,9 @@ def child_immunization_http(request: HttpRequest) -> HttpResponse:
 @require_http_methods(["GET"])
 def child_health_entry(request: HttpRequest, child_health_record_id: int) -> HttpResponse:
     try:
+        maternal_data = MaternalHealthRecordQueries(CONNECTION)
         role = request.session.get("auth").get("role_name").lower()
-        child_information_form = ChildInformationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, role=role, is_readonly=True)
+        child_information_form = ChildInformationForm(maternal_data=maternal_data,chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, role=role, is_readonly=True)
         bf_form = ChildBreastFeedingForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
         immunizations = ChildImmunizationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
         birth_and_supplementation = BirthAndSupplentationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
@@ -215,9 +217,11 @@ def find_person_http(request: HttpRequest) -> JsonResponse:
 @nocache
 def create_child_health_record(request: HttpRequest) -> HttpResponse:
     try:
+        maternal_data = MaternalHealthRecordQueries(CONNECTION)
         if request.method == "POST":
             child_information_form = ChildInformationForm(
             chr_repo=CHILD_HEALTH_REPOSITORY,
+            maternal_data=maternal_data,
             child_health_record_id=None,
             role=request.session.get("auth").get("role_name"),
             data=request.POST,
@@ -306,6 +310,7 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
             return redirect('child_health:create_child_health_record')
         child_information_form = ChildInformationForm(
             chr_repo=CHILD_HEALTH_REPOSITORY,
+            maternal_data=maternal_data,
             child_health_record_id=None,
             role=request.session.get("auth").get("role_name"),
             is_readonly=False,

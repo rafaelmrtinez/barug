@@ -13,7 +13,7 @@ class ChildVisitForm(forms.Form):
         error_messages={'required': 'Please provide the date of visit.'},
     )
     age = forms.DecimalField(
-        label="Age (years)", required=False, min_value=Decimal('0.1'), max_value=Decimal('5'),
+        label="Age (month/s or year/s)", required=False, min_value=Decimal('0.1'), max_value=Decimal('5'),
         error_messages={
             'required': 'Please provide the age.',
             'min_value': 'Age must be positive.',

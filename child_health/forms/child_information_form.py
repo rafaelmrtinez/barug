@@ -17,10 +17,12 @@ change runtime behavior.
 """
 
 from django import forms
+from django.core.exceptions import ValidationError
 
 from src.infra.repositories.child_health_record_repository import ChildHealthRecordRepository
 from maternal.constants import PLACE_OF_DELIVERY_CHOICES, SEX_CHOICES
 from maternal.forms.maternal_identification_form import add_bootstrap_classes
+from src.infra.repositories.queries.maternal_health_record_queries import MaternalHealthRecordQueries
 
 class ChildInformationForm(forms.Form):
     """Form containing the child's basic information fields.
@@ -70,8 +72,16 @@ class ChildInformationForm(forms.Form):
     father_occupation = forms.CharField(
         label="Father Occupation", required=False, error_messages={'required': 'Father Occupation is required.'})
     address = forms.CharField(label="Complete Address with landmarks", required=False, widget=forms.Textarea(attrs={'rows': 2}), error_messages={'required': 'Address is required.'})
-
-    def __init__(self, chr_repo: ChildHealthRecordRepository | None, child_health_record_id: int | None, role: str | None, is_readonly: bool | None, *args, **kwargs):
+    mother_person_id = forms.IntegerField(widget=forms.HiddenInput(attrs={
+        'id': 'mother_person_id',
+        'name': 'mother_id'
+        }), required=False)
+    def __init__(
+        self, 
+        chr_repo: ChildHealthRecordRepository | None,  
+        child_health_record_id: int | None, 
+        maternal_data: MaternalHealthRecordQueries | None, role: str | None, 
+        is_readonly: bool | None, *args, **kwargs):
         """Initialize the form.
 
         Parameters:
@@ -89,6 +99,7 @@ class ChildInformationForm(forms.Form):
         add_bootstrap_classes(self)
         self._chr_repo = chr_repo
         self._child_health_record_id = child_health_record_id
+        self._maternal_data = maternal_data
         # Apply role-specific UI policies and display-only behaviour.
         # Apply role-specific UI policies and display-only behaviour.
         # Keep behavior unchanged (BHW and midwife get display-only view),
@@ -104,6 +115,67 @@ class ChildInformationForm(forms.Form):
             elif role == 'midwife':
                 # Midwives view the form as display-only
                 self._readonly_fields()
+                
+    def clean(self):
+        """Custom form-level validation can be added here if needed."""
+        cleaned_data = super().clean()
+        # Additional cross-field validation logic: validate birth-order
+        # chronology for the mother. We fetch the most relevant existing
+        # child record for the mother (if any) and ensure the submitted
+        # `birth_order` is chronological (greater than existing child's
+        # birth_order) when creating a new child record or when the
+        # submitted record differs from the existing child record.
+
+        mother_id = cleaned_data.get('mother_person_id')
+        submitted_birth_order = cleaned_data.get('birth_order')
+        # Determine current child_record_id (may be present when editing)
+        current_chr_id = cleaned_data.get('child_health_record_id') or self._child_health_record_id
+
+        if self._maternal_data and mother_id and submitted_birth_order is not None:
+            try:
+                existing = self._maternal_data.get_child_by_mother_id(mother_id=mother_id)
+            except Exception:
+                existing = None
+
+            if existing:
+                try:
+                    existing_birth_order_raw = existing.get('birth_order')
+                    existing_birth_order = int(existing_birth_order_raw) if existing_birth_order_raw is not None and str(existing_birth_order_raw).strip() != '' else None
+                except Exception:
+                    existing_birth_order = None
+
+                existing_chr_id = existing.get('child_record_id')
+
+                # Only enforce chronology when an existing birth_order is known
+                # and the submitted record is not the same row as the existing one.
+                if existing_birth_order is not None:
+                    try:
+                        # Normalize to ints for comparison
+                        submitted_bo = int(submitted_birth_order)
+                        existing_chr_id_int = int(existing_chr_id) if existing_chr_id is not None else None
+                        current_chr_id_int = int(current_chr_id) if current_chr_id is not None else None
+                    except Exception:
+                        # If conversion fails, skip strict numeric check
+                        submitted_bo = submitted_birth_order
+                        existing_chr_id_int = existing_chr_id
+                        current_chr_id_int = current_chr_id
+
+                    if existing_chr_id_int != current_chr_id_int:
+                        # Creating a new child or editing a different child: require
+                        # submitted birth_order to be strictly greater than the
+                        # most recent existing birth_order for this mother.
+                        try:
+                            if int(submitted_bo) <= int(existing_birth_order):
+                                self.add_error('birth_order', ValidationError(
+                                    'Birth order must be greater than the existing child birth order for this mother.'
+                                ))
+                        except Exception:
+                            # If numeric compare fails, add a generic error
+                            self.add_error('birth_order', ValidationError(
+                                'Invalid birth order value; must be a positive integer greater than existing child birth order.'
+                            ))
+
+        return cleaned_data
                     
     def _readonly_fields(self):
         """Populate display data and disable all fields for read-only view.
@@ -146,7 +218,7 @@ class ChildInformationForm(forms.Form):
             self.fields['mother_age'].initial = row.get('mothers_age', '')
             self.fields['father_age'].initial = row.get('fathers_age', '')
             self.fields['address'].initial = row.get('child_complete_address', '')
-            self.fields['birth_order'].initial = row.get('birth_order', '')
+            self.fields['birth_order'].initial = row.get('child_birth_order', '')
             self.fields['mother_occupation'].initial = row.get('mother_occupation', '')
             self.fields['father_occupation'].initial = row.get('fathers_occupation', '')
 
