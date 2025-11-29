@@ -3329,6 +3329,7 @@ def business_information(
             "renewal_href": renewal_href,
             "closure_href": closure_href,
             "cta_mode": cta_mode,
+            'is_clerk': (user_role == CLERK_ROLE),
         },
     )
 
