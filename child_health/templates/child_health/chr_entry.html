@@ -545,10 +545,10 @@
                                 <button type="button" class="btn btn-sm btn-outline-secondary visit-text-toggle" data-type="findings" data-findings="{{ v.findings|default_if_none:''|escapejs }}" data-id="{{ v.child_monitoring_id }}" title="View findings" aria-label="View findings for visit {{ v.child_monitoring_id }}">…</button>
                             {% else %}
                                 &nbsp;
-                            {% endif %}
-                            {# Midwife-only edit button to open a modal for editing findings for this row #}
-                            {% if request.session.auth.role_name == "midwife" %}
-                                <button type="button" class="btn btn-sm btn-outline-primary ms-1 visit-edit-btn" data-id="{{ v.child_monitoring_id }}" data-findings="{{ v.findings|default_if_none:''|escapejs }}" title="Edit findings" aria-label="Edit findings for visit {{ v.child_monitoring_id }}">✎</button>
+                                {# Show edit button only to midwives and only when findings are empty for this row #}
+                                {% if request.session.auth.role_name == "midwife" %}
+                                    <button type="button" class="btn btn-sm btn-outline-primary ms-1 visit-edit-btn" data-id="{{ v.child_monitoring_id }}" data-findings="{{ v.findings|default_if_none:''|escapejs }}" title="Edit findings" aria-label="Edit findings for visit {{ v.child_monitoring_id }}">✎</button>
+                                {% endif %}
                             {% endif %}
                         </td>
                         <td>
