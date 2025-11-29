@@ -457,6 +457,40 @@ class PersonQuery:
         rows = self.db.execute_query_to_dict(query, params)
         return rows or []
 
+    def get_husband_by_src_person_id(self, src_person_id: int) -> dict:
+            """Return the husband (person DTO) for a female identified by `src_person_id`.
+
+            This looks up the `person_kinship` links where the given person is the
+            source and the relationship is recorded as a 'spouse'. It prefers an
+            active link (is_active true and end_date is NULL) and otherwise returns
+            the most recent link.
+            """
+            query = """
+            SELECT p2.*,
+                    CONCAT(p2.first_name, ' ',
+                                    CASE WHEN p2.middle_name IS NOT NULL AND p2.middle_name <> '' THEN
+                                            SUBSTRING(p2.middle_name FROM 1 FOR 1) || '. '
+                                    ELSE '' END,
+                                    p2.last_name,
+                                    CASE WHEN p2.suffix IS NOT NULL AND p2.suffix <> '' THEN
+                                            ' ' || p2.suffix
+                                    ELSE '' END) AS full_name
+            FROM person_kinship pk
+            JOIN person p2 ON p2.person_id = pk.dst_person_id
+            LEFT JOIN relationship r ON r.relationship_id = pk.relationship_id
+            WHERE pk.src_person_id = %s
+                AND LOWER(r.relationship_name) = 'spouse'
+                AND p2.sex_id = 1
+            ORDER BY
+                (pk.is_active IS TRUE AND pk.end_date IS NULL) DESC,
+                COALESCE(pk.start_date, pk.added_at) DESC,
+                pk.kinship_id DESC
+            LIMIT 1;
+            """
+
+            rows = self.db.execute_query_to_dict(query, (src_person_id,))
+            return rows[0] if rows else {}
+
     def search_female_active_resident_by_key(self, key: str, limit: int | None = None) -> list:
         """Search active female residents who are also marked as RESIDENT using a free-text `key` matched with ILIKE.
 

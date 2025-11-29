@@ -83,7 +83,7 @@ function init(){
         };
 
         try{
-            const resp = await fetch('/maternal/create/', {
+            const resp = await fetch('/maternal/api/v1/create-mhr/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

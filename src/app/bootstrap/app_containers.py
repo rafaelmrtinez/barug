@@ -141,6 +141,7 @@ from src.app.contracts.announcement_service_contract import (
 from src.app.services.announcement_service import (
     AnnouncementService,
 )
+from src.app.services.create_maternal_health_record_service import CreateMaternalHealthRecordService
 from src.app.contracts.audience_service_contract import (
     IAudienceService,
 )
@@ -253,6 +254,13 @@ class AppContainer(containers.DeclarativeContainer):
     prenatal_followup_service = providers.Factory(
         lambda repository: __import__("src.app.services.prenatal_followup_service", fromlist=["PrenatalFollowUpService"]).PrenatalFollowUpService(repository=repository),
         repository=infra.maternal_health_record_repository,
+    )
+
+    create_maternal_health_record_service = providers.Factory(
+        CreateMaternalHealthRecordService,
+        repository=infra.maternal_health_record_repository,
+        person_query=infra.person_query,
+        mhr_query=infra.maternal_health_record_query,
     )
 
     maternal_status_service: providers.Factory[IMaternalRecordStatusService] = providers.Factory(
