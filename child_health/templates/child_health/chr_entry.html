@@ -546,6 +546,10 @@
                             {% else %}
                                 &nbsp;
                             {% endif %}
+                            {# Midwife-only edit button to open a modal for editing findings for this row #}
+                            {% if request.session.auth.role_name == "midwife" %}
+                                <button type="button" class="btn btn-sm btn-outline-primary ms-1 visit-edit-btn" data-id="{{ v.child_monitoring_id }}" data-findings="{{ v.findings|default_if_none:''|escapejs }}" title="Edit findings" aria-label="Edit findings for visit {{ v.child_monitoring_id }}">✎</button>
+                            {% endif %}
                         </td>
                         <td>
                             {% if v.notes %}
@@ -593,6 +597,28 @@
     </div>
 </div>
 
+<!-- Modal used by midwives to edit Findings for a specific visit -->
+<div class="modal fade" id="visitEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="visitEditModalLabel">Edit Findings</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="visitEditModalTextarea" class="form-label">Findings</label>
+                    <textarea id="visitEditModalTextarea" class="form-control" rows="6" aria-label="Findings textarea"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="visitEditModalCancel" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="visitEditModalSave" class="btn btn-primary">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>window.__USER_ROLE = "{{ request.session.auth.role_name|escapejs }}";</script>
 
 {% block script %}
@@ -607,6 +633,7 @@
 <script defer src="{% static 'child_health/js/auto_disable_sections.js' %}"></script>
 <script defer src="{% static 'child_health/js/api_post_entries.js' %}"></script>
 <script defer src="{% static 'child_health/js/visit_text_modal.js' %}"></script>
+<script defer src="{% static 'child_health/js/visit_edit_modal.js' %}"></script>
 <script defer src="{% static 'child_health/js/age_display.js' %}"></script>
 <script src="{% static 'js/toast.js' %}"></script>
 {% endblock %}
