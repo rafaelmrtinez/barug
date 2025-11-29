@@ -38,6 +38,7 @@ import logging
 
 from src.infra.repositories.child_health_repository import ChildHealthRepository
 from src.infra.repositories.queries.maternal_health_record_queries import MaternalHealthRecordQueries
+from src.infra.utilities.age_calculator import AgeCalculator
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +104,11 @@ def child_immunization_http(request: HttpRequest) -> HttpResponse:
 @require_http_methods(["GET"])
 def child_health_entry(request: HttpRequest, child_health_record_id: int) -> HttpResponse:
     try:
+        from src.infra.repositories.queries.child_helth_record_query import ChildHealthRecordQuery
+        child_data = ChildHealthRecordQuery(CONNECTION)
         maternal_data = MaternalHealthRecordQueries(CONNECTION)
+        child_age = AgeCalculator.float_age_to_years(child_data.fetch_by_child_id(child_health_record_id)['child_age'])
+        print(f"DEBUG: Child age for record ID {child_health_record_id}: {child_age}")
         role = request.session.get("auth").get("role_name").lower()
         child_information_form = ChildInformationForm(maternal_data=maternal_data,chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, role=role, is_readonly=True)
         bf_form = ChildBreastFeedingForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
@@ -114,12 +119,12 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
         visit_form = ChildVisitForm()
         new_born_screening = NewbornScreeningForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
         visit_log = CHILD_HEALTH_REPOSITORY.fetch_child_monitoring_logs(child_health_record_id)
-        print(f"Visit log: {visit_log}")
         if request.method == "GET":
             return render(
                 request,
                 "child_health/chr_entry.html",
                 {
+                    "child_age": child_age,
                     "form": birth_and_supplementation,
                     "new_born_screening": new_born_screening,
                     "child_information_form": child_information_form,

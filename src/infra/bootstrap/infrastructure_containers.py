@@ -96,6 +96,7 @@ from src.infra.repositories.channel_repository import (
 )
 from src.infra.repositories.queries.child_monitoring_query import ChildMonitoringQuery
 from src.infra.repositories.queries.maternal_health_record_queries import MaternalHealthRecordQueries
+from src.infra.repositories.queries.child_helth_record_query import ChildHealthRecordQuery
 
 
 class InfraContainer(containers.DeclarativeContainer):
@@ -308,6 +309,11 @@ class InfraContainer(containers.DeclarativeContainer):
     child_monitoring_query = providers.Factory(
         ChildMonitoringQuery,
         db=context,
+    )
+
+    child_health_record_query = providers.Factory(
+        ChildHealthRecordQuery,
+        connection=context,
     )
 
     maternal_health_record_query = providers.Factory(
