@@ -109,6 +109,8 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
         maternal_data = MaternalHealthRecordQueries(CONNECTION)
         child_age = AgeCalculator.float_age_to_years(child_data.fetch_by_child_id(child_health_record_id)['child_age'])
         print(f"DEBUG: Child age for record ID {child_health_record_id}: {child_age}")
+        # Lock the record (make page read-only) for children older than 4 years to match maternal UX
+        is_locked = (child_age is not None and child_age > 4)
         role = request.session.get("auth").get("role_name").lower()
         child_information_form = ChildInformationForm(maternal_data=maternal_data,chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, role=role, is_readonly=True)
         bf_form = ChildBreastFeedingForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
@@ -135,6 +137,7 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                     "visit_log": visit_log,
                     "vitamin_form": vitamin_form,
                     "iron_intake_form": iron_intake_form,
+                    "is_locked": is_locked,
                 },
             )
     except ChildHealthRecordException as chre:
@@ -154,6 +157,7 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                 "visit_log": visit_log,
                 "vitamin_form": vitamin_form,
                 "iron_intake_form": iron_intake_form,
+                "is_locked": is_locked,
             },
         )
     except Exception as e:
@@ -173,6 +177,7 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                 "visit_log": visit_log,
                 "vitamin_form": vitamin_form,
                 "iron_intake_form": iron_intake_form,
+                "is_locked": is_locked,
             },
         )
         
