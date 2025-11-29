@@ -70,3 +70,32 @@
     padding-right: .5rem;
   }
 }
+
+/* Button style for Laboratory Results download (white outline with #6d2932) */
+.btn-outline-labs {
+  background: #ffffff;
+  color: #6d2932;
+  border: 1px solid #6d2932;
+}
+.btn-outline-labs:hover,
+.btn-outline-labs:focus {
+  background: #6d2932;
+  color: #ffffff;
+  border-color: #6d2932;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(109,41,50,0.12);
+}
+
+
+/* Smooth autosize transition for lab result textareas */
+.autosize-textarea {
+  overflow: hidden; /* hide vertical scrollbar while autosizing */
+  resize: none;     /* user resizing disabled to keep autosize behavior consistent */
+  transition: height 140ms ease; /* small smooth expand/collapse */
+  min-height: 48px; /* reasonable minimum */
+}
+
+.autosize-textarea:focus {
+  outline: 2px solid rgba(109,41,50,0.12);
+}
+

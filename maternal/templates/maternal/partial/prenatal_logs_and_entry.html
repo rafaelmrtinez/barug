@@ -1,5 +1,10 @@
-<form id="prenatal-form" method="post" action="{% url 'maternal:bhw_prenatal_form' mhr_id %}" novalidate
-    data-api-endpoint="/maternal/api/form/prenatal/" data-mhr-id="{{ mhr_id }}">
+{% load static %}
+{% block css %}
+<link rel="stylesheet" href="{% static 'maternal/css/prenatal_table.css' %}">
+{% endblock %}
+
+<form id="prenatal-form" novalidate
+    data-api-endpoint="/maternal/api/form/prenatal/" data-mhr-id="{{ mhr_id }}" data-role="{{ request.session.auth.role_name|default:''|lower }}">
     {% csrf_token %}
 
     {% if prenatal_form.non_field_errors %}
@@ -10,66 +15,52 @@
     </div>
     {% endif %}
 
-    <div class="card mb-3 card-brand">
+    <div class="card mb-3 card-brand prenatal-card">
         <div class="card-header">Prenatal Follow-up Entry</div>
         <div class="card-body">
             <div class="row g-3 align-items-end">
                 <div class="col-md-2">
                     {{ prenatal_form.aog_days.label_tag }}
                     {{ prenatal_form.aog_days }}
-                    {% for error in prenatal_form.aog_days.errors %}
-                    {% endfor %}
                 </div>
 
                 <div class="col-md-2">
                     {{ prenatal_form.aog_weeks.label_tag }}
                     {{ prenatal_form.aog_weeks }}
-                    {% for error in prenatal_form.aog_weeks.errors %}
-                    {% endfor %}
                 </div>
 
                 <div class="col-md-2">
                     {{ prenatal_form.wt_kg.label_tag }}
                     {{ prenatal_form.wt_kg }}
-                    {% for error in prenatal_form.wt_kg.errors %}
-                    {% endfor %}
                 </div>
 
                 <div class="col-md-2">
                     {{ prenatal_form.bp_systolic.label_tag }}
                     {{ prenatal_form.bp_systolic }}
-                    {% for error in prenatal_form.bp_systolic.errors %}
-                    {% endfor %}
                 </div>
 
                 <div class="col-md-2">
                     {{ prenatal_form.bp_diastolic.label_tag }}
                     {{ prenatal_form.bp_diastolic }}
-                    {% for error in prenatal_form.bp_diastolic.errors %}
-                    {% endfor %}
                 </div>
 
                 <div class="col-md-4">
                     {{ prenatal_form.findings.label_tag }}
                     {{ prenatal_form.findings }}
-                    {% for error in prenatal_form.findings.errors %}
-                    {% endfor %}
                 </div>
 
                 <div class="col-md-4">
                     {{ prenatal_form.notes.label_tag }}
                     {{ prenatal_form.notes }}
-                    {% for error in prenatal_form.notes.errors %}
-                    {% endfor %}
                 </div>
             </div>
 
             <div class="card-footer d-flex justify-content-end gap-2 mt-3">
                 <button type="reset" class="btn btn-outline-brand">Clear</button>
                 {% if request.session.auth.role_name == 'midwife'  %}
-                <button type="submit" class="btn btn-brand">Mark Complete</button>
+                <button type="button" name="mark_complete" value="1" class="btn btn-brand">Mark Complete</button>
                 {% endif %}
-                <button type="submit" class="btn btn-brand">Save</button>
+                <button type="submit" name="save" value="1" class="btn btn-brand">Save</button>
             </div>
         </div>
     </div>
@@ -82,23 +73,25 @@
     </div>
 
     <div class="card-body table-responsive">
-        <table class="table table-sm align-middle text-center">
+        <table class="table table-sm align-middle text-center prenatal-table">
             <thead>
                 <tr>
-                <th style="width:10%">Date</th>
-                <th style="width:10%">AOG Days</th>
-                <th style="width:10%">AOG Weeks</th>
-                <th style="width:10%">WT (kg)</th>
-                <th style="width:10%">BP Systolic</th>
-                <th style="width:10%">BP Diastolic</th>
-                <th style="width:30%">Findings (Leopold’s)</th>
-                <th style="width:30%">Notes</th>
+                <th>ID</th>
+                <th>Date</th>
+                <th>AOG Days</th>
+                <th>AOG Weeks</th>
+                <th>WT (kg)</th>
+                <th>BP Systolic</th>
+                <th>BP Diastolic</th>
+                <th>Findings (Leopold’s)</th>
+                <th>Notes</th>
                 </tr>
             </thead>
                 <tbody>
                     {% if prenatal_followup_formset and prenatal_followup_formset.forms %}
                         {% for f in prenatal_followup_formset %}
-                                <tr>
+                            <tr>
+                                <td class="text-nowrap">{{ f.anc_row_id.value|default:"—" }}</td>
                                 <td class="text-nowrap">{{ f.date.value|default:"—" }}</td>
                                 <td class="text-nowrap">{{ f.aog_days.value|default:"—" }}</td>
                                 <td class="text-nowrap">{{ f.aog_weeks.value|default:"—" }}</td>
@@ -119,14 +112,18 @@
                                         &mdash;
                                     {% endif %}
                                 </td>
-                                </tr>
+                            </tr>
                         {% endfor %}
                         {% else %}
                         <tr>
-                                <td colspan="8" class="text-center text-muted">No follow-up entries yet.</td>
+                            <td colspan="8" class="text-center text-muted">No follow-up entries yet.</td>
                         </tr>
                     {% endif %}
                 </tbody>
         </table>
     </div>
 </div>
+
+{% block js %}
+<script src="{% static 'maternal/js/prenatal_mark_as_complete.js' %}"></script>
+{% endblock %}

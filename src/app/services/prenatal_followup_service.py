@@ -140,6 +140,12 @@ class PrenatalFollowUpService:
                     findings=findings,
                     notes=notes,
                 )
+                
+                if res[0]:
+                    self.repository.insert_maternal_visit_and_schedule_completion(
+                        mhr_id=mid,
+                        staff_id=staff_id,
+                    )
 
             return res
         except MaternalHealthRecordException:

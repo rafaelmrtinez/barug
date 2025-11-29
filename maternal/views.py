@@ -46,12 +46,6 @@ MIDWIFE_ACCESS = ("MIDWIFE", "Midwife", "midwife")
 
 
 REPOSITORY: MaternalHealthRecordRepository = LazyRepositoryProxy(repo_factory=lambda: MaternalHealthRecordRepository(ConnectionAdapter()))
-
-# NOTE: prenatal follow-up POST handling moved to
-# `maternal/api/prenatal_followup_api.py` as a class-based endpoint.
-    
-
-# Moved postpartum API into class-based APIs under maternal/api/
     
 @session_login_required
 @role_required(*BHW_ACCESS)
@@ -65,6 +59,7 @@ def health_worker_prenatal_form_view(request: HttpRequest, mhr_id: int) -> HttpR
     staff_role = request.session.get("auth", {}).get("role_name")
     existing_data = REPOSITORY.fetch_prenatal_information_by_mhr_id(mhr_id)
     initial = [{
+        "anc_row_id": r.get("anc_row_id"),
         "date":  r.get("date"),
         "aog_days": r.get("aog_days"),
         "aog_weeks": r.get('aog_weeks'),
@@ -255,8 +250,9 @@ def maternal_health_record_form(request, record_id : int):
             risk_code_form.has_existing = False
         
         pre_natal_existing_data = REPOSITORY.fetch_prenatal_information_by_mhr_id(record_id)
-        
+        print(f'pre_natal_existing_data: {pre_natal_existing_data}')
         initial_pre_natal_existing_data = [{
+            "anc_row_id": r.get("anc_row_id"),
             "date":  r.get("date"),
             "aog_days": r.get("aog_days"),
             "aog_weeks": r.get('aog_weeks'),
@@ -275,12 +271,14 @@ def maternal_health_record_form(request, record_id : int):
             form_kwargs={
                 "mhr_repository": None,
                 "maternal_id": record_id,
+                "role": role,
             },
         )
         # single blank form for entering a new prenatal followup
         pf_entry_form = PrenatalFollowUpEntryForm(
             mhr_repository=REPOSITORY,
             maternal_id=record_id,
+            role=role,
             prefix="pf_entry"  # keep prefixes distinct from the formset (if used)
         )
 

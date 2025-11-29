@@ -1223,6 +1223,9 @@ class MaternalHealthRecordRepository(IMaternalHealthRecordRepository):
         """
         sql = """
             SELECT
+                anc_row_id,
+                anc_visit_id,
+                maternal_record_id,
                 anc_date::date AS date,
                 aog_days,
                 aog_weeks,

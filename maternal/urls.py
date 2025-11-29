@@ -13,7 +13,7 @@ urlpatterns = [
     path("create/", views.create_new_maternal_entry, name="create_maternal_entry"),
     path("find-mother-basic-info/<int:person_id>/", views.find_mother_basic_info, name="find_mother_basic_info"),
     path("form/prenatal/<int:mhr_id>/", views.health_worker_prenatal_form_view, name="bhw_prenatal_form"),
-    path("api/form/prenatal/", __import__('maternal.api.prenatal_followup_api', fromlist=['']).PrenatalFollowUpEntryAPI.as_view(), name="bhw_prenatal_api"),
+    path(f"api/v{API_VERSION}/form/prenatal/", __import__('maternal.api.prenatal_followup_api', fromlist=['']).PrenatalFollowUpEntryAPI.as_view(), name="bhw_prenatal_api"),
     # New class-based API endpoints for forms (migrated from the monolithic POST handler)
     path(f'api/v{API_VERSION}/mhr/obstetric/', __import__('maternal.api.obstetric_api', fromlist=['']).ObstetricHistoryAPI.as_view(), name='mhr_obstetric_api'),
     path(f'api/v{API_VERSION}/mhr/medical-history/', __import__('maternal.api.medical_history_api', fromlist=['']).MedicalHistoryAPI.as_view(), name='mhr_medical_history_api'),
