@@ -113,13 +113,14 @@ def _get_all_pdf_field_names(template_path: str) -> List[str]:
                         names.append(nm)
     return names
 
-def _fill_pdf_with_values(template_path: str, merged: Dict[str, str]) -> bytes:
+def _fill_pdf_with_values(template_path: str, merged: Dict[str, str], is_ctc: bool = False) -> bytes:
     if PdfReader is None:
         raise RuntimeError("pypdf is not installed. Run: pip install pypdf")
     
     print(f"[PDF DEBUG] Reading template: {template_path}")
     print(f"[PDF DEBUG] Template exists: {os.path.exists(template_path)}")
     print(f"[PDF DEBUG] Values to fill: {len(merged)} fields")
+    print(f"[PDF DEBUG] Is CTC: {is_ctc}")
     
     reader = PdfReader(template_path)
     writer = PdfWriter()
@@ -139,6 +140,24 @@ def _fill_pdf_with_values(template_path: str, merged: Dict[str, str]) -> bytes:
     for page_num, page in enumerate(writer.pages):
         print(f"[PDF DEBUG] Updating page {page_num + 1}")
         writer.update_page_form_field_values(page, merged)
+        
+        # Add CTC watermark if this is a certified true copy
+        if is_ctc:
+            from reportlab.pdfgen import canvas
+            from reportlab.lib.pagesizes import letter
+            packet = io.BytesIO()
+            can = canvas.Canvas(packet, pagesize=letter)
+            can.setFont("Helvetica-Bold", 40)
+            can.setFillColorRGB(0.8, 0, 0, alpha=0.3)
+            can.saveState()
+            can.translate(300, 400)
+            can.rotate(45)
+            can.drawCentredString(0, 0, "CERTIFIED TRUE COPY")
+            can.restoreState()
+            can.save()
+            packet.seek(0)
+            watermark = PdfReader(packet)
+            page.merge_page(watermark.pages[0])
     
     buf = io.BytesIO()
     writer.write(buf)

@@ -46,6 +46,39 @@
     box-shadow: 0 0 0 .25rem rgba(86,28,36,.15);
   }
 
+  /* Enhanced search input */
+  #residentSearch, #onBehalfSearch {
+    border-radius: 12px;
+    padding: 0.75rem 3rem 0.75rem 2.75rem;
+    border: 2px solid var(--line);
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+  }
+  #residentSearch:focus, #onBehalfSearch:focus {
+    border-color: var(--brand-700);
+    box-shadow: 0 0 0 4px rgba(109,41,50,.08);
+    transform: translateY(-1px);
+  }
+  .position-relative .bi-search {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--brand-700);
+    font-size: 1.1rem;
+    z-index: 5;
+  }
+  #residentSearch::-webkit-search-cancel-button,
+  #onBehalfSearch::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 20px;
+    width: 20px;
+    background: var(--brand-700);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854Z'/%3E%3C/svg%3E");
+    cursor: pointer;
+  }
+
   /* Buttons (flat) */
   .btn-brand{
     --bs-btn-bg: var(--brand-700);
@@ -124,11 +157,12 @@
           <div class="section-head">Find Resident</div>
           <div class="section-body">
             <div class="row g-2 align-items-center">
-              <div class="col-sm-9 col-md-7">
+              <div class="col-12">
                 <div class="position-relative">
-                  <label for="residentSearch" class="form-label label-req mb-1">Search</label>
+                  <label for="residentSearch" class="form-label label-req mb-2">Search</label>
+                  <i class="bi bi-search" style="padding-top: 30;"></i>
                   <input id="residentSearch" type="search" class="form-control" placeholder="Search by code or name (min 2 chars)" autocomplete="off">
-                  <div id="residentSpinner" class="position-absolute top-50 end-0 translate-middle-y me-3 d-hidden">
+                  <div id="residentSpinner" class="position-absolute top-50 end-0 translate-middle-y me-3 d-hidden" style="margin-top: 12px;">
                     <div class="spinner-border spinner-border-sm text-secondary" role="status" aria-label="Searching"></div>
                   </div>
                 </div>
@@ -161,10 +195,13 @@
 
             <div id="onBehalfRow" class="row g-3 mt-1 d-hidden">
               <div class="col-12">
-                <label class="form-label label-req">Find person (on behalf of)</label>
-                <input type="search" id="onBehalfSearch" class="form-control" placeholder="Search by name or code (min 2 chars)" autocomplete="off">
-                <div id="onBehalfSpinner" class="position-absolute top-50 end-0 translate-middle-y me-3 d-hidden">
-                  <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+                <div class="position-relative">
+                  <label class="form-label label-req mb-2">Find person (on behalf of)</label>
+                  <i class="bi bi-search" style="padding-top: 30;"></i>
+                  <input type="search" id="onBehalfSearch" class="form-control" placeholder="Search by name or code (min 2 chars)" autocomplete="off">
+                  <div id="onBehalfSpinner" class="position-absolute top-50 end-0 translate-middle-y me-3 d-hidden" style="margin-top: 12px;">
+                    <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+                  </div>
                 </div>
                 <div id="onBehalfResults" class="mt-2 help">Type to search…</div>
               </div>

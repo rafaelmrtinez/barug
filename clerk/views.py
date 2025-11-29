@@ -186,7 +186,7 @@ def _staff_id(request: HttpRequest) -> int | None:
 BRGY_BUSINESS_DOC_NAME = "BARANGAY BUSINESS CLEARANCE"     # must match request_document_type_name
 BRGY_BUSINESS_PDF_FILE = "barangay-business-clearance.pdf" # the uploaded template filename
 # e.g., near BRGY_BUSINESS_DOC_NAME / BRGY_BUSINESS_PDF_FILE
-CTC_BRGY_BUSINESS_PDF_FILE = "ctc-barangay-business-clearance.pdf"
+CTC_BRGY_BUSINESS_PDF_FILE = "barangay-ctc.pdf"
 
 # ────────────────────────────────────────────────────────────
 # SECTION: Missing-value advice (for logs)
@@ -976,7 +976,7 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
                   for name in field_names}
 
         try:
-            pdf_bytes = _fill_pdf_with_values(template_path, merged)
+            pdf_bytes = _fill_pdf_with_values(template_path, merged, is_ctc=is_ctc)
         except Exception:
             with open(template_path, "rb") as f:
                 pdf_bytes = f.read()
@@ -1387,7 +1387,7 @@ def ajax_resident_search(request: HttpRequest):
     rows: List[Dict[str, Any]] = []
     if len(q) >= 2:
         try:
-            res = supabase.rpc("search_person_by_code_or_name", {"p_key": q}).execute()
+            res = supabase.rpc("search_person_by_code_or_name_not_deceased", {"p_key": q}).execute()
             rows = res.data or []
         except Exception as e:
             logger.warning("ajax_resident_search RPC failed: %s", e)

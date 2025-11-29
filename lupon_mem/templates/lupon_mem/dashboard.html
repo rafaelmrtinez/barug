@@ -310,21 +310,6 @@
     }
   })();
 
-  // Populate year dropdown dynamically
-  (function() {
-    const yearSelect = document.getElementById('yearSelect');
-    const currentYear = new Date().getFullYear();
-    const startYear = 2020;
-    const endYear = currentYear + 2;
-    
-    for (let year = startYear; year <= endYear; year++) {
-        const option = document.createElement('option');
-        option.value = year;
-        option.textContent = year;
-        yearSelect.appendChild(option);
-    }
-  })();
-
   function showFilterModal(reportType) {
     const form = document.getElementById('filterForm');
     const monthYearFilters = document.getElementById('monthYearFilters');
@@ -346,6 +331,18 @@
         
         const monthSelect = monthYearFilters.querySelector('select[name="month"]');
         const yearSelect = monthYearFilters.querySelector('select[name="year"]');
+        
+        // Populate year dropdown dynamically
+        if (yearSelect.options.length <= 1) {
+            const startYear = 2020;
+            const endYear = currentYear + 2;
+            for (let year = startYear; year <= endYear; year++) {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                yearSelect.appendChild(option);
+            }
+        }
         
         if (monthSelect) monthSelect.value = currentMonth;
         if (yearSelect) yearSelect.value = currentYear;
