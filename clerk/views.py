@@ -3730,11 +3730,95 @@ def create_renewal_request(
 
             if new_ids:
                 ids_str = ", ".join(str(i) for i in new_ids)
-                messages.success(
-                    request,
-                    f"Created {len(new_ids)} renewal request(s) for unpaid years up to {period_type} {period_year}: [{ids_str}] "
-                    f"(status: FOR_TREASURER_REVIEW)."
-                )
+                
+                # Track if document request was created
+                created_doc_request_id = None
+                
+                # Create document request for business clearance for the most recent renewal
+                try:
+                    dto = business_info.execute_by_business_id(business_id)
+                    owner = dict(dto.owner or {})
+                    owner_person_id = owner.get("person_id") or owner.get("owner_person_id")
+                    
+                    if not owner_person_id:
+                        print(f"[create_renewal_request] WARNING: No owner_person_id found for business {business_id}")
+                        messages.warning(request, "Document request not created: Business owner not found.")
+                    else:
+                        # Get Business Clearance document type ID
+                        dt_res = supabase.table("request_document_type").select("request_document_type_id, request_document_type_name").ilike("request_document_type_name", "%business clearance%").limit(1).execute()
+                        if not dt_res.data:
+                            print(f"[create_renewal_request] WARNING: Business Clearance document type not found")
+                            messages.warning(request, "Document request not created: Business Clearance document type not configured.")
+                        else:
+                            doc_type_id = dt_res.data[0].get("request_document_type_id")
+                            
+                            # Get a default purpose for business clearance
+                            purpose_res = supabase.table("document_purpose").select("document_purpose_id").eq("request_document_type_id", doc_type_id).limit(1).execute()
+                            if not purpose_res.data:
+                                print(f"[create_renewal_request] WARNING: No active document purpose found for doc_type_id {doc_type_id}")
+                                messages.warning(request, "Document request not created: No active document purpose configured.")
+                            else:
+                                purpose_id = purpose_res.data[0].get("document_purpose_id")
+                                
+                                # Create document request for the newest renewal
+                                newest_renewal_id = new_ids[0]
+                                bc_details = _fetch_business_clearance_fields(business_id, owner_person_id)
+                                bc_details["renewal_request_id"] = newest_renewal_id
+                                bc_details["period_type"] = period_type
+                                bc_details["period_year"] = period_year
+                                
+                                print(f"[create_renewal_request] Creating document request with params: business_id={business_id}, purpose_id={purpose_id}, renewal_id={newest_renewal_id}")
+                                
+                                rpc_params = {
+                                    "p_requester_person_id": owner_person_id,
+                                    "p_subject_person_id": owner_person_id,
+                                    "p_business_id": business_id,
+                                    "p_purpose_notes": f"Business renewal for {period_type} {period_year}",
+                                    "p_lines": [
+                                        {
+                                            "document_purpose_id": purpose_id,
+                                            "quantity": 1,
+                                            "offense_no": None,
+                                            "details": bc_details,
+                                        }
+                                    ],
+                                    "p_clerk_user_id": _auth_staff_id(request),
+                                }
+                                
+                                doc_res = supabase.rpc("create_document_request_walkin", rpc_params).execute()
+                                print(f"[create_renewal_request] RPC response: {doc_res.data}")
+                                
+                                if doc_res.data:
+                                    doc_request_id = doc_res.data if isinstance(doc_res.data, int) else (doc_res.data[0] if isinstance(doc_res.data, list) else doc_res.data.get("doc_request_id"))
+                                    
+                                    print(f"[create_renewal_request] Linking renewal {newest_renewal_id} to document {doc_request_id}")
+                                    
+                                    # Link renewal request to document request
+                                    supabase.table("renewal_request").update({"doc_request_id": doc_request_id}).eq("renewal_request_id", newest_renewal_id).execute()
+                                    
+                                    messages.success(
+                                        request,
+                                        f"Created {len(new_ids)} renewal request(s) for unpaid years up to {period_type} {period_year}: [{ids_str}]. "
+                                        f"Document request #{doc_request_id} created for business clearance (status: FOR_TREASURER_REVIEW)."
+                                    )
+                                    
+                                    # Store doc_request_id for redirect
+                                    created_doc_request_id = doc_request_id
+                                else:
+                                    print(f"[create_renewal_request] WARNING: RPC returned no data")
+                                    messages.warning(
+                                        request,
+                                        f"Created {len(new_ids)} renewal request(s) for unpaid years up to {period_type} {period_year}: [{ids_str}]. "
+                                        f"Warning: Document request creation failed (status: FOR_TREASURER_REVIEW)."
+                                    )
+                except Exception as e:
+                    print(f"[create_renewal_request] ERROR: Failed to create document request: {e}")
+                    traceback.print_exc()
+                    messages.warning(
+                        request,
+                        f"Created {len(new_ids)} renewal request(s) for unpaid years up to {period_type} {period_year}: [{ids_str}]. "
+                        f"Warning: Document request creation failed: {str(e)}"
+                    )
             else:
                 messages.info(
                     request,
@@ -3768,7 +3852,7 @@ def create_renewal_request(
                             f"Period: {period_type} {period_year}.\n"
                             f"Status: FOR TREASURER REVIEW. Check with the office for payment details."
                         )
-                        send_sms(owner_mobile, msg, fail_silently=True)
+                        # send_sms(owner_mobile, msg, fail_silently=True)
                     
                     # Send Email
                     if owner_email:
@@ -3818,8 +3902,13 @@ def create_renewal_request(
                 except Exception:
                     pass
 
-            print(f"[create_renewal_request] Redirecting to business_information(b_id={business_id})", flush=True)
-            return redirect("clerk:business_information", b_id=business_id)
+            # Redirect to document request detail if created, otherwise back to business info
+            if created_doc_request_id:
+                print(f"[create_renewal_request] Redirecting to document request detail (doc_request_id={created_doc_request_id})", flush=True)
+                return redirect("clerk:detail", doc_request_id=created_doc_request_id)
+            else:
+                print(f"[create_renewal_request] Redirecting to business_information(b_id={business_id})", flush=True)
+                return redirect("clerk:business_information", b_id=business_id)
 
         except Exception as e:
             try:
