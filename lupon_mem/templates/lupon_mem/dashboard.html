@@ -290,21 +290,23 @@
     const parsed = dashEl ? JSON.parse(dashEl.textContent) : null;
     ChartUtils.renderDashboardFromJSON(parsed || {});
 
-    // If the donut render didn't produce a legend, fallback to parsed.settlement_status_breakdown
+    // Manually populate legend with colors from settlementStatus
     const statusLegend = document.getElementById('statusLegend');
-    if (statusLegend && statusLegend.children.length === 0 && parsed?.settlement_status_breakdown){
+    if (statusLegend && parsed?.settlementStatus) {
+      const labels = parsed.settlementStatus.labels || [];
+      const colors = parsed.settlementStatus.colors || [];
       statusLegend.innerHTML = '';
-      parsed.settlement_status_breakdown.forEach(item => {
+      labels.forEach((label, idx) => {
         const div = document.createElement('div');
         div.className = 'legend-item';
         const dot = document.createElement('span');
         dot.className = 'legend-dot';
-        dot.style.backgroundColor = item.color;
-        const label = document.createElement('span');
-        label.className = 'legend-label';
-        label.textContent = item.label;
+        dot.style.backgroundColor = colors[idx] || '#34495e';
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'legend-label';
+        labelSpan.textContent = label;
         div.appendChild(dot);
-        div.appendChild(label);
+        div.appendChild(labelSpan);
         statusLegend.appendChild(div);
       });
     }

@@ -69,6 +69,9 @@ urlpatterns = [
     path('case/<int:case_id>/hearing/media/upload/',
          views.hearing_media_upload,
          name='hearing_media_upload'),
+    path('case/<int:case_id>/hearing/media/delete/',
+         views.hearing_media_delete,
+         name='hearing_media_delete'),
 
     path("case/<int:case_id>/mediation/<int:submission_id>/photos/upload/",
          views.mediation_photos_upload, name="mediation_photos_upload"),

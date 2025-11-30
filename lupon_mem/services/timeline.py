@@ -493,6 +493,56 @@ def _fetch_media(case_id: int) -> List[Dict[str, Any]]:
         out.append(_row_to_event(when, "media", "Hearing media uploaded", subtitle, meta))
     return out
 
+def _fetch_state_changes(case_id: int) -> List[Dict[str, Any]]:
+    """Fetch case state and settlement status changes from case_state_history table."""
+    if not _column_exists("case_state_history", "blotter_case_id"):
+        return []
+    
+    with connection.cursor() as cur:
+        cur.execute("""
+            SELECT 
+                changed_at,
+                transition_kind,
+                old_state,
+                new_state,
+                remarks,
+                changed_by_id,
+                changed_by_name
+            FROM case_state_history
+            WHERE blotter_case_id = %s
+            ORDER BY changed_at ASC
+        """, [case_id])
+        rows = cur.fetchall()
+    
+    out: List[Dict[str, Any]] = []
+    for when, trans_kind, old_state, new_state, remarks, by_id, by_name in rows:
+        # Determine the event kind based on transition_kind
+        if 'STATE' in (trans_kind or '').upper():
+            kind = "state"
+            title = f"Case state changed: {old_state or 'N/A'} → {new_state}"
+        elif 'SETTLEMENT' in (trans_kind or '').upper():
+            kind = "settlement"
+            title = f"Settlement status changed: {old_state or 'N/A'} → {new_state}"
+        else:
+            kind = "status"
+            title = f"Status changed: {old_state or 'N/A'} → {new_state}"
+        
+        meta = {
+            "transition_kind": trans_kind,
+            "old_state": old_state,
+            "new_state": new_state,
+        }
+        
+        # Use provided name or resolve from staff_id
+        by = by_name or _staff_name(by_id)
+        if by:
+            meta["by"] = by
+        
+        subtitle = remarks or ""
+        out.append(_row_to_event(when, kind, title, subtitle, meta))
+    
+    return out
+
 
 # ----------------------------
 # main builder
@@ -525,6 +575,9 @@ def get_case_timeline(case_id: int) -> Dict[str, Any]:
 
     # photos/docs attached to hearings
     events += _fetch_media(case_id)
+    
+    # state and settlement changes
+    events += _fetch_state_changes(case_id)
 
     # sort (stable)
     def _stable_key(e: Dict[str, Any]) -> Tuple[float, str, int]:

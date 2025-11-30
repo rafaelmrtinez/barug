@@ -129,7 +129,7 @@ def _fill_pdf_with_values(template_path: str, merged: Dict[str, str], is_ctc: bo
     # Check if PDF has form fields
     form_fields = reader.get_form_text_fields() if hasattr(reader, 'get_form_text_fields') else {}
     print(f"[PDF DEBUG] Form fields found: {len(form_fields)}")
-    print(f"[PDF DEBUG] Form field names: {list(form_fields.keys())[:10]}")
+    print(f"[PDF DEBUG] ALL Form field names: {list(form_fields.keys())}")
     
     if "/AcroForm" in writer._root_object:
         writer._root_object["/AcroForm"].update({NameObject("/NeedAppearances"): BooleanObject(True)})
@@ -230,13 +230,44 @@ def _fill_fields_for_line(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[
         }
 
     if "low" in doc_name and "income" in doc_name:
+        # Fetch family income from database
+        family_income_range = ""
+        try:
+            from authentication.supabase_client import supabase
+            # Get person_id from header (subject or requester)
+            person_id = (
+                header.get("subject_person_id")
+                or header.get("on_behalf_of_person_id")
+                or header.get("requested_by_person_id")
+                or header.get("requester_person_id")
+                or header.get("person_id")
+            )
+            
+            print(f"[PDF DEBUG] Low Income - person_id: {person_id}")
+            
+            if person_id:
+                result = supabase.rpc("get_person_fam_income", {"p_person_id": int(person_id)}).execute()
+                print(f"[PDF DEBUG] RPC result.data: {result.data}")
+                if result.data and len(result.data) > 0:
+                    fam_data = result.data[0]
+                    family_income_range = _safe_str(fam_data.get("family_income_range", ""))
+                    print(f"[PDF DEBUG] Extracted family_income_range: '{family_income_range}'")
+            else:
+                print(f"[PDF DEBUG] No person_id found in header")
+        except Exception as e:
+            print(f"[PDF DEBUG] Failed to fetch family income: {e}")
+        
+        print(f"[PDF DEBUG] Final family_income_range value: '{family_income_range}'")
+        
+        paid_amt = _safe_str(header.get("paid_amount") or line.get("line_total") or "")
+        
         return {
             "full_name": subject_full_name, "age": subject_age, "civil_status": subject_civil, "nationality": subject_nat,
             "barangay_name": barangay, "city_municipality": city, "province": province,
-            "total_earning": _safe_str(line.get("monthly_income") or ""), "purpose": purpose,
+            "total_earning": family_income_range or "No data", "purpose": purpose,
             "day": d, "month": m, "year": y,
             "issued_at_brgy": barangay, "issued_at_city_municipality": city, "issued_at_province": province,
-            "amnt": _safe_str(line.get("monthly_income") or ""), "official_reciept": or_no,
+            "amnt": paid_amt, "official_reciept": or_no,
         }
 
     if "death" in doc_name:

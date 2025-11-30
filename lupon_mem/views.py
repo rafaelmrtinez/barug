@@ -2050,29 +2050,54 @@ def incident_heatmap(request: HttpRequest):
         cur.execute(f"SELECT COUNT(*) FROM blotter_case bc WHERE bc.date_filed >= CURRENT_DATE - INTERVAL '2 years' {case_time_condition}")
         blotter_cases_count = cur.fetchone()[0]
 
-        # ---------- 3) Street-level stats ----------
+        # ---------- 3) Street-level stats with statistical threshold ----------
+        # Calculate mean and standard deviation for high-incident classification
         sql_streets = """
-            SELECT 
-                COALESCE(a.street, 'Unknown Street') as street_name,
-                COALESCE(a.barangay, 'Unknown Barangay') as barangay_name,
-                COUNT(*) as incident_count,
-                COUNT(CASE WHEN ss.settlement_status_id IN (2, 15, 16) OR UPPER(ss.settlement_status_name) IN ('SETTLED', 'SETTLED THROUGH MEDIATION', 'SETTLED THROUGH CONCILIATION') THEN 1 END) as settled_count,
-                COUNT(CASE WHEN bc.date_filed >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as recent_count,
-                MAX(bc.date_filed) as last_incident_date
-            FROM blotter_case bc
-            LEFT JOIN addresss a ON a.address_id = (
-                SELECT br.incident_address_id 
-                FROM blotter_report br 
-                WHERE br.blotter_report_id = bc.blotter_report_id
-                LIMIT 1
+            WITH street_incidents AS (
+                SELECT 
+                    COALESCE(a.street, 'Unknown Street') as street_name,
+                    COALESCE(a.barangay, 'Unknown Barangay') as barangay_name,
+                    COUNT(*) as incident_count,
+                    COUNT(CASE WHEN ss.settlement_status_id IN (2, 15, 16) OR UPPER(ss.settlement_status_name) IN ('SETTLED', 'SETTLED THROUGH MEDIATION', 'SETTLED THROUGH CONCILIATION') THEN 1 END) as settled_count,
+                    COUNT(CASE WHEN bc.date_filed >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as recent_count,
+                    MAX(bc.date_filed) as last_incident_date
+                FROM blotter_case bc
+                LEFT JOIN addresss a ON a.address_id = (
+                    SELECT br.incident_address_id 
+                    FROM blotter_report br 
+                    WHERE br.blotter_report_id = bc.blotter_report_id
+                    LIMIT 1
+                )
+                LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+                WHERE a.latitude IS NOT NULL 
+                  AND a.longitude IS NOT NULL
+                  AND bc.date_filed >= CURRENT_DATE - INTERVAL '1 year'
+                GROUP BY a.street, a.barangay
+            ),
+            stats AS (
+                SELECT 
+                    AVG(incident_count) as mean_incidents,
+                    STDDEV(incident_count) as stddev_incidents
+                FROM street_incidents
             )
-            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
-            WHERE a.latitude IS NOT NULL 
-              AND a.longitude IS NOT NULL
-              AND bc.date_filed >= CURRENT_DATE - INTERVAL '1 year'
-            GROUP BY a.street, a.barangay
-            HAVING COUNT(*) >= 1
-            ORDER BY incident_count DESC, recent_count DESC
+            SELECT 
+                si.street_name,
+                si.barangay_name,
+                si.incident_count,
+                si.settled_count,
+                si.recent_count,
+                si.last_incident_date,
+                -- Z-score: how many standard deviations above mean
+                CASE 
+                    WHEN s.stddev_incidents > 0 THEN 
+                        (si.incident_count - s.mean_incidents) / s.stddev_incidents
+                    ELSE 0
+                END as z_score
+            FROM street_incidents si
+            CROSS JOIN stats s
+            WHERE si.incident_count >= GREATEST(3, s.mean_incidents)  -- At least 3 incidents OR above average
+               OR si.recent_count >= 2  -- OR 2+ incidents in last 30 days
+            ORDER BY si.incident_count DESC, si.recent_count DESC
             LIMIT 25
         """
         cur.execute(sql_streets)
@@ -2150,6 +2175,16 @@ def incident_heatmap(request: HttpRequest):
     street_data = []
     for street in street_stats:
         settlement_rate = round((street[3] / street[2] * 100) if street[2] > 0 else 0, 1)
+        z_score = float(street[6]) if len(street) > 6 and street[6] is not None else 0
+        
+        # Risk level based on z-score and recent activity
+        if z_score >= 1.5 or street[4] >= 3:
+            risk_level = 'High'
+        elif z_score >= 0.5 or street[4] >= 2:
+            risk_level = 'Medium'
+        else:
+            risk_level = 'Low'
+        
         street_data.append({
             'street': street[0],
             'barangay': street[1],
@@ -2158,7 +2193,8 @@ def incident_heatmap(request: HttpRequest):
             'recent_count': street[4],
             'settlement_rate': settlement_rate,
             'last_incident': street[5].strftime('%Y-%m-%d') if street[5] else 'N/A',
-            'risk_level': 'High' if street[4] >= 3 else 'Medium' if street[4] >= 1 else 'Low'
+            'risk_level': risk_level,
+            'z_score': round(z_score, 2)
         })
 
     user_role = _auth_role_name(request)
@@ -2391,39 +2427,39 @@ def case_hearing_schedule(request, case_id: int):
     if idx + 1 < len(all_hearings):
         next_submitted_at = all_hearings[idx + 1][3]
 
-    # 3) Pull hearing date/time from the notice
+    # 3) Pull hearing date/time from fn_case_mediation_hearings
     hearing_date = hearing_time = None
-    if form_id and picked_submission_id:
-        with connection.cursor() as cur:
-            cur.execute("""
-                WITH wanted AS (
-                  SELECT f.field_id, LOWER(f.field_code) AS code
-                    FROM kp_form_field kff
-                    JOIN kp_field f ON f.field_id = kff.field_id
-                   WHERE kff.form_id=%s
-                     AND LOWER(f.field_code) IN ('appearance_date','appearance_time','hearing_date','hearing_time')
-                )
-                SELECT w.code, a.value_json
-                  FROM wanted w
-                  JOIN blotter_kp_answer a
-                    ON a.submission_id=%s AND a.field_id=w.field_id
-            """, [form_id, picked_submission_id])
-            pairs = dict(cur.fetchall() or [])
+    with connection.cursor() as cur:
+        cur.execute("SELECT * FROM fn_case_mediation_hearings(%s)", [case_id])
+        cols = [c[0] for c in cur.description] if cur.description else []
+        hearing_rows = [dict(zip(cols, r)) for r in cur.fetchall()] if cols else []
+        
+        # Find the hearing that matches our picked submission
+        for hearing in hearing_rows:
+            if hearing.get('notice_sid') == picked_submission_id:
+                hearing_date = hearing.get('hearing_date')
+                hearing_time = hearing.get('hearing_time')
+                break
 
-        def _clean(v):
-            if v is None: return None
-            if isinstance(v, str) and len(v) >= 2 and v[0] == '"' and v[-1] == '"':
-                return v[1:-1]
-            if isinstance(v, dict):
-                for k in ("value", "text", "date", "time"):
-                    if k in v and v[k]:
-                        return v[k]
-            return v
+    # 4) Get held status from fn_case_mediation_hearings for this specific hearing
+    hearing_held = False
+    held_at = None
+    held_at_fmt = None
+    for hearing in hearing_rows:
+        if hearing.get('notice_sid') == picked_submission_id:
+            hearing_held = bool(hearing.get('hearing_held'))
+            held_at = hearing.get('held_at')
+            if held_at:
+                try:
+                    held_at_fmt = timezone.localtime(held_at).strftime("%b %d, %Y %I:%M %p")
+                except Exception:
+                    try:
+                        held_at_fmt = held_at.strftime("%b %d, %Y %I:%M %p")
+                    except Exception:
+                        held_at_fmt = str(held_at)
+            break
 
-        hearing_date = _clean(pairs.get('hearing_date')) or _clean(pairs.get('appearance_date'))
-        hearing_time = _clean(pairs.get('hearing_time')) or _clean(pairs.get('appearance_time'))
-
-    # 4) Parties
+    # 5) Parties
     with connection.cursor() as cur:
         cur.execute("""SELECT TRIM(COALESCE(p.first_name,'')||' '||COALESCE(p.last_name,'')) 
                          FROM complainant_case cc JOIN person p ON p.person_id=cc.person_id
@@ -2433,27 +2469,6 @@ def case_hearing_schedule(request, case_id: int):
                          FROM respondent_case rc JOIN person p ON p.person_id=rc.person_id
                         WHERE rc.blotter_case_id=%s ORDER BY 1""", [case_id])
         respondents = [r[0] for r in cur.fetchall()]
-
-    # 5) Held status within this hearing window
-    with connection.cursor() as cur:
-        cur.execute("""
-            SELECT MAX(cpt.date_processed)
-              FROM case_progress_tracking cpt
-              JOIN case_progress_type t ON t.case_progress_type_id=cpt.case_progress_type_id
-             WHERE cpt.blotter_case_id=%s
-               AND UPPER(t.case_progress_type_name) IN ('HEARING HELD','CONCILIATION HELD')
-               AND cpt.date_processed >= %s
-               AND (%s IS NULL OR cpt.date_processed < %s)
-        """, [case_id, submitted_at, next_submitted_at, next_submitted_at])
-        held_at = (cur.fetchone() or [None])[0]
-
-    hearing_held = bool(held_at)
-    held_at_fmt = None
-    if held_at:
-        try:
-            held_at_fmt = timezone.localtime(held_at).strftime("%b %d, %Y %I:%M %p")
-        except Exception:
-            held_at_fmt = getattr(held_at, "strftime", lambda *_: None)("%b %d, %Y %I:%M %p")
 
     # 6) Per-hearing Med-ATT count within this window
     with connection.cursor() as cur:
@@ -3891,6 +3906,34 @@ def _supabase_client():
     if not (isinstance(url, str) and url and isinstance(key, str) and key):
         raise RuntimeError("Supabase URL/Key are missing or invalid. Check settings/env.")
     return create_client(url, key)
+
+@session_login_required
+@role_required(*LUPON_ROLES)
+@require_POST
+def hearing_media_delete(request, case_id: int):
+    """Delete a hearing documentation photo."""
+    import json
+    try:
+        data = json.loads(request.body)
+        file_path = data.get('file_path', '').strip()
+        
+        if not file_path:
+            return JsonResponse({'success': False, 'error': 'No file path provided'})
+        
+        with connection.cursor() as cur:
+            cur.execute("""
+                DELETE FROM case_hearing_media
+                WHERE blotter_case_id = %s AND file_path = %s
+                RETURNING case_hearing_media_id
+            """, [case_id, file_path])
+            deleted = cur.fetchone()
+        
+        if deleted:
+            return JsonResponse({'success': True})
+        else:
+            return JsonResponse({'success': False, 'error': 'Photo not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
 
 @require_POST
 def hearing_media_upload(request, case_id: int):

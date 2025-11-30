@@ -1690,6 +1690,7 @@ def walkin_create(request: HttpRequest):
     dp_ids = request.POST.getlist("line_document_purpose_id[]") or []
     qtys   = request.POST.getlist("line_quantity[]") or []
     offs   = request.POST.getlist("line_offense_no[]") or []
+    monthly_income = (request.POST.get("monthly_income") or "").strip() or None
 
     if not requested_by:
         messages.error(request, "Please select a resident first (Requester).")
@@ -1731,6 +1732,10 @@ def walkin_create(request: HttpRequest):
         # allow defaults to flow through (e.g., residency_kind, etc.)
         if meta.get("default_details"):
             details.update(meta["default_details"] or {})
+
+        # Add monthly income if provided (for Certificate of Low Income)
+        if monthly_income:
+            details["monthly_income"] = monthly_income
 
         lines.append({
             "document_purpose_id": dp_id,

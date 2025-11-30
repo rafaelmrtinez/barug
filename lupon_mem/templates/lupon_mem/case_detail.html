@@ -136,6 +136,30 @@
 <!-- @dontshowthemessages -->
 <div class="container-fluid page-wrap" style="margin-top:60px;">
 
+  <!-- ======= CONCILIATION PHASE ALERT ======= -->
+  {% if 'KP-10' in all_form_codes %}
+  <div class="alert alert-info mb-3" style="border-radius:12px; border-left:4px solid #0ea5e9;">
+    <div class="d-flex align-items-start">
+      <i class="bi bi-info-circle-fill me-2" style="font-size:1.2rem;"></i>
+      <div class="flex-grow-1">
+        <strong>Conciliation Phase:</strong> This case has entered the Pangkat conciliation stage.
+        {% if pangkat_members %}
+        <div class="mt-2">
+          <small class="text-muted">Pangkat Members:</small>
+          <div class="d-flex flex-wrap gap-2 mt-1">
+            {% for member in pangkat_members %}
+            <span class="badge bg-light text-dark border" style="font-weight:600; padding:0.4rem 0.7rem;">
+              <i class="bi bi-person-check me-1"></i>{{ member }}
+            </span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- ======= HERO HEADER ======= -->
   <section class="hero mb-3">
     <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
@@ -732,6 +756,32 @@
     const upperCode = String(code || "").toUpperCase();
     return ATTACHED.filter(f => f === upperCode).length;
   }
+  
+  function hasFormAfterKp8(formCode, kp8Attempt) {
+    const table = document.getElementById('formsTable');
+    if (!table) return false;
+    
+    let kp8Count = 0;
+    let foundForm = false;
+    const rows = Array.from(table.querySelectorAll('tbody tr')).reverse();
+    
+    for (const row of rows) {
+      const codeChip = row.querySelector('.code-chip');
+      if (!codeChip) continue;
+      const code = codeChip.textContent.trim();
+      
+      if (code.includes('KP-8')) {
+        kp8Count++;
+        foundForm = false;
+      }
+      
+      if (kp8Count === kp8Attempt && code.includes(formCode)) {
+        foundForm = true;
+      }
+    }
+    
+    return foundForm;
+  }
 
   /* ===== KP-7 Complaint Details Display ===== */
   function formatComplaintDetails(text) {
@@ -1041,20 +1091,12 @@
             
             // Handle KP-18 & KP-19 steps
             if (step.code === 'KP-18 & KP-19') {
-              // Determine required count based on current step
-              let requiredKp18Count = 1;
-              let requiredKp19Count = 1;
+              let attempt = 1;
+              if (currentStep === 'kp18_kp19_second') attempt = 2;
+              else if (currentStep === 'kp18_kp19_third') attempt = 3;
               
-              if (currentStep === 'kp18_kp19_second') {
-                requiredKp18Count = 2;
-                requiredKp19Count = 2;
-              } else if (currentStep === 'kp18_kp19_third') {
-                requiredKp18Count = 3;
-                requiredKp19Count = 3;
-              }
-              
-              const hasKp18 = countForms('KP-18') >= requiredKp18Count;
-              const hasKp19 = countForms('KP-19') >= requiredKp19Count;
+              const hasKp18 = hasFormAfterKp8('KP-18', attempt);
+              const hasKp19 = hasFormAfterKp8('KP-19', attempt);
               let html = '';
               
               if (hasKp18) {
@@ -1081,18 +1123,7 @@
             else if (currentStep === 'kp9_first') { hasRequiredForm = countForms('KP-9') >= 1; requiredCount = 1; }
             else if (currentStep === 'kp9_second') { hasRequiredForm = countForms('KP-9') >= 2; requiredCount = 2; }
             else if (currentStep === 'kp9_third') { hasRequiredForm = countForms('KP-9') >= 3; requiredCount = 3; }
-            else if (currentStep === 'kp19_first') { hasRequiredForm = countForms('KP-19') >= 1; requiredCount = 1; }
-            else if (currentStep === 'kp19_second') { hasRequiredForm = countForms('KP-19') >= 2; requiredCount = 2; }
-            else if (currentStep === 'kp19_third') { hasRequiredForm = countForms('KP-19') >= 3; requiredCount = 3; }
-            else if (step.code === 'KP-18' || step.code === 'KP-19') {
-              const kp9Count = countForms('KP-9');
-              if (currentStep.includes('pangkat')) {
-                requiredCount = currentStep.includes('pangkat_2') ? 2 : 1;
-              } else {
-                requiredCount = Math.max(1, kp9Count);
-              }
-              hasRequiredForm = countForms(step.code) >= requiredCount;
-            }
+            else if (currentStep.startsWith('kp19_') || currentStep.startsWith('kp18_')) { hasRequiredForm = haveForm(step.code); requiredCount = 1; }
             else hasRequiredForm = haveForm(step.code);
             
             const displayText = (step.code === 'KP-18' || step.code === 'KP-19') && requiredCount > 1 
@@ -1497,8 +1528,7 @@
     const table = document.getElementById('formsTable');
     if (!table) return;
     
-    let kp8Count = 0;
-    let kp9Count = 0;
+    let currentMediation = 0;
     
     // Process rows in reverse order (oldest first) since table shows newest first
     const rows = Array.from(table.querySelectorAll('tbody tr')).reverse();
@@ -1510,27 +1540,26 @@
         const codeText = codeChip.textContent.trim();
         
         if (codeText.includes('KP-8')) {
-          kp8Count++;
-          const suffix = kp8Count === 1 ? 'st' : kp8Count === 2 ? 'nd' : 'rd';
+          currentMediation++;
+          const suffix = currentMediation === 1 ? 'st' : currentMediation === 2 ? 'nd' : 'rd';
           
           let existingBadge = formNameCell.querySelector('.mediation-badge');
           if (!existingBadge) {
             const badge = document.createElement('span');
             badge.className = 'badge rounded-pill bg-primary text-white ms-2 mediation-badge';
-            badge.textContent = `${kp8Count}${suffix} Mediation`;
+            badge.textContent = `${currentMediation}${suffix} Mediation`;
             formNameCell.appendChild(badge);
           }
         }
         
-        if (codeText.includes('KP-9')) {
-          kp9Count++;
-          const suffix = kp9Count === 1 ? 'st' : kp9Count === 2 ? 'nd' : 'rd';
+        if (codeText.includes('KP-9') || codeText.includes('KP-18') || codeText.includes('KP-19')) {
+          const suffix = currentMediation === 1 ? 'st' : currentMediation === 2 ? 'nd' : 'rd';
           
           let existingBadge = formNameCell.querySelector('.mediation-badge');
           if (!existingBadge) {
             const badge = document.createElement('span');
             badge.className = 'badge rounded-pill bg-success text-white ms-2 mediation-badge';
-            badge.textContent = `${kp9Count}${suffix} Mediation`;
+            badge.textContent = `${currentMediation}${suffix} Mediation`;
             formNameCell.appendChild(badge);
           }
         }

@@ -257,6 +257,15 @@
               </div>
             </div>
 
+            <!-- Monthly Income (for Certificate of Low Income) -->
+            <div class="row g-3 mt-1 d-hidden" id="monthlyIncomeRow">
+              <div class="col-12">
+                <label class="form-label label-req" for="monthlyIncomeInput">Monthly Income</label>
+                <input id="monthlyIncomeInput" class="form-control" type="text" name="monthly_income" placeholder="e.g., ₱5,000">
+                <div class="help">Enter the monthly income amount</div>
+              </div>
+            </div>
+
             <div class="row g-3 mt-1">
               <div class="col-6 col-md-2">
                 <input id="qtyInput" class="form-control" type="number" min="1" value="1" name="line_quantity[]" required hidden>
@@ -389,6 +398,10 @@
 
   const isBusinessDoc   = (text) => (text||'').toLowerCase().includes('business');
   const isClearanceDoc  = (text) => (text||'').toLowerCase().includes('clearance');
+  const isLowIncomeDoc  = (text) => {
+    const s = (text||'').toLowerCase();
+    return s.includes('low') && s.includes('income');
+  };
 
   // NEW: detect "Certified True Copy" doc type
   const isCTCDoc        = (text) => {
@@ -579,6 +592,12 @@
 
     // Offense input visible only for "*clearance*"
     offenseWrap.classList.toggle('d-hidden', !isClearanceDoc(selectedText));
+
+    // Monthly income visible only for "Certificate of Low Income"
+    const monthlyIncomeRow = document.getElementById('monthlyIncomeRow');
+    if (monthlyIncomeRow) {
+      monthlyIncomeRow.classList.toggle('d-hidden', !isLowIncomeDoc(selectedText));
+    }
 
     // Business row shown for Business Clearance OR CTC
     const needsBusiness = isBusinessDoc(selectedText) || isCTCDoc(selectedText);
