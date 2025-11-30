@@ -2788,6 +2788,213 @@ def ajax_nonresident_owner_search(
 @session_login_required
 @role_required(CLERK_ROLE)
 @nocache
+@inject
+def business_update(
+    request: HttpRequest,
+    b_id: int,
+    business_service: IBusinessService = Provide[AppContainer.business_service],
+    business_info: IBusinessInfoService = Provide[AppContainer.owner_business_service],
+):
+    """Update existing business information."""
+    user_role = _auth_role_name(request)
+
+    # Fetch existing business data
+    try:
+        dto = business_info.execute_by_business_id(b_id)
+        if not dto or not dto.business:
+            messages.error(request, f"Business #{b_id} not found.")
+            return redirect("clerk:business_list")
+    except Exception as e:
+        messages.error(request, f"Failed to load business: {e}")
+        return redirect("clerk:business_list")
+
+    business_dict = dict(dto.business or {})
+    owner_dict = dict(dto.owner or {})
+
+    if request.method == "POST":
+        form = BusinessDetails(request.POST, request.FILES or None)
+
+        if form.is_valid():
+            cd = form.cleaned_data
+
+            # Build update payload
+            update_payload: Dict[str, Any] = {
+                "business_id": b_id,
+                "b_name": _sstrip(cd.get("b_name")) or "",
+                "b_nature": _sstrip(cd.get("b_nature")),
+                "b_address": _sstrip(cd.get("b_address")) or "",
+                "b_desc": _sstrip(cd.get("b_desc")),
+                "dti": _sstrip(cd.get("dti")),
+                "inc_est": _to_str_num(cd.get("inc_est"), "0"),
+                "ownership_type": _to_int_or_none(cd.get("ownership_type")),
+                "b_category": _to_int_or_none(cd.get("b_category")),
+                "capital_invested": _to_str_num(cd.get("capital_invested"), "0"),
+                "prevgross": _to_str_num(cd.get("prevgross"), "0"),
+                "emp_num": _to_int_or_none(cd.get("emp_num") or 0),
+                "opt_days_start": _to_int_or_none(cd.get("opt_days_start")),
+                "opt_days_end": _to_int_or_none(cd.get("opt_days_end")),
+                "opt_start": cd["opt_start"].strftime("%H:%M:%S") if cd.get("opt_start") else None,
+                "opt_end": cd["opt_end"].strftime("%H:%M:%S") if cd.get("opt_end") else None,
+                "date_est": (cd["date_est"].isoformat() if cd.get("date_est") else None),
+                "latitude": _to_float_or_none(cd.get("latitude")),
+                "longitude": _to_float_or_none(cd.get("longitude")),
+                "street": _sstrip(cd.get("street")) or "",
+                "barangay": _sstrip(cd.get("barangay")) or "",
+                "city": _sstrip(cd.get("city")) or "",
+                "purok_sitio_id": _to_int_or_none(cd.get("purok_sitio_id")),
+                "purok_sitio": _sstrip(cd.get("purok_sitio")) or "",
+            }
+
+            # Handle new proof files if uploaded
+            proof_pairs = []
+            if request.FILES:
+                files = request.FILES.getlist("proof") if "proof" in request.FILES else []
+                for up in files:
+                    info = _save_temp_upload(up, "bizproof")
+                    if info and info.get("path"):
+                        proof_pairs.append(info)
+
+            if proof_pairs:
+                update_payload["proof_name"] = ", ".join(p["name"] for p in proof_pairs)
+                update_payload["proof_tmp_pairs"] = proof_pairs
+
+            try:
+                # Call business service to update
+                business_service.update_business(update_payload)
+
+                log_business_action(
+                    business_id=b_id,
+                    table_affected='BUSINESS',
+                    action='UPDATE',
+                    performer_id=_auth_staff_id(request),
+                    details=f'Updated business #{b_id}',
+                )
+
+                messages.success(request, f'Business #{b_id} updated successfully.')
+                return redirect("clerk:business_information", b_id=b_id)
+            except Exception as e:
+                print(f"[business_update] Failed to update business: {e}", flush=True)
+                import traceback
+                traceback.print_exc()
+                messages.error(request, f"Failed to update business: {e}")
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        # Parse operating days from string format "Mon, Tue, Wed, Thu, Fri, Sat"
+        operating_days_str = business_dict.get("operating_days") or ""
+        opt_days_start = None
+        opt_days_end = None
+        
+        if operating_days_str:
+            days = [d.strip() for d in operating_days_str.split(",")]
+            # Map day names to integers (1=Monday, 7=Sunday)
+            DAY_NAME_TO_NUM = {
+                "Mon": 1, "Monday": 1,
+                "Tue": 2, "Tuesday": 2,
+                "Wed": 3, "Wednesday": 3,
+                "Thu": 4, "Thursday": 4,
+                "Fri": 5, "Friday": 5,
+                "Sat": 6, "Saturday": 6,
+                "Sun": 7, "Sunday": 7,
+            }
+            if days:
+                opt_days_start = DAY_NAME_TO_NUM.get(days[0])
+                opt_days_end = DAY_NAME_TO_NUM.get(days[-1])
+        
+        # Parse operating hours from string format "4:15 am - 4:15 pm"
+        operating_hours_str = business_dict.get("operating_hours") or ""
+        opt_start = None
+        opt_end = None
+        
+        if operating_hours_str and " - " in operating_hours_str:
+            from datetime import datetime
+            try:
+                parts = operating_hours_str.split(" - ")
+                if len(parts) == 2:
+                    # Parse "4:15 am" to time object
+                    opt_start = datetime.strptime(parts[0].strip(), "%I:%M %p").time()
+                    opt_end = datetime.strptime(parts[1].strip(), "%I:%M %p").time()
+            except Exception as e:
+                print(f"[business_update] Failed to parse operating hours '{operating_hours_str}': {e}", flush=True)
+        
+        # Strip peso sign from monetary fields if present
+        capital_invested = business_dict.get("capital_invested")
+        if isinstance(capital_invested, str):
+            capital_invested = capital_invested.replace("₱", "").replace(",", "").strip()
+        
+        prev_gross = business_dict.get("prev_yr_total_gross_sales") or business_dict.get("prev_year_gross_sales")
+        if isinstance(prev_gross, str):
+            prev_gross = prev_gross.replace("₱", "").replace(",", "").strip()
+        
+        mnthly_income = business_dict.get("mnthly_gross_incom_est")
+        if isinstance(mnthly_income, str):
+            mnthly_income = mnthly_income.replace("₱", "").replace(",", "").strip()
+        
+        # Pre-populate form with existing business data
+        initial_data = {
+            "b_name": business_dict.get("business_name"),
+            "b_nature": business_dict.get("business_nature"),
+            "b_address": business_dict.get("business_address"),
+            "b_desc": business_dict.get("description") or business_dict.get("location_description"),
+            "dti": business_dict.get("dti_reg_num") or business_dict.get("dti_sec_reg_num"),
+            "inc_est": mnthly_income,
+            "ownership_type": business_dict.get("ownership_type_id"),
+            "b_category": business_dict.get("business_category_id"),
+            "capital_invested": capital_invested,
+            "prevgross": prev_gross,
+            "emp_num": business_dict.get("num_of_employees") or business_dict.get("num_of_emp"),
+            "opt_days_start": opt_days_start,
+            "opt_days_end": opt_days_end,
+            "opt_start": opt_start,
+            "opt_end": opt_end,
+            "date_est": business_dict.get("date_established") or business_dict.get("date_est"),
+            "latitude": business_dict.get("latitude"),
+            "longitude": business_dict.get("longitude"),
+        }
+
+        form = BusinessDetails(initial=initial_data)
+
+    # Parse operating days for display
+    operating_days = (dto.business.get("operating_days") or "").strip()
+    days = [d.strip() for d in operating_days.split(",")] if operating_days else []
+    operating_days_start_name = days[0] if days else None
+    operating_days_end_name = days[-1] if days else None
+    
+    # Map numeric day values to day names for display
+    DAY_MAP = {1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday", 5: "Friday", 6: "Saturday", 7: "Sunday"}
+    if opt_days_start and not operating_days_start_name:
+        operating_days_start_name = DAY_MAP.get(opt_days_start)
+    if opt_days_end and not operating_days_end_name:
+        operating_days_end_name = DAY_MAP.get(opt_days_end)
+
+    # Get business proof files - same as business_information
+    business_files = (dto.business_proof or {}).get("files") or []
+    print(f"[business_update] dto.business_proof = {dto.business_proof}", flush=True)
+    print(f"[business_update] business_files count = {len(business_files)}", flush=True)
+    if business_files:
+        print(f"[business_update] First file: {business_files[0]}", flush=True)
+
+    return render(
+        request,
+        "clerk/business/business_update.html",
+        {
+            "page_path": f"{user_role} / Business Records / Update Business : {b_id:06d}",
+            "page_title": f"Update Business : {b_id:06d}",
+            "form": form,
+            "business": business_dict,
+            "owner": owner_dict,
+            "b_id": b_id,
+            "business_files": business_files,
+            "operating_days_start_name": operating_days_start_name,
+            "operating_days_end_name": operating_days_end_name,
+            "operating_hours_start": opt_start,
+            "operating_hours_end": opt_end,
+        },
+    )
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
 def business_details(
     request: HttpRequest,
     business_service: IBusinessService = Provide[AppContainer.business_service],
@@ -3283,7 +3490,10 @@ def business_information(
     summary_cta_label = None
     cta_mode = "link"
 
-    if status_upper == "ACTIVE":
+    if status_upper == "CLOSED":
+        # Don't show any button for closed businesses
+        show_summary_cta = False
+    elif status_upper == "ACTIVE":
         if has_dues:
             # NEW: even if ACTIVE, show Renew/Pay action when there are dues
             show_summary_cta = True
@@ -3291,7 +3501,11 @@ def business_information(
             cta_mode = "selector"
             summary_cta_label = "Create Renewal Request"
         else:
-            show_summary_cta = False
+            # ACTIVE with no dues: show Request Business Closure button
+            show_summary_cta = True
+            cta_mode = "link"
+            summary_cta_href = closure_href
+            summary_cta_label = "Request Business Closure"
     elif status_upper == "PENDING":
         show_summary_cta = True
         cta_mode = "link"

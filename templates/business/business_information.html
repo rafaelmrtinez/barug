@@ -77,9 +77,9 @@
       <button type="button" class="btn btn-outline-brand btn-sm">
         {% bs_icon 'file-earmark-pdf' %} Generate PDF
       </button>
-      <button type="button" class="btn btn-outline-brand btn-sm">
+      <a href="{% url 'clerk:business_update' b_id=business.business_id %}" class="btn btn-outline-brand btn-sm">
         {% bs_icon 'pencil-square' %} Update
-      </button>
+      </a>
     </div>
   {% endif %}
 
@@ -172,6 +172,21 @@
           <div class="col-md-6 kv"><div class="label">Business Category</div><div class="value">{{ business.business_category|default:"—" }}</div></div>
           <div class="col-md-6 kv"><div class="label">Nature of Business</div><div class="value">{{ business.business_nature|default:"—" }}</div></div>
           <div class="col-md-6 kv"><div class="label">Date Established</div><div class="value">{{ business.date_established|date:"Y-m-d"|default:"—" }}</div></div>
+        </div>
+      </div>
+
+      <!-- REGISTRATION & FINANCIALS -->
+      <div class="section-block">
+        <div class="section-cap">
+          <i class="text-muted d-inline-flex"><span class="bi bi-cash-coin"></span></i>
+          <div class="section-title"><span>Registration & Financials</span></div>
+        </div>
+        <div class="row mt-1 g-3">
+          <div class="col-md-6 kv"><div class="label">Capital Invested</div><div class="value no-case">{{ business.capital_invested|default:"—" }}</div></div>
+          <div class="col-md-6 kv"><div class="label">Previous Year Total Gross Sales</div><div class="value no-case">{{ business.prev_year_gross_sales|default:"—" }}</div></div>
+          <div class="col-md-6 kv"><div class="label">Monthly Gross Income Estimate</div><div class="value no-case">{{ business.mnthly_gross_incom_est|default:"—" }}</div></div>
+          <div class="col-md-6 kv"><div class="label">DTI/SEC Registration Number</div><div class="value">{{ business.dti_reg_num|default:"—" }}</div></div>
+          <div class="col-md-6 kv"><div class="label">Number of Employees</div><div class="value">{{ business.num_of_employees|default:"—" }}</div></div>
         </div>
       </div>
 

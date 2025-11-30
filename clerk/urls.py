@@ -50,6 +50,7 @@ urlpatterns = [
     path("business/business_information_review/", views.business_information_review, name="business_information_review"),
     path("business/business_list/", views.business_list, name="business_list"),
     path("business/business_information/<int:b_id>/", views.business_information, name="business_information"),
+    path("business/business_update/<int:b_id>/", views.business_update, name="business_update"),
     path("business/business_map/", views.business_map_list, name="business_map_list"),
     path("business/business_renewal/", views.renewal_list, name="renewal_list"),
     path("business/create_renewal_request/<int:b_id>/", views.create_renewal_request, name="create_renewal_request"),
