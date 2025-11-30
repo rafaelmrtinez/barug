@@ -116,6 +116,7 @@ from src.app.transfer_objects.commands.business_cmd import (
 )
 from src.app.services.business_notification import notify_registration_received
 from common.send_sms import send_sms
+from notifications.service import notify_user
 
 def _auth_role_name(request: HttpRequest) -> str:
     return (((request.session.get("auth") or {}).get("role_name")) or "Staff").title()
@@ -3239,25 +3240,25 @@ def business_information_review(
                         except Exception:
                             pass
 
-                # try:
-                #     notify_registration_received(owner=owner, business=business, business_id=business_id)
-                # except Exception:
-                #     pass
+                try:
+                    notify_registration_received(owner=owner, business=business, business_id=business_id)
+                except Exception:
+                    pass
 
-                # try:
-                #     owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
-                #     if owner_mobile:
-                #         bname = (business.get("b_name") or "your business").strip()
-                #         msg = (
-                #             f"BARUG: Business Registration received for '{bname}'.\n"
-                #             f"Ref: {business_id: 06d}.\n"
-                #             f"Sign in to the mobile app to request the necessary business documents."
-                #         )
-                #         # fail_silently so we don't break the user flow
-                #         send_sms(owner_mobile, msg, fail_silently=True)
-                # except Exception:
-                #     # fully swallow—logging optional
-                #     pass
+                try:
+                    owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
+                    if owner_mobile:
+                        bname = (business.get("b_name") or "your business").strip()
+                        msg = (
+                            f"BARUG: Business Registration received for '{bname}'.\n"
+                            f"Ref: {business_id: 06d}.\n"
+                            f"Sign in to the mobile app to request the necessary business documents."
+                        )
+                        # fail_silently so we don't break the user flow
+                        send_sms(owner_mobile, msg, fail_silently=True)
+                except Exception:
+                    # fully swallow—logging optional
+                    pass
 
                 request.session.pop("bizreg_owner", None)
                 request.session.pop("bizreg_business", None)
@@ -3748,6 +3749,75 @@ def create_renewal_request(
                 details=f'Created a renewal request for business #{business_id}',
             )
 
+            # Send email, SMS, and in-app notifications
+            if new_ids:
+                try:
+                    dto = business_info.execute_by_business_id(business_id)
+                    owner = dict(dto.owner or {})
+                    business = dict(dto.business or {})
+                    
+                    owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
+                    owner_email = (owner.get("email") or "").strip()
+                    owner_person_id = owner.get("person_id") or owner.get("owner_person_id")
+                    bname = (business.get("business_name") or "your business").strip()
+                    
+                    # Send SMS
+                    if owner_mobile:
+                        msg = (
+                            f"BARUG: Renewal request created for '{bname}'.\n"
+                            f"Period: {period_type} {period_year}.\n"
+                            f"Status: FOR TREASURER REVIEW. Check with the office for payment details."
+                        )
+                        send_sms(owner_mobile, msg, fail_silently=True)
+                    
+                    # Send Email
+                    if owner_email:
+                        try:
+                            owner_name = f"{owner.get('first_name', '')} {owner.get('last_name', '')}".strip() or "Business Owner"
+                            subject = f"Business Renewal Request Created - {bname}"
+                            body_html = f"""
+                                <p>Hi {owner_name},</p>
+                                <p>A renewal request has been created for your business <strong>{bname}</strong> (ID: {business_id:06d}).</p>
+                                <p><b>Period:</b> {period_type} {period_year}</p>
+                                <p><b>Status:</b> FOR TREASURER REVIEW</p>
+                                <p>Please check with the Barangay Office for payment details and next steps.</p>
+                                <p>Thank you,<br>Barangay Sto. Niño</p>
+                            """
+                            body_txt = (
+                                f"Hi {owner_name},\n\n"
+                                f"A renewal request has been created for your business {bname} (ID: {business_id:06d}).\n"
+                                f"Period: {period_type} {period_year}\n"
+                                f"Status: FOR TREASURER REVIEW\n\n"
+                                f"Please check with the Barangay Office for payment details and next steps.\n\n"
+                                f"Thank you,\nBarangay Sto. Niño\n"
+                            )
+                            send_email(
+                                subject=subject,
+                                to=[(owner_name, owner_email)],
+                                body_text=body_txt,
+                                body_html=body_html,
+                                from_name="Barangay Sto. Niño",
+                                fail_silently=True,
+                            )
+                        except Exception:
+                            pass
+                    
+                    # Send in-app notification
+                    if owner_person_id:
+                        try:
+                            notify_user(
+                                user_type_id=1,  # PERSON
+                                person_id=owner_person_id,
+                                staff_id=None,
+                                title="Business Renewal Request Created",
+                                body=f"Renewal request for '{bname}' has been created. Period: {period_type} {period_year}. Status: FOR TREASURER REVIEW.",
+                                deep_link=f"/business/{business_id}"
+                            )
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
             print(f"[create_renewal_request] Redirecting to business_information(b_id={business_id})", flush=True)
             return redirect("clerk:business_information", b_id=business_id)
 
@@ -3938,6 +4008,75 @@ def create_closure_payment_request(
                 performer_id=_auth_staff_id(request),
                 details=f'Created a closure request for business #{business_id}',
             )
+
+            # Send email and SMS notification
+            if new_ids:
+                try:
+                    dto = business_info.execute_by_business_id(business_id)
+                    owner = dict(dto.owner or {})
+                    business = dict(dto.business or {})
+                    
+                    owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
+                    owner_email = (owner.get("email") or "").strip()
+                    bname = (business.get("business_name") or "your business").strip()
+                    
+                    # Send SMS
+                    if owner_mobile:
+                        msg = (
+                            f"BARUG: Closure payment request created for '{bname}'.\n"
+                            f"Period: {period_type} {period_year}.\n"
+                            f"Please settle outstanding dues at the Barangay Office to complete closure."
+                        )
+                        send_sms(owner_mobile, msg, fail_silently=True)
+                    
+                    # Send Email
+                    if owner_email:
+                        try:
+                            owner_name = f"{owner.get('first_name', '')} {owner.get('last_name', '')}".strip() or "Business Owner"
+                            subject = f"Business Closure Payment Request Created - {bname}"
+                            body_html = f"""
+                                <p>Hi {owner_name},</p>
+                                <p>A closure payment request has been created for your business <strong>{bname}</strong> (ID: {business_id:06d}).</p>
+                                <p><b>Period:</b> {period_type} {period_year}</p>
+                                <p><b>Status:</b> FOR TREASURER REVIEW</p>
+                                <p>Please settle any outstanding dues at the Barangay Office to complete the closure process.</p>
+                                <p>Thank you,<br>Barangay Sto. Niño</p>
+                            """
+                            body_txt = (
+                                f"Hi {owner_name},\n\n"
+                                f"A closure payment request has been created for your business {bname} (ID: {business_id:06d}).\n"
+                                f"Period: {period_type} {period_year}\n"
+                                f"Status: FOR TREASURER REVIEW\n\n"
+                                f"Please settle any outstanding dues at the Barangay Office to complete the closure process.\n\n"
+                                f"Thank you,\nBarangay Sto. Niño\n"
+                            )
+                            send_email(
+                                subject=subject,
+                                to=[(owner_name, owner_email)],
+                                body_text=body_txt,
+                                body_html=body_html,
+                                from_name="Barangay Sto. Niño",
+                                fail_silently=True,
+                            )
+                        except Exception:
+                            pass
+                    
+                    # Send in-app notification
+                    owner_person_id = owner.get("person_id") or owner.get("owner_person_id")
+                    if owner_person_id:
+                        try:
+                            notify_user(
+                                user_type_id=1,  # PERSON
+                                person_id=owner_person_id,
+                                staff_id=None,
+                                title="Business Closure Payment Request",
+                                body=f"Closure payment request for '{bname}' has been created. Period: {period_type} {period_year}. Please settle outstanding dues.",
+                                deep_link=f"/business/{business_id}"
+                            )
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
 
             return redirect("clerk:initiate_business_closure", b_id=business_id)
         except Exception as e:

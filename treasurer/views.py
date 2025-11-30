@@ -19,6 +19,7 @@ from django.utils.dateparse import parse_datetime, parse_date
 from zoneinfo import ZoneInfo
 from dependency_injector.wiring import inject, Provide
 from src.app.bootstrap.app_containers import AppContainer
+from src.app.contracts.business_service_contract import IBusinessInfoService
 
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
@@ -39,6 +40,11 @@ from src.app.services.or_service import (
     IORService,
 )
 from .utils.ui import STATUS_UI, ACTION_LABELS, titleize
+
+from common.send_email import send_email
+from common.send_sms import send_sms
+from notifications.service import notify_user
+from common.logging_utils import log_business_action
 
 # >>> NEW: import extracted helpers (behavior unchanged)
 from .utils.helpers import (
@@ -1737,6 +1743,95 @@ def business_renewal_take_payment(request: HttpRequest, renewal_request_id: int)
         messages.error(request, f"Payment failed: {escape(str(getattr(e, 'message', e)))}")
         return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)
 
+    # Send notifications after successful payment
+    try:
+        # Get renewal request details to extract business_id
+        res = supabase.table("renewal_request").select("*").eq("renewal_request_id", renewal_request_id).single().execute()
+        if res.data:
+            business_id = res.data.get("business_id")
+            period_type = res.data.get("period_type", "")
+            period_year = res.data.get("period_year", "")
+            
+            # Log business action
+            try:
+                log_business_action(
+                    business_id=business_id,
+                    table_affected='RENEWAL_PAYMENT',
+                    action='UPDATE',
+                    performer_id=staff_id,
+                    details=f'Accepted renewal payment for business #{business_id}, period: {period_type} {period_year}',
+                )
+            except Exception:
+                pass
+            
+            # Get business and owner info
+            business_info = AppContainer.owner_business_service()
+            dto = business_info.execute_by_business_id(business_id)
+            owner = dict(dto.owner or {})
+            business = dict(dto.business or {})
+            
+            owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
+            owner_email = (owner.get("email") or "").strip()
+            owner_person_id = owner.get("person_id") or owner.get("owner_person_id")
+            bname = (business.get("business_name") or "your business").strip()
+            
+            # Send SMS
+            if owner_mobile:
+                msg = (
+                    f"BARUG: Payment received for business renewal '{bname}'.\n"
+                    f"Period: {period_type} {period_year}. Status: PAID.\n"
+                    f"Your business clearance is now ready."
+                )
+                send_sms(owner_mobile, msg, fail_silently=True)
+            
+            # Send Email
+            if owner_email:
+                try:
+                    owner_name = f"{owner.get('first_name', '')} {owner.get('last_name', '')}".strip() or "Business Owner"
+                    subject = f"Business Renewal Payment Confirmed - {bname}"
+                    body_html = f"""
+                        <p>Hi {owner_name},</p>
+                        <p>Your payment for business renewal has been received and confirmed for <strong>{bname}</strong> (ID: {business_id:06d}).</p>
+                        <p><b>Period:</b> {period_type} {period_year}</p>
+                        <p><b>Status:</b> PAID</p>
+                        <p>Your business clearance is now ready. Thank you for your prompt payment.</p>
+                        <p>Thank you,<br>Barangay Sto. Niño</p>
+                    """
+                    body_txt = (
+                        f"Hi {owner_name},\n\n"
+                        f"Your payment for business renewal has been received and confirmed for {bname} (ID: {business_id:06d}).\n"
+                        f"Period: {period_type} {period_year}\n"
+                        f"Status: PAID\n\n"
+                        f"Your business clearance is now ready. Thank you for your prompt payment.\n\n"
+                        f"Thank you,\nBarangay Sto. Niño\n"
+                    )
+                    send_email(
+                        subject=subject,
+                        to=[(owner_name, owner_email)],
+                        body_text=body_txt,
+                        body_html=body_html,
+                        from_name="Barangay Sto. Niño",
+                        fail_silently=True,
+                    )
+                except Exception:
+                    pass
+            
+            # Send in-app notification
+            if owner_person_id:
+                try:
+                    notify_user(
+                        user_type_id=1,  # PERSON
+                        person_id=owner_person_id,
+                        staff_id=None,
+                        title="Business Renewal Payment Confirmed",
+                        body=f"Payment received for '{bname}' renewal. Period: {period_type} {period_year}. Your clearance is ready.",
+                        deep_link=f"/business/{business_id}"
+                    )
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
     messages.success(request, f"Payment posted (clearance id {clearance_id}).")
     return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)
 
@@ -1775,6 +1870,92 @@ def business_renewal_take_payment_all(request: HttpRequest, business_id: int):
         )
         cnt   = (summary or {}).get("processed_count", 0)
         total = (summary or {}).get("sum_quoted_total", "0")
+        
+        # Log business action
+        if cnt > 0:
+            try:
+                log_business_action(
+                    business_id=business_id,
+                    table_affected='RENEWAL_PAYMENT',
+                    action='UPDATE',
+                    performer_id=staff_id,
+                    details=f'Accepted {cnt} renewal payment(s) for business #{business_id}, total: {total}',
+                )
+            except Exception:
+                pass
+        
+        # Send notifications after successful bulk payment
+        if cnt > 0:
+            try:
+                business_info = AppContainer.owner_business_service()
+                dto = business_info.execute_by_business_id(business_id)
+                owner = dict(dto.owner or {})
+                business = dict(dto.business or {})
+                
+                owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
+                owner_email = (owner.get("email") or "").strip()
+                owner_person_id = owner.get("person_id") or owner.get("owner_person_id")
+                bname = (business.get("business_name") or "your business").strip()
+                
+                # Send SMS
+                if owner_mobile:
+                    msg = (
+                        f"BARUG: Payment received for business renewal '{bname}'.\n"
+                        f"{cnt} year(s) paid. Total: {total}.\n"
+                        f"Your business clearance is now ready."
+                    )
+                    send_sms(owner_mobile, msg, fail_silently=True)
+                
+                # Send Email
+                if owner_email:
+                    try:
+                        owner_name = f"{owner.get('first_name', '')} {owner.get('last_name', '')}".strip() or "Business Owner"
+                        subject = f"Business Renewal Payment Confirmed - {bname}"
+                        body_html = f"""
+                            <p>Hi {owner_name},</p>
+                            <p>Your payment for business renewal has been received and confirmed for <strong>{bname}</strong> (ID: {business_id:06d}).</p>
+                            <p><b>Years Paid:</b> {cnt}</p>
+                            <p><b>Total Amount:</b> {total}</p>
+                            <p><b>Status:</b> PAID</p>
+                            <p>Your business clearance is now ready. Thank you for your prompt payment.</p>
+                            <p>Thank you,<br>Barangay Sto. Niño</p>
+                        """
+                        body_txt = (
+                            f"Hi {owner_name},\n\n"
+                            f"Your payment for business renewal has been received and confirmed for {bname} (ID: {business_id:06d}).\n"
+                            f"Years Paid: {cnt}\n"
+                            f"Total Amount: {total}\n"
+                            f"Status: PAID\n\n"
+                            f"Your business clearance is now ready. Thank you for your prompt payment.\n\n"
+                            f"Thank you,\nBarangay Sto. Niño\n"
+                        )
+                        send_email(
+                            subject=subject,
+                            to=[(owner_name, owner_email)],
+                            body_text=body_txt,
+                            body_html=body_html,
+                            from_name="Barangay Sto. Niño",
+                            fail_silently=True,
+                        )
+                    except Exception:
+                        pass
+                
+                # Send in-app notification
+                if owner_person_id:
+                    try:
+                        notify_user(
+                            user_type_id=1,  # PERSON
+                            person_id=owner_person_id,
+                            staff_id=None,
+                            title="Business Renewal Payment Confirmed",
+                            body=f"Payment received for '{bname}' renewal. {cnt} year(s) paid. Total: {total}. Your clearance is ready.",
+                            deep_link=f"/business/{business_id}"
+                        )
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+        
         messages.success(request, f"Accepted payments for {cnt} unpaid year(s). Total due: {total}.")
     except Exception as e:
         messages.error(request, f"Bulk payment failed: {escape(str(getattr(e, 'message', e)))}")
@@ -2058,6 +2239,99 @@ def closure_take_payment(request, closure_payment_request_id: int):
         res = supabase.rpc("treasurer_accept_closure_payment_h", payload).execute()
         if getattr(res, "error", None):
             raise RuntimeError(getattr(res.error, "message", str(res.error)))
+        
+        # Log business action
+        try:
+            closure_res = supabase.table("closure_payment_request").select("business_id").eq("closure_payment_request_id", closure_payment_request_id).single().execute()
+            if closure_res.data:
+                business_id = closure_res.data.get("business_id")
+                log_business_action(
+                    business_id=business_id,
+                    table_affected='CLOSURE_PAYMENT',
+                    action='UPDATE',
+                    performer_id=staff_id,
+                    details=f'Accepted closure payment for business #{business_id}, request #{closure_payment_request_id}',
+                )
+        except Exception:
+            pass
+        
+        # Send notifications after successful closure payment
+        try:
+            # Get closure request details to extract business_id
+            closure_res = supabase.table("closure_payment_request").select("*").eq("closure_payment_request_id", closure_payment_request_id).single().execute()
+            if closure_res.data:
+                business_id = closure_res.data.get("business_id")
+                period_type = closure_res.data.get("period_type", "")
+                period_year = closure_res.data.get("period_year", "")
+                
+                # Get business and owner info
+                business_info = AppContainer.owner_business_service()
+                dto = business_info.execute_by_business_id(business_id)
+                owner = dict(dto.owner or {})
+                business = dict(dto.business or {})
+                
+                owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
+                owner_email = (owner.get("email") or "").strip()
+                owner_person_id = owner.get("person_id") or owner.get("owner_person_id")
+                bname = (business.get("business_name") or "your business").strip()
+                
+                # Send SMS
+                if owner_mobile:
+                    msg = (
+                        f"BARUG: Business closure payment confirmed for '{bname}'.\n"
+                        f"All dues settled. Your business is now officially CLOSED.\n"
+                        f"Thank you."
+                    )
+                    send_sms(owner_mobile, msg, fail_silently=True)
+                
+                # Send Email
+                if owner_email:
+                    try:
+                        owner_name = f"{owner.get('first_name', '')} {owner.get('last_name', '')}".strip() or "Business Owner"
+                        subject = f"Business Closure Confirmed - {bname}"
+                        body_html = f"""
+                            <p>Hi {owner_name},</p>
+                            <p>Your business closure payment has been confirmed for <strong>{bname}</strong> (ID: {business_id:06d}).</p>
+                            <p><b>Status:</b> CLOSED</p>
+                            <p>All outstanding dues have been settled. Your business is now officially closed.</p>
+                            <p>Thank you for your compliance.</p>
+                            <p>Thank you,<br>Barangay Sto. Niño</p>
+                        """
+                        body_txt = (
+                            f"Hi {owner_name},\n\n"
+                            f"Your business closure payment has been confirmed for {bname} (ID: {business_id:06d}).\n"
+                            f"Status: CLOSED\n\n"
+                            f"All outstanding dues have been settled. Your business is now officially closed.\n\n"
+                            f"Thank you for your compliance.\n\n"
+                            f"Thank you,\nBarangay Sto. Niño\n"
+                        )
+                        send_email(
+                            subject=subject,
+                            to=[(owner_name, owner_email)],
+                            body_text=body_txt,
+                            body_html=body_html,
+                            from_name="Barangay Sto. Niño",
+                            fail_silently=True,
+                        )
+                    except Exception:
+                        pass
+                
+                # Send in-app notification
+                if owner_person_id:
+                    try:
+                        notify_user(
+                            user_type_id=1,  # PERSON
+                            person_id=owner_person_id,
+                            staff_id=None,
+                            title="Business Closure Confirmed",
+                            body=f"Closure payment confirmed for '{bname}'. All dues settled. Business status: CLOSED.",
+                            deep_link=f"/business/{business_id}"
+                        )
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        
         messages.success(request, "Closure payment accepted and business set to CLOSED.")
     except Exception as e:
         messages.error(request, f"Failed to accept closure payment: {e}")
@@ -2184,6 +2458,88 @@ def closure_take_payment_all(request, business_id: int):
         res = supabase.rpc("treasurer_accept_all_unpaid_closure_h", payload).execute()
         if getattr(res, "error", None):
             raise RuntimeError(getattr(res.error, "message", str(res.error)))
+        
+        # Log business action
+        try:
+            log_business_action(
+                business_id=business_id,
+                table_affected='CLOSURE_PAYMENT',
+                action='UPDATE',
+                performer_id=staff_id,
+                details=f'Accepted all unpaid closure payments for business #{business_id}',
+            )
+        except Exception:
+            pass
+        
+        # Send notifications after successful bulk closure payment
+        try:
+            business_info = AppContainer.owner_business_service()
+            dto = business_info.execute_by_business_id(business_id)
+            owner = dict(dto.owner or {})
+            business = dict(dto.business or {})
+            
+            owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
+            owner_email = (owner.get("email") or "").strip()
+            owner_person_id = owner.get("person_id") or owner.get("owner_person_id")
+            bname = (business.get("business_name") or "your business").strip()
+            
+            # Send SMS
+            if owner_mobile:
+                msg = (
+                    f"BARUG: Business closure payment confirmed for '{bname}'.\n"
+                    f"All outstanding dues settled.\n"
+                    f"Your business is now officially CLOSED."
+                )
+                send_sms(owner_mobile, msg, fail_silently=True)
+            
+            # Send Email
+            if owner_email:
+                try:
+                    owner_name = f"{owner.get('first_name', '')} {owner.get('last_name', '')}".strip() or "Business Owner"
+                    subject = f"Business Closure Confirmed - {bname}"
+                    body_html = f"""
+                        <p>Hi {owner_name},</p>
+                        <p>Your business closure payment has been confirmed for <strong>{bname}</strong> (ID: {business_id:06d}).</p>
+                        <p><b>Status:</b> CLOSED</p>
+                        <p>All outstanding dues have been settled. Your business is now officially closed.</p>
+                        <p>Thank you for your compliance.</p>
+                        <p>Thank you,<br>Barangay Sto. Niño</p>
+                    """
+                    body_txt = (
+                        f"Hi {owner_name},\n\n"
+                        f"Your business closure payment has been confirmed for {bname} (ID: {business_id:06d}).\n"
+                        f"Status: CLOSED\n\n"
+                        f"All outstanding dues have been settled. Your business is now officially closed.\n\n"
+                        f"Thank you for your compliance.\n\n"
+                        f"Thank you,\nBarangay Sto. Niño\n"
+                    )
+                    send_email(
+                        subject=subject,
+                        to=[(owner_name, owner_email)],
+                        body_text=body_txt,
+                        body_html=body_html,
+                        from_name="Barangay Sto. Niño",
+                        fail_silently=True,
+                    )
+                except Exception:
+                    pass
+            
+            # Send in-app notification
+            if owner_person_id:
+                try:
+                    notify_user(
+                        user_type_id=1,  # PERSON
+                        person_id=owner_person_id,
+                        staff_id=None,
+                        title="Business Closure Confirmed",
+                        body=f"All closure payments confirmed for '{bname}'. Business status: CLOSED.",
+                        deep_link=f"/business/{business_id}"
+                    )
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        
         messages.success(request, "All unpaid closure items were paid and the business was marked CLOSED.")
     except Exception as e:
         messages.error(request, f"Failed to process bulk closure payment: {e}")
