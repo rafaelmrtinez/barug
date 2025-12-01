@@ -35,6 +35,7 @@ urlpatterns = [
 
     # HOUSEHOLD 
     path("household/household_list/", views.household_list , name="household_list"),
+    path("household/<int:household_id>/", views.household_detail, name="household_detail"),
     path("household/household_map/", views.household_map_list , name="household_map"),
     path("ajax/household_search/", views.ajax_household_search ,name="ajax_household_search"),
     path("api/household/pins", views.api_household_pins, name="api_household_pins"),

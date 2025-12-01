@@ -3,10 +3,14 @@ from src.infra.exceptions.query_exec_exception import QueryExecutionException
 
 from src.app.transfer_objects.dto.household_dto import (
     HouseholdListDTO,
+    HouseholdDetailDTO,
+    FamilyDTO,
+    HouseholdMemberDTO,
 )
 from src.domain.contracts.household_repository_contract import (
     IHouseholdRepository,
 )
+from typing import Optional
 
 class HouseholdRepository(IHouseholdRepository):
     def __init__(self, ctx: IConnectionAdapter):
@@ -336,3 +340,65 @@ class HouseholdRepository(IHouseholdRepository):
         except Exception as e:
             # keep a code for consistent error handling like you did in BusinessRepository
             raise QueryExecutionException(f"fetch_household_pins failed: {e}", "E_DB")
+
+    def fetch_household_detail(self, household_id: int) -> Optional[HouseholdDetailDTO]:
+        """
+        Calls the RPC function get_active_household_fam_and_member to retrieve
+        household details with families and members.
+        """
+        try:
+            sql = """
+                SELECT public.get_active_household_fam_and_member(%s) AS result;
+            """
+            rows = self._ctx.execute_query_to_dict(sql, [household_id])
+            
+            if not rows or not rows[0].get('result'):
+                return None
+            
+            result = rows[0]['result']
+            household_data = result.get('household')
+            families_data = result.get('families', [])
+            
+            if not household_data:
+                return None
+            
+            # Parse families and members
+            families = []
+            for family in families_data:
+                members_data = family.get('members', [])
+                members = [
+                    HouseholdMemberDTO(
+                        person_id=m.get('person_id'),
+                        full_name=m.get('full_name', ''),
+                        relationship_to_household_head=m.get('relationship_to_household_head'),
+                        age=m.get('age'),
+                        sex=m.get('sex')
+                    )
+                    for m in members_data
+                ]
+                
+                families.append(FamilyDTO(
+                    family_id=family.get('family_id'),
+                    family_num=family.get('family_num', ''),
+                    family_head_name=family.get('family_head_name', ''),
+                    household_type=family.get('household_type'),
+                    nhts_status=family.get('nhts_status'),
+                    indigent_status=family.get('indigent_status'),
+                    monthly_income=family.get('monthly_income'),
+                    source_of_income=family.get('source_of_income'),
+                    members=members
+                ))
+            
+            # Build the HouseholdDetailDTO
+            return HouseholdDetailDTO(
+                household_id=household_data.get('household_id'),
+                household_num=household_data.get('household_num', ''),
+                household_head_name=household_data.get('household_head_name', ''),
+                house_type=household_data.get('house_type'),
+                house_ownership=household_data.get('house_ownership'),
+                address=household_data.get('address', ''),
+                families=families
+            )
+            
+        except Exception as e:
+            raise QueryExecutionException(f"fetch_household_detail failed: {e}", "E_DB") from e

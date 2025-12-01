@@ -2,6 +2,7 @@ from typing import Optional
 from src.infra.exceptions.query_exec_exception import QueryExecutionException
 from src.app.transfer_objects.dto.household_dto import(
     HouseholdListDTO,
+    HouseholdDetailDTO,
 )
 from src.app.contracts.household_service_contract import (
     IHouseholdService,
@@ -31,3 +32,6 @@ class HouseholdService(IHouseholdService):
             return self._household_repo.sort_ownership_type(ownership_type)
         
         return self._household_repo.fetch_household_list()
+
+    def get_household_detail(self, household_id: int) -> Optional[HouseholdDetailDTO]:
+        return self._household_repo.fetch_household_detail(household_id)

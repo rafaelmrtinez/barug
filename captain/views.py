@@ -19,6 +19,7 @@ from datetime import datetime, time as dtime, date
 from dateutil.relativedelta import relativedelta
 from typing import Any, Dict, List, Optional
 from django.conf import settings
+from django.contrib import messages
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import render, redirect
 from django.views.decorators.http import require_GET, require_http_methods
@@ -2027,6 +2028,33 @@ def ajax_household_search(
         request=request,
     )
     return HttpResponse(html)
+
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@csrf_protect
+@nocache
+@inject
+def household_detail(
+    request: HttpRequest,
+    household_id: int,
+    household_service: IHouseholdService = Provide[AppContainer.household_service],
+) -> HttpResponse:
+    """
+    Display detailed household information including all families and members.
+    """
+    user_role = _auth_role_name(request)
+    
+    household = household_service.get_household_detail(household_id)
+    
+    if not household:
+        messages.error(request, "Household not found.")
+        return redirect("captain:household_list")
+    
+    return render(request, "household/household_detail.html", {
+        'page_path': f'{user_role} / Household / {household.household_num}',
+        'page_title': f'Household {household.household_num}',
+        'household': household,
+    })
 
 @session_login_required
 @role_required(CAPTAIN_ROLE)
