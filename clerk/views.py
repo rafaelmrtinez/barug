@@ -2024,6 +2024,10 @@ def _json_safe(val):
     if isinstance(val, Decimal):
         # choose float for numbers (you already stringified money fields separately)
         return float(val)
+    if isinstance(val, date):
+        return val.isoformat()
+    if isinstance(val, time):
+        return val.strftime("%H:%M:%S")
     if isinstance(val, (list, tuple)):
         return [ _json_safe(v) for v in val ]
     if isinstance(val, dict):
@@ -2243,6 +2247,7 @@ def build_owner_display(owner: dict, maps: Dict[str, Dict[Any, str]]) -> Dict[st
         owner.get("purok_sitio") or "",
         owner.get("barangay") or "",
         owner.get("city") or "",
+        owner.get("province") or "",
     ])
 
     res_name = _normalize_residency_name(
@@ -2717,6 +2722,7 @@ def business_owner_nonresident(
                 "purok_sitio": (cd.get("purok_sitio") or "").strip(),
                 "barangay": (cd["barangay"]).strip(),
                 "city": (cd["city"]).strip(),
+                "province": (cd.get("province") or "").strip(),
                 "residency_name": "NON-RESIDENT",
             }
 
@@ -3093,7 +3099,16 @@ def business_details(
 
             if dup_biz_id:
                 # 🚫 Do NOT redirect yet — render the same page and open a modal.
-                form = BusinessDetails(initial=cd)
+                # Convert cleaned_data to JSON-safe format for form initial
+                cd_safe = dict(cd)
+                if cd_safe.get("opt_start"):
+                    cd_safe["opt_start"] = cd_safe["opt_start"].strftime("%H:%M:%S")
+                if cd_safe.get("opt_end"):
+                    cd_safe["opt_end"] = cd_safe["opt_end"].strftime("%H:%M:%S")
+                if cd_safe.get("date_est"):
+                    cd_safe["date_est"] = cd_safe["date_est"].isoformat()
+                
+                form = BusinessDetails(initial=cd_safe)
 
                 addr_parts = [
                     payload.get("street") or "",
@@ -3147,7 +3162,8 @@ def business_details(
             messages.error(request, "Please correct the errors below.")
 
     else:
-        saved = request.session.get("bizreg_business") or {}
+        saved_raw = request.session.get("bizreg_business") or {}
+        saved = copy.deepcopy(saved_raw)  # IMPORTANT: Don't mutate session data
 
         # Convert back to proper field types for form initial
         if "date_est" in saved:
@@ -3453,9 +3469,10 @@ def business_information(
         sitio_purok = (data.get("sitio_purok") or "").strip()
         barangay    = (data.get("barangay") or "").strip()
         city        = (data.get("city") or "").strip()
+        province    = (data.get("province") or "").strip()
 
-        # Order strictly: STREET, PUROK/SITIO, BARANGAY, CITY
-        parts = [p for p in [street, sitio_purok, barangay, city] if p]
+        # Order: STREET, PUROK/SITIO, BARANGAY, CITY, PROVINCE
+        parts = [p for p in [street, sitio_purok, barangay, city, province] if p]
         return ", ".join(parts) if parts else None
 
     owner = dict(dto.owner or {})

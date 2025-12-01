@@ -258,22 +258,41 @@ def _norm_email(txt: str | None) -> str | None:
 MOBILE_RE = re.compile(r"\D+")
 def _norm_mobile(txt: str | None) -> str | None:
     """
-    Keep digits only; PH-friendly:
-    - strip +63 or leading 0
-    - return last 11 (or last 10) digits if present
+    Normalize to 09XXXXXXXXX format (11 digits) for PH mobile numbers.
+    Accepts: 09XXXXXXXXX, 9XXXXXXXXX, +639XXXXXXXXX, 639XXXXXXXXX
+    Database expects: 09XXXXXXXXX or +639XXXXXXXXX
     """
     if not txt:
         return None
-    digits = MOBILE_RE.sub("", txt)
-    if digits.startswith("63"):
-        digits = digits[2:]
-    if digits.startswith("0"):
-        digits = digits[1:]
-    if len(digits) >= 11:
-        return digits[-11:]
-    if len(digits) >= 10:
-        return digits[-10:]
-    return digits or None
+    
+    # Keep only digits and + sign
+    cleaned = MOBILE_RE.sub("", txt)
+    
+    # Handle +639 format - keep it as is if valid
+    if txt.strip().startswith("+63"):
+        digits = cleaned  # Remove the +
+        if len(digits) == 12 and digits.startswith("63") and digits[2] == "9":
+            return "+" + digits  # Return +639XXXXXXXXX
+    
+    # Remove country code 63 if present (without +)
+    if cleaned.startswith("63") and not txt.strip().startswith("+"):
+        cleaned = cleaned[2:]
+    
+    # Remove leading 0 if present
+    if cleaned.startswith("0"):
+        cleaned = cleaned[1:]
+    
+    # Should have 10 digits now (9XXXXXXXXX)
+    if len(cleaned) == 10 and cleaned.startswith("9"):
+        return "0" + cleaned  # Return 09XXXXXXXXX
+    elif len(cleaned) >= 10:
+        # Take last 10 digits and ensure it starts with 9
+        last10 = cleaned[-10:]
+        if last10.startswith("9"):
+            return "0" + last10  # Return 09XXXXXXXXX
+    
+    # If format is invalid, return as-is to trigger validation error in form
+    return cleaned if cleaned else None
  
 class BusinessOwnerInfo(forms.Form):
     # PERSONAL INFORMATION
@@ -423,6 +442,16 @@ class BusinessOwnerInfo(forms.Form):
             'style': 'text-transform: uppercase;',
     }),
         label= 'City',
+        required= True,
+    )
+    province = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'province',
+            'class' : 'form-control',
+            'placeholder' : 'Province',
+            'style': 'text-transform: uppercase;',
+    }),
+        label= 'Province',
         required= True,
     )
     email = forms.EmailField(

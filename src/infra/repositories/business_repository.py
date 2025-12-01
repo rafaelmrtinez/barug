@@ -267,6 +267,7 @@ class BusinessRepository(IBusinessRepository):
                 "p_owner_barangay":         self._upper_or_blank(o.get("barangay")),
                 "p_owner_street":           self._upper_or_blank(o.get("street")),
                 "p_owner_purok_sitio_name": (o.get("purok_sitio") or None),
+                "p_owner_province":         self._upper_or_blank(o.get("province")),
 
                 # ✅ ID docs
                 # "p_owner_valid_id_front":   (o.get("id_front_path") or cmd.owner_id_front_path),
@@ -329,6 +330,7 @@ class BusinessRepository(IBusinessRepository):
             "p_owner_barangay",
             "p_owner_street",
             "p_owner_purok_sitio_name",
+            "p_owner_province",
 
             # Optional files for owner
             # "p_owner_valid_id_front",
