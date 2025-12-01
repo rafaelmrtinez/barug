@@ -194,9 +194,174 @@ class MaternalHealthRecordQueries:
             raise
 
     def get_maternal_anc_rows_by_mhr_id(self, maternal_record_id: int) -> list:
+        """Return all maternal ANC (prenatal) visit rows for a maternal health record.
+        
+        Returns list of ANC row dicts ordered by visit date (most recent first).
+        """
         sql = "SELECT * FROM maternal_anc_row WHERE maternal_record_id = %s ORDER BY anc_date DESC, anc_row_id DESC"
         try:
             rows = self._connection.execute_query_to_dict(sql, (maternal_record_id,))
+            return rows or []
+        except Exception:
+            raise
+
+    def get_maternal_anc_row_by_id(self, anc_row_id: int) -> dict | None:
+        """Return a single maternal ANC row by its ID.
+        
+        Returns None when no row is found.
+        """
+        sql = "SELECT * FROM maternal_anc_row WHERE anc_row_id = %s LIMIT 1"
+        try:
+            rows = self._connection.execute_query_to_dict(sql, (anc_row_id,))
+            return rows[0] if rows else None
+        except Exception:
+            raise
+
+    def get_maternal_anc_rows_by_visit_id(self, anc_visit_id: int) -> list:
+        """Return all maternal ANC rows for a specific ANC visit.
+        
+        Returns list of ANC row dicts ordered by visit date (most recent first).
+        """
+        sql = "SELECT * FROM maternal_anc_row WHERE anc_visit_id = %s ORDER BY anc_date DESC, anc_row_id DESC"
+        try:
+            rows = self._connection.execute_query_to_dict(sql, (anc_visit_id,))
+            return rows or []
+        except Exception:
+            raise
+
+    def get_latest_maternal_anc_row_by_mhr_id(self, maternal_record_id: int) -> dict | None:
+        """Return the most recent maternal ANC row for a maternal health record.
+        
+        Returns None when no row is found.
+        """
+        sql = "SELECT * FROM maternal_anc_row WHERE maternal_record_id = %s ORDER BY anc_date DESC, anc_row_id DESC LIMIT 1"
+        try:
+            rows = self._connection.execute_query_to_dict(sql, (maternal_record_id,))
+            return rows[0] if rows else None
+        except Exception:
+            raise
+
+    def get_maternal_anc_rows_by_date_range(self, maternal_record_id: int, start_date: str, end_date: str) -> list:
+        """Return maternal ANC rows within a specific date range.
+        
+        Args:
+            maternal_record_id: The maternal health record ID
+            start_date: Start date (inclusive) in format 'YYYY-MM-DD'
+            end_date: End date (inclusive) in format 'YYYY-MM-DD'
+        
+        Returns list of ANC row dicts ordered by visit date (most recent first).
+        """
+        sql = (
+            "SELECT * FROM maternal_anc_row "
+            "WHERE maternal_record_id = %s AND anc_date >= %s AND anc_date <= %s "
+            "ORDER BY anc_date DESC, anc_row_id DESC"
+        )
+        try:
+            rows = self._connection.execute_query_to_dict(sql, (maternal_record_id, start_date, end_date))
+            return rows or []
+        except Exception:
+            raise
+
+    def count_maternal_anc_rows_by_mhr_id(self, maternal_record_id: int) -> int:
+        """Return the count of maternal ANC rows for a maternal health record.
+        
+        Returns 0 when no rows are found.
+        """
+        sql = "SELECT COUNT(*) as count FROM maternal_anc_row WHERE maternal_record_id = %s"
+        try:
+            rows = self._connection.execute_query_to_dict(sql, (maternal_record_id,))
+            return rows[0]['count'] if rows else 0
+        except Exception:
+            raise
+
+    def get_postpartum_visit_rows_by_mhr_id(self, maternal_record_id: int) -> list:
+        """Return all postpartum visit rows for a maternal health record.
+        
+        Returns list of postpartum visit row dicts ordered by visit date (most recent first).
+        """
+        sql = "SELECT * FROM postpartum_visit_row WHERE maternal_record_id = %s ORDER BY date_visit DESC, pp_row_id DESC"
+        try:
+            rows = self._connection.execute_query_to_dict(sql, (maternal_record_id,))
+            return rows or []
+        except Exception:
+            raise
+
+    def get_postpartum_visit_rows_with_feeding_type_by_mhr_id(self, maternal_record_id: int) -> list:
+        """Return all postpartum visit rows with feeding type names joined.
+        
+        Joins postpartum_visit_row with feeding_type to include feeding_type_name.
+        Returns list ordered by visit date (most recent first).
+        """
+        sql = (
+            "SELECT ppvr.*, ft.feeding_type_name "
+            "FROM postpartum_visit_row ppvr "
+            "LEFT JOIN feeding_type ft ON ft.feeding_type_id = ppvr.feeding_type_id "
+            "WHERE ppvr.maternal_record_id = %s "
+            "ORDER BY ppvr.date_visit DESC, ppvr.pp_row_id DESC"
+        )
+        try:
+            rows = self._connection.execute_query_to_dict(sql, (maternal_record_id,))
+            return rows or []
+        except Exception:
+            raise
+
+    def get_postpartum_visit_row_by_id(self, pp_row_id: int) -> dict | None:
+        """Return a single postpartum visit row by its ID.
+        
+        Returns None when no row is found.
+        """
+        sql = "SELECT * FROM postpartum_visit_row WHERE pp_row_id = %s LIMIT 1"
+        try:
+            rows = self._connection.execute_query_to_dict(sql, (pp_row_id,))
+            return rows[0] if rows else None
+        except Exception:
+            raise
+
+    def get_postpartum_visit_row_with_feeding_type_by_id(self, pp_row_id: int) -> dict | None:
+        """Return a single postpartum visit row with feeding type name joined.
+        
+        Joins postpartum_visit_row with feeding_type to include feeding_type_name.
+        Returns None when no row is found.
+        """
+        sql = (
+            "SELECT ppvr.*, ft.feeding_type_name "
+            "FROM postpartum_visit_row ppvr "
+            "LEFT JOIN feeding_type ft ON ft.feeding_type_id = ppvr.feeding_type_id "
+            "WHERE ppvr.pp_row_id = %s LIMIT 1"
+        )
+        try:
+            rows = self._connection.execute_query_to_dict(sql, (pp_row_id,))
+            return rows[0] if rows else None
+        except Exception:
+            raise
+        
+    def get_postpartum_visit_row_with_feeding_type_by_mhr_id(self, maternal_record_id: int) -> dict | None:
+        """Return a single postpartum visit row with feeding type name joined.
+        
+        Joins postpartum_visit_row with feeding_type to include feeding_type_name.
+        Returns None when no row is found.
+        """
+        sql = (
+            "SELECT ppvr.*, ft.feeding_type_name "
+            "FROM postpartum_visit_row ppvr "
+            "LEFT JOIN feeding_type ft ON ft.feeding_type_id = ppvr.feeding_type_id "
+            "WHERE ppvr.maternal_record_id = %s LIMIT 1"
+        )
+        try:
+            rows = self._connection.execute_query_to_dict(sql, (maternal_record_id,))
+            return rows[0] if rows else None
+        except Exception:
+            raise
+
+
+    def get_feeding_types(self) -> list:
+        """Return all feeding types ordered by ID.
+        
+        Returns list of feeding type dicts (feeding_type_id, feeding_type_name).
+        """
+        sql = "SELECT * FROM feeding_type ORDER BY feeding_type_id"
+        try:
+            rows = self._connection.execute_query_to_dict(sql, None)
             return rows or []
         except Exception:
             raise
@@ -237,6 +402,8 @@ class MaternalHealthRecordQueries:
             record['plan_and_baseline'] = self.get_plan_and_baseline_by_mhr_id(mhr_id)
             record['maternal_visit_schedules'] = self.get_maternal_visit_schedules_by_mhr_id(mhr_id)
             record['anc_rows'] = self.get_maternal_anc_rows_by_mhr_id(mhr_id)
+            record['postpartum_visit_rows'] = self.get_postpartum_visit_rows_with_feeding_type_by_mhr_id(mhr_id)
+            record['feeding_types'] = self.get_feeding_types()
         except Exception:
             # if any part fails, still return what we have
             pass

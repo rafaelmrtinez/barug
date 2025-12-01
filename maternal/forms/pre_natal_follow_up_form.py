@@ -105,6 +105,7 @@ class PrenatalFollowUpEntryForm(forms.Form):
 
         if self._role_norm in self.HEALTH_WORKER:
             self.fields["findings"].disabled = True
+            self.fields["notes"].disabled = True
         else:
             self.fields["date"].disabled = True
             self.fields["aog_weeks"].disabled = True
@@ -112,7 +113,7 @@ class PrenatalFollowUpEntryForm(forms.Form):
             self.fields["wt_kg"].disabled = True
             self.fields["bp_systolic"].disabled = True
             self.fields["bp_diastolic"].disabled = True
-            self.fields["notes"].disabled = True
+            
 
     def clean(self):
         cleaned_data = super().clean()

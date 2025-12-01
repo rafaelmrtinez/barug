@@ -252,8 +252,9 @@ class AppContainer(containers.DeclarativeContainer):
     )
 
     prenatal_followup_service = providers.Factory(
-        lambda repository: __import__("src.app.services.prenatal_followup_service", fromlist=["PrenatalFollowUpService"]).PrenatalFollowUpService(repository=repository),
+        lambda repository, queries: __import__("src.app.services.prenatal_followup_service", fromlist=["PrenatalFollowUpService"]).PrenatalFollowUpService(repository=repository, queries=queries),
         repository=infra.maternal_health_record_repository,
+        queries=infra.maternal_health_record_query,
     )
 
     create_maternal_health_record_service = providers.Factory(

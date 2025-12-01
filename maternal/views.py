@@ -37,6 +37,8 @@ from src.app.services.maternal_risk_service import MaternalRiskService
 
 import logging
 
+from src.infra.repositories.queries.maternal_health_record_queries import MaternalHealthRecordQueries
+
 logger = logging.getLogger(__name__)
 
 # Create your views here.
@@ -191,6 +193,8 @@ def maternal_health_record_form(request, record_id : int):
         # Fetch rows once, then map to form initial
         rows = REPOSITORY.fetch_all_previous_pregnancies_by_person_id(person_id)
         # Map repo fields -> form field names (adjust keys to your repo output)
+        
+        postpartum_visit_data = MaternalHealthRecordQueries(ConnectionAdapter()).get_postpartum_visit_rows_with_feeding_type_by_mhr_id(record_id)
         initial = [{
             "delivery_date":  r.get("date_of_delivery"),
             "outcome":   r.get("outcome_type"),
@@ -290,6 +294,7 @@ def maternal_health_record_form(request, record_id : int):
         
         logger.info(f"FORM TYPE RECEIVED: {request.POST.get('form_type', None)}")
         return render(request, "maternal/health_record_form.html", {
+            "postpartum_visit_data": postpartum_visit_data,
             "risk_code_form": risk_code_form,
             "formset": formset,
             "identification_form": maternal_identification_form,
@@ -312,6 +317,7 @@ def maternal_health_record_form(request, record_id : int):
         logger.warning(f"Error in maternal health record form: {str(e)}")
         messages.warning(request, e.message)
         return render(request, "maternal/health_record_form.html", {
+            "postpartum_visit_data": postpartum_visit_data,
             "risk_code_form": risk_code_form,
             "formset": formset,
             "identification_form": maternal_identification_form,
