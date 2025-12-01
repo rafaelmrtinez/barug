@@ -89,11 +89,11 @@
                                 <i class="bi bi-clock-history me-2"></i> Postpartum Schedule
                               </button>
                             </li>
-                            <li>
+                            {% comment %} <li>
                               <button class="dropdown-item btn-postpartum-followup" type="button" data-bs-toggle="modal" data-bs-target="#postpartumFollowupMidwifeModal" data-mhr-id="{{ r.maternal_record_id }}">
                                 <i class="bi bi-file-earmark-medical me-2"></i> Add Postpartum Follow-up
                               </button>
-                            </li>
+                            </li> {% endcomment %}
                             <li>
                               <button class="dropdown-item btn-generate-summary" type="button" data-mhr-id="{{ r.maternal_record_id }}">
                                 <i class="bi bi-file-earmark-pdf me-2"></i> Generate PDF Summary
@@ -119,11 +119,11 @@
                                 <i class="bi bi-calendar2-check me-2"></i> Prenatal Follow-up Schedule
                               </a>
                             </li>
-                            <li>
+                            {% comment %} <li>
                               <button class="dropdown-item btn-postpartum-visit" type="button" data-bs-toggle="modal" data-bs-target="#postpartumVisitBHWModal" data-mhr-id="{{ r.maternal_record_id }}">
                                 <i class="bi bi-plus-circle me-2"></i> Add Postpartum Visit
                               </button>
-                            </li>
+                            </li> {% endcomment %}
                             <li>
                               <button class="dropdown-item btn-postpartum-record" type="button" data-bs-toggle="modal" data-bs-target="#postpartumRecordModal" data-mhr-id="{{ r.maternal_record_id }}">
                                 <i class="bi bi-file-earmark-medical me-2"></i> Add Postpartum Record
