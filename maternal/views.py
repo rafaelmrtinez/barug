@@ -86,6 +86,8 @@ def health_worker_prenatal_form_view(request: HttpRequest, mhr_id: int) -> HttpR
         role=staff_role,
     )
     return render(request, "maternal/bhw_prenatal_form.html", {
+        "page_path": "Maternal > Prenatal Form",
+        "page_title": "Prenatal Form - Health Worker",
         "prenatal_form": prenatal_form,
         "mhr_id": mhr_id,
         "prenatal_followup_formset": pf_formset,
@@ -131,17 +133,23 @@ def create_new_maternal_entry(request: HttpRequest) -> HttpResponse:
                     # Here you would typically save the data to the database
                     # For now, just redirect or render a success message
                     return render(request, "maternal/identification.html", {
+                        "page_path": "Maternal > Identification",
+                        "page_title": "Maternal Identification",
                         "identification_form": maternal_identification_form,
                     })
                 else:
                     messages.error(request, "Failed to create maternal identification record.")
                     return render(request, "maternal/identification.html", {
+                        "page_path": "Maternal > Identification",
+                        "page_title": "Maternal Identification",
                         "identification_form": maternal_identification_form,
                     })
             else:
                 messages.warning(request, "Please fill out fields with red asterisk.")
                 # MessageUtility.push_form_errors_as_messages(request, maternal_identification_form)
                 return render(request, "maternal/identification.html", {
+                    "page_path": "Maternal > Identification",
+                    "page_title": "Maternal Identification",
                     "identification_form": maternal_identification_form,
                 })
         else:
@@ -151,18 +159,24 @@ def create_new_maternal_entry(request: HttpRequest) -> HttpResponse:
                 maternal_id=None
             )
         return render(request, "maternal/identification.html", {
+            "page_path": "Maternal > Identification",
+            "page_title": "Maternal Identification",
             "identification_form": maternal_identification_form,
         })
     except MaternalHealthRecordException as e:
         logger.warning(f"Error creating maternal entry: {str(e)}")
         messages.warning(request, e.message)
         return render(request, "maternal/identification.html", {
+            "page_path": "Maternal > Identification",
+            "page_title": "Maternal Identification",
             "identification_form": maternal_identification_form,
         })
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         messages.error(request, f"Something went wrong. Please try again later.")
         return render(request, "maternal/identification.html", {
+            "page_path": "Maternal > Identification",
+            "page_title": "Maternal Identification",
             "identification_form": maternal_identification_form,
         })
 
@@ -294,6 +308,8 @@ def maternal_health_record_form(request, record_id : int):
         
         logger.info(f"FORM TYPE RECEIVED: {request.POST.get('form_type', None)}")
         return render(request, "maternal/health_record_form.html", {
+            "page_path": "Maternal > Health Record",
+            "page_title": "Maternal Health Record Form",
             "postpartum_visit_data": postpartum_visit_data,
             "risk_code_form": risk_code_form,
             "formset": formset,
@@ -317,6 +333,8 @@ def maternal_health_record_form(request, record_id : int):
         logger.warning(f"Error in maternal health record form: {str(e)}")
         messages.warning(request, e.message)
         return render(request, "maternal/health_record_form.html", {
+            "page_path": "Maternal > Health Record",
+            "page_title": "Maternal Health Record Form",
             "postpartum_visit_data": postpartum_visit_data,
             "risk_code_form": risk_code_form,
             "formset": formset,
@@ -442,6 +460,8 @@ def record_detail(request: HttpRequest, person_id: int) -> HttpResponse:
         request,
         "maternal/record_history.html",
         {
+            "page_path": "Maternal > Record History",
+            "page_title": "Maternal Record History",
             "record_id": maternal_health_record_id,
             "person_id": person_id,
 
@@ -487,7 +507,8 @@ def records(request: HttpRequest) -> HttpResponse:
         request,
         "maternal/records.html",
         {
-            "page_title": "Records",
+            "page_path": "Maternal > Records",
+            "page_title": "Maternal Records",
             "q": q,
             "page_obj": page_obj,
         },
