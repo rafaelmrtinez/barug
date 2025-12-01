@@ -42,9 +42,12 @@
       <input type="hidden" name="b_category" value="{{ request.GET.b_category|default:'' }}">
       <input type="hidden" name="ownership_type" value="{{ request.GET.ownership_type|default:'' }}">
       <input type="hidden" name="status" value="{{ request.GET.status|default:'' }}">
+      <input type="hidden" name="purok" value="{{ request.GET.purok|default:'' }}">
+      <input type="hidden" name="date_range" value="{{ request.GET.date_range|default:'' }}">
+      <input type="hidden" name="employee_range" value="{{ request.GET.employee_range|default:'' }}">
 
-      {% with bcat=request.GET.b_category|yesno:"1,0" own=request.GET.ownership_type|yesno:"1,0" stat=request.GET.status|yesno:"1,0" %}
-        {% with fc=0|add:bcat|add:own|add:stat %}
+      {% with bcat=request.GET.b_category|yesno:"1,0" own=request.GET.ownership_type|yesno:"1,0" stat=request.GET.status|yesno:"1,0" pur=request.GET.purok|yesno:"1,0" dr=request.GET.date_range|yesno:"1,0" er=request.GET.employee_range|yesno:"1,0" %}
+        {% with fc=0|add:bcat|add:own|add:stat|add:pur|add:dr|add:er %}
         <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
                 type="button"
                 data-bs-toggle="offcanvas"
@@ -61,13 +64,13 @@
 
     {# Active filter chips ... (unchanged) #}
     <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
-      {% if request.GET.b_category or request.GET.ownership_type or request.GET.status %}
+      {% if request.GET.b_category or request.GET.ownership_type or request.GET.status or request.GET.purok or request.GET.date_range or request.GET.employee_range %}
         <span class="text-muted me-1">Active:</span>
 
         {% if request.GET.b_category %}
           {% with label=form.b_category|choice_label:request.GET.b_category %}
             <a class="filter-chip"
-               href="?search={{ request.GET.search|urlencode }}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}">
+               href="?search={{ request.GET.search|urlencode }}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}{% if request.GET.purok %}&purok={{ request.GET.purok|urlencode }}{% endif %}{% if request.GET.date_range %}&date_range={{ request.GET.date_range|urlencode }}{% endif %}{% if request.GET.employee_range %}&employee_range={{ request.GET.employee_range|urlencode }}{% endif %}">
               {{ label }} <span class="x" aria-hidden="true">×</span>
             </a>
           {% endwith %}
@@ -76,7 +79,7 @@
         {% if request.GET.ownership_type %}
           {% with label=form.ownership_type|choice_label:request.GET.ownership_type %}
             <a class="filter-chip"
-               href="?search={{ request.GET.search|urlencode }}{% if request.GET.b_category %}&b_category={{ request.GET.b_category|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}">
+               href="?search={{ request.GET.search|urlencode }}{% if request.GET.b_category %}&b_category={{ request.GET.b_category|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}{% if request.GET.purok %}&purok={{ request.GET.purok|urlencode }}{% endif %}{% if request.GET.date_range %}&date_range={{ request.GET.date_range|urlencode }}{% endif %}{% if request.GET.employee_range %}&employee_range={{ request.GET.employee_range|urlencode }}{% endif %}">
               {{ label }} <span class="x" aria-hidden="true">×</span>
             </a>
           {% endwith %}
@@ -85,7 +88,34 @@
         {% if request.GET.status %}
           {% with label=form.status|choice_label:request.GET.status %}
             <a class="filter-chip"
-               href="?search={{ request.GET.search|urlencode }}{% if request.GET.b_category %}&b_category={{ request.GET.b_category|urlencode }}{% endif %}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}">
+               href="?search={{ request.GET.search|urlencode }}{% if request.GET.b_category %}&b_category={{ request.GET.b_category|urlencode }}{% endif %}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}{% if request.GET.purok %}&purok={{ request.GET.purok|urlencode }}{% endif %}{% if request.GET.date_range %}&date_range={{ request.GET.date_range|urlencode }}{% endif %}{% if request.GET.employee_range %}&employee_range={{ request.GET.employee_range|urlencode }}{% endif %}">
+              {{ label }} <span class="x" aria-hidden="true">×</span>
+            </a>
+          {% endwith %}
+        {% endif %}
+
+        {% if request.GET.purok %}
+          {% with label=form.purok|choice_label:request.GET.purok %}
+            <a class="filter-chip"
+               href="?search={{ request.GET.search|urlencode }}{% if request.GET.b_category %}&b_category={{ request.GET.b_category|urlencode }}{% endif %}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}{% if request.GET.date_range %}&date_range={{ request.GET.date_range|urlencode }}{% endif %}{% if request.GET.employee_range %}&employee_range={{ request.GET.employee_range|urlencode }}{% endif %}">
+              {{ label }} <span class="x" aria-hidden="true">×</span>
+            </a>
+          {% endwith %}
+        {% endif %}
+
+        {% if request.GET.date_range %}
+          {% with label=form.date_range|choice_label:request.GET.date_range %}
+            <a class="filter-chip"
+               href="?search={{ request.GET.search|urlencode }}{% if request.GET.b_category %}&b_category={{ request.GET.b_category|urlencode }}{% endif %}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}{% if request.GET.purok %}&purok={{ request.GET.purok|urlencode }}{% endif %}{% if request.GET.employee_range %}&employee_range={{ request.GET.employee_range|urlencode }}{% endif %}">
+              {{ label }} <span class="x" aria-hidden="true">×</span>
+            </a>
+          {% endwith %}
+        {% endif %}
+
+        {% if request.GET.employee_range %}
+          {% with label=form.employee_range|choice_label:request.GET.employee_range %}
+            <a class="filter-chip"
+               href="?search={{ request.GET.search|urlencode }}{% if request.GET.b_category %}&b_category={{ request.GET.b_category|urlencode }}{% endif %}{% if request.GET.ownership_type %}&ownership_type={{ request.GET.ownership_type|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}{% if request.GET.purok %}&purok={{ request.GET.purok|urlencode }}{% endif %}{% if request.GET.date_range %}&date_range={{ request.GET.date_range|urlencode }}{% endif %}">
               {{ label }} <span class="x" aria-hidden="true">×</span>
             </a>
           {% endwith %}
@@ -139,6 +169,24 @@
             {{ form.status }}
           </div>
 
+          <hr class="my-3">
+          <h6 class="text-muted mb-3">Location & Demographics</h6>
+
+          <div class="mb-3">
+            <label class="form-label">Purok/Sitio</label>
+            {{ form.purok }}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Date Established</label>
+            {{ form.date_range }}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Business Size</label>
+            {{ form.employee_range }}
+          </div>
+
           <input type="hidden" name="search" value="{{ request.GET.search|default:'' }}"/>
 
           <div class="offcanvas-footer">
@@ -173,10 +221,16 @@
     const bCategory = document.querySelector('input[name="b_category"]')?.value || '';
     const ownership = document.querySelector('input[name="ownership_type"]')?.value || '';
     const status = document.querySelector('input[name="status"]')?.value || '';
+    const purok = document.querySelector('input[name="purok"]')?.value || '';
+    const dateRange = document.querySelector('input[name="date_range"]')?.value || '';
+    const employeeRange = document.querySelector('input[name="employee_range"]')?.value || '';
 
     if (bCategory) params.set('b_category', bCategory);
     if (ownership) params.set('ownership_type', ownership);
     if (status) params.set('status', status);
+    if (purok) params.set('purok', purok);
+    if (dateRange) params.set('date_range', dateRange);
+    if (employeeRange) params.set('employee_range', employeeRange);
     return params.toString();
   }
 

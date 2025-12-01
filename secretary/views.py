@@ -9,6 +9,7 @@ import io
 import logging
 from uuid import uuid4
 from datetime import datetime, time as dtime, date
+from dateutil.relativedelta import relativedelta
 import logging
 log = logging.getLogger(__name__)
 
@@ -1932,13 +1933,35 @@ def business_map_list(
     b_category = _to_int_or_none(request.GET.get("b_category"))
     ownership_type = _to_int_or_none(request.GET.get("ownership_type"))
     status = _to_int_or_none(request.GET.get("status"))
+    purok = request.GET.get("purok") or None
+    date_range = request.GET.get("date_range") or None
+    employee_range = request.GET.get("employee_range") or None
 
-    rows = business_service.execute(
-        search=search,
-        b_category=b_category,
-        ownership_type=ownership_type,
-        status=status,
-    )
+    # Use execute_with_filters if any of the new filters are applied
+    use_filter_query = purok or date_range or employee_range
+    
+    if use_filter_query:
+        rows = business_service.execute_with_filters()
+    else:
+        rows = business_service.execute(
+            search=search,
+            b_category=b_category,
+            ownership_type=ownership_type,
+            status=status,
+        )
+    
+    # Apply additional filters after fetching results
+    if purok:
+        rows = [r for r in rows if (r.sitio_purok or '').upper() == purok.upper()]
+    
+    if date_range:
+        months = int(date_range)
+        cutoff_date = datetime.now().date() - relativedelta(months=months)
+        rows = [r for r in rows if r.date_established and r.date_established >= cutoff_date]
+    
+    if employee_range:
+        min_emp, max_emp = map(int, employee_range.split('-'))
+        rows = [r for r in rows if r.num_of_employees and min_emp <= r.num_of_employees <= max_emp]
 
     paginator = Paginator(rows, 5)
     page_number = request.GET.get("page")
@@ -1960,6 +1983,9 @@ def business_map_list(
                 'b_category' : b_category,
                 'ownership_type' :ownership_type,
                 'status' : status,
+                'purok': purok,
+                'date_range': date_range,
+                'employee_range': employee_range,
             },
             "pins_url": reverse("secretary:api_business_pins"),
             'search_url': 'secretary:ajax_business_search',
@@ -1983,6 +2009,9 @@ def api_business_pins(
         b_category=_to_int_or_none(request.GET.get("b_category")),
         ownership_type=_to_int_or_none(request.GET.get("ownership_type")),
         status=_to_int_or_none(request.GET.get("status")),
+        purok=(request.GET.get("purok") or None),
+        date_range=(request.GET.get("date_range") or None),
+        employee_range=(request.GET.get("employee_range") or None),
     )
     return JsonResponse(pins, safe=False)
 
@@ -2660,150 +2689,6 @@ def ajax_business_search(
     context = {**base_ctx, ("rows" if tpl_key == "rows" else "cards"): rows}
     html = render_to_string(template_name, context, request=request)
     return HttpResponse(html)
-
-@session_login_required
-@role_required(SECRETARY_ROLE)
-@nocache
-@inject
-def business_information(
-    request, 
-    b_id: int,
-    business_info: IBusinessInfoService = Provide[
-        AppContainer.owner_business_service]) -> HttpResponse:
-    user_role = _auth_role_name(request)
-    
-    person_id = request.GET.get("owner")
-    person_id = int(person_id) if person_id and str(person_id).isdigit() else None
-
-    dto = (
-        business_info.execute(person_id=person_id, business_id=b_id)
-        if person_id is not None
-        else business_info.execute_by_business_id(b_id)  # see helper below
-    )
-
-    def _compose_owner_full_name(data: dict) -> str | None:
-        last   = (data.get("last_name") or "").strip()
-        first  = (data.get("first_name") or "").strip()
-        middle = (data.get("middle_name") or "").strip()
-        suffix = (data.get("suffix") or "").strip()
-
-        parts = []
-        if last:
-            parts.append(last.upper())                   # LAST
-        if first:
-            parts.append((", " if parts else "") + first.title())  # , First
-        if middle:
-            parts.append(" " + middle[:1].upper() + ".")           #  M.
-        if suffix:
-            parts.append(" " + suffix.upper())                     #  JR / III, etc.
-        return "".join(parts) or None
-    
-    def _compose_full_address_from_owner(data: dict) -> str | None:
-        street      = (data.get("street") or "").strip()
-        sitio_purok = (data.get("sitio_purok") or "").strip()
-        barangay    = (data.get("barangay") or "").strip()
-        city        = (data.get("city") or "").strip()
-
-        # Order strictly: STREET, PUROK/SITIO, BARANGAY, CITY
-        parts = [p for p in [street, sitio_purok, barangay, city] if p]
-        return ", ".join(parts) if parts else None
-
-    owner = dict(dto.owner or {})
-    owner["owner_full_name"] = _compose_owner_full_name(owner)
-    owner["full_address"]    = _compose_full_address_from_owner(owner)
-
-    operating_days = (dto.business.get("operating_days") or "").strip()  # e.g., "Mon, Tue, Wed"
-    days = [d.strip() for d in operating_days.split(",")] if operating_days else []
-    operating_days_start_name = days[0] if days else None
-    operating_days_end_name = days[-1] if days else None
-
-    formatted_id = f"{int(b_id):06d}"
-
-    return render(
-        request,
-        "business/business_information.html",
-        {
-            "page_path": f"{user_role} / Business Records / Business Details : {formatted_id}",
-            "page_title": f"Business Details : {formatted_id}",
-            "owner": owner,
-            "business": dto.business,
-            "business_files": (dto.business_proof or {}).get("files") or [],
-            "operating_days_start_name": operating_days_start_name,
-            "operating_days_end_name": operating_days_end_name,
-        },
-    )
-
-@session_login_required
-@role_required(SECRETARY_ROLE)
-@csrf_protect
-@nocache
-@inject
-def business_map_list(
-    request: HttpRequest,
-    business_service: IBusinessService = Provide[AppContainer.business_service],
-) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
-    
-    user_role = _auth_role_name(request)
-    form = BusinessFilters(request.GET or None)
-
-    search = request.GET.get("search")
-    b_category = _to_int_or_none(request.GET.get("b_category"))
-    ownership_type = _to_int_or_none(request.GET.get("ownership_type"))
-    status = _to_int_or_none(request.GET.get("status"))
-
-    rows = business_service.execute(
-        search=search,
-        b_category=b_category,
-        ownership_type=ownership_type,
-        status=status,
-    )
-
-    paginator = Paginator(rows, 5)
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
-
-    if (search or b_category is not None or ownership_type is not None or status is not None) and not form.is_valid():
-        form = BusinessFilters()
-
-    return render(
-        request,
-        "business/business_map_list.html",
-        {
-            'page_path': f"{user_role} / Business Map",
-            'page_title': "Business Map",
-            'form': form,
-            'page_obj' : page_obj,
-            'filters' : {
-                'search' : search,
-                'b_category' : b_category,
-                'ownership_type' :ownership_type,
-                'status' : status,
-            },
-            "pins_url": reverse("secretary:api_business_pins"),
-            'search_url': 'secretary:ajax_business_search',
-        }
-    )
-
-@session_login_required
-@role_required(SECRETARY_ROLE)
-@csrf_protect
-@nocache
-@inject
-def api_business_pins(
-    request: HttpRequest,
-    business_repo: IBusinessRepository = Provide[AppContainer.infra.business],
-):
-    if request.method != "GET":
-        return HttpResponseBadRequest("GET only")
-
-    pins = business_repo.fetch_business_pins(
-        search=(request.GET.get("search") or None),
-        b_category=_to_int_or_none(request.GET.get("b_category")),
-        ownership_type=_to_int_or_none(request.GET.get("ownership_type")),
-        status=_to_int_or_none(request.GET.get("status")),
-    )
-    return JsonResponse(pins, safe=False)
-
 
 # -------------------------------
 # INCIDENT HEATMAP

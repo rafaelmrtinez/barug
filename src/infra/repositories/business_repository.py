@@ -105,6 +105,53 @@ class BusinessRepository(IBusinessRepository):
         except Exception as e:
             raise QueryExecutionException(f"sort_status failed: {e}") from e
     
+    def fetch_business_list_with_filters(self) -> list[BusinessListDTO]:
+        """
+        Fetches business list with additional fields for advanced filtering:
+        - date_est (date_established)
+        - num_of_emp (number of employees)
+        - purok_sitio_name (location)
+        """
+        try:
+            sql = """
+            SELECT 
+                b.business_id,
+                b.business_name,
+                bc.purpose_label AS business_category_name,
+                b.business_nature,
+                TRIM(CONCAT_WS(' ',
+                    COALESCE(p.first_name, ''),
+                    COALESCE(p.middle_name, ''),
+                    COALESCE(p.last_name, ''),
+                    COALESCE(p.suffix, '')
+                )) AS business_owner_name,
+                TRIM(CONCAT_WS(', ',
+                    NULLIF(TRIM(COALESCE(a.street, '')), ''),
+                    NULLIF(TRIM(COALESCE(ps.purok_sitio_name, '')), ''),
+                    NULLIF(TRIM(COALESCE(a.barangay, '')), ''),
+                    NULLIF(TRIM(COALESCE(a.city, '')), '')
+                )) AS business_address,
+                bs.business_status_name,
+                ot.ownership_type_name,
+                b.date_est AS date_established,
+                b.num_of_emp AS num_of_employees,
+                ps.purok_sitio_name AS sitio_purok
+            FROM business b
+            LEFT JOIN person p ON p.person_id = b.business_owner_id
+            LEFT JOIN document_purpose bc ON bc.document_purpose_id = b.business_category_id
+            LEFT JOIN business_status bs ON bs.business_status_id = b.business_status_id
+            LEFT JOIN ownership_type ot ON ot.ownership_type_id = b.ownership_type_id
+            LEFT JOIN addresss a ON a.address_id = b.address_id
+            LEFT JOIN purok_sitio ps ON ps.purok_sitio_id = a.purok_sitio_id
+            ORDER BY b.business_id DESC
+            """
+            rows = self._ctx.execute_query_to_dict(sql, [])
+            print("SAMPLE ROW KEYS FETCH_WITH_FILTERS:", list(rows[0].keys()) if rows else [], flush=True)
+
+            return self._map_with_filters(rows)
+        except Exception as e:
+            raise QueryExecutionException(f"fetch_business_list_with_filters failed: {e}", "SQL_ERROR") from e
+    
     def _map(self, rows: list[dict]) -> list[BusinessListDTO]:
         # Ensure your SQL functions include ownership_type_name as a column.
         mapped: list[BusinessListDTO] = []
@@ -119,6 +166,27 @@ class BusinessRepository(IBusinessRepository):
                     business_address=r["business_address"],
                     business_status_name=r["business_status_name"],
                     ownership_type_name=r.get("ownership_type_name", ""),  # safe-get
+                )
+            )
+        return mapped
+    
+    def _map_with_filters(self, rows: list[dict]) -> list[BusinessListDTO]:
+        """Maps query results including additional filter fields."""
+        mapped: list[BusinessListDTO] = []
+        for r in rows:
+            mapped.append(
+                BusinessListDTO(
+                    business_id=r["business_id"],
+                    business_name=r["business_name"],
+                    business_category_name=r["business_category_name"],
+                    business_nature=r["business_nature"],
+                    business_owner_name=r["business_owner_name"],
+                    business_address=r["business_address"],
+                    business_status_name=r["business_status_name"],
+                    ownership_type_name=r.get("ownership_type_name", ""),
+                    date_established=self._to_date(r.get("date_established")),
+                    num_of_employees=self._to_int(r.get("num_of_employees")),
+                    sitio_purok=r.get("sitio_purok") or None,
                 )
             )
         return mapped
@@ -361,6 +429,9 @@ class BusinessRepository(IBusinessRepository):
         b_category: Optional[int] = None,
         ownership_type: Optional[int] = None,
         status: Optional[int] = None,
+        purok: Optional[str] = None,
+        date_range: Optional[str] = None,
+        employee_range: Optional[str] = None,
     ) -> list[dict]:
         """
         Returns pins with optional filters. Filters are bound via a CTE to avoid
@@ -373,7 +444,10 @@ class BusinessRepository(IBusinessRepository):
                     %s::int  AS p_status,
                     %s::int  AS p_category,
                     %s::int  AS p_ownership,
-                    %s::text AS p_search
+                    %s::text AS p_search,
+                    %s::text AS p_purok,
+                    %s::text AS p_date_range,
+                    %s::text AS p_employee_range
                 )
                 SELECT
                 b.business_id,
@@ -388,7 +462,9 @@ class BusinessRepository(IBusinessRepository):
                 a.barangay,
                 a.city,
                 a.purok_sitio_id,
-                ps.purok_sitio_name       AS purok
+                ps.purok_sitio_name       AS purok,
+                b.date_est                AS date_established,
+                b.num_of_emp              AS num_of_employees
                 FROM public.business AS b
                 JOIN public.addresss AS a
                 ON a.address_id = b.address_id
@@ -412,15 +488,44 @@ class BusinessRepository(IBusinessRepository):
                     COALESCE(b.business_nature,'') ILIKE '%%' || p.p_search || '%%' OR
                     COALESCE(a.street,'')          ILIKE '%%' || p.p_search || '%%'
                 )
+                AND (
+                    COALESCE(p.p_purok,'') = '' OR
+                    UPPER(COALESCE(ps.purok_sitio_name,'')) = UPPER(p.p_purok)
+                )
+                AND (
+                    COALESCE(p.p_date_range,'') = '' OR
+                    (b.date_est IS NOT NULL AND 
+                     b.date_est >= CURRENT_DATE - 
+                     CASE p.p_date_range
+                       WHEN '6' THEN INTERVAL '6 months'
+                       WHEN '12' THEN INTERVAL '12 months'
+                       WHEN '24' THEN INTERVAL '24 months'
+                       WHEN '60' THEN INTERVAL '60 months'
+                       ELSE INTERVAL '0 days'
+                     END)
+                )
+                AND (
+                    COALESCE(p.p_employee_range,'') = '' OR
+                    (b.num_of_emp IS NOT NULL AND
+                     CASE p.p_employee_range
+                       WHEN '1-5' THEN b.num_of_emp BETWEEN 1 AND 5
+                       WHEN '6-20' THEN b.num_of_emp BETWEEN 6 AND 20
+                       WHEN '21-999' THEN b.num_of_emp >= 21
+                       ELSE TRUE
+                     END)
+                )
                 ORDER BY b.business_name;
             """
 
-            # Only 4 params, matching the CTE order:
+            # 7 params, matching the CTE order:
             params = [
                 status,          # %s::int  -> p_status
                 b_category,      # %s::int  -> p_category
                 ownership_type,  # %s::int  -> p_ownership
-                (search or None) # %s::text -> p_search
+                (search or None), # %s::text -> p_search
+                (purok or None),  # %s::text -> p_purok
+                (date_range or None), # %s::text -> p_date_range
+                (employee_range or None) # %s::text -> p_employee_range
             ]
 
             return self._ctx.execute_query_to_dict(sql, params) or []

@@ -255,6 +255,50 @@ class BusinessFilters(forms.Form):
         label= 'Status',
         required= False,
     )
+    purok = forms.ChoiceField(
+        choices=[
+            ("", "— All Puroks —"),
+            ("KANIPAAN", "Kanipaan"),
+            ("PAMPANGO", "Pampango"),
+            ("LUTAW-LUTAW", "Lutaw-Lutaw"),
+            ("MAUCO", "Mauco"),
+        ],
+        widget=forms.Select(attrs={
+            'id': 'purok',
+            'class': 'form-select',
+        }),
+        label='Purok/Sitio',
+        required=False,
+    )
+    date_range = forms.ChoiceField(
+        choices=[
+            ("", "— All Time —"),
+            ("6", "Last 6 Months"),
+            ("12", "Last Year"),
+            ("24", "Last 2 Years"),
+            ("60", "Last 5 Years"),
+        ],
+        widget=forms.Select(attrs={
+            'id': 'date_range',
+            'class': 'form-select',
+        }),
+        label='Date Established',
+        required=False,
+    )
+    employee_range = forms.ChoiceField(
+        choices=[
+            ("", "— All Sizes —"),
+            ("1-5", "Small (1-5 employees)"),
+            ("6-20", "Medium (6-20 employees)"),
+            ("21-999", "Large (20+ employees)"),
+        ],
+        widget=forms.Select(attrs={
+            'id': 'employee_range',
+            'class': 'form-select',
+        }),
+        label='Number of Employees',
+        required=False,
+    )
 
 class StaffAccountRequestFilters(forms.Form):
     search = forms.CharField(

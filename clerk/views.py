@@ -18,6 +18,7 @@ import logging
 import traceback
 import uuid
 from datetime import datetime, date, time
+from dateutil.relativedelta import relativedelta
 
 from decimal import Decimal
 from django.forms import Form
@@ -3641,13 +3642,36 @@ def business_map_list(
     b_category = _to_int_or_none(request.GET.get("b_category"))
     ownership_type = _to_int_or_none(request.GET.get("ownership_type"))
     status = _to_int_or_none(request.GET.get("status"))
+    purok = request.GET.get("purok") or None
+    date_range = request.GET.get("date_range") or None
+    employee_range = request.GET.get("employee_range") or None
 
-    rows = business_service.execute(
-        search=search,
-        b_category=b_category,
-        ownership_type=ownership_type,
-        status=status,
-    )
+    # Use execute_with_filters if any of the new filters are applied
+    # This fetches additional fields (date_established, num_of_employees, sitio_purok)
+    use_filter_query = purok or date_range or employee_range
+    
+    if use_filter_query:
+        rows = business_service.execute_with_filters()
+    else:
+        rows = business_service.execute(
+            search=search,
+            b_category=b_category,
+            ownership_type=ownership_type,
+            status=status,
+        )
+    
+    # Apply additional filters after fetching results
+    if purok:
+        rows = [r for r in rows if (r.sitio_purok or '').upper() == purok.upper()]
+    
+    if date_range:
+        months = int(date_range)
+        cutoff_date = datetime.now().date() - relativedelta(months=months)
+        rows = [r for r in rows if r.date_established and r.date_established >= cutoff_date]
+    
+    if employee_range:
+        min_emp, max_emp = map(int, employee_range.split('-'))
+        rows = [r for r in rows if r.num_of_employees and min_emp <= r.num_of_employees <= max_emp]
 
     paginator = Paginator(rows, 5)
     page_number = request.GET.get("page")
@@ -3669,6 +3693,9 @@ def business_map_list(
                 'b_category' : b_category,
                 'ownership_type' :ownership_type,
                 'status' : status,
+                'purok': purok,
+                'date_range': date_range,
+                'employee_range': employee_range,
             },
             "pins_url": reverse("clerk:api_business_pins"),
             'search_url': 'clerk:ajax_business_search',
@@ -3691,6 +3718,9 @@ def api_business_pins(
         b_category=_to_int_or_none(request.GET.get("b_category")),
         ownership_type=_to_int_or_none(request.GET.get("ownership_type")),
         status=_to_int_or_none(request.GET.get("status")),
+        purok=(request.GET.get("purok") or None),
+        date_range=(request.GET.get("date_range") or None),
+        employee_range=(request.GET.get("employee_range") or None),
     )
     return JsonResponse(pins, safe=False)
 
