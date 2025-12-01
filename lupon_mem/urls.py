@@ -6,6 +6,7 @@ from . import views_api
 from . import views_cases
 from . import views_progress  # ← ADDED: import for flow progress API
 from . import views_hearing_api
+from . import views_hearings
 from . import views_resident_records
 from .views_case_state import update_case_state
 
@@ -49,6 +50,7 @@ urlpatterns = [
     path("cases/hearings/", views.hearing_list, name="hearing_list"),  # global listing (kept)
     path("cases/<int:case_id>/hearings/", views.case_hearing_list, name="case_hearing_list"),  # NEW per-case list
     path("cases/<int:case_id>/hearing/", views.case_hearing_schedule, name="case_hearing_schedule"),
+    path("cases/<int:case_id>/hearing/<int:sid>/", views.case_hearing_schedule, name="case_hearing"),
         # KP-16 opener used when outcome is settled
     path(
         "cases/<int:case_id>/hearing/kp16/",
@@ -72,6 +74,9 @@ urlpatterns = [
     path('case/<int:case_id>/hearing/media/delete/',
          views.hearing_media_delete,
          name='hearing_media_delete'),
+    path('cases/<int:case_id>/hearing/reschedule/',
+         views_hearings.reschedule_hearing,
+         name='reschedule_hearing'),
 
     path("case/<int:case_id>/mediation/<int:submission_id>/photos/upload/",
          views.mediation_photos_upload, name="mediation_photos_upload"),

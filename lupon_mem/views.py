@@ -2351,7 +2351,7 @@ def _case_has_kp16(case_id: int) -> bool:
 
 @session_login_required
 @role_required(*LUPON_ROLES, "barangay treasurer")
-def case_hearing_schedule(request, case_id: int):
+def case_hearing_schedule(request, case_id: int, sid: int = None):
     """
     Per-hearing page (Mediation/Conciliation).
 
@@ -2365,7 +2365,8 @@ def case_hearing_schedule(request, case_id: int):
     from django.utils import timezone
     from django.urls import reverse
 
-    sid = _toi(request.GET.get("sid"))
+    if sid is None:
+        sid = _toi(request.GET.get("sid"))
 
     # 1) All KP-8/KP-12 hearing notices for this case, ascending by time
     with connection.cursor() as cur:

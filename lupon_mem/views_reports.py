@@ -759,7 +759,7 @@ def report_review(request: HttpRequest, report_id: int):
             SELECT br.blotter_report_id,
                    COALESCE(br.incident_subject,'(no subject)') AS subj,
                    COALESCE(br.incident_desc,'') AS descr,
-                   to_char(br.date_time_reported,'YYYY-MM-DD HH24:MI') AS reported_at,
+                   to_char(br.date_time_reported AT TIME ZONE 'Asia/Manila','Month DD, YYYY HH12:MI AM') AS reported_at,
                    COALESCE(ps.payment_status_name, '—') AS pay_status,
                    COALESCE(
                      NULLIF(
@@ -823,12 +823,22 @@ def report_review(request: HttpRequest, report_id: int):
         settlements = cur.fetchall()
 
         # latest review trail entry (who/when/remarks)
-        # Note: adjust table/column names if they differ in your schema.
+        # Debug: get ALL entries first
+        cur.execute("""
+            SELECT rsd.report_status_detail_id, rsd.verification_date, rs.report_status_name, rsd.remarks
+            FROM report_status_detail rsd
+            LEFT JOIN report_status rs ON rs.report_status_id = rsd.report_status_id
+            WHERE rsd.blotter_report_id = %s
+            ORDER BY rsd.verification_date DESC
+        """, [report_id])
+        all_reviews = cur.fetchall()
+        print(f"[DEBUG] All reviews for report {report_id}: {all_reviews}")
+        
         cur.execute("""
             SELECT
               rs.report_status_name      AS action,             -- APPROVED / DECLINED / REVIEWED ...
               rsd.remarks                AS remarks,            -- reason text (if any)
-              to_char(rsd.verification_date,'YYYY-MM-DD HH24:MI') AS acted_at,
+              to_char(rsd.verification_date AT TIME ZONE 'Asia/Manila','Month DD, YYYY HH12:MI AM') AS acted_at,
               s.staff_id,
               trim(coalesce(p.first_name,'') || ' ' || coalesce(p.last_name,'')) AS reviewer_name
             FROM report_status_detail rsd
@@ -840,6 +850,7 @@ def report_review(request: HttpRequest, report_id: int):
             LIMIT 1
         """, [report_id])
         latest_review = cur.fetchone()
+        print(f"[DEBUG] Latest review selected: {latest_review}")
 
     pay_status = (rpt[4] or "—").upper()
     # is reviewed if payment status is conclusive OR we have an approve/decline entry

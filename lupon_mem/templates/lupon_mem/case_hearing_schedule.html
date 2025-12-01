@@ -434,6 +434,9 @@
         <button class="btn btn-outline-brand btn-sm" data-bs-toggle="modal" data-bs-target="#uploadDocsModal">
           <i class="bi bi-images me-1"></i> Add Documentation Photos
         </button>
+        <button class="btn btn-outline-brand btn-sm" data-bs-toggle="modal" data-bs-target="#rescheduleModal">
+          <i class="bi bi-calendar-event me-1"></i> Reschedule Hearing
+        </button>
       </div>
 
       {% if not hearing_held %}
@@ -506,6 +509,38 @@
         </div>
         <div class="modal-footer">
           <button type="submit" id="uploadBtn" class="btn btn-brand" disabled>Upload</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Reschedule modal -->
+  <div class="modal fade" id="rescheduleModal" tabindex="-1" aria-hidden="true" style="margin-top:150px;">
+    <div class="modal-dialog">
+      <form class="modal-content" id="rescheduleForm" method="post" action="{% url 'lupon_mem:reschedule_hearing' case_id %}">
+        <div class="modal-header">
+          <h5 class="modal-title" style="color:var(--brand)"><i class="bi bi-calendar-event me-1"></i> Reschedule Hearing</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          {% csrf_token %}
+          <input type="hidden" name="submission_id" value="{{ picked_submission_id }}">
+          <div class="mb-3">
+            <label for="newDate" class="form-label">New Date</label>
+            <input type="date" id="newDate" name="new_date" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label for="newTime" class="form-label">New Time</label>
+            <input type="time" id="newTime" name="new_time" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label for="remarks" class="form-label">Remarks</label>
+            <textarea id="remarks" name="remarks" class="form-control" rows="3" placeholder="Reason for rescheduling..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-brand">Reschedule</button>
         </div>
       </form>
     </div>
@@ -752,6 +787,42 @@
       const count = selectedFiles.length;
       if (count > 0) {
         showConfirmModal('Upload Photos', `Upload ${count} photo${count > 1 ? 's' : ''}?`, () => uploadForm.submit());
+      }
+    });
+  }
+
+  // Reschedule form confirmation
+  const rescheduleForm = document.getElementById('rescheduleForm');
+  if (rescheduleForm) {
+    rescheduleForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const newDate = document.getElementById('newDate').value;
+      const newTime = document.getElementById('newTime').value;
+      if (newDate && newTime) {
+        const dateObj = new Date(newDate + 'T' + newTime);
+        const formattedDate = dateObj.toLocaleDateString(undefined, { month:'long', day:'numeric', year:'numeric' });
+        const formattedTime = dateObj.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit', hour12:true });
+        showConfirmModal('Reschedule Hearing', `Do you really want to reschedule this hearing to ${formattedDate} at ${formattedTime}?`, () => {
+          const formData = new FormData(rescheduleForm);
+          fetch(rescheduleForm.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'X-CSRFToken': '{{ csrf_token }}'
+            }
+          })
+          .then(r => r.json())
+          .then(data => {
+            if (data.success) {
+              showAlertModal('Success', data.message);
+              bootstrap.Modal.getInstance(document.getElementById('rescheduleModal')).hide();
+              setTimeout(() => location.reload(), 2000);
+            } else {
+              showAlertModal('Error', data.error || 'Failed to reschedule hearing.');
+            }
+          })
+          .catch(e => showAlertModal('Error', 'Error: ' + e.message));
+        });
       }
     });
   }

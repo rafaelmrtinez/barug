@@ -147,8 +147,8 @@ def _fill_pdf_with_values(template_path: str, merged: Dict[str, str], is_ctc: bo
             from reportlab.lib.pagesizes import letter
             packet = io.BytesIO()
             can = canvas.Canvas(packet, pagesize=letter)
-            can.setFont("Helvetica-Bold", 40)
-            can.setFillColorRGB(0.8, 0, 0, alpha=0.3)
+            can.setFont("Helvetica-Bold", 60)
+            can.setFillColorRGB(0.3, 0.3, 0.3, alpha=0.15)
             can.saveState()
             can.translate(300, 400)
             can.rotate(45)
@@ -259,7 +259,8 @@ def _fill_fields_for_line(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[
         
         print(f"[PDF DEBUG] Final family_income_range value: '{family_income_range}'")
         
-        paid_amt = _safe_str(header.get("paid_amount") or line.get("line_total") or "")
+        paid_amt = header.get("paid_amount") or line.get("line_total")
+        paid_amt_str = "0" if paid_amt is None or paid_amt == "" or paid_amt == 0 else _safe_str(paid_amt)
         
         return {
             "full_name": subject_full_name, "age": subject_age, "civil_status": subject_civil, "nationality": subject_nat,
@@ -267,7 +268,7 @@ def _fill_fields_for_line(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[
             "total_earning": family_income_range or "No data", "purpose": purpose,
             "day": d, "month": m, "year": y,
             "issued_at_brgy": barangay, "issued_at_city_municipality": city, "issued_at_province": province,
-            "amnt": paid_amt, "official_reciept": or_no,
+            "amnt": paid_amt_str, "official_reciept": or_no or "—",
         }
 
     if "death" in doc_name:

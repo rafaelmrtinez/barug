@@ -258,11 +258,20 @@ class KP9_2Handler:
         # Normalize the two Officer's Return date triplets (split Y-m-d if needed)
         self._normalize_triplet(out, "offcret_serve_date", "offcret_serve_month", "offcret_serve_year")
         self._normalize_triplet(out, "date_offcret", "month_offcret", "ofcret_year")
+        
+        # For modes 3 and 4, copy officer return date to serve date if serve date is empty
+        mode = self._detect_mode(by_code, out)
+        if mode in ["3", "4"]:
+            if not (out.get("offcret_serve_date") or "").strip():
+                out["offcret_serve_date"] = out.get("date_offcret", "")
+            if not (out.get("offcret_serve_month") or "").strip():
+                out["offcret_serve_month"] = out.get("month_offcret", "")
+            if not (out.get("offcret_serve_year") or "").strip():
+                out["offcret_serve_year"] = out.get("ofcret_year", "")
 
         # ---- NO GENERIC MIRROR FALLBACKS ----
 
-        # Mode-aware behavior
-        mode = self._detect_mode(by_code, out)
+        # Mode-aware behavior (mode already detected above)
         primary = (out.get("served_to") or "").strip()
 
         # Signatures: only auto-fill date_signed_one; never touch date_signed_two
@@ -274,20 +283,28 @@ class KP9_2Handler:
         if sig_full:
             self._ensure(out, "date_signed_one", sig_full)
 
-        # WHO SIGNS (served_to_3):
-        # 1 / 2 -> respondent (served_to)
-        # 3 -> proxy_name_one
-        # 4 -> proxy_name_two
-        if mode == "1" or mode == "2":
+        # WHO SIGNS (served_to_3): Always the respondent for modes 3 and 4
+        # served_to_4: proxy name for mode 4, empty for mode 3
+        # date_signed_two: same as date_signed_one for mode 4
+        if mode in ["1", "2", "3", "4"]:
             self._ensure(out, "served_to_3", primary)
-        elif mode == "3":
+            
+        if mode == "3":
+            # Mode 3: Left at dwelling with (Name) - served_to_4 gets proxy_name_one
             prox = (out.get("proxy_name_one") or "").strip()
             if prox:
-                out["served_to_3"] = prox
+                out["served_to_4"] = prox
+            # Copy date_signed_one to date_signed_two for mode 3
+            if sig_full:
+                self._ensure(out, "date_signed_two", sig_full)
         elif mode == "4":
+            # Mode 4: proxy signs, so served_to_4 gets the proxy name
             prox = (out.get("proxy_name_two") or "").strip()
             if prox:
-                out["served_to_3"] = prox
+                out["served_to_4"] = prox
+            # Copy date_signed_one to date_signed_two for mode 4
+            if sig_full:
+                self._ensure(out, "date_signed_two", sig_full)
 
         # NOTE: We never auto-fill proxy_name_one/proxy_name_two themselves here.
 

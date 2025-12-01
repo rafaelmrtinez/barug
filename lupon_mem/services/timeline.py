@@ -290,6 +290,73 @@ def _fetch_forms(case_id: int) -> List[Dict[str, Any]]:
             out.append(_row_to_event(None, "form", "Draft saved", f"{code} — {name}", meta))
     return out
 
+def _fetch_schedule_timeline(case_id: int) -> List[Dict[str, Any]]:
+    """
+    Fetch schedule timeline events from get_Schedule_timeline function.
+    Returns events showing schedule changes (SET, RESCHEDULE, CANCEL).
+    """
+    with connection.cursor() as cur:
+        try:
+            cur.execute("SELECT * FROM get_Schedule_timeline(%s) ORDER BY event_seq ASC", [case_id])
+            cols = [c[0] for c in cur.description] if cur.description else []
+            rows = cur.fetchall() if cols else []
+        except Exception as e:
+            print(f"[timeline] Error fetching schedule timeline: {e}")
+            return []
+    
+    out: List[Dict[str, Any]] = []
+    for row in rows:
+        data = dict(zip(cols, row))
+        event_kind = (data.get('event_kind') or '').upper()
+        source = data.get('source') or ''
+        notice_sid = data.get('notice_sid')
+        old_schedule = data.get('old_schedule') or ''
+        new_schedule = data.get('new_schedule') or ''
+        event_at = data.get('event_at')
+        staff_name = data.get('staff_name')
+        log_message = data.get('log_message')
+        event_seq = data.get('event_seq', 0)
+        
+        # Skip entries with empty schedules (incomplete reschedule records)
+        if event_kind == 'RESCHEDULE' and not new_schedule and not old_schedule:
+            continue
+        
+        # Build title based on event kind
+        if event_kind == 'SET':
+            title = f"Hearing scheduled ({source})" if source else "Hearing scheduled"
+        elif event_kind == 'RESCHEDULE':
+            title = f"Hearing rescheduled ({source})" if source else "Hearing rescheduled"
+        elif event_kind == 'CANCEL':
+            title = f"Hearing cancelled ({source})" if source else "Hearing cancelled"
+        else:
+            title = "Schedule event"
+        
+        # Use log_message if available, otherwise build subtitle
+        if log_message:
+            subtitle = log_message
+        elif new_schedule:
+            if old_schedule and event_kind == 'RESCHEDULE':
+                subtitle = f"Changed from {old_schedule} to {new_schedule}"
+            else:
+                subtitle = f"Scheduled for: {new_schedule}"
+        else:
+            subtitle = ""
+        
+        meta = {
+            "notice_sid": notice_sid,
+            "source": source,
+            "event_kind": event_kind,
+            "old_schedule": old_schedule,
+            "new_schedule": new_schedule,
+            "event_seq": event_seq,
+        }
+        if staff_name:
+            meta["by"] = staff_name
+        
+        out.append(_row_to_event(event_at, "hearing", title, subtitle, meta))
+    
+    return out
+
 def _fetch_progress(case_id: int) -> List[Dict[str, Any]]:
     """
     case_progress_tracking + case_progress_type classification.
@@ -563,6 +630,9 @@ def get_case_timeline(case_id: int) -> Dict[str, Any]:
 
     # forms (with actor & special handling for KP-8/KP-12/KP-9)
     events += _fetch_forms(case_id)
+    
+    # schedule timeline (from get_Schedule_timeline function)
+    events += _fetch_schedule_timeline(case_id)
 
     # progress (hearing/conciliation/intake/settlement etc.)
     events += _fetch_progress(case_id)
