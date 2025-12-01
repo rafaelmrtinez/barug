@@ -5,6 +5,7 @@ from common.api.residents_pdf_api import ResidentsPDFAPI
 from common.api.business_pdf_api import BusinessPDFAPI
 from common.api.household_pdf_api import HouseholdPDFAPI
 from common.api.financial_pdf_api import FinancialPDFAPI
+from common.api.family_pdf_api import FamilyPDFAPI
 
 app_name = 'captain'
 
@@ -41,6 +42,11 @@ urlpatterns = [
     path("ajax/household_search/", views.ajax_household_search ,name="ajax_household_search"),
     path("api/household/pins", views.api_household_pins, name="api_household_pins"),
 
+    # FAMILY
+    path('families/', views.family_list, name='family_list'),
+    path('api/families/search/', views.ajax_family_search, name='ajax_family_search'),
+    path('families/<int:family_id>/', views.family_detail, name='family_detail'),
+
     # BUSINESS
     path("business/business_list/", views.business_list , name="business_list"),
     path("business_information/<int:b_id>/", views.business_information, name="business_information"),
@@ -63,5 +69,6 @@ urlpatterns = [
     path("api/residents/pdf/", ResidentsPDFAPI.as_view(), name="residents_pdf_api"),
     path("api/business/pdf/", BusinessPDFAPI.as_view(), name="business_pdf_api"),
     path("api/household/pdf/", HouseholdPDFAPI.as_view(), name="household_pdf_api"),
+    path("api/family/pdf/", FamilyPDFAPI.as_view(), name="family_pdf_api"),
     path("api/financial/pdf/", FinancialPDFAPI.as_view(), name="financial_pdf_api"),
 ]

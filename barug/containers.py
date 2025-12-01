@@ -48,6 +48,7 @@ app.wire(modules=[
     "common.api.business_pdf_api",
     "common.api.paid_history_pdf_api",
     "common.api.household_pdf_api",
+    "common.api.family_pdf_api",
     "common.api.financial_pdf_api",
     "captain.views",
     "clerk.views",

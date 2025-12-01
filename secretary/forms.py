@@ -795,6 +795,67 @@ class ResidentFilters(forms.Form):
         required= False,
     )
 
+HOUSEHOLD_TYPE_CHOICES = [
+    ("", "— All household types —"),
+    (1, "NUCLEAR FAMILY"),
+    (2, "EXTENDED FAMILY"),
+    (3, "BOARDING HOUSE"),
+    (4, "SHARED APARTMENT"),
+    (5, "SOLO HOUSEHOLD"),
+    (6, "GOVERNMENT HOUSING"),
+    (7, "INFORMAL SETTLER"),
+]
+
+NHTS_STATUS_CHOICES = [
+    ("", "— All NHTS status —"),
+    (1, "NHTS MEMBER"),
+    (2, "NOT NHTS MEMBER"),
+]
+
+INDIGENT_STATUS_CHOICES = [
+    ("", "— All indigent status —"),
+    (1, "INDIGENT"),
+    (2, "NOT INDIGENT"),
+]
+
+class FamilyFilters(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search',
+        }),
+        label= 'Search',
+        required= False,
+    )
+    household_type = forms.ChoiceField(
+        choices= HOUSEHOLD_TYPE_CHOICES,
+        widget=forms.Select(attrs={
+            'id' : 'household_type',
+            'class' : 'form-select',
+        }),
+        label= 'Household Type',
+        required= False,
+    )
+    nhts_status = forms.ChoiceField(
+        choices= NHTS_STATUS_CHOICES,
+        widget=forms.Select(attrs={
+            'id' : 'nhts_status',
+            'class' : 'form-select',
+        }),
+        label= 'NHTS Status',
+        required= False,
+    )
+    indigent_status = forms.ChoiceField(
+        choices= INDIGENT_STATUS_CHOICES,
+        widget=forms.Select(attrs={
+            'id' : 'indigent_status',
+            'class' : 'form-select',
+        }),
+        label= 'Indigent Status',
+        required= False,
+    )
+
 class AddChannelForm(forms.Form):
     channel = forms.ChoiceField(
         choices=CHANNEL_CHOICES,

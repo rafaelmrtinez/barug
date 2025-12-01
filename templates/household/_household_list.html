@@ -13,6 +13,10 @@
       <a class="btn btn-outline-brand btn-sm" href="{% url 'captain:household_detail' household_id=r.household_id %}">
           View
       </a>
+    {% elif request.resolver_match.namespace == 'bhw' %}
+      <a class="btn btn-outline-brand btn-sm" href="{% url 'bhw:household_detail' household_id=r.household_id %}">
+          View
+      </a>
     {% else %}
       <a class="btn btn-outline-brand btn-sm" href="{% url 'secretary:household_detail' household_id=r.household_id %}">
           View

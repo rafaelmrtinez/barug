@@ -88,6 +88,7 @@ from .forms import (
     HouseholdFilters,
     ResidentFilters,
     ORFilters,
+    FamilyFilters,
 )
 
 
@@ -2145,6 +2146,112 @@ def api_household_pins(
         ownership_type=_to_int_or_none(request.GET.get("house_ownership")),
     )
     return JsonResponse(pins, safe=False)
+
+
+# -------------------------------
+# FAMILY
+# -------------------------------
+
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@csrf_protect
+@nocache
+@inject
+def family_list(
+    request: HttpRequest,
+    household_repo: IHouseholdRepository = Provide[AppContainer.household_repository],
+) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+    
+    user_role = _auth_role_name(request)
+    form = FamilyFilters(request.GET or None)
+
+    search = request.GET.get("search")
+    household_type = _to_int_or_none(request.GET.get("household_type"))
+    nhts_status = _to_int_or_none(request.GET.get("nhts_status"))
+    indigent_status = _to_int_or_none(request.GET.get("indigent_status"))
+
+    if search:
+        rows = household_repo.search_family(search)
+    elif household_type:
+        rows = household_repo.filter_family_by_household_type(household_type)
+    elif nhts_status:
+        rows = household_repo.filter_family_by_nhts_status(nhts_status)
+    elif indigent_status:
+        rows = household_repo.filter_family_by_indigent_status(indigent_status)
+    else:
+        rows = household_repo.fetch_family_list()
+
+    paginator = Paginator(rows, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "user_role": user_role,
+        "form": form,
+        "page_obj": page_obj,
+        "search_url": "captain:ajax_family_search",
+    }
+    return render(request, "family/family_list.html", context)
+
+
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@csrf_protect
+@nocache
+@inject
+def ajax_family_search(
+    request: HttpRequest,
+    household_repo: IHouseholdRepository = Provide[AppContainer.household_repository],
+) -> HttpResponse:
+    
+    search = request.GET.get("search")
+    household_type = _to_int_or_none(request.GET.get("household_type"))
+    nhts_status = _to_int_or_none(request.GET.get("nhts_status"))
+    indigent_status = _to_int_or_none(request.GET.get("indigent_status"))
+
+    if search:
+        rows = household_repo.search_family(search)
+    elif household_type:
+        rows = household_repo.filter_family_by_household_type(household_type)
+    elif nhts_status:
+        rows = household_repo.filter_family_by_nhts_status(nhts_status)
+    elif indigent_status:
+        rows = household_repo.filter_family_by_indigent_status(indigent_status)
+    else:
+        rows = household_repo.fetch_family_list()
+
+    context = {
+        "rows": rows,
+        "search_url": "captain:ajax_family_search",
+    }
+    return render(request, "family/_family_list.html", context)
+
+
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@csrf_protect
+@nocache
+@inject
+def family_detail(
+    request: HttpRequest,
+    family_id: int,
+    household_repo: IHouseholdRepository = Provide[AppContainer.household_repository],
+) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+    
+    user_role = _auth_role_name(request)
+    family = household_repo.fetch_family_detail(family_id)
+    
+    if not family:
+        messages.error(request, "Family not found.")
+        return redirect("captain:family_list")
+
+    context = {
+        'page_path': f'{user_role} / Family / {family.get("family_num", "")}',
+        'page_title': f'Family {family.get("family_num", "")}',
+        "user_role": user_role,
+        "family": family,
+    }
+    return render(request, "family/family_detail.html", context)
 
 
 # -------------------------------

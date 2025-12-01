@@ -29,7 +29,7 @@ from .forms import ChildHealtheRecordForm
 from typing import Any, Optional
 from django.shortcuts import render, redirect
 from django.core.paginator import Paginator
-from django.http import JsonResponse, HttpRequest, HttpResponse, HttpResponseNotAllowed
+from django.http import JsonResponse, HttpRequest, HttpResponse, HttpResponseNotAllowed, HttpResponseBadRequest
 from django.template.loader import render_to_string
 from django.contrib import messages
 from datetime import datetime
@@ -822,3 +822,707 @@ def api_household_pins(
     
     return JsonResponse(pins, safe=False)
 
+
+# -------------------------------
+# RESIDENT LIST
+# -------------------------------
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@csrf_protect
+@nocache
+@inject
+def resident_list(
+    request: HttpRequest,
+    resident_service = Provide[AppContainer.resident_service],
+):
+    """Display resident list for BHW."""
+    from bhw.forms import ResidentFilters
+    
+    user_role = request.session.get("authenticated_role_name", "")
+    form = ResidentFilters()
+    
+    search = request.GET.get("search")
+    purok_sitio = request.GET.get("purok_sitio")
+
+    rows = resident_service.execute(
+        search=search,
+        purok=purok_sitio,
+    )
+
+    paginator = Paginator(rows, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+    
+    if (search or purok_sitio is not None) and not form.is_valid():
+        form = ResidentFilters()
+
+    return render(request, "resident/resident_list.html", {
+        'page_path': f'{user_role} / Resident List',
+        'page_title': 'Resident List',
+        'page_obj': page_obj,
+        'form': form,
+        'search_url': 'bhw:ajax_resident_search',
+    })
+
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@nocache
+@require_http_methods(["GET"])
+@inject
+def ajax_resident_search(
+    request: HttpRequest,
+    resident_service = Provide[AppContainer.resident_service],
+) -> HttpResponse:
+    """AJAX search for residents."""
+    if request.headers.get("x-requested-with") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR required")
+    
+    tpl_key = (request.GET.get("tpl") or "rows").strip().lower()
+    if tpl_key != "rows":
+        return HttpResponseBadRequest("Unknown partial")
+
+    q = request.GET.get("q", "") or None
+    purok_sitio = request.GET.get("purok_sitio")
+
+    rows = resident_service.execute(
+        search=q,
+        purok=purok_sitio,
+    )[:50]
+
+    context = {"rows": rows}
+    html = render_to_string("resident/_resident_list.html", context, request=request)
+    return HttpResponse(html)
+
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@csrf_protect
+@nocache
+@inject
+def resident_detail(
+    request: HttpRequest,
+    person_id: int,
+    resident_service = Provide[AppContainer.resident_service],
+) -> HttpResponse:
+    """Display detailed resident information."""
+    user_role = request.session.get("authenticated_role_name", "")
+    
+    resident = resident_service.get_resident_detail(person_id)
+    
+    if not resident:
+        messages.error(request, "Resident not found.")
+        return redirect("bhw:resident_list")
+    
+    return render(request, "resident/resident_detail.html", {
+        'page_path': f'{user_role} / Resident / {resident.person_code}',
+        'page_title': f'Resident {resident.person_code}',
+        'resident': resident,
+    })
+
+
+# -------------------------------
+# HOUSEHOLD LIST
+# -------------------------------
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@csrf_protect
+@nocache
+@inject
+def household_list(
+    request: HttpRequest,
+    household_service = Provide[AppContainer.household_service],
+) -> HttpResponse:
+    """Display household list for BHW."""
+    from bhw.forms import HouseholdFilters
+    
+    user_role = request.session.get("authenticated_role_name", "")
+    form = HouseholdFilters(request.GET or None)
+
+    search = request.GET.get("search")
+    
+    house_type = request.GET.get("house_type")
+    if house_type:
+        try:
+            house_type = int(house_type)
+        except:
+            house_type = None
+    else:
+        house_type = None
+    
+    house_ownership = request.GET.get("house_ownership")
+    if house_ownership:
+        try:
+            house_ownership = int(house_ownership)
+        except:
+            house_ownership = None
+    else:
+        house_ownership = None
+
+    rows = household_service.execute(
+        search=search,
+        house_type=house_type,
+        ownership_type=house_ownership,
+    )
+
+    paginator = Paginator(rows, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    if (search or house_type is not None or house_ownership is not None) and not form.is_valid():
+        form = HouseholdFilters()
+
+    return render(request, "household/household_list.html", {
+        'page_path': f'{user_role} / Household List',
+        'page_title': 'Household List',
+        'page_obj': page_obj,
+        'form': form,
+        'filters': {
+            'search': search,
+            'house_type': house_type,
+            'house_ownership': house_ownership,
+        },
+        "search_url": "bhw:ajax_household_search",
+    })
+
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@nocache
+@inject
+def ajax_household_search(
+    request: HttpRequest,
+    household_service = Provide[AppContainer.household_service],
+) -> HttpResponse:
+    """AJAX search for households."""
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR only")
+
+    tpl_key = (request.GET.get("tpl") or "cards").strip().lower()
+    if tpl_key == "rows":
+        template_name = "household/_household_list.html"
+        ctx_key = "rows"
+    elif tpl_key == "cards":
+        template_name = "household/_households.html"
+        ctx_key = "cards"
+    else:
+        return HttpResponseBadRequest("Unknown partial")
+
+    q = request.GET.get("q")
+    
+    house_type = request.GET.get("house_type")
+    if house_type:
+        try:
+            house_type = int(house_type)
+        except:
+            house_type = None
+    else:
+        house_type = None
+    
+    house_ownership = request.GET.get("house_ownership")
+    if house_ownership:
+        try:
+            house_ownership = int(house_ownership)
+        except:
+            house_ownership = None
+    else:
+        house_ownership = None
+
+    rows = household_service.execute(
+        search=q,
+        house_type=house_type,
+        ownership_type=house_ownership,
+    )[:50]
+
+    html = render_to_string(
+        template_name,
+        {ctx_key: rows},
+        request=request,
+    )
+    return HttpResponse(html)
+
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@csrf_protect
+@nocache
+@inject
+def household_detail(
+    request: HttpRequest,
+    household_id: int,
+    household_service = Provide[AppContainer.household_service],
+) -> HttpResponse:
+    """Display detailed household information."""
+    user_role = request.session.get("authenticated_role_name", "")
+    
+    household = household_service.get_household_detail(household_id)
+    
+    if not household:
+        messages.error(request, "Household not found.")
+        return redirect("bhw:household_list")
+    
+    return render(request, "household/household_detail.html", {
+        'page_path': f'{user_role} / Household / {household.household_num}',
+        'page_title': f'Household {household.household_num}',
+        'household': household,
+    })
+
+
+# -------------------------------
+# FAMILY LIST
+# -------------------------------
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@csrf_protect
+@nocache
+@inject
+def family_list(
+    request: HttpRequest,
+    household_repo = Provide[AppContainer.household_repository],
+) -> HttpResponse:
+    """Display family list for BHW."""
+    from bhw.forms import FamilyFilters
+    
+    user_role = request.session.get("authenticated_role_name", "")
+    form = FamilyFilters(request.GET or None)
+
+    search = request.GET.get("search")
+    
+    household_type = request.GET.get("household_type")
+    if household_type:
+        try:
+            household_type = int(household_type)
+        except:
+            household_type = None
+    else:
+        household_type = None
+    
+    nhts_status = request.GET.get("nhts_status")
+    if nhts_status:
+        try:
+            nhts_status = int(nhts_status)
+        except:
+            nhts_status = None
+    else:
+        nhts_status = None
+    
+    indigent_status = request.GET.get("indigent_status")
+    if indigent_status:
+        try:
+            indigent_status = int(indigent_status)
+        except:
+            indigent_status = None
+    else:
+        indigent_status = None
+
+    # Fetch family list based on filters
+    if search:
+        rows = household_repo.search_family(search)
+    elif household_type:
+        rows = household_repo.filter_family_by_household_type(household_type)
+    elif nhts_status:
+        rows = household_repo.filter_family_by_nhts_status(nhts_status)
+    elif indigent_status:
+        rows = household_repo.filter_family_by_indigent_status(indigent_status)
+    else:
+        rows = household_repo.fetch_family_list()
+
+    paginator = Paginator(rows, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    if (search or household_type is not None or nhts_status is not None or indigent_status is not None) and not form.is_valid():
+        form = FamilyFilters()
+
+    return render(request, "family/family_list.html", {
+        'page_path': f'{user_role} / Family List',
+        'page_title': 'Family List',
+        'page_obj': page_obj,
+        'form': form,
+        'filters': {
+            'search': search,
+            'household_type': household_type,
+            'nhts_status': nhts_status,
+            'indigent_status': indigent_status,
+        },
+        "search_url": "bhw:ajax_family_search",
+    })
+
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@nocache
+@inject
+def ajax_family_search(
+    request: HttpRequest,
+    household_repo = Provide[AppContainer.household_repository],
+) -> HttpResponse:
+    """AJAX search for families."""
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR only")
+
+    tpl_key = (request.GET.get("tpl") or "rows").strip().lower()
+    if tpl_key == "rows":
+        template_name = "family/_family_list.html"
+        ctx_key = "rows"
+    else:
+        return HttpResponseBadRequest("Unknown partial")
+
+    q = request.GET.get("q")
+    
+    household_type = request.GET.get("household_type")
+    if household_type:
+        try:
+            household_type = int(household_type)
+        except:
+            household_type = None
+    else:
+        household_type = None
+    
+    nhts_status = request.GET.get("nhts_status")
+    if nhts_status:
+        try:
+            nhts_status = int(nhts_status)
+        except:
+            nhts_status = None
+    else:
+        nhts_status = None
+    
+    indigent_status = request.GET.get("indigent_status")
+    if indigent_status:
+        try:
+            indigent_status = int(indigent_status)
+        except:
+            indigent_status = None
+    else:
+        indigent_status = None
+
+    # Fetch family search results based on filters
+    if q:
+        rows = household_repo.search_family(q)
+    elif household_type:
+        rows = household_repo.filter_family_by_household_type(household_type)
+    elif nhts_status:
+        rows = household_repo.filter_family_by_nhts_status(nhts_status)
+    elif indigent_status:
+        rows = household_repo.filter_family_by_indigent_status(indigent_status)
+    else:
+        rows = household_repo.fetch_family_list()
+    
+    rows = rows[:50]
+
+    html = render_to_string(
+        template_name,
+        {ctx_key: rows},
+        request=request,
+    )
+    return HttpResponse(html)
+
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@csrf_protect
+@nocache
+@inject
+def family_detail(
+    request: HttpRequest,
+    family_id: int,
+    household_repo = Provide[AppContainer.household_repository],
+) -> HttpResponse:
+    """Display detailed family information."""
+    user_role = request.session.get("authenticated_role_name", "")
+    
+    family = household_repo.fetch_family_detail(family_id)
+    
+    if not family:
+        messages.error(request, "Family not found.")
+        return redirect("bhw:family_list")
+    
+    return render(request, "family/family_detail.html", {
+        'page_path': f'{user_role} / Family / {family.get("family_num", "")}',
+        'page_title': f'Family {family.get("family_num", "")}',
+        'family': family,
+    })
+
+
+# -------------------------------
+# HOUSEHOLD HISTORY
+# -------------------------------
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@csrf_protect
+@nocache
+@inject
+def household_history_list(
+    request: HttpRequest,
+    household_repo = Provide[AppContainer.household_repository],
+) -> HttpResponse:
+    """
+    Display household history records for a specific quarter and year.
+    Supports search, house type, and ownership filtering.
+    Only accessible by BHW.
+    """
+    from bhw.forms import HouseholdHistoryFilters
+    from datetime import datetime
+    
+    user_role = request.session.get("authenticated_role_name", "")
+    
+    # Default to current quarter and year
+    current_date = datetime.now()
+    default_quarter = (current_date.month - 1) // 3 + 1
+    default_year = current_date.year
+    
+    # Get filter parameters
+    quarter = request.GET.get("quarter")
+    if quarter:
+        try:
+            quarter = int(quarter)
+        except:
+            quarter = default_quarter
+    else:
+        quarter = default_quarter
+    
+    year = request.GET.get("year")
+    if year:
+        try:
+            year = int(year)
+        except:
+            year = default_year
+    else:
+        year = default_year
+    
+    search = request.GET.get("search")
+    
+    house_type = request.GET.get("house_type")
+    if house_type:
+        try:
+            house_type = int(house_type)
+        except:
+            house_type = None
+    else:
+        house_type = None
+    
+    house_ownership = request.GET.get("house_ownership")
+    if house_ownership:
+        try:
+            house_ownership = int(house_ownership)
+        except:
+            house_ownership = None
+    else:
+        house_ownership = None
+    
+    # Initialize form with current values
+    form_data = {
+        'quarter': str(quarter),
+        'year': year,
+        'search': search or '',
+        'house_type': house_type or '',
+        'house_ownership': house_ownership or '',
+    }
+    form = HouseholdHistoryFilters(form_data)
+    
+    # Fetch data based on filters
+    try:
+        if search:
+            rows = household_repo.search_household_history(search, quarter, year)
+        elif house_type:
+            rows = household_repo.sort_household_history_by_house_type(house_type, quarter, year)
+        elif house_ownership:
+            rows = household_repo.sort_household_history_by_ownership(house_ownership, quarter, year)
+        else:
+            rows = household_repo.fetch_household_history_by_quarter_year(quarter, year)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception("Error fetching household history")
+        messages.error(request, f"Error fetching household history: {str(e)}")
+        rows = []
+    
+    paginator = Paginator(rows, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, "household/household_history_list.html", {
+        'page_path': f'{user_role} / Household History',
+        'page_title': 'Household History',
+        'page_obj': page_obj,
+        'form': form,
+        'filters': {
+            'quarter': quarter,
+            'year': year,
+            'search': search,
+            'house_type': house_type,
+            'house_ownership': house_ownership,
+        },
+    })
+
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@csrf_protect
+@nocache
+@inject
+def household_history_detail(
+    request: HttpRequest,
+    household_history_id: int,
+    household_repo = Provide[AppContainer.household_repository],
+) -> HttpResponse:
+    """
+    Display detailed household history information including all families and members.
+    Only accessible by BHW.
+    """
+    user_role = request.session.get("authenticated_role_name", "")
+    
+    try:
+        result = household_repo.fetch_household_history_detail(household_history_id)
+        
+        if not result:
+            messages.error(request, "Household history record not found.")
+            return redirect("bhw:household_history_list")
+        
+        household_data = result.get('household')
+        families_data = result.get('families', [])
+        
+        if not household_data:
+            messages.error(request, "Household history data is incomplete.")
+            return redirect("bhw:household_history_list")
+        
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception("Error fetching household history detail")
+        messages.error(request, f"Error fetching household history: {str(e)}")
+        return redirect("bhw:household_history_list")
+    
+    return render(request, "household/household_history_detail.html", {
+        'page_path': f'{user_role} / Household History / {household_data.get("household_num", "")}',
+        'page_title': f'Household History {household_data.get("household_num", "")}',
+        'household': household_data,
+        'families': families_data,
+    })
+
+# -------------------------------
+# FAMILY HISTORY
+# -------------------------------
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@nocache
+@inject
+def family_history_list(
+    request: HttpRequest,
+    household_repo = Provide[AppContainer.household_repository],
+) -> HttpResponse:
+    """
+    Display family history records for a specific quarter and year.
+    Supports search, household type, NHTS status, and indigent status filtering.
+    Only accessible by BHW.
+    """
+    from bhw.forms import FamilyHistoryFilters
+    from datetime import datetime
+    
+    user_role = request.session.get("authenticated_role_name", "")
+    
+    # Default to current quarter and year
+    current_date = datetime.now()
+    default_quarter = (current_date.month - 1) // 3 + 1
+    default_year = current_date.year
+    
+    # Get filter parameters
+    quarter = request.GET.get("quarter")
+    if quarter:
+        try:
+            quarter = int(quarter)
+        except:
+            quarter = default_quarter
+    else:
+        quarter = default_quarter
+    
+    year = request.GET.get("year")
+    if year:
+        try:
+            year = int(year)
+        except:
+            year = default_year
+    else:
+        year = default_year
+    
+    search = request.GET.get("search")
+    
+    household_type = request.GET.get("household_type")
+    if household_type:
+        try:
+            household_type = int(household_type)
+        except:
+            household_type = None
+    else:
+        household_type = None
+    
+    nhts_status = request.GET.get("nhts_status")
+    if nhts_status:
+        try:
+            nhts_status = int(nhts_status)
+        except:
+            nhts_status = None
+    else:
+        nhts_status = None
+    
+    indigent_status = request.GET.get("indigent_status")
+    if indigent_status:
+        try:
+            indigent_status = int(indigent_status)
+        except:
+            indigent_status = None
+    else:
+        indigent_status = None
+    
+    # Initialize form with current values
+    form_data = {
+        'quarter': str(quarter),
+        'year': year,
+        'search': search or '',
+        'household_type': household_type or '',
+        'nhts_status': nhts_status or '',
+        'indigent_status': indigent_status or '',
+    }
+    form = FamilyHistoryFilters(form_data)
+    
+    # Fetch data based on filters
+    try:
+        if search:
+            rows = household_repo.search_family_history(search, quarter, year)
+        elif household_type:
+            rows = household_repo.sort_family_history_by_household_type(household_type, quarter, year)
+        elif nhts_status:
+            rows = household_repo.sort_family_history_by_nhts_status(nhts_status, quarter, year)
+        elif indigent_status:
+            rows = household_repo.sort_family_history_by_indigent_status(indigent_status, quarter, year)
+        else:
+            rows = household_repo.fetch_family_history_by_quarter_year(quarter, year)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception("Error fetching family history")
+        rows = []
+        messages.error(request, f"Error fetching family history: {str(e)}")
+    
+    # Pagination
+    paginator = Paginator(rows, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, "family/family_history_list.html", {
+        'page_path': f'{user_role} / Family History',
+        'page_title': 'Family History',
+        'page_obj': page_obj,
+        'form': form,
+        'filters': {
+            'quarter': quarter,
+            'year': year,
+            'search': search,
+            'household_type': household_type,
+            'nhts_status': nhts_status,
+            'indigent_status': indigent_status,
+        },
+    })

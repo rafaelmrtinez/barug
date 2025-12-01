@@ -1,0 +1,434 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+  <link rel="stylesheet" href="{% static 'css/button.css' %}">
+  <style>
+    :root{
+      --brand:#6d2932;
+      --section-border:#e9ecef;
+      --section-bg:#fff;
+      --section-cap-bg:#f8f9fa;
+      --muted:#6c757d;
+    }
+
+    .btn-outline-brand{
+      color:#6d2932;
+      border-color:#6d2932;
+      background:#fff;
+    }
+    .btn-outline-brand:hover{
+      background:#6d2932;
+      color:#fff;
+    }
+
+    .section-block{
+      background:var(--section-bg);
+      border:1px solid var(--section-border);
+      border-left:4px solid var(--brand);
+      border-radius:12px;
+      padding:1.5rem;
+      margin-bottom:1.5rem;
+      box-shadow:0 1px 3px rgba(16,24,40,.08);
+    }
+
+    .section-header{
+      display:flex;
+      align-items:center;
+      gap:.75rem;
+      margin-bottom:1.25rem;
+      padding-bottom:1rem;
+      border-bottom:2px solid #f1f3f5;
+    }
+
+    .section-icon{
+      width:40px;
+      height:40px;
+      border-radius:10px;
+      background:linear-gradient(135deg, #6d2932 0%, #8a3843 100%);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#fff;
+      font-size:1.25rem;
+    }
+
+    .section-title{
+      font-weight:700;
+      font-size:1.25rem;
+      margin:0;
+      color:#1a1a1a;
+    }
+
+    .info-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));
+      gap:1.25rem;
+    }
+
+    .info-item{
+      display:flex;
+      flex-direction:column;
+      gap:.25rem;
+    }
+
+    .info-label{
+      font-size:.8125rem;
+      font-weight:600;
+      color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:.5px;
+    }
+
+    .info-value{
+      font-size:1rem;
+      font-weight:600;
+      color:#1a1a1a;
+    }
+
+    .family-card{
+      background:#f8f9fa;
+      border:1px solid #e9ecef;
+      border-radius:10px;
+      padding:1.25rem;
+      margin-bottom:1rem;
+      transition:all .2s ease;
+    }
+
+    .family-card:hover{
+      box-shadow:0 4px 12px rgba(0,0,0,.08);
+      transform:translateY(-2px);
+    }
+
+    .family-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:1rem;
+      padding-bottom:.75rem;
+      border-bottom:1px solid #dee2e6;
+    }
+
+    .family-number{
+      font-size:1.125rem;
+      font-weight:700;
+      color:#6d2932;
+    }
+
+    .toggle-members-btn{
+      background:#fff;
+      border:1px solid #dee2e6;
+      border-radius:6px;
+      padding:.375rem .75rem;
+      font-size:.875rem;
+      font-weight:600;
+      color:#6d2932;
+      cursor:pointer;
+      transition:all .2s ease;
+    }
+
+    .toggle-members-btn:hover{
+      background:#6d2932;
+      color:#fff;
+      border-color:#6d2932;
+    }
+
+    .members-container{
+      margin-top:1rem;
+      display:none;
+    }
+
+    .members-container.show{
+      display:block;
+    }
+
+    .member-item{
+      background:#fff;
+      border:1px solid #e9ecef;
+      border-radius:8px;
+      padding:1rem;
+      margin-bottom:.75rem;
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+      gap:1rem;
+    }
+
+    .member-item:last-child{
+      margin-bottom:0;
+    }
+
+    .badge-custom{
+      display:inline-flex;
+      align-items:center;
+      gap:.375rem;
+      padding:.375rem .75rem;
+      border-radius:999px;
+      font-size:.8125rem;
+      font-weight:600;
+    }
+
+    .badge-nhts{
+      background:#e8f7ef;
+      color:#0f5132;
+      border:1px solid #cce7da;
+    }
+
+    .badge-indigent{
+      background:#fff3cd;
+      color:#664d03;
+      border:1px solid #ffe69c;
+    }
+
+    .no-families{
+      text-align:center;
+      padding:3rem 1rem;
+      color:var(--muted);
+    }
+
+    .no-families i{
+      font-size:3rem;
+      opacity:.3;
+      margin-bottom:1rem;
+    }
+
+    .back-link{
+      display:inline-flex;
+      align-items:center;
+      gap:.5rem;
+      color:#6d2932;
+      text-decoration:none;
+      font-weight:600;
+      margin-bottom:1.5rem;
+      transition:all .2s ease;
+    }
+
+    .back-link:hover{
+      gap:.75rem;
+      color:#8a3843;
+    }
+
+    .page-header{
+      margin-bottom:2rem;
+    }
+
+    .household-number{
+      font-size:2rem;
+      font-weight:800;
+      color:#6d2932;
+      margin-bottom:.5rem;
+    }
+
+    .household-head{
+      font-size:1.25rem;
+      color:#495057;
+      font-weight:500;
+    }
+
+    .history-badge{
+      display:inline-block;
+      padding:.375rem .75rem;
+      border-radius:4px;
+      background:#ffc107;
+      color:#000;
+      font-weight:600;
+      font-size:.875rem;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="margin-top:60px;">
+
+  <a href="{% url 'bhw:household_history_list' %}" class="back-link">
+    {% bs_icon 'arrow-left' %} Back to Household History
+  </a>
+
+  <div class="page-header">
+    <div class="household-number">
+      Household {{ household.household_num }} 
+      <span class="history-badge">HISTORICAL</span>
+    </div>
+    <div class="household-head">
+      {% bs_icon 'person-fill' %} {{ household.household_head_name }}
+    </div>
+  </div>
+
+  <!-- Household Information Section -->
+  <div class="section-block">
+    <div class="section-header">
+      <div class="section-icon">
+        {% bs_icon 'house-fill' %}
+      </div>
+      <h2 class="section-title">Household Information</h2>
+    </div>
+    
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">Household Number</div>
+        <div class="info-value">{{ household.household_num }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Household Head</div>
+        <div class="info-value">{{ household.household_head_name }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">House Type</div>
+        <div class="info-value">{{ household.house_type|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">House Ownership</div>
+        <div class="info-value">{{ household.house_ownership|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item" style="grid-column:1/-1;">
+        <div class="info-label">Address</div>
+        <div class="info-value">{{ household.address }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Families Section -->
+  <div class="section-block">
+    <div class="section-header">
+      <div class="section-icon">
+        {% bs_icon 'people-fill' %}
+      </div>
+      <h2 class="section-title">Families ({{ families|length }})</h2>
+    </div>
+
+    {% if families %}
+      {% for family in families %}
+        <div class="family-card">
+          <div class="family-header">
+            <div>
+              <div class="family-number">Family {{ family.family_num }}</div>
+              <div style="color:#6c757d; font-size:.9375rem;">
+                Head: <strong>{{ family.family_head_name }}</strong>
+              </div>
+            </div>
+            <button class="toggle-members-btn" onclick="toggleMembers({{ forloop.counter0 }})">
+              <span class="toggle-text">Show Members ({{ family.members|length }})</span>
+              {% bs_icon 'chevron-down' extra_classes='toggle-icon' %}
+            </button>
+          </div>
+
+          <div class="info-grid" style="gap:.75rem;">
+            {% if family.household_type %}
+              <div class="info-item">
+                <div class="info-label">Household Type</div>
+                <div class="info-value" style="font-size:.9375rem;">{{ family.household_type }}</div>
+              </div>
+            {% endif %}
+
+            {% if family.nhts_status %}
+              <div class="info-item">
+                <div class="info-label">NHTS Status</div>
+                <div>
+                  <span class="badge-custom badge-nhts">{{ family.nhts_status }}</span>
+                </div>
+              </div>
+            {% endif %}
+
+            {% if family.indigent_status %}
+              <div class="info-item">
+                <div class="info-label">Indigent Status</div>
+                <div>
+                  <span class="badge-custom badge-indigent">{{ family.indigent_status }}</span>
+                </div>
+              </div>
+            {% endif %}
+
+            {% if family.monthly_income %}
+              <div class="info-item">
+                <div class="info-label">Monthly Income</div>
+                <div class="info-value" style="font-size:.9375rem;">{{ family.monthly_income }}</div>
+              </div>
+            {% endif %}
+
+            {% if family.source_of_income %}
+              <div class="info-item" style="grid-column:1/-1;">
+                <div class="info-label">Source of Income</div>
+                <div class="info-value" style="font-size:.9375rem;">{{ family.source_of_income }}</div>
+              </div>
+            {% endif %}
+          </div>
+
+          <!-- Members Container -->
+          <div class="members-container" id="members-{{ forloop.counter0 }}">
+            <div style="font-weight:700; font-size:1rem; margin-bottom:.75rem; color:#495057;">
+              {% bs_icon 'people' %} Family Members ({{ family.members|length }})
+            </div>
+            
+            {% if family.members %}
+              {% for member in family.members %}
+                <div class="member-item">
+                  <div class="info-item">
+                    <div class="info-label">Name</div>
+                    <div class="info-value" style="font-size:.9375rem;">{{ member.full_name }}</div>
+                  </div>
+                  
+                  <div class="info-item">
+                    <div class="info-label">Relationship (HH)</div>
+                    <div class="info-value" style="font-size:.9375rem;">{{ member.relationship_to_household_head|default:"—" }}</div>
+                  </div>
+
+                  <div class="info-item">
+                    <div class="info-label">Relationship (FH)</div>
+                    <div class="info-value" style="font-size:.9375rem;">{{ member.relationship_to_family_head|default:"—" }}</div>
+                  </div>
+                  
+                  <div class="info-item">
+                    <div class="info-label">Age</div>
+                    <div class="info-value" style="font-size:.9375rem;">{{ member.age|floatformat:"0"|default:"—" }}</div>
+                  </div>
+                  
+                  <div class="info-item">
+                    <div class="info-label">Sex</div>
+                    <div class="info-value" style="font-size:.9375rem;">{{ member.sex|default:"—" }}</div>
+                  </div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div style="text-align:center; padding:2rem; color:#6c757d; font-style:italic;">
+                No members recorded for this family
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="no-families">
+        <div>
+          <i>{% bs_icon 'inbox' %}</i>
+        </div>
+        <div style="font-size:1.125rem; font-weight:600;">No Families Found</div>
+        <div style="font-size:.9375rem;">This household has no family records in history.</div>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  function toggleMembers(index) {
+    const container = document.getElementById(`members-${index}`);
+    const btn = event.currentTarget;
+    const text = btn.querySelector('.toggle-text');
+    const icon = btn.querySelector('.toggle-icon');
+    
+    if (container.classList.contains('show')) {
+      container.classList.remove('show');
+      text.textContent = text.textContent.replace('Hide', 'Show');
+      icon.style.transform = 'rotate(0deg)';
+    } else {
+      container.classList.add('show');
+      text.textContent = text.textContent.replace('Show', 'Hide');
+      icon.style.transform = 'rotate(180deg)';
+    }
+  }
+</script>
+{% endblock %}
