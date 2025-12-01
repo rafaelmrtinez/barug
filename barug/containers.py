@@ -46,6 +46,7 @@ app.wire(modules=[
     "child_health.api.bf_feeding_api",
     "common.api.residents_pdf_api",
     "common.api.business_pdf_api",
+    "common.api.paid_history_pdf_api",
     "common.api.household_pdf_api",
     "common.api.financial_pdf_api",
     "captain.views",

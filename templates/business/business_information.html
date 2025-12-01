@@ -74,9 +74,11 @@
 
   {% if is_clerk %}
     <div class="d-flex flex-wrap justify-content-end gap-2 mb-2">
-      <button type="button" class="btn btn-outline-brand btn-sm">
+      <a href="{% url 'clerk:api_business_detail_pdf' b_id=business.business_id %}" 
+         target="_blank" 
+         class="btn btn-outline-brand btn-sm">
         {% bs_icon 'file-earmark-pdf' %} Generate PDF
-      </button>
+      </a>
       <a href="{% url 'clerk:business_update' b_id=business.business_id %}" class="btn btn-outline-brand btn-sm">
         {% bs_icon 'pencil-square' %} Update
       </a>
@@ -320,6 +322,9 @@
         <div class="section-cap">
           <i class="text-muted d-inline-flex"><span class="bi bi-receipt-cutoff"></span></i>
           <div class="section-title"><span>Paid History</span></div>
+          <button type="button" class="btn btn-sm btn-outline-primary ms-auto" data-bs-toggle="modal" data-bs-target="#paidHistoryPdfModal">
+            <i class="bi bi-file-earmark-pdf"></i> Generate PDF
+          </button>
         </div>
 
         <div class="table-responsive" style="max-height:250px; overflow-y:auto;">
@@ -508,6 +513,71 @@ document.addEventListener('DOMContentLoaded', function () {
       lightboxModal.addEventListener('hidden.bs.modal', () => { lightboxImg.src = ''; });
     }
   }
+});
+</script>
+
+<!-- Paid History PDF Filter Modal -->
+<div class="modal fade" id="paidHistoryPdfModal" tabindex="-1" aria-labelledby="paidHistoryPdfModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="paidHistoryPdfModalLabel"><i class="bi bi-file-earmark-pdf"></i> Generate Paid History PDF</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="get" action="{% url 'clerk:api_paid_history_pdf' b_id=business.business_id %}" target="_blank">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Date Range</label>
+            <select class="form-select" name="date_range" id="dateRangeSelect">
+              <option value="all">All Time</option>
+              <option value="30">Last 30 Days</option>
+              <option value="90">Last 3 Months</option>
+              <option value="180">Last 6 Months</option>
+              <option value="365">Last Year</option>
+              <option value="custom">Custom Range</option>
+            </select>
+          </div>
+          
+          <div id="customDateRange" style="display:none;">
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label class="form-label">From Date</label>
+                <input type="date" class="form-control" name="from_date">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">To Date</label>
+                <input type="date" class="form-control" name="to_date">
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Year (Optional)</label>
+            <input type="number" class="form-control" name="year" placeholder="e.g., 2024" min="2000" max="2100">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Sort Order</label>
+            <select class="form-select" name="sort_order">
+              <option value="desc">Newest First</option>
+              <option value="asc">Oldest First</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-file-earmark-pdf"></i> Generate PDF</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+// Toggle custom date range visibility
+document.getElementById('dateRangeSelect').addEventListener('change', function() {
+  const customRange = document.getElementById('customDateRange');
+  customRange.style.display = this.value === 'custom' ? 'block' : 'none';
 });
 </script>
 
