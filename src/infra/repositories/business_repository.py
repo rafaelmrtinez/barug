@@ -465,11 +465,11 @@ class ResidentOwnerRepository(IResidentOwnerRepository):
     def search_owner(self, search: str, *, only_nonresident: bool = False) -> list[ResidentOwnerDTO]:
         try: 
             if only_nonresident:
-                sql = "SELECT * FROM search_person_by_code_or_name(%s)"
+                sql = "SELECT * FROM search_person_by_code_or_name_nonresident(%s)"
                 rows = self._ctx.execute_query_to_dict(sql, [search])
 
             else:
-                sql = "SELECT * FROM search_person_by_code_or_name(%s)"
+                sql = "SELECT * FROM search_person_by_code_or_name_resident_pending(%s)"
                 rows = self._ctx.execute_query_to_dict(sql, [search])
 
             def _addr(r: dict) -> str | None:
