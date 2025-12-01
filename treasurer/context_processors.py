@@ -1,5 +1,6 @@
 from authentication.supabase_client import supabase
 from treasurer.services.requests_service import list_requests, list_business_requests
+from django.db import connection
 
 def queue_counts(request):
     """Provide queue counts for navbar badges"""
@@ -8,6 +9,7 @@ def queue_counts(request):
         'resident_count': 0,
         'renewal_count': 0,
         'refund_count': 0,
+        'lupon_unpaid_count': 0,
     }
     
     try:
@@ -45,6 +47,23 @@ def queue_counts(request):
         ref_res = supabase.table("payment_refund").select("payment_refund_id", count="exact").in_("status", ["CREATED", "PENDING", "REQUESTED"]).execute()
         if ref_res.count:
             counts['refund_count'] = ref_res.count
+    except Exception:
+        pass
+    
+    try:
+        # Lupon unpaid reports count (FOR CASE FILING or ESCALATED TO CASE with UNPAID status)
+        with connection.cursor() as cur:
+            cur.execute("""
+                SELECT COUNT(*)
+                FROM blotter_report br
+                JOIN v_report_latest_status vr ON vr.blotter_report_id = br.blotter_report_id
+                JOIN payment_status ps ON ps.payment_status_id = br.payment_status_id
+                WHERE UPPER(vr.report_status_name) IN ('FOR CASE FILING', 'ESCALATED TO CASE')
+                AND UPPER(ps.payment_status_name) = 'UNPAID'
+            """)
+            result = cur.fetchone()
+            if result and result[0]:
+                counts['lupon_unpaid_count'] = result[0]
     except Exception:
         pass
     

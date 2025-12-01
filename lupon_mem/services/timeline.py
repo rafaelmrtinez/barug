@@ -290,6 +290,73 @@ def _fetch_forms(case_id: int) -> List[Dict[str, Any]]:
             out.append(_row_to_event(None, "form", "Draft saved", f"{code} — {name}", meta))
     return out
 
+def _fetch_schedule_timeline(case_id: int) -> List[Dict[str, Any]]:
+    """
+    Fetch schedule timeline events from get_Schedule_timeline function.
+    Returns events showing schedule changes (SET, RESCHEDULE, CANCEL).
+    """
+    with connection.cursor() as cur:
+        try:
+            cur.execute("SELECT * FROM get_Schedule_timeline(%s) ORDER BY event_seq ASC", [case_id])
+            cols = [c[0] for c in cur.description] if cur.description else []
+            rows = cur.fetchall() if cols else []
+        except Exception as e:
+            print(f"[timeline] Error fetching schedule timeline: {e}")
+            return []
+    
+    out: List[Dict[str, Any]] = []
+    for row in rows:
+        data = dict(zip(cols, row))
+        event_kind = (data.get('event_kind') or '').upper()
+        source = data.get('source') or ''
+        notice_sid = data.get('notice_sid')
+        old_schedule = data.get('old_schedule') or ''
+        new_schedule = data.get('new_schedule') or ''
+        event_at = data.get('event_at')
+        staff_name = data.get('staff_name')
+        log_message = data.get('log_message')
+        event_seq = data.get('event_seq', 0)
+        
+        # Skip entries with empty schedules (incomplete reschedule records)
+        if event_kind == 'RESCHEDULE' and not new_schedule and not old_schedule:
+            continue
+        
+        # Build title based on event kind
+        if event_kind == 'SET':
+            title = f"Hearing scheduled ({source})" if source else "Hearing scheduled"
+        elif event_kind == 'RESCHEDULE':
+            title = f"Hearing rescheduled ({source})" if source else "Hearing rescheduled"
+        elif event_kind == 'CANCEL':
+            title = f"Hearing cancelled ({source})" if source else "Hearing cancelled"
+        else:
+            title = "Schedule event"
+        
+        # Use log_message if available, otherwise build subtitle
+        if log_message:
+            subtitle = log_message
+        elif new_schedule:
+            if old_schedule and event_kind == 'RESCHEDULE':
+                subtitle = f"Changed from {old_schedule} to {new_schedule}"
+            else:
+                subtitle = f"Scheduled for: {new_schedule}"
+        else:
+            subtitle = ""
+        
+        meta = {
+            "notice_sid": notice_sid,
+            "source": source,
+            "event_kind": event_kind,
+            "old_schedule": old_schedule,
+            "new_schedule": new_schedule,
+            "event_seq": event_seq,
+        }
+        if staff_name:
+            meta["by"] = staff_name
+        
+        out.append(_row_to_event(event_at, "hearing", title, subtitle, meta))
+    
+    return out
+
 def _fetch_progress(case_id: int) -> List[Dict[str, Any]]:
     """
     case_progress_tracking + case_progress_type classification.
@@ -493,6 +560,56 @@ def _fetch_media(case_id: int) -> List[Dict[str, Any]]:
         out.append(_row_to_event(when, "media", "Hearing media uploaded", subtitle, meta))
     return out
 
+def _fetch_state_changes(case_id: int) -> List[Dict[str, Any]]:
+    """Fetch case state and settlement status changes from case_state_history table."""
+    if not _column_exists("case_state_history", "blotter_case_id"):
+        return []
+    
+    with connection.cursor() as cur:
+        cur.execute("""
+            SELECT 
+                changed_at,
+                transition_kind,
+                old_state,
+                new_state,
+                remarks,
+                changed_by_id,
+                changed_by_name
+            FROM case_state_history
+            WHERE blotter_case_id = %s
+            ORDER BY changed_at ASC
+        """, [case_id])
+        rows = cur.fetchall()
+    
+    out: List[Dict[str, Any]] = []
+    for when, trans_kind, old_state, new_state, remarks, by_id, by_name in rows:
+        # Determine the event kind based on transition_kind
+        if 'STATE' in (trans_kind or '').upper():
+            kind = "state"
+            title = f"Case state changed: {old_state or 'N/A'} → {new_state}"
+        elif 'SETTLEMENT' in (trans_kind or '').upper():
+            kind = "settlement"
+            title = f"Settlement status changed: {old_state or 'N/A'} → {new_state}"
+        else:
+            kind = "status"
+            title = f"Status changed: {old_state or 'N/A'} → {new_state}"
+        
+        meta = {
+            "transition_kind": trans_kind,
+            "old_state": old_state,
+            "new_state": new_state,
+        }
+        
+        # Use provided name or resolve from staff_id
+        by = by_name or _staff_name(by_id)
+        if by:
+            meta["by"] = by
+        
+        subtitle = remarks or ""
+        out.append(_row_to_event(when, kind, title, subtitle, meta))
+    
+    return out
+
 
 # ----------------------------
 # main builder
@@ -513,6 +630,9 @@ def get_case_timeline(case_id: int) -> Dict[str, Any]:
 
     # forms (with actor & special handling for KP-8/KP-12/KP-9)
     events += _fetch_forms(case_id)
+    
+    # schedule timeline (from get_Schedule_timeline function)
+    events += _fetch_schedule_timeline(case_id)
 
     # progress (hearing/conciliation/intake/settlement etc.)
     events += _fetch_progress(case_id)
@@ -525,6 +645,9 @@ def get_case_timeline(case_id: int) -> Dict[str, Any]:
 
     # photos/docs attached to hearings
     events += _fetch_media(case_id)
+    
+    # state and settlement changes
+    events += _fetch_state_changes(case_id)
 
     # sort (stable)
     def _stable_key(e: Dict[str, Any]) -> Tuple[float, str, int]:

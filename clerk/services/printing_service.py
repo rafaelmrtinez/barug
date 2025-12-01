@@ -130,10 +130,13 @@ def process_printing(doc_request_id: int, include_debug: bool=False) -> Tuple[by
 
         template_file = _choose_template(doc_name, False)
         det = (line.get("details") or {})
-        if (doc_name.strip().upper() == BRGY_BUSINESS_DOC_NAME) or (det.get("template_override") == BRGY_BUSINESS_PDF_FILE):
-            template_file = BRGY_BUSINESS_PDF_FILE
+        doc_upper = doc_name.strip().upper()
+        is_business_clearance = (doc_upper == BRGY_BUSINESS_DOC_NAME or "CTC" in doc_upper and "BUSINESS CLEARANCE" in doc_upper)
+        if is_business_clearance or det.get("template_override") == BRGY_BUSINESS_PDF_FILE:
+            is_ctc = "CTC" in doc_upper or det.get("is_certified_true_copy") or line.get("is_certified_true_copy") or header.get("is_certified_true_copy")
+            template_file = "barangay-ctc.pdf" if is_ctc else BRGY_BUSINESS_PDF_FILE
+            print(f"[PRINT DEBUG] doc='{doc_name}' (from='{line.get('document_type_name')}') -> template='{template_file}' (CTC={is_ctc})")
         template_path = os.path.join(base_dir, template_file)
-        print(f"[PRINT DEBUG] doc='{doc_name}' -> using template_file='{template_file}'")
 
         if not os.path.exists(template_path):
             alt = os.path.join(settings.BASE_DIR, "clerk", "pdf_templates", template_file)
@@ -177,7 +180,8 @@ def process_printing(doc_request_id: int, include_debug: bool=False) -> Tuple[by
             combined_values.setdefault("paid_date", None)
         combined_values.setdefault("or_number", header.get("or_number"))
 
-        if doc_name.strip().upper() == BRGY_BUSINESS_DOC_NAME:
+        doc_upper = doc_name.strip().upper()
+        if doc_upper == BRGY_BUSINESS_DOC_NAME or ("CTC" in doc_upper and "BUSINESS CLEARANCE" in doc_upper):
             bc_keys = ["business_name_style","business_address","capital_invested","gross_sales_prev_year"]
             needs_enrich = any(not _safe_str(combined_values.get(k)).strip() for k in bc_keys)
             if needs_enrich:
