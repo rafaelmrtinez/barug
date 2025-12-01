@@ -2,6 +2,7 @@ from typing import Any, Dict, Optional
 import logging
 
 from src.infra.repositories.maternal_health_record_repository import MaternalHealthRecordRepository
+from src.infra.repositories.queries.maternal_health_record_queries import MaternalHealthRecordQueries
 from src.infra.exceptions.maternal_health_record_exceptions import MaternalHealthRecordException
 from maternal.forms.form_utils import FormUtils
 
@@ -27,8 +28,9 @@ class PrenatalFollowUpService:
     BASIC_INFO_PERMS = {"bhw", "barangay health worker"}
     FINDINGS_AND_NOTES_PERMS = {"midwife"}
 
-    def __init__(self, repository: MaternalHealthRecordRepository):
+    def __init__(self, repository: MaternalHealthRecordRepository, queries: Optional[MaternalHealthRecordQueries] = None):
         self.repository = repository
+        self.queries = queries
 
     def _normalize_payload(self, payload: Dict[str, Any], prefix: Optional[str] = None) -> Dict[str, Any]:
         if not prefix:
@@ -114,7 +116,9 @@ class PrenatalFollowUpService:
         mid = cleaned.get('mhr_id')
 
         try:
-            if role and role.strip().lower() in self.BASIC_INFO_PERMS:
+            role_norm = (role or '').strip().lower()
+            
+            if role_norm in self.BASIC_INFO_PERMS:
                 res = self.repository.insert_anc_row_findings(
                     mhr_id=mid,
                     staff_id=staff_id,
@@ -130,6 +134,24 @@ class PrenatalFollowUpService:
                     # caller/API will map this to 501
                     raise NotImplementedError('Midwife update not implemented.')
 
+                # Check if midwife has already provided findings/notes for the latest record
+                if self.queries and role_norm in self.FINDINGS_AND_NOTES_PERMS:
+                    latest_anc_row = self.queries.get_latest_maternal_anc_row_by_mhr_id(mid)
+                    if latest_anc_row:
+                        # Check if findings and notes are already filled (not null/empty and not 'N/A')
+                        existing_findings = latest_anc_row.get('leopolds_findings')
+                        existing_notes = latest_anc_row.get('notes')
+                        
+                        # Consider 'N/A', None, empty string as not filled
+                        findings_filled = existing_findings and existing_findings.strip() and existing_findings.strip().upper() != 'N/A'
+                        notes_filled = existing_notes and existing_notes.strip() and existing_notes.strip().upper() != 'N/A'
+                        
+                        if findings_filled or notes_filled:
+                            raise PrenatalFollowUpValidationException(
+                                'Findings and/or notes have already been provided for the latest prenatal visit. Cannot update again.',
+                                errors={'__all__': ['Findings and/or notes have already been provided for the latest prenatal visit. Cannot update again.']}
+                            )
+
                 # ensure defaults applied as in original API
                 findings = cleaned.get('findings') or 'N/A'
                 notes = cleaned.get('notes') or 'N/A'
@@ -140,12 +162,21 @@ class PrenatalFollowUpService:
                     findings=findings,
                     notes=notes,
                 )
+                
+                if res[0]:
+                    self.repository.insert_maternal_visit_and_schedule_completion(
+                        mhr_id=mid,
+                        staff_id=staff_id,
+                    )
 
             return res
         except MaternalHealthRecordException:
             # propagate domain infra exceptions to API layer
             raise
         except NotImplementedError:
+            raise
+        except PrenatalFollowUpValidationException:
+            # propagate validation exceptions
             raise
         except Exception:
             LOG.exception('Failed to persist prenatal follow-up for mhr_id=%s', mid)

@@ -17,6 +17,7 @@
             {{ person_name|default:"-" }}
           </div>
           <div class="meta small">
+            <input class="d-none" type="hidden" id="person_id" value="{{ person_id|default:'' }}">
             Total Maternal Records:
             <strong id="total_mhr">{{ basic_info.total_maternal_records|default:"-" }}</strong>
             Family Number:
@@ -29,10 +30,10 @@
           <button
             class="btn btn-hero"
             type="button"
-            onclick="location.href='{% url 'maternal:create_maternal_entry'  %}'"
+            data-bs-toggle="modal"
+            data-bs-target="#createMaternalModal"
           >
-            <i class="bi bi-file-plus me-1">
-            </i>
+            <i class="bi bi-file-plus me-1"></i>
                 Add Maternal Health Record
           </button>
           {% endif %}
@@ -88,11 +89,11 @@
                                 <i class="bi bi-clock-history me-2"></i> Postpartum Schedule
                               </button>
                             </li>
-                            <li>
+                            {% comment %} <li>
                               <button class="dropdown-item btn-postpartum-followup" type="button" data-bs-toggle="modal" data-bs-target="#postpartumFollowupMidwifeModal" data-mhr-id="{{ r.maternal_record_id }}">
                                 <i class="bi bi-file-earmark-medical me-2"></i> Add Postpartum Follow-up
                               </button>
-                            </li>
+                            </li> {% endcomment %}
                             <li>
                               <button class="dropdown-item btn-generate-summary" type="button" data-mhr-id="{{ r.maternal_record_id }}">
                                 <i class="bi bi-file-earmark-pdf me-2"></i> Generate PDF Summary
@@ -109,15 +110,20 @@
                           </button>
                           <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="actionsDropdownBHW{{ r.maternal_record_id }}">
                             <li>
-                              <a class="dropdown-item" href="{% url 'maternal:bhw_prenatal_form' r.maternal_record_id %}">
-                                <i class="bi bi-folder2-open me-2"></i> Prenatal Follow-up Schedule
+                              <a class="dropdown-item" href="{% url 'maternal:maternal_health_record_form' r.maternal_record_id %}">
+                                <i class="bi bi-folder2-open me-2"></i> Open
                               </a>
                             </li>
                             <li>
+                              <a class="dropdown-item" href="{% url 'maternal:bhw_prenatal_form' r.maternal_record_id %}">
+                                <i class="bi bi-calendar2-check me-2"></i> Prenatal Follow-up Schedule
+                              </a>
+                            </li>
+                            {% comment %} <li>
                               <button class="dropdown-item btn-postpartum-visit" type="button" data-bs-toggle="modal" data-bs-target="#postpartumVisitBHWModal" data-mhr-id="{{ r.maternal_record_id }}">
                                 <i class="bi bi-plus-circle me-2"></i> Add Postpartum Visit
                               </button>
-                            </li>
+                            </li> {% endcomment %}
                             <li>
                               <button class="dropdown-item btn-postpartum-record" type="button" data-bs-toggle="modal" data-bs-target="#postpartumRecordModal" data-mhr-id="{{ r.maternal_record_id }}">
                                 <i class="bi bi-file-earmark-medical me-2"></i> Add Postpartum Record
@@ -273,6 +279,45 @@
 
   {% include 'maternal/partial/postpartum_schedule_history_modal.html' %}
 
+  <!-- Create Maternal Entry Modal -->
+  <div class="modal fade" id="createMaternalModal" tabindex="-1" aria-labelledby="createMaternalModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="createMaternalModalLabel">Add Maternal Health Record</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="createMaternalForm" novalidate>
+          {% csrf_token %}
+          <div class="modal-body">
+            <div id="createMaternalAlert"></div>
+            <div class="mb-3">
+              <label for="cm_weight" class="form-label">Weight (kg)</label>
+              <input type="number" step="0.1" min="0" class="form-control" id="cm_weight" name="weight" placeholder="e.g. 60.5" required />
+            </div>
+            <div class="mb-3">
+              <label for="cm_height" class="form-label">Height (cm)</label>
+              <input type="number" step="0.1" min="0" class="form-control" id="cm_height" name="height" placeholder="e.g. 160" required />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">BMI Status</label>
+              <div>
+                <input type="hidden" id="cm_bmi_status_id" name="bmi_status_id" value="2" />
+                <span id="cm_bmi_status" class="badge bg-secondary">Unknown</span>
+              </div>
+              <div class="form-text">Auto-calculated from weight and height. Low = 1, Normal = 2, High = 3.</div>
+            </div>
+            <input type="hidden" id="cm_person_id" name="person_id" />
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" id="cm_save" class="btn btn-primary">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   {% block scripts %}
   <script defer src="{% static 'maternal/js/record_history.js' %}"></script>
   <script defer src="{% static 'maternal/js/schedule_form_helpers.js' %}"></script>
@@ -285,5 +330,6 @@
   <script defer src="{% static 'maternal/js/postpartum_followup_midwife.js' %}"></script>
   <script defer src="{% static 'maternal/js/postpartum_visit_bhw.js' %}"></script>
   <script defer src="{% static 'maternal/js/postpartum_modal_wiring.js' %}"></script>
+  <script defer src="{% static 'maternal/js/create_maternal_entry_modal.js' %}"></script>
   {% endblock %}
 {% endblock %}

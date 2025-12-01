@@ -15,7 +15,6 @@ from django.views.decorators.csrf import csrf_protect
 
 from authentication.guards import role_required, session_login_required
 from authentication.utils import nocache
-from src.infra.utilities.custom_date_time_util import DateAndTimeUtility
 from barug.utility.lazy_repository import LazyRepositoryProxy
 from barug.utility.messages_util import MessageUtility
 from src.infra.exceptions.child_health_record_exception import ChildHealthRecordException
@@ -38,15 +37,16 @@ from child_health.utilities.repository_payload_validator import RepositoryPayloa
 import logging
 
 from src.infra.repositories.child_health_repository import ChildHealthRepository
+from src.infra.repositories.queries.maternal_health_record_queries import MaternalHealthRecordQueries
+from src.infra.utilities.age_calculator import AgeCalculator
 
 logger = logging.getLogger(__name__)
 
-ACCESS = ("MIDWIFE", "Midwife", "midwife", "Barangay Health Worker", "bhw", "Super Admin")
+ACCESS = ("MIDWIFE", "Midwife", "midwife", "Barangay Health Worker", "bhw", "Super Admin", "barangay health worker")
 CONNECTION = ConnectionAdapter()
 CHILD_HEALTH_REPOSITORY: ChildHealthRecordRepository = LazyRepositoryProxy(repo_factory=lambda: ChildHealthRecordRepository(CONNECTION))
 
 # Create your views here.
-
 @session_login_required
 @role_required(*ACCESS)
 @nocache
@@ -104,8 +104,15 @@ def child_immunization_http(request: HttpRequest) -> HttpResponse:
 @require_http_methods(["GET"])
 def child_health_entry(request: HttpRequest, child_health_record_id: int) -> HttpResponse:
     try:
+        from src.infra.repositories.queries.child_helth_record_query import ChildHealthRecordQuery
+        child_data = ChildHealthRecordQuery(CONNECTION)
+        maternal_data = MaternalHealthRecordQueries(CONNECTION)
+        child_age = AgeCalculator.float_age_to_years(child_data.fetch_by_child_id(child_health_record_id)['child_age'])
+        print(f"DEBUG: Child age for record ID {child_health_record_id}: {child_age}")
+        # Lock the record (make page read-only) for children older than 4 years to match maternal UX
+        is_locked = (child_age is not None and child_age > 4)
         role = request.session.get("auth").get("role_name").lower()
-        child_information_form = ChildInformationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, role=role)
+        child_information_form = ChildInformationForm(maternal_data=maternal_data,chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id, role=role, is_readonly=True)
         bf_form = ChildBreastFeedingForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
         immunizations = ChildImmunizationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
         birth_and_supplementation = BirthAndSupplentationForm(chr_repo=CHILD_HEALTH_REPOSITORY, child_health_record_id=child_health_record_id)
@@ -119,6 +126,7 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                 request,
                 "child_health/chr_entry.html",
                 {
+                    "child_age": child_age,
                     "form": birth_and_supplementation,
                     "new_born_screening": new_born_screening,
                     "child_information_form": child_information_form,
@@ -129,6 +137,9 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                     "visit_log": visit_log,
                     "vitamin_form": vitamin_form,
                     "iron_intake_form": iron_intake_form,
+                    "is_locked": is_locked,
+                    "page_path": "Child Health > Health Record",
+                    "page_title": "Child Health Record Entry",
                 },
             )
     except ChildHealthRecordException as chre:
@@ -148,6 +159,9 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                 "visit_log": visit_log,
                 "vitamin_form": vitamin_form,
                 "iron_intake_form": iron_intake_form,
+                "is_locked": is_locked,
+                "page_path": "Child Health > Health Record",
+                "page_title": "Child Health Record Entry",
             },
         )
     except Exception as e:
@@ -167,6 +181,9 @@ def child_health_entry(request: HttpRequest, child_health_record_id: int) -> Htt
                 "visit_log": visit_log,
                 "vitamin_form": vitamin_form,
                 "iron_intake_form": iron_intake_form,
+                "is_locked": is_locked,
+                "page_path": "Child Health > Health Record",
+                "page_title": "Child Health Record Entry",
             },
         )
         
@@ -201,8 +218,12 @@ def find_person_http(request: HttpRequest) -> JsonResponse:
     if len(q) < 2:
         return JsonResponse({"ok": True, "count": 0, "results": []})
     try:
-        rows = CHILD_HEALTH_REPOSITORY.match_person_by_key(q)  # [{'person_id':..., 'full_name':..., 'address':...}, ...]
-        results = [{"id": r["person_id"], "name": r["full_name"], "address": r.get("address") or ""} for r in rows]
+        from src.infra.repositories.queries.person_queries import PersonQuery
+        from src.app.adapters.resident_service_adapter import ResidentServiceAdapter
+        from src.app.services.resident_service import ResidentService
+        from src.infra.repositories.resident_repository import ResidentRepository
+        p = ResidentServiceAdapter(ResidentService(ResidentRepository(CONNECTION)), PersonQuery(CONNECTION))
+        results = [{"id": r["person_id"], "name": r["full_name"], "address": r.get("address") or ""} for r in p.get_minors_under5_active(key=q, limit=15)]
         return JsonResponse({"ok": True, "count": len(results), "results": results})
     except Exception as e:
         logger.exception("find_person failed: %s", e)
@@ -213,12 +234,15 @@ def find_person_http(request: HttpRequest) -> JsonResponse:
 @nocache
 def create_child_health_record(request: HttpRequest) -> HttpResponse:
     try:
+        maternal_data = MaternalHealthRecordQueries(CONNECTION)
         if request.method == "POST":
             child_information_form = ChildInformationForm(
             chr_repo=CHILD_HEALTH_REPOSITORY,
+            maternal_data=maternal_data,
             child_health_record_id=None,
             role=request.session.get("auth").get("role_name"),
-            data=request.POST
+            data=request.POST,
+            is_readonly=False,
             )
             if not child_information_form.is_valid():
                 MessageUtility.push_form_errors_as_messages(request, child_information_form)
@@ -227,6 +251,8 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
                     "child_health/create_chr.html",
                     {
                         "form": child_information_form,
+                        "page_path": "Child Health > Create Record",
+                        "page_title": "Create Child Health Record",
                     },
                 )
             # Sanitize and validate inputs before repository call
@@ -252,6 +278,8 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
                     "child_health/create_chr.html",
                     {
                         "form": child_information_form,
+                        "page_path": "Child Health > Create Record",
+                        "page_title": "Create Child Health Record",
                     },
                 )
 
@@ -265,6 +293,8 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
                     "child_health/create_chr.html",
                     {
                         "form": child_information_form,
+                        "page_path": "Child Health > Create Record",
+                        "page_title": "Create Child Health Record",
                     },
                 )
 
@@ -281,6 +311,8 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
                     "child_health/create_chr.html",
                     {
                         "form": child_information_form,
+                        "page_path": "Child Health > Create Record",
+                        "page_title": "Create Child Health Record",
                     },
                 )
 
@@ -297,20 +329,26 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
                     "child_health/create_chr.html",
                     {
                         "form": child_information_form,
+                        "page_path": "Child Health > Create Record",
+                        "page_title": "Create Child Health Record",
                     },
                 )
             messages.success(request, "Child Health Record created successfully.")
             return redirect('child_health:create_child_health_record')
         child_information_form = ChildInformationForm(
             chr_repo=CHILD_HEALTH_REPOSITORY,
+            maternal_data=maternal_data,
             child_health_record_id=None,
             role=request.session.get("auth").get("role_name"),
+            is_readonly=False,
         )
         return render(
             request,
             "child_health/create_chr.html",
             {
                 "form": child_information_form,
+                "page_path": "Child Health > Create Record",
+                "page_title": "Create Child Health Record",
             },
         )
     except ChildHealthRecordException as chre:
@@ -321,6 +359,8 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
             "child_health/create_chr.html",
             {
                 "form": child_information_form,
+                "page_path": "Child Health > Create Record",
+                "page_title": "Create Child Health Record",
             },
         )
     except Exception as e:
@@ -331,6 +371,8 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
             "child_health/create_chr.html",
             {
                 "form": child_information_form,
+                "page_path": "Child Health > Create Record",
+                "page_title": "Create Child Health Record",
             },
         )
     
@@ -383,7 +425,7 @@ def child_record_list_view(request: HttpRequest) -> HttpRequest:
             total = 0
             p = Paginator([], per_page)
             page_obj = p.get_page(1)
-            return render(request, "child_health/child_record.html", {"page_obj": page_obj, "q": raw_q, "total_matches": total})
+            return render(request, "child_health/child_record.html", {"page_obj": page_obj, "q": raw_q, "total_matches": total, "page_path": "Child Health > Records", "page_title": "Child Health Records"})
         else:
             try:
                 cache.set(cache_key, count + 1, timeout=window_seconds)
@@ -396,7 +438,7 @@ def child_record_list_view(request: HttpRequest) -> HttpRequest:
             total = 0
             p = Paginator([], per_page)
             page_obj = p.get_page(1)
-            return render(request, "child_health/child_record.html", {"page_obj": page_obj, "q": raw_q, "total_matches": total})
+            return render(request, "child_health/child_record.html", {"page_obj": page_obj, "q": raw_q, "total_matches": total, "page_path": "Child Health > Records", "page_title": "Child Health Records"})
 
         try:
             total = CHILD_HEALTH_REPOSITORY.count_basic_chr_record_search(q)
@@ -409,7 +451,7 @@ def child_record_list_view(request: HttpRequest) -> HttpRequest:
             total = 0
             p = Paginator([], per_page)
             page_obj = p.get_page(1)
-            return render(request, "child_health/child_record.html", {"page_obj": page_obj, "q": raw_q, "total_matches": total})
+            return render(request, "child_health/child_record.html", {"page_obj": page_obj, "q": raw_q, "total_matches": total, "page_path": "Child Health > Records", "page_title": "Child Health Records"})
     else:
         try:
             rows = CHILD_HEALTH_REPOSITORY.fetch_all_basic_chr_record()
@@ -429,5 +471,7 @@ def child_record_list_view(request: HttpRequest) -> HttpRequest:
             "page_obj": page_obj,
             "q": raw_q,
             "total_matches": total,
+            "page_path": "Child Health > Records",
+            "page_title": "Child Health Records",
         },
     )

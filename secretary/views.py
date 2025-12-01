@@ -72,6 +72,7 @@ from src.app.transfer_objects.commands.channel_cmd import (
     CreateAnnouncementRecipientsCMD
 )
 from src.app.transfer_objects.commands.publish_now_cmd import PublishAnnouncementNowCMD
+from src.app.transfer_objects.commands.schedule_cmd import ScheduleAnnouncementCMD
 
 
 from .forms import (
@@ -2343,6 +2344,63 @@ def publish_announcement_now(
     except Exception as e:
         logger.exception("Failed to publish announcement: %s", e)
         return JsonResponse({'error': 'Failed to publish announcement'}, status=500)
+
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def schedule_announcement(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> JsonResponse:
+    """Schedule an announcement for future publishing"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        announcement_id = data.get('announcement_id')
+        
+        if not announcement_id:
+            return JsonResponse({'error': 'Announcement ID required'}, status=400)
+        
+        auth = request.session.get('auth', {})
+        staff_id = auth.get('staff_id')
+        
+        command = ScheduleAnnouncementCMD(
+            announcement_id=announcement_id,
+            scheduled_by_id=staff_id
+        )
+        
+        result = announcement_service.schedule_announcement(command)
+        
+        log_announcement_action(
+            announcement_id=result.announcement_id,
+            table_affected='ANNOUNCEMENT',
+            action='UPDATE',
+            performer_id=staff_id,
+            details=f'Scheduled announcement for {result.publish_at}',
+        )
+        
+        # Format publish_at to local timezone for display
+        from django.utils import timezone
+        local_time = timezone.localtime(result.publish_at) if result.publish_at else None
+        formatted_time = local_time.strftime('%Y-%m-%d %I:%M %p') if local_time else 'Unknown'
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Announcement scheduled for {local_time}',
+            'announcement_id': result.announcement_id,
+            'new_status': result.new_status,
+            'publish_at': result.publish_at.isoformat() if result.publish_at else None
+        })
+        
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+    except Exception as e:
+        logger.exception("Failed to schedule announcement: %s", e)
+        return JsonResponse({'error': 'Failed to schedule announcement'}, status=500)
 
 
 # -------------------------------

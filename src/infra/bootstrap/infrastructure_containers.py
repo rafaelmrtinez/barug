@@ -94,6 +94,10 @@ from src.domain.contracts.channel_repository_contract import (
 from src.infra.repositories.channel_repository import (
     ChannelRepository,
 )
+from src.infra.repositories.queries.child_monitoring_query import ChildMonitoringQuery
+from src.infra.repositories.queries.maternal_health_record_queries import MaternalHealthRecordQueries
+from src.infra.repositories.queries.child_helth_record_query import ChildHealthRecordQuery
+from src.infra.repositories.queries.person_queries import PersonQuery
 
 
 class InfraContainer(containers.DeclarativeContainer):
@@ -300,4 +304,25 @@ class InfraContainer(containers.DeclarativeContainer):
     channel_repository: providers.Factory[IChannelRepository] = providers.Factory(
         ChannelRepository,
         ctx=context
+    )
+
+    # Query objects (read-only query responsibility)
+    child_monitoring_query = providers.Factory(
+        ChildMonitoringQuery,
+        db=context,
+    )
+
+    child_health_record_query = providers.Factory(
+        ChildHealthRecordQuery,
+        connection=context,
+    )
+
+    maternal_health_record_query = providers.Factory(
+        MaternalHealthRecordQueries,
+        connection=context,
+    )
+
+    person_query = providers.Factory(
+        PersonQuery,
+        db=context,
     )
