@@ -49,6 +49,9 @@ urlpatterns = [
     path("api/staff/search/", views.staff_search_api, name="staff_search_api"),
     # path("api/staff/filter/", views.staff_filter_api, name="staff_filter_api"),
 
+    # BLOTTER CASES (VIEW ONLY)
+    path("blotter-cases/", views.blotter_cases, name="blotter_cases"),
+    
     # INCIDENT HEATMAP
     path("incident-heatmap/", views.incident_heatmap, name="incident_heatmap"),
 

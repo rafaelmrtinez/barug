@@ -242,6 +242,7 @@
         </div>
       </div>
 
+      {% if request.session.auth.role_name|lower != 'barangay secretary' %}
       <div class="d-flex gap-2 flex-wrap">
         <a class="btn btn-outline-brand" href="{% url 'lupon_mem:case_timeline' case_id %}">
           {% bs_icon 'clock-history' extra_classes='me-1' %} Timeline
@@ -262,6 +263,7 @@
           {% bs_icon 'diagram-3' extra_classes='me-1' %} Lupon Flow
         </button>
       </div>
+      {% endif %}
     </div>
   </section>
 
@@ -324,7 +326,7 @@
     </div>
 
     <div class="ms-auto d-flex align-items-center gap-2">
-      {% if case_state_name|lower != 'closed' and case_state_name|lower != 'dismissed' %}
+      {% if case_state_name|lower != 'closed' and case_state_name|lower != 'dismissed' and request.session.auth.role_name|lower != 'barangay secretary' %}
       <a class="btn btn-outline-brand" href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
         {% bs_icon 'plus-circle' extra_classes='me-1' %} Add Form
       </a>

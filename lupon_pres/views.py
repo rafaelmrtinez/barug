@@ -1296,13 +1296,14 @@ def members_list(request: HttpRequest) -> HttpResponse:
     }
 
     auth = request.session.get("auth") or {}
+    user_role = _auth_role_name(request)
     _user_fullname = auth.get("full_name") or user_fullname
     _user_role = auth.get("role_name") or user_role
     _user_role_template = (_user_role or "").lower().replace(" ", "_")
 
     return render(request, "members/members_list.html", {
-        "user_fullname": _user_fullname,
-        "user_role": _user_role,
+        # "user_fullname": _user_fullname,
+        # "user_role": _user_role,
         "page_path": f"{_user_role} / Staff List",
         "page_title": "Staff List",
         "user_role_template": _user_role_template,
@@ -1507,8 +1508,6 @@ def member_dets(request: HttpRequest, staff_code: str) -> HttpResponse:
 
     form = UpdateInfo()
     return render(request, "members/member_dets.html", {
-        "user_fullname": user_fullname,
-        "user_role": user_role,
         "page_path": f"{user_role} / Staff Details : {staff_code}",
         "page_title": f"Staff Details : {staff_code}",
         "user_role_template": user_role_template,

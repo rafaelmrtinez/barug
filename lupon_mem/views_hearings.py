@@ -29,8 +29,11 @@ def reschedule_hearing(request: HttpRequest, case_id: int):
     if not submission_id or not new_date or not new_time:
         return JsonResponse({"success": False, "error": "Missing required fields for rescheduling."})
     
+    print(f"[RESCHEDULE DEBUG] Received time from form: {new_time}")
+    
     try:
         with connection.cursor() as cur:
+            print(f"[RESCHEDULE DEBUG] Calling fn_reschedule_hearing with time: {new_time}")
             cur.execute(
                 "SELECT * FROM fn_reschedule_hearing(%s, %s, %s, %s, %s)",
                 [int(submission_id), new_date, new_time, remarks or None, staff_id]

@@ -813,6 +813,9 @@ def report_review(request: HttpRequest, report_id: int):
              ORDER BY role, name
         """, [report_id, report_id])
         parties = cur.fetchall()
+        
+        # Check if there's at least one respondent
+        has_respondent = any(p[2].upper() == 'RESPONDENT' for p in parties)
 
         # picklist data
         cur.execute("SELECT complaint_title_id, complaint_title_name FROM complaint_title ORDER BY 2")
@@ -865,6 +868,7 @@ def report_review(request: HttpRequest, report_id: int):
         "settlement_statuses": settlements,
         "user_role": role,
         "LUPON_ROLES_LIST": LUPON_ROLES_LIST,
+        "has_respondent": has_respondent,
 
         # review meta (safe-guard for None)
         "is_reviewed": is_reviewed,
@@ -884,6 +888,75 @@ def report_review(request: HttpRequest, report_id: int):
         'page_title': 'Review Blotter Report',
     }
     return render(request, "lupon_mem/report_review.html", ctx)
+
+
+@session_login_required
+@role_required(*LUPON_ROLES)
+@require_POST
+def report_update_respondents(request: HttpRequest, report_id: int):
+    """Update respondents for a blotter report"""
+    staff_id = (request.session.get("auth") or {}).get("staff_id")
+    if not staff_id:
+        return HttpResponseBadRequest("Missing staff id.")
+
+    # Get respondent IDs from form
+    respondent_ids_str = (request.POST.get("respondent_ids") or "").strip()
+    respondent_ids = [_toi(x) for x in respondent_ids_str.split(",") if x.strip()]
+    respondent_ids = [x for x in respondent_ids if x]
+
+    if not respondent_ids:
+        messages.error(request, "Please select at least one respondent.")
+        return redirect("lupon_mem:report_review", report_id=report_id)
+
+    try:
+        with connection.cursor() as cur:
+            # Call the update function
+            cur.execute(
+                "SELECT update_blotter_report(%s, %s)",
+                [report_id, respondent_ids]
+            )
+            result = cur.fetchone()[0]
+            
+            # Get respondent names for logging
+            respondent_names = []
+            for resp_id in respondent_ids:
+                cur.execute(
+                    "SELECT TRIM(CONCAT_WS(' ', first_name, NULLIF(SUBSTRING(COALESCE(middle_name, '') FROM 1 FOR 1) || '.', '.'), last_name, NULLIF(suffix, ''))) FROM person WHERE person_id = %s",
+                    [resp_id]
+                )
+                resp_row = cur.fetchone()
+                if resp_row and resp_row[0]:
+                    respondent_names.append(resp_row[0])
+            
+            # Get staff name for logging
+            staff_name = None
+            cur.execute(
+                "SELECT TRIM(CONCAT_WS(' ', p.first_name, NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), p.last_name, NULLIF(p.suffix, ''))) FROM staff s JOIN person p ON p.person_id = s.person_id WHERE s.staff_id = %s",
+                [staff_id]
+            )
+            staff_row = cur.fetchone()
+            staff_name = staff_row[0] if staff_row else None
+            
+            # Log the update
+            message = f"{staff_name or f'Staff ID {staff_id}'} updated respondents for blotter report #{report_id}"
+            if respondent_names:
+                message += f" (respondent(s): {', '.join(respondent_names)})"
+            
+            blotter_log_event(
+                action="UPDATE",
+                table_affected="blotter_report",
+                record_affected_id=report_id,
+                details=message,
+                performer_staff_id=staff_id,
+                field_changed="respondents",
+                new_value=", ".join(respondent_names) if respondent_names else "N/A"
+            )
+            
+        messages.success(request, "Respondents updated successfully.")
+    except Exception as e:
+        messages.error(request, f"Failed to update respondents: {e}")
+    
+    return redirect("lupon_mem:report_review", report_id=report_id)
 
 
 # APPROVE (Lupon -> set UNPAID via DB func)
@@ -923,17 +996,40 @@ def report_approve(request: HttpRequest, report_id: int):
             print("[DEBUG][APPROVE] DB result:", res)
             print(f"[DEBUG][APPROVE] Stored case details via function: complaint_title_id={complaint_title_id}, case_nature_id={case_nature_id}")
             
+            # Get staff name and complaint/case nature names for logging
+            staff_name = None
+            cur.execute(
+                "SELECT TRIM(CONCAT_WS(' ', p.first_name, NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), p.last_name, NULLIF(p.suffix, ''))) FROM staff s JOIN person p ON p.person_id = s.person_id WHERE s.staff_id = %s",
+                [staff_id]
+            )
+            staff_row = cur.fetchone()
+            staff_name = staff_row[0] if staff_row else None
+            
+            complaint_title_name = None
+            case_nature_name = None
+            if complaint_title_id:
+                cur.execute("SELECT complaint_title_name FROM complaint_title WHERE complaint_title_id = %s", [complaint_title_id])
+                ct_row = cur.fetchone()
+                complaint_title_name = ct_row[0] if ct_row else None
+            if case_nature_id:
+                cur.execute("SELECT case_name FROM case_nature WHERE case_nature_id = %s", [case_nature_id])
+                cn_row = cur.fetchone()
+                case_nature_name = cn_row[0] if cn_row else None
+            
+            # Build human-readable message
+            message = f"{staff_name or f'Staff ID {staff_id}'} approved blotter report #{report_id} for case payment"
+            if complaint_title_name:
+                message += f" (Complaint: {complaint_title_name}"
+                if case_nature_name:
+                    message += f", Nature: {case_nature_name}"
+                message += ")"
+            
             # Log the report approval
             blotter_log_event(
                 action="UPDATE",
                 table_affected="blotter_report",
                 record_affected_id=report_id,
-                details={
-                    "action": "APPROVED",
-                    "complaint_title_id": complaint_title_id,
-                    "case_nature_id": case_nature_id,
-                    "payment_status": "UNPAID"
-                },
+                details=message,
                 performer_staff_id=staff_id,
                 field_changed="payment_status",
                 new_value="UNPAID"
@@ -970,16 +1066,26 @@ def report_decline(request: HttpRequest, report_id: int):
             res = cur.fetchone()  # may be None; just echo for symmetry
             print("[DEBUG][DECLINE] DB result:", res)
             
+            # Get staff name for logging
+            staff_name = None
+            cur.execute(
+                "SELECT TRIM(CONCAT_WS(' ', p.first_name, NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), p.last_name, NULLIF(p.suffix, ''))) FROM staff s JOIN person p ON p.person_id = s.person_id WHERE s.staff_id = %s",
+                [staff_id]
+            )
+            staff_row = cur.fetchone()
+            staff_name = staff_row[0] if staff_row else None
+            
+            # Build human-readable message
+            message = f"{staff_name or f'Staff ID {staff_id}'} declined blotter report #{report_id}"
+            if reason and reason != "Declined by Lupon":
+                message += f" (Reason: {reason})"
+            
             # Log the report decline
             blotter_log_event(
                 action="UPDATE",
                 table_affected="blotter_report",
                 record_affected_id=report_id,
-                details={
-                    "action": "DECLINED",
-                    "reason": reason,
-                    "payment_status": "DECLINED"
-                },
+                details=message,
                 performer_staff_id=staff_id,
                 field_changed="payment_status",
                 new_value="DECLINED"
