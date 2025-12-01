@@ -59,11 +59,41 @@ class BirthSupplementationDomainService:
         if (anemic_given or anemic_given == True) and not anemic_seen:
             raise BirthSupplementationDomainException("Cannot record 'given iron' for anemic children when 'anemic seen' is not provided")
 
+        # Additional rule: anemic 'seen' date and 'given iron' date must not be the same
+        if anemic_seen and anemic_given:
+            try:
+                seen_date = DateAndTimeUtility.parse_date(anemic_seen)
+                given_date = DateAndTimeUtility.parse_date(anemic_given)
+                if seen_date and given_date and seen_date == given_date:
+                    raise BirthSupplementationDomainException(
+                        "Anemic 'seen' and 'given iron' for 2-59 months cannot be recorded on the same date"
+                    )
+            except BirthSupplementationDomainException:
+                raise
+            except Exception:
+                # If parsing fails, do not block here; rely on existing format validation elsewhere
+                pass
+
         # 2-6 months rules
         seen_2_6 = data.get("seen_2_6_mos") or data.get("birth_wt_seen")
         given_2_6 = data.get("given_2_6_mos") or data.get("birth_wt_given_iron")
         if (given_2_6 or given_2_6 == True) and not seen_2_6:
             raise BirthSupplementationDomainException("Cannot record 'given iron for 2-6 months' when 'seen 2-6 months' is not provided")
+
+        # Additional rule: 2-6 months 'seen' date and 'given iron' date must not be the same
+        if seen_2_6 and given_2_6:
+            try:
+                seen_2_6_date = DateAndTimeUtility.parse_date(seen_2_6)
+                given_2_6_date = DateAndTimeUtility.parse_date(given_2_6)
+                if seen_2_6_date and given_2_6_date and seen_2_6_date == given_2_6_date:
+                    raise BirthSupplementationDomainException(
+                        "2-6 months 'seen' and 'given iron' cannot be recorded on the same date"
+                    )
+            except BirthSupplementationDomainException:
+                raise
+            except Exception:
+                # If parsing fails, do not block here; existing date validation will catch format issues
+                pass
 
         # guard against future dates in other date fields if present
         date_fields = ["seen_2_6_mos", "given_2_6_mos"]

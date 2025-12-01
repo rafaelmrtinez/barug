@@ -31,6 +31,8 @@ app.wire(modules=[
     "maternal.api.plans_api",
     "maternal.api.micronutrients_api",
     "maternal.api.prenatal_followup_api",
+    "maternal.api.create_mhr_api",
+    "maternal.api.search_mother_api",
     "maternal.api.mhr_side_panel_api",
     "maternal.api.maternal_report_api",
     "maternal.api.obstetric_api",

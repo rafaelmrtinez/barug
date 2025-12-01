@@ -1,4 +1,5 @@
 from datetime import datetime, date
+import math
 from typing import Optional, Tuple
 
 
@@ -12,6 +13,64 @@ class AgeCalculator:
 
     DOB_KEYS = ("date_of_birth", "dob", "birth_date")
     COMMON_FORMATS = ("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y")
+    
+    @staticmethod
+    def float_age_to_years_months(age_float):
+        """
+        Converts a floating-point age in years (e.g., 44.17) 
+        to a string representation of years and months.
+        """
+        # Extract the integer part for years (this truncates/rounds down)
+        years = math.floor(age_float)
+        
+        # Extract the decimal part representing the fraction of the year
+        decimal_part = age_float - years
+        
+        # Convert the decimal part to months (approx 12 months per year)
+        # The result is rounded to the nearest whole month
+        months = round(decimal_part * 12)
+        
+        # Handle cases where rounding up to 12 months occurs
+        if months == 12:
+            years += 1
+            months = 0
+
+        return f"{years} years and {months} months"
+
+    @staticmethod
+    def float_age_to_years(age_float) -> int:
+        """Return the whole-year component (integer years) of a float age.
+
+        Example: 4.83 -> 4
+        Safely handles None and non-numeric inputs by returning 0.
+        """
+        try:
+            if age_float is None:
+                return 0
+            return math.floor(float(age_float))
+        except Exception:
+            return 0
+
+    @staticmethod
+    def float_age_to_months(age_float) -> int:
+        """Return the remaining months (0-11) part of a float age.
+
+        Example: 4.83 -> 10 (since .83 * 12 ~= 10)
+        If rounding results in 12 months, this method returns 0 (the caller
+        can combine with `float_age_to_years` to account for the extra year).
+        Safely handles None and non-numeric inputs by returning 0.
+        """
+        try:
+            if age_float is None:
+                return 0
+            af = float(age_float)
+            years = math.floor(af)
+            months = round((af - years) * 12)
+            if months == 12:
+                return 0
+            return int(months)
+        except Exception:
+            return 0
 
     @staticmethod
     def parse_date(value) -> Optional[datetime]:

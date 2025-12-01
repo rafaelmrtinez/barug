@@ -282,8 +282,6 @@
             if (computedLatest) mhrId = computedLatest;
         }
 
-        console.log('Maternal Side Panel: loading data for MHR ID', mhrId, '(computed latest:', computedLatest, ')');
-
         if (mhrId) fetchSidePanel(mhrId);
 
         // listen for postpartum:created events to refresh panel when record changes

@@ -85,7 +85,7 @@
       if (activeController) activeController.abort();
       activeController = new AbortController();
       try {
-        const res = await fetch(`/child-health/ajax/find-person/?q=${encodeURIComponent(q)}`, { signal: activeController.signal });
+        const res = await fetch(`/maternal/api/v1/find-person/?q=${encodeURIComponent(q)}`, { signal: activeController.signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const normalized = (data.results || []).map(r => ({

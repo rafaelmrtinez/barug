@@ -37,6 +37,8 @@ from src.app.services.maternal_risk_service import MaternalRiskService
 
 import logging
 
+from src.infra.repositories.queries.maternal_health_record_queries import MaternalHealthRecordQueries
+
 logger = logging.getLogger(__name__)
 
 # Create your views here.
@@ -46,12 +48,6 @@ MIDWIFE_ACCESS = ("MIDWIFE", "Midwife", "midwife")
 
 
 REPOSITORY: MaternalHealthRecordRepository = LazyRepositoryProxy(repo_factory=lambda: MaternalHealthRecordRepository(ConnectionAdapter()))
-
-# NOTE: prenatal follow-up POST handling moved to
-# `maternal/api/prenatal_followup_api.py` as a class-based endpoint.
-    
-
-# Moved postpartum API into class-based APIs under maternal/api/
     
 @session_login_required
 @role_required(*BHW_ACCESS)
@@ -65,6 +61,7 @@ def health_worker_prenatal_form_view(request: HttpRequest, mhr_id: int) -> HttpR
     staff_role = request.session.get("auth", {}).get("role_name")
     existing_data = REPOSITORY.fetch_prenatal_information_by_mhr_id(mhr_id)
     initial = [{
+        "anc_row_id": r.get("anc_row_id"),
         "date":  r.get("date"),
         "aog_days": r.get("aog_days"),
         "aog_weeks": r.get('aog_weeks'),
@@ -89,6 +86,8 @@ def health_worker_prenatal_form_view(request: HttpRequest, mhr_id: int) -> HttpR
         role=staff_role,
     )
     return render(request, "maternal/bhw_prenatal_form.html", {
+        "page_path": "Maternal > Prenatal Form",
+        "page_title": "Prenatal Form - Health Worker",
         "prenatal_form": prenatal_form,
         "mhr_id": mhr_id,
         "prenatal_followup_formset": pf_formset,
@@ -134,17 +133,23 @@ def create_new_maternal_entry(request: HttpRequest) -> HttpResponse:
                     # Here you would typically save the data to the database
                     # For now, just redirect or render a success message
                     return render(request, "maternal/identification.html", {
+                        "page_path": "Maternal > Identification",
+                        "page_title": "Maternal Identification",
                         "identification_form": maternal_identification_form,
                     })
                 else:
                     messages.error(request, "Failed to create maternal identification record.")
                     return render(request, "maternal/identification.html", {
+                        "page_path": "Maternal > Identification",
+                        "page_title": "Maternal Identification",
                         "identification_form": maternal_identification_form,
                     })
             else:
                 messages.warning(request, "Please fill out fields with red asterisk.")
                 # MessageUtility.push_form_errors_as_messages(request, maternal_identification_form)
                 return render(request, "maternal/identification.html", {
+                    "page_path": "Maternal > Identification",
+                    "page_title": "Maternal Identification",
                     "identification_form": maternal_identification_form,
                 })
         else:
@@ -154,18 +159,24 @@ def create_new_maternal_entry(request: HttpRequest) -> HttpResponse:
                 maternal_id=None
             )
         return render(request, "maternal/identification.html", {
+            "page_path": "Maternal > Identification",
+            "page_title": "Maternal Identification",
             "identification_form": maternal_identification_form,
         })
     except MaternalHealthRecordException as e:
         logger.warning(f"Error creating maternal entry: {str(e)}")
         messages.warning(request, e.message)
         return render(request, "maternal/identification.html", {
+            "page_path": "Maternal > Identification",
+            "page_title": "Maternal Identification",
             "identification_form": maternal_identification_form,
         })
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         messages.error(request, f"Something went wrong. Please try again later.")
         return render(request, "maternal/identification.html", {
+            "page_path": "Maternal > Identification",
+            "page_title": "Maternal Identification",
             "identification_form": maternal_identification_form,
         })
 
@@ -196,6 +207,8 @@ def maternal_health_record_form(request, record_id : int):
         # Fetch rows once, then map to form initial
         rows = REPOSITORY.fetch_all_previous_pregnancies_by_person_id(person_id)
         # Map repo fields -> form field names (adjust keys to your repo output)
+        
+        postpartum_visit_data = MaternalHealthRecordQueries(ConnectionAdapter()).get_postpartum_visit_rows_with_feeding_type_by_mhr_id(record_id)
         initial = [{
             "delivery_date":  r.get("date_of_delivery"),
             "outcome":   r.get("outcome_type"),
@@ -255,8 +268,9 @@ def maternal_health_record_form(request, record_id : int):
             risk_code_form.has_existing = False
         
         pre_natal_existing_data = REPOSITORY.fetch_prenatal_information_by_mhr_id(record_id)
-        
+        print(f'pre_natal_existing_data: {pre_natal_existing_data}')
         initial_pre_natal_existing_data = [{
+            "anc_row_id": r.get("anc_row_id"),
             "date":  r.get("date"),
             "aog_days": r.get("aog_days"),
             "aog_weeks": r.get('aog_weeks'),
@@ -275,12 +289,14 @@ def maternal_health_record_form(request, record_id : int):
             form_kwargs={
                 "mhr_repository": None,
                 "maternal_id": record_id,
+                "role": role,
             },
         )
         # single blank form for entering a new prenatal followup
         pf_entry_form = PrenatalFollowUpEntryForm(
             mhr_repository=REPOSITORY,
             maternal_id=record_id,
+            role=role,
             prefix="pf_entry"  # keep prefixes distinct from the formset (if used)
         )
 
@@ -292,6 +308,9 @@ def maternal_health_record_form(request, record_id : int):
         
         logger.info(f"FORM TYPE RECEIVED: {request.POST.get('form_type', None)}")
         return render(request, "maternal/health_record_form.html", {
+            "page_path": "Maternal > Health Record",
+            "page_title": "Maternal Health Record Form",
+            "postpartum_visit_data": postpartum_visit_data,
             "risk_code_form": risk_code_form,
             "formset": formset,
             "identification_form": maternal_identification_form,
@@ -314,6 +333,9 @@ def maternal_health_record_form(request, record_id : int):
         logger.warning(f"Error in maternal health record form: {str(e)}")
         messages.warning(request, e.message)
         return render(request, "maternal/health_record_form.html", {
+            "page_path": "Maternal > Health Record",
+            "page_title": "Maternal Health Record Form",
+            "postpartum_visit_data": postpartum_visit_data,
             "risk_code_form": risk_code_form,
             "formset": formset,
             "identification_form": maternal_identification_form,
@@ -438,6 +460,8 @@ def record_detail(request: HttpRequest, person_id: int) -> HttpResponse:
         request,
         "maternal/record_history.html",
         {
+            "page_path": "Maternal > Record History",
+            "page_title": "Maternal Record History",
             "record_id": maternal_health_record_id,
             "person_id": person_id,
 
@@ -483,7 +507,8 @@ def records(request: HttpRequest) -> HttpResponse:
         request,
         "maternal/records.html",
         {
-            "page_title": "Records",
+            "page_path": "Maternal > Records",
+            "page_title": "Maternal Records",
             "q": q,
             "page_obj": page_obj,
         },

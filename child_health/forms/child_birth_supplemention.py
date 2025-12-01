@@ -33,7 +33,10 @@ class BirthAndSupplentationForm(forms.Form):
 
     form_type = forms.CharField(widget=forms.HiddenInput(attrs={'id': 'id_form_type_bs'}), initial='birth_and_supplementation_form')
 
-    def __init__(self, chr_repo: ChildHealthRecordRepository, child_health_record_id, *args, **kwargs):
+    def __init__(
+        self, 
+        chr_repo: ChildHealthRecordRepository, 
+        child_health_record_id, *args, **kwargs):
         super().__init__(*args, **kwargs)
         add_bootstrap_classes(self)
         self._repo = chr_repo
@@ -102,6 +105,6 @@ class BirthAndSupplentationForm(forms.Form):
                     if name:
                         sanitized, err = FormUtils.sanitize_text(str(name), "TT Status")
                         self.fields['tt_status_mother'].initial = sanitized if not err else str(name)
-                        self.fields['tt_status_mother'].widget.attrs['readonly'] = True
             except Exception:
                 pass
+        self.fields['tt_status_mother'].widget.attrs['readonly'] = True
