@@ -1566,6 +1566,33 @@ def ajax_resident_search(
     html = render_to_string("resident/_resident_list.html", context, request=request)
     return HttpResponse(html)
 
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@csrf_protect
+@nocache
+@inject
+def resident_detail(
+    request: HttpRequest,
+    person_id: int,
+    resident_service: IResidentService = Provide[AppContainer.resident_service],
+) -> HttpResponse:
+    """
+    Display detailed resident information.
+    """
+    user_role = _auth_role_name(request)
+    
+    resident = resident_service.get_resident_detail(person_id)
+    
+    if not resident:
+        messages.error(request, "Resident not found.")
+        return redirect("secretary:resident_list")
+    
+    return render(request, "resident/resident_detail.html", {
+        'page_path': f'{user_role} / Resident / {resident.person_code}',
+        'page_title': f'Resident {resident.person_code}',
+        'resident': resident,
+    })
+
 def resident_map_list(request):
     form = StaffFilters()
     list = []

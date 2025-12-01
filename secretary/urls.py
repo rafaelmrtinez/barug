@@ -25,7 +25,7 @@ urlpatterns = [
 
     # Residents
     path("residents/", views.residents_list, name="residents_list"),
-    path("residents/<int:person_id>/", views.resident_profile, name="resident_profile"),
+    path("residents/<int:person_id>/", views.resident_detail, name="resident_detail"),
 
     # Resident (legacy paths kept if still used elsewhere)
     path("resident/resident_list/", views.resident_list, name="resident_list"),

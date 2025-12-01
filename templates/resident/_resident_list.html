@@ -9,9 +9,15 @@
   <td>{{ r.mob_num|format_mobile|default_if_none:"" }}</td>
   <td>{{ r.email|default_if_none:"" }}</td>
   <td class="text-end">
-    <a class="btn btn-outline-brand btn-sm" href="#">
+    {% if request.resolver_match.namespace == 'captain' %}
+      <a class="btn btn-outline-brand btn-sm" href="{% url 'captain:resident_detail' r.person_id %}">
         View
-    </a>
+      </a>
+    {% else %}
+      <a class="btn btn-outline-brand btn-sm" href="{% url 'secretary:resident_detail' r.person_id %}">
+        View
+      </a>
+    {% endif %}
   </td>
 </tr>
 {% empty %}

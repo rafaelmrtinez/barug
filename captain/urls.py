@@ -30,6 +30,7 @@ urlpatterns = [
 
     # RESIDENT
     path("resident/resident_list/", views.resident_list, name="resident_list"),
+    path("resident/<int:person_id>/", views.resident_detail, name="resident_detail"),
     path("resident/resident_map/", views.resident_map_list, name="resident_map"),
     path("ajax/resident_search/", views.ajax_resident_search, name="ajax_resident_search"),
 
