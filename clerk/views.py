@@ -1471,6 +1471,7 @@ def walkin_new(request: HttpRequest):
     GET:
       - ?q= search residents
       - ?request_document_type_id= preselects doc type and loads purposes
+      - ?business_id= prefill with business data
     """
     q = (request.GET.get("q") or "").strip()
     doc_types = _fetch_request_doc_types()
@@ -1479,6 +1480,12 @@ def walkin_new(request: HttpRequest):
         chosen_req_type_id = int(request.GET.get("request_document_type_id") or 0) or None
     except Exception:
         chosen_req_type_id = None
+
+    # Get business_id if provided
+    try:
+        business_id = int(request.GET.get("business_id") or 0) or None
+    except Exception:
+        business_id = None
 
     purposes = _fetch_purposes_by_request_type(chosen_req_type_id) if chosen_req_type_id else []
 
@@ -1495,6 +1502,56 @@ def walkin_new(request: HttpRequest):
         )
         residents = res.data or []
 
+    # Prefill data if business_id is provided
+    prefill_data = None
+    prefill_resident = None
+    if business_id:
+        try:
+            # Get business and owner data
+            bq = (
+                supabase.table("business")
+                .select("business_owner_id, business_name")
+                .eq("business_id", business_id)
+                .limit(1)
+                .execute()
+            )
+            biz = (bq.data or [None])[0]
+            if biz and biz.get("business_owner_id"):
+                owner_id = biz["business_owner_id"]
+                
+                # Try to get owner from person table (resident)
+                oq = (
+                    supabase.table("person")
+                    .select("person_id, person_code, first_name, last_name, middle_name, suffix, email")
+                    .eq("person_id", owner_id)
+                    .limit(1)
+                    .execute()
+                )
+                owner = (oq.data or [None])[0]
+                
+                # If not found in person, try business_owner_info (non-resident)
+                if not owner:
+                    boi = (
+                        supabase.table("business_owner_info")
+                        .select("person_id, first_name, last_name, middle_name, suffix, email, mobile_number")
+                        .eq("person_id", owner_id)
+                        .limit(1)
+                        .execute()
+                    )
+                    owner = (boi.data or [None])[0]
+                    if owner:
+                        # Add person_code as None for non-residents
+                        owner["person_code"] = None
+                
+                if owner:
+                    prefill_resident = owner
+                    prefill_data = {
+                        "business_id": business_id,
+                        "business_name": biz.get("business_name"),
+                    }
+        except Exception as e:
+            print(f"[walkin_new] Failed to prefill business data: {e}", flush=True)
+
     user_role = _auth_role_name(request)
     return render(request, "clerk/walkin_request.html", {
         "page_path": f"{user_role} / Document Requests / Walk-in Request",
@@ -1504,6 +1561,8 @@ def walkin_new(request: HttpRequest):
         "chosen_doc_type_id": chosen_req_type_id,  # template uses this name
         "purposes": purposes,
         "residents": residents,
+        "prefill_data": prefill_data,
+        "prefill_resident": prefill_resident,
     })
 
 
@@ -3494,7 +3553,7 @@ def business_information(
 
     renewal_href = reverse("clerk:create_renewal_request", kwargs={"b_id": b_id})
     closure_href = reverse("clerk:initiate_business_closure", kwargs={"b_id": b_id})
-    doc_req_href = reverse("clerk:walkin_new")
+    doc_req_href = reverse("clerk:walkin_new") + f"?business_id={b_id}"
 
     try:
         _gt = grand_total if isinstance(grand_total, Decimal) else Decimal(str(grand_total or 0))

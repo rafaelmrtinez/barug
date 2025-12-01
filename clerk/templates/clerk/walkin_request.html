@@ -668,6 +668,105 @@
   indexPurposes();   // build once if options already present
   updateSummary();
 
+  // ------- Auto-select prefilled resident if provided -------
+  {% if prefill_resident %}
+  (function autoPrefillResident() {
+    const prefillId = '{{ prefill_resident.person_id }}';
+    const prefillFirstName = '{{ prefill_resident.first_name|default:""|escapejs }}';
+    const prefillLastName = '{{ prefill_resident.last_name|default:""|escapejs }}';
+    const prefillMiddleName = '{{ prefill_resident.middle_name|default:""|escapejs }}';
+    const prefillSuffix = '{{ prefill_resident.suffix|default:""|escapejs }}';
+    const prefillCode = '{{ prefill_resident.person_code|default:""|escapejs }}';
+    {% if prefill_data %}
+    const prefillBusinessId = '{{ prefill_data.business_id }}';
+    const prefillBusinessName = '{{ prefill_data.business_name|escapejs }}';
+    {% endif %}
+    
+    // Build full name
+    let fullName = '';
+    if (prefillLastName) fullName += prefillLastName.toUpperCase();
+    if (prefillFirstName) fullName += (fullName ? ', ' : '') + prefillFirstName;
+    if (prefillMiddleName) fullName += ' ' + prefillMiddleName.charAt(0).toUpperCase() + '.';
+    if (prefillSuffix) fullName += ' ' + prefillSuffix.toUpperCase();
+    
+    // Build display text (with code if resident, without if non-resident)
+    const displayText = prefillCode 
+      ? fullName + ' (' + prefillCode + ')'
+      : fullName + ' (Non-Resident Business Owner)';
+    
+    console.log('[WALKIN PREFILL] Auto-selecting owner:', prefillId, displayText);
+    
+    // Set the hidden input and label
+    personHidden.value = prefillId;
+    residentLabel.textContent = displayText;
+    
+    // Hide the search panel and show change button
+    panel.classList.add('d-none');
+    btnChange.classList.remove('d-hidden');
+    wrap.innerHTML = '<div class="help">Pre-filled from business owner. Use "Change" to pick someone else.</div>';
+    
+    // Update summary
+    updateSummary();
+    
+    {% if prefill_data %}
+    // Auto-select "Barangay Business Clearance" document type
+    setTimeout(async () => {
+      console.log('[WALKIN PREFILL] Looking for Barangay Business Clearance document type');
+      
+      // Find "BARANGAY BUSINESS CLEARANCE" in document types
+      let foundDocType = false;
+      for (let i = 0; i < docSel.options.length; i++) {
+        const optText = (docSel.options[i].text || '').toUpperCase();
+        if (optText.includes('BARANGAY') && optText.includes('BUSINESS') && optText.includes('CLEARANCE')) {
+          docSel.selectedIndex = i;
+          foundDocType = true;
+          console.log('[WALKIN PREFILL] Selected document type:', docSel.options[i].text);
+          break;
+        }
+      }
+      
+      if (foundDocType) {
+        // Trigger document type change to load purposes
+        const docTypeId = docSel.value;
+        await loadPurposes(docTypeId);
+        updateDocDependentToggles();
+        
+        // Load businesses for the owner
+        console.log('[WALKIN PREFILL] Loading businesses for owner:', prefillId);
+        await loadOwnerBusinesses(prefillId, false);
+        
+        // Wait a bit for businesses to load, then select the specific business
+        setTimeout(() => {
+          console.log('[WALKIN PREFILL] Attempting to select business:', prefillBusinessId);
+          
+          // Find and select the business
+          let foundBusiness = false;
+          for (let i = 0; i < bizSel.options.length; i++) {
+            if (bizSel.options[i].value === prefillBusinessId) {
+              bizSel.selectedIndex = i;
+              bizHidden.value = prefillBusinessId;
+              foundBusiness = true;
+              console.log('[WALKIN PREFILL] Selected business:', bizSel.options[i].text);
+              break;
+            }
+          }
+          
+          if (foundBusiness) {
+            // Auto-pick purpose based on business category
+            autoPickPurposeByCategory();
+          }
+          
+          // Update summary with all selections
+          updateSummary();
+        }, 300);
+      }
+    }, 100);
+    {% endif %}
+    
+    console.log('[WALKIN PREFILL] Owner auto-selected successfully');
+  })();
+  {% endif %}
+
   // ------- Validation & submit -------
   form.addEventListener('submit', (e) => {
     e.preventDefault();
