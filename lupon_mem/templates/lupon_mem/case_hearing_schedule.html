@@ -263,6 +263,9 @@
       border-color:rgba(148,163,184,1);
       box-shadow:0 16px 38px -26px rgba(15,23,42,.8);
     }
+    .tile:hover .btn-danger{
+      opacity:1!important;
+    }
     .caption{
       white-space:nowrap;
       overflow:hidden;
@@ -333,66 +336,77 @@
        data-kp14-url="{{ kp14_url|default_if_none:'' }}"
        hidden></div>
 
-  <!-- ===== Summary (Status now on same row) ===== -->
+  <!-- ===== Summary ===== -->
   <div class="wrap mb-3" style="margin-top:12px;">
-    <div class="summary">
-      <!-- Source -->
-      <div class="cell cell--quarter">
-        <div class="k-label"><i class="bi bi-file-earmark-text"></i> Source</div>
-        <div class="k-value">
-          {% if hearing_source == "KP-8" %}
-            <span class="pill pill-brand"><i class="bi bi-people"></i> KP-8 — Mediation</span>
-          {% elif hearing_source == "KP-12" %}
-            <span class="pill pill-info"><i class="bi bi-handshake"></i> KP-12 — Conciliation</span>
-          {% else %}
-            <span class="soft">—</span>
-          {% endif %}
+    <div class="row g-3">
+      <!-- Left: Source & Schedule -->
+      <div class="col-md-6">
+        <div class="d-flex align-items-start gap-3">
+          <div class="flex-shrink-0">
+            {% if hearing_source == "KP-8" %}
+              <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:56px;height:56px;background:linear-gradient(135deg,#6d2932,#561c24);">
+                <i class="bi bi-people text-white" style="font-size:1.5rem;"></i>
+              </div>
+            {% elif hearing_source == "KP-12" %}
+              <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:56px;height:56px;background:linear-gradient(135deg,#6d2932,#561c24);">
+                <i class="bi bi-people text-white" style="font-size:1.5rem;"></i>
+              </div>
+            {% endif %}
+          </div>
+          <div class="flex-grow-1">
+            <div class="text-muted small text-uppercase" style="letter-spacing:.08em;font-weight:600;">{{ hearing_source|default:"—" }}</div>
+            <h5 class="mb-1 fw-bold" style="color:#6d2932;">{% if hearing_source == "KP-8" %}Mediation Hearing{% elif hearing_source == "KP-12" %}Conciliation Hearing{% else %}Hearing{% endif %}</h5>
+            <div class="d-flex align-items-center gap-2 text-muted small">
+              <i class="bi bi-calendar3"></i>
+              <span id="hearing-dt" data-date="{{ hearing_date|default_if_none:'' }}" data-time="{{ hearing_time|default_if_none:'' }}">
+                {% if hearing_date or hearing_time %}{{ hearing_date|default:"—" }} {{ hearing_time|default:"" }}{% else %}—{% endif %}
+              </span>
+            </div>
+            {% if hearing_label %}<div class="badge bg-light text-dark border mt-2">{{ hearing_label }}</div>{% endif %}
+          </div>
         </div>
       </div>
 
-      <!-- Date & Time -->
-      <div class="cell cell--quarter">
-        <div class="k-label"><i class="bi bi-calendar2-event"></i> Date &amp; Time</div>
-        <div id="hearing-dt" class="k-value"
-             data-date="{{ hearing_date|default_if_none:'' }}"
-             data-time="{{ hearing_time|default_if_none:'' }}">
-          {% if hearing_date %}{{ hearing_date }}{% endif %}{% if hearing_time %} {{ hearing_time }}{% endif %}
-        </div>
-        {% if hearing_label %}<div class="k-note mt-1">{{ hearing_label }}</div>{% endif %}
-      </div>
-
-      <!-- Parties -->
-      <div class="cell cell--quarter">
-        <div class="k-label"><i class="bi bi-person-lines-fill"></i> Parties</div>
-        <div class="k-value text-truncate" title="{{ complainants|join:', ' }} vs {{ respondents|join:', ' }}">
-          {{ complainants|join:", " }} <span class="soft">vs</span> {{ respondents|join:", " }}
-        </div>
-      </div>
-
-      <!-- Status -->
-      <div class="cell cell--quarter">
-        <div class="k-label"><i class="bi bi-flag"></i> Status</div>
-        <div class="k-value d-flex align-items-center gap-2 flex-wrap">
+      <!-- Right: Status -->
+      <div class="col-md-6">
+        <div class="h-100 d-flex flex-column justify-content-center">
+          <div class="text-muted small text-uppercase mb-2" style="letter-spacing:.08em;font-weight:600;">Status</div>
           {% if hearing_held %}
-            <span class="pill pill-ok"><i class="bi bi-check2-circle"></i> Held</span>
-            <span id="heldOutcomePill" class="pill pill-info d-none"></span>
-            {% if held_at_fmt %}<span class="k-note">{{ held_at_fmt }}</span>{% endif %}
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="badge" style="background:#16a34a;font-size:.9rem;padding:.4rem .75rem;"><i class="bi bi-check-circle me-1"></i>Held</span>
+              <span id="heldOutcomePill" class="badge d-none" style="font-size:.85rem;padding:.35rem .65rem;"></span>
+            </div>
+            {% if held_at_fmt %}<div class="text-muted small"><i class="bi bi-clock"></i> {{ held_at_fmt }}</div>{% endif %}
           {% else %}
-            <span class="pill pill-warn"><i class="bi bi-hourglass-split"></i> Not Held</span>
+            <span class="badge bg-warning text-dark" style="font-size:.9rem;padding:.4rem .75rem;width:fit-content;"><i class="bi bi-hourglass-split me-1"></i>Not Held</span>
           {% endif %}
         </div>
       </div>
+    </div>
 
-      <!-- Outcome details below row -->
-      <div id="outcomeDetailRow" class="cell cell--full d-none" style="background:#f9fafb;">
-        <div class="k-note">
-          <span id="attNote"></span>
-          <span id="arbNote" class="ms-2"></span>
+    <!-- Parties Section -->
+    <div class="mt-3 pt-3 border-top">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="text-muted small text-uppercase mb-1" style="letter-spacing:.08em;font-weight:600;"><i class="bi bi-person-fill me-1"></i>Complainant</div>
+          <div class="fw-semibold" style="color:#111827;">{{ complainants|join:", "|default:"—" }}</div>
         </div>
-        <div class="mt-2 d-flex gap-2 flex-wrap">
-          <div id="attSummaryPill"></div>
-          <div id="kp16Pill"></div>
+        <div class="col-md-6">
+          <div class="text-muted small text-uppercase mb-1" style="letter-spacing:.08em;font-weight:600;"><i class="bi bi-person me-1"></i>Respondent</div>
+          <div class="fw-semibold" style="color:#111827;">{{ respondents|join:", "|default:"—" }}</div>
         </div>
+      </div>
+    </div>
+
+    <!-- Outcome details -->
+    <div id="outcomeDetailRow" class="mt-3 pt-3 border-top d-none">
+      <div class="text-muted small mb-2">
+        <span id="attNote"></span>
+        <span id="arbNote" class="ms-2"></span>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <div id="attSummaryPill"></div>
+        <div id="kp16Pill"></div>
       </div>
     </div>
 
@@ -400,7 +414,7 @@
   </div>
 
   <!-- ===== Hearing Actions (Mediation/Conciliation) ===== -->
-  {% if hearing_source in "KP-8,KP-12" and not hearing_held %}
+  {% if hearing_source in "KP-8,KP-12" %}
   <div class="wrap wrap--quiet mb-3">
     <div class="section-h">
       <h6 class="title">Actions</h6>
@@ -410,7 +424,7 @@
     </div>
     <div class="section-b">
 
-      {% if med_attendance_count|default:0 > 0 %}
+      {% if med_attendance_count|default:0 > 0 and not hearing_held %}
         <div id="attSuccessBanner" class="alert alert-success py-2 px-3 mb-3">
           <i class="bi bi-check2-circle me-1"></i><strong>Attendance recorded:</strong> {{ med_attendance_ord_label }}
         </div>
@@ -420,7 +434,12 @@
         <button class="btn btn-outline-brand btn-sm" data-bs-toggle="modal" data-bs-target="#uploadDocsModal">
           <i class="bi bi-images me-1"></i> Add Documentation Photos
         </button>
+        <button class="btn btn-outline-brand btn-sm" data-bs-toggle="modal" data-bs-target="#rescheduleModal">
+          <i class="bi bi-calendar-event me-1"></i> Reschedule Hearing
+        </button>
       </div>
+
+      {% if not hearing_held %}
 
       <div class="wrap" style="padding:.9rem 1rem;">
         <form id="medHeldForm" class="d-flex flex-wrap align-items-center gap-2"
@@ -430,15 +449,8 @@
             <input type="hidden" name="submission_id" value="{{ picked_submission_id }}">
           {% endif %}
 
-          <div class="form-check me-2">
-            <input class="form-check-input" type="checkbox" id="cmpAtt" name="compl_attended" value="1" checked>
-            <label class="form-check-label" for="cmpAtt">Complainant attended</label>
-          </div>
-
-          <div class="form-check me-2">
-            <input class="form-check-input" type="checkbox" id="rspAtt" name="resp_attended" value="1" checked>
-            <label class="form-check-label" for="rspAtt">Respondent attended</label>
-          </div>
+          <input type="hidden" id="cmpAtt" name="compl_attended" value="1">
+          <input type="hidden" id="rspAtt" name="resp_attended" value="1">
 
           <select id="medOutcome" name="settlement" required class="form-select form-select-sm w-auto">
             <option value="">What happened?</option>
@@ -456,6 +468,7 @@
           </button>
         </form>
       </div>
+      {% endif %}
     </div>
   </div>
 
@@ -500,6 +513,38 @@
       </form>
     </div>
   </div>
+
+  <!-- Reschedule modal -->
+  <div class="modal fade" id="rescheduleModal" tabindex="-1" aria-hidden="true" style="margin-top:150px;">
+    <div class="modal-dialog">
+      <form class="modal-content" id="rescheduleForm" method="post" action="{% url 'lupon_mem:reschedule_hearing' case_id %}">
+        <div class="modal-header">
+          <h5 class="modal-title" style="color:var(--brand)"><i class="bi bi-calendar-event me-1"></i> Reschedule Hearing</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          {% csrf_token %}
+          <input type="hidden" name="submission_id" value="{{ picked_submission_id }}">
+          <div class="mb-3">
+            <label for="newDate" class="form-label">New Date</label>
+            <input type="date" id="newDate" name="new_date" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label for="newTime" class="form-label">New Time</label>
+            <input type="time" id="newTime" name="new_time" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label for="remarks" class="form-label">Remarks</label>
+            <textarea id="remarks" name="remarks" class="form-control" rows="3" placeholder="Reason for rescheduling..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-brand">Reschedule</button>
+        </div>
+      </form>
+    </div>
+  </div>
   {% endif %}
 
   <!-- ===== Gallery ===== -->
@@ -512,12 +557,20 @@
     <div class="section-b">
       <div class="grid">
         {% for p in mediation_photos %}
-          <a class="tile text-decoration-none" href="{{ p.display_url }}" target="_blank" rel="noopener">
-            <div class="ratio ratio-4x3">
-              <img src="{{ p.display_url }}" alt="documentation" class="w-100 h-100 rounded" style="object-fit:cover;" loading="lazy" decoding="async">
-            </div>
+          <div class="tile position-relative">
+            <a href="{{ p.display_url }}" target="_blank" rel="noopener" class="text-decoration-none">
+              <div class="ratio ratio-4x3">
+                <img src="{{ p.display_url }}" alt="documentation" class="w-100 h-100 rounded" style="object-fit:cover;" loading="lazy" decoding="async">
+              </div>
+            </a>
+            <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1" 
+                    style="padding:.25rem .5rem;font-size:.75rem;opacity:.9;" 
+                    onclick="deletePhoto('{{ p.file_path }}', this)" 
+                    title="Delete photo">
+              <i class="bi bi-trash"></i>
+            </button>
             <div class="small soft mt-1 caption">{{ p.caption|default:" " }}</div>
-          </a>
+          </div>
         {% endfor %}
       </div>
     </div>
@@ -545,13 +598,23 @@
     const ts = (node.getAttribute('data-time') || '').trim();
     if (ds){
       try{
-        let [Y,M,D] = ds.split('-').map(Number);
-        let [h,m] = ts ? ts.split(':').map(Number) : [0,0];
-        const dt = new Date(Y,(M||1)-1,D||1,h||0,m||0,0,0);
-        const dateStr = dt.toLocaleDateString(undefined, { month:'long', day:'numeric', year:'numeric' });
-        const timeStr = ts ? dt.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' }) : '';
+        let dateStr = ds;
+        let timeStr = ts;
+        
+        // Try to format date if it's YYYY-MM-DD
+        if (/^\d{4}-\d{2}-\d{2}$/.test(ds)) {
+          const [Y,M,D] = ds.split('-').map(Number);
+          const dt = new Date(Y, M-1, D);
+          if (!isNaN(dt.getTime())) {
+            dateStr = dt.toLocaleDateString(undefined, { month:'long', day:'numeric', year:'numeric' });
+          }
+        }
+        
         node.textContent = timeStr ? `${dateStr} ${timeStr}` : dateStr;
-      }catch(e){}
+      }catch(e){
+        // Keep original values if formatting fails
+        node.textContent = ts ? `${ds} ${ts}` : ds;
+      }
     }
   }
 
@@ -559,20 +622,10 @@
   const attCount = parseInt((document.getElementById('attData')?.dataset.attCount||'0').trim(),10) || 0;
 
   // Attendance summary pill
-  const attPillHost = document.getElementById('attSummaryPill');
-  // if (attPillHost){
-  //   attPillHost.innerHTML = attCount > 0
-  //     ? `<span class="pill pill-info"><i class="bi bi-clipboard-check"></i> ${ordinal(attCount)} Mediation Attendance</span>`
-  //     : `<span class="pill"><i class="bi bi-clipboard-x"></i> No Mediation Attendance yet</span>`;
-  // }
-
-  // KP-16 pill
   const hasKP16 = (document.getElementById('caseFlags')?.dataset.hasKp16 === '1');
   const kp16PillHost = document.getElementById('kp16Pill');
-  if (kp16PillHost){
-    kp16PillHost.innerHTML = hasKP16
-      ? `<span class="pill pill-ok"><i class="bi bi-journal-check"></i> KP-16 on file</span>`
-      : `<span class="pill"><i class="bi bi-journal-x"></i> No KP-16 yet</span>`;
+  if (kp16PillHost && hasKP16){
+    kp16PillHost.innerHTML = `<span class="badge" style="background:#16a34a;"><i class="bi bi-file-earmark-check me-1"></i>KP-16 Filed</span>`;
   }
 
   // Enable/disable settlement
@@ -603,13 +656,24 @@
   const outcomeSel = document.getElementById('medOutcome');
   const cmpAttBox = document.getElementById('cmpAtt');
   const rspAttBox = document.getElementById('rspAtt');
+  
+  console.log('[FORM] Elements found:', {form, outcomeSel, cmpAttBox, rspAttBox});
+  
   if (outcomeSel && cmpAttBox && rspAttBox) {
     outcomeSel.addEventListener('change', function() {
       const o = this.value;
-      if (o==='SETTLED' || o==='NOT_SETTLED' || o==='ARBITRATION'){ cmpAttBox.checked = true; rspAttBox.checked = true; }
-      else if (o==='COMPLAINANT_NO_SHOW'){ cmpAttBox.checked = false; rspAttBox.checked = true; }
-      else if (o==='RESPONDENT_NO_SHOW'){ cmpAttBox.checked = true; rspAttBox.checked = false; }
-      else if (o==='BOTH_NO_SHOW'){ cmpAttBox.checked = false; rspAttBox.checked = false; }
+      if (o==='SETTLED' || o==='NOT_SETTLED' || o==='ARBITRATION'){ 
+        cmpAttBox.value = '1'; rspAttBox.value = '1';
+      }
+      else if (o==='COMPLAINANT_NO_SHOW'){ 
+        cmpAttBox.value = '0'; rspAttBox.value = '1';
+      }
+      else if (o==='RESPONDENT_NO_SHOW'){ 
+        cmpAttBox.value = '1'; rspAttBox.value = '0';
+      }
+      else if (o==='BOTH_NO_SHOW'){ 
+        cmpAttBox.value = '0'; rspAttBox.value = '0';
+      }
     });
   }
 
@@ -617,37 +681,18 @@
   if (form) {
     form.addEventListener('submit', function(ev){
       const o = outcomeSel?.value || '';
-      if (!o) { ev.preventDefault(); alert('Please select what happened in the hearing.'); return false; }
-      
-      // Confirmation dialog
-      const outcomeText = outcomeSel.options[outcomeSel.selectedIndex].text;
-      if (!confirm(`Do you really want to record this hearing outcome as "${outcomeText}"?`)) {
+      console.log('[SUBMIT] Outcome:', o, 'Compl:', cmpAttBox?.checked, 'Resp:', rspAttBox?.checked);
+      if (!o) { 
         ev.preventDefault();
-        return false;
+        showAlertModal('Required', 'Please select what happened in the hearing.');
+        return false; 
       }
-      if (o === 'SETTLED') {
-        setTimeout(() => {
-          if (confirm('Hearing marked as SETTLED. Create the Settlement Agreement (KP-16) now?')) {
-            // Prevent duplicate creation by checking if KP-16 already exists
-            const hasKP16 = (document.getElementById('caseFlags')?.dataset.hasKp16 === '1');
-            if (!hasKP16) {
-              window.location.href = "{% url 'lupon_mem:open_kp16_from_hearing' case_id %}?sid={{ picked_submission_id }}";
-            } else {
-              alert('KP-16 Settlement Agreement already exists for this case.');
-            }
-          }
-        }, 350);
-      }
-      if (o === 'ARBITRATION') {
-        setTimeout(() => {
-          const to = (document.getElementById('hearingOutcome')?.dataset.kp14Url || "").trim()
-                  || "{% url 'lupon_mem:form_builder_by_code' case_id 'KP-14' %}";
-          if (confirm('Parties agreed to ARBITRATION. Prepare Agreement to Arbitrate (KP-14) now?')) {
-            window.location.href = to + "?sid={{ picked_submission_id }}";
-          }
-        }, 350);
-      }
-      return true;
+      
+      ev.preventDefault();
+      const outcomeText = outcomeSel.options[outcomeSel.selectedIndex].text;
+      showConfirmModal('Confirm Hearing Outcome', `Record this hearing outcome as "${outcomeText}"?`, () => form.submit());
+      return false;
+
     }, false);
   }
 
@@ -713,16 +758,121 @@
     new bootstrap.Modal(document.getElementById('imagePreviewModal')).show();
   };
 
-  // Upload confirmation
+  window.deletePhoto = function(filePath, btn) {
+    showConfirmModal('Delete Photo', 'Delete this photo? This cannot be undone.', () => {
+      fetch('{% url "lupon_mem:hearing_media_delete" case_id %}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}'
+      },
+      body: JSON.stringify({ file_path: filePath })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        btn.closest('.tile').remove();
+      } else {
+        showAlertModal('Error', 'Failed to delete photo: ' + (data.error || 'Unknown error'));
+      }
+    })
+    .catch(e => showAlertModal('Error', 'Error: ' + e.message));
+    });
+  };
+
   const uploadForm = document.getElementById('uploadForm');
   if (uploadForm) {
     uploadForm.addEventListener('submit', function(e) {
       e.preventDefault();
       const count = selectedFiles.length;
-      if (count > 0 && confirm(`Do you really want to upload these ${count} picture${count > 1 ? 's' : ''}?`)) {
-        this.submit();
+      if (count > 0) {
+        showConfirmModal('Upload Photos', `Upload ${count} photo${count > 1 ? 's' : ''}?`, () => uploadForm.submit());
       }
     });
+  }
+
+  // Reschedule form confirmation
+  const rescheduleForm = document.getElementById('rescheduleForm');
+  if (rescheduleForm) {
+    rescheduleForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const newDate = document.getElementById('newDate').value;
+      const newTime = document.getElementById('newTime').value;
+      if (newDate && newTime) {
+        const dateObj = new Date(newDate + 'T' + newTime);
+        const formattedDate = dateObj.toLocaleDateString(undefined, { month:'long', day:'numeric', year:'numeric' });
+        const formattedTime = dateObj.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit', hour12:true });
+        showConfirmModal('Reschedule Hearing', `Do you really want to reschedule this hearing to ${formattedDate} at ${formattedTime}?`, () => {
+          const formData = new FormData(rescheduleForm);
+          fetch(rescheduleForm.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'X-CSRFToken': '{{ csrf_token }}'
+            }
+          })
+          .then(r => r.json())
+          .then(data => {
+            if (data.success) {
+              showAlertModal('Success', data.message);
+              bootstrap.Modal.getInstance(document.getElementById('rescheduleModal')).hide();
+              setTimeout(() => location.reload(), 2000);
+            } else {
+              showAlertModal('Error', data.error || 'Failed to reschedule hearing.');
+            }
+          })
+          .catch(e => showAlertModal('Error', 'Error: ' + e.message));
+        });
+      }
+    });
+  }
+  
+  function showConfirmModal(title, message, onConfirm) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:14px;">
+          <div class="modal-header">
+            <h5 class="modal-title">${title}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">${message}</div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-brand" id="confirmBtn">Confirm</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    modal.querySelector('#confirmBtn').onclick = () => { bsModal.hide(); onConfirm(); };
+    modal.addEventListener('hidden.bs.modal', () => modal.remove());
+    bsModal.show();
+  }
+  
+  function showAlertModal(title, message) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:14px;">
+          <div class="modal-header">
+            <h5 class="modal-title">${title}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">${message}</div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-brand" data-bs-dismiss="modal">OK</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    modal.addEventListener('hidden.bs.modal', () => modal.remove());
+    bsModal.show();
   }
 
   // If already held → concise summary chips
@@ -731,17 +881,28 @@
   const outcomeDetailRow = document.getElementById('outcomeDetailRow');
 
   if (outcomeHost && "{{ hearing_held|yesno:'1,0' }}" === "1") {
-    const outcome = (outcomeHost.dataset.outcome || "").toUpperCase();
+    const outcome = (outcomeHost.dataset.outcome || "").toUpperCase().replace(/\s+/g, '_');
     const cAtt = outcomeHost.dataset.complAtt === "1";
     const rAtt = outcomeHost.dataset.respAtt === "1";
 
     if (outcome && heldOutcomePill) {
       heldOutcomePill.classList.remove('d-none');
-      if (outcome==='ARBITRATION'|| outcome==='ARBITRATED'){ heldOutcomePill.innerHTML = `<i class="bi bi-handshake"></i> Agreed to Arbitration`; }
-      else if (outcome==='SETTLED'){ heldOutcomePill.innerHTML = `<i class="bi bi-journal-check"></i> Settled`; }
-      else if (outcome==='NOT_SETTLED'){ heldOutcomePill.innerHTML = `<i class="bi bi-x-circle"></i> Not Settled`; }
-      else { heldOutcomePill.innerHTML = `<i class="bi bi-info-circle"></i> ${outcome.replaceAll('_',' ')}`; }
-      heldOutcomePill.classList.add('ms-2');
+      if (outcome==='ARBITRATION'|| outcome==='ARBITRATED'){ 
+        heldOutcomePill.innerHTML = `<i class="bi bi-handshake me-1"></i>Arbitration`; 
+        heldOutcomePill.style.background = '#2563eb';
+      }
+      else if (outcome==='SETTLED'){ 
+        heldOutcomePill.innerHTML = `<i class="bi bi-check-circle me-1"></i>Settled`; 
+        heldOutcomePill.style.background = '#16a34a';
+      }
+      else if (outcome==='NOT_SETTLED'){ 
+        heldOutcomePill.innerHTML = `<i class="bi bi-x-circle me-1"></i>Not Settled`; 
+        heldOutcomePill.style.background = '#dc2626';
+      }
+      else { 
+        heldOutcomePill.innerHTML = `<i class="bi bi-info-circle me-1"></i>${outcome.replaceAll('_',' ')}`; 
+        heldOutcomePill.style.background = '#6b7280';
+      }
     }
 
     if (outcomeDetailRow){
@@ -749,15 +910,13 @@
       const attNote = document.getElementById('attNote');
       const arbNote = document.getElementById('arbNote');
       if (attNote){
-        if (cAtt && rAtt) attNote.textContent = 'Both parties attended.';
-        else if (cAtt && !rAtt) attNote.textContent = 'Only the complainant attended.';
-        else if (!cAtt && rAtt) attNote.textContent = 'Only the respondent attended.';
-        else attNote.textContent = 'No parties attended.';
+        if (cAtt && rAtt) attNote.innerHTML = '<i class="bi bi-people-fill me-1"></i>Both parties attended';
+        else if (cAtt && !rAtt) attNote.innerHTML = '<i class="bi bi-person-fill me-1"></i>Only complainant attended';
+        else if (!cAtt && rAtt) attNote.innerHTML = '<i class="bi bi-person me-1"></i>Only respondent attended';
+        else attNote.innerHTML = '<i class="bi bi-x-circle me-1"></i>No parties attended';
       }
       if (arbNote && (outcome==='ARBITRATION'||outcome==='ARBITRATED')){
-        const fallback = "{% url 'lupon_mem:form_builder_by_code' case_id 'KP-14' %}";
-        const url = (outcomeHost.dataset.kp14Url || fallback) + "?sid={{ picked_submission_id }}";
-        arbNote.innerHTML = `Next: <a class="text-decoration-none" href="${url}"><strong>Prepare KP-14</strong></a>`;
+        arbNote.style.display = 'none';
       }
     }
   }

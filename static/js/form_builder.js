@@ -1059,16 +1059,14 @@ function bindCloseOnEscape(input, closeFn){
   }
 
   function composeNarr(mode){
-    const servedTo   = (servedToEl?.value || "").trim() || "respondent";
+    const servedTo   = (servedToEl?.value || "").trim();
     const proxyDw    = byCode("proxy_name_one")?.value?.trim();
     const proxyOff   = byCode("proxy_name_two")?.value?.trim();
     switch(String(mode)){
-      case "1": return `Served personally upon ${servedTo}.`;
-      case "2": return `Summons tendered to ${servedTo} who refused to receive it.`;
-      case "3": return proxyDw ? `Left at the dwelling of ${servedTo} with ${proxyDw}.`
-                               : `Left at the dwelling of ${servedTo} with a competent person.`;
-      case "4": return proxyOff ? `Left at the office/place of business of ${servedTo} with ${proxyOff}.`
-                                : `Left at the office/place of business of ${servedTo} with a competent person.`;
+      case "1": return "";
+      case "2": return "";
+      case "3": return proxyDw || "";
+      case "4": return proxyOff || "";
       default: return "";
     }
   }
@@ -1089,14 +1087,45 @@ function bindCloseOnEscape(input, closeFn){
     // SINGLE-LINE filling logic
     const name = (servedToEl?.value || "").trim();
     putOnlyInSelectedLine(sel, name);
+    
+    // ALWAYS sync served_to_3 with served_to (respondent name) for ALL modes
+    const servedTo3El = byCode("served_to_3");
+    if (servedTo3El) write(servedTo3El, name);
+    
+    // Mode 3 or 4: sync proxy name to served_to_4
+    const servedTo4El = byCode("served_to_4");
+    if (sel === "3") {
+      const proxy1 = byCode("proxy_name_one")?.value?.trim() || "";
+      if (servedTo4El) write(servedTo4El, proxy1);
+    } else if (sel === "4") {
+      const proxy2 = byCode("proxy_name_two")?.value?.trim() || "";
+      if (servedTo4El) write(servedTo4El, proxy2);
+    } else {
+      if (servedTo4El) write(servedTo4El, "");
+    }
+    
+    // Always sync date_signed_two with date_signed_one
+    const dateSigned1El = byCode("date_signed_one");
+    const dateSigned2El = byCode("date_signed_two");
+    if (dateSigned1El && dateSigned2El) {
+      write(dateSigned2El, dateSigned1El.value);
+    }
   }
 
   // Re-run when any dependent field changes
-  ["served_to","proxy_name_one","proxy_name_two"].forEach(code=>{
+  ["served_to","proxy_name_one","proxy_name_two","date_signed_one"].forEach(code=>{
     const el = byCode(code); if (!el) return;
     el.addEventListener("input", onMode);
     el.addEventListener("change", onMode);
   });
+  
+  // Also sync served_to_3 whenever served_to changes
+  if (servedToEl) {
+    servedToEl.addEventListener("input", ()=>{
+      const servedTo3El = byCode("served_to_3");
+      if (servedTo3El) write(servedTo3El, servedToEl.value.trim());
+    });
+  }
   rads.forEach(r=>r.addEventListener("change", onMode));
 
   // Initial compute

@@ -409,6 +409,12 @@
             {% with field_code|lower as code %}
               {% if type_name == "TEXTAREA" %}
                 <div class="col-12
+                  {% if header.0 == 'KP-9-P2' and 'respondent_names' in code %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'served_to' in code and code != 'served_to' %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'offcr_ret' in code %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'officer_return_narrative' in code %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'narrative' in code %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'Officer' in label and 'Return' in label and 'Narrative' in label %} kp-offscreen{% endif %}
                   {% if kp8_ui_minimal and code != 'hearing_date' and code != 'hearing_time' and code != 'place_of_hearing' %} kp-offscreen{% endif %}
                   {% if kp10_ui_minimal and code != 'appearance_date' and code != 'appearance_time' and code != 'addr_to' %} kp-offscreen{% endif %}
                   {% if kp11_ui_minimal and code != 'pangkat_member_name' %} kp-offscreen{% endif %}
@@ -428,6 +434,19 @@
                   {% if kp24_ui_minimal and code != 'case_num' and code != 'purpose' and code != 'motion_date' and code != 'motion_time' %} kp-offscreen{% endif %}">
               {% else %}
                 <div class="col-12 col-md-6
+                  {% if header.0 == 'KP-9-P2' and 'respondent_names' in code %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'served_to' in code and code != 'served_to' %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'offcr_ret' in code %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'officer_return_narrative' in code %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'narrative' in code %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'Officer' in label and 'Return' in label and 'Narrative' in label %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'Officer Return' in label and 'Month' in label %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'Officer Return' in label and 'Year' in label %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'Served' in label and 'Day' in label %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'Served' in label and 'Month' in label %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'Served' in label and 'Year' in label %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'Date Signed' in label %} kp-offscreen{% endif %}
+                  {% if header.0 == 'KP-9-P2' and 'Processed' in label %} kp-offscreen{% endif %}
                   {% if kp8_ui_minimal and code != 'hearing_date' and code != 'hearing_time' and code != 'place_of_hearing' %} kp-offscreen{% endif %}
                   {% if kp10_ui_minimal and code != 'appearance_date' and code != 'appearance_time' and code != 'addr_to' %} kp-offscreen{% endif %}
                   {% if kp11_ui_minimal and code != 'pangkat_member_name' %} kp-offscreen{% endif %}

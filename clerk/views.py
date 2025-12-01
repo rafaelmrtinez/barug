@@ -186,7 +186,7 @@ def _staff_id(request: HttpRequest) -> int | None:
 BRGY_BUSINESS_DOC_NAME = "BARANGAY BUSINESS CLEARANCE"     # must match request_document_type_name
 BRGY_BUSINESS_PDF_FILE = "barangay-business-clearance.pdf" # the uploaded template filename
 # e.g., near BRGY_BUSINESS_DOC_NAME / BRGY_BUSINESS_PDF_FILE
-CTC_BRGY_BUSINESS_PDF_FILE = "ctc-barangay-business-clearance.pdf"
+CTC_BRGY_BUSINESS_PDF_FILE = "barangay-ctc.pdf"
 
 # ────────────────────────────────────────────────────────────
 # SECTION: Missing-value advice (for logs)
@@ -976,7 +976,7 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
                   for name in field_names}
 
         try:
-            pdf_bytes = _fill_pdf_with_values(template_path, merged)
+            pdf_bytes = _fill_pdf_with_values(template_path, merged, is_ctc=is_ctc)
         except Exception:
             with open(template_path, "rb") as f:
                 pdf_bytes = f.read()
@@ -1312,9 +1312,77 @@ def person_submission_dets(request: HttpRequest, req_id: int):
         "person": person,
     })
 
-# ────────────────────────────────────────────────────────────
-# SECTION: AJAX helpers (search and purposes)
-# ────────────────────────────────────────────────────────────
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_POST
+def decision_request(request: HttpRequest, req_id: int):
+    """Handle rejection of identity verification request."""
+    action = request.POST.get("action")
+    remarks = (request.POST.get("remarks") or "").strip()
+    
+    if not remarks:
+        messages.error(request, "Remarks are required.")
+        return redirect("clerk:person_details", req_id=req_id)
+    
+    try:
+        if action == "reject":
+            # Get REJECTED status ID
+            status_res = supabase.table("request_status").select("request_status_id").eq("request_status_name", "REJECTED").limit(1).execute()
+            if not status_res.data:
+                messages.error(request, "REJECTED status not found in system.")
+                return redirect("clerk:person_details", req_id=req_id)
+            
+            status_id = status_res.data[0]["request_status_id"]
+            
+            res = supabase.rpc("approve_person_by_clerk", {
+                "p_person_id": req_id,
+                "p_status_id": status_id,
+                "p_remarks": remarks,
+                "p_clerk_staff_id": _staff_id(request)
+            }).execute()
+            
+            if getattr(res, "error", None):
+                messages.error(request, f"Failed to reject request: {escape(res.error.message)}")
+            else:
+                messages.success(request, "Request has been rejected.")
+        else:
+            messages.error(request, "Invalid action.")
+            
+    except Exception as e:
+        messages.error(request, f"An error occurred: {escape(str(e))}")
+    
+    return redirect("clerk:person_details", req_id=req_id)
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_POST
+def approve_request(request: HttpRequest, req_id: int):
+    """Handle approval of identity verification request."""
+    try:
+        # Get APPROVED status ID
+        status_res = supabase.table("request_status").select("request_status_id").eq("request_status_name", "APPROVED").limit(1).execute()
+        if not status_res.data:
+            messages.error(request, "APPROVED status not found in system.")
+            return redirect("clerk:person_details", req_id=req_id)
+        
+        status_id = status_res.data[0]["request_status_id"]
+        
+        res = supabase.rpc("approve_person_by_clerk", {
+            "p_person_id": req_id,
+            "p_status_id": status_id,
+            "p_remarks": "Identity verified and approved by clerk",
+            "p_clerk_staff_id": _staff_id(request)
+        }).execute()
+        
+        if getattr(res, "error", None):
+            messages.error(request, f"Failed to approve request: {escape(res.error.message)}")
+        else:
+            messages.success(request, "Request has been approved successfully.")
+            
+    except Exception as e:
+        messages.error(request, f"An error occurred: {escape(str(e))}")
+    
+    return redirect("clerk:person_details", req_id=req_id)
 
 # ────────────────────────────────────────────────────────────
 # SECTION: AJAX helpers (search and purposes)
@@ -1387,7 +1455,7 @@ def ajax_resident_search(request: HttpRequest):
     rows: List[Dict[str, Any]] = []
     if len(q) >= 2:
         try:
-            res = supabase.rpc("search_person_by_code_or_name", {"p_key": q}).execute()
+            res = supabase.rpc("search_person_by_code_or_name_not_deceased", {"p_key": q}).execute()
             rows = res.data or []
         except Exception as e:
             logger.warning("ajax_resident_search RPC failed: %s", e)
@@ -3788,4 +3856,76 @@ def renewal_request(request, b_id):
     return render(request, "business/renewal_request.html", {
         'page_path' : f'{user_role} / Renewal Request : {b_id}',
         'page_title' : f'Renewal Request : {b_id}',
+    })
+
+
+# ========= PEOPLE REQUEST HISTORY (same as treasurer) =========
+@session_login_required
+@role_required("BARANGAY CLERK")
+@require_GET
+def people_requests(request):
+    from authentication.supabase_client import supabase
+    from django.core.paginator import Paginator
+    q = (request.GET.get("q") or "").strip() or None
+    try:
+        res = supabase.rpc("get_person_request_counts").execute()
+        rows = res.data or []
+    except Exception:
+        rows = []
+    if q:
+        q_up = q.upper()
+        rows = [r for r in rows if q_up in (r.get("person_name") or "").upper() or q in str(r.get("person_id") or "")]
+    paginator = Paginator(rows, 25)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
+    return render(request, "clerk/people_requests.html", {
+        "q": q or "",
+        "page_obj": page_obj,
+        "paginator": paginator,
+    })
+
+@session_login_required
+@role_required("BARANGAY CLERK")
+@require_GET
+def person_request_history(request, person_id: int):
+    from authentication.supabase_client import supabase
+    from django.core.paginator import Paginator
+    from django.contrib import messages
+    q = (request.GET.get("q") or "").strip() or None
+    statuses = request.GET.getlist("status") or []
+    doc_types_filter = request.GET.getlist("doc_type") or []
+    try:
+        res = supabase.rpc("get_document_request_history", {"p_person_id": person_id}).execute()
+        requests = res.data or []
+    except Exception:
+        messages.error(request, "Failed to load request history.")
+        return redirect("clerk:people_requests")
+    all_doc_types = sorted(set(dt for r in requests for dt in (r.get("doc_types") or [])))
+    if statuses:
+        requests = [r for r in requests if r.get("status") in statuses]
+    if doc_types_filter:
+        requests = [r for r in requests if any(dt in doc_types_filter for dt in (r.get("doc_types") or []))]
+    if q:
+        q_up = q.upper()
+        requests = [r for r in requests if 
+            q_up in (r.get("request_code") or "").upper() or
+            q_up in (r.get("latest_or_number") or "").upper()]
+    person = {"person_id": person_id, "full_name": requests[0].get("requested_by_name") if requests else "Unknown"}
+    for r in requests:
+        r["created_fmt"] = str(r.get("created_at") or "")[:19]
+        r["amount_due_f"] = float(r.get("amount_due") or 0)
+        r["total_paid_f"] = float(r.get("total_paid") or 0)
+        r["balance_f"] = float(r.get("balance") or 0)
+        r["doc_types_display"] = ", ".join(r.get("doc_types") or [])
+        r["purposes_display"] = ", ".join(r.get("purposes") or [])
+    paginator = Paginator(requests, 10)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
+    return render(request, "clerk/person_request_history.html", {
+        "person": person,
+        "requests": page_obj.object_list,
+        "statuses": statuses,
+        "doc_types": all_doc_types,
+        "doc_types_filter": doc_types_filter,
+        "q": q or "",
+        "page_obj": page_obj,
+        "paginator": paginator,
     })
