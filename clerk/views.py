@@ -3987,60 +3987,125 @@ def initiate_business_closure(
     request: HttpRequest,
     b_id: int,
     business_info: IBusinessInfoService = Provide[AppContainer.owner_business_service],
-    renewal_quote_svc: IBusinessRenewalQuoteService = Provide[AppContainer.business_renewal_quote_service],
 ):
+    """
+    Direct business closure for businesses with no outstanding dues.
+    This is a POST-only endpoint that immediately closes the business.
+    """
     user_role = _auth_role_name(request)
 
-    # Reuse the same DTO pattern used elsewhere
-    dto = business_info.execute_by_business_id(b_id)
+    if request.method != "POST":
+        messages.warning(request, "Invalid request method. Please use the business information page.")
+        return redirect("clerk:business_information", b_id=b_id)
 
-    def _compose_owner_full_name(data: dict) -> str | None:
-        last   = (data.get("last_name") or "").strip()
-        first  = (data.get("first_name") or "").strip()
-        middle = (data.get("middle_name") or "").strip()
-        suffix = (data.get("suffix") or "").strip()
-        parts = []
-        if last:   parts.append(last.upper())
-        if first:  parts.append((", " if parts else "") + first.title())
-        if middle: parts.append(" " + middle[:1].upper() + ".")
-        if suffix: parts.append(" " + suffix.upper())
-        return "".join(parts) or None
+    try:
+        business_id = int(b_id)
+        staff_id = (request.session.get("auth") or {}).get("staff_id")
+        
+        if not staff_id:
+            messages.error(request, "Session expired. Please log in again.")
+            return redirect("clerk:business_information", b_id=business_id)
 
-    owner = dict(dto.owner or {})
-    owner["owner_full_name"] = _compose_owner_full_name(owner)
+        # Get business details for notifications
+        dto = business_info.execute_by_business_id(business_id)
+        owner = dto.owner or {}
+        business = dto.business or {}
+        bname = (business.get("business_name") or "Business").strip()
+        owner_person_id = owner.get("person_id")
+        owner_email = owner.get("email")
+        contact_mobile = owner.get("mobile_num") or owner.get("mobile_no") or owner.get("contact_no")
 
-    business = dto.business or {}
-    header_status = ((business.get("business_status") or "").strip().upper())
+        # Call Supabase RPC to close business without payment
+        payload = {
+            "p_business_id": int(business_id),
+            "p_clerk_staff_id": int(staff_id),
+        }
+        
+        res = supabase.rpc("clerk_close_business_no_dues", payload).execute()
+        if getattr(res, "error", None):
+            raise RuntimeError(getattr(res.error, "message", str(res.error)))
 
-    # NEW: compute outstanding dues (reusing renewal quote)
-    current_year = date.today().year
-    grand_total, quote_rows, paid_rows = renewal_quote_svc.execute(business_id=b_id, year=current_year)
+        # Log the business closure action
+        try:
+            log_business_action(
+                business_id=business_id,
+                table_affected='BUSINESS',
+                action='UPDATE',
+                performer_id=staff_id,
+                details=f'Business #{business_id} ({bname}) closed - no outstanding dues.',
+            )
+        except Exception as log_err:
+            print(f"[WARN] Failed to log business closure action: {log_err}", flush=True)
 
-    def _to_decimal(x):
-        if x is None:
-            return Decimal("0")
-        return x if isinstance(x, Decimal) else Decimal(str(x))
+        # Send notifications
+        # SMS notification
+        if contact_mobile:
+            try:
+                from common.send_sms import send_sms
+                print(f"[SMS] Sending to {contact_mobile} for business {bname}", flush=True)
+                send_sms(
+                    to=contact_mobile,
+                    message=(
+                        f"BARUG: Your business '{bname}' has been officially closed. "
+                        f"No outstanding dues. Status: CLOSED. Thank you."
+                    )
+                )
+                print(f"[SMS] Successfully sent to {contact_mobile}", flush=True)
+            except Exception as sms_err:
+                print(f"[WARN] SMS notification failed: {sms_err}", flush=True)
+        else:
+            print(f"[WARN] No contact mobile for business {business_id}", flush=True)
 
-    quote_rows = quote_rows or []
-    base_sum  = sum(_to_decimal(getattr(r, "base_fee", 0))   for r in quote_rows)
-    surch_sum = sum(_to_decimal(getattr(r, "surcharge", 0))  for r in quote_rows)
-    has_dues  = (_to_decimal(grand_total) > 0)
+        # Email notification
+        if owner_email:
+            try:
+                print(f"[EMAIL] Sending to {owner_email} for business {bname}", flush=True)
+                subject = f"Business Closure Confirmation - {bname}"
+                html_body = f"""
+                    <h3>Business Closure Confirmation</h3>
+                    <p>Your business <strong>{bname}</strong> (ID: {business_id:06d}) has been officially closed.</p>
+                    <p><strong>Effective Date:</strong> {date.today().strftime('%B %d, %Y')}</p>
+                    <p><strong>Status:</strong> CLOSED</p>
+                    <p>All requirements have been satisfied with no outstanding dues.</p>
+                    <p>Thank you for your compliance.</p>
+                """
+                send_email(
+                    subject=subject,
+                    to=[owner_email],
+                    body_text=f"Business Closure Confirmation - {bname}\n\nYour business {bname} (ID: {business_id:06d}) has been officially closed.\nEffective Date: {date.today().strftime('%B %d, %Y')}\nStatus: CLOSED\n\nAll requirements have been satisfied with no outstanding dues.\nThank you for your compliance.",
+                    body_html=html_body,
+                )
+                print(f"[EMAIL] Successfully sent to {owner_email}", flush=True)
+            except Exception as email_err:
+                print(f"[WARN] Email notification failed: {email_err}", flush=True)
+        else:
+            print(f"[WARN] No owner email for business {business_id}", flush=True)
 
-    return render(request, "business/initiate_business_closure.html", {
-        'page_path'    : f'{user_role} / Business Closure : {b_id:06d}',
-        'page_title'   : f'Business Closure : {b_id:06d}',
-        'business'     : business,
-        'owner'        : owner,
-        'header_status': header_status,
+        # In-app notification
+        if owner_person_id:
+            try:
+                print(f"[NOTIF] Creating in-app notification for person {owner_person_id}", flush=True)
+                notify_user(
+                    user_type_id=1,  # PERSON
+                    person_id=owner_person_id,
+                    staff_id=None,
+                    title="Business Closed",
+                    body=f"Your business '{bname}' has been officially closed. No outstanding dues. Status: CLOSED.",
+                    deep_link=f"/business/{business_id}"
+                )
+                print(f"[NOTIF] Successfully created for person {owner_person_id}", flush=True)
+            except Exception as notif_err:
+                print(f"[WARN] In-app notification failed: {notif_err}", flush=True)
+        else:
+            print(f"[WARN] No owner_person_id for business {business_id}", flush=True)
 
-        # NEW context for dues display
-        'grand_total'  : grand_total,
-        'quote_rows'   : quote_rows,
-        'base_sum'     : base_sum,
-        'surch_sum'    : surch_sum,
-        'has_dues'     : has_dues,
-        'clearance_year': current_year,  # optional for display/consistency
-    })
+        messages.success(request, f"Business '{bname}' has been successfully closed.")
+        return redirect("clerk:business_information", b_id=business_id)
+
+    except Exception as e:
+        print(f"\n[initiate_business_closure][ERROR]: {repr(e)}", flush=True)
+        messages.error(request, f"Failed to close business: {e}")
+        return redirect("clerk:business_information", b_id=b_id)
 
 # clerk/views.py  (add)
 @session_login_required

@@ -1820,7 +1820,7 @@ def business_renewal_take_payment(request: HttpRequest, renewal_request_id: int)
                     f"Period: {period_type} {period_year}. Status: PAID.\n"
                     f"Your business clearance is now ready."
                 )
-                # send_sms(owner_mobile, msg, fail_silently=True)
+                send_sms(owner_mobile, msg, fail_silently=True)
             
             # Send Email
             if owner_email:
@@ -1972,7 +1972,7 @@ def business_renewal_take_payment_all(request: HttpRequest, business_id: int):
                             f"{cnt} year(s) paid.\n"
                             f"Your business clearance is now ready."
                         )
-                        # send_sms(owner_mobile, msg, fail_silently=True)
+                        send_sms(owner_mobile, msg, fail_silently=True)
                     
                     if owner_email:
                         try:
@@ -2074,7 +2074,7 @@ def business_renewal_take_payment_all(request: HttpRequest, business_id: int):
                             f"{cnt} year(s) paid. Total: {total}.\n"
                             f"Your business clearance is now ready."
                         )
-                        # send_sms(owner_mobile, msg, fail_silently=True)
+                        send_sms(owner_mobile, msg, fail_silently=True)
                     
                     # Send Email
                     if owner_email:

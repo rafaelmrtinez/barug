@@ -100,6 +100,14 @@
             <button type="button" class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#renewOrCloseModal">
               {{ summary_cta_label }}
             </button>
+          {% elif summary_cta_label == "Request Business Closure" %}
+            <!-- POST form for direct closure -->
+            <form method="post" action="{{ summary_cta_href }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to close this business? This action will update the business status to CLOSED.');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline-brand">
+                {% bs_icon 'x-circle' %} {{ summary_cta_label }}
+              </button>
+            </form>
           {% else %}
             <a href="{{ summary_cta_href }}" class="btn btn-outline-brand">{{ summary_cta_label }}</a>
           {% endif %}
