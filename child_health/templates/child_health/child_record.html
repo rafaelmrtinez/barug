@@ -76,17 +76,22 @@
                                                             {% bs_icon 'folder2-open' extra_classes='me-1' %}Open
                                                         </a>
                                                     </li>
-                                                                        {% elif request.session.auth.role_name == "barangay health worker" %}
-                                                                            <li>
-                                                                                <button class="dropdown-item btn-generate-child-summary" data-child-id="{{ record.child_record_id }}" type="button">
-                                                                                    {% bs_icon 'file-earmark-pdf' extra_classes='me-1' %}Generate Child Health Report Summary
-                                                                                </button>
-                                                                            </li>
-                                                                            <li>
-                                                                                <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#visitScheduleModal" data-child-id="{{ record.child_record_id }}">
-                                                                                    {% bs_icon 'calendar3' extra_classes='me-1' %}Schedule Visit
-                                                                                </a>
-                                                                            </li>
+                                                {% elif request.session.auth.role_name == "barangay health worker" %}
+                                                    <li>
+                                                        <a class="dropdown-item" href="{% url 'child_health:child_health_entry' record.child_record_id %}">
+                                                            {% bs_icon 'folder2-open' extra_classes='me-1' %}Open
+                                                        </a>
+                                                    </li>
+                                                    <li>
+                                                        <button class="dropdown-item btn-generate-child-summary" data-child-id="{{ record.child_record_id }}" type="button">
+                                                            {% bs_icon 'file-earmark-pdf' extra_classes='me-1' %}Generate Child Health Report Summary
+                                                        </button>
+                                                    </li>
+                                                    <li>
+                                                        <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#visitScheduleModal" data-child-id="{{ record.child_record_id }}">
+                                                            {% bs_icon 'calendar3' extra_classes='me-1' %}Schedule Visit
+                                                        </a>
+                                                    </li>
                                                 {% else %}
                                                     <!-- Default for other roles: show Open -->
                                                     <li>

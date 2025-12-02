@@ -12,7 +12,47 @@
     flex: 1 1 auto;
     min-width: 0;
 }
-.mhr-title h1 { margin: 0; }
+.mhr-title h1 { 
+    margin: 0;
+    font-size: clamp(1.5rem, 4vw, 2.5rem); /* Responsive font size */
+    word-break: break-word; /* Prevent long text from overflowing */
+}
+
+/* Responsive adjustments for small devices */
+@media (max-width: 768px) {
+    .mhr-action-group {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    .mhr-action-group select, .mhr-action-group .btn {
+        min-width: 7rem;
+        max-width: 9rem;
+        width: 8rem;
+        font-size: 0.875rem;
+    }
+}
+
+@media (max-width: 576px) {
+    /* Stack title and buttons vertically on very small screens */
+    .d-flex.align-items-center.justify-content-between.mb-3 {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 1rem;
+    }
+    .mhr-title {
+        width: 100%;
+    }
+    .mhr-action-group {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    .mhr-action-group select, .mhr-action-group .btn {
+        min-width: 6rem;
+        max-width: 100%;
+        width: auto;
+        flex: 1 1 auto;
+    }
+}
 
 .mhr-locked .card-footer .btn { display: none !important; }     /* hide save buttons */
 .mhr-locked .card { opacity: 0.9; }                             /* subtle dim */
@@ -51,3 +91,249 @@
 
 /* Fallback: allow the labs card to scroll horizontally if unavoidable */
 .card-body.table-responsive { overflow-x: auto; }
+
+/* Uniform action button sizing for maternal forms
+   - targets common Save/download buttons used across sections
+   - uses !important so template inline `style="min-width:..."` is overridden
+   - responsive fallback reduces size on small screens
+   - EXCLUDES header buttons and card-header buttons to prevent fat buttons
+*/
+.card-footer .btn {
+  min-width: 120px !important;
+  max-width: 14rem;
+  text-align: center;
+}
+
+/* Prevent header buttons from getting min-width (keep them compact) */
+.card-header .btn,
+.card-header .btn-sm,
+.card-header .btn-light {
+  min-width: auto !important;
+  width: auto !important;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 576px) {
+  .card-footer .btn {
+    min-width: 96px !important;
+    padding-left: .5rem;
+    padding-right: .5rem;
+  }
+  
+  .card-header .btn,
+  .card-header .btn-sm {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.8rem;
+  }
+}
+
+/* Button style for Laboratory Results download (white outline with #6d2932) */
+.btn-outline-labs {
+  background: #ffffff;
+  color: #6d2932;
+  border: 1px solid #6d2932;
+}
+.btn-outline-labs:hover,
+.btn-outline-labs:focus {
+  background: #6d2932;
+  color: #ffffff;
+  border-color: #6d2932;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(109,41,50,0.12);
+}
+
+
+/* Smooth autosize transition for lab result textareas */
+.autosize-textarea {
+  overflow: hidden; /* hide vertical scrollbar while autosizing */
+  resize: none;     /* user resizing disabled to keep autosize behavior consistent */
+  transition: height 140ms ease; /* small smooth expand/collapse */
+  min-height: 48px; /* reasonable minimum */
+}
+
+.autosize-textarea:focus {
+  outline: 2px solid rgba(109,41,50,0.12);
+}
+
+
+/* Mobile sidebar toggle button and icon improvements */
+@media (max-width: 767.98px) {
+  #sidebar-toggle {
+    width: 44px !important;
+    height: 44px !important;
+    padding: 0.25rem !important;
+    border-radius: 8px !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.08);
+    color: var(--brand-700);
+  }
+
+  #sidebar-toggle:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(109,41,50,0.08);
+  }
+
+  .sidebar-toggle-icon {
+    width: 20px;
+    height: 20px;
+    stroke: var(--brand-700);
+    stroke-width: 2;
+    transition: transform 200ms ease;
+    display: block;
+  }
+
+  #sidebar-toggle.open .sidebar-toggle-icon {
+    transform: rotate(90deg);
+  }
+
+  /* ensure the toggle isn't visually squashed in very tight containers */
+  .d-md-none.mb-3 { display: block !important; }
+}
+
+/* Postpartum table: responsive with equal columns, centered, no overflow, horizontal scroll */
+.postpartum-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 100%;
+  margin-bottom: 0;
+}
+
+.postpartum-table thead th,
+.postpartum-table tbody td {
+  width: 20%; /* 5 equal columns */
+  text-align: center;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.5rem 0.25rem;
+}
+
+/* Ensure the table wrapper allows horizontal scrolling */
+#postpartum-section .table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent buttons from breaking layout - keep compact */
+.postpartum-table .btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.postpartum-table .btn svg {
+  flex-shrink: 0;
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+  .postpartum-table {
+    min-width: 600px; /* force horizontal scroll on small screens */
+  }
+  
+  .postpartum-table thead th,
+  .postpartum-table tbody td {
+    font-size: 0.875rem;
+    padding: 0.4rem 0.2rem;
+  }
+}
+
+/* Previous Pregnancies table: responsive with equal columns, centered, no overflow, horizontal scroll */
+.prev-preg-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 100%;
+  margin-bottom: 0;
+}
+
+.prev-preg-table thead th,
+.prev-preg-table tbody td {
+  width: 14.28%; /* 7 equal columns (100% / 7) */
+  text-align: center;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.5rem 0.25rem;
+}
+
+/* Ensure the table wrapper allows horizontal scrolling */
+#prev-preg-section .table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile optimization for previous pregnancies table */
+@media (max-width: 768px) {
+  .prev-preg-table {
+    min-width: 700px; /* force horizontal scroll on small screens */
+  }
+  
+  .prev-preg-table thead th,
+  .prev-preg-table tbody td {
+    font-size: 0.875rem;
+    padding: 0.4rem 0.2rem;
+  }
+}
+
+/* Record History table: responsive with equal columns, centered, no overflow, horizontal scroll */
+.record-history-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 100%;
+  margin-bottom: 0;
+}
+
+.record-history-table thead th,
+.record-history-table tbody td {
+  width: 25%; /* 4 equal columns */
+  text-align: center !important; /* Force center alignment, override any conflicting classes */
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.75rem 0.5rem;
+}
+
+/* Prevent dropdowns from breaking layout */
+.record-history-table .dropdown {
+  position: static !important;
+}
+
+.record-history-table .dropdown-menu {
+  position: absolute !important;
+}
+
+.record-history-table .btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+/* Mobile optimization for record history table */
+@media (max-width: 768px) {
+  .record-history-table {
+    min-width: 800px; /* force horizontal scroll on small screens - wider for dropdown actions */
+  }
+  
+  .record-history-table thead th,
+  .record-history-table tbody td {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.4rem;
+  }
+  
+  .record-history-table .btn {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+  }
+}
+

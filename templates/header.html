@@ -16,31 +16,7 @@
 
         {# ───────────── Notifications (bell + badge + dropdown) ───────────── #}
         <div id="notifRoot" class="position-relative me-2">
-          <button id="notifBell" class="btn pe-0 position-relative" type="button" aria-label="Open notifications">
-            {% bs_icon 'bell-fill' color='white' size='1.2em' %}
-            <span id="notifBadge"
-                  class="position-absolute translate-middle badge rounded-pill bg-danger"
-                  style="top:0; right:-6px; display:none; font-size:.65rem; min-width:18px;">
-              0
-            </span>
-          </button>
 
-          <!-- Dropdown panel -->
-          <div id="notifMenu"
-               class="shadow-lg"
-               style="display:none; position:absolute; right:0; top:120%; width:360px;
-                      background:#fff; border:1px solid #e5e7eb; border-radius:12px; z-index:1000;">
-            <div id="notifList"></div>
-            <div class="d-flex justify-content-between align-items-center p-2"
-                 style="border-top:1px solid #f1f5f9">
-              <a href="/resident/notifications" class="text-decoration-none" style="color:#7a1212; font-weight:600">
-                View all
-              </a>
-              <button id="notifClearAll" class="btn btn-link p-0" style="color:#7a1212; font-weight:600">
-                Clear all
-              </button>
-            </div>
-          </div>
         </div>
         {# ──────────────────────────────────────────────────────────────────── #}
 
@@ -61,6 +37,9 @@
       <span class="navbar-text d-none d-sm-inline"> - </span>
       <div class="user-type text-end">
         <span class="navbar-text">{{ user_role }}</span>
+        <!-- {% if lupon_sched %}
+          <br><small class="text-white-50">{% for sched in lupon_sched %}{% if sched.day == 0 %}Sun{% elif sched.day == 1 %}Mon{% elif sched.day == 2 %}Tue{% elif sched.day == 3 %}Wed{% elif sched.day == 4 %}Thu{% elif sched.day == 5 %}Fri{% elif sched.day == 6 %}Sat{% endif %} {{ sched.time_start|slice:":5" }}-{{ sched.time_end|slice:":5" }}{% if not forloop.last %}, {% endif %}{% endfor %}</small>
+        {% endif %} -->
       </div>
 
       <div class="d-flex align-items-center">

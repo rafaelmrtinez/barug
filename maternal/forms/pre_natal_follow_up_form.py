@@ -90,10 +90,10 @@ class PrenatalFollowUpEntryForm(forms.Form):
         label="Notes (Lab results, complaints, advises)",
         widget=forms.Textarea(attrs={"rows": 2}),
     )
+    anc_row_id = forms.IntegerField(required=False, widget=forms.HiddenInput())
 
     # Role policies — compare on lowercase
-    BASIC_INFO_PERMS = {"bhw", "barangay health worker"}
-    FINDINGS_AND_NOTES_PERMS  = {"midwife"}
+    HEALTH_WORKER = {"bhw", "barangay health worker"}
 
     def __init__(self, *args, role: Optional[str] = None, mhr_repository: Optional[MaternalHealthRecordRepository] = None, maternal_id: Optional[int] = None, **kwargs):
         # Always call super first for Django forms
@@ -103,18 +103,17 @@ class PrenatalFollowUpEntryForm(forms.Form):
         self._maternal_id = maternal_id
         self._role_norm = (role or "").strip().lower()
 
-        if self._role_norm in self.BASIC_INFO_PERMS:
+        if self._role_norm in self.HEALTH_WORKER:
             self.fields["findings"].disabled = True
             self.fields["notes"].disabled = True
-            self.fields["findings"].initial = "TBD"
-            self.fields["notes"].initial = "TBD"
-        elif self._role_norm not in self.FINDINGS_AND_NOTES_PERMS:
+        else:
             self.fields["date"].disabled = True
             self.fields["aog_weeks"].disabled = True
             self.fields["aog_days"].disabled = True
             self.fields["wt_kg"].disabled = True
             self.fields["bp_systolic"].disabled = True
             self.fields["bp_diastolic"].disabled = True
+            
 
     def clean(self):
         cleaned_data = super().clean()
@@ -142,7 +141,7 @@ class PrenatalFollowUpEntryForm(forms.Form):
         # require all basic measurement fields to be present. Notes and
         # findings are intentionally excluded because BHWs only fill the
         # basic info block.
-        if self.is_bound and (self._role_norm in self.BASIC_INFO_PERMS):
+        if self.is_bound and (self._role_norm in self.HEALTH_WORKER):
             required_fields = [
                 'aog_weeks',
                 'aog_days',

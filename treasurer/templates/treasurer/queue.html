@@ -89,6 +89,12 @@
             />
           </div>
 
+          <!-- Sort dropdown -->
+          <select class="form-select" name="sort" style="width: auto;">
+            <option value="newest" {% if sort_order == 'newest' %}selected{% endif %}>Newest to Oldest</option>
+            <option value="oldest" {% if sort_order == 'oldest' %}selected{% endif %}>Oldest to Newest</option>
+          </select>
+
           <!-- hidden status chips will be injected by JS on submit -->
           <button type="submit" class="btn btn-brand d-flex align-items-center">
             {% bs_icon 'search' extra_classes='me-2' %} Search
@@ -124,40 +130,38 @@
             </tr>
           </thead>
           <tbody>
-            {% with items=page_obj.object_list|default:rows %}
-              {% if items %}
-                {% for r in items %}
-                  <tr class="table-row-height">
-                    <td><span class="code-badge">{{ r.request_code }}</span></td>
-                    <td><span class="small text-muted">{{ r.created_fmt|default:"—" }}</span></td>
-                    <td>{{ r.requester_display|default:r.requested_by|default:"—" }}</td>
-                    <td>{{ r.on_behalf_of|default:"Self" }}</td>
-                    <td>
-                      {% if r.doc_types %}
-                        {% for d in r.doc_types %}
-                          <span class="mini-badge">{{ d }}</span>
-                        {% endfor %}
-                      {% else %} — {% endif %}
-                    </td>
-                    <td>
-                      {% if r.purposes_display %}
-                        {% for p in r.purposes_display %}
-                          <span class="mini-badge">{{ p }}</span>
-                        {% endfor %}
-                      {% else %} — {% endif %}
-                    </td>
-                    <td><span class="{{ r.status_ui.cls }}">{{ r.status_ui.label }}</span></td>
-                    <td>
-                      <a class="btn btn-outline-brand btn-sm" href="{% url 'treasurer:detail' r.doc_request_id %}">
-                        {% bs_icon 'person-lines-fill' extra_classes='me-1' %} View
-                      </a>
-                    </td>
-                  </tr>
-                {% endfor %}
-              {% else %}
-                <tr><td colspan="8" class="text-center">No matching requests.</td></tr>
-              {% endif %}
-            {% endwith %}
+            {% if page_obj.object_list %}
+              {% for r in page_obj.object_list %}
+                <tr class="table-row-height">
+                  <td><span class="code-badge">{{ r.request_code }}</span></td>
+                  <td><span class="small text-muted">{{ r.created_fmt|default:"—" }}</span></td>
+                  <td>{{ r.requester_display|default:r.requested_by|default:"—" }}</td>
+                  <td>{{ r.on_behalf_of|default:"Self" }}</td>
+                  <td>
+                    {% if r.doc_types %}
+                      {% for d in r.doc_types %}
+                        <span class="mini-badge">{{ d }}</span>
+                      {% endfor %}
+                    {% else %} — {% endif %}
+                  </td>
+                  <td>
+                    {% if r.purposes_display %}
+                      {% for p in r.purposes_display %}
+                        <span class="mini-badge">{{ p }}</span>
+                      {% endfor %}
+                    {% else %} — {% endif %}
+                  </td>
+                  <td><span class="{{ r.status_ui.cls }}">{{ r.status_ui.label }}</span></td>
+                  <td>
+                    <a class="btn btn-outline-brand btn-sm" href="{% url 'treasurer:detail' r.doc_request_id %}">
+                      {% bs_icon 'person-lines-fill' extra_classes='me-1' %} View
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr><td colspan="8" class="text-center">No matching requests.</td></tr>
+            {% endif %}
           </tbody>
         </table>
 
@@ -316,6 +320,16 @@
         const i=document.createElement('input'); i.type='hidden'; i.name='status'; i.value=s; form.appendChild(i);
       });
     });
+  })();
+
+  // Auto-submit form when sort order changes
+  (function(){
+    const sortSelect = document.querySelector('select[name="sort"]');
+    if(sortSelect){
+      sortSelect.addEventListener('change', function(){
+        document.getElementById('toolbarForm').submit();
+      });
+    }
   })();
 
   // Offcanvas backdrop safety

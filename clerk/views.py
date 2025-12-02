@@ -50,6 +50,10 @@ from .forms import (
     BusinessDetails, BusinessFilters, RequestedDocsFilters, SelectOwnerForm, RenewalFilters
 )
 
+from common.logging_utils import (
+    log_business_action
+)
+
 # ---- email helper (uses your custom Gmail SMTP backend) ----
 from common.send_email import send_email
 
@@ -182,7 +186,7 @@ def _staff_id(request: HttpRequest) -> int | None:
 BRGY_BUSINESS_DOC_NAME = "BARANGAY BUSINESS CLEARANCE"     # must match request_document_type_name
 BRGY_BUSINESS_PDF_FILE = "barangay-business-clearance.pdf" # the uploaded template filename
 # e.g., near BRGY_BUSINESS_DOC_NAME / BRGY_BUSINESS_PDF_FILE
-CTC_BRGY_BUSINESS_PDF_FILE = "ctc-barangay-business-clearance.pdf"
+CTC_BRGY_BUSINESS_PDF_FILE = "barangay-ctc.pdf"
 
 # ────────────────────────────────────────────────────────────
 # SECTION: Missing-value advice (for logs)
@@ -364,7 +368,7 @@ def _fetch_purposes_by_request_type(req_doc_type_id: int) -> List[Dict[str, Any]
         .select(
             "document_purpose_id, request_document_type_id, purpose_code, purpose_label, "
             "default_details, default_offense_no, business_category_id, "  # ← NEW
-            "fee_item:fee_item_id(fee_item_id, current_amount, "
+            "fee_item:fee_item_id(fee_item_id, current_amount, is_active, "
             "exempt_ftj, exempt_senior, exempt_pwd, exempt_indigent, exempt_student)"
         )
         .eq("request_document_type_id", req_doc_type_id)
@@ -375,6 +379,8 @@ def _fetch_purposes_by_request_type(req_doc_type_id: int) -> List[Dict[str, Any]
     out = []
     for r in rows:
         fi = r.get("fee_item") or {}
+        if not fi.get("is_active"):
+            continue
         out.append({
             "document_purpose_id": r["document_purpose_id"],
             "purpose_label": r.get("purpose_label"),
@@ -496,7 +502,10 @@ def queue(request: HttpRequest):
     paginator = Paginator(rows, 10)
     page_obj = paginator.get_page(request.GET.get("page"))
 
+    user_role = _auth_role_name(request)
     return render(request, "clerk/queue.html", {
+        "page_path": f"{user_role} / Document Requests / Queue",
+        "page_title": "Document Request Queue",
         "page_obj": page_obj,
         "rows": page_obj.object_list,
         "q": q or "",
@@ -660,7 +669,10 @@ def detail(request: HttpRequest, doc_request_id: int):
                 was_marked_paid = True
                 break
 
+    user_role = _auth_role_name(request)
     return render(request, "clerk/detail.html", {
+        "page_path": f"{user_role} / Document Requests / Request Detail",
+        "page_title": "Request Detail",
         "header": header,
         "status_ui": ui,
         "lines": lines,
@@ -964,7 +976,7 @@ def mark_for_printing(request: HttpRequest, doc_request_id: int):
                   for name in field_names}
 
         try:
-            pdf_bytes = _fill_pdf_with_values(template_path, merged)
+            pdf_bytes = _fill_pdf_with_values(template_path, merged, is_ctc=is_ctc)
         except Exception:
             with open(template_path, "rb") as f:
                 pdf_bytes = f.read()
@@ -1300,9 +1312,77 @@ def person_submission_dets(request: HttpRequest, req_id: int):
         "person": person,
     })
 
-# ────────────────────────────────────────────────────────────
-# SECTION: AJAX helpers (search and purposes)
-# ────────────────────────────────────────────────────────────
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_POST
+def decision_request(request: HttpRequest, req_id: int):
+    """Handle rejection of identity verification request."""
+    action = request.POST.get("action")
+    remarks = (request.POST.get("remarks") or "").strip()
+    
+    if not remarks:
+        messages.error(request, "Remarks are required.")
+        return redirect("clerk:person_details", req_id=req_id)
+    
+    try:
+        if action == "reject":
+            # Get REJECTED status ID
+            status_res = supabase.table("request_status").select("request_status_id").eq("request_status_name", "REJECTED").limit(1).execute()
+            if not status_res.data:
+                messages.error(request, "REJECTED status not found in system.")
+                return redirect("clerk:person_details", req_id=req_id)
+            
+            status_id = status_res.data[0]["request_status_id"]
+            
+            res = supabase.rpc("approve_person_by_clerk", {
+                "p_person_id": req_id,
+                "p_status_id": status_id,
+                "p_remarks": remarks,
+                "p_clerk_staff_id": _staff_id(request)
+            }).execute()
+            
+            if getattr(res, "error", None):
+                messages.error(request, f"Failed to reject request: {escape(res.error.message)}")
+            else:
+                messages.success(request, "Request has been rejected.")
+        else:
+            messages.error(request, "Invalid action.")
+            
+    except Exception as e:
+        messages.error(request, f"An error occurred: {escape(str(e))}")
+    
+    return redirect("clerk:person_details", req_id=req_id)
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@require_POST
+def approve_request(request: HttpRequest, req_id: int):
+    """Handle approval of identity verification request."""
+    try:
+        # Get APPROVED status ID
+        status_res = supabase.table("request_status").select("request_status_id").eq("request_status_name", "APPROVED").limit(1).execute()
+        if not status_res.data:
+            messages.error(request, "APPROVED status not found in system.")
+            return redirect("clerk:person_details", req_id=req_id)
+        
+        status_id = status_res.data[0]["request_status_id"]
+        
+        res = supabase.rpc("approve_person_by_clerk", {
+            "p_person_id": req_id,
+            "p_status_id": status_id,
+            "p_remarks": "Identity verified and approved by clerk",
+            "p_clerk_staff_id": _staff_id(request)
+        }).execute()
+        
+        if getattr(res, "error", None):
+            messages.error(request, f"Failed to approve request: {escape(res.error.message)}")
+        else:
+            messages.success(request, "Request has been approved successfully.")
+            
+    except Exception as e:
+        messages.error(request, f"An error occurred: {escape(str(e))}")
+    
+    return redirect("clerk:person_details", req_id=req_id)
 
 # ────────────────────────────────────────────────────────────
 # SECTION: AJAX helpers (search and purposes)
@@ -1375,7 +1455,7 @@ def ajax_resident_search(request: HttpRequest):
     rows: List[Dict[str, Any]] = []
     if len(q) >= 2:
         try:
-            res = supabase.rpc("search_person_by_code_or_name", {"p_key": q}).execute()
+            res = supabase.rpc("search_person_by_code_or_name_not_deceased", {"p_key": q}).execute()
             rows = res.data or []
         except Exception as e:
             logger.warning("ajax_resident_search RPC failed: %s", e)
@@ -1421,7 +1501,7 @@ def _fetch_purposes_by_request_type(req_doc_type_id: int) -> List[Dict[str, Any]
         .select(
             "document_purpose_id, request_document_type_id, purpose_code, purpose_label, "
             "default_details, default_offense_no, "
-            "fee_item:fee_item_id(fee_item_id, current_amount, "
+            "fee_item:fee_item_id(fee_item_id, current_amount, is_active, "
             "exempt_ftj, exempt_senior, exempt_pwd, exempt_indigent, exempt_student)"
         )
         .eq("request_document_type_id", req_doc_type_id)
@@ -1432,6 +1512,8 @@ def _fetch_purposes_by_request_type(req_doc_type_id: int) -> List[Dict[str, Any]
     out: List[Dict[str, Any]] = []
     for r in rows:
         fi = r.get("fee_item") or {}
+        if not fi.get("is_active"):
+            continue
         out.append({
             "document_purpose_id": r["document_purpose_id"],
             "purpose_label": r.get("purpose_label"),
@@ -1480,7 +1562,10 @@ def walkin_new(request: HttpRequest):
         )
         residents = res.data or []
 
+    user_role = _auth_role_name(request)
     return render(request, "clerk/walkin_request.html", {
+        "page_path": f"{user_role} / Document Requests / Walk-in Request",
+        "page_title": "Walk-in Request",
         "q": q,
         "doc_types": doc_types,
         "chosen_doc_type_id": chosen_req_type_id,  # template uses this name
@@ -1617,6 +1702,12 @@ def walkin_create(request: HttpRequest):
     """POST handler that builds the same payload the mobile sends, but routes through
     create_document_request_walkin so we tag channel=WALKIN and filed_by clerk staff.
     """
+    print("\n" + "="*80)
+    print("[WALKIN DEBUG] walkin_create view called")
+    print(f"[WALKIN DEBUG] Request method: {request.method}")
+    print(f"[WALKIN DEBUG] Request path: {request.path}")
+    print(f"[WALKIN DEBUG] User: {request.user}")
+    print("="*80 + "\n")
     # DEBUG: dump important POST data (sanitized)
     try:
         safe_post = {
@@ -1629,6 +1720,7 @@ def walkin_create(request: HttpRequest):
             "line_document_purpose_id[]": request.POST.getlist("line_document_purpose_id[]"),
             "line_quantity[]": request.POST.getlist("line_quantity[]"),
             "line_offense_no[]": request.POST.getlist("line_offense_no[]"),
+            "auth_letter": "<file>" if request.FILES.get("auth_letter") else None,
         }
         print("\n[WALKIN DEBUG] raw POST (sanitized):\n", json.dumps(safe_post, indent=2))
     except Exception as e:
@@ -1738,6 +1830,32 @@ def walkin_create(request: HttpRequest):
             ln["details"] = {**(ln.get("details") or {}), **bc_details}
         print("[WALKIN DEBUG] lines after Business Clearance enrichment:\n", json.dumps(lines, indent=2, default=str))
 
+    # Handle authorization letter upload
+    auth_letter_path = None
+    if is_on_behalf and request.FILES.get("auth_letter"):
+        try:
+            from common.services.storage import upload_to_storage
+            auth_file = request.FILES["auth_letter"]
+            file_name = f"auth_{requested_by}_{int(dt.datetime.now().timestamp())}.{auth_file.name.split('.')[-1]}"
+            result = upload_to_storage(
+                auth_file,
+                path=f"{file_name}",
+                bucket="authorization-letters",
+                upsert=True,
+                make_public=True
+            )
+            auth_letter_path = result.get("path")
+            print(f"[WALKIN DEBUG] Auth letter uploaded: {auth_letter_path}")
+        except Exception as e:
+            print(f"[WALKIN DEBUG] Auth letter upload failed: {e}")
+            messages.error(request, "Failed to upload authorization letter.")
+            return redirect("clerk:walkin_new")
+
+    # Add auth letter path to line details if uploaded
+    if auth_letter_path:
+        for ln in lines:
+            ln["details"]["auth_letter_path"] = auth_letter_path
+
     # Debug preview in client-shape for parity with mobile logs
     payload_client_shape = {
         "requested_by": requested_by,
@@ -1746,6 +1864,7 @@ def walkin_create(request: HttpRequest):
         "business_id": business_id,
         "purpose_notes": purpose_notes,
         "lines": lines,
+        "auth_letter_path": auth_letter_path,
     }
     print("\n[WALKIN DEBUG] (client-shape) create_document_request_walkin payload:\n",
           json.dumps(payload_client_shape, indent=2, default=str))
@@ -1759,9 +1878,9 @@ def walkin_create(request: HttpRequest):
     walkin_args = {
         "p_requester_person_id": int(requested_by),
         "p_subject_person_id":   int(subject_id or requested_by),
-        "p_business_id":         business_id,        # may be None
-        "p_purpose_notes":       purpose_notes,      # may be None
-        "p_lines":               lines,              # list; Supabase will JSON-encode to jsonb
+        "p_business_id":         int(business_id) if business_id else None,
+        "p_purpose_notes":       str(purpose_notes) if purpose_notes else None,
+        "p_lines":               lines,
         "p_clerk_user_id":       int(staff_id),
     }
 
@@ -1769,7 +1888,17 @@ def walkin_create(request: HttpRequest):
           json.dumps(walkin_args, indent=2, default=str))
 
     try:
-        res = supabase.rpc("create_document_request_walkin", walkin_args).execute()
+        # Ensure all parameters are properly typed
+        rpc_params = {
+            "p_requester_person_id": walkin_args["p_requester_person_id"],
+            "p_subject_person_id": walkin_args["p_subject_person_id"],
+            "p_business_id": walkin_args["p_business_id"],
+            "p_purpose_notes": walkin_args["p_purpose_notes"],
+            "p_lines": walkin_args["p_lines"],  # Send as list, Supabase will handle JSONB conversion
+            "p_clerk_user_id": walkin_args["p_clerk_user_id"],
+        }
+        print("[WALKIN DEBUG] Final RPC params:", json.dumps(rpc_params, indent=2, default=str))
+        res = supabase.rpc("create_document_request_walkin", rpc_params).execute()
         print("[WALKIN DEBUG] RPC result .data :", getattr(res, "data", None))
         print("[WALKIN DEBUG] RPC result .error:", getattr(res, "error", None))
     except Exception as e:
@@ -1796,6 +1925,24 @@ def walkin_create(request: HttpRequest):
         messages.error(request, "Could not obtain new request ID from RPC.")
         return redirect("clerk:walkin_new")
 
+    # Attach authorization letter if uploaded (stores in request_document table)
+    if auth_letter_path:
+        try:
+            print(f"[WALKIN DEBUG] Attaching auth letter to request {new_id}: {auth_letter_path}")
+            attach_res = supabase.rpc("attach_authorization_letter", {
+                "p_doc_request_id": int(new_id),
+                "p_file_path": auth_letter_path,
+                "p_reason": "Letter of authorization (on-behalf)."
+            }).execute()
+            if getattr(attach_res, "error", None):
+                print(f"[WALKIN DEBUG] attach_authorization_letter error: {attach_res.error}")
+            else:
+                print(f"[WALKIN DEBUG] Authorization letter attached successfully")
+        except Exception as e:
+            print(f"[WALKIN DEBUG] Failed to attach auth letter: {e}")
+
+    print(f"\n[WALKIN DEBUG] SUCCESS - Created request ID: {new_id}")
+    print("="*80 + "\n")
     messages.success(request, f"Walk-in request created. ID: {new_id}")
     return redirect("clerk:detail", doc_request_id=new_id)
 
@@ -2936,6 +3083,14 @@ def business_information_review(
 
             try:
                 business_id, owner_person_id = business_registration_service.business_registration(cmd)
+                
+                log_business_action(
+                    business_id=business_id,
+                    table_affected= 'BUSINESS',
+                    action='INSERT',
+                    performer_id=_auth_staff_id(request),
+                    details=f'Registered a new business #{business_id} for owner #{owner_person_id}',
+                )
 
                 for p in (business or {}).get("proof_tmp_pairs", []) or []:
                     spath = p.get("path")
@@ -3437,6 +3592,14 @@ def create_renewal_request(
                     request,
                     f"No unpaid {period_type} items found up to {period_year}. Nothing to create."
                 )
+            
+            log_business_action(
+                business_id=business_id,
+                table_affected= 'RENEWAL_REQUEST',
+                action='INSERT',
+                performer_id=_auth_staff_id(request),
+                details=f'Created a renewal request for business #{business_id}',
+            )
 
             print(f"[create_renewal_request] Redirecting to business_information(b_id={business_id})", flush=True)
             return redirect("clerk:business_information", b_id=business_id)
@@ -3621,6 +3784,14 @@ def create_closure_payment_request(
             else:
                 messages.info(request, "No unpaid items found. Nothing to create.")
 
+            log_business_action(
+                business_id=business_id,
+                table_affected= 'CLOSURE_PAYMENT_REQUEST',
+                action='INSERT',
+                performer_id=_auth_staff_id(request),
+                details=f'Created a closure request for business #{business_id}',
+            )
+
             return redirect("clerk:initiate_business_closure", b_id=business_id)
         except Exception as e:
             try:
@@ -3685,4 +3856,76 @@ def renewal_request(request, b_id):
     return render(request, "business/renewal_request.html", {
         'page_path' : f'{user_role} / Renewal Request : {b_id}',
         'page_title' : f'Renewal Request : {b_id}',
+    })
+
+
+# ========= PEOPLE REQUEST HISTORY (same as treasurer) =========
+@session_login_required
+@role_required("BARANGAY CLERK")
+@require_GET
+def people_requests(request):
+    from authentication.supabase_client import supabase
+    from django.core.paginator import Paginator
+    q = (request.GET.get("q") or "").strip() or None
+    try:
+        res = supabase.rpc("get_person_request_counts").execute()
+        rows = res.data or []
+    except Exception:
+        rows = []
+    if q:
+        q_up = q.upper()
+        rows = [r for r in rows if q_up in (r.get("person_name") or "").upper() or q in str(r.get("person_id") or "")]
+    paginator = Paginator(rows, 25)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
+    return render(request, "clerk/people_requests.html", {
+        "q": q or "",
+        "page_obj": page_obj,
+        "paginator": paginator,
+    })
+
+@session_login_required
+@role_required("BARANGAY CLERK")
+@require_GET
+def person_request_history(request, person_id: int):
+    from authentication.supabase_client import supabase
+    from django.core.paginator import Paginator
+    from django.contrib import messages
+    q = (request.GET.get("q") or "").strip() or None
+    statuses = request.GET.getlist("status") or []
+    doc_types_filter = request.GET.getlist("doc_type") or []
+    try:
+        res = supabase.rpc("get_document_request_history", {"p_person_id": person_id}).execute()
+        requests = res.data or []
+    except Exception:
+        messages.error(request, "Failed to load request history.")
+        return redirect("clerk:people_requests")
+    all_doc_types = sorted(set(dt for r in requests for dt in (r.get("doc_types") or [])))
+    if statuses:
+        requests = [r for r in requests if r.get("status") in statuses]
+    if doc_types_filter:
+        requests = [r for r in requests if any(dt in doc_types_filter for dt in (r.get("doc_types") or []))]
+    if q:
+        q_up = q.upper()
+        requests = [r for r in requests if 
+            q_up in (r.get("request_code") or "").upper() or
+            q_up in (r.get("latest_or_number") or "").upper()]
+    person = {"person_id": person_id, "full_name": requests[0].get("requested_by_name") if requests else "Unknown"}
+    for r in requests:
+        r["created_fmt"] = str(r.get("created_at") or "")[:19]
+        r["amount_due_f"] = float(r.get("amount_due") or 0)
+        r["total_paid_f"] = float(r.get("total_paid") or 0)
+        r["balance_f"] = float(r.get("balance") or 0)
+        r["doc_types_display"] = ", ".join(r.get("doc_types") or [])
+        r["purposes_display"] = ", ".join(r.get("purposes") or [])
+    paginator = Paginator(requests, 10)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
+    return render(request, "clerk/person_request_history.html", {
+        "person": person,
+        "requests": page_obj.object_list,
+        "statuses": statuses,
+        "doc_types": all_doc_types,
+        "doc_types_filter": doc_types_filter,
+        "q": q or "",
+        "page_obj": page_obj,
+        "paginator": paginator,
     })

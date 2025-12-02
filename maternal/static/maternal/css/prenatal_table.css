@@ -1,0 +1,54 @@
+/* Prenatal follow-up table and card styles */
+.prenatal-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 900px; /* triggers horizontal scroll on narrow viewports */
+}
+.prenatal-table th,
+.prenatal-table td {
+  width: calc(100% / 9);
+  max-width: 360px;
+  /* allow wrapping so content remains readable instead of truncating */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-overflow: clip;
+  text-align: center;
+  vertical-align: middle;
+  padding: .35rem .5rem;
+}
+
+/* Make date column slightly narrower but still wrap when needed */
+.prenatal-table th:nth-child(2),
+.prenatal-table td:nth-child(2) {
+  max-width: 140px;
+}
+
+/* Allow findings and notes columns to occupy more vertical space for readability */
+.prenatal-table th:nth-child(8),
+.prenatal-table td:nth-child(8),
+.prenatal-table th:nth-child(9),
+.prenatal-table td:nth-child(9) {
+  max-width: 480px;
+  text-align: left;
+}
+
+/* Center the form and footer contents inside the card while preserving
+   bootstrap grid behavior for the inputs. */
+.prenatal-card .card-body { display: block; }
+.prenatal-card .row { justify-content: center; }
+.prenatal-card .card-footer { display: flex; justify-content: center; gap: .5rem; }
+
+/* Ensure labels stay on the left side (removed center alignment) */
+.prenatal-card .col-md-2, .prenatal-card .col-md-4 {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch; /* Changed from center to stretch */
+}
+.prenatal-card label { 
+  text-align: left; /* Changed from center to left */
+  width: 100%; 
+}
+.prenatal-card .form-control { 
+  width: 100%; /* Changed from margin auto to full width */
+}

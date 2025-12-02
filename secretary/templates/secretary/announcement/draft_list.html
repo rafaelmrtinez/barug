@@ -1,128 +1,144 @@
-{% extends "base.html" %}
+{# business_list.html (hardcoded filters) #}
+{% extends 'base.html' %}
 {% load static %}
 {% load bootstrap_icons %}
+{% load choiceextras %}
 
 {% block css %}
-<link rel="stylesheet" href="{% static 'css/form.css' %}">
 <link rel="stylesheet" href="{% static 'css/table.css' %}">
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
 <link rel="stylesheet" href="{% static 'css/paginator.css' %}">
-<style>
-  :root{
-    --brand-900:#3a1217;
-    --brand-800:#561c24;
-    --brand-700:#6d2932;
-    --brand-600:#7a323b;
-    --brand-100:#f3eaeb;
-    --brand-050:#fbf6f6;
-  }
-  body{ background:var(--brand-050); }
-  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
-  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
-  .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); background:#fff; }
-  .btn-outline-brand:hover{ background:var(--brand-700); color:#fff; }
+<link rel="stylesheet" href="{% static 'css/filters.css' %}">
 
-  .toolbar{
-    background:#fff; border:1px solid var(--bs-border-color,#dee2e6);
-    border-radius:1rem; padding:.75rem; gap:.5rem;
+<style>
+  .btn-outline-brand{ color:#6d2932; border-color:#6d2932; background:#fff; }
+  .btn-outline-brand:hover{ background:#6d2932; color:#fff; }
+
+  .table thead th{
+    font-size:.80rem;
+    text-transform:capitalize;   /* keep headers uppercase */
+    letter-spacing:.02em;
+    vertical-align:middle;
+    white-space:nowrap;
+    text-align:left;
   }
-  .searchbox{ position:relative; flex:1; min-width:280px; }
-  .searchbox .bi{ position:absolute; left:.8rem; top:50%; transform:translateY(-50%); opacity:.6; color:var(--brand-700); }
-  .searchbox input{ padding-left:2.35rem !important; }
-  .badge-soft{ background:var(--brand-100); color:var(--brand-700); border:1px solid rgba(0,0,0,.04); }
+
+  .table .business-id{
+    width:1%;
+    white-space:nowrap;
+  }
+
+  /* Pill-styled, monospace, tabular digits for perfect alignment */
+  .id-pill{
+    display:inline-block;
+    padding:.22rem .55rem;
+    border-radius:999px;
+    background:#f8f1f2;                      /* soft brand-tinted bg */
+    border:1px solid rgba(109,41,50,.18);    /* matches your cat-badge border tone */
+    color:#6d2932;
+    font-weight:700;
+    font-size:.78rem;
+    line-height:1;
+    /* font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", Consolas, "Liberation Mono", monospace; */
+    font-variant-numeric: tabular-nums;      /* aligned digits */
+    letter-spacing:.03em;
+  }
+
+  .table tbody td{
+    font-size:.80rem;           /* slightly smaller body text */
+    vertical-align:middle;
+    text-align:left;
+    font-weight:600;            /* normalize weight */
+  }
 </style>
+
 {% endblock %}
 
 {% block content %}
 <div class="page-wrap" style="margin-top: 40px;">
   <div class="container-fluid pt-3 page-main">
     <div class="row">
-      <div>
-
-        <!-- Toolbar (Search only) -->
-        <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get" id="toolbarForm">
-            {% csrf_token %}
-            <div class="searchbox">
-            {% bs_icon 'search' extra_classes='bi' %}
-            {{ form.search }}
-            </div>
-        </form>
-
-        <!-- Table -->
-        <div class="table-responsive">
-          <table class="table align-middle">
-            <thead class="table-light">
-              <tr>
-                <th style="width:45%;">Title</th>
-                <th style="width:20%;">Publish at</th>
-                <th style="width:20%;">Expire at</th>
-                <th class="text-end" style="width:15%;">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <!-- ===== STATIC SAMPLE ROWS (replace later with a for-loop) ===== -->
-              <tr>
-                <td>
-                  <div class="fw-semibold">Road Closure: P. Zamora St. (Nov 8)</div>
-                  <div class="small text-muted">
-                    <span class="badge badge-soft rounded-pill px-2 py-1">DRAFT</span>
-                    <span class="ms-2">Created Nov 05, 2025 • 09:12</span>
-                  </div>
-                </td>
-                <td>Nov 07, 2025 • 08:00</td>
-                <td>Nov 09, 2025 • 23:59</td>
-                <td class="text-end">
-                  <a class="btn btn-outline-brand btn-sm" href="#">
-                    {% bs_icon 'pencil-square' extra_classes='me-1' %} Edit
-                  </a>
-                </td>
-              </tr>
-
-              <tr>
-                <td>
-                  <div class="fw-semibold">Free Medical Mission at Barangay Hall</div>
-                  <div class="small text-muted">
-                    <span class="badge badge-soft rounded-pill px-2 py-1">DRAFT</span>
-                    <span class="ms-2">Created Nov 04, 2025 • 14:27</span>
-                  </div>
-                </td>
-                <td>—</td>
-                <td>Dec 01, 2025 • 17:00</td>
-                <td class="text-end">
-                  <a class="btn btn-outline-brand btn-sm" href="#">
-                    {% bs_icon 'pencil-square' extra_classes='me-1' %} Edit
-                  </a>
-                </td>
-              </tr>
-
-              <tr>
-                <td>
-                  <div class="fw-semibold">Solid Waste Collection Schedule Update</div>
-                  <div class="small text-muted">
-                    <span class="badge badge-soft rounded-pill px-2 py-1">DRAFT</span>
-                    <span class="ms-2">Created Oct 30, 2025 • 10:05</span>
-                  </div>
-                </td>
-                <td>Nov 10, 2025 • 06:00</td>
-                <td>—</td>
-                <td class="text-end">
-                  <a class="btn btn-outline-brand btn-sm" href="#">
-                    {% bs_icon 'pencil-square' extra_classes='me-1' %} Edit
-                  </a>
-                </td>
-              </tr>
-              <!-- ===== END STATIC SAMPLE ROWS ===== -->
-            </tbody>
-          </table>
+      {# ─── Toolbar: search + filters + add ─── #}
+      <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+        {% csrf_token %}
+        <div class="searchbox">
+          {% bs_icon 'search' extra_classes='bi' %}
+          {{ form.search }}
         </div>
 
-        <!-- Static paginator hint or your include (works even without data) -->
-        <div class="page-pagination">
-          {% include 'paginator.html' with page_obj=page_obj %}
-        </div>
-        <div class="small text-muted mt-2">Page 1 of 1</div>
+        <a class="btn btn-outline-brand ms-2" href="{% url 'secretary:announcement_draft' %}">
+        {% bs_icon 'plus-lg' extra_classes='me-2' %} Create New Draft
+        </a>
+      </form>
+
+
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th scope="col">Title</th>
+              <th scope="col">Publish A</th>
+              <th scope="col">Expire At</th>
+              <th scope="col">Created At</th>
+              <th scope="col">Status</th>
+              <th scope="col" class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody id="results-body">
+            {% include "announcement/_draft_list.html" with rows=page_obj.object_list %}
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
+
+  {% if page_obj.has_other_pages %}
+    <div class="page-pagination">
+    <div class="page-pagination">
+      {% include 'paginator.html' %}
+    </div>
+  {% endif %}
+
 </div>
+
+<script>
+(function () {
+  const input = document.getElementById('search');
+  const tbody = document.getElementById('results-body');
+  const endpoint = "{% url 'secretary:ajax_announcement_draft_search' %}";
+
+  function currentParams() {
+    const params = new URLSearchParams();
+    params.set('q', (input?.value || '').trim());
+    params.set('tpl', 'rows');
+    return params.toString();
+  }
+
+  let t = null;
+  function debounce(fn, delay) {
+    return function (...args) {
+      clearTimeout(t);
+      t = setTimeout(() => fn.apply(this, args), delay);
+    }
+  }
+
+  async function fetchRows() {
+    try {
+      const url = endpoint + "?" + currentParams();
+      const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+      if (!res.ok) throw new Error("Network error");
+      const html = await res.text();
+      tbody.innerHTML = html;
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3">Failed to load results</td></tr>`;
+      console.error(err);
+    }
+  }
+
+  if (input && tbody) {
+    input.addEventListener('input', debounce(fetchRows, 300));
+  }
+})();
+</script>
+
 {% endblock %}

@@ -20,6 +20,7 @@ from django.urls import path, include
 from authentication import views as auth_view
 from django.conf import settings
 from django.conf.urls.static import static
+from process_scheduled_deliveries_endpoint import process_scheduled_deliveries
 
 urlpatterns = [
     path("", auth_view.login, name="login"),
@@ -42,6 +43,7 @@ urlpatterns = [
     path("child-health/", include("child_health.urls", namespace="child_health")),
     path("docs/", include("doc_ingest.urls", namespace="doc_ingest")),
     path("e/", include("event_logs.urls", namespace="event_logs")),
+    path('process-scheduled-deliveries/', process_scheduled_deliveries, name='process_scheduled_deliveries'),
 ]
 
 if settings.DEBUG:

@@ -40,13 +40,21 @@ class MaternalIdentificationForm(forms.Form):
     husband_id = forms.IntegerField(required=False, widget=forms.HiddenInput())
     is_transferred = forms.BooleanField(required=False, label="Transferred")
 
-    def __init__(self, role: str | None, maternal_repository: MaternalHealthRecordRepository, maternal_id: int | None, *args, **kwargs):
+    def __init__(
+        self, 
+        role: str | None, 
+        maternal_repository: MaternalHealthRecordRepository, 
+        maternal_id: int | None, is_read_only: bool | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         add_bootstrap_classes(self)
         self._maternal_repository = maternal_repository
         self._maternal_id = maternal_id
+        self._is_read_only = is_read_only
         
         if role == "barangay health worker":
+            if is_read_only:
+                self.__midwife_policy()
+                return
             self.__health_worker_policy()
         elif role == "midwife":
             self.__midwife_policy()

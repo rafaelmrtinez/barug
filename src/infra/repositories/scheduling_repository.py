@@ -40,7 +40,7 @@ class ActiveScheduleRepository(ISchedulingRepository):
             print(f"Unexpected error during rescheduling: {qe.code} - {qe.message}")
 
     def sort_by_status(self, status: int) -> list[ActiveScheduleDTO]:
-        raw = """
+        raw = r"""
         SELECT 
         hi.household_id,
         bs.schedule_id AS "Schedule ID",
@@ -68,7 +68,7 @@ class ActiveScheduleRepository(ISchedulingRepository):
         return [ActiveScheduleDTO(*row) for row in rows]
         
     def search_schedule(self, search_key: str) -> list[ActiveScheduleDTO]:
-        sql = """
+        sql = r"""
             SELECT 
             hi.household_id,
             bs.schedule_id AS "Schedule ID",
@@ -92,7 +92,7 @@ class ActiveScheduleRepository(ISchedulingRepository):
         return [ActiveScheduleDTO(*row) for row in rows]
     
     def sort_by_week_range(self, week_range: int) -> list[ActiveScheduleDTO]:
-        raw = """
+        raw = r"""
         SELECT 
         hi.household_id,
         bs.schedule_id AS "Schedule ID",
@@ -120,7 +120,7 @@ class ActiveScheduleRepository(ISchedulingRepository):
         return [ActiveScheduleDTO(*row) for row in rows]
         
     def fetch_schedules(self) -> list[ActiveScheduleDTO]:
-        raw = """
+        raw = r"""
         SELECT 
         hi.household_id,
         bs.schedule_id AS "Schedule ID",

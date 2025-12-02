@@ -272,6 +272,19 @@ def login(request):
             except Exception:
                 pass
         
+        # Fetch lupon schedule for Barangay Lupon Member
+        lupon_sched = []
+        if role_lower == "barangay lupon member":
+            try:
+                from common.supabase_client import supabase
+                staff_sched = supabase.table("lupon_staff_sched").select("lupon_sched_id").eq("staff_id", staff_id).execute()
+                if staff_sched.data:
+                    sched_ids = [s["lupon_sched_id"] for s in staff_sched.data]
+                    lupon_sched = supabase.table("lupon_sched").select("*").in_("lupon_sched_id", sched_ids).execute().data or []
+                    print(f"[LUPON_SCHED] staff_id={staff_id} | lupon_sched={lupon_sched}")
+            except Exception as e:
+                print(f"[LUPON_SCHED ERROR] staff_id={staff_id} | error={e}")
+        
         request.session["auth"] = {
             "staff_id": staff_id,
             "person_id": person_id,
@@ -289,6 +302,7 @@ def login(request):
             "login_log_id": login_log_id,     # <<< store login log ID for logout tracking
             "assigned_puroks": assigned_puroks,  # <<< BHW assigned purok IDs
             "assigned_purok_names": assigned_purok_names,  # <<< BHW assigned purok names
+            "lupon_sched": lupon_sched,  # <<< Lupon member schedule
         }
         request.session['last_activity'] = timezone.now().isoformat()  # Track session activity
         request.session.set_expiry(60 * 60 * 8)

@@ -178,6 +178,37 @@ class ChildHealthRecordRepository(IChildHealthRecordRepository):
                 raise ChildHealthRecordException(e.message) from e
             raise e
 
+    def insert_child_monitoring_log_midwife(
+        self,
+        p_child_record_id: int,
+        p_child_monitoring_id: int,
+        p_findings: str,
+        p_notes: str,
+        p_performed_by_id: int,
+    ):
+        """Update an existing child monitoring log with midwife-provided findings/notes.
+
+        Invokes the DB function `update_monitoring_log_midwife` which expects
+        (child_record_id, child_monitoring_id, findings, notes, performed_by_id).
+        """
+        sql = """SELECT * FROM update_monitoring_log_midwife(%s, %s, %s, %s);"""
+        params = [
+            p_child_record_id,
+            p_child_monitoring_id,
+            p_findings,
+            p_performed_by_id,
+        ]
+        try:
+            result = self.ctx.execute_query(sql, params)
+            if not result:
+                return None
+            return result
+        except QueryExecutionException as e:
+            logger.error(f"Error updating child monitoring log (midwife): {e}")
+            if ChildHealthRecordException.is_child_health_record_exception(e.code):
+                raise ChildHealthRecordException(e.message) from e
+            raise e
+
     def fetch_new_born_screening_date_by_chr_id(self, chr_id: int) -> dict | None:
         # Return the most relevant feeding_type / newborn screening
         # entry for this child by selecting directly from visits that
@@ -191,7 +222,7 @@ class ChildHealthRecordRepository(IChildHealthRecordRepository):
         JOIN feeding_type_nwbrn_scrnng ftns ON ftns.visit_id = cv.visit_id
         LEFT JOIN feeding_type ft ON ft.feeding_type_id = ftns.feeding_type_id
         WHERE cv.child_record_id = %s
-        ORDER BY cv.visit_date DESC NULLS LAST, cv.visit_id DESC
+        ORDER BY cv.visit_date DESC, cv.visit_id DESC
         LIMIT 1;
         """
         params = [chr_id]
@@ -272,7 +303,6 @@ class ChildHealthRecordRepository(IChildHealthRecordRepository):
         """
         sql = """SELECT * FROM add_child_visit_schedule(%s, %s, %s, %s, %s, %s);"""
         params = [p_child_record_id, p_schedule_date, p_schedule_time, p_created_by_id, p_visit_purpose, p_notes]
-        print(f"add_child_visit_schedule params: {params}")
         try:
             result = self.ctx.execute_query(sql, params)
             if not result:
@@ -787,6 +817,23 @@ class ChildHealthRecordRepository(IChildHealthRecordRepository):
         if not result:
             return None
         return result[0]['child_record_id']
+
+    def fetch_mother_id_by_chr_id(self, chr_id: int) -> int | None:
+        """Return the mother_id (person_id) for a given child_record_id."""
+        sql = """
+            SELECT c.mother_id
+            FROM child_health_record AS c
+            WHERE c.child_record_id = %s
+            LIMIT 1;
+        """
+        params = [chr_id]
+        rows = self.ctx.execute_query_to_dict(sql, params)
+        if not rows:
+            return None
+        try:
+            return rows[0].get('mother_id')
+        except Exception:
+            return None
 
     def fetch_all_feeding_check_dates_by_person_id(self, id: int) -> list[dict]:
         sql = """WITH target AS (

@@ -133,6 +133,27 @@ from src.app.contracts.resident_service_contract import (
 from src.app.services.resident_service import (
     ResidentService,
 )
+from src.infra.repositories.queries.person_queries import PersonQuery
+from src.app.adapters.resident_service_adapter import ResidentServiceAdapter
+from src.app.contracts.announcement_service_contract import (
+    IAnnouncementService,
+)
+from src.app.services.announcement_service import (
+    AnnouncementService,
+)
+from src.app.services.create_maternal_health_record_service import CreateMaternalHealthRecordService
+from src.app.contracts.audience_service_contract import (
+    IAudienceService,
+)
+from src.app.services.audience_service import (
+    AudienceService,
+)
+from src.app.contracts.channel_service_contract import (
+    IChannelService,
+)
+from src.app.services.channel_service import (
+    ChannelService,
+)
 
 
 class AppContainer(containers.DeclarativeContainer):
@@ -231,8 +252,16 @@ class AppContainer(containers.DeclarativeContainer):
     )
 
     prenatal_followup_service = providers.Factory(
-        lambda repository: __import__("src.app.services.prenatal_followup_service", fromlist=["PrenatalFollowUpService"]).PrenatalFollowUpService(repository=repository),
+        lambda repository, queries: __import__("src.app.services.prenatal_followup_service", fromlist=["PrenatalFollowUpService"]).PrenatalFollowUpService(repository=repository, queries=queries),
         repository=infra.maternal_health_record_repository,
+        queries=infra.maternal_health_record_query,
+    )
+
+    create_maternal_health_record_service = providers.Factory(
+        CreateMaternalHealthRecordService,
+        repository=infra.maternal_health_record_repository,
+        person_query=infra.person_query,
+        mhr_query=infra.maternal_health_record_query,
     )
 
     maternal_status_service: providers.Factory[IMaternalRecordStatusService] = providers.Factory(
@@ -359,12 +388,14 @@ class AppContainer(containers.DeclarativeContainer):
     child_visit_domain_service = providers.Factory(
         ChildVisitDomainService,
         ch_repo=infra.child_health_record_repository,
+        child_monitoring_query=infra.child_monitoring_query,
     )
 
     child_visit_service: providers.Factory[IChildVisitService] = providers.Factory(
         ChildVisitService,
         ch_repo=infra.child_health_record_repository,
         domain_service=child_visit_domain_service,
+        child_monitoring_query=infra.child_monitoring_query,
     )
 
     birth_supplementation_domain_service = providers.Factory(
@@ -429,4 +460,33 @@ class AppContainer(containers.DeclarativeContainer):
     resident_service: providers.Factory[IResidentService] = providers.Factory(
         ResidentService,
         repo=infra.resident_repository,
+    )
+
+    # Query and adapter providers for resident/person lookups
+    person_query = providers.Factory(
+        PersonQuery,
+        db=infra.context,
+    )
+
+    resident_service_adapter = providers.Factory(
+        ResidentServiceAdapter,
+        resident_service=resident_service,
+        person_query=person_query,
+    )
+
+    # Announcement
+
+    announcement_service: providers.Factory[IAnnouncementService] = providers.Factory(
+        AnnouncementService,
+        announcement_repository=infra.announcement_repository,
+    )
+
+    audience_service: providers.Factory[IAudienceService] = providers.Factory(
+        AudienceService,
+        audience_repository=infra.audience_repository,
+    )
+
+    channel_service: providers.Factory[IChannelService] = providers.Factory(
+        ChannelService,
+        channel_repository=infra.channel_repository,
     )
