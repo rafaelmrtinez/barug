@@ -103,6 +103,7 @@
 <script defer src="{% static 'child_health/js/findPerson.js' %}"></script>
 {% comment %} <script defer src="{% static 'child_health/js/fetchParentBasics.js' %}"></script> {% endcomment %}
 <script defer src="{% static 'child_health/js/fetchChildBasics.js' %}"></script>
+<script src="{% static 'js/toast.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const nameField = document.getElementById('id_name');
@@ -158,9 +159,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Form submission with button state management
   if (form && saveBtn) {
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault(); // Prevent default form submission
+      
       if (isSubmitting) {
-        e.preventDefault();
+        return false;
+      }
+
+      // Check form validity
+      if (form.checkValidity && !form.checkValidity()) {
+        form.reportValidity();
         return false;
       }
 
@@ -174,15 +182,78 @@ document.addEventListener('DOMContentLoaded', () => {
       // Disable clear button during submission
       if (clearBtn) clearBtn.disabled = true;
 
-      // Re-enable buttons if form validation fails (no actual submit)
-      setTimeout(() => {
-        if (form.checkValidity && !form.checkValidity()) {
-          saveBtn.disabled = false;
-          saveBtn.innerHTML = originalHtml;
-          if (clearBtn) clearBtn.disabled = false;
-          isSubmitting = false;
+      try {
+        // Get CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        // Collect form data
+        const formData = new FormData(form);
+        
+        // Send POST request via fetch
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': csrfToken,
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: formData,
+          credentials: 'same-origin'
+        });
+
+        // Try to parse response as JSON
+        const contentType = response.headers.get('content-type');
+        let data = null;
+        
+        if (contentType && contentType.includes('application/json')) {
+          data = await response.json();
         }
-      }, 100);
+
+        if (response.ok) {
+          // Success - show toast and clear form
+          const successMsg = (data && data.message) || 'Child Health Record created successfully.';
+          if (typeof globalThis.CustomToast !== 'undefined' && typeof globalThis.CustomToast.show === 'function') {
+            globalThis.CustomToast.show(successMsg, { type: 'success', delay: 4000 });
+          }
+          
+          // Clear form after successful submission
+          setTimeout(() => {
+            clearAllFields();
+            if (nameField) nameField.focus();
+          }, 500);
+        } else {
+          // Server returned an error status
+          let errorMsg = 'Failed to create child health record. Please check the form and try again.';
+          
+          if (data && data.message) {
+            errorMsg = data.message;
+          } else if (!contentType || !contentType.includes('application/json')) {
+            // Server returned HTML instead of JSON, likely a validation error
+            errorMsg = 'Validation error. Please check all required fields are filled correctly.';
+          }
+          
+          if (typeof globalThis.CustomToast !== 'undefined' && typeof globalThis.CustomToast.show === 'function') {
+            globalThis.CustomToast.show(errorMsg, { type: 'error', delay: 5000 });
+          } else {
+            alert(errorMsg);
+          }
+          
+          console.error('Form submission error:', errorMsg, data);
+        }
+      } catch (err) {
+        console.error('Error submitting form:', err);
+        const errorMsg = 'An unexpected error occurred. Please try again later.';
+        if (typeof globalThis.CustomToast !== 'undefined' && typeof globalThis.CustomToast.show === 'function') {
+          globalThis.CustomToast.show(errorMsg, { type: 'error', delay: 5000 });
+        } else {
+          alert(errorMsg);
+        }
+      } finally {
+        // Re-enable buttons
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalHtml;
+        if (clearBtn) clearBtn.disabled = false;
+        isSubmitting = false;
+      }
     });
   }
 });

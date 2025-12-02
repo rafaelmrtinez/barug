@@ -246,6 +246,22 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
             )
             if not child_information_form.is_valid():
                 MessageUtility.push_form_errors_as_messages(request, child_information_form)
+                
+                # For AJAX requests, return JSON with validation errors
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    error_messages = []
+                    for field, errors in child_information_form.errors.items():
+                        for error in errors:
+                            if field == '__all__':
+                                error_messages.append(str(error))
+                            else:
+                                field_label = child_information_form.fields.get(field).label or field
+                                error_messages.append(f"{field_label}: {error}")
+                    return JsonResponse({
+                        "success": False, 
+                        "message": "; ".join(error_messages) if error_messages else "Form validation failed."
+                    }, status=400)
+                
                 return render(
                     request,
                     "child_health/create_chr.html",
@@ -273,6 +289,8 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
             if v_errors:
                 for e in v_errors:
                     messages.error(request, e)
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                    return JsonResponse({"success": False, "message": "; ".join(v_errors)}, status=400)
                 return render(
                     request,
                     "child_health/create_chr.html",
@@ -288,6 +306,8 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
             raw_birth_order = child_information_form.cleaned_data.get('birth_order')
             if raw_birth_order in (None, ""):
                 messages.error(request, "Birth order is required and cannot be empty.")
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                    return JsonResponse({"success": False, "message": "Birth order is required and cannot be empty."}, status=400)
                 return render(
                     request,
                     "child_health/create_chr.html",
@@ -306,6 +326,8 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
 
             if birth_order_int is None or birth_order_int < 1:
                 messages.error(request, "Birth order must be a number 1 or greater.")
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                    return JsonResponse({"success": False, "message": "Birth order must be a number 1 or greater."}, status=400)
                 return render(
                     request,
                     "child_health/create_chr.html",
@@ -323,6 +345,8 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
                 p_delivery_place_type_id=cleaned_vals.get('place_of_delivery'),
             )
             if not res or not isinstance(res, tuple):
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                    return JsonResponse({"success": False, "message": "Failed to create child health record."}, status=500)
                 messages.error(request, "Failed to create child health record.")
                 return render(
                     request,
@@ -333,6 +357,10 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
                         "page_title": "Create Child Health Record",
                     },
                 )
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.content_type == 'application/json':
+                return JsonResponse({"success": True, "message": "Child Health Record created successfully."}, status=200)
+            
             messages.success(request, "Child Health Record created successfully.")
             return redirect('child_health:create_child_health_record')
         child_information_form = ChildInformationForm(
@@ -353,6 +381,8 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
         )
     except ChildHealthRecordException as chre:
         logger.error("ChildHealthRecordExcetion: %s", chre.message)
+        if request.method == "POST" and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({"success": False, "message": chre.message}, status=400)
         messages.warning(request, f"Warning: {chre.message}")
         return render(
             request,
@@ -365,6 +395,8 @@ def create_child_health_record(request: HttpRequest) -> HttpResponse:
         )
     except Exception as e:
         logger.exception("create_child_health_record failed: %s", e)
+        if request.method == "POST" and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({"success": False, "message": "An error occurred while creating the child health record."}, status=500)
         messages.error(request, "An error occurred while creating the child health record.")
         return render(
             request,
