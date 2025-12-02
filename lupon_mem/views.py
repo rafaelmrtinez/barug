@@ -1742,6 +1742,7 @@ def add_form_choose_static(request, case_id: int):
     
     # ---- return only the three specific forms ----
     all_forms = [
+        ('KP-9-P2', 'SUMMON FOR THE RESPONDENT - PAGE 2'),
         ('KP-10', 'NOTICE FOR CONSTITUTION OF PANGKAT'),
         ('KP-11', 'NOTICE TO CHOSEN PANGKAT MEMBER'),
         ('KP-13', 'SUBPOENA LETTER')

@@ -778,7 +778,8 @@ def report_review(request: HttpRequest, report_id: int):
                    br.temp_complaint_title_id,
                    br.temp_case_nature_id,
                    ct.complaint_title_name,
-                   cn.case_name
+                   cn.case_name,
+                   to_char(br.incident_date, 'Month DD, YYYY') AS incident_date
             FROM blotter_report br
             LEFT JOIN payment_status ps ON ps.payment_status_id = br.payment_status_id
             LEFT JOIN addresss a        ON a.address_id = br.incident_address_id
@@ -880,6 +881,9 @@ def report_review(request: HttpRequest, report_id: int):
         # stored selections (if approved) - complaint_title_name is at index 10, case_name is at index 11
         "selected_complaint_title": rpt[10] if len(rpt) > 10 else None,  # complaint_title_name
         "selected_case_nature": rpt[11] if len(rpt) > 11 else None,      # case_name
+        
+        # incident date is at index 12
+        "incident_date": rpt[12] if len(rpt) > 12 else None,
         
         # Debug what we're passing to template
         "debug_complaint_title": rpt[10] if len(rpt) > 10 else "None",

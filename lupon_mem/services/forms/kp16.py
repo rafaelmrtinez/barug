@@ -333,9 +333,10 @@ class KP16Handler:
         if not (out.get("year_entered") or "").strip():
             out["year_entered"] = str(today.year)
 
-        # ---- Chairman → Lupon/Pangkat Chairman ----
+        # ---- Chairman → Barangay Captain ----
         if not (out.get("chairman") or "").strip():
-            out["chairman"] = get_lupon_chair_name(default=out.get("chairman", ""))
+            from .util import get_captain_name
+            out["chairman"] = get_captain_name(default=out.get("chairman", ""))
 
         # ---- Final sanitize & ensure all fields exist ----
         for k, v in list(out.items()):
