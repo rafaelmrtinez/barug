@@ -716,6 +716,29 @@ class HouseholdRepository(IHouseholdRepository):
                 "QRY_FAMILY_HISTORY_FILTER"
             ) from e
 
+    def fetch_family_history_detail(self, family_id: int) -> Optional[dict]:
+        """
+        Calls the RPC function get_family_unit_history_by_family_id to retrieve
+        family history details.
+        """
+        try:
+            sql = """
+                SELECT * FROM public.get_family_unit_history_by_family_id(%s);
+            """
+            rows = self._ctx.execute_query_to_dict(sql, [family_id])
+            
+            if not rows:
+                return None
+            
+            # Return the first row (should be only one for a specific family_id)
+            return rows[0] if rows else None
+            
+        except Exception as e:
+            raise QueryExecutionException(
+                f"fetch_family_history_detail failed: {e}",
+                "E_DB"
+            ) from e
+
     def search_family(self, search: str) -> list[dict]:
         """
         Search families by family head name, family number, or UFC number.

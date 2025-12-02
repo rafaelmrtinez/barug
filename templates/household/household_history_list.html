@@ -256,51 +256,5 @@
   </div>
 </div>
 
-<script>
-// PDF Generation
-(function() {
-  const pdfBtn = document.querySelector('.btn-generate-household-history-pdf');
-  if (!pdfBtn) return;
-
-  pdfBtn.addEventListener('click', async function(e) {
-    e.preventDefault();
-    
-    const params = new URLSearchParams(window.location.search);
-    const apiUrl = "{% url 'bhw:household_history_pdf_api' %}?" + params.toString();
-    
-    try {
-      this.disabled = true;
-      this.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generating...';
-      
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error('PDF generation failed');
-      }
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `household_history_Q${params.get('quarter') || ''}_${params.get('year') || ''}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      alert('Failed to generate PDF. Please try again.');
-    } finally {
-      this.disabled = false;
-      this.innerHTML = '{% bs_icon "file-text" extra_classes="me-2" %} Generate PDF';
-    }
-  });
-})();
-</script>
+<script src="{% static 'js/generate_household_history_pdf.js' %}"></script>
 {% endblock %}

@@ -167,13 +167,14 @@
           <thead>
             <tr>
               <th scope="col">Family No</th>
-              <th scope="col">UFC No</th>
+              <!-- <th scope="col">UFC No</th> -->
               <th scope="col">Family Head</th>
               <th scope="col">Household</th>
               <th scope="col">Type</th>
               <th scope="col">NHTS</th>
               <th scope="col">Indigent</th>
               <th scope="col">Created Date</th>
+              <th scope="col" class="text-end">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -181,7 +182,7 @@
               {% for row in page_obj.object_list %}
                 <tr>
                   <td><span class="id-pill">{{ row.family_num|default:"—" }}</span></td>
-                  <td><span class="id-pill">{{ row.ufc_num|default:"—" }}</span></td>
+                  <!-- <td><span class="id-pill">{{ row.ufc_num|default:"—" }}</span></td> -->
                   <td>{{ row.family_head_name|default:"—" }}</td>
                   <td>{{ row.household_num|default:"—" }}</td>
                   <td>
@@ -194,6 +195,12 @@
                   <td>{{ row.nhts_status_name|default:"—" }}</td>
                   <td>{{ row.indigent_status_name|default:"—" }}</td>
                   <td>{{ row.created_date|date:"M d, Y" }}</td>
+                  <td class="text-end">
+                    <a href="{% url 'bhw:family_history_detail' row.family_id %}" 
+                       class="btn btn-sm btn-brand-subtle">
+                      {% bs_icon 'eye' %} View
+                    </a>
+                  </td>
                 </tr>
               {% endfor %}
             {% else %}
@@ -258,31 +265,5 @@
   </div>
 </div>
 
-<script>
-// PDF Generation
-(function() {
-  const pdfBtn = document.querySelector('.btn-generate-family-history-pdf');
-  if (!pdfBtn) return;
-
-  pdfBtn.addEventListener('click', function(e) {
-    e.preventDefault();
-    
-    const params = new URLSearchParams(window.location.search);
-    
-    // Determine namespace from current URL
-    const currentPath = window.location.pathname;
-    let apiPath = '';
-    if (currentPath.includes('/secretary/')) {
-      apiPath = '/secretary/api/family-history/pdf/';
-    } else if (currentPath.includes('/captain/')) {
-      apiPath = '/captain/api/family-history/pdf/';
-    } else if (currentPath.includes('/bhw/')) {
-      apiPath = '/bhw/api/family-history/pdf/';
-    }
-    
-    const url = apiPath + '?' + params.toString();
-    window.open(url, '_blank');
-  });
-})();
-</script>
+<script src="{% static 'js/generate_family_history_pdf.js' %}"></script>
 {% endblock %}

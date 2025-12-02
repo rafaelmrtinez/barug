@@ -4,6 +4,8 @@ from doc_ingest.api.faq_ingest_api import FAQIngestAPI
 from common.api.residents_pdf_api import ResidentsPDFAPI
 from common.api.business_pdf_api import BusinessPDFAPI
 from common.api.household_pdf_api import HouseholdPDFAPI
+from common.api.household_history_pdf_api import HouseholdHistoryPDFAPI
+from common.api.family_history_pdf_api import FamilyHistoryPDFAPI
 from common.api.financial_pdf_api import FinancialPDFAPI
 from common.api.family_pdf_api import FamilyPDFAPI
 
@@ -69,6 +71,8 @@ urlpatterns = [
     path("api/residents/pdf/", ResidentsPDFAPI.as_view(), name="residents_pdf_api"),
     path("api/business/pdf/", BusinessPDFAPI.as_view(), name="business_pdf_api"),
     path("api/household/pdf/", HouseholdPDFAPI.as_view(), name="household_pdf_api"),
+    path("api/household/history/pdf/", HouseholdHistoryPDFAPI.as_view(), name="household_history_pdf_api"),
+    path("api/family/history/pdf/", FamilyHistoryPDFAPI.as_view(), name="family_history_pdf_api"),
     path("api/family/pdf/", FamilyPDFAPI.as_view(), name="family_pdf_api"),
     path("api/financial/pdf/", FinancialPDFAPI.as_view(), name="financial_pdf_api"),
 ]

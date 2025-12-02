@@ -18,8 +18,13 @@ from src.app.services.household_history_report_service import HouseholdHistoryRe
 
 logger = logging.getLogger(__name__)
 
-# BHW Role
-ROLE_BHW = ("BARANGAY HEALTH WORKER", "Barangay Health Worker", "bhw", "Super Admin")
+# Authorized roles
+AUTHORIZED_ROLES = (
+    "BARANGAY HEALTH WORKER", "Barangay Health Worker", "bhw",
+    "Barangay Secretary", "BARANGAY SECRETARY", "barangay secretary",
+    "Barangay Captain", "BARANGAY CAPTAIN", "barangay captain",
+    "Super Admin"
+)
 
 
 def _to_int_or_none(val):
@@ -33,7 +38,7 @@ def _to_int_or_none(val):
 
 
 @method_decorator(session_login_required, name='dispatch')
-@method_decorator(role_required(*ROLE_BHW), name='dispatch')
+@method_decorator(role_required(*AUTHORIZED_ROLES), name='dispatch')
 @method_decorator(nocache, name='dispatch')
 class HouseholdHistoryPDFAPI(View):
     """
@@ -118,7 +123,7 @@ class HouseholdHistoryPDFAPI(View):
             )
             
             response = HttpResponse(pdf_bytes, content_type="application/pdf")
-            response["Content-Disposition"] = f'attachment; filename="{filename}"'
+            response["Content-Disposition"] = f'inline; filename="{filename}"'
             return response
             
         except Exception as e:

@@ -1537,3 +1537,37 @@ def family_history_list(
             'indigent_status': indigent_status,
         },
     })
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@nocache
+@inject
+def family_history_detail(
+    request: HttpRequest,
+    family_id: int,
+    household_repo = Provide[AppContainer.household_repository],
+) -> HttpResponse:
+    """
+    Display detailed family history information.
+    Only accessible by BHW.
+    """
+    user_role = request.session.get("authenticated_role_name", "")
+    
+    try:
+        family_data = household_repo.fetch_family_history_detail(family_id)
+        
+        if not family_data:
+            messages.error(request, "Family history record not found.")
+            return redirect("bhw:family_history_list")
+        
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception("Error fetching family history detail")
+        messages.error(request, f"Error fetching family history: {str(e)}")
+        return redirect("bhw:family_history_list")
+    
+    return render(request, "family/family_history_detail.html", {
+        'page_path': f'{user_role} / Family History / {family_data.get("family_num", "")}',
+        'page_title': f'Family History {family_data.get("family_num", "")}',
+        'family': family_data,
+    })
