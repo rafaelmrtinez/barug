@@ -85,7 +85,8 @@ class Admin(models.Model):
         password: str = None,
         email: str = None,
         purok_ids: list[int] = None,
-        schedules_json: list[dict] = None
+        schedules_json: list[dict] = None,
+        reason: str = None
     ) -> dict:
         with connection.cursor() as cursor:
             schedules_jsonb = None
@@ -94,7 +95,7 @@ class Admin(models.Model):
             
             cursor.execute("""
                 SELECT * FROM update_staff_information(
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s
                 )
             """, [
                 staff_id,
@@ -105,7 +106,8 @@ class Admin(models.Model):
                 password,
                 email,
                 purok_ids,
-                schedules_jsonb
+                schedules_jsonb,
+                reason
             ])
             
             result = cursor.fetchone()
@@ -283,3 +285,81 @@ class Admin(models.Model):
             if row:
                 return dict(zip(columns, row))
             return None
+
+    @staticmethod
+    def get_staff_acc_req_status_history(p_staff_acc_req_id):
+        """Get status history for a staff account request"""
+        try:
+            with connection.cursor() as cursor:
+                cursor.callproc('get_staff_acc_req_status_history', [p_staff_acc_req_id])
+                cols = [col[0] for col in cursor.description]
+                rows = cursor.fetchall()
+                return [dict(zip(cols, row)) for row in rows]
+        except Exception as e:
+            logger.error("Error getting staff account request status history: %s", e)
+            raise e
+
+    @staticmethod
+    def get_staff_account_req_list_by_requester(p_requested_by_id):
+        """Get staff account requests list filtered by requester ID"""
+        try:
+            with connection.cursor() as cursor:
+                cursor.callproc('get_staff_account_req_list_by_requester', [p_requested_by_id])
+                cols = [col[0] for col in cursor.description]
+                rows = cursor.fetchall()
+                return [dict(zip(cols, row)) for row in rows]
+        except Exception as e:
+            logger.error("Error getting staff account requests by requester: %s", e)
+            raise e
+
+    @staticmethod
+    def get_staff_acc_req_profile_progress(p_staff_acc_req_id):
+        """Get detailed staff account request profile with progress info"""
+        try:
+            with connection.cursor() as cursor:
+                cursor.callproc('get_staff_acc_req_profile_progress', [p_staff_acc_req_id])
+                cols = [col[0] for col in cursor.description]
+                rows = cursor.fetchall()
+                return [dict(zip(cols, row)) for row in rows]
+        except Exception as e:
+            logger.error("Error getting staff account request profile: %s", e)
+            raise e
+
+    @staticmethod
+    def get_staff_request_statistics_by_requester(p_requested_by_id):
+        """Get request statistics for a specific requester"""
+        try:
+            with connection.cursor() as cursor:
+                cursor.callproc('get_staff_request_statistics_by_requester', [p_requested_by_id])
+                cols = [col[0] for col in cursor.description]
+                rows = cursor.fetchall()
+                return [dict(zip(cols, row)) for row in rows]
+        except Exception as e:
+            logger.error("Error getting staff request statistics: %s", e)
+            raise e
+
+    @staticmethod
+    def get_staff_account_req_list_by_all():
+        """Get all staff account requests using the database function"""
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT * FROM get_staff_account_req_list_by_all()")
+                cols = [col[0] for col in cursor.description]
+                rows = cursor.fetchall()
+                return [dict(zip(cols, row)) for row in rows]
+        except Exception as e:
+            logger.error("Error getting all staff account requests: %s", e)
+            raise e
+
+    @staticmethod
+    def get_staff_request_statistics():
+        """Get overall staff request statistics using the database function"""
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT * FROM get_staff_request_statistics()")
+                cols = [col[0] for col in cursor.description]
+                rows = cursor.fetchall()
+                return [dict(zip(cols, row)) for row in rows]
+        except Exception as e:
+            logger.error("Error getting staff request statistics: %s", e)
+            raise e

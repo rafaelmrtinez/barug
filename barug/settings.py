@@ -168,6 +168,8 @@ TEMPLATES = [
                 "lupon_mem.context_processors.lupon_badge_counts",
                 "clerk.context_processors.app_badge_counts",
                 "treasurer.context_processors.queue_counts",
+                "staff_admin.context_processors.staff_admin_badge_counts",
+                "secretary.context_processors.secretary_badge_counts",
             ],
         },
     },

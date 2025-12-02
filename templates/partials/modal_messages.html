@@ -73,7 +73,7 @@
 </style>
 
 {% for message in messages %}
-  {% if 'auth' in message.tags %}
+  <!--  -->
   {% with tag=message.tags|default:"info" %}
     <div class="modal fade message-modal" id="messageModal{{ forloop.counter }}" tabindex="-1" style="z-index: 9999;">
       <div class="modal-dialog modal-dialog-centered">
@@ -112,7 +112,6 @@
       </div>
     </div>
   {% endwith %}
-  {% endif %}
 {% endfor %}
 
 <script>

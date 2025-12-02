@@ -19,6 +19,9 @@ urlpatterns = [
     path("staff_account_requests_list/pending_staff_details/<str:p_staff_acc_req_id>/", views.pending_staff_dets , name="pending_staff_details"),
 
     path("staff-requests/process/", views.process_staff_request, name="process_staff_request"),
+    path("my-requests/", views.staff_requests_list, name="staff_requests_list"),
+    path("my-requests/<int:request_id>/", views.staff_request_detail, name="staff_request_detail"),
+    path("all-staff-requests/", views.all_staff_requests_list, name="all_staff_requests_list"),
 
     path("api/staff/search/", views.staff_search_api, name="staff_search_api"),
     path("api/staff/filter/", views.staff_filter_api, name="staff_filter_api"),

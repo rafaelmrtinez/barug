@@ -22,6 +22,8 @@
         <p class="text-muted mb-0">Manage your profile, security, and preferences</p>
       </div>
 
+      {% include 'partials/modal_messages.html' %}
+
       <div class="row g-4">
         <!-- Sidebar Navigation -->
         <div class="col-lg-3">
@@ -227,17 +229,33 @@
                 <div class="col-12">
                   <div class="settings-card card">
                     <div class="card-body">
-                      <h6 class="card-title d-flex align-items-center gap-2 mb-4">
-                        {% bs_icon 'person-fill' %} Personal Information
-                      </h6>
+                      <div class="d-flex align-items-center justify-content-between mb-4">
+                        <h6 class="card-title d-flex align-items-center gap-2 mb-0">
+                          {% bs_icon 'person-fill' %} Personal Information
+                        </h6>
+                        {% if profile.residential_status == 'Non Resident' and user_role == 'Admin' or user_role == 'Super Admin' %}
+                        <button type="button" class="btn btn-submit btn-sm" id="editPersonalInfoBtn">
+                          {% bs_icon 'pencil-square' %} Edit
+                        </button>
+                        {% endif %}
+                      </div>
+                      {% if profile.residential_status != 'Non Resident' %}
+                      <div class="alert alert-info d-flex align-items-center mb-4" role="alert">
+                        {% bs_icon 'info-circle-fill' extra_classes='me-2' %}
+                        <small>Only Barangay Health Workers can update your personal information.</small>
+                      </div>
+                      {% endif %}
                       <div class="row g-3">
+                      </div>
+                      <div class="row g-3">
+                        <!-- Basic Information -->
                         <div class="col-md-3">
                           <div class="info-card">
                             <div class="d-flex align-items-center gap-2 mb-2">
                               {% bs_icon 'person-badge' color='var(--bs-danger-text-emphasis)' %}
                               <small class="text-muted fw-semibold">First Name</small>
                             </div>
-                            <div class="fw-bold text-dark">{{ profile.first_name|default:"—" }}</div>
+                            <div class="fw-bold text-dark">{{ profile.first_name|title|default:"—" }}</div>
                           </div>
                         </div>
                         <div class="col-md-3">
@@ -246,7 +264,7 @@
                               {% bs_icon 'person-badge' color='var(--bs-danger-text-emphasis)' %}
                               <small class="text-muted fw-semibold">Middle Name</small>
                             </div>
-                            <div class="fw-bold text-dark">{{ profile.middle_name|default:"—" }}</div>
+                            <div class="fw-bold text-dark">{{ profile.middle_name|title|default:"—" }}</div>
                           </div>
                         </div>
                         <div class="col-md-3">
@@ -255,7 +273,7 @@
                               {% bs_icon 'person-badge' color='var(--bs-danger-text-emphasis)' %}
                               <small class="text-muted fw-semibold">Last Name</small>
                             </div>
-                            <div class="fw-bold text-dark">{{ profile.last_name|default:"—" }}</div>
+                            <div class="fw-bold text-dark">{{ profile.last_name|title|default:"—" }}</div>
                           </div>
                         </div>
                         <div class="col-md-3">
@@ -264,7 +282,22 @@
                               {% bs_icon 'person-badge' color='var(--bs-danger-text-emphasis)' %}
                               <small class="text-muted fw-semibold">Suffix</small>
                             </div>
-                            <div class="fw-bold text-dark">{{ profile.suffix|default:"—" }}</div>
+                            <div class="fw-bold text-dark">{{ profile.suffix|title|default:"—" }}</div>
+                          </div>
+                        </div>
+                        
+                        <!-- Personal Details -->
+                        <div class="col-md-4">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'calendar-date' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Birth Date</small>
+                            </div>
+                            {% if profile.birth_date %}
+                              <div class="fw-bold text-dark">{{ profile.birth_date|date:"M d, Y" }}</div>
+                            {% else %}
+                              <div class="text-muted">Not Provided</div>
+                            {% endif %}
                           </div>
                         </div>
                         <div class="col-md-4">
@@ -275,19 +308,6 @@
                             </div>
                             {% if profile.sex %}
                               <div class="fw-bold text-dark">{{ profile.sex }}</div>
-                            {% else %}
-                              <div class="text-muted">Not Provided</div>
-                            {% endif %}
-                          </div>
-                        </div>
-                        <div class="col-md-4">
-                          <div class="info-card">
-                            <div class="d-flex align-items-center gap-2 mb-2">
-                              {% bs_icon 'calendar-date' color='var(--bs-danger-text-emphasis)' %}
-                              <small class="text-muted fw-semibold">Birth Date</small>
-                            </div>
-                            {% if profile.birth_date %}
-                              <div class="fw-bold text-dark">{{ profile.birth_date|date:"M d, Y" }}</div>
                             {% else %}
                               <div class="text-muted">Not Provided</div>
                             {% endif %}
@@ -332,6 +352,9 @@
                             {% endif %}
                           </div>
                         </div>
+
+                        
+                        <!-- Contact Information -->
                         <div class="col-md-4">
                           <div class="info-card">
                             <div class="d-flex align-items-center gap-2 mb-2">
@@ -358,14 +381,86 @@
                             {% endif %}
                           </div>
                         </div>
-                        <div class="col-md-8">
+                        <div class="col-md-4">
                           <div class="info-card">
                             <div class="d-flex align-items-center gap-2 mb-2">
-                              {% bs_icon 'geo-alt-fill' color='var(--bs-danger-text-emphasis)' %}
-                              <small class="text-muted fw-semibold">Home Address</small>
+                              {% bs_icon 'house-door' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Residential Status</small>
                             </div>
-                            {% if profile.home_address %}
-                              <div class="fw-bold text-dark">{{ profile.home_address }}</div>
+                            {% if profile.residential_status %}
+                              <div class="fw-bold text-dark">{{ profile.residential_status }}</div>
+                            {% else %}
+                              <div class="text-muted">Not Provided</div>
+                            {% endif %}
+                          </div>
+                        </div>
+                        
+                        <!-- Socioeconomic Information -->
+                        <div class="col-12 mt-4">
+                          <h6 class="text-muted mb-3 d-flex align-items-center gap-2">
+                            {% bs_icon 'graph-up' color='var(--bs-danger-text-emphasis)' %} Socioeconomic Information
+                          </h6>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'briefcase' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Occupation</small>
+                            </div>
+                            {% if profile.occupation %}
+                              <div class="fw-bold text-dark">{{ profile.occupation|title }}</div>
+                            {% else %}
+                              <div class="text-muted">Not Provided</div>
+                            {% endif %}
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'currency-dollar' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Monthly Income</small>
+                            </div>
+                            {% if profile.monthly_income %}
+                              <div class="fw-bold text-dark">{{ profile.monthly_income }}</div>
+                            {% else %}
+                              <div class="text-muted">Not Provided</div>
+                            {% endif %}
+                          </div>
+                        </div>
+                        <div class="col-md-4">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'mortarboard' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Education</small>
+                            </div>
+                            {% if profile.education %}
+                              <div class="fw-bold text-dark">{{ profile.education }}</div>
+                            {% else %}
+                              <div class="text-muted">Not Provided</div>
+                            {% endif %}
+                          </div>
+                        </div>
+                        <div class="col-md-6">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'person-workspace' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Employment Status</small>
+                            </div>
+                            {% if profile.employment_status %}
+                              <div class="fw-bold text-dark">{{ profile.employment_status }}</div>
+                            {% else %}
+                              <div class="text-muted">Not Provided</div>
+                            {% endif %}
+                          </div>
+                        </div>
+                        <div class="col-md-6">
+                          <div class="info-card">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                              {% bs_icon 'shield-check' color='var(--bs-danger-text-emphasis)' %}
+                              <small class="text-muted fw-semibold">Government Programs</small>
+                            </div>
+                            {% if profile.government_programs %}
+                              <div class="fw-bold text-dark">{{ profile.government_programs }}</div>
                             {% else %}
                               <div class="text-muted">Not Provided</div>
                             {% endif %}
@@ -517,18 +612,32 @@
                       <div class="row g-3">
                         <div class="col-md-4">
                           <div class="info-card">
-                            <div class="d-flex align-items-center gap-2 mb-2">
-                              {% bs_icon 'person-fill' color='var(--bs-danger-text-emphasis)' %}
-                              <small class="text-muted fw-semibold">Username</small>
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                              <div class="d-flex align-items-center gap-2">
+                                {% bs_icon 'person-fill' color='var(--bs-danger-text-emphasis)' %}
+                                <small class="text-muted fw-semibold">Username</small>
+                              </div>
+                              {% if user_role == 'Super Admin' %}
+                              <button type="button" class="btn btn-sm p-1" id="editUsernameBtn" style="color: var(--bs-danger-text-emphasis);" title="Edit Username">
+                                {% bs_icon 'pencil' size='0.9em' %}
+                              </button>
+                              {% endif %}
                             </div>
                             <div class="fw-bold text-dark">{{ profile.username|default:"—" }}</div>
                           </div>
                         </div>
                         <div class="col-md-4">
                           <div class="info-card">
-                            <div class="d-flex align-items-center gap-2 mb-2">
-                              {% bs_icon 'envelope-fill' color='var(--bs-danger-text-emphasis)' %}
-                              <small class="text-muted fw-semibold">Email</small>
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                              <div class="d-flex align-items-center gap-2">
+                                {% bs_icon 'envelope-fill' color='var(--bs-danger-text-emphasis)' %}
+                                <small class="text-muted fw-semibold">Email</small>
+                              </div>
+                              {% if user_role == 'Super Admin' %}
+                              <button type="button" class="btn btn-sm p-1" id="editEmailBtn" style="color: var(--bs-danger-text-emphasis);" title="Edit Email">
+                                {% bs_icon 'pencil' size='0.9em' %}
+                              </button>
+                              {% endif %}
                             </div>
                             {% if profile.email_address %}
                               <div class="fw-bold text-dark">{{ profile.email_address }}</div>
@@ -649,7 +758,7 @@
                         </li>
                         <li class="nav-item" role="presentation">
                           <button class="nav-link" id="operation-log-tab" data-bs-toggle="pill" data-bs-target="#operation-log" type="button" role="tab" aria-controls="operation-log" aria-selected="false">
-                            {% bs_icon 'gear' extra_classes='me-2' %} Operation Log
+                            {% bs_icon 'gear' extra_classes='me-2' %} User Log
                           </button>
                         </li>
                       </ul>
@@ -825,7 +934,7 @@
             <div class="row g-2 small">
               <div class="col-12 col-sm-6">
                 <div id="modal-req-length" class="text-muted mb-1">
-                  <span class="me-2">✗</span>At least 8 characters
+                  <span class="me-2">✗</span>At least 16 characters
                 </div>
                 <div id="modal-req-upper" class="text-muted mb-1">
                   <span class="me-2">✗</span>Uppercase letter (A-Z)
@@ -902,7 +1011,549 @@
 <script>
 // Pass profile email to JavaScript
 const profileEmail = '{{ profile.email_address|default:"" }}';
+const userRole = '{{ user_role }}';
+
+// Pass profile data for autofill
+const profileData = {
+  person_id: '{% if profile.person_id %}{{ profile.person_id }}{% endif %}',
+  first_name: '{% if profile.first_name %}{{ profile.first_name|title|escapejs }}{% endif %}',
+  middle_name: '{% if profile.middle_name %}{{ profile.middle_name|title|escapejs }}{% endif %}',
+  last_name: '{% if profile.last_name %}{{ profile.last_name|title|escapejs }}{% endif %}',
+  suffix: '{% if profile.suffix %}{{ profile.suffix|title|escapejs }}{% endif %}',
+  birth_date: '{% if profile.birth_date %}{{ profile.birth_date|date:"Y-m-d" }}{% endif %}',
+  email_address: '{% if profile.email_address %}{{ profile.email_address|escapejs }}{% endif %}',
+  mobile_number: '{% if profile.mobile_number %}{{ profile.mobile_number|escapejs }}{% endif %}',
+  occupation: '{% if profile.occupation %}{{ profile.occupation|title|escapejs }}{% endif %}',
+  sex: '{% if profile.sex %}{{ profile.sex|escapejs }}{% endif %}',
+  civil_status: '{% if profile.civil_status %}{{ profile.civil_status|escapejs }}{% endif %}',
+  nationality: '{% if profile.nationality %}{{ profile.nationality|escapejs }}{% endif %}',
+  religion: '{% if profile.religion %}{{ profile.religion|escapejs }}{% endif %}',
+  education_id: '{% if profile.education_id %}{{ profile.education_id }}{% endif %}',
+  employment_status_id: '{% if profile.employment_status_id %}{{ profile.employment_status_id }}{% endif %}',
+  personal_monthly_income_id: '{% if profile.personal_monthly_income_id %}{{ profile.personal_monthly_income_id }}{% endif %}',
+  government_program_ids: {% if profile.government_program_ids %}{{ profile.government_program_ids|safe }}{% else %}[]{% endif %},
+  street: '{% if profile.home_street %}{{ profile.home_street|title|escapejs }}{% endif %}',
+  sitio_purok: '{% if profile.home_purok %}{{ profile.home_purok|title|escapejs }}{% endif %}',
+  barangay: '{% if profile.home_barangay %}{{ profile.home_barangay|title|escapejs }}{% endif %}',
+  city: '{% if profile.home_city %}{{ profile.home_city|title|escapejs }}{% endif %}',
+  province: '{% if profile.home_province %}{{ profile.home_province|title|escapejs }}{% endif %}'
+};
 </script>
+
+<!-- Edit Personal Information Modal -->
+{% if user_role == 'Admin' or user_role == 'Super Admin' %}
+<div class="modal fade" id="editPersonalInfoModal" tabindex="-1" aria-labelledby="editPersonalInfoModalLabel" aria-hidden="true" style="z-index: 9999;">
+  <div class="modal-dialog modal-xl" style="max-width: 1200px; margin: 1.75rem auto; position: relative; top: 50%; transform: translateY(-50%);">
+    <div class="modal-content border-0 shadow-lg px-4" style="border-radius: 16px;">
+      <div class="modal-header border-0">
+        <h5 class="modal-title" id="editPersonalInfoModalLabel">Edit Personal Information</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{% url 'authentication:account_settings' %}">
+        {% csrf_token %}
+        <input type="hidden" name="form_type" value="update_personal_info">
+        <input type="hidden" name="person_id" value="{{ profile.person_id }}">
+        <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+          <div class="row g-3">
+            <!-- Basic Information -->
+            <div class="col-12"><h6 class="text-muted mb-0">Basic Information</h6></div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="edit_first_name" name="first_name" value="{% if profile.first_name %}{{ profile.first_name }}{% endif %}" required>
+                <label for="edit_first_name">First Name *</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="edit_middle_name" name="middle_name" value="{% if profile.middle_name %}{{ profile.middle_name }}{% endif %}">
+                <label for="edit_middle_name">Middle Name</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="edit_last_name" name="last_name" value="{% if profile.last_name %}{{ profile.last_name }}{% endif %}" required>
+                <label for="edit_last_name">Last Name *</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="edit_suffix" name="suffix" value="{% if profile.suffix %}{{ profile.suffix }}{% endif %}">
+                <label for="edit_suffix">Suffix</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="date" class="form-control" id="edit_birthdate" name="birthdate" value="{% if profile.birth_date %}{{ profile.birth_date|date:'Y-m-d' }}{% endif %}">
+                <label for="edit_birthdate">Birth Date</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="edit_sex" name="sex_id">
+                  <option value="">Select Sex</option>
+                  <option value="1">Male</option>
+                  <option value="2">Female</option>
+                </select>
+                <label for="edit_sex">Sex</label>
+              </div>
+            </div>
+            
+            <!-- Personal Details -->
+            <div class="col-12"><h6 class="text-muted mb-0 mt-3">Personal Details</h6></div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="edit_civil_status" name="civil_status_id">
+                  <option value="">Select Civil Status</option>
+                  <option value="1">Single</option>
+                  <option value="2">Married</option>
+                  <option value="3">Widowed</option>
+                  <option value="4">Separated</option>
+                  <option value="5">Divorced</option>
+                </select>
+                <label for="edit_civil_status">Civil Status</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="edit_nationality" name="nationality_id">
+                  <option value="">Select Nationality</option>
+                  <option value="1">American</option>
+                  <option value="2">Australian</option>
+                  <option value="3">Brazilian</option>
+                  <option value="4">British</option>
+                  <option value="5">Canadian</option>
+                  <option value="6">Chinese</option>
+                  <option value="7">Filipino</option>
+                  <option value="8">French</option>
+                  <option value="9">German</option>
+                  <option value="10">Indian</option>
+                  <option value="11">Indonesian</option>
+                  <option value="12">Italian</option>
+                  <option value="13">Japanese</option>
+                  <option value="14">Korean</option>
+                  <option value="15">Malaysian</option>
+                  <option value="16">Russian</option>
+                  <option value="17">Saudi</option>
+                  <option value="18">Spanish</option>
+                  <option value="19">Thai</option>
+                  <option value="20">Vietnamese</option>
+                  <option value="21">Others</option>
+                </select>
+                <label for="edit_nationality">Nationality</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="edit_religion" name="religion_id">
+                  <option value="">Select Religion</option>
+                  <option value="1">Agnostic</option>
+                  <option value="2">Born Again</option>
+                  <option value="3">Buddhist</option>
+                  <option value="4">Christian</option>
+                  <option value="5">Evangelical</option>
+                  <option value="6">Hindu</option>
+                  <option value="7">Iglesia Ni Cristo</option>
+                  <option value="8">Islam</option>
+                  <option value="9">Jehovah's Witness</option>
+                  <option value="10">Orthodox</option>
+                  <option value="11">Protestant</option>
+                  <option value="12">Roman Catholic</option>
+                  <option value="13">Seventh-Day Adventist</option>
+                  <option value="14">Others</option>
+                </select>
+                <label for="edit_religion">Religion</label>
+              </div>
+            </div>
+
+            
+            <!-- Contact Information -->
+            <div class="col-12"><h6 class="text-muted mb-0 mt-3">Contact Information</h6></div>
+            <div class="col-md-6">
+              <div class="form-floating">
+                <input type="tel" class="form-control" id="edit_mobile_number" name="mobile_number" value="{% if profile.mobile_number %}{{ profile.mobile_number }}{% endif %}">
+                <label for="edit_mobile_number">Mobile Number</label>
+              </div>
+            </div>
+            
+            <!-- Address Information -->
+            <div class="col-12"><h6 class="text-muted mb-0 mt-3">Address Information</h6></div>
+            <div class="col-md-6">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="edit_street" name="street" value="{% if profile.home_street %}{{ profile.home_street|title }}{% endif %}">
+                <label for="edit_street">Street</label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="edit_sitio_purok" name="sitio_purok" value="{% if profile.home_purok %}{{ profile.home_purok|title }}{% endif %}">
+                <label for="edit_sitio_purok">Sitio/Purok</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="edit_barangay" name="barangay" value="{% if profile.home_barangay %}{{ profile.home_barangay|title }}{% endif %}">
+                <label for="edit_barangay">Barangay</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="edit_city" name="city" value="{% if profile.home_city %}{{ profile.home_city|title }}{% endif %}">
+                <label for="edit_city">City</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="edit_province" name="province" value="{% if profile.home_province %}{{ profile.home_province|title }}{% endif %}">
+                <label for="edit_province">Province</label>
+              </div>
+            </div>
+            
+            <!-- Socioeconomic Information -->
+            <div class="col-12"><h6 class="text-muted mb-0 mt-3">Socioeconomic Information</h6></div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="edit_occupation" name="occupation" value="{% if profile.occupation %}{{ profile.occupation }}{% endif %}">
+                <label for="edit_occupation">Occupation</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="edit_monthly_income" name="monthly_income_id">
+                  <option value="">Select Monthly Income</option>
+                  <option value="1">Below ₱5,000</option>
+                  <option value="2">₱5,001 - ₱10,000</option>
+                  <option value="3">₱10,001 - ₱15,000</option>
+                  <option value="4">₱15,001 - ₱20,000</option>
+                  <option value="5">₱20,001 - ₱30,000</option>
+                  <option value="6">₱30,001 - ₱50,000</option>
+                  <option value="7">₱50,001 - ₱75,000</option>
+                  <option value="8">₱75,001 - ₱100,000</option>
+                  <option value="9">Above ₱100,000</option>
+                </select>
+                <label for="edit_monthly_income">Monthly Income</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="edit_education" name="education_id">
+                  <option value="">Select Education Level</option>
+                  <option value="1">No Formal Education</option>
+                  <option value="2">Kinder</option>
+                  <option value="3">Elementary Student</option>
+                  <option value="4">Elementary Undergrad</option>
+                  <option value="5">Elementary Graduate</option>
+                  <option value="6">High School Student</option>
+                  <option value="7">High School Undergrad</option>
+                  <option value="8">High School Graduate</option>
+                  <option value="9">Vocational Course</option>
+                  <option value="10">College Student</option>
+                  <option value="11">College Undergrad</option>
+                  <option value="12">College Graduate</option>
+                  <option value="13">Postgraduate</option>
+                </select>
+                <label for="edit_education">Education Level</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="edit_employment_status" name="employment_status_id">
+                  <option value="">Select Employment Status</option>
+                  <option value="1">Employed</option>
+                  <option value="2">Unemployed</option>
+                  <option value="3">OFW</option>
+                  <option value="4">Student</option>
+                  <option value="5">Retired</option>
+                  <option value="6">Self-Employed</option>
+                  <option value="7">Pensioner</option>
+                  <option value="8">Housewife</option>
+                  <option value="9">Freelancer</option>
+                  <option value="10">Looking For Work</option>
+                  <option value="11">Part-Time</option>
+                  <option value="12">Full-Time</option>
+                  <option value="13">Underemployed</option>
+                  <option value="14">Others</option>
+                </select>
+                <label for="edit_employment_status">Employment Status</label>
+              </div>
+            </div>
+            
+            <!-- Government Programs -->
+            <div class="col-12"><h6 class="text-muted mb-0 mt-3">Government Programs</h6></div>
+            <div class="col-12">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_4ps" name="government_programs[]" value="1">
+                <label class="form-check-label" for="prog_4ps">4PS</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_gsis" name="government_programs[]" value="2">
+                <label class="form-check-label" for="prog_gsis">GSIS</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_philhealth" name="government_programs[]" value="3">
+                <label class="form-check-label" for="prog_philhealth">PHILHEALTH</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_pwd" name="government_programs[]" value="4">
+                <label class="form-check-label" for="prog_pwd">PWD</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_senior" name="government_programs[]" value="5">
+                <label class="form-check-label" for="prog_senior">SENIOR CITIZEN</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_sss" name="government_programs[]" value="6">
+                <label class="form-check-label" for="prog_sss">SSS</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_none" name="government_programs[]" value="7">
+                <label class="form-check-label" for="prog_none">NONE</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_others" name="government_programs[]" value="8">
+                <label class="form-check-label" for="prog_others">OTHERS</label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-floating">
+                <select class="form-select" id="edit_reason" name="reason" required>
+                  <option value="">Select Reason</option>
+                  <option value="update_profile">Update Profile Information</option>
+                  <option value="correction">Data Correction</option>
+                  <option value="change_status">Status Change</option>
+                  <option value="admin_update">Administrative Update</option>
+                  <option value="other">Other</option>
+                </select>
+                <label for="edit_reason">Reason for Update *</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-reset" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-submit">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Username Modal -->
+<div class="modal fade" id="editUsernameModal" tabindex="-1" aria-labelledby="editUsernameModalLabel" aria-hidden="true" style="z-index: 9999;">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content border-0 shadow-lg px-4" style="border-radius: 16px;">
+      <div class="modal-header border-0">
+        <h5 class="modal-title" id="editUsernameModalLabel">Edit Username</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="editUsernameForm">
+        {% csrf_token %}
+        <input type="hidden" name="form_type" value="update_username">
+        <div class="modal-body">
+          <div class="form-floating">
+            <input type="text" class="form-control" id="edit_username" name="username" value="{{ profile.username }}" required>
+            <label for="edit_username">Username</label>
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-reset" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-submit">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Email Modal -->
+<div class="modal fade" id="editEmailModal" tabindex="-1" aria-labelledby="editEmailModalLabel" aria-hidden="true" style="z-index: 9999;">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content border-0 shadow-lg px-4" style="border-radius: 16px;">
+      <div class="modal-header border-0">
+        <h5 class="modal-title" id="editEmailModalLabel">Edit Email</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="editEmailForm">
+        {% csrf_token %}
+        <input type="hidden" name="form_type" value="update_email">
+        <div class="modal-body">
+          <div class="form-floating">
+            <input type="email" class="form-control" id="edit_email_field" name="email" value="{{ profile.email_address|default:'' }}">
+            <label for="edit_email_field">Email Address</label>
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-reset" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-submit">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Error Modal -->
+<div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true" style="z-index: 9999;">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+      <div class="modal-body text-center p-4">
+        <div class="mb-3">
+          <div class="d-inline-flex align-items-center justify-content-center" id="messageIcon" style="width: 64px; height: 64px; border-radius: 50%; margin-bottom: 16px;">
+            <!-- Icon will be set by JavaScript -->
+          </div>
+        </div>
+        <h5 class="modal-title fw-semibold mb-2" id="messageTitle" style="color: #2d3748;">Information</h5>
+        <p id="messageText" class="text-muted mb-4" style="line-height: 1.5;"><!-- Message will be set by JavaScript --></p>
+        <div class="d-flex gap-2 justify-content-center">
+          <button type="button" class="btn btn-reset px-3 py-2" data-bs-dismiss="modal" style="border-radius: 8px; font-weight: 500;">Cancel</button>
+          <button type="button" class="btn btn-submit px-4 py-2" style="border-radius: 8px; font-weight: 500; min-width: 100px;">Got it</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Inline password validation for 16 characters
+document.addEventListener('DOMContentLoaded', function() {
+  const modalPasswordInput = document.getElementById('id_new_password');
+  const modalRequirements = {
+    length: { element: document.getElementById('modal-req-length'), regex: /.{16,}/ },
+    upper: { element: document.getElementById('modal-req-upper'), regex: /[A-Z]/ },
+    lower: { element: document.getElementById('modal-req-lower'), regex: /[a-z]/ },
+    number: { element: document.getElementById('modal-req-number'), regex: /[0-9]/ },
+    special: { element: document.getElementById('modal-req-special'), regex: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/ }
+  };
+  
+  if (modalPasswordInput) {
+    modalPasswordInput.addEventListener('input', function() {
+      const password = this.value;
+      let score = 0;
+      
+      Object.keys(modalRequirements).forEach(key => {
+        const req = modalRequirements[key];
+        const met = req.regex.test(password);
+        
+        if (met) {
+          score++;
+          req.element.className = 'text-success mb-1';
+          req.element.querySelector('span').textContent = '✓';
+        } else {
+          req.element.className = 'text-muted mb-1';
+          req.element.querySelector('span').textContent = '✗';
+        }
+      });
+      
+      const modalStrengthBar = document.getElementById('modal-strength-bar');
+      const modalStrengthText = document.getElementById('modal-strength-text');
+      const percentage = (score / 5) * 100;
+      modalStrengthBar.style.width = percentage + '%';
+      
+      if (score === 0) {
+        modalStrengthBar.className = 'progress-bar bg-secondary';
+        modalStrengthText.textContent = 'Weak';
+        modalStrengthText.className = 'text-muted ms-2';
+      } else if (score <= 2) {
+        modalStrengthBar.className = 'progress-bar bg-danger';
+        modalStrengthText.textContent = 'Weak';
+        modalStrengthText.className = 'text-danger ms-2';
+      } else if (score <= 4) {
+        modalStrengthBar.className = 'progress-bar bg-warning';
+        modalStrengthText.textContent = 'Medium';
+        modalStrengthText.className = 'text-warning ms-2';
+      } else {
+        modalStrengthBar.className = 'progress-bar bg-success';
+        modalStrengthText.textContent = 'Strong';
+        modalStrengthText.className = 'text-success ms-2';
+      }
+    });
+  }
+});
+</script>
+
+<script>
+// Personal info form validation
+document.addEventListener('DOMContentLoaded', function() {
+  let originalData = '';
+  
+  // Store original data when modal opens
+  const modal = document.getElementById('editPersonalInfoModal');
+  if (modal) {
+    modal.addEventListener('shown.bs.modal', function() {
+      const form = this.querySelector('form');
+      if (form) {
+        const formData = new FormData(form);
+        const filtered = new FormData();
+        for (let [key, value] of formData.entries()) {
+          if (key !== 'reason' && key !== 'csrfmiddlewaretoken' && key !== 'form_type') {
+            filtered.append(key, value);
+          }
+        }
+        originalData = new URLSearchParams(filtered).toString();
+      }
+    });
+    
+    // Form validation
+    const form = modal.querySelector('form');
+    if (form) {
+      form.addEventListener('submit', function(e) {
+        const reason = document.getElementById('edit_reason')?.value?.trim();
+        
+        if (!reason) {
+          e.preventDefault();
+          const icon = document.getElementById('messageIcon');
+          const title = document.getElementById('messageTitle');
+          const text = document.getElementById('messageText');
+          const buttons = document.querySelector('#errorModal .d-flex');
+          icon.style.background = 'linear-gradient(135deg, #ffc107, #ffb300)';
+          icon.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-white" style="font-size: 28px;"></i>';
+          title.textContent = 'Warning';
+          text.textContent = 'Please provide a reason for updating personal information.';
+          buttons.innerHTML = '<button type="button" class="btn btn-submit px-4 py-2" data-bs-dismiss="modal" style="border-radius: 8px; font-weight: 500; min-width: 100px;">Got it</button>';
+          new bootstrap.Modal(document.getElementById('errorModal')).show();
+          return false;
+        }
+        
+        const currentData = new FormData(form);
+        const currentFiltered = new FormData();
+        for (let [key, value] of currentData.entries()) {
+          if (key !== 'reason' && key !== 'csrfmiddlewaretoken' && key !== 'form_type') {
+            currentFiltered.append(key, value);
+          }
+        }
+        const current = new URLSearchParams(currentFiltered).toString();
+        
+        if (current === originalData) {
+          e.preventDefault();
+          const icon = document.getElementById('messageIcon');
+          const title = document.getElementById('messageTitle');
+          const text = document.getElementById('messageText');
+          const buttons = document.querySelector('#errorModal .d-flex');
+          icon.style.background = 'linear-gradient(135deg, #ffc107, #ffb300)';
+          icon.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-white" style="font-size: 28px;"></i>';
+          title.textContent = 'Warning';
+          text.textContent = 'No changes were made to the personal information.';
+          buttons.innerHTML = '<button type="button" class="btn btn-submit px-4 py-2" data-bs-dismiss="modal" style="border-radius: 8px; font-weight: 500; min-width: 100px;">Got it</button>';
+          new bootstrap.Modal(document.getElementById('errorModal')).show();
+          return false;
+        }
+        
+        // Show confirmation modal
+        e.preventDefault();
+        const icon = document.getElementById('messageIcon');
+        const title = document.getElementById('messageTitle');
+        const text = document.getElementById('messageText');
+        const buttons = document.querySelector('#errorModal .d-flex');
+        icon.style.background = 'linear-gradient(135deg, #007bff, #0056b3)';
+        icon.innerHTML = '<i class="bi bi-question-circle-fill text-white" style="font-size: 28px;"></i>';
+        title.textContent = 'Confirm Changes';
+        text.textContent = 'Are you sure you want to save these changes to your personal information?';
+        buttons.innerHTML = '<button type="button" class="btn btn-reset px-3 py-2" data-bs-dismiss="modal" style="border-radius: 8px; font-weight: 500;">Cancel</button><button type="button" class="btn btn-submit px-4 py-2" onclick="bootstrap.Modal.getInstance(document.getElementById(\'errorModal\')).hide(); document.querySelector(\'#editPersonalInfoModal form\').submit();" style="border-radius: 8px; font-weight: 500;">Yes, Save Changes</button>';
+        new bootstrap.Modal(document.getElementById('errorModal')).show();
+      });
+    }
+  }
+});
+</script>
+
 <script src="{% static 'js/account_settings.js' %}"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>

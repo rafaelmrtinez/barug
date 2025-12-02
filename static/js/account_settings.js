@@ -1,5 +1,31 @@
 // Account Settings JavaScript
+console.log('Account settings JS loaded');
 (function() {
+  // Message modal helper function
+  function showMessage(message, type = 'info') {
+    const modal = document.getElementById('errorModal');
+    const icon = document.getElementById('messageIcon');
+    const title = document.getElementById('messageTitle');
+    const text = document.getElementById('messageText');
+    
+    // Set icon and color based on type
+    if (type === 'success') {
+      icon.style.background = 'linear-gradient(135deg, #28a745, #20c997)';
+      icon.innerHTML = '<i class="bi bi-check-circle-fill text-white" style="font-size: 28px;"></i>';
+      title.textContent = 'Success';
+    } else if (type === 'error') {
+      icon.style.background = 'linear-gradient(135deg, #ff6b6b, #ee5a52)';
+      icon.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-white" style="font-size: 28px;"></i>';
+      title.textContent = 'Error';
+    } else {
+      icon.style.background = 'linear-gradient(135deg, #007bff, #0056b3)';
+      icon.innerHTML = '<i class="bi bi-info-circle-fill text-white" style="font-size: 28px;"></i>';
+      title.textContent = 'Information';
+    }
+    
+    text.textContent = message;
+    new bootstrap.Modal(modal).show();
+  }
   // In-memory password cache (more secure than sessionStorage)
   let pwdCache = { current: null, next: null, confirm: null };
   const clearPwdCache = () => { pwdCache.current = pwdCache.next = pwdCache.confirm = null; };
@@ -32,7 +58,7 @@
   let modalHideTimeout;
   
   const modalRequirements = {
-    length: { element: document.getElementById('modal-req-length'), regex: /.{8,}/ },
+    length: { element: document.getElementById('modal-req-length'), regex: /.{16,}/ },
     upper: { element: document.getElementById('modal-req-upper'), regex: /[A-Z]/ },
     lower: { element: document.getElementById('modal-req-lower'), regex: /[a-z]/ },
     number: { element: document.getElementById('modal-req-number'), regex: /[0-9]/ },
@@ -47,6 +73,8 @@
       Object.keys(modalRequirements).forEach(key => {
         const req = modalRequirements[key];
         const met = req.regex.test(password);
+        
+
         
         if (met) {
           score++;
@@ -155,7 +183,10 @@
       fetch(window.location.href, {
         method: 'POST',
         body: formData,
-        signal: emailAbortController.signal
+        signal: emailAbortController.signal,
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
       })
       .then(response => response.json())
       .then(data => {
@@ -391,7 +422,10 @@
       
       fetch(window.location.href, {
         method: 'POST',
-        body: formData
+        body: formData,
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
       }).then(response => response.json())
       .then(data => {
         if (data.success && data.new_image_url) {
@@ -598,7 +632,10 @@
     
     fetch(window.location.href, {
       method: 'POST',
-      body: formData
+      body: formData,
+      headers: {
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+      }
     })
     .then(response => response.json())
     .then(data => {
@@ -670,7 +707,10 @@
       
       fetch(window.location.href, {
         method: 'POST',
-        body: formData
+        body: formData,
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
       })
       .then(response => response.json())
       .then(data => {
@@ -747,7 +787,13 @@
     const formData = new FormData();
     formData.append('form_type', 'clear_code');
     formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
-    fetch(window.location.href, { method: 'POST', body: formData }).catch(() => {});
+    fetch(window.location.href, { 
+      method: 'POST', 
+      body: formData,
+      headers: {
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+      }
+    }).catch(() => {});
     
     // End verification flow and clear password cache
     verificationFlow = false;
@@ -834,4 +880,290 @@
 
   // Simplified access logs - no pagination needed for 10 items
 
+  // Government programs mutual exclusivity logic
+  document.addEventListener('change', function(e) {
+    if (e.target.name === 'government_programs[]') {
+      const noneCheckbox = document.getElementById('prog_none');
+      const otherCheckboxes = document.querySelectorAll('input[name="government_programs[]"]:not(#prog_none)');
+      
+      if (e.target.id === 'prog_none') {
+        // If NONE is checked, uncheck all others
+        if (e.target.checked) {
+          otherCheckboxes.forEach(cb => cb.checked = false);
+        }
+      } else {
+        // If any other program is checked, uncheck NONE
+        if (e.target.checked && noneCheckbox) {
+          noneCheckbox.checked = false;
+        }
+      }
+    }
+  });
+
+  // Admin edit functionality
+  if (typeof userRole !== 'undefined' && userRole === 'Admin') {
+    // Edit Personal Information
+    document.getElementById('editPersonalInfoBtn')?.addEventListener('click', function() {
+      // Autofill form with current profile data
+      if (typeof profileData !== 'undefined') {
+        try {
+          const setValue = (id, value) => {
+            const element = document.getElementById(id);
+            if (element) element.value = value || '';
+          };
+          
+          setValue('edit_first_name', profileData.first_name);
+          setValue('edit_middle_name', profileData.middle_name);
+          setValue('edit_last_name', profileData.last_name);
+          setValue('edit_suffix', profileData.suffix);
+          setValue('edit_birthdate', profileData.birth_date);
+          setValue('edit_mobile_number', profileData.mobile_number);
+          setValue('edit_occupation', profileData.occupation);
+          
+          // Set dropdown values
+          if (profileData.sex === 'Male') setValue('edit_sex', '1');
+          else if (profileData.sex === 'Female') setValue('edit_sex', '2');
+          
+          // Set civil status
+          const civilStatusMap = {'Single': '1', 'Married': '2', 'Widowed': '3', 'Separated': '4', 'Divorced': '5'};
+          if (civilStatusMap[profileData.civil_status]) setValue('edit_civil_status', civilStatusMap[profileData.civil_status]);
+          
+          // Set nationality
+          const nationalityMap = {
+            'American': '1', 'Australian': '2', 'Brazilian': '3', 'British': '4', 'Canadian': '5',
+            'Chinese': '6', 'Filipino': '7', 'French': '8', 'German': '9', 'Indian': '10',
+            'Indonesian': '11', 'Italian': '12', 'Japanese': '13', 'Korean': '14', 'Malaysian': '15',
+            'Russian': '16', 'Saudi': '17', 'Spanish': '18', 'Thai': '19', 'Vietnamese': '20', 'Others': '21'
+          };
+          if (nationalityMap[profileData.nationality]) setValue('edit_nationality', nationalityMap[profileData.nationality]);
+          
+          // Set religion
+          const religionMap = {
+            'Agnostic': '1', 'Born Again': '2', 'Buddhist': '3', 'Christian': '4', 'Evangelical': '5',
+            'Hindu': '6', 'Iglesia Ni Cristo': '7', 'Islam': '8', 'Jehovah\'s Witness': '9', 'Orthodox': '10',
+            'Protestant': '11', 'Roman Catholic': '12', 'Seventh-Day Adventist': '13', 'Others': '14'
+          };
+          if (religionMap[profileData.religion]) setValue('edit_religion', religionMap[profileData.religion]);
+          
+          // Set other dropdowns based on IDs from database
+          if (profileData.education_id) setValue('edit_education', profileData.education_id);
+          if (profileData.employment_status_id) setValue('edit_employment_status', profileData.employment_status_id);
+          if (profileData.personal_monthly_income_id) setValue('edit_monthly_income', profileData.personal_monthly_income_id);
+          
+          // Set government program checkboxes
+          document.querySelectorAll('input[name="government_programs[]"]').forEach(cb => cb.checked = false);
+          if (profileData.government_program_ids && Array.isArray(profileData.government_program_ids)) {
+            profileData.government_program_ids.forEach(id => {
+              const checkbox = document.querySelector(`input[name="government_programs[]"][value="${id}"]`);
+              if (checkbox) checkbox.checked = true;
+            });
+          }
+        } catch (error) {
+          console.warn('Error autofilling form data:', error);
+        }
+      }
+      
+      new bootstrap.Modal(document.getElementById('editPersonalInfoModal')).show();
+    });
+    
+    // Edit Username
+    document.getElementById('editUsernameBtn')?.addEventListener('click', function() {
+      new bootstrap.Modal(document.getElementById('editUsernameModal')).show();
+    });
+    
+    // Edit Email
+    document.getElementById('editEmailBtn')?.addEventListener('click', function() {
+      new bootstrap.Modal(document.getElementById('editEmailModal')).show();
+    });
+    
+
+    
+
+    
+    // Handle Username Form Submission (Placeholder)
+    document.getElementById('editUsernameForm')?.addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const submitBtn = this.querySelector('button[type="submit"]');
+      const originalText = submitBtn.textContent;
+      
+      // Show loading state
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<div class="spinner-border spinner-border-sm me-2" role="status"></div>Saving...';
+      
+      // Get CSRF token for future implementation
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+      
+      // TODO: When implementing, ensure HTTPS is used for secure communication
+      // Simulate API call
+      setTimeout(() => {
+        alert('Username update functionality will be implemented in the backend.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('editUsernameModal'));
+        modal.hide();
+      }, 1000);
+    });
+    
+    // Handle Email Form Submission (Placeholder)
+    document.getElementById('editEmailForm')?.addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const submitBtn = this.querySelector('button[type="submit"]');
+      const originalText = submitBtn.textContent;
+      
+      // Show loading state
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<div class="spinner-border spinner-border-sm me-2" role="status"></div>Saving...';
+      
+      // Get CSRF token for future implementation
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+      
+      // TODO: When implementing, ensure HTTPS is used for secure communication
+      // Simulate API call
+      setTimeout(() => {
+        alert('Email update functionality will be implemented in the backend.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('editEmailModal'));
+        modal.hide();
+      }, 1000);
+    });
+    
+
+    
+
+  }
+
+  // Store original personal form data
+  let originalPersonalData = '';
+  
+  // Check if personal form data has changed
+  function hasPersonalFormChanged() {
+    const form = document.querySelector('#editPersonalInfoModal form');
+    if (!form) return false;
+    
+    // Get current data
+    const currentData = new FormData(form);
+    const currentFiltered = new FormData();
+    for (let [key, value] of currentData.entries()) {
+      if (key !== 'reason' && key !== 'csrfmiddlewaretoken' && key !== 'form_type') {
+        currentFiltered.append(key, value);
+      }
+    }
+    const currentSerialized = new URLSearchParams(currentFiltered).toString();
+    
+    return currentSerialized !== originalPersonalData;
+  }
+  
+  // Store original data when modal opens
+  const personalInfoModal = document.getElementById('editPersonalInfoModal');
+  if (personalInfoModal) {
+    personalInfoModal.addEventListener('shown.bs.modal', function() {
+      const form = this.querySelector('form');
+      if (form) {
+        setTimeout(() => {
+          const formData = new FormData(form);
+          const filteredData = new FormData();
+          for (let [key, value] of formData.entries()) {
+            if (key !== 'reason' && key !== 'csrfmiddlewaretoken' && key !== 'form_type') {
+              filteredData.append(key, value);
+            }
+          }
+          originalPersonalData = new URLSearchParams(filteredData).toString();
+          console.log('Original data stored:', originalPersonalData);
+        }, 100);
+      }
+    });
+  } else {
+    console.log('Personal info modal not found');
+  }
+  
+  // Show error modal function
+  function showErrorModal(message) {
+    document.getElementById('messageText').textContent = message;
+    const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+    errorModal.show();
+  }
+  
+  // Form submission validation - using exact person_dets pattern
+  document.addEventListener('submit', function(e) {
+    if (e.target && e.target.closest('#editPersonalInfoModal')) {
+      console.log('Personal form validation triggered');
+      
+      const reason = document.getElementById('edit_reason')?.value?.trim();
+      
+      if (!reason) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        showErrorModal('Please provide a reason for updating personal information.');
+        return false;
+      }
+      
+      if (!hasPersonalFormChanged()) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        showErrorModal('No changes were made to the personal information.');
+        return false;
+      }
+    }
+  }, true);
+
 })();
+
+// Personal info validation outside IIFE
+console.log('Setting up personal info validation');
+const personalModal = document.getElementById('editPersonalInfoModal');
+console.log('Personal modal found:', !!personalModal);
+
+if (personalModal) {
+  const form = personalModal.querySelector('form');
+  console.log('Form found:', !!form);
+  
+  if (form) {
+    form.addEventListener('submit', function(e) {
+      console.log('Form submit intercepted');
+      e.preventDefault();
+      alert('Form submission blocked by validation');
+      return false;
+    });
+  }
+}
+
+// Global showMessage function
+function showMessage(message, type = 'info') {
+  const modal = document.getElementById('errorModal');
+  const icon = document.getElementById('messageIcon');
+  const title = document.getElementById('messageTitle');
+  const text = document.getElementById('messageText');
+  
+  // Set icon and color based on type
+  if (type === 'success') {
+    icon.style.background = 'linear-gradient(135deg, #28a745, #20c997)';
+    icon.innerHTML = '<i class="bi bi-check-circle-fill text-white" style="font-size: 28px;"></i>';
+    title.textContent = 'Success';
+  } else if (type === 'error') {
+    icon.style.background = 'linear-gradient(135deg, #ff6b6b, #ee5a52)';
+    icon.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-white" style="font-size: 28px;"></i>';
+    title.textContent = 'Error';
+  } else {
+    icon.style.background = 'linear-gradient(135deg, #007bff, #0056b3)';
+    icon.innerHTML = '<i class="bi bi-info-circle-fill text-white" style="font-size: 28px;"></i>';
+    title.textContent = 'Information';
+  }
+  
+  text.textContent = message;
+  new bootstrap.Modal(modal).show();
+}
+
+// Global function for form validation
+function checkPersonalInfoChanges(event) {
+  // Allow form submission - personal info update is now enabled
+  return true;
+}

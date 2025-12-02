@@ -417,6 +417,15 @@ class ResidentProfileform(forms.Form):
         label= 'City',
         required= True,
     )
+    province = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'province',
+            'class' : 'form-control',
+            'placeholder' : 'Province',
+    }),
+        label= 'Province',
+        required= True,
+    )
     email = forms.EmailField(
         widget=forms.EmailInput(attrs={
             'id' : 'email',
@@ -658,6 +667,38 @@ class DraftListSearch(forms.Form):
         required= False,
     )
 
+
+class StaffAccountRequestFilters(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search Staff Requests',
+            'name': 'q'
+        }),
+        label='Search Staff Requests',
+        required= False,
+    )
+    role = forms.ChoiceField(
+        choices=[("", "— Select a Role —")] + ROLE_CHOICES,
+        widget=forms.Select(attrs={
+            'id': 'role_filter',
+            'class': 'form-select',
+            'name': 'role',
+        }),
+        label='Filter by Role',
+        required=False,
+    )
+    date_submitted = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'id': 'date_submitted',
+            'class': 'form-control',
+            'name': 'date_submitted',
+        }),
+        label='Date Submitted',
+        required=False,
+    )
 
 class ResidentFilters(forms.Form):
     search = forms.CharField(
