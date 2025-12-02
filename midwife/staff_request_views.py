@@ -125,7 +125,7 @@ def staff_requests_list(request):
     })
 
 @session_login_required
-@role_required("Barangay Midwife")
+@role_required("Midwife")
 @nocache
 def staff_request_detail(request, request_id):
     """View detailed information about a specific staff request"""

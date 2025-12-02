@@ -993,7 +993,7 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
             flash_system_error(request, "Could not prepare previews.", exc=e)
             return redirect(request.path)
 
-        flash_success(request, "Documents loaded for preview. Please review and choose role.")
+        # flash_success(request, "Documents loaded for preview. Please review and choose role.")
         return redirect("staff_admin:staff_selection_nonres_role_review")
 
     user_fullname, user_role, user_role_template = get_user_info(request)
