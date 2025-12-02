@@ -153,10 +153,10 @@
                                 <span class="info-label">Target Table:</span>
                                 <code class="bg-light px-2 py-1 rounded">{{ log_detail.table_affected|default:"—"|title }}</code>
                             </div> -->
-                            <div class="info-row d-flex">
+                            <!-- <div class="info-row d-flex">
                                 <span class="info-label">Record ID:</span>
                                 <span class="text-muted">{{ log_detail.record_affected_id|default:"—" }}</span>
-                            </div>
+                            </div> -->
                             <div class="info-row d-flex">
                                 <span class="info-label">Data Changed:</span>
                                 <span class="fw-medium">{{ log_detail.field_changed|default:"—"|title }}</span>
@@ -179,7 +179,7 @@
                     <div class="mb-3">
                         <h6 class="text-muted mb-2">Details:</h6>
                         <div class="bg-light p-3 rounded">
-                            {{ log_detail.details|lower|capfirst }}{% if not log_detail.details|last == '.' %}.{% endif %}
+                            {{ log_detail.details }}{% if not log_detail.details|last == '.' %}.{% endif %}
                         </div>
                     </div>
                     {% endif %}

@@ -115,8 +115,8 @@ PUROK_SITIO_CHOICES = [
 
 STAFF_ROLE_CHOICES = [
     ("", "— Select Staff Role —"),
-    (1, "SUPER ADMIN"),
-    (2, "ADMIN"),
+    # (1, "SUPER ADMIN"),
+    # (2, "ADMIN"),
     (3, "BARANGAY CAPTAIN"),
     (4, "BARANGAY SECRETARY"),
     (5, "BARANGAY TREASURER"),
@@ -124,21 +124,21 @@ STAFF_ROLE_CHOICES = [
     (7, "BARANGAY LUPON PRESIDENT"),
     (8, "BARANGAY LUPON MEMBER"),
     (9, "BARANGAY HEALTH WORKER"),
-    (10, "NURSE"),
-    (11, "MIDWIFE"),
-    (12, "SYSTEM"),
+    # (10, "NURSE"),
+    # (11, "MIDWIFE"),
+    # (12, "SYSTEM"),
 ]
 
 AUDIENCE_SCOPE =[
     ("", "— Select Audience Scope —"),
     (1, "ALL"),
     (2, "RESIDENTS"),
-    (8, "PUROK"),
-    (3, "STAFF"),
     (4, "HOUSEHOLD HEAD"),
     (5, "FAMILY HEAD"),
+    (6, "STUDENTS"),
+    (8, "PUROK"),
     (7, "BUSINESS OWNER"),
-    (6, "PERSON LIST"),
+    (3, "STAFF"),
 ]
 
 CHANNEL_CHOICES = [
@@ -607,6 +607,50 @@ class BusinessFilters(forms.Form):
         label= 'Status',
         required= False,
     )
+    purok = forms.ChoiceField(
+        choices=[
+            ("", "— All Puroks —"),
+            ("KANIPAAN", "Kanipaan"),
+            ("PAMPANGO", "Pampango"),
+            ("LUTAW-LUTAW", "Lutaw-Lutaw"),
+            ("MAUCO", "Mauco"),
+        ],
+        widget=forms.Select(attrs={
+            'id': 'purok',
+            'class': 'form-select',
+        }),
+        label='Purok/Sitio',
+        required=False,
+    )
+    date_range = forms.ChoiceField(
+        choices=[
+            ("", "— All Time —"),
+            ("6", "Last 6 Months"),
+            ("12", "Last Year"),
+            ("24", "Last 2 Years"),
+            ("60", "Last 5 Years"),
+        ],
+        widget=forms.Select(attrs={
+            'id': 'date_range',
+            'class': 'form-select',
+        }),
+        label='Date Established',
+        required=False,
+    )
+    employee_range = forms.ChoiceField(
+        choices=[
+            ("", "— All Sizes —"),
+            ("1-5", "Small (1-5 employees)"),
+            ("6-20", "Medium (6-20 employees)"),
+            ("21-999", "Large (20+ employees)"),
+        ],
+        widget=forms.Select(attrs={
+            'id': 'employee_range',
+            'class': 'form-select',
+        }),
+        label='Number of Employees',
+        required=False,
+    )
 class HouseholdFilters(forms.Form):
     search = forms.CharField(
         widget=forms.TextInput(attrs={
@@ -730,14 +774,38 @@ class AudienceScope(forms.Form):
         label= 'Purok / Sitio',
         required= False,
     )
-    search_person = forms.CharField(
+    # search_person field removed - scope 6 is now STUDENTS (no person selection needed)
+
+class StaffAccountRequestFilters(forms.Form):
+    search = forms.CharField(
         widget=forms.TextInput(attrs={
-            'id' : 'search_person',
+            'id' : 'search',
             'class' : 'form-control', 
-            'placeholder' : 'Search Person',
+            'placeholder' : 'Search Staff Requests',
+            'name': 'q'
         }),
-        label= 'Search Person',
+        label='Search Staff Requests',
         required= False,
+    )
+    role = forms.ChoiceField(
+        choices=[("", "— Select a Role —")] + ROLE_CHOICES,
+        widget=forms.Select(attrs={
+            'id': 'role_filter',
+            'class': 'form-select',
+            'name': 'role',
+        }),
+        label='Filter by Role',
+        required=False,
+    )
+    date_submitted = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'id': 'date_submitted',
+            'class': 'form-control',
+            'name': 'date_submitted',
+        }),
+        label='Date Submitted',
+        required=False,
     )
 
 class StaffAccountRequestFilters(forms.Form):
@@ -789,6 +857,67 @@ class ResidentFilters(forms.Form):
             'class' : 'form-select',
         }),
         label= 'Purok / Sitio',
+        required= False,
+    )
+
+HOUSEHOLD_TYPE_CHOICES = [
+    ("", "— All household types —"),
+    (1, "NUCLEAR FAMILY"),
+    (2, "EXTENDED FAMILY"),
+    (3, "BOARDING HOUSE"),
+    (4, "SHARED APARTMENT"),
+    (5, "SOLO HOUSEHOLD"),
+    (6, "GOVERNMENT HOUSING"),
+    (7, "INFORMAL SETTLER"),
+]
+
+NHTS_STATUS_CHOICES = [
+    ("", "— All NHTS status —"),
+    (1, "NHTS MEMBER"),
+    (2, "NOT NHTS MEMBER"),
+]
+
+INDIGENT_STATUS_CHOICES = [
+    ("", "— All indigent status —"),
+    (1, "INDIGENT"),
+    (2, "NOT INDIGENT"),
+]
+
+class FamilyFilters(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search',
+        }),
+        label= 'Search',
+        required= False,
+    )
+    household_type = forms.ChoiceField(
+        choices= HOUSEHOLD_TYPE_CHOICES,
+        widget=forms.Select(attrs={
+            'id' : 'household_type',
+            'class' : 'form-select',
+        }),
+        label= 'Household Type',
+        required= False,
+    )
+    nhts_status = forms.ChoiceField(
+        choices= NHTS_STATUS_CHOICES,
+        widget=forms.Select(attrs={
+            'id' : 'nhts_status',
+            'class' : 'form-select',
+        }),
+        label= 'NHTS Status',
+        required= False,
+    )
+    indigent_status = forms.ChoiceField(
+        choices= INDIGENT_STATUS_CHOICES,
+        widget=forms.Select(attrs={
+            'id' : 'indigent_status',
+            'class' : 'form-select',
+        }),
+        label= 'Indigent Status',
         required= False,
     )
 

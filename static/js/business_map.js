@@ -91,7 +91,7 @@
   function buildPinsUrl() {
     const base = window.__PINS_URL__ || "/api/business/pins/";
     const url = new URL(base, window.location.origin);
-    ["search","b_category","ownership_type","status"].forEach(k => {
+    ["search","b_category","ownership_type","status","purok","date_range","employee_range"].forEach(k => {
       const v = new URL(window.location.href).searchParams.get(k);
       if (v !== null && v !== "") url.searchParams.set(k, v);
     });

@@ -442,11 +442,19 @@ def laboratory_save_api(request, record_id: int) -> JsonResponse:
 @nocache
 @csrf_protect
 def record_detail(request: HttpRequest, person_id: int) -> HttpResponse:
+    from django.core.paginator import Paginator
+    
     maternal_health_record_id = REPOSITORY.fetch_maternal_health_record_id_by_person_id(person_id)['maternal_record_id']
     record = REPOSITORY.fetch_latest_maternal_record_by_person_and_maternal_id(person_id, maternal_record_id=maternal_health_record_id) or {}
     all_records = REPOSITORY.fetch_all_maternal_records_for_person(person_id)
     basic_info = REPOSITORY.fetch_mhr_count_and_fam_id_by_person_id(person_id)
     staff_name = (request.session.get('auth', {}).get('first_name') or "") + ' ' + (request.session.get('auth', {}).get('last_name') or "")
+    
+    # Pagination: 5 records per page
+    paginator = Paginator(all_records, 5)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+    
     # prepare postpartum form pre-populated with maternal record id
     postpartum_form = PostpartumRecordForm(
         mhr_id=maternal_health_record_id,
@@ -473,7 +481,8 @@ def record_detail(request: HttpRequest, person_id: int) -> HttpResponse:
             "edd":        record.get("edd"),
             "person_status": record.get("person_status"),
 
-            # history table (now includes latest)
+            # history table with pagination
+            "page_obj": page_obj,
             "all_records": all_records,
             "basic_info": basic_info,
             "postpartum_form": postpartum_form,

@@ -37,9 +37,14 @@ class MaternalHealthRecordStatusUpdateAPI(View):
 
         mhr_id = payload.get('mhr_id')
         status_id = payload.get('status_id')
+        closure_reason = payload.get('closure_reason')
 
         if mhr_id is None or status_id is None:
             return JsonResponse({'success': False, 'message': 'Missing required fields: mhr_id and status_id are required.'}, status=400)
+        
+        # Validate closure_reason is always provided and not empty
+        if not closure_reason or not str(closure_reason).strip():
+            return JsonResponse({'success': False, 'message': 'closure_reason is required for all status changes.'}, status=400)
 
         # sanitize/coerce to ints
         try:
@@ -76,7 +81,7 @@ class MaternalHealthRecordStatusUpdateAPI(View):
             return JsonResponse({'success': False, 'message': 'Invalid status id.'}, status=400)
 
         try:
-            res = service.update_status(mhr_id, status_id, staff_id)
+            res = service.update_status(mhr_id, status_id, staff_id, closure_reason)
         except MaternalHealthRecordException as e:
             return JsonResponse({'success': False, 'message': e.message or str(e)}, status=400)
         except ValueError as e:

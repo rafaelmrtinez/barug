@@ -19,6 +19,7 @@ from django.utils.dateparse import parse_datetime, parse_date
 from zoneinfo import ZoneInfo
 from dependency_injector.wiring import inject, Provide
 from src.app.bootstrap.app_containers import AppContainer
+from src.app.contracts.business_service_contract import IBusinessInfoService
 
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
@@ -39,6 +40,11 @@ from src.app.services.or_service import (
     IORService,
 )
 from .utils.ui import STATUS_UI, ACTION_LABELS, titleize
+
+from common.send_email import send_email
+from common.send_sms import send_sms
+from notifications.service import notify_user
+from common.logging_utils import log_business_action
 
 # >>> NEW: import extracted helpers (behavior unchanged)
 from .utils.helpers import (
@@ -75,6 +81,8 @@ def dashboard(
     treasurer_dashboard_service=Provide[AppContainer.treasurer_dashboard_service],
 ):
     user_role = _auth_role_name(request)
+    auth = request.session.get('auth', {})
+    person_id = auth.get('person_id')
 
     kpis = {
         "pending_payments": 0,
@@ -88,6 +96,7 @@ def dashboard(
     }
 
     dashboard_json = None
+    announcements = []
 
     try:
         payload = treasurer_dashboard_service.get_dashboard_content() or {}
@@ -95,6 +104,13 @@ def dashboard(
         dashboard_json = payload.get("dashboard_json")
     except Exception as exc:
         print("Error fetching treasurer dashboard KPIs:", exc)
+    
+    if person_id:
+        try:
+            from authentication.announcement_views import get_user_announcements
+            announcements = get_user_announcements(person_id)
+        except Exception as exc:
+            print(f"Error fetching announcements for person {person_id}:", exc)
 
     return render(request, "treasurer/dashboard.html", {
         'page_path' : f'{user_role} / Dashboard',
@@ -102,6 +118,7 @@ def dashboard(
         'kpis': kpis,
         'dashboard_json': dashboard_json,
         'today': datetime.now().strftime("%B %d, %Y"),
+        'announcements': announcements,
     })
 
 
@@ -1074,6 +1091,33 @@ def business_detail(request: HttpRequest, business_id: int, doc_request_id: int)
         None
     )
 
+    # === NEW: Detect business renewal and override amount_due ===
+    is_business_renewal = False
+    renewal_totals = {}
+    
+    try:
+        for l in lines:
+            det = l.get("details") or {}
+            # Check if this is a business clearance with renewal data
+            if det.get("renewal_breakdown") and det.get("years_count"):
+                is_business_renewal = True
+                renewal_totals = {
+                    "total_base_fee": det.get("total_base_fee", 0),
+                    "total_surcharge": det.get("total_surcharge", 0),
+                    "total_amount": det.get("total_amount", 0),
+                    "years_count": det.get("years_count", 0),
+                    "period_type": det.get("period_type", ""),
+                    "period_year": det.get("period_year", ""),
+                }
+                
+                # Override the header amount_due with the actual total from renewal breakdown
+                header["amount_due"] = det.get("total_amount", 0)
+                print(f"[treasurer business_detail] Business renewal detected: {renewal_totals['years_count']} year(s), total: ₱{renewal_totals['total_amount']:.2f}")
+                break
+    except Exception as e:
+        print(f"[treasurer business_detail] Error extracting renewal breakdown: {e}")
+        pass
+
     user_role = _auth_role_name(request)
     return render(request, "treasurer/business_details.html", {
         'page_path': f'{user_role} / Business Details',
@@ -1096,6 +1140,8 @@ def business_detail(request: HttpRequest, business_id: int, doc_request_id: int)
         "ctc_ref_request_id": ctc_ref_request_id,
         "ctc_ref_header": ctc_ref_header,
         "ctc_ref_lines": ctc_ref_lines,
+        "is_business_renewal": is_business_renewal,
+        "renewal_totals": renewal_totals,
     })
 
 
@@ -1162,6 +1208,112 @@ def business_pay_and_print(request: HttpRequest, business_id: int, doc_request_i
     except Exception as e:
         print(f"[PAY DEBUG] Business flag FAILED: {e}")
         messages.warning(request, f"Payment ok, but failed to set business flag: {escape(str(getattr(e,'message',e)))}")
+
+    # Update business status to ACTIVE after successful renewal payment
+    try:
+        print(f"[PAY DEBUG] Updating business status to ACTIVE for business_id={business_id}")
+        update_res = (
+            supabase.table("business")
+            .update({"business_status_id": 1})  # 1 = ACTIVE
+            .eq("business_id", business_id)
+            .execute()
+        )
+        print(f"[PAY DEBUG] Business status update result: {update_res.data}, error: {getattr(update_res, 'error', None)}")
+        messages.success(request, "Business status updated to ACTIVE.")
+    except Exception as e:
+        print(f"[PAY DEBUG] Business status update FAILED: {e}")
+        messages.warning(request, f"Payment ok, but failed to update business status: {escape(str(getattr(e,'message',e)))}")
+
+    # Mark all renewal requests as PAID
+    try:
+        print(f"[PAY DEBUG] Fetching renewal request IDs from document details")
+        # Fetch the document bundle to get line details
+        try:
+            bundle = fetch_detail_bundle(doc_request_id)
+            lines = bundle.get("lines") or []
+        except Exception as e:
+            print(f"[PAY DEBUG] Failed to fetch bundle: {e}")
+            lines = []
+        
+        renewal_request_ids = []
+        if lines:
+            for line in lines:
+                details = line.get("details") or {}
+                ids = details.get("renewal_request_ids", [])
+                if ids:
+                    renewal_request_ids.extend(ids)
+        
+        print(f"[PAY DEBUG] Found renewal request IDs: {renewal_request_ids}")
+        
+        if renewal_request_ids:
+            # Get OR number and payment date for the renewal requests
+            or_number = None
+            paid_on = None
+            try:
+                or_res = supabase.table("official_receipt").select("or_number, created_at").eq("or_id", or_id).single().execute()
+                if or_res.data:
+                    or_number = or_res.data.get("or_number")
+                    paid_on = or_res.data.get("created_at")
+            except Exception as e:
+                print(f"[PAY DEBUG] Could not fetch OR details: {e}")
+            
+            # Fetch renewal request details to get period_year for each
+            renewal_years = {}
+            try:
+                for renewal_id in renewal_request_ids:
+                    rr_res = supabase.table("renewal_request").select("period_year").eq("renewal_request_id", renewal_id).single().execute()
+                    if rr_res.data:
+                        renewal_years[renewal_id] = rr_res.data.get("period_year")
+            except Exception as e:
+                print(f"[PAY DEBUG] Could not fetch renewal request years: {e}")
+            
+            # Update all renewal requests to PAID
+            for renewal_id in renewal_request_ids:
+                try:
+                    update_data = {
+                        "paid": True,
+                        "or_id": or_id,
+                    }
+                    if or_number:
+                        update_data["or_number"] = or_number
+                    if paid_on:
+                        update_data["paid_on"] = paid_on
+                    
+                    renewal_update = (
+                        supabase.table("renewal_request")
+                        .update(update_data)
+                        .eq("renewal_request_id", renewal_id)
+                        .execute()
+                    )
+                    print(f"[PAY DEBUG] Marked renewal_request_id {renewal_id} as PAID with OR {or_number}")
+                    
+                    # Also update business_clearance_status_record for paid history
+                    period_year = renewal_years.get(renewal_id)
+                    if period_year:
+                        try:
+                            status_update = (
+                                supabase.table("business_clearance_status_record")
+                                .update({
+                                    "or_number": or_number,
+                                    "paid_on": paid_on
+                                })
+                                .eq("business_id", business_id)
+                                .eq("period_year", period_year)
+                                .eq("period_type", "ANNUAL")
+                                .execute()
+                            )
+                            print(f"[PAY DEBUG] Updated business_clearance_status_record for year {period_year}")
+                        except Exception as e:
+                            print(f"[PAY DEBUG] Failed to update business_clearance_status_record for year {period_year}: {e}")
+                except Exception as e:
+                    print(f"[PAY DEBUG] Failed to mark renewal_request_id {renewal_id} as paid: {e}")
+            
+            messages.success(request, f"Marked {len(renewal_request_ids)} renewal request(s) as PAID.")
+    except Exception as e:
+        print(f"[PAY DEBUG] Failed to mark renewal requests as paid: {e}")
+        import traceback
+        print(f"[PAY DEBUG] Traceback: {traceback.format_exc()}")
+        messages.warning(request, f"Payment ok, but failed to mark renewal requests as paid: {escape(str(getattr(e,'message',e)))}")
 
     try:
         print(f"[PAY DEBUG] Marking for printing doc_request_id={doc_request_id}")
@@ -1738,20 +1890,147 @@ def business_renewal_take_payment(request: HttpRequest, renewal_request_id: int)
         messages.error(request, "Select a payment method and ensure your staff session is active.")
         return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)
 
+    # Get the linked document request ID if it exists
+    doc_request_id = None
     try:
-        from .services.payments_service import accept_renewal_payment
-        clearance_id = accept_renewal_payment(
-            renewal_request_id=int(renewal_request_id),
-            method_id=method_id,
-            amount_paid=amount_paid,  # kept for signature; RPC ignores
-            staff_id=staff_id,
-            or_number=or_number,
-            paid_on=paid_on,
-            # rpc_name can be overridden here if you renamed the SQL fn
-        )
-    except Exception as e:
-        messages.error(request, f"Payment failed: {escape(str(getattr(e, 'message', e)))}")
-        return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)
+        renewal_res = supabase.table("renewal_request").select("doc_request_id, business_id").eq("renewal_request_id", renewal_request_id).single().execute()
+        if renewal_res.data:
+            doc_request_id = renewal_res.data.get("doc_request_id")
+            business_id_from_renewal = renewal_res.data.get("business_id")
+    except Exception:
+        pass
+    
+    # If there's a document request, process payment through normal document flow
+    if doc_request_id:
+        try:
+            or_id = accept_payment(
+                doc_request_id=doc_request_id,
+                method_id=method_id,
+                amount_paid=float(amount_paid),
+                staff_id=staff_id,
+            )
+            
+            # Update renewal_request to PAID status
+            supabase.table("renewal_request").update({
+                "request_status_id": 9,  # PAID
+                "paid_on": paid_on or supabase.now(),
+                "or_number": or_number,
+                "amount_paid": amount_paid,
+            }).eq("renewal_request_id", renewal_request_id).execute()
+            
+            # Move to FOR_PRINTING
+            try:
+                mark_for_printing(doc_request_id=doc_request_id, staff_id=staff_id, reason="Auto-marked after renewal payment")
+            except Exception:
+                pass
+                
+        except Exception as e:
+            messages.error(request, f"Payment failed: {escape(str(getattr(e, 'message', e)))}")
+            return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)
+    else:
+        # Fallback to old direct clearance creation method
+        try:
+            from .services.payments_service import accept_renewal_payment
+            clearance_id = accept_renewal_payment(
+                renewal_request_id=int(renewal_request_id),
+                method_id=method_id,
+                amount_paid=amount_paid,
+                staff_id=staff_id,
+                or_number=or_number,
+                paid_on=paid_on,
+            )
+        except Exception as e:
+            messages.error(request, f"Payment failed: {escape(str(getattr(e, 'message', e)))}")
+            return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)
+
+    # Send notifications after successful payment
+    try:
+        # Get renewal request details to extract business_id
+        res = supabase.table("renewal_request").select("*").eq("renewal_request_id", renewal_request_id).single().execute()
+        if res.data:
+            business_id = res.data.get("business_id")
+            period_type = res.data.get("period_type", "")
+            period_year = res.data.get("period_year", "")
+            
+            # Log business action
+            try:
+                log_business_action(
+                    business_id=business_id,
+                    table_affected='RENEWAL_PAYMENT',
+                    action='UPDATE',
+                    performer_id=staff_id,
+                    details=f'Accepted renewal payment for business #{business_id}, period: {period_type} {period_year}',
+                )
+            except Exception:
+                pass
+            
+            # Get business and owner info
+            business_info = AppContainer.owner_business_service()
+            dto = business_info.execute_by_business_id(business_id)
+            owner = dict(dto.owner or {})
+            business = dict(dto.business or {})
+            
+            owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
+            owner_email = (owner.get("email") or "").strip()
+            owner_person_id = owner.get("person_id") or owner.get("owner_person_id")
+            bname = (business.get("business_name") or "your business").strip()
+            
+            # Send SMS
+            if owner_mobile:
+                msg = (
+                    f"BARUG: Payment received for business renewal '{bname}'.\n"
+                    f"Period: {period_type} {period_year}. Status: PAID.\n"
+                    f"Your business clearance is now ready."
+                )
+                send_sms(owner_mobile, msg, fail_silently=True)
+            
+            # Send Email
+            if owner_email:
+                try:
+                    owner_name = f"{owner.get('first_name', '')} {owner.get('last_name', '')}".strip() or "Business Owner"
+                    subject = f"Business Renewal Payment Confirmed - {bname}"
+                    body_html = f"""
+                        <p>Hi {owner_name},</p>
+                        <p>Your payment for business renewal has been received and confirmed for <strong>{bname}</strong> (ID: {business_id:06d}).</p>
+                        <p><b>Period:</b> {period_type} {period_year}</p>
+                        <p><b>Status:</b> PAID</p>
+                        <p>Your business clearance is now ready. Thank you for your prompt payment.</p>
+                        <p>Thank you,<br>Barangay Sto. Niño</p>
+                    """
+                    body_txt = (
+                        f"Hi {owner_name},\n\n"
+                        f"Your payment for business renewal has been received and confirmed for {bname} (ID: {business_id:06d}).\n"
+                        f"Period: {period_type} {period_year}\n"
+                        f"Status: PAID\n\n"
+                        f"Your business clearance is now ready. Thank you for your prompt payment.\n\n"
+                        f"Thank you,\nBarangay Sto. Niño\n"
+                    )
+                    send_email(
+                        subject=subject,
+                        to=[(owner_name, owner_email)],
+                        body_text=body_txt,
+                        body_html=body_html,
+                        from_name="Barangay Sto. Niño",
+                        fail_silently=True,
+                    )
+                except Exception:
+                    pass
+            
+            # Send in-app notification
+            if owner_person_id:
+                try:
+                    notify_user(
+                        user_type_id=1,  # PERSON
+                        person_id=owner_person_id,
+                        staff_id=None,
+                        title="Business Renewal Payment Confirmed",
+                        body=f"Payment received for '{bname}' renewal. Period: {period_type} {period_year}. Your clearance is ready.",
+                        deep_link=f"/business/{business_id}"
+                    )
+                except Exception:
+                    pass
+    except Exception:
+        pass
 
     messages.success(request, f"Payment posted (clearance id {clearance_id}).")
     return redirect("treasurer:business_renewal_detail", renewal_request_id=renewal_request_id)
@@ -1779,22 +2058,240 @@ def business_renewal_take_payment_all(request: HttpRequest, business_id: int):
         messages.error(request, "Select a payment method and ensure your staff session is active.")
         return redirect("treasurer:business_renewal_detail", b_id=business_id)
 
+    # Check if there are any renewal requests with linked document requests
+    has_doc_requests = False
     try:
-        from .services.payments_service import accept_all_unpaid_payments
-        summary = accept_all_unpaid_payments(
-            business_id=business_id,
-            period_type=period_type,
-            period_year=period_year,
-            method_id=method_id,
-            staff_id=staff_id,
-            paid_on=paid_on,
-        )
-        cnt   = (summary or {}).get("processed_count", 0)
-        total = (summary or {}).get("sum_quoted_total", "0")
-        messages.success(request, f"Accepted payments for {cnt} unpaid year(s). Total due: {total}.")
-    except Exception as e:
-        messages.error(request, f"Bulk payment failed: {escape(str(getattr(e, 'message', e)))}")
+        check_res = supabase.table("renewal_request").select("doc_request_id").eq("business_id", business_id).eq("request_status_id", 8).not_.is_("doc_request_id", "null").limit(1).execute()
+        has_doc_requests = bool(check_res.data)
+    except Exception:
+        pass
 
+    if has_doc_requests:
+        # Process each unpaid renewal with a document request
+        try:
+            unpaid_renewals = supabase.table("renewal_request").select("renewal_request_id, doc_request_id, business_id, period_type, period_year").eq("business_id", business_id).eq("request_status_id", 8).not_.is_("doc_request_id", "null").eq("period_type", period_type).lte("period_year", period_year).execute()
+            
+            cnt = 0
+            for renewal in (unpaid_renewals.data or []):
+                doc_req_id = renewal.get("doc_request_id")
+                renewal_id = renewal.get("renewal_request_id")
+                
+                if doc_req_id:
+                    try:
+                        # Accept payment for document request
+                        or_id = accept_payment(
+                            doc_request_id=doc_req_id,
+                            method_id=method_id,
+                            amount_paid=0,  # Amount calculated by RPC
+                            staff_id=staff_id,
+                        )
+                        
+                        # Update renewal to PAID
+                        supabase.table("renewal_request").update({
+                            "request_status_id": 9,
+                            "paid_on": paid_on or supabase.now(),
+                            "amount_paid": 0,  # Will be set by trigger
+                        }).eq("renewal_request_id", renewal_id).execute()
+                        
+                        # Mark for printing
+                        try:
+                            mark_for_printing(doc_request_id=doc_req_id, staff_id=staff_id, reason="Auto-marked after bulk renewal payment")
+                        except Exception:
+                            pass
+                        
+                        cnt += 1
+                    except Exception as e:
+                        print(f"Failed to process renewal {renewal_id}: {e}")
+            
+            if cnt > 0:
+                # Log business action
+                try:
+                    log_business_action(
+                        business_id=business_id,
+                        table_affected='RENEWAL_PAYMENT',
+                        action='UPDATE',
+                        performer_id=staff_id,
+                        details=f'Accepted {cnt} renewal payment(s) for business #{business_id}',
+                    )
+                except Exception:
+                    pass
+                
+                # Send notifications
+                try:
+                    business_info = AppContainer.owner_business_service()
+                    dto = business_info.execute_by_business_id(business_id)
+                    owner = dict(dto.owner or {})
+                    business = dict(dto.business or {})
+                    
+                    owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
+                    owner_email = (owner.get("email") or "").strip()
+                    owner_person_id = owner.get("person_id") or owner.get("owner_person_id")
+                    bname = (business.get("business_name") or "your business").strip()
+                    
+                    if owner_mobile:
+                        msg = (
+                            f"BARUG: Payment received for business renewal '{bname}'.\n"
+                            f"{cnt} year(s) paid.\n"
+                            f"Your business clearance is now ready."
+                        )
+                        send_sms(owner_mobile, msg, fail_silently=True)
+                    
+                    if owner_email:
+                        try:
+                            owner_name = f"{owner.get('first_name', '')} {owner.get('last_name', '')}".strip() or "Business Owner"
+                            subject = f"Business Renewal Payment Confirmed - {bname}"
+                            body_html = f"""
+                                <p>Hi {owner_name},</p>
+                                <p>Your payment for business renewal has been received and confirmed for <strong>{bname}</strong> (ID: {business_id:06d}).</p>
+                                <p><b>Years Paid:</b> {cnt}</p>
+                                <p><b>Status:</b> PAID</p>
+                                <p>Your business clearance is now ready. Thank you for your prompt payment.</p>
+                                <p>Thank you,<br>Barangay Sto. Niño</p>
+                            """
+                            body_txt = (
+                                f"Hi {owner_name},\n\n"
+                                f"Your payment for business renewal has been received and confirmed for {bname} (ID: {business_id:06d}).\n"
+                                f"Years Paid: {cnt}\n"
+                                f"Status: PAID\n\n"
+                                f"Your business clearance is now ready. Thank you for your prompt payment.\n\n"
+                                f"Thank you,\nBarangay Sto. Niño\n"
+                            )
+                            send_email(
+                                subject=subject,
+                                to=[(owner_name, owner_email)],
+                                body_text=body_txt,
+                                body_html=body_html,
+                                from_name="Barangay Sto. Niño",
+                                fail_silently=True,
+                            )
+                        except Exception:
+                            pass
+                    
+                    if owner_person_id:
+                        try:
+                            notify_user(
+                                user_type_id=1,
+                                person_id=owner_person_id,
+                                staff_id=None,
+                                title="Business Renewal Payment Confirmed",
+                                body=f"Payment received for '{bname}' renewal. {cnt} year(s) paid. Your clearance is ready.",
+                                deep_link=f"/business/{business_id}"
+                            )
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                
+                messages.success(request, f"Accepted payments for {cnt} unpaid year(s).")
+            else:
+                messages.info(request, "No unpaid items found.")
+                
+        except Exception as e:
+            messages.error(request, f"Bulk payment failed: {escape(str(getattr(e, 'message', e)))}")
+    else:
+        # Fallback to old direct clearance method
+        try:
+            from .services.payments_service import accept_all_unpaid_payments
+            summary = accept_all_unpaid_payments(
+                business_id=business_id,
+                period_type=period_type,
+                period_year=period_year,
+                method_id=method_id,
+                staff_id=staff_id,
+                paid_on=paid_on,
+            )
+            cnt   = (summary or {}).get("processed_count", 0)
+            total = (summary or {}).get("sum_quoted_total", "0")
+            
+            # Log business action
+            if cnt > 0:
+                try:
+                    log_business_action(
+                        business_id=business_id,
+                        table_affected='RENEWAL_PAYMENT',
+                        action='UPDATE',
+                        performer_id=staff_id,
+                        details=f'Accepted {cnt} renewal payment(s) for business #{business_id}, total: {total}',
+                    )
+                except Exception:
+                    pass
+            
+            # Send notifications after successful bulk payment
+            if cnt > 0:
+                try:
+                    business_info = AppContainer.owner_business_service()
+                    dto = business_info.execute_by_business_id(business_id)
+                    owner = dict(dto.owner or {})
+                    business = dict(dto.business or {})
+                    
+                    owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
+                    owner_email = (owner.get("email") or "").strip()
+                    owner_person_id = owner.get("person_id") or owner.get("owner_person_id")
+                    bname = (business.get("business_name") or "your business").strip()
+                    
+                    # Send SMS
+                    if owner_mobile:
+                        msg = (
+                            f"BARUG: Payment received for business renewal '{bname}'.\n"
+                            f"{cnt} year(s) paid. Total: {total}.\n"
+                            f"Your business clearance is now ready."
+                        )
+                        send_sms(owner_mobile, msg, fail_silently=True)
+                    
+                    # Send Email
+                    if owner_email:
+                        try:
+                            owner_name = f"{owner.get('first_name', '')} {owner.get('last_name', '')}".strip() or "Business Owner"
+                            subject = f"Business Renewal Payment Confirmed - {bname}"
+                            body_html = f"""
+                            <p>Hi {owner_name},</p>
+                            <p>Your payment for business renewal has been received and confirmed for <strong>{bname}</strong> (ID: {business_id:06d}).</p>
+                            <p><b>Years Paid:</b> {cnt}</p>
+                            <p><b>Total Amount:</b> {total}</p>
+                            <p><b>Status:</b> PAID</p>
+                            <p>Your business clearance is now ready. Thank you for your prompt payment.</p>
+                            <p>Thank you,<br>Barangay Sto. Niño</p>
+                        """
+                            body_txt = (
+                                f"Hi {owner_name},\n\n"
+                                f"Your payment for business renewal has been received and confirmed for {bname} (ID: {business_id:06d}).\n"
+                                f"Years Paid: {cnt}\n"
+                                f"Total Amount: {total}\n"
+                                f"Status: PAID\n\n"
+                                f"Your business clearance is now ready. Thank you for your prompt payment.\n\n"
+                                f"Thank you,\nBarangay Sto. Niño\n"
+                            )
+                            send_email(
+                                subject=subject,
+                                to=[(owner_name, owner_email)],
+                                body_text=body_txt,
+                                body_html=body_html,
+                                from_name="Barangay Sto. Niño",
+                                fail_silently=True,
+                            )
+                        except Exception:
+                            pass
+                    
+                    # Send in-app notification
+                    if owner_person_id:
+                        try:
+                            notify_user(
+                                user_type_id=1,  # PERSON
+                                person_id=owner_person_id,
+                                staff_id=None,
+                                title="Business Renewal Payment Confirmed",
+                                body=f"Payment received for '{bname}' renewal. {cnt} year(s) paid. Total: {total}. Your clearance is ready.",
+                                deep_link=f"/business/{business_id}"
+                            )
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+            
+            messages.success(request, f"Accepted payments for {cnt} unpaid year(s). Total due: {total}.")
+        except Exception as e:
+            messages.error(request, f"Bulk payment failed: {escape(str(getattr(e, 'message', e)))}")
+    
     return redirect("treasurer:business_renewal_group", business_id=business_id)
 
 # ========= CLOSURE =========
@@ -2009,8 +2506,11 @@ def closure_detail(request, closure_payment_request_id: int):
 
     try:
         payment_methods = list_payment_methods()
+        cash_method = next((m for m in payment_methods if m.get("method_name") == "CASH"), None)
+        cash_payment_method_id = cash_method.get("payment_method_id") if cash_method else (payment_methods[0].get("payment_method_id") if payment_methods else 1)
     except Exception:
         payment_methods = []
+        cash_payment_method_id = 1  # fallback to ID 1
 
     payments = {
         "latest_or_number": r.get("or_number") or "",
@@ -2044,6 +2544,8 @@ def closure_detail(request, closure_payment_request_id: int):
         "payments": payments,
         "is_paid_no_or": is_paid_no_or,
         "is_paid": is_paid,
+        "today": timezone.now().date().isoformat(),
+        "cash_payment_method_id": cash_payment_method_id,
     }
     return render(request, "treasurer/closure_detail.html", ctx)
 
@@ -2074,6 +2576,99 @@ def closure_take_payment(request, closure_payment_request_id: int):
         res = supabase.rpc("treasurer_accept_closure_payment_h", payload).execute()
         if getattr(res, "error", None):
             raise RuntimeError(getattr(res.error, "message", str(res.error)))
+        
+        # Log business action
+        try:
+            closure_res = supabase.table("closure_payment_request").select("business_id").eq("closure_payment_request_id", closure_payment_request_id).single().execute()
+            if closure_res.data:
+                business_id = closure_res.data.get("business_id")
+                log_business_action(
+                    business_id=business_id,
+                    table_affected='CLOSURE_PAYMENT',
+                    action='UPDATE',
+                    performer_id=staff_id,
+                    details=f'Accepted closure payment for business #{business_id}, request #{closure_payment_request_id}',
+                )
+        except Exception:
+            pass
+        
+        # Send notifications after successful closure payment
+        try:
+            # Get closure request details to extract business_id
+            closure_res = supabase.table("closure_payment_request").select("*").eq("closure_payment_request_id", closure_payment_request_id).single().execute()
+            if closure_res.data:
+                business_id = closure_res.data.get("business_id")
+                period_type = closure_res.data.get("period_type", "")
+                period_year = closure_res.data.get("period_year", "")
+                
+                # Get business and owner info
+                business_info = AppContainer.owner_business_service()
+                dto = business_info.execute_by_business_id(business_id)
+                owner = dict(dto.owner or {})
+                business = dict(dto.business or {})
+                
+                owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
+                owner_email = (owner.get("email") or "").strip()
+                owner_person_id = owner.get("person_id") or owner.get("owner_person_id")
+                bname = (business.get("business_name") or "your business").strip()
+                
+                # Send SMS
+                if owner_mobile:
+                    msg = (
+                        f"BARUG: Business closure payment confirmed for '{bname}'.\n"
+                        f"All dues settled. Your business is now officially CLOSED.\n"
+                        f"Thank you."
+                    )
+                    send_sms(owner_mobile, msg, fail_silently=True)
+                
+                # Send Email
+                if owner_email:
+                    try:
+                        owner_name = f"{owner.get('first_name', '')} {owner.get('last_name', '')}".strip() or "Business Owner"
+                        subject = f"Business Closure Confirmed - {bname}"
+                        body_html = f"""
+                            <p>Hi {owner_name},</p>
+                            <p>Your business closure payment has been confirmed for <strong>{bname}</strong> (ID: {business_id:06d}).</p>
+                            <p><b>Status:</b> CLOSED</p>
+                            <p>All outstanding dues have been settled. Your business is now officially closed.</p>
+                            <p>Thank you for your compliance.</p>
+                            <p>Thank you,<br>Barangay Sto. Niño</p>
+                        """
+                        body_txt = (
+                            f"Hi {owner_name},\n\n"
+                            f"Your business closure payment has been confirmed for {bname} (ID: {business_id:06d}).\n"
+                            f"Status: CLOSED\n\n"
+                            f"All outstanding dues have been settled. Your business is now officially closed.\n\n"
+                            f"Thank you for your compliance.\n\n"
+                            f"Thank you,\nBarangay Sto. Niño\n"
+                        )
+                        send_email(
+                            subject=subject,
+                            to=[(owner_name, owner_email)],
+                            body_text=body_txt,
+                            body_html=body_html,
+                            from_name="Barangay Sto. Niño",
+                            fail_silently=True,
+                        )
+                    except Exception:
+                        pass
+                
+                # Send in-app notification
+                if owner_person_id:
+                    try:
+                        notify_user(
+                            user_type_id=1,  # PERSON
+                            person_id=owner_person_id,
+                            staff_id=None,
+                            title="Business Closure Confirmed",
+                            body=f"Closure payment confirmed for '{bname}'. All dues settled. Business status: CLOSED.",
+                            deep_link=f"/business/{business_id}"
+                        )
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        
         messages.success(request, "Closure payment accepted and business set to CLOSED.")
     except Exception as e:
         messages.error(request, f"Failed to accept closure payment: {e}")
@@ -2104,8 +2699,11 @@ def closure_group(request, business_id: int):
 
     try:
         payment_methods = list_payment_methods()
+        cash_method = next((m for m in payment_methods if m.get("method_name") == "CASH"), None)
+        cash_payment_method_id = cash_method.get("payment_method_id") if cash_method else (payment_methods[0].get("payment_method_id") if payment_methods else 1)
     except Exception:
         payment_methods = []
+        cash_payment_method_id = 1  # fallback to ID 1
 
     unpaid, paid = [], []
     for r in rows:
@@ -2122,10 +2720,13 @@ def closure_group(request, business_id: int):
             unpaid.append(r)
 
     quote_rows, base_sum, surch_sum, grand_total = [], 0.0, 0.0, 0.0
+    current_year = timezone.now().year
     for r in unpaid:
+        year = r.get("period_year")
+        kind = "CURRENT" if year == current_year else "ARREARS"
         line = {
-            "item_year": r.get("period_year"),
-            "kind": "ARREARS",  # closure is typically settling before closure; keep label consistent with renewal table
+            "item_year": year,
+            "kind": kind,
             "base_fee": r.get("base_fee_quote_f") or 0.0,
             "offense_no": r.get("offense_no") or None,  # tolerate if present
             "surcharge": r.get("surcharge_quote_f") or 0.0,
@@ -2160,6 +2761,8 @@ def closure_group(request, business_id: int):
         "methods": payment_methods,
         "default_period_type": default_period_type,
         "default_year": latest_unpaid_year or timezone.now().year,
+        "today": timezone.now().date().isoformat(),
+        "cash_payment_method_id": cash_payment_method_id,
         "paid_rows": [
             {
                 "period_year": r.get("period_year"),
@@ -2200,6 +2803,88 @@ def closure_take_payment_all(request, business_id: int):
         res = supabase.rpc("treasurer_accept_all_unpaid_closure_h", payload).execute()
         if getattr(res, "error", None):
             raise RuntimeError(getattr(res.error, "message", str(res.error)))
+        
+        # Log business action
+        try:
+            log_business_action(
+                business_id=business_id,
+                table_affected='CLOSURE_PAYMENT',
+                action='UPDATE',
+                performer_id=staff_id,
+                details=f'Accepted all unpaid closure payments for business #{business_id}',
+            )
+        except Exception:
+            pass
+        
+        # Send notifications after successful bulk closure payment
+        try:
+            business_info = AppContainer.owner_business_service()
+            dto = business_info.execute_by_business_id(business_id)
+            owner = dict(dto.owner or {})
+            business = dict(dto.business or {})
+            
+            owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
+            owner_email = (owner.get("email") or "").strip()
+            owner_person_id = owner.get("person_id") or owner.get("owner_person_id")
+            bname = (business.get("business_name") or "your business").strip()
+            
+            # Send SMS
+            if owner_mobile:
+                msg = (
+                    f"BARUG: Business closure payment confirmed for '{bname}'.\n"
+                    f"All outstanding dues settled.\n"
+                    f"Your business is now officially CLOSED."
+                )
+                send_sms(owner_mobile, msg, fail_silently=True)
+            
+            # Send Email
+            if owner_email:
+                try:
+                    owner_name = f"{owner.get('first_name', '')} {owner.get('last_name', '')}".strip() or "Business Owner"
+                    subject = f"Business Closure Confirmed - {bname}"
+                    body_html = f"""
+                        <p>Hi {owner_name},</p>
+                        <p>Your business closure payment has been confirmed for <strong>{bname}</strong> (ID: {business_id:06d}).</p>
+                        <p><b>Status:</b> CLOSED</p>
+                        <p>All outstanding dues have been settled. Your business is now officially closed.</p>
+                        <p>Thank you for your compliance.</p>
+                        <p>Thank you,<br>Barangay Sto. Niño</p>
+                    """
+                    body_txt = (
+                        f"Hi {owner_name},\n\n"
+                        f"Your business closure payment has been confirmed for {bname} (ID: {business_id:06d}).\n"
+                        f"Status: CLOSED\n\n"
+                        f"All outstanding dues have been settled. Your business is now officially closed.\n\n"
+                        f"Thank you for your compliance.\n\n"
+                        f"Thank you,\nBarangay Sto. Niño\n"
+                    )
+                    send_email(
+                        subject=subject,
+                        to=[(owner_name, owner_email)],
+                        body_text=body_txt,
+                        body_html=body_html,
+                        from_name="Barangay Sto. Niño",
+                        fail_silently=True,
+                    )
+                except Exception:
+                    pass
+            
+            # Send in-app notification
+            if owner_person_id:
+                try:
+                    notify_user(
+                        user_type_id=1,  # PERSON
+                        person_id=owner_person_id,
+                        staff_id=None,
+                        title="Business Closure Confirmed",
+                        body=f"All closure payments confirmed for '{bname}'. Business status: CLOSED.",
+                        deep_link=f"/business/{business_id}"
+                    )
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        
         messages.success(request, "All unpaid closure items were paid and the business was marked CLOSED.")
     except Exception as e:
         messages.error(request, f"Failed to process bulk closure payment: {e}")
@@ -2446,6 +3131,10 @@ def financial_report(
 
     search = request.GET.get("search") or request.GET.get("q")
     pay_meth = _to_int_or_none(request.GET.get("pay_meth"))
+    month = _to_int_or_none(request.GET.get("month"))
+    year = _to_int_or_none(request.GET.get("year"))
+    date_from = request.GET.get("date_from") or None
+    date_to = request.GET.get("date_to") or None
     
     # Check if this is an AJAX request for rows only
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
@@ -2453,10 +3142,17 @@ def financial_report(
 
     rows = or_service.execute(
         search=search,
-        payment_method=pay_meth
+        payment_method=pay_meth,
+        month=month,
+        year=year,
+        date_from=date_from,
+        date_to=date_to
     )
 
-    if (search or pay_meth is not None):
+    # Calculate total
+    total_amount = sum(float(r.amount_paid or 0) for r in rows)
+
+    if (search or pay_meth is not None or month or year or date_from or date_to):
         form = ORFilters()
 
     paginator = Paginator(rows, 10)
@@ -2468,7 +3164,7 @@ def financial_report(
         return render(
             request,
             "financial/_financial_report_rows.html",
-            {"rows": page_obj.object_list}
+            {"rows": page_obj.object_list, "total_amount": total_amount}
         )
 
     return render(
@@ -2480,6 +3176,7 @@ def financial_report(
             'form': form,
             'page_obj': page_obj,
             'search_url': 'treasurer:financial_report_search',
+            'total_amount': total_amount,
         },
     )
 

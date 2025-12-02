@@ -1,0 +1,79 @@
+<!-- Visit Schedule History Modal -->
+<div class="modal fade" id="visitScheduleHistoryModal" tabindex="-1" aria-labelledby="visitScheduleHistoryModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content">
+      <div class="modal-header" style="background: linear-gradient(90deg, #44141e, #6d2932); color: #fff;">
+        <h5 class="modal-title" id="visitScheduleHistoryModalLabel">Visit Schedule History</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle" style="table-layout: fixed; width: 100%;">
+            <thead>
+              <tr>
+                <th style="width: 12%;">Date</th>
+                <th style="width: 10%;">Time</th>
+                <th style="width: 20%;">Purpose</th>
+                <th style="width: 25%;">Notes</th>
+                <th style="width: 20%;">Created By</th>
+                <th style="width: 13%;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="visit_schedule_history_tbody">
+              <tr>
+                <td colspan="6" class="text-center small text-muted">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Pagination Controls -->
+        <nav aria-label="Visit schedule history pagination" id="schedule_pagination_nav" style="display: none;">
+          <ul class="pagination pagination-sm justify-content-center mb-0">
+            <!-- Pagination will be inserted here by JavaScript -->
+          </ul>
+        </nav>
+        <style>
+          #schedule_pagination_nav .page-link {
+            color: #6d2932;
+            border-color: #6d2932;
+          }
+          #schedule_pagination_nav .page-link:hover {
+            background-color: #6d2932;
+            border-color: #6d2932;
+            color: #fff;
+          }
+          #schedule_pagination_nav .page-item.active .page-link {
+            background-color: #6d2932;
+            border-color: #6d2932;
+            color: #fff;
+          }
+          #schedule_pagination_nav .page-item.disabled .page-link {
+            color: #ccc;
+            border-color: #dee2e6;
+          }
+        </style>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Text Detail Modal for Schedule Purpose and Notes -->
+<div class="modal fade" id="scheduleTextDetailModal" tabindex="-1" aria-labelledby="scheduleTextDetailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background: linear-gradient(90deg, #44141e, #6d2932); color: #fff;">
+        <h5 class="modal-title" id="scheduleTextDetailModalLabel">Details</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p id="scheduleTextDetailContent" class="mb-0" style="white-space: pre-wrap; word-wrap: break-word;"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

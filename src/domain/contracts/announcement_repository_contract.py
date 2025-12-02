@@ -71,3 +71,8 @@ class IAnnouncementRepository(ABC):
     def delete_draft(self, announcement_id: int) -> bool:
         """Delete an announcement draft"""
         pass
+
+    @abstractmethod
+    def cancel_scheduled(self, announcement_id: int) -> bool:
+        """Cancel a scheduled announcement"""
+        pass

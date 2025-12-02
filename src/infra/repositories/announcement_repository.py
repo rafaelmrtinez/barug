@@ -60,6 +60,8 @@ class AnnouncementRepository(IAnnouncementRepository):
 
     def update_draft(self, command: UpdateAnnouncementDraftCMD) -> bool:
         """Update an existing announcement draft"""
+        from django.db import connection
+        
         sql = """
             UPDATE public.announcement 
             SET announcement_title = %s,
@@ -78,8 +80,13 @@ class AnnouncementRepository(IAnnouncementRepository):
             command.announcement_id
         )
         
-        result = self.ctx.execute_query(sql, params)
-        return result is not None
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(sql, params)
+                rows_affected = cursor.rowcount
+                return rows_affected > 0
+        except Exception:
+            return False
 
     def get_by_id(self, announcement_id: int) -> Optional[AnnouncementDTO]:
         """Get announcement by ID"""
@@ -441,11 +448,330 @@ class AnnouncementRepository(IAnnouncementRepository):
        
 
     def delete_draft(self, announcement_id: int) -> bool:
-        """Delete an announcement draft"""
+        """Delete an announcement draft or cancelled announcement"""
+        from django.db import connection
+        
         sql = """
             DELETE FROM public.announcement 
-            WHERE announcement_id = %s AND announcement_status_id = 1
+            WHERE announcement_id = %s AND announcement_status_id IN (1, 4)
         """
         
-        result = self.ctx.execute_query(sql, (announcement_id,))
-        return result is not None
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(sql, (announcement_id,))
+                rows_affected = cursor.rowcount
+                return rows_affected > 0
+        except Exception:
+            return False
+
+    def get_all_scheduled(self) -> List[AnnouncementDTO]:
+        """Get all scheduled announcements (status = 2)"""
+        sql = """
+            SELECT a.announcement_id, a.announcement_title, a.announcement_body,
+                   a.announcement_created_at, a.announcement_status_id,
+                   a.announcement_published_at, a.announcement_expire_at,
+                   a.created_by_id, a.published_by_id,
+                   ast.announcement_status_name
+            FROM public.announcement a
+            LEFT JOIN public.announcement_status ast ON a.announcement_status_id = ast.announcement_status_id
+            WHERE a.announcement_status_id = 2
+            ORDER BY a.announcement_published_at ASC
+        """
+        
+        result = self.ctx.execute_query(sql)
+        return [
+            AnnouncementDTO(
+                announcement_id=row[0],
+                announcement_title=row[1],
+                announcement_body=row[2],
+                announcement_created_at=row[3],
+                announcement_status_id=row[4],
+                announcement_published_at=row[5],
+                announcement_expire_at=row[6],
+                created_by_id=row[7],
+                published_by_id=row[8],
+                announcement_status_name=row[9]
+            )
+            for row in result
+        ]
+
+    def search_scheduled(self, search: str) -> List[AnnouncementDTO]:
+        """Search scheduled announcements (status = 2)"""
+        if not search or not search.strip():
+            return self.get_all_scheduled()
+
+        like_pattern = f"%{search.strip()}%"
+
+        sql = """
+            SELECT a.announcement_id, a.announcement_title, a.announcement_body,
+                   a.announcement_created_at, a.announcement_status_id,
+                   a.announcement_published_at, a.announcement_expire_at,
+                   a.created_by_id, a.published_by_id,
+                   ast.announcement_status_name
+            FROM public.announcement a
+            LEFT JOIN public.announcement_status ast ON a.announcement_status_id = ast.announcement_status_id
+            WHERE a.announcement_status_id = 2
+              AND (a.announcement_title ILIKE %s OR a.announcement_body ILIKE %s)
+            ORDER BY a.announcement_published_at ASC
+        """
+
+        params = (like_pattern, like_pattern)
+        result = self.ctx.execute_query(sql, params)
+
+        if not result:
+            return []
+
+        return [
+            AnnouncementDTO(
+                announcement_id=row[0],
+                announcement_title=row[1],
+                announcement_body=row[2],
+                announcement_created_at=row[3],
+                announcement_status_id=row[4],
+                announcement_published_at=row[5],
+                announcement_expire_at=row[6],
+                created_by_id=row[7],
+                published_by_id=row[8],
+                announcement_status_name=row[9]
+            )
+            for row in result
+        ]
+
+    def get_all_published(self) -> List[AnnouncementDTO]:
+        """Get all published announcements (status = 3)"""
+        sql = """
+            SELECT a.announcement_id, a.announcement_title, a.announcement_body,
+                   a.announcement_created_at, a.announcement_status_id,
+                   a.announcement_published_at, a.announcement_expire_at,
+                   a.created_by_id, a.published_by_id,
+                   ast.announcement_status_name
+            FROM public.announcement a
+            LEFT JOIN public.announcement_status ast ON a.announcement_status_id = ast.announcement_status_id
+            WHERE a.announcement_status_id = 3
+            ORDER BY a.announcement_published_at DESC
+        """
+        
+        result = self.ctx.execute_query(sql)
+        return [
+            AnnouncementDTO(
+                announcement_id=row[0],
+                announcement_title=row[1],
+                announcement_body=row[2],
+                announcement_created_at=row[3],
+                announcement_status_id=row[4],
+                announcement_published_at=row[5],
+                announcement_expire_at=row[6],
+                created_by_id=row[7],
+                published_by_id=row[8],
+                announcement_status_name=row[9]
+            )
+            for row in result
+        ]
+
+    def search_published(self, search: str) -> List[AnnouncementDTO]:
+        """Search published announcements (status = 3)"""
+        if not search or not search.strip():
+            return self.get_all_published()
+
+        like_pattern = f"%{search.strip()}%"
+
+        sql = """
+            SELECT a.announcement_id, a.announcement_title, a.announcement_body,
+                   a.announcement_created_at, a.announcement_status_id,
+                   a.announcement_published_at, a.announcement_expire_at,
+                   a.created_by_id, a.published_by_id,
+                   ast.announcement_status_name
+            FROM public.announcement a
+            LEFT JOIN public.announcement_status ast ON a.announcement_status_id = ast.announcement_status_id
+            WHERE a.announcement_status_id = 3
+              AND (a.announcement_title ILIKE %s OR a.announcement_body ILIKE %s)
+            ORDER BY a.announcement_published_at DESC
+        """
+
+        params = (like_pattern, like_pattern)
+        result = self.ctx.execute_query(sql, params)
+
+        if not result:
+            return []
+
+        return [
+            AnnouncementDTO(
+                announcement_id=row[0],
+                announcement_title=row[1],
+                announcement_body=row[2],
+                announcement_created_at=row[3],
+                announcement_status_id=row[4],
+                announcement_published_at=row[5],
+                announcement_expire_at=row[6],
+                created_by_id=row[7],
+                published_by_id=row[8],
+                announcement_status_name=row[9]
+            )
+            for row in result
+        ]
+
+    def get_all_expired(self) -> List[AnnouncementDTO]:
+        """Get all expired announcements (status = 5)"""
+        sql = """
+            SELECT a.announcement_id, a.announcement_title, a.announcement_body,
+                   a.announcement_created_at, a.announcement_status_id,
+                   a.announcement_published_at, a.announcement_expire_at,
+                   a.created_by_id, a.published_by_id,
+                   ast.announcement_status_name
+            FROM public.announcement a
+            LEFT JOIN public.announcement_status ast ON a.announcement_status_id = ast.announcement_status_id
+            WHERE a.announcement_status_id = 5
+            ORDER BY a.announcement_expire_at DESC
+        """
+        
+        result = self.ctx.execute_query(sql)
+        return [
+            AnnouncementDTO(
+                announcement_id=row[0],
+                announcement_title=row[1],
+                announcement_body=row[2],
+                announcement_created_at=row[3],
+                announcement_status_id=row[4],
+                announcement_published_at=row[5],
+                announcement_expire_at=row[6],
+                created_by_id=row[7],
+                published_by_id=row[8],
+                announcement_status_name=row[9]
+            )
+            for row in result
+        ]
+
+    def search_expired(self, search: str) -> List[AnnouncementDTO]:
+        """Search expired announcements (status = 5)"""
+        if not search or not search.strip():
+            return self.get_all_expired()
+
+        like_pattern = f"%{search.strip()}%"
+
+        sql = """
+            SELECT a.announcement_id, a.announcement_title, a.announcement_body,
+                   a.announcement_created_at, a.announcement_status_id,
+                   a.announcement_published_at, a.announcement_expire_at,
+                   a.created_by_id, a.published_by_id,
+                   ast.announcement_status_name
+            FROM public.announcement a
+            LEFT JOIN public.announcement_status ast ON a.announcement_status_id = ast.announcement_status_id
+            WHERE a.announcement_status_id = 5
+              AND (a.announcement_title ILIKE %s OR a.announcement_body ILIKE %s)
+            ORDER BY a.announcement_expire_at DESC
+        """
+
+        params = (like_pattern, like_pattern)
+        result = self.ctx.execute_query(sql, params)
+
+        if not result:
+            return []
+
+        return [
+            AnnouncementDTO(
+                announcement_id=row[0],
+                announcement_title=row[1],
+                announcement_body=row[2],
+                announcement_created_at=row[3],
+                announcement_status_id=row[4],
+                announcement_published_at=row[5],
+                announcement_expire_at=row[6],
+                created_by_id=row[7],
+                published_by_id=row[8],
+                announcement_status_name=row[9]
+            )
+            for row in result
+        ]
+
+    def get_all_cancelled(self) -> List[AnnouncementDTO]:
+        """Get all cancelled announcements (status = 4)"""
+        sql = """
+            SELECT a.announcement_id, a.announcement_title, a.announcement_body,
+                   a.announcement_created_at, a.announcement_status_id,
+                   a.announcement_published_at, a.announcement_expire_at,
+                   a.created_by_id, a.published_by_id,
+                   ast.announcement_status_name
+            FROM public.announcement a
+            LEFT JOIN public.announcement_status ast ON a.announcement_status_id = ast.announcement_status_id
+            WHERE a.announcement_status_id = 4
+            ORDER BY a.announcement_created_at DESC
+        """
+        
+        result = self.ctx.execute_query(sql)
+        return [
+            AnnouncementDTO(
+                announcement_id=row[0],
+                announcement_title=row[1],
+                announcement_body=row[2],
+                announcement_created_at=row[3],
+                announcement_status_id=row[4],
+                announcement_published_at=row[5],
+                announcement_expire_at=row[6],
+                created_by_id=row[7],
+                published_by_id=row[8],
+                announcement_status_name=row[9]
+            )
+            for row in result
+        ]
+
+    def search_cancelled(self, search: str) -> List[AnnouncementDTO]:
+        """Search cancelled announcements (status = 4)"""
+        if not search or not search.strip():
+            return self.get_all_cancelled()
+
+        like_pattern = f"%{search.strip()}%"
+
+        sql = """
+            SELECT a.announcement_id, a.announcement_title, a.announcement_body,
+                   a.announcement_created_at, a.announcement_status_id,
+                   a.announcement_published_at, a.announcement_expire_at,
+                   a.created_by_id, a.published_by_id,
+                   ast.announcement_status_name
+            FROM public.announcement a
+            LEFT JOIN public.announcement_status ast ON a.announcement_status_id = ast.announcement_status_id
+            WHERE a.announcement_status_id = 4
+              AND (a.announcement_title ILIKE %s OR a.announcement_body ILIKE %s)
+            ORDER BY a.announcement_created_at DESC
+        """
+
+        params = (like_pattern, like_pattern)
+        result = self.ctx.execute_query(sql, params)
+
+        if not result:
+            return []
+
+        return [
+            AnnouncementDTO(
+                announcement_id=row[0],
+                announcement_title=row[1],
+                announcement_body=row[2],
+                announcement_created_at=row[3],
+                announcement_status_id=row[4],
+                announcement_published_at=row[5],
+                announcement_expire_at=row[6],
+                created_by_id=row[7],
+                published_by_id=row[8],
+                announcement_status_name=row[9]
+            )
+            for row in result
+        ]
+
+    def cancel_scheduled(self, announcement_id: int) -> bool:
+        """Cancel a scheduled announcement (change status from 2 to 4)"""
+        from django.db import connection
+        
+        sql = """
+            UPDATE public.announcement 
+            SET announcement_status_id = 4,
+                updated_at = now()
+            WHERE announcement_id = %s 
+            AND announcement_status_id = 2
+        """
+        
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(sql, (announcement_id,))
+                rows_affected = cursor.rowcount
+                return rows_affected > 0
+        except Exception:
+            return False

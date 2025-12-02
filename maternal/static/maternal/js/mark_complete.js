@@ -35,17 +35,49 @@
     }
 
   btn.addEventListener('click', async function () {
-      // Confirm user's intention
-      const confirmed = confirm('Are you sure you want to mark this maternal health record as complete?');
-      if (!confirmed) {
-        // await showMessage('Action cancelled by user.', true);
-        // console.log('User cancelled marking maternal health record as complete.');
+      // Get the selected status to determine if user is closing/completing the record
+      const statusRaw = statusSelect ? statusSelect.value : null;
+      if (!statusRaw) {
+        await showMessage('Please select a valid status before continuing.', true);
         return;
+      }
+
+      const statusId = Number.parseInt(statusRaw, 10);
+      
+      // Always ask for a reason when changing status
+      let closureReason = null;
+      const statusNameMap = {
+        1: 'ONGOING',
+        2: 'INCOMPLETE',
+        3: 'COMPLETE'
+      };
+      const statusName = statusNameMap[statusId] || 'this status';
+      
+      // Loop until a valid reason is provided or user cancels
+      while (true) {
+        const reasonPrompt = prompt(
+          `You are about to mark this maternal health record as ${statusName}.\n\n` +
+          `Please provide a reason for this status change (required):`,
+          ''
+        );
+        
+        if (reasonPrompt === null) {
+          // User clicked Cancel
+          return;
+        }
+        
+        const trimmedReason = reasonPrompt.trim();
+        if (trimmedReason === '') {
+          await showMessage('A reason is required to update this maternal health record status. Please try again.', true);
+          // Loop continues to prompt again
+        } else {
+          closureReason = trimmedReason;
+          break; // Valid reason provided, exit loop
+        }
       }
 
       // Basic front-end validation / sanitization
       const mhrIdRaw = mhrContainer ? mhrContainer.getAttribute('data-mhr-id') : null;
-      const statusRaw = statusSelect ? statusSelect.value : null;
 
       // ensure values are present
       if (!mhrIdRaw) {
@@ -53,14 +85,8 @@
         return;
       }
 
-      if (!statusRaw) {
-        await showMessage('Please select a valid status before continuing.', true);
-        return;
-      }
-
       // coerce to integers and validate
       const mhrId = Number.parseInt(mhrIdRaw, 10);
-      const statusId = Number.parseInt(statusRaw, 10);
       if (!Number.isInteger(mhrId) || mhrId <= 0) {
         await showMessage('Invalid maternal record id. Aborting.', true);
         return;
@@ -79,7 +105,11 @@
 
       // Prepare the request
       const url = '/maternal/api/v1/mhr/status/update/';
-      const payload = { mhr_id: mhrId, status_id: statusId };
+      const payload = { 
+        mhr_id: mhrId, 
+        status_id: statusId,
+        closure_reason: closureReason
+      };
 
       // Disable button while working
       btn.disabled = true;
@@ -140,11 +170,25 @@
 
         // success
         const successMsg = (body && body.message) ? body.message : 'Status updated successfully.';
-        await showMessage(successMsg, false);
+        if (typeof globalThis.CustomToast !== 'undefined' && typeof globalThis.CustomToast.show === 'function') {
+          globalThis.CustomToast.show(successMsg, { type: 'success', delay: 4000 });
+        } else {
+          await showMessage(successMsg, false);
+        }
         console.log('Maternal status update result:', body);
+        
+        // Optionally reload page after a short delay to reflect updated status
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
       } catch (err) {
         // avoid showing internal error details to users
-        await showMessage('An unexpected error occurred. Please try again later.', true);
+        const errorMsg = 'An unexpected error occurred. Please try again later.';
+        if (typeof globalThis.CustomToast !== 'undefined' && typeof globalThis.CustomToast.show === 'function') {
+          globalThis.CustomToast.show(errorMsg, { type: 'error', delay: 5000 });
+        } else {
+          await showMessage(errorMsg, true);
+        }
         console.error('Error while calling status update API:', err);
       } finally {
         // restore button state

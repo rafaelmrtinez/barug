@@ -1016,6 +1016,7 @@ const userRole = '{{ user_role }}';
 // Pass profile data for autofill
 const profileData = {
   person_id: '{% if profile.person_id %}{{ profile.person_id }}{% endif %}',
+  username: '{% if profile.username %}{{ profile.username|escapejs }}{% endif %}',
   first_name: '{% if profile.first_name %}{{ profile.first_name|title|escapejs }}{% endif %}',
   middle_name: '{% if profile.middle_name %}{{ profile.middle_name|title|escapejs }}{% endif %}',
   last_name: '{% if profile.last_name %}{{ profile.last_name|title|escapejs }}{% endif %}',
@@ -1338,25 +1339,44 @@ const profileData = {
 </div>
 
 <!-- Edit Username Modal -->
-<div class="modal fade" id="editUsernameModal" tabindex="-1" aria-labelledby="editUsernameModalLabel" aria-hidden="true" style="z-index: 9999;">
-  <div class="modal-dialog modal-dialog-centered modal-sm">
+<div class="modal fade" id="editUsernameModal" tabindex="-1" aria-labelledby="editUsernameModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false" style="z-index: 9999;">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 500px;">
     <div class="modal-content border-0 shadow-lg px-4" style="border-radius: 16px;">
       <div class="modal-header border-0">
-        <h5 class="modal-title" id="editUsernameModalLabel">Edit Username</h5>
+        <h5 class="modal-title" id="editUsernameModalLabel">Change Username</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <form id="editUsernameForm">
         {% csrf_token %}
-        <input type="hidden" name="form_type" value="update_username">
         <div class="modal-body">
-          <div class="form-floating">
-            <input type="text" class="form-control" id="edit_username" name="username" value="{{ profile.username }}" required>
-            <label for="edit_username">Username</label>
+          <div class="form-floating mb-3">
+            <input type="password" class="form-control" id="username_current_password" name="current_password" required>
+            <label for="username_current_password">Current Password</label>
+            <button type="button"
+                    class="btn toggle-password position-absolute top-50 end-0 translate-middle-y me-3 p-0"
+                    data-target="username_current_password"
+                    style="background: none; border: none; cursor: pointer;">
+                <small>Show</small>
+            </button>
+          </div>
+          <div class="form-floating mb-3">
+            <input type="text" class="form-control" id="edit_username" name="username" placeholder="Enter new username" required>
+            <label for="edit_username">New Username</label>
+          </div>
+          <div class="form-floating mb-3">
+            <select class="form-select" id="username_reason" name="reason" required>
+              <option value="">Select Reason</option>
+              <option value="security_update">Security Update</option>
+              <option value="personal_preference">Personal Preference</option>
+              <option value="account_management">Account Management</option>
+              <option value="other">Other</option>
+            </select>
+            <label for="username_reason">Reason for Change *</label>
           </div>
         </div>
         <div class="modal-footer border-0">
           <button type="button" class="btn btn-reset" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-submit">Save Changes</button>
+          <button type="submit" class="btn btn-submit">Proceed</button>
         </div>
       </form>
     </div>
@@ -1364,27 +1384,182 @@ const profileData = {
 </div>
 
 <!-- Edit Email Modal -->
-<div class="modal fade" id="editEmailModal" tabindex="-1" aria-labelledby="editEmailModalLabel" aria-hidden="true" style="z-index: 9999;">
-  <div class="modal-dialog modal-dialog-centered modal-sm">
+<div class="modal fade" id="editEmailModal" tabindex="-1" aria-labelledby="editEmailModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false" style="z-index: 9999;">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 500px;">
     <div class="modal-content border-0 shadow-lg px-4" style="border-radius: 16px;">
       <div class="modal-header border-0">
-        <h5 class="modal-title" id="editEmailModalLabel">Edit Email</h5>
+        <h5 class="modal-title" id="editEmailModalLabel">Change Email</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <form id="editEmailForm">
         {% csrf_token %}
-        <input type="hidden" name="form_type" value="update_email">
         <div class="modal-body">
-          <div class="form-floating">
-            <input type="email" class="form-control" id="edit_email_field" name="email" value="{{ profile.email_address|default:'' }}">
-            <label for="edit_email_field">Email Address</label>
+          <div class="form-floating mb-3">
+            <input type="password" class="form-control" id="email_current_password" name="current_password" required>
+            <label for="email_current_password">Current Password</label>
+            <button type="button"
+                    class="btn toggle-password position-absolute top-50 end-0 translate-middle-y me-3 p-0"
+                    data-target="email_current_password"
+                    style="background: none; border: none; cursor: pointer;">
+                <small>Show</small>
+            </button>
+          </div>
+          <div class="form-floating mb-3">
+            <input type="email" class="form-control" id="edit_email_field" name="email" placeholder="Enter new email address" required>
+            <label for="edit_email_field">New Email Address</label>
+          </div>
+
+          <div class="form-floating mb-3">
+            <select class="form-select" id="email_reason" name="reason" required>
+              <option value="">Select Reason</option>
+              <option value="security_update">Security Update</option>
+              <option value="contact_update">Contact Information Update</option>
+              <option value="account_management">Account Management</option>
+              <option value="other">Other</option>
+            </select>
+            <label for="email_reason">Reason for Change *</label>
           </div>
         </div>
         <div class="modal-footer border-0">
           <button type="button" class="btn btn-reset" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-submit">Save Changes</button>
+          <button type="submit" class="btn btn-submit">Proceed</button>
         </div>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- Username Verification Modal -->
+<div class="modal fade" id="usernameVerificationModal" tabindex="-1" aria-labelledby="usernameVerificationModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+    <div class="modal-content border-0 shadow-lg px-4" style="border-radius: 16px; overflow: hidden;">
+      <div class="modal-header border-0" style="color: rgb(20, 20, 20);">
+        <h5 class="modal-title" id="usernameVerificationModalLabel" style="margin-top: 8px;">Email Verification</h5>
+      </div>
+      <div class="modal-body text-center">
+        <div class="mb-4">
+          <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width: 60px; height: 60px; background: var(--bs-danger-text-emphasis); color: white;">
+            {% bs_icon 'envelope-fill' size='1.5em' %}
+          </div>
+          <p class="text-muted mb-0">A code has been sent to your email:</p>
+          <p class="fw-bold text-dark mb-0" id="username-masked-email"></p>
+        </div>
+        
+        <div class="d-flex justify-content-center gap-2 mb-4">
+          <input type="text" class="form-control text-center code-input" id="username_code1" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="username_code2" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="username_code3" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="username_code4" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="username_code5" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="username_code6" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+        </div>
+        
+        <div class="mb-4">
+          <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
+            <small class="text-muted">Code expires in:</small>
+            <span id="username-expiry-timer" class="fw-bold text-danger">05:00</span>
+          </div>
+          <button type="button" id="resend-username-code" class="btn btn-link p-0 text-decoration-none" disabled>
+            <small>Resend code in <span id="username-resend-timer">60</span>s</small>
+          </button>
+        </div>
+        
+        <div id="username-verification-message" class="alert alert-warning small mb-3" style="display: none;"></div>
+      </div>
+      <div class="modal-footer border-0 justify-content-between">
+        <button type="button" class="btn btn-reset" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" id="verify-username-code" class="btn btn-submit">Verify Code</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Old Email Verification Modal -->
+<div class="modal fade" id="oldEmailVerificationModal" tabindex="-1" aria-labelledby="oldEmailVerificationModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+    <div class="modal-content border-0 shadow-lg px-4" style="border-radius: 16px; overflow: hidden;">
+      <div class="modal-header border-0" style="color: rgb(20, 20, 20);">
+        <h5 class="modal-title" id="oldEmailVerificationModalLabel" style="margin-top: 8px;">Verify Current Email</h5>
+      </div>
+      <div class="modal-body text-center">
+        <div class="mb-4">
+          <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width: 60px; height: 60px; background: var(--bs-danger-text-emphasis); color: white;">
+            {% bs_icon 'envelope-fill' size='1.5em' %}
+          </div>
+          <p class="text-muted mb-0">A code has been sent to your current email:</p>
+          <p class="fw-bold text-dark mb-0" id="old-email-masked-email"></p>
+        </div>
+        
+        <div class="d-flex justify-content-center gap-2 mb-4">
+          <input type="text" class="form-control text-center code-input" id="old_email_code1" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="old_email_code2" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="old_email_code3" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="old_email_code4" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="old_email_code5" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="old_email_code6" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+        </div>
+        
+        <div class="mb-4">
+          <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
+            <small class="text-muted">Code expires in:</small>
+            <span id="old-email-expiry-timer" class="fw-bold text-danger">05:00</span>
+          </div>
+          <button type="button" id="resend-old-email-code" class="btn btn-link p-0 text-decoration-none" disabled>
+            <small>Resend code in <span id="old-email-resend-timer">60</span>s</small>
+          </button>
+        </div>
+        
+        <div id="old-email-verification-message" class="alert alert-warning small mb-3" style="display: none;"></div>
+      </div>
+      <div class="modal-footer border-0 justify-content-between">
+        <button type="button" class="btn btn-reset" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" id="verify-old-email-code" class="btn btn-submit">Verify Code</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Email Change Verification Modal -->
+<div class="modal fade" id="emailChangeVerificationModal" tabindex="-1" aria-labelledby="emailChangeVerificationModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+    <div class="modal-content border-0 shadow-lg px-4" style="border-radius: 16px; overflow: hidden;">
+      <div class="modal-header border-0" style="color: rgb(20, 20, 20);">
+        <h5 class="modal-title" id="emailChangeVerificationModalLabel" style="margin-top: 8px;">Verify New Email</h5>
+      </div>
+      <div class="modal-body text-center">
+        <div class="mb-4">
+          <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width: 60px; height: 60px; background: var(--bs-danger-text-emphasis); color: white;">
+            {% bs_icon 'envelope-fill' size='1.5em' %}
+          </div>
+          <p class="text-muted mb-0">A code has been sent to your new email:</p>
+          <p class="fw-bold text-dark mb-0" id="email-masked-email"></p>
+        </div>
+        
+        <div class="d-flex justify-content-center gap-2 mb-4">
+          <input type="text" class="form-control text-center code-input" id="email_code1" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="email_code2" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="email_code3" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="email_code4" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="email_code5" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+          <input type="text" class="form-control text-center code-input" id="email_code6" maxlength="1" style="width: 50px; height: 50px; font-size: 1.2rem; font-weight: bold;" onpaste="return false;">
+        </div>
+        
+        <div class="mb-4">
+          <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
+            <small class="text-muted">Code expires in:</small>
+            <span id="email-expiry-timer" class="fw-bold text-danger">05:00</span>
+          </div>
+          <button type="button" id="resend-email-code" class="btn btn-link p-0 text-decoration-none" disabled>
+            <small>Resend code in <span id="email-resend-timer">60</span>s</small>
+          </button>
+        </div>
+        
+        <div id="email-verification-message" class="alert alert-warning small mb-3" style="display: none;"></div>
+      </div>
+      <div class="modal-footer border-0 justify-content-between">
+        <button type="button" class="btn btn-reset" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" id="verify-email-code" class="btn btn-submit">Verify Code</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1507,7 +1682,7 @@ document.addEventListener('DOMContentLoaded', function() {
           icon.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-white" style="font-size: 28px;"></i>';
           title.textContent = 'Warning';
           text.textContent = 'Please provide a reason for updating personal information.';
-          buttons.innerHTML = '<button type="button" class="btn btn-submit px-4 py-2" data-bs-dismiss="modal" style="border-radius: 8px; font-weight: 500; min-width: 100px;">Got it</button>';
+          buttons.innerHTML = '<button type="button" class="btn btn-submit px-4 py-2" onclick="bootstrap.Modal.getInstance(document.getElementById(\'errorModal\')).hide();" style="border-radius: 8px; font-weight: 500; min-width: 100px;">Got it</button>';
           new bootstrap.Modal(document.getElementById('errorModal')).show();
           return false;
         }
@@ -1531,7 +1706,7 @@ document.addEventListener('DOMContentLoaded', function() {
           icon.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-white" style="font-size: 28px;"></i>';
           title.textContent = 'Warning';
           text.textContent = 'No changes were made to the personal information.';
-          buttons.innerHTML = '<button type="button" class="btn btn-submit px-4 py-2" data-bs-dismiss="modal" style="border-radius: 8px; font-weight: 500; min-width: 100px;">Got it</button>';
+          buttons.innerHTML = '<button type="button" class="btn btn-submit px-4 py-2" onclick="bootstrap.Modal.getInstance(document.getElementById(\'errorModal\')).hide();" style="border-radius: 8px; font-weight: 500; min-width: 100px;">Got it</button>';
           new bootstrap.Modal(document.getElementById('errorModal')).show();
           return false;
         }

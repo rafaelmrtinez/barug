@@ -46,6 +46,36 @@ body.record-history {
 
 .visit-table thead th { color: #6b7280; font-weight: 600; text-align: center; }
 .visit-table td, .visit-table th { vertical-align: middle; }
+.visit-table tbody tr { cursor: pointer; transition: background-color 0.2s ease; }
+.visit-table tbody tr:hover { background-color: rgba(109, 41, 50, 0.05) !important; }
+
+/* Status badges with color-coded styling */
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
+
+.status-ongoing {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.status-incomplete {
+  background-color: #e5e7eb;
+  color: #4b5563;
+  border: 1px solid #d1d5db;
+}
+
+.status-complete {
+  background-color: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
 
 /* Center all text in the visit table to improve readability */
 .visit-table td, .visit-table th, .visit-table td.text-end, .visit-table td.text-start {

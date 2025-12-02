@@ -35,6 +35,14 @@ class IBusinessRepository(ABC):
     @abstractmethod
     def sort_status(self, status: int) -> list[BusinessListDTO]:
         pass
+    
+    @abstractmethod
+    def fetch_business_list_with_filters(self) -> list[BusinessListDTO]:
+        """
+        Fetches business list with additional fields for advanced filtering.
+        Includes: date_established, num_of_employees, sitio_purok
+        """
+        pass
 
     @abstractmethod
     def register_business(slf, cmd: RegisterBusinessProfileCmd) -> tuple[int,int]:
@@ -48,6 +56,9 @@ class IBusinessRepository(ABC):
         b_category: Optional[int] = None,
         ownership_type: Optional[int] = None,
         status: Optional[int] = None,
+        purok: Optional[str] = None,
+        date_range: Optional[str] = None,
+        employee_range: Optional[str] = None,
     ) -> list[Dict[str, Any]]:
         pass
 

@@ -49,7 +49,7 @@
         <div class="card p-3 mb-3">
           <div class="d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0">All Maternal Records</h5>
-            <small class="text-muted">Total: {{ all_records|length|default:0 }}</small>
+            <small class="text-muted">Total: {{ all_records|length|default:0 }} | Showing: {{ page_obj.start_index }}-{{ page_obj.end_index }}</small>
           </div>
 
           <div class="table-responsive mt-2 position-static">
@@ -63,12 +63,26 @@
                 </tr>
               </thead>
               <tbody>
-                {% if all_records %}
-                  {% for r in all_records %}
-                    <tr class="{% if r.maternal_record_id == mhr_number %}table-active{% endif %}">
+                {% if page_obj %}
+                  {% for r in page_obj %}
+                    <tr class="{% if r.maternal_record_id == mhr_number %}table-active{% endif %}" data-mhr-id="{{ r.maternal_record_id }}" role="button">
                       <td>{{ r.maternal_record_id }}</td>
                       <td>{{ r.start_date|date:"Y-m-d"|default:"-" }}</td>
-                      <td>{{ r.status_name|default:"N/A" }}</td>
+                      <td>
+                        {% if r.status_name %}
+                          {% if r.status_name|upper == "ONGOING" %}
+                            <span class="status-badge status-ongoing">{{ r.status_name }}</span>
+                          {% elif r.status_name|upper == "INCOMPLETE" %}
+                            <span class="status-badge status-incomplete">{{ r.status_name }}</span>
+                          {% elif r.status_name|upper == "COMPLETE" %}
+                            <span class="status-badge status-complete">{{ r.status_name }}</span>
+                          {% else %}
+                            <span class="status-badge status-incomplete">{{ r.status_name }}</span>
+                          {% endif %}
+                        {% else %}
+                          <span class="status-badge status-incomplete">N/A</span>
+                        {% endif %}
+                      </td>
                       {% if request.session.auth.role_name == "midwife" %}
                       <td class="text-end actions-cell">
                         <div class="dropdown d-inline-block position-static">
@@ -150,6 +164,13 @@
               </tbody>
             </table>
           </div>
+
+          <!-- Pagination Controls -->
+          {% if page_obj.has_other_pages %}
+          <div class="page-pagination mt-3">
+            {% include 'paginator.html' with page_obj=page_obj %}
+          </div>
+          {% endif %}
         </div>
       </div>
 
@@ -157,9 +178,60 @@
       <div class="col-lg-4">
         <!-- Replace previous side cards: schedules first, then trimester summary -->
         <div id="lmhr_cards_container">
-          {% include 'maternal/partial/prenatal_schedule_card.html' %}
+          {% include 'maternal/partial/visit_schedule_card.html' %}
 
-          {% include 'maternal/partial/postpartum_schedule_card.html' %}
+          <!-- Postpartum Visit Schedule Card -->
+          <div id="postpartum_schedule_card" class="card p-3 mb-3" style="display:none;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="card-title mb-0">Next Postpartum Visit</h6>
+            </div>
+            <div class="small">
+              <div class="row g-2">
+                <div class="col-6">
+                  <strong>Date:</strong>
+                  <div id="postpartum_sched_date" class="text-muted">-</div>
+                </div>
+                <div class="col-6">
+                  <strong>Time:</strong>
+                  <div id="postpartum_sched_time" class="text-muted">-</div>
+                </div>
+                <div class="col-12">
+                  <strong>Purpose:</strong>
+                  <div id="postpartum_sched_purpose" class="text-muted">-</div>
+                </div>
+                <div class="col-12">
+                  <strong>Notes:</strong>
+                  <div id="postpartum_sched_notes" class="text-muted">-</div>
+                </div>
+                <div class="col-12">
+                  <strong>Created By:</strong>
+                  <div id="postpartum_sched_creator" class="text-muted">-</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Postpartum Visit History Card -->
+          <div class="card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="card-title mb-0">Postpartum Visit History</h6>
+              <button id="btn_postpartum_visits" type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#postpartumVisitScheduleModal" style="display:none;">View All</button>
+            </div>
+            <div class="small text-muted">
+              Click "View All" to see postpartum visit history
+            </div>
+          </div>
+
+          <!-- Maternal ANC Visit History Card -->
+          <div class="card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="card-title mb-0">ANC Visit History</h6>
+              <button id="btn_maternal_anc_visits" type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#maternalAncVisitHistoryModal" style="display:none;">View All</button>
+            </div>
+            <div class="small text-muted">
+              Click "View All" to see detailed ANC visit records
+            </div>
+          </div>
 
           <!-- Trimester cards will be rendered here by maternal_side_panel.js -->
           <div class="card p-3 mb-3">
@@ -277,9 +349,11 @@
     {% include 'maternal/partial/postpartum_record_modal.html' %}
   {% endif %}
 
-  {% include 'maternal/partial/prenatal_schedule_history_modal.html' %}
+  {% include 'maternal/partial/visit_schedule_history_modal.html' %}
 
-  {% include 'maternal/partial/postpartum_schedule_history_modal.html' %}
+  {% include 'maternal/partial/maternal_anc_visit_history_modal.html' %}
+
+  {% include 'maternal/partial/postpartum_visit_schedule_modal.html' %}
 
   <!-- Create Maternal Entry Modal -->
   <div class="modal fade" id="createMaternalModal" tabindex="-1" aria-labelledby="createMaternalModalLabel" aria-hidden="true">

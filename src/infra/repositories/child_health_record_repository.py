@@ -630,6 +630,7 @@ class ChildHealthRecordRepository(IChildHealthRecordRepository):
                 JOIN person p3 ON p3.person_id = pk.dst_person_id
                 WHERE pk.src_person_id  = b.person_id
                     AND pk.relationship_id = 5
+                    AND pk.is_active = TRUE
                 ORDER BY
                     (pk.is_active IS TRUE AND pk.end_date IS NULL) DESC,  -- prefer active
                     COALESCE(pk.start_date, pk.added_at) DESC,

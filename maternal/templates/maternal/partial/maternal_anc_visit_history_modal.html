@@ -1,0 +1,82 @@
+<!-- Maternal ANC Visit History Modal -->
+<div class="modal fade" id="maternalAncVisitHistoryModal" tabindex="-1" aria-labelledby="maternalAncVisitHistoryModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content">
+      <div class="modal-header" style="background: linear-gradient(90deg, #44141e, #6d2932); color: #fff;">
+        <h5 class="modal-title" id="maternalAncVisitHistoryModalLabel">Maternal ANC Visit History</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle" style="table-layout: fixed; width: 100%;">
+            <thead>
+              <tr>
+                <th style="width: 8%;">Visit #</th>
+                <th style="width: 11%;">Visit Date</th>
+                <th style="width: 13%;">Trimester</th>
+                <th style="width: 10%;">AOG</th>
+                <th style="width: 10%;">Weight (kg)</th>
+                <th style="width: 10%;">BP</th>
+                <th style="width: 13%;">Leopold's</th>
+                <th style="width: 15%;">Notes</th>
+                <th style="width: 10%;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="maternal_anc_visit_history_tbody">
+              <tr>
+                <td colspan="9" class="text-center small text-muted">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Pagination Controls -->
+        <nav aria-label="ANC visit history pagination" id="anc_pagination_nav" style="display: none;">
+          <ul class="pagination pagination-sm justify-content-center mb-0">
+            <!-- Pagination will be inserted here by JavaScript -->
+          </ul>
+        </nav>
+        <style>
+          #anc_pagination_nav .page-link {
+            color: #6d2932;
+            border-color: #6d2932;
+          }
+          #anc_pagination_nav .page-link:hover {
+            background-color: #6d2932;
+            border-color: #6d2932;
+            color: #fff;
+          }
+          #anc_pagination_nav .page-item.active .page-link {
+            background-color: #6d2932;
+            border-color: #6d2932;
+            color: #fff;
+          }
+          #anc_pagination_nav .page-item.disabled .page-link {
+            color: #ccc;
+            border-color: #dee2e6;
+          }
+        </style>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Text Detail Modal for Leopold's and Notes -->
+<div class="modal fade" id="ancTextDetailModal" tabindex="-1" aria-labelledby="ancTextDetailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background: linear-gradient(90deg, #44141e, #6d2932); color: #fff;">
+        <h5 class="modal-title" id="ancTextDetailModalLabel">Details</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p id="ancTextDetailContent" class="mb-0" style="white-space: pre-wrap; word-wrap: break-word;"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

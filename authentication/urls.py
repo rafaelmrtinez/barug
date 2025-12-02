@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .announcement_views import in_app_announcements
 
 app_name = "authentication"
 
@@ -17,6 +18,9 @@ urlpatterns = [
     
     # Account settings
     path("account-settings/", views.account_settings, name="account_settings"),
+    
+    # In-app announcements
+    path("announcements/", in_app_announcements, name="in_app_announcements"),
     
     # Debug endpoint (TEMPORARY - remove in production)
     path("debug-login-log/", views.debug_login_log, name="debug_login_log"),

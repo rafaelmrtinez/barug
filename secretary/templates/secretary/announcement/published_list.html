@@ -1,0 +1,156 @@
+{# published_list.html #}
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+{% load choiceextras %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<link rel="stylesheet" href="{% static 'css/filters.css' %}">
+
+<style>
+  .btn-outline-brand{ color:#6d2932; border-color:#6d2932; background:#fff; }
+  .btn-outline-brand:hover{ background:#6d2932; color:#fff; }
+
+  .table thead th{
+    font-size:.80rem;
+    text-transform:capitalize;
+    letter-spacing:.02em;
+    vertical-align:middle;
+    white-space:nowrap;
+    text-align:left;
+  }
+
+  .table tbody td{
+    font-size:.80rem;
+    vertical-align:middle;
+    text-align:left;
+    font-weight:600;
+  }
+
+  /* Status pill */
+  .status-pill {
+    display: inline-block;
+    padding: 0.35rem 0.85rem;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    background: #f3f4f6;
+    color: #6b7280;
+    border: 1px solid #e5e7eb;
+  }
+
+  .status-pill-warning {
+    background: #fef3c7;
+    color: #92400e;
+    border-color: #fde68a;
+  }
+
+  .status-pill-success {
+    background: #d1fae5;
+    color: #065f46;
+    border-color: #a7f3d0;
+  }
+
+  .status-pill-danger {
+    background: #fee2e2;
+    color: #991b1b;
+    border-color: #fecaca;
+  }
+
+  .status-pill-secondary {
+    background: #e5e7eb;
+    color: #374151;
+    border-color: #d1d5db;
+  }
+</style>
+
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap" style="margin-top: 40px;">
+  <div class="container-fluid pt-3 page-main">
+    <div class="row">
+      {# ─── Toolbar: search + back button ─── #}
+      <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+        {% csrf_token %}
+        <div class="searchbox">
+          {% bs_icon 'search' extra_classes='bi' %}
+          {{ form.search }}
+        </div>
+      </form>
+
+
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th scope="col">Title</th>
+              <th scope="col">Published At</th>
+              <th scope="col">Expire At</th>
+              <th scope="col">Created At</th>
+              <th scope="col">Status</th>
+              <th scope="col" class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody id="results-body">
+            {% include "announcement/_published_list.html" with rows=page_obj.object_list %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div class="page-pagination">
+      {% include 'paginator.html' %}
+    </div>
+  {% endif %}
+
+</div>
+
+<script>
+(function () {
+  const input = document.getElementById('search');
+  const tbody = document.getElementById('results-body');
+  const endpoint = "{% url 'secretary:ajax_announcement_published_search' %}";
+
+  function currentParams() {
+    const params = new URLSearchParams();
+    params.set('q', (input?.value || '').trim());
+    params.set('tpl', 'rows');
+    return params.toString();
+  }
+
+  let t = null;
+  function debounce(fn, delay) {
+    return function (...args) {
+      clearTimeout(t);
+      t = setTimeout(() => fn.apply(this, args), delay);
+    }
+  }
+
+  async function fetchRows() {
+    try {
+      const url = endpoint + "?" + currentParams();
+      const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+      if (!res.ok) throw new Error("Network error");
+      const html = await res.text();
+      tbody.innerHTML = html;
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3">Failed to load results</td></tr>`;
+      console.error(err);
+    }
+  }
+
+  if (input && tbody) {
+    input.addEventListener('input', debounce(fetchRows, 300));
+  }
+})();
+</script>
+
+{% endblock %}

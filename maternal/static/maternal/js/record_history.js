@@ -1,5 +1,27 @@
 (() => {
     document.addEventListener('DOMContentLoaded', function () {
+        // Handle table row clicks to fetch side panel data
+        document.body.addEventListener('click', function (ev) {
+            const row = ev.target.closest && ev.target.closest('tr[data-mhr-id]');
+            if (!row) return;
+            
+            // Don't trigger if clicking on buttons/dropdowns in the Actions column
+            if (ev.target.closest('.actions-cell, .dropdown, button, a')) return;
+            
+            const mhrId = row.getAttribute('data-mhr-id');
+            if (mhrId && window.fetchMaternalSidePanel) {
+                // Remove active class from all rows
+                document.querySelectorAll('.record-history-table tbody tr').forEach(r => {
+                    r.classList.remove('table-active');
+                });
+                // Add active class to clicked row
+                row.classList.add('table-active');
+                
+                // Fetch side panel data
+                window.fetchMaternalSidePanel(mhrId);
+            }
+        });
+
         // schedule (prenatal)
         document.body.addEventListener('click', function (ev) {
             const btn = ev.target.closest && ev.target.closest('.btn-schedule');

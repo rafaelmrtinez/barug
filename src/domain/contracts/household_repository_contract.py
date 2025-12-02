@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
 from src.app.transfer_objects.dto.household_dto import (
     HouseholdListDTO,
+    HouseholdDetailDTO,
 )
 
 class IHouseholdRepository(ABC):
@@ -30,5 +31,9 @@ class IHouseholdRepository(ABC):
         house_type: Optional[int] = None,
         ownership_type: Optional[int] = None,
     ) -> list[Dict[str, Any]]:
+        pass
+
+    @abstractmethod
+    def fetch_household_detail(self, household_id: int) -> Optional[HouseholdDetailDTO]:
         pass
 
