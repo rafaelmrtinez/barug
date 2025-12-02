@@ -233,11 +233,11 @@
                         <h6 class="card-title d-flex align-items-center gap-2 mb-0">
                           {% bs_icon 'person-fill' %} Personal Information
                         </h6>
-                        {% if profile.residential_status == 'Non Resident' and user_role == 'Admin' or user_role == 'Super Admin' %}
+                        {% if profile.residential_status == 'Non Resident' %}{% if user_role == 'Admin' or user_role == 'Super Admin' %}
                         <button type="button" class="btn btn-submit btn-sm" id="editPersonalInfoBtn">
                           {% bs_icon 'pencil-square' %} Edit
                         </button>
-                        {% endif %}
+                        {% endif %}{% endif %}
                       </div>
                       {% if profile.residential_status != 'Non Resident' %}
                       <div class="alert alert-info d-flex align-items-center mb-4" role="alert">

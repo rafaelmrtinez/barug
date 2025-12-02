@@ -901,7 +901,7 @@ console.log('Account settings JS loaded');
   });
 
   // Admin edit functionality
-  if (typeof userRole !== 'undefined' && userRole === 'Admin') {
+  if (typeof userRole !== 'undefined' && (userRole === 'Admin' || userRole === 'Super Admin')) {
     // Edit Personal Information
     document.getElementById('editPersonalInfoBtn')?.addEventListener('click', function() {
       // Autofill form with current profile data
@@ -1130,7 +1130,7 @@ if (personalModal) {
     form.addEventListener('submit', function(e) {
       console.log('Form submit intercepted');
       e.preventDefault();
-      alert('Form submission blocked by validation');
+      // alert('Form submission blocked by validation');
       return false;
     });
   }
