@@ -120,25 +120,25 @@
         controls.appendChild(next);
 
         // goto input
-        const goto = document.createElement('input');
-        goto.type = 'number';
-        goto.className = 'form-control form-control-sm';
-        goto.style.width = '80px';
-        goto.placeholder = 'Go to';
-        goto.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                let v = Math.max(1, Math.floor(Number(goto.value) || 1));
-                const totalPages = Math.max(1, Math.ceil((previewState.rows.length - 1) / previewState.pageSize));
-                if (v > totalPages) v = totalPages;
-                previewState.currentPage = v;
-                renderCurrentPage();
-            }
-        });
-        controls.appendChild(goto);
+        // const goto = document.createElement('input');
+        // goto.type = 'number';
+        // goto.className = 'form-control form-control-sm';
+        // goto.style.width = '80px';
+        // goto.placeholder = 'Go to';
+        // goto.addEventListener('keydown', (e) => {
+        //     if (e.key === 'Enter') {
+        //         let v = Math.max(1, Math.floor(Number(goto.value) || 1));
+        //         const totalPages = Math.max(1, Math.ceil((previewState.rows.length - 1) / previewState.pageSize));
+        //         if (v > totalPages) v = totalPages;
+        //         previewState.currentPage = v;
+        //         renderCurrentPage();
+        //     }
+        // });
+        // controls.appendChild(goto);
 
         // show total rows
         const totalInfo = document.createElement('div');
-        totalInfo.id = 'faqTotalInfo';
+        // totalInfo.id = 'faqTotalInfo';
         totalInfo.className = 'ms-auto text-muted small';
         controls.appendChild(totalInfo);
     }
@@ -189,10 +189,10 @@
         if (pageIndicator) {
             pageIndicator.innerText = `Page ${previewState.currentPage} / ${totalPages}`;
         }
-        const totalInfo = document.getElementById('faqTotalInfo');
-        if (totalInfo) {
-            totalInfo.innerText = `${totalRows} rows total`;
-        }
+        // const totalInfo = document.getElementById('faqTotalInfo');
+        // if (totalInfo) {
+        //     totalInfo.innerText = `${totalRows} rows total`;
+        // }
 
         // enable/disable Prev/Next
         const controls = document.getElementById('faqPreviewControls');
