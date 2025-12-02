@@ -67,6 +67,7 @@ urlpatterns = [
     path("announcement/draft_edit/<int:announcement_id>/", views.announcement_draft_edit, name="announcement_draft_edit"),
     path("announcement/audience_scope/", views.announcement_audience_scope, name="announcement_audience_scope"),
     path("ajax/save_audience_rules/", views.save_audience_rules, name="save_audience_rules"),
+    path("ajax/remove_audience/", views.remove_audience, name="remove_audience"),
     path("ajax/announcement_draft_search/", views.ajax_announcement_draft_search, name="ajax_announcement_draft_search"),
     path("ajax/delete_announcement_draft/", views.ajax_delete_announcement_draft, name="ajax_delete_announcement_draft"),
     

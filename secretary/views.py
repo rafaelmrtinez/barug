@@ -2524,7 +2524,7 @@ def save_audience_rules(
     request: HttpRequest,
     audience_service: IAudienceService = Provide[AppContainer.audience_service],
 ) -> JsonResponse:
-    """Save all audience rules to database"""
+    """Save all audience rules to database with duplicate prevention"""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
     
@@ -2537,26 +2537,88 @@ def save_audience_rules(
         if not announcement_id:
             return JsonResponse({'error': 'Announcement ID required'}, status=400)
         
+        # Get existing audiences to check for duplicates
+        existing_audiences = audience_service.get_announcement_audiences(announcement_id)
+        
         saved_count = 0
+        skipped_count = 0
+        
         for rule in rules:
+            scope_id = rule.get('scope_id')
+            role_id = rule.get('role_id')
+            purok_id = rule.get('purok_id')
+            
+            # Check for duplicate
+            is_duplicate = any(
+                aud.audience_scope_id == scope_id and
+                aud.role_id == role_id and
+                aud.purok_sitio_id == purok_id
+                for aud in existing_audiences
+            )
+            
+            if is_duplicate:
+                skipped_count += 1
+                continue
+            
             command = AddAnnouncementAudienceCMD(
                 announcement_id=announcement_id,
-                audience_scope_id=rule.get('scope_id'),
-                role_id=rule.get('role_id'),
-                purok_sitio_id=rule.get('purok_id'),
+                audience_scope_id=scope_id,
+                role_id=role_id,
+                purok_sitio_id=purok_id,
                 person_ids=rule.get('person_ids')
             )
             
             audience_id, inserted_persons = audience_service.add_announcement_audience(command)
             saved_count += inserted_persons
         
+        message = f'{len(rules) - skipped_count} rules saved, {saved_count} persons added'
+        if skipped_count > 0:
+            message += f' ({skipped_count} duplicate(s) skipped)'
+        
         return JsonResponse({
             'success': True,
-            'message': f'{len(rules)} rules saved, {saved_count} persons added'
+            'message': message
         })
         
     except Exception as e:
         logger.exception("Failed to save audience rules: %s", e)
+        return JsonResponse({'error': str(e)}, status=500)
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def remove_audience(
+    request: HttpRequest,
+    audience_service: IAudienceService = Provide[AppContainer.audience_service],
+) -> JsonResponse:
+    """Remove an audience scope from an announcement"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        audience_id = data.get('audience_id')
+        
+        if not audience_id:
+            return JsonResponse({'error': 'Audience ID required'}, status=400)
+        
+        # Delete from audience_person_list first (foreign key constraint)
+        sql_delete_persons = "DELETE FROM public.audience_person_list WHERE audience_id = %s"
+        audience_service.audience_repository.ctx.execute_command(sql_delete_persons, (audience_id,))
+        
+        # Delete from audience
+        sql_delete_audience = "DELETE FROM public.audience WHERE audience_id = %s"
+        audience_service.audience_repository.ctx.execute_command(sql_delete_audience, (audience_id,))
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Audience removed successfully'
+        })
+        
+    except Exception as e:
+        logger.exception("Failed to remove audience: %s", e)
         return JsonResponse({'error': str(e)}, status=500)
 
 @session_login_required

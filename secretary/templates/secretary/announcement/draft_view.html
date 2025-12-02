@@ -392,16 +392,23 @@
                   </h6>
                   {% if audiences %}
                     {% for audience in audiences %}
-                      <div class="audience-item">
-                        <div class="d-flex justify-content-between align-items-center">
-                          <div>
+                      <div class="audience-item" id="audience-{{ audience.audience_id }}">
+                        <div class="d-flex justify-content-between align-items-start">
+                          <div class="flex-grow-1">
                             <strong>{{ audience.audience_scope_name }}</strong>
                             <br>
                             <small class="text-muted">
                               <i class="bi bi-person-check me-1"></i>{{ audience.inserted_persons }} recipients
                             </small>
                           </div>
-                          <span class="audience-badge">{{ audience.inserted_persons }}</span>
+                          <div class="d-flex align-items-center gap-2">
+                            <span class="audience-badge">{{ audience.inserted_persons }}</span>
+                            <button type="button" 
+                                    class="btn btn-sm btn-outline-danger" 
+                                    onclick="removeAudience({{ audience.audience_id }}, '{{ audience.audience_scope_name }}')"
+                                    title="Remove audience"><i class="bi bi-x-lg"></i>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     {% endfor %}
@@ -498,7 +505,8 @@
           <div id="draft-data"
               data-announcement-id="{{ draft.announcement_id }}"
               data-upsert-url="{% url 'secretary:upsert_announcement_channels' %}"
-              data-channels-url="{% url 'secretary:announcement_channels_api' draft.announcement_id %}">
+              data-channels-url="{% url 'secretary:announcement_channels_api' draft.announcement_id %}"
+              data-has-audiences="{% if audiences %}true{% else %}false{% endif %}">
           </div>
 
         </div>
@@ -508,6 +516,68 @@
 </div>
 
 <script>
+// Remove Audience Function
+window.removeAudience = function(audienceId, audienceName) {
+  // Set modal content
+  document.getElementById('removeAudienceName').textContent = audienceName;
+  
+  // Store data for confirmation
+  const confirmBtn = document.getElementById('confirmRemoveAudienceBtn');
+  confirmBtn.onclick = async function() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('removeAudienceModal'));
+    modal.hide();
+    
+    try {
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+      const response = await fetch('{% url "secretary:remove_audience" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken,
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ audience_id: audienceId })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // Remove the element from DOM with animation
+        const element = document.getElementById('audience-' + audienceId);
+        if (element) {
+          element.style.transition = 'opacity 0.3s ease';
+          element.style.opacity = '0';
+          setTimeout(() => {
+            element.remove();
+            // Check if no audiences left
+            const audienceSection = element.closest('.sidebar-section');
+            const remainingAudiences = audienceSection.querySelectorAll('.audience-item');
+            if (remainingAudiences.length === 0) {
+              window.location.reload(); // Reload to show empty state
+            }
+          }, 300);
+        }
+      } else {
+        showErrorModal('Failed to Remove', result.error || 'An error occurred while removing the audience.');
+      }
+    } catch (error) {
+      showErrorModal('Failed to Remove', error.message || 'An unexpected error occurred.');
+    }
+  };
+  
+  // Show modal
+  const modal = new bootstrap.Modal(document.getElementById('removeAudienceModal'));
+  modal.show();
+};
+
+// Helper function to show error modal
+function showErrorModal(title, message) {
+  document.getElementById('errorModalTitle').textContent = title;
+  document.getElementById('errorModalMessage').textContent = message;
+  const modal = new bootstrap.Modal(document.getElementById('errorModal'));
+  modal.show();
+}
+
 (() => {
   // Read data attributes
   const dataEl = document.getElementById('draft-data');
@@ -691,9 +761,15 @@
 
   // Add / Update buttons logic
   function configureActionButtons(channels) {
+    const hasAudiences = dataEl.dataset.hasAudiences === 'true';
+    
     if (channels && channels.length) {
       show(updateBtn); hide(addBtn);
       updateBtn.onclick = () => {
+        if (!hasAudiences) {
+          showErrorModal('No Audiences Configured', 'You must add at least one audience scope before modifying delivery channels.');
+          return;
+        }
         showChannelForm();
         clearChannels();
         channels.forEach(ch => {
@@ -708,6 +784,10 @@
     } else {
       show(addBtn); hide(updateBtn);
       addBtn.onclick = () => {
+        if (!hasAudiences) {
+          showErrorModal('No Audiences Configured', 'You must add at least one audience scope before adding delivery channels. Recipients are created based on audiences.');
+          return;
+        }
         showChannelForm();
         clearChannels();
         updateSaveButtonState();
@@ -717,6 +797,11 @@
 
   // Show/hide form
   function showChannelForm() {
+    const hasAudiences = dataEl.dataset.hasAudiences === 'true';
+    if (!hasAudiences) {
+      showErrorModal('No Audiences Configured', 'You must add at least one audience scope before adding delivery channels. Recipients are created based on audiences.');
+      return;
+    }
     show(channelFormArea);
     channelFormArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
     updateSaveButtonState();
@@ -870,7 +955,7 @@
         console.log('scopeSelect value:', scopeSelect ? scopeSelect.value : 'null');
         
         if (!scopeSelect || !scopeSelect.value || scopeSelect.value === '' || scopeSelect.value === '0') {
-          alert('Please select a scope first');
+          showErrorModal('No Scope Selected', 'Please select a scope before adding a rule.');
           return;
         }
         
@@ -909,6 +994,19 @@
         }
         
         console.log('Rule created:', rule);
+        
+        // Check for duplicate before adding
+        const isDuplicate = appliedRules.some(existingRule => 
+          existingRule.scope_id === rule.scope_id &&
+          existingRule.role_id === rule.role_id &&
+          existingRule.purok_id === rule.purok_id
+        );
+        
+        if (isDuplicate) {
+          showErrorModal('Duplicate Rule', 'This audience scope has already been added to the list. Please select a different scope or modify the existing one.');
+          return;
+        }
+        
         appliedRules.push(rule);
         updateRulesList();
       });
@@ -921,7 +1019,7 @@
         const announcementId = {{ draft.announcement_id }};
         
         if (appliedRules.length === 0) {
-          alert('Please add at least one rule');
+          showErrorModal('No Rules Added', 'Please add at least one rule before saving.');
           return;
         }
         
@@ -946,10 +1044,10 @@
             bootstrap.Modal.getInstance(document.getElementById('audienceModal')).hide();
             window.location.reload();
           } else {
-            alert('Error: ' + result.error);
+            showErrorModal('Save Failed', result.error || 'An error occurred while saving the audience.');
           }
         } catch (error) {
-          alert('Failed to save audience: ' + error.message);
+          showErrorModal('Save Failed', error.message || 'An unexpected error occurred.');
         }
       });
     }
@@ -980,8 +1078,8 @@
 </script>
 
 <!-- Audience Scope Modal -->
-<div class="modal fade" id="audienceModal" tabindex="-1" aria-labelledby="audienceModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
+<div class="modal fade" id="audienceModal" tabindex="-1" aria-labelledby="audienceModalLabel" aria-hidden="true" style="margin-top: 70px;">
+  <div class="modal-dialog modal-lg" style="margin-top: 10vh;">
     <div class="modal-content">
       <div class="modal-header" style="background: linear-gradient(135deg, #6d2932 0%, #8a3a47 100%); color: white;">
         <h5 class="modal-title" id="audienceModalLabel">
@@ -1030,11 +1128,59 @@
         </div>
       </div>
       <div class="modal-footer">
+        <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">
+          <i class="bi bi-x-circle"></i> Cancel
+        </button>
+        <button type="button" id="save-audience-btn" class="btn btn-primary" disabled>
+          <i class="bi bi-check-lg"></i> Save Audience
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Remove Audience Confirmation Modal -->
+<div class="modal fade" id="removeAudienceModal" tabindex="-1" aria-labelledby="removeAudienceModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0" style="background: linear-gradient(135deg, #6d2932 0%, #8a3a47 100%); color: white;">
+        <h5 class="modal-title" id="removeAudienceModalLabel">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>Confirm Remove
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">Are you sure you want to remove <strong id="removeAudienceName"></strong> from this announcement?</p>
+        <p class="text-muted small mb-0">This will remove all recipients associated with this audience scope. This action cannot be undone.</p>
+      </div>
+      <div class="modal-footer border-0">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
           <i class="bi bi-x-circle"></i> Cancel
         </button>
-        <button type="button" id="save-audience-btn" class="btn btn-success" disabled>
-          <i class="bi bi-check-lg"></i> Save Audience
+        <button type="button" class="btn btn-danger" id="confirmRemoveAudienceBtn">
+          <i class="bi bi-trash"></i> Remove
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Error Modal -->
+<div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0" style="background: linear-gradient(135deg, #6d2932 0%, #8a3a47 100%); color: white;">
+        <h5 class="modal-title" id="errorModalLabel">
+          <i class="bi bi-exclamation-circle-fill me-2"></i><span id="errorModalTitle">Error</span>
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0" id="errorModalMessage"></p>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+          <i class="bi bi-check-lg"></i> OK
         </button>
       </div>
     </div>
