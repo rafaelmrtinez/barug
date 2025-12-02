@@ -231,3 +231,27 @@ def get_this_case_kp16_settlement_agreement(case_id: int) -> Optional[str]:
     rows = get_latest_form_fields(case_id, 'KP-16')
     val = (get_field_text(rows, 'settlement_statement') or '').strip()
     return val or None
+
+def get_barangay_captain_name() -> str:
+    """
+    Fetches the current barangay captain name from the database.
+    Returns formatted name: "FIRST M. LAST" or fallback to "Lourdes Ramirez".
+    """
+    sql = """
+        SELECT p.first_name, p.middle_name, p.last_name, p.suffix
+        FROM staff s
+        JOIN person p ON p.person_id = s.person_id
+        WHERE s.role_id = 3 AND s.acc_status_id = 1
+        LIMIT 1
+    """
+    with connection.cursor() as cur:
+        cur.execute(sql)
+        row = cur.fetchone()
+        if row:
+            first, middle, last, suffix = row
+            middle_initial = f"{middle[0]}." if middle else ""
+            parts = [first, middle_initial, last]
+            if suffix:
+                parts.append(suffix)
+            return " ".join(p for p in parts if p).strip()
+    return "Lourdes Ramirez"

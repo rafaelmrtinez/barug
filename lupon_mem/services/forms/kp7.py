@@ -177,7 +177,8 @@ class KP7Handler:
         # Default Punong Barangay
         # ---------------------------------------------------
         if not (out.get("punong_barangay") or "").strip():
-            out["punong_barangay"] = "Lourdes Ramirez"
+            from ..fields_util import get_barangay_captain_name
+            out["punong_barangay"] = get_barangay_captain_name()
 
         # ---------------------------------------------------
         # Complaint Details (WHAT/WHEN/WHERE) — idempotent
@@ -195,11 +196,26 @@ class KP7Handler:
         # Start from a raw WHAT body (no previous labels)
         raw_what = _strip_www(out.get("complaint_details", "").strip())
 
+        # Get incident date from blotter_report first, then fallback to form fields
         incident_val = ""
-        if "incident date" in by_label:
-            incident_val = FS.normalize(by_label["incident date"])
-        elif "incident_date" in by_code:
-            incident_val = FS.normalize(by_code["incident_date"])
+        with FS.connection.cursor() as cur2:
+            cur2.execute("""
+                SELECT br.incident_date
+                  FROM blotter_report br
+                  JOIN blotter_case bc ON bc.blotter_report_id = br.blotter_report_id
+                  JOIN blotter_kp_submission s ON s.blotter_case_id = bc.blotter_case_id
+                 WHERE s.submission_id = %s
+            """, [submission_id])
+            row = cur2.fetchone()
+            if row and row[0]:
+                incident_val = str(row[0])
+        
+        # Fallback to form fields if no blotter report incident date
+        if not incident_val:
+            if "incident date" in by_label:
+                incident_val = FS.normalize(by_label["incident date"])
+            elif "incident_date" in by_code:
+                incident_val = FS.normalize(by_code["incident_date"])
 
         if incident_val:
             idd, imo, iyr = _parts_from_value(incident_val)

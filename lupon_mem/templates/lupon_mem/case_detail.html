@@ -160,13 +160,37 @@
   </div>
   {% endif %}
 
+  <!-- ======= CONCILIATION PHASE ALERT ======= -->
+  {% if 'KP-10' in all_form_codes %}
+  <div class="alert alert-info mb-3" style="border-radius:12px; border-left:4px solid #0ea5e9;">
+    <div class="d-flex align-items-start">
+      <i class="bi bi-info-circle-fill me-2" style="font-size:1.2rem;"></i>
+      <div class="flex-grow-1">
+        <strong>Conciliation Phase:</strong> This case has entered the Pangkat conciliation stage.
+        {% if pangkat_members %}
+        <div class="mt-2">
+          <small class="text-muted">Pangkat Members:</small>
+          <div class="d-flex flex-wrap gap-2 mt-1">
+            {% for member in pangkat_members %}
+            <span class="badge bg-light text-dark border" style="font-weight:600; padding:0.4rem 0.7rem;">
+              <i class="bi bi-person-check me-1"></i>{{ member }}
+            </span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- ======= HERO HEADER ======= -->
   <section class="hero mb-3">
     <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
       <div>
       <div>
         <div class="case-no">
-          Case_detail.html Case No. {{ case.1 }}
+          Barangay Case No. {{ case.1 }}
           <a href="#" class="info-icon" title="View case information" data-bs-toggle="tooltip">
             <i class="bi bi-info-circle-fill"></i>
           </a>
@@ -242,6 +266,7 @@
         </div>
       </div>
 
+      {% if request.session.auth.role_name|lower != 'barangay secretary' %}
       <div class="d-flex gap-2 flex-wrap">
         <a class="btn btn-outline-brand" href="{% url 'lupon_mem:case_timeline' case_id %}">
           {% bs_icon 'clock-history' extra_classes='me-1' %} Timeline
@@ -262,6 +287,7 @@
           {% bs_icon 'diagram-3' extra_classes='me-1' %} Lupon Flow
         </button>
       </div>
+      {% endif %}
     </div>
   </section>
 
@@ -324,7 +350,7 @@
     </div>
 
     <div class="ms-auto d-flex align-items-center gap-2">
-      {% if case_state_name|lower != 'closed' and case_state_name|lower != 'dismissed' %}
+      {% if case_state_name|lower != 'closed' and case_state_name|lower != 'dismissed' and request.session.auth.role_name|lower != 'barangay secretary' %}
       <a class="btn btn-outline-brand" href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
         {% bs_icon 'plus-circle' extra_classes='me-1' %} Add Form
       </a>
@@ -782,6 +808,32 @@
     
     return foundForm;
   }
+  
+  function hasFormAfterKp8(formCode, kp8Attempt) {
+    const table = document.getElementById('formsTable');
+    if (!table) return false;
+    
+    let kp8Count = 0;
+    let foundForm = false;
+    const rows = Array.from(table.querySelectorAll('tbody tr')).reverse();
+    
+    for (const row of rows) {
+      const codeChip = row.querySelector('.code-chip');
+      if (!codeChip) continue;
+      const code = codeChip.textContent.trim();
+      
+      if (code.includes('KP-8')) {
+        kp8Count++;
+        foundForm = false;
+      }
+      
+      if (kp8Count === kp8Attempt && code.includes(formCode)) {
+        foundForm = true;
+      }
+    }
+    
+    return foundForm;
+  }
 
   /* ===== KP-7 Complaint Details Display ===== */
   function formatComplaintDetails(text) {
@@ -1094,7 +1146,12 @@
               let attempt = 1;
               if (currentStep === 'kp18_kp19_second') attempt = 2;
               else if (currentStep === 'kp18_kp19_third') attempt = 3;
+              let attempt = 1;
+              if (currentStep === 'kp18_kp19_second') attempt = 2;
+              else if (currentStep === 'kp18_kp19_third') attempt = 3;
               
+              const hasKp18 = hasFormAfterKp8('KP-18', attempt);
+              const hasKp19 = hasFormAfterKp8('KP-19', attempt);
               const hasKp18 = hasFormAfterKp8('KP-18', attempt);
               const hasKp19 = hasFormAfterKp8('KP-19', attempt);
               let html = '';
@@ -1123,6 +1180,7 @@
             else if (currentStep === 'kp9_first') { hasRequiredForm = countForms('KP-9') >= 1; requiredCount = 1; }
             else if (currentStep === 'kp9_second') { hasRequiredForm = countForms('KP-9') >= 2; requiredCount = 2; }
             else if (currentStep === 'kp9_third') { hasRequiredForm = countForms('KP-9') >= 3; requiredCount = 3; }
+            else if (currentStep.startsWith('kp19_') || currentStep.startsWith('kp18_')) { hasRequiredForm = haveForm(step.code); requiredCount = 1; }
             else if (currentStep.startsWith('kp19_') || currentStep.startsWith('kp18_')) { hasRequiredForm = haveForm(step.code); requiredCount = 1; }
             else hasRequiredForm = haveForm(step.code);
             
@@ -1246,8 +1304,36 @@
           }
         } else if (currentStep.includes('pangkat_hearing')) {
           // Handle Pangkat hearings similarly to KP-9
+          // Handle Pangkat hearings similarly to KP-9
           const mediationHearings = await getMediationHearingDetails();
           const currentHearing = mediationHearings.find(h => h.hearing_no === (currentStep.includes('_2') ? 3 : 2));
+          const outcomeDisplay = document.getElementById(`hearingOutcomeDisplay-${currentStep}`);
+          if (outcomeDisplay && currentHearing) {
+            const isHeld = currentHearing.hearing_held;
+            const attendees = [];
+            if (currentHearing.complainant_attended === 'TRUE') attendees.push('Complainant');
+            if (currentHearing.respondent_attended === 'TRUE') attendees.push('Respondent');
+            outcomeDisplay.innerHTML = `
+              <div class="alert ${isHeld ? 'alert-success' : 'alert-secondary'} mb-2" style="padding:0.75rem;">
+                <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+                  <span class="badge ${isHeld ? 'bg-success' : 'bg-secondary'}" style="font-size:0.75rem;">
+                    Hearing Status: ${isHeld ? 'HELD' : 'NOT HELD'}
+                  </span>
+                  ${isHeld && currentHearing.settlement_outcome ? `
+                    <span class="badge ${currentHearing.settlement_outcome === 'SETTLED' ? 'bg-success' : 'bg-warning'}" style="font-size:0.75rem;">
+                      Outcome: ${currentHearing.settlement_outcome}
+                    </span>
+                  ` : ''}
+                  ${isHeld && attendees.length ? `
+                    <span style="font-size:0.8rem;color:#64748b;">•</span>
+                    <span style="font-size:0.8rem;color:#475569;">Who attended:</span>
+                    ${attendees.map(a=>`<span class="badge bg-light text-dark border" style="font-size:0.7rem;">${a}</span>`).join(' ')}
+                  ` : ''}
+                </div>
+              </div>
+            `;
+          }
+          if (currentHearing && currentHearing.hearing_held) {
           const outcomeDisplay = document.getElementById(`hearingOutcomeDisplay-${currentStep}`);
           if (outcomeDisplay && currentHearing) {
             const isHeld = currentHearing.hearing_held;
@@ -1304,8 +1390,26 @@
                 else goToStep('kp20');
               }));
               branchDiv.appendChild(mkBtn('ARBITRATION', () => goToStep('kp14')));
+            } else {
+              branchDiv.appendChild(mkBtn('SETTLED', () => goToStep('kp16_settled')));
+              branchDiv.appendChild(mkBtn('NOT SETTLED', () => {
+                if (currentStep === 'pangkat_hearing_1') goToStep('pangkat_choice_1');
+                else goToStep('kp20');
+              }));
+              branchDiv.appendChild(mkBtn('ARBITRATION', () => goToStep('kp14')));
             }
           } else {
+            branchDiv.innerHTML = `
+              <div class="fw-bold mb-2 text-muted">What happened?</div>
+              <div class="mb-2">
+                <a href="{% url 'lupon_mem:case_hearing_list' case_id %}" class="btn btn-brand btn-sm">
+                  {% bs_icon 'calendar-week' %} Record Outcome
+                </a>
+              </div>
+              <div class="text-muted small">
+                Record if hearing was held, not held, or parties didn't attend
+              </div>
+            `;
             branchDiv.innerHTML = `
               <div class="fw-bold mb-2 text-muted">What happened?</div>
               <div class="mb-2">
@@ -1529,6 +1633,7 @@
     if (!table) return;
     
     let currentMediation = 0;
+    let currentMediation = 0;
     
     // Process rows in reverse order (oldest first) since table shows newest first
     const rows = Array.from(table.querySelectorAll('tbody tr')).reverse();
@@ -1542,11 +1647,14 @@
         if (codeText.includes('KP-8')) {
           currentMediation++;
           const suffix = currentMediation === 1 ? 'st' : currentMediation === 2 ? 'nd' : 'rd';
+          currentMediation++;
+          const suffix = currentMediation === 1 ? 'st' : currentMediation === 2 ? 'nd' : 'rd';
           
           let existingBadge = formNameCell.querySelector('.mediation-badge');
           if (!existingBadge) {
             const badge = document.createElement('span');
             badge.className = 'badge rounded-pill bg-primary text-white ms-2 mediation-badge';
+            badge.textContent = `${currentMediation}${suffix} Mediation`;
             badge.textContent = `${currentMediation}${suffix} Mediation`;
             formNameCell.appendChild(badge);
           }
@@ -1554,11 +1662,14 @@
         
         if (codeText.includes('KP-9') || codeText.includes('KP-18') || codeText.includes('KP-19')) {
           const suffix = currentMediation === 1 ? 'st' : currentMediation === 2 ? 'nd' : 'rd';
+        if (codeText.includes('KP-9') || codeText.includes('KP-18') || codeText.includes('KP-19')) {
+          const suffix = currentMediation === 1 ? 'st' : currentMediation === 2 ? 'nd' : 'rd';
           
           let existingBadge = formNameCell.querySelector('.mediation-badge');
           if (!existingBadge) {
             const badge = document.createElement('span');
             badge.className = 'badge rounded-pill bg-success text-white ms-2 mediation-badge';
+            badge.textContent = `${currentMediation}${suffix} Mediation`;
             badge.textContent = `${currentMediation}${suffix} Mediation`;
             formNameCell.appendChild(badge);
           }

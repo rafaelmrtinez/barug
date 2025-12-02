@@ -5,6 +5,7 @@ from django.http import HttpRequest
 from authentication.guards import session_login_required, role_required
 from .views_shared import LUPON_ROLES, _hearing_gate
 from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST
 # (This module is a stub for future hearing-specific POST actions like “mark held”.
 #  Your current hearing logic lives inside helper gates and KP-16 submit hook.)
 #  Keeping it minimal now to avoid duplicating code.
@@ -29,8 +30,11 @@ def reschedule_hearing(request: HttpRequest, case_id: int):
     if not submission_id or not new_date or not new_time:
         return JsonResponse({"success": False, "error": "Missing required fields for rescheduling."})
     
+    print(f"[RESCHEDULE DEBUG] Received time from form: {new_time}")
+    
     try:
         with connection.cursor() as cur:
+            print(f"[RESCHEDULE DEBUG] Calling fn_reschedule_hearing with time: {new_time}")
             cur.execute(
                 "SELECT * FROM fn_reschedule_hearing(%s, %s, %s, %s, %s)",
                 [int(submission_id), new_date, new_time, remarks or None, staff_id]
