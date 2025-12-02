@@ -163,7 +163,7 @@ class PrenatalFollowUpService:
                     notes=notes,
                 )
                 
-                if res[0]:
+                if res:
                     self.repository.insert_maternal_visit_and_schedule_completion(
                         mhr_id=mid,
                         staff_id=staff_id,

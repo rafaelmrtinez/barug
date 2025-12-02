@@ -46,6 +46,8 @@ body.record-history {
 
 .visit-table thead th { color: #6b7280; font-weight: 600; text-align: center; }
 .visit-table td, .visit-table th { vertical-align: middle; }
+.visit-table tbody tr { cursor: pointer; transition: background-color 0.2s ease; }
+.visit-table tbody tr:hover { background-color: rgba(109, 41, 50, 0.05) !important; }
 
 /* Status badges with color-coded styling */
 .status-badge {

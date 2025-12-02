@@ -65,7 +65,7 @@
               <tbody>
                 {% if page_obj %}
                   {% for r in page_obj %}
-                    <tr class="{% if r.maternal_record_id == mhr_number %}table-active{% endif %}">
+                    <tr class="{% if r.maternal_record_id == mhr_number %}table-active{% endif %}" data-mhr-id="{{ r.maternal_record_id }}" role="button">
                       <td>{{ r.maternal_record_id }}</td>
                       <td>{{ r.start_date|date:"Y-m-d"|default:"-" }}</td>
                       <td>
@@ -178,9 +178,60 @@
       <div class="col-lg-4">
         <!-- Replace previous side cards: schedules first, then trimester summary -->
         <div id="lmhr_cards_container">
-          {% include 'maternal/partial/prenatal_schedule_card.html' %}
+          {% include 'maternal/partial/visit_schedule_card.html' %}
 
-          {% include 'maternal/partial/postpartum_schedule_card.html' %}
+          <!-- Postpartum Visit Schedule Card -->
+          <div id="postpartum_schedule_card" class="card p-3 mb-3" style="display:none;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="card-title mb-0">Next Postpartum Visit</h6>
+            </div>
+            <div class="small">
+              <div class="row g-2">
+                <div class="col-6">
+                  <strong>Date:</strong>
+                  <div id="postpartum_sched_date" class="text-muted">-</div>
+                </div>
+                <div class="col-6">
+                  <strong>Time:</strong>
+                  <div id="postpartum_sched_time" class="text-muted">-</div>
+                </div>
+                <div class="col-12">
+                  <strong>Purpose:</strong>
+                  <div id="postpartum_sched_purpose" class="text-muted">-</div>
+                </div>
+                <div class="col-12">
+                  <strong>Notes:</strong>
+                  <div id="postpartum_sched_notes" class="text-muted">-</div>
+                </div>
+                <div class="col-12">
+                  <strong>Created By:</strong>
+                  <div id="postpartum_sched_creator" class="text-muted">-</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Postpartum Visit History Card -->
+          <div class="card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="card-title mb-0">Postpartum Visit History</h6>
+              <button id="btn_postpartum_visits" type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#postpartumVisitScheduleModal" style="display:none;">View All</button>
+            </div>
+            <div class="small text-muted">
+              Click "View All" to see postpartum visit history
+            </div>
+          </div>
+
+          <!-- Maternal ANC Visit History Card -->
+          <div class="card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="card-title mb-0">ANC Visit History</h6>
+              <button id="btn_maternal_anc_visits" type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#maternalAncVisitHistoryModal" style="display:none;">View All</button>
+            </div>
+            <div class="small text-muted">
+              Click "View All" to see detailed ANC visit records
+            </div>
+          </div>
 
           <!-- Trimester cards will be rendered here by maternal_side_panel.js -->
           <div class="card p-3 mb-3">
@@ -298,9 +349,11 @@
     {% include 'maternal/partial/postpartum_record_modal.html' %}
   {% endif %}
 
-  {% include 'maternal/partial/prenatal_schedule_history_modal.html' %}
+  {% include 'maternal/partial/visit_schedule_history_modal.html' %}
 
-  {% include 'maternal/partial/postpartum_schedule_history_modal.html' %}
+  {% include 'maternal/partial/maternal_anc_visit_history_modal.html' %}
+
+  {% include 'maternal/partial/postpartum_visit_schedule_modal.html' %}
 
   <!-- Create Maternal Entry Modal -->
   <div class="modal fade" id="createMaternalModal" tabindex="-1" aria-labelledby="createMaternalModalLabel" aria-hidden="true">
