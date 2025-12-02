@@ -68,7 +68,21 @@
                     <tr class="{% if r.maternal_record_id == mhr_number %}table-active{% endif %}">
                       <td>{{ r.maternal_record_id }}</td>
                       <td>{{ r.start_date|date:"Y-m-d"|default:"-" }}</td>
-                      <td>{{ r.status_name|default:"N/A" }}</td>
+                      <td>
+                        {% if r.status_name %}
+                          {% if r.status_name|upper == "ONGOING" %}
+                            <span class="status-badge status-ongoing">{{ r.status_name }}</span>
+                          {% elif r.status_name|upper == "INCOMPLETE" %}
+                            <span class="status-badge status-incomplete">{{ r.status_name }}</span>
+                          {% elif r.status_name|upper == "COMPLETE" %}
+                            <span class="status-badge status-complete">{{ r.status_name }}</span>
+                          {% else %}
+                            <span class="status-badge status-incomplete">{{ r.status_name }}</span>
+                          {% endif %}
+                        {% else %}
+                          <span class="status-badge status-incomplete">N/A</span>
+                        {% endif %}
+                      </td>
                       {% if request.session.auth.role_name == "midwife" %}
                       <td class="text-end actions-cell">
                         <div class="dropdown d-inline-block position-static">
