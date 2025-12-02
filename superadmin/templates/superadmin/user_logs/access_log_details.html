@@ -1,0 +1,241 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<script>
+  // Execute immediately to prevent flash
+  (function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (!urlParams.has('per_page')) {
+      urlParams.set('per_page', '10');
+      urlParams.set('page', '1');
+      window.location.replace(window.location.pathname + '?' + urlParams.toString());
+    }
+  })();
+</script>
+<style>
+  .stats-card {
+    background: var(--bs-danger-text-emphasis);
+    color: white;
+    border: none;
+    border-radius: 20px;
+    padding: 2rem;
+    box-shadow: 0 4px 15px rgba(139, 21, 56, 0.15);
+  }
+  .session-table {
+    border: none;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    background: rgba(255,255,255,0.95);
+  }
+  .session-table:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+  }
+  .table thead th {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+    font-weight: 600;
+  }
+  .status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+  .status-active {
+    background-color: #d4edda;
+    color: #155724;
+  }
+  .status-inactive {
+    background-color: #f8d7da;
+    color: #721c24;
+  }
+  .info-card {
+    background: #f8f9fa;
+    border-radius: 15px;
+    padding: 1.5rem;
+    border: 1px solid rgba(139, 21, 56, 0.1);
+    transition: all 0.3s ease;
+  }
+  .info-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(139, 21, 56, 0.08);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="container-fluid pt-3 page-main" style="margin-top: 40px;">
+    <div class="row">
+      <div class="col-12">
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h2 class="mb-1">Access Log Details</h2>
+            <p class="text-muted mb-0">Detailed login history and session information</p>
+          </div>
+          <a href="{% url 'superadmin:access_logs' %}" class="btn btn-outline-brand">
+            {% bs_icon 'arrow-left' extra_classes='me-2' %} Back to Access Logs
+          </a>
+        </div>
+
+        <!-- Debug: logs count = {{ logs|length }} -->
+        {% if logs %}
+          {% with first_log=logs.0 %}
+          <div class="card stats-card mb-4">
+            <div class="card-body">
+              <div class="row text-center">
+                <div class="col">
+                  <div class="mb-2">
+                    {% bs_icon 'person-circle' size='2em' %}
+                  </div>
+                  <h6 class="mb-1">{{ first_log.user_name }}</h6>
+                  <small class="opacity-75">{{ first_log.role_name|default:"Not assigned" }}</small>
+                </div>
+                <div class="col">
+                  <div class="mb-2">
+                    {% bs_icon 'card-text' size='2em' %}
+                  </div>
+                  <h6 class="mb-1">{{ first_log.staff_code|default:"—" }}</h6>
+                  <small class="opacity-75">Staff Code</small>
+                </div>
+                <div class="col">
+                  <div class="mb-2">
+                    {% bs_icon 'clock-history' size='2em' %}
+                  </div>
+                  <h6 class="mb-1">{{ first_log.total_sessions }}</h6>
+                  <small class="opacity-75">Total Sessions</small>
+                </div>
+                <div class="col">
+                  <div class="mb-2">
+                    {% bs_icon 'activity' size='2em' %}
+                  </div>
+                  <h6 class="mb-1">{{ first_log.active_sessions }}</h6>
+                  <small class="opacity-75">Active Sessions</small>
+                </div>
+                <div class="col">
+                  <div class="mb-2">
+                    {% bs_icon 'stopwatch' size='2em' %}
+                  </div>
+                  <h6 class="mb-1">{{ first_log.total_session_duration|default:"—" }}</h6>
+                  <small class="opacity-75">Total Duration</small>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endwith %}
+
+          <div class="card session-table">
+            <div class="card-header bg-white">
+              <div class="d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                  {% bs_icon 'list-ul' extra_classes='me-2' %}
+                  Login Sessions ({{ total_count }} total)
+                </h5>
+                <div class="d-flex align-items-center">
+                  <label class="form-label me-2 mb-0">Show:</label>
+                  <select class="form-select form-select-sm" id="perPageSelect" style="width: auto;" onchange="window.location.href='?per_page=' + this.value + '&page=1'">
+                    <option value="10">10</option>
+                    <option value="15" {% if per_page == 15 %}selected{% endif %}>15</option>
+                    <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+                    <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                  </select>
+
+                </div>
+              </div>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                  <thead>
+                    <tr>
+                      <th class="ps-4">{% bs_icon 'calendar-event' extra_classes='me-1' %} Login Time</th>
+                      <th>{% bs_icon 'calendar-x' extra_classes='me-1' %} Logout Time</th>
+                      <th>{% bs_icon 'circle-fill' extra_classes='me-1' %} Status</th>
+                      <th>{% bs_icon 'clock' extra_classes='me-1' %} Duration</th>
+                      <th class="pe-4">{% bs_icon 'globe' extra_classes='me-1' %} IP Address</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for log in page_obj.object_list %}
+                      <tr>
+                        <td class="ps-4">
+                          {% if log.login_time %}
+                            <div class="fw-medium">{{ log.login_time|date:"M d, Y" }}</div>
+                            <small class="text-muted">{{ log.login_time|date:"g:i A" }}</small>
+                          {% else %}
+                            <span class="text-muted">—</span>
+                          {% endif %}
+                        </td>
+                        <td>
+                          {% if log.logout_time %}
+                            <div class="fw-medium">{{ log.logout_time|date:"M d, Y" }}</div>
+                            <small class="text-muted">{{ log.logout_time|date:"g:i A" }}</small>
+                          {% else %}
+                            <span class="badge bg-success">Still active</span>
+                          {% endif %}
+                        </td>
+                        <td>
+                          <span class="status-badge {% if log.active_status == 'ACTIVE' %}status-active{% else %}status-inactive{% endif %}">
+                            {% if log.active_status == 'ACTIVE' %}
+                              {% bs_icon 'check-circle-fill' extra_classes='me-1' %}
+                              Online
+                            {% else %}
+                              {% bs_icon 'x-circle-fill' extra_classes='me-1' %}
+                              Offline
+                            {% endif %}
+                          </span>
+                        </td>
+                        <td>
+                          <span class="fw-medium">{{ log.session_duration|default:"—" }}</span>
+                        </td>
+                        <td class="pe-4">
+                          <code class="bg-light px-2 py-1 rounded">{{ log.ip_add|default:"—" }}</code>
+                        </td>
+                      </tr>
+                    {% empty %}
+                      <tr>
+                        <td colspan="5" class="text-center py-4">
+                          <div class="text-muted">
+                            {% bs_icon 'inbox' size='2em' extra_classes='mb-2' %}
+                            <p class="mb-0">No session records found</p>
+                          </div>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {% if page_obj.has_other_pages %}
+            <div class="page-pagination"> 
+              {% include 'paginator.html' %}
+            </div>
+          {% endif %}
+        {% else %}
+          <div class="card">
+            <div class="card-body text-center py-5">
+              {% bs_icon 'exclamation-triangle' size='3em' extra_classes='text-warning mb-3' %}
+              <h5>No Access Logs Found</h5>
+              <p class="text-muted mb-0">No login sessions were found for this staff member.</p>
+            </div>
+          </div>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

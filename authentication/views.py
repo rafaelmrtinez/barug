@@ -67,7 +67,7 @@ def _role_home(role_name: str) -> str:
     if is_secy:             return "secretary:dashboard"
     if is_nurse:            return "nurse:dashboard"
     if is_admin:            return "staff_admin:dashboard"     # << NEW
-    if is_super_admin:      return "metrics:health_check"
+    if is_super_admin:      return "superadmin:dashboard"
 
     # NEW: targets for Lupon roles (separate apps)
     if is_lupon_member:     return "lupon_mem:dashboard"
@@ -1062,7 +1062,7 @@ def account_settings(request):
             verify_key = f"verify_attempts:{staff_id}"
             attempts = cache.get(verify_key, 0)
             if attempts >= 3:
-                return JsonResponse({'success': False, 'error': 'Too many verification attempts. Please request a new code.'})
+                return JsonResponse({'success': False, 'error': 'Too many verification attempts. Please request a new code or try again later.'})
             
             # Increment attempt counter
             cache.set(verify_key, attempts + 1, 300)  # 5 minutes
@@ -1177,7 +1177,137 @@ def account_settings(request):
         except Exception:
             return JsonResponse({'success': False})
     
-    # Handle profile photo upload
+    # Handle personal information update
+    if request.method == 'POST' and request.POST.get('form_type') == 'update_personal_info':
+        from django.db import DatabaseError, OperationalError, IntegrityError
+        
+        try:
+            # Check if reason is provided
+            reason = (request.POST.get('reason') or '').strip()
+            if not reason:
+                flash_warning(request, 'Please provide a reason for updating personal information.')
+                return redirect(request.path)
+            
+            # Extract form data using the same approach as staff_dets
+            first_name = (request.POST.get('first_name') or '').strip() or None
+            middle_name = (request.POST.get('middle_name') or '').strip() or None
+            last_name = (request.POST.get('last_name') or '').strip() or None
+            suffix = (request.POST.get('suffix') or '').strip() or None
+            birthdate = (request.POST.get('birthdate') or '').strip() or None
+            sex_id = Authentication._to_int_or_none(request.POST.get('sex_id'))
+            civil_status_id = Authentication._to_int_or_none(request.POST.get('civil_status_id'))
+            nationality_id = Authentication._to_int_or_none(request.POST.get('nationality_id'))
+            religion_id = Authentication._to_int_or_none(request.POST.get('religion_id'))
+            email = (request.POST.get('email') or '').strip() or None
+            mobile_num = (request.POST.get('mobile_number') or '').strip() or None
+            occupation = (request.POST.get('occupation') or '').strip() or None
+            mnthly_personal_income_id = Authentication._to_int_or_none(request.POST.get('monthly_income_id'))
+            residential_status_id = Authentication._to_int_or_none(request.POST.get('residential_status_id'))
+            education_id = Authentication._to_int_or_none(request.POST.get('education_id'))
+            employment_status_id = Authentication._to_int_or_none(request.POST.get('employment_status_id'))
+            is_student = request.POST.get('is_student') == 'true' if request.POST.get('is_student') else None
+            
+            # Handle government programs
+            gov_programs = request.POST.getlist('government_programs[]')
+            gov_mem_prog_ids = [int(x) for x in gov_programs if x.isdigit()] if gov_programs else None
+            
+            # Extract address fields
+            city = (request.POST.get('city') or '').strip() or None
+            barangay = (request.POST.get('barangay') or '').strip() or None
+            sitio_purok = (request.POST.get('sitio_purok') or '').strip() or None
+            street = (request.POST.get('street') or '').strip() or None
+            province = (request.POST.get('province') or '').strip() or None
+            
+            # Check if any changes were made by comparing with current profile
+            current_profile = Authentication.get_staff_profile_by_id(staff_id)
+            if not current_profile:
+                flash_warning(request, 'Unable to verify current information.')
+                return redirect(request.path)
+            
+            # Compare values to detect changes
+            changes_made = (
+                first_name != current_profile.get('first_name') or
+                middle_name != current_profile.get('middle_name') or
+                last_name != current_profile.get('last_name') or
+                suffix != current_profile.get('suffix') or
+                birthdate != (current_profile.get('birth_date').strftime('%Y-%m-%d') if current_profile.get('birth_date') else None) or
+                sex_id != current_profile.get('sex_id') or
+                civil_status_id != current_profile.get('civil_status_id') or
+                nationality_id != current_profile.get('nationality_id') or
+                religion_id != current_profile.get('religion_id') or
+                email != current_profile.get('email_address') or
+                mobile_num != current_profile.get('mobile_number') or
+                occupation != current_profile.get('occupation') or
+                mnthly_personal_income_id != current_profile.get('monthly_income_id') or
+                residential_status_id != current_profile.get('residential_status_id') or
+                education_id != current_profile.get('education_id') or
+                employment_status_id != current_profile.get('employment_status_id') or
+                city != current_profile.get('city') or
+                barangay != current_profile.get('barangay') or
+                sitio_purok != current_profile.get('sitio_purok') or
+                street != current_profile.get('street') or
+                province != current_profile.get('province')
+            )
+            
+            if not changes_made:
+                flash_warning(request, 'No changes were made to the personal information.')
+                return redirect(request.path)
+            
+            # Validate email if provided
+            if email:
+                is_valid, reason_email = verify_email_deliverable_abstract(email)
+                if not is_valid:
+                    flash_warning(request, f'Email validation failed: {reason_email}. Please provide a valid email address.')
+                    return redirect(request.path)
+            
+            # Call the update function using the same approach as staff_dets
+            result = Authentication.update_personal_information(
+                staff_id=staff_id,
+                updated_by_staff_id=staff_id,  # Self-update
+                first_name=first_name,
+                middle_name=middle_name,
+                last_name=last_name,
+                suffix=suffix,
+                birthdate=birthdate,
+                sex_id=sex_id,
+                civil_status_id=civil_status_id,
+                nationality_id=nationality_id,
+                religion_id=religion_id,
+                email=email,
+                mobile_number=mobile_num,
+                occupation=occupation,
+                monthly_income_id=mnthly_personal_income_id,
+                residential_status_id=residential_status_id,
+                education_id=education_id,
+                employment_status_id=employment_status_id,
+                is_student=is_student,
+                gov_mem_prog_ids=gov_mem_prog_ids,
+                city=city,
+                barangay=barangay,
+                sitio_purok=sitio_purok,
+                street=street,
+                province=province,
+                reason=f'Personal information update from account settings: {reason}'
+            )
+            
+            if result:
+                # Clear profile cache
+                cache_key = f"staff_profile_{staff_id}"
+                cache.delete(cache_key)
+                flash_success(request, 'Personal information updated successfully!')
+            else:
+                flash_warning(request, 'No changes were made.')
+                
+        except (DatabaseError, OperationalError, IntegrityError) as e:
+            logger.error(f"Database error updating personal info: {str(e)}", exc_info=True)
+            flash_db_error(request, e)
+        except Exception as e:
+            logger.error(f"Error updating personal info: {str(e)}", exc_info=True)
+            flash_system_error(request, 'An error occurred while updating personal information.', exc=e)
+        
+        return redirect(request.path)
+    
+    # Handle profile photo upload  
     if request.method == 'POST' and 'staff_img' in request.FILES:
         from django.http import JsonResponse
         

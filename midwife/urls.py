@@ -1,6 +1,7 @@
 # midwife/urls.py
 from django.urls import path
 from . import views
+from .staff_request_views import staff_requests_list, staff_request_detail
 
 app_name = "midwife"
 
@@ -32,6 +33,10 @@ urlpatterns = [
 
     path("api/staff/search/", views.staff_search_api, name="staff_search_api"),
     path("api/staff/filter/", views.staff_filter_api, name="staff_filter_api"),
+    
+    # Staff requests list and details
+    path("staff/requests/", staff_requests_list, name="staff_requests_list"),
+    path("staff/requests/<int:request_id>/", staff_request_detail, name="staff_request_detail"),
     
     path("child-visit/", views.child_visit_http, name="child_visit"),
     path("child-basic-info/<int:q>/", views.child_basic_info_http, name="child_basic_info"),
