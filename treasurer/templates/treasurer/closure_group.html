@@ -24,9 +24,9 @@
 <div class="container-narrow">
 
   <div class="d-flex align-items-center justify-content-between mb-3">
-    <a class="btn btn-outline-secondary btn-sm" href="{% url 'treasurer:closure_list' %}">
+    <!-- <a class="btn btn-outline-secondary btn-sm" href="{% url 'treasurer:closure_list' %}">
       {% bs_icon 'arrow-left' extra_classes='me-1' %} Back to Closures
-    </a>
+    </a> -->
     <div class="text-end">
       <div class="fw-bold">{{ biz.business_name|default:"Business" }}</div>
       <div class="text-muted small">Business ID: <span class="badge bg-light text-dark border">{{ business_id|stringformat:"06d" }}</span></div>
@@ -53,7 +53,13 @@
               {% for r in quote_rows %}
               <tr>
                 <td>{{ r.item_year }}</td>
-                <td><span class="pill pill-danger">{{ r.kind }}</span></td>
+                <td>
+                  {% if r.kind == 'CURRENT' %}
+                    <span class="pill pill-ok">{{ r.kind }}</span>
+                  {% else %}
+                    <span class="pill pill-danger">{{ r.kind }}</span>
+                  {% endif %}
+                </td>
                 <td>{{ r.period_label|default:"—" }}</td>
                 <td class="text-end">₱ {{ r.base_fee|floatformat:2 }}</td>
                 <td class="text-end">₱ {{ r.surcharge|floatformat:2 }}</td>
@@ -108,30 +114,32 @@
         <h6 class="mb-2">Pay All Unpaid Years</h6>
         <form method="post" action="{% url 'treasurer:closure_take_payment_all' business_id %}">
           {% csrf_token %}
-          <div class="mb-2">
+          <!-- <div class="mb-2">
             <label class="form-label">Period Type</label>
             <div class="d-flex gap-3">
               <label class="form-check-label"><input class="form-check-input" type="radio" name="period_type" value="ANNUAL" {% if default_period_type != 'QUARTERLY' %}checked{% endif %}> ANNUAL</label>
               <label class="form-check-label"><input class="form-check-input" type="radio" name="period_type" value="QUARTERLY" {% if default_period_type == 'QUARTERLY' %}checked{% endif %}> QUARTERLY</label>
             </div>
-          </div>
+          </div> -->
           <div class="mb-2">
             <label class="form-label">Pay up to Year (inclusive)</label>
             <input class="form-control" name="period_year" type="number" value="{{ default_year }}" min="2000" max="2100" required>
           </div>
           <div class="mb-2">
-            <label class="form-label">Paid On (optional)</label>
-            <input class="form-control" name="paid_on" type="date" value="">
+            <label class="form-label">Paid On</label>
+            <input class="form-control" type="date" value="{{ today }}" disabled>
+            <input type="hidden" name="paid_on" value="{{ today }}">
           </div>
           <div class="mb-3">
             <label class="form-label">Payment Method</label>
-            <select class="form-select" name="payment_method_id" required>
+            <select class="form-select" disabled>
               {% for m in methods %}
-                <option value="{{ m.payment_method_id }}">{{ m.method_name }}</option>
+                <option value="{{ m.payment_method_id }}" {% if m.method_name == 'CASH' %}selected{% endif %}>{{ m.method_name }}</option>
               {% endfor %}
             </select>
+            <input type="hidden" name="payment_method_id" value="{{ cash_payment_method_id }}">
           </div>
-          <button type="submit" class="btn btn-brand w-100">
+          <button type="submit" class="btn btn-brand w-100" {% if grand_total == 0 %}disabled{% endif %}>
             {% bs_icon 'calendar-check' extra_classes='me-2' %}Pay All Unpaid Years & Close
           </button>
         </form>

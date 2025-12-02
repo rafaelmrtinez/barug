@@ -98,14 +98,8 @@
             <a href="{% url 'captain:incident_heatmap' %}" class="btn btn-outline-brand">
               {% bs_icon 'geo-alt' %}<span class="ms-1">Incident Heatmap</span>
             </a>
-            <a href="" class="btn btn-outline-brand">
-              {% bs_icon 'exclamation-octagon' %}<span class="ms-1">Lupon Cases</span>
-            </a>
-            <a href="" class="btn btn-brand">
-              {% bs_icon 'calendar-event' %}<span class="ms-1">Staff</span>
-            </a>
-            <a href="" class="btn btn-brand-subtle">
-              {% bs_icon 'megaphone' %}<span class="ms-1">RCD</span>
+            <a href="{% url 'captain:financial_report' %}" class="btn btn-brand-subtle">
+              {% bs_icon 'megaphone' %}<span class="ms-1">Financial Report</span>
             </a>
           </div>
         </div>
