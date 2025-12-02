@@ -3756,7 +3756,7 @@ def business_information(
         show_summary_cta = True
         # summary_cta_href = renewal_href
         cta_mode = "selector"
-        summary_cta_label = "Create Renewal Request"
+        summary_cta_label = "Choose Action"
     else:
         # Fallback: show renewal CTA for other non-active statuses
         show_summary_cta = True
