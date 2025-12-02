@@ -151,7 +151,6 @@ def _get_all_pdf_field_names(template_path: str) -> List[str]:
     return names
 
 def _fill_pdf_with_values(template_path: str, merged: Dict[str, str], is_ctc: bool = False) -> bytes:
-def _fill_pdf_with_values(template_path: str, merged: Dict[str, str], is_ctc: bool = False) -> bytes:
     if PdfReader is None:
         raise RuntimeError("pypdf is not installed. Run: pip install pypdf")
     
