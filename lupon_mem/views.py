@@ -1467,6 +1467,8 @@ def dashboard(
     lupon_mem_dashboard_service=Provide[AppContainer.lupon_mem_dashboard_service],
 ):
     user_role = _auth_role_name(request)
+    auth = request.session.get('auth', {})
+    person_id = auth.get('person_id')
 
     kpis = {
         "ongoing_cases": 0,
@@ -1479,6 +1481,7 @@ def dashboard(
     }
 
     dashboard_json = None
+    announcements = []
 
     try:
         payload = lupon_mem_dashboard_service.get_dashboard_content() or {}
@@ -1493,6 +1496,13 @@ def dashboard(
         complaint_titles = cur.fetchall()
         cur.execute("SELECT case_nature_id, case_name FROM case_nature ORDER BY case_name")
         case_natures = cur.fetchall()
+    
+    if person_id:
+        try:
+            from authentication.announcement_views import get_user_announcements
+            announcements = get_user_announcements(person_id)
+        except Exception as exc:
+            print(f"Error fetching announcements for person {person_id}:", exc)
 
     return render(
         request,
@@ -1503,6 +1513,7 @@ def dashboard(
             'kpis': kpis,
             'dashboard_json': dashboard_json,
             'today': datetime.now().strftime("%B %d, %Y"),
+            'announcements': announcements,
             'complaint_titles': complaint_titles,
             'case_natures': case_natures,
         },

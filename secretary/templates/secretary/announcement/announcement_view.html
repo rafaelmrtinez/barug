@@ -87,6 +87,30 @@
     color: #374151;
     border-color: #d1d5db;
   }
+
+  .audiences-scroll-container {
+    max-height: 250px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .audiences-scroll-container::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .audiences-scroll-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+  }
+
+  .audiences-scroll-container::-webkit-scrollbar-thumb {
+    background: #6d2932;
+    border-radius: 10px;
+  }
+
+  .audiences-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: #5a2129;
+  }
 </style>
 {% endblock %}
 
@@ -216,31 +240,33 @@
                     <i class="bi bi-people me-1"></i>
                     Target Audiences
                   </div>
-                  {% if audiences %}
-                    {% for audience in audiences %}
-                      <div class="audience-item">
-                        <div class="d-flex justify-content-between align-items-start">
-                          <div>
-                            <strong>{{ audience.audience_scope_name }}</strong>
-                            {% if audience.role_name %}
-                              <br><small class="text-primary"><i class="bi bi-briefcase me-1"></i>{{ audience.role_name }}</small>
-                            {% endif %}
-                            {% if audience.purok_sitio_name %}
-                              <br><small class="text-success"><i class="bi bi-geo-alt me-1"></i>{{ audience.purok_sitio_name }}</small>
-                            {% endif %}
-                            <br>
-                            <small class="text-muted">
-                              <i class="bi bi-person-check me-1"></i>
-                              {{ audience.inserted_persons }} person{{ audience.inserted_persons|pluralize }}
-                            </small>
+                  <div class="audiences-scroll-container">
+                    {% if audiences %}
+                      {% for audience in audiences %}
+                        <div class="audience-item">
+                          <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                              <strong>{{ audience.audience_scope_name }}</strong>
+                              {% if audience.role_name %}
+                                <br><small class="text-primary"><i class="bi bi-briefcase me-1"></i>{{ audience.role_name }}</small>
+                              {% endif %}
+                              {% if audience.purok_sitio_name %}
+                                <br><small class="text-success"><i class="bi bi-geo-alt me-1"></i>{{ audience.purok_sitio_name }}</small>
+                              {% endif %}
+                              <br>
+                              <small class="text-muted">
+                                <i class="bi bi-person-check me-1"></i>
+                                {{ audience.inserted_persons }} person{{ audience.inserted_persons|pluralize }}
+                              </small>
+                            </div>
+                            <span class="badge bg-primary rounded-pill">{{ audience.inserted_persons }}</span>
                           </div>
-                          <span class="badge bg-primary rounded-pill">{{ audience.inserted_persons }}</span>
                         </div>
-                      </div>
-                    {% endfor %}
-                  {% else %}
-                    <p class="text-muted small">No audiences defined</p>
-                  {% endif %}
+                      {% endfor %}
+                    {% else %}
+                      <p class="text-muted small">No audiences defined</p>
+                    {% endif %}
+                  </div>
                 </div>
 
                 <!-- Channels -->

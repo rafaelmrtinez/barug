@@ -1166,7 +1166,16 @@ def dashboard(
     request: HttpRequest,
     clerk_dashboard_service=Provide[AppContainer.clerk_dashboard_service],
 ):
+    print("=" * 80)
+    print("CLERK DASHBOARD VIEW CALLED")
+    print("=" * 80)
+    
     user_role = _auth_role_name(request)
+    auth = request.session.get('auth', {})
+    person_id = auth.get('person_id')
+    
+    print(f"user_role: {user_role}")
+    print(f"person_id from session: {person_id}")
 
     kpis = {
         "doc_requests": 0,
@@ -1180,6 +1189,7 @@ def dashboard(
     }
 
     dashboard_json = None
+    announcements = []
 
     try:
         payload = clerk_dashboard_service.get_dashboard_content() or {}
@@ -1187,6 +1197,21 @@ def dashboard(
         dashboard_json = payload.get("dashboard_json")
     except Exception as exc:
         print("Error fetching clerk dashboard KPIs:", exc)
+    
+    # Fetch announcements for the logged-in user
+    if person_id:
+        try:
+            from authentication.announcement_views import get_user_announcements
+            announcements = get_user_announcements(person_id)
+            print(f"✓ Successfully fetched {len(announcements)} announcements for person_id {person_id}")
+        except Exception as exc:
+            print(f"✗ Error fetching announcements for person {person_id}:", exc)
+            import traceback
+            traceback.print_exc()
+    else:
+        print(f"✗ No person_id in session!")
+
+    print(f"DEBUG: Passing {len(announcements)} announcements to template")
 
     return render(request, "clerk/dashboard.html", {
         'page_path' : f'{user_role} / Dashboard',
@@ -1194,6 +1219,7 @@ def dashboard(
         'kpis': kpis,
         'dashboard_json': dashboard_json,
         'today': datetime.now().strftime("%B %d, %Y"),
+        'announcements': announcements,
     })
 
 @session_login_required

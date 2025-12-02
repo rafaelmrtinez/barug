@@ -134,6 +134,8 @@ def dashboard(
     captain_dashboard_service=Provide[AppContainer.captain_dashboard_service],
 ):
     user_role = _auth_role_name(request)
+    auth = request.session.get('auth', {})
+    person_id = auth.get('person_id')
 
     kpis = {
         "ongoing_cases": 0,
@@ -147,6 +149,7 @@ def dashboard(
     }
 
     dashboard_json = None
+    announcements = []
 
     try:
         payload = captain_dashboard_service.get_dashboard_content() or {}
@@ -154,6 +157,13 @@ def dashboard(
         dashboard_json = payload.get("dashboard_json")
     except Exception as exc:
         print("Error fetching captain dashboard KPIs:", exc)
+    
+    if person_id:
+        try:
+            from authentication.announcement_views import get_user_announcements
+            announcements = get_user_announcements(person_id)
+        except Exception as exc:
+            print(f"Error fetching announcements for person {person_id}:", exc)
 
     return render(request, "captain/dashboard.html", {
         'page_path' : f'{user_role} / Dashboard',
@@ -161,6 +171,7 @@ def dashboard(
         'kpis': kpis,
         'dashboard_json': dashboard_json,
         'today': datetime.now().strftime("%B %d, %Y"),
+        'announcements': announcements,
     })
 
 def _smart_redirect(request, url_name, *args, **kwargs):
