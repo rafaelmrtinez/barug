@@ -2506,8 +2506,11 @@ def closure_detail(request, closure_payment_request_id: int):
 
     try:
         payment_methods = list_payment_methods()
+        cash_method = next((m for m in payment_methods if m.get("method_name") == "CASH"), None)
+        cash_payment_method_id = cash_method.get("payment_method_id") if cash_method else (payment_methods[0].get("payment_method_id") if payment_methods else 1)
     except Exception:
         payment_methods = []
+        cash_payment_method_id = 1  # fallback to ID 1
 
     payments = {
         "latest_or_number": r.get("or_number") or "",
@@ -2541,6 +2544,8 @@ def closure_detail(request, closure_payment_request_id: int):
         "payments": payments,
         "is_paid_no_or": is_paid_no_or,
         "is_paid": is_paid,
+        "today": timezone.now().date().isoformat(),
+        "cash_payment_method_id": cash_payment_method_id,
     }
     return render(request, "treasurer/closure_detail.html", ctx)
 
@@ -2694,8 +2699,11 @@ def closure_group(request, business_id: int):
 
     try:
         payment_methods = list_payment_methods()
+        cash_method = next((m for m in payment_methods if m.get("method_name") == "CASH"), None)
+        cash_payment_method_id = cash_method.get("payment_method_id") if cash_method else (payment_methods[0].get("payment_method_id") if payment_methods else 1)
     except Exception:
         payment_methods = []
+        cash_payment_method_id = 1  # fallback to ID 1
 
     unpaid, paid = [], []
     for r in rows:
@@ -2712,10 +2720,13 @@ def closure_group(request, business_id: int):
             unpaid.append(r)
 
     quote_rows, base_sum, surch_sum, grand_total = [], 0.0, 0.0, 0.0
+    current_year = timezone.now().year
     for r in unpaid:
+        year = r.get("period_year")
+        kind = "CURRENT" if year == current_year else "ARREARS"
         line = {
-            "item_year": r.get("period_year"),
-            "kind": "ARREARS",  # closure is typically settling before closure; keep label consistent with renewal table
+            "item_year": year,
+            "kind": kind,
             "base_fee": r.get("base_fee_quote_f") or 0.0,
             "offense_no": r.get("offense_no") or None,  # tolerate if present
             "surcharge": r.get("surcharge_quote_f") or 0.0,
@@ -2750,6 +2761,8 @@ def closure_group(request, business_id: int):
         "methods": payment_methods,
         "default_period_type": default_period_type,
         "default_year": latest_unpaid_year or timezone.now().year,
+        "today": timezone.now().date().isoformat(),
+        "cash_payment_method_id": cash_payment_method_id,
         "paid_rows": [
             {
                 "period_year": r.get("period_year"),

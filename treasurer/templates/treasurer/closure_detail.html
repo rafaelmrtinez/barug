@@ -83,19 +83,17 @@
               {% csrf_token %}
               <div class="mb-2">
                 <label class="form-label">Payment Method</label>
-                <select class="form-select" name="payment_method_id" required>
+                <select class="form-select" disabled>
                   {% for m in methods %}
-                    <option value="{{ m.payment_method_id }}">{{ m.method_name }}</option>
+                    <option value="{{ m.payment_method_id }}" {% if m.method_name == 'CASH' %}selected{% endif %}>{{ m.method_name }}</option>
                   {% endfor %}
                 </select>
-              </div>
-              <div class="mb-2">
-                <label class="form-label">Paid On (optional)</label>
-                <input class="form-control" type="date" name="paid_on">
+                <input type="hidden" name="payment_method_id" value="{{ cash_payment_method_id }}">
               </div>
               <div class="mb-3">
-                <label class="form-label">OR Number (optional)</label>
-                <input class="form-control" type="text" name="or_number" placeholder="Auto-generate if blank">
+                <label class="form-label">Paid On</label>
+                <input class="form-control" type="date" value="{{ today }}" disabled>
+                <input type="hidden" name="paid_on" value="{{ today }}">
               </div>
               <button type="submit" class="btn btn-brand w-100">{% bs_icon 'cash-coin' extra_classes='me-2' %}Accept Payment & Close Business</button>
             </form>
