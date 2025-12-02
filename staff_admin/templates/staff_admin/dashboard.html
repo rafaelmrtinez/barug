@@ -104,12 +104,18 @@
             <a href="" class="btn btn-brand-subtle">
               {% bs_icon 'megaphone' %}<span class="ms-1">RCD</span>
             </a>
+            {% if request.session.auth.role_name == 'admin' or request.session.auth.role_name == 'super admin' %}
+            <a class="btn btn-brand-subtle" href="#" data-bs-toggle="modal" data-bs-target="#uploadFaqModal">
+              <span>Upload Barangay FAQ's</span>
+            {% bs_icon 'upload' %}
+            </a>
+            {% endif %}
           </div>
         </div>
       </div>
     </div>
   </div>
-
+  {% include 'captain/partialy/upload_faq_modal.html' %}
   <!-- KPIs -->
   <div class="row g-3 row-cols-1 row-cols-md-2 row-cols-xl-4">
     <div class="col">
