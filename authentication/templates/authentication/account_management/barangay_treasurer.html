@@ -78,7 +78,7 @@
                     <ul class="dropdown-menu" aria-labelledby="resident_dropdown">
                         <li><a class="dropdown-item" href="{% url 'treasurer:business_queue' %}">Business{% if business_count %}<span class="count-badge">{{ business_count }}</span>{% endif %}</a></li>
                         <li><a class="dropdown-item" href="{% url 'treasurer:queue' %}">Resident (Requests){% if resident_count %}<span class="count-badge">{{ resident_count }}</span>{% endif %}</a></li>
-                        <li><a class="dropdown-item" href="{% url 'treasurer:business_renewal' %}">Business Renewal{% if renewal_count %}<span class="count-badge">{{ renewal_count }}</span>{% endif %}</a></li>
+                        <li><a class="dropdown-item" href="{% url 'treasurer:closure_list' %}">Business Closure</a></li>
                         <li><a class="dropdown-item" href="{% url 'treasurer:payment_refunds' %}">Payment Refunds{% if refund_count %}<span class="count-badge">{{ refund_count }}</span>{% endif %}</a></li>
                         <li><a class="dropdown-item" href="{% url 'treasurer:people_requests' %}">History</a></li>
                     </ul>
