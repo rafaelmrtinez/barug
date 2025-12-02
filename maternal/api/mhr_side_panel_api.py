@@ -66,20 +66,28 @@ class MhrSidePanelAPI(View):
                 logging.exception('Error fetching latest scheduled visit for mhr %s', mhr_id)
 
             # Also fetch latest prenatal and postpartum schedules separately so the UI
-            # Fetch full prenatal and postpartum schedule histories (for history modals)
-            prenatal_history = []
-            postpartum_history = []
+            # Fetch visit schedules and ANC visit history
+            visit_schedules = []
+            postpartum_visit_schedules = []
+            maternal_anc_visits = []
             try:
-                prenatal_history = repo.fetch_all_prenatal_scheduled_by_mhr_id(mhr_id) or []
+                visit_schedules = repo.fetch_all_visit_schedules_by_mhr_id(mhr_id) or []
             except Exception:
                 import logging
-                logging.exception('Error fetching prenatal schedule history for mhr %s', mhr_id)
+                logging.exception('Error fetching visit schedules for mhr %s', mhr_id)
 
             try:
-                postpartum_history = repo.fetch_all_postpartum_scheduled_by_mhr_id(mhr_id) or []
+                postpartum_visit_schedules = repo.fetch_all_postpartum_visit_schedules_by_mhr_id(mhr_id) or []
             except Exception:
                 import logging
-                logging.exception('Error fetching postpartum schedule history for mhr %s', mhr_id)
+                logging.exception('Error fetching postpartum visit schedules for mhr %s', mhr_id)
+
+            try:
+                maternal_anc_visits = repo.fetch_all_maternal_anc_visits_by_mhr_id(mhr_id) or []
+                print(f"Maternal ANC Visits {visit_schedules}")
+            except Exception:
+                import logging
+                logging.exception('Error fetching maternal ANC visit history for mhr %s', mhr_id)
 
         except Exception:
             import logging
@@ -114,8 +122,9 @@ class MhrSidePanelAPI(View):
         payload = {
             'result': tracker or {},
             'latest_scheduled_visit': latest_visit or {},
-            'prenatal_schedule_history': prenatal_history,
-            'postpartum_schedule_history': postpartum_history,
+            'visit_schedules': visit_schedules,
+            'postpartum_visit_schedules': postpartum_visit_schedules,
+            'maternal_anc_visit_history': maternal_anc_visits,
         }
 
         return JsonResponse({'success': True, **payload})

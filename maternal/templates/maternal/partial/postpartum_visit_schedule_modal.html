@@ -1,0 +1,79 @@
+<!-- Postpartum Visit Schedule Modal -->
+<div class="modal fade" id="postpartumVisitScheduleModal" tabindex="-1" aria-labelledby="postpartumVisitScheduleModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content">
+      <div class="modal-header" style="background: linear-gradient(90deg, #44141e, #6d2932); color: #fff;">
+        <h5 class="modal-title" id="postpartumVisitScheduleModalLabel">Postpartum Visit Schedule</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle" style="table-layout: fixed; width: 100%;">
+            <thead>
+              <tr>
+                <th style="width: 12%;">Date</th>
+                <th style="width: 10%;">Time</th>
+                <th style="width: 20%;">Purpose</th>
+                <th style="width: 25%;">Notes</th>
+                <th style="width: 20%;">Created By</th>
+                <th style="width: 13%;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="postpartum_visit_schedule_tbody">
+              <tr>
+                <td colspan="6" class="text-center small text-muted">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Pagination Controls -->
+        <nav aria-label="Postpartum visit schedule pagination" id="postpartum_pagination_nav" style="display: none;">
+          <ul class="pagination pagination-sm justify-content-center mb-0">
+            <!-- Pagination will be inserted here by JavaScript -->
+          </ul>
+        </nav>
+        <style>
+          #postpartum_pagination_nav .page-link {
+            color: #6d2932;
+            border-color: #6d2932;
+          }
+          #postpartum_pagination_nav .page-link:hover {
+            background-color: #6d2932;
+            border-color: #6d2932;
+            color: #fff;
+          }
+          #postpartum_pagination_nav .page-item.active .page-link {
+            background-color: #6d2932;
+            border-color: #6d2932;
+            color: #fff;
+          }
+          #postpartum_pagination_nav .page-item.disabled .page-link {
+            color: #ccc;
+            border-color: #dee2e6;
+          }
+        </style>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Text Detail Modal for Postpartum Purpose and Notes -->
+<div class="modal fade" id="postpartumTextDetailModal" tabindex="-1" aria-labelledby="postpartumTextDetailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background: linear-gradient(90deg, #44141e, #6d2932); color: #fff;">
+        <h5 class="modal-title" id="postpartumTextDetailModalLabel">Details</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p id="postpartumTextDetailContent" class="mb-0" style="white-space: pre-wrap; word-wrap: break-word;"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
