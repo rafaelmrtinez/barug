@@ -1126,22 +1126,32 @@ def business_pay_and_print(request: HttpRequest, business_id: int, doc_request_i
         messages.error(request, "Staff session required.")
         return redirect("treasurer:business_detail", business_id=business_id, doc_request_id=doc_request_id)
 
+    print(f"[PAY DEBUG] POST data: {dict(request.POST)}")
+    print(f"[PAY DEBUG] staff_id: {staff_id}")
+    
     try:
         method_id = int(request.POST.get("payment_method_id", "0") or 0)
         amount_paid = float(Decimal(request.POST.get("amount_paid", "0") or "0"))
-    except Exception:
+        print(f"[PAY DEBUG] method_id: {method_id}, amount_paid: {amount_paid}")
+    except Exception as e:
+        print(f"[PAY DEBUG] Parse error: {e}")
         messages.error(request, "Invalid payment fields.")
         return redirect("treasurer:business_detail", business_id=business_id, doc_request_id=doc_request_id)
 
     or_id = None
     try:
+        print(f"[PAY DEBUG] Calling accept_payment with doc_request_id={doc_request_id}, method_id={method_id}, amount_paid={amount_paid}, staff_id={staff_id}")
         or_id = accept_payment(
             doc_request_id=doc_request_id,
             method_id=method_id,
             amount_paid=amount_paid,
             staff_id=staff_id,
         )
+        print(f"[PAY DEBUG] accept_payment returned or_id: {or_id}")
     except Exception as e:
+        print(f"[PAY DEBUG] accept_payment FAILED: {e}")
+        import traceback
+        print(f"[PAY DEBUG] Traceback: {traceback.format_exc()}")
         messages.error(request, f"Payment failed: {escape(str(getattr(e, 'message', e)))}")
         return redirect("treasurer:business_detail", business_id=business_id, doc_request_id=doc_request_id)
 
@@ -1162,19 +1172,25 @@ def business_pay_and_print(request: HttpRequest, business_id: int, doc_request_i
         messages.success(request, f"Payment posted. OR id {or_id}.")
 
     try:
-        supabase.rpc("set_business_has_clearance_true", {"p_business_id": business_id}).execute()
+        print(f"[PAY DEBUG] Setting business flag for business_id={business_id}")
+        res = supabase.rpc("set_business_has_clearance_true", {"p_business_id": business_id}).execute()
+        print(f"[PAY DEBUG] Business flag result: {res.data}, error: {getattr(res, 'error', None)}")
         messages.info(request, "Business flag set: has_business_clearance = TRUE.")
     except Exception as e:
+        print(f"[PAY DEBUG] Business flag FAILED: {e}")
         messages.warning(request, f"Payment ok, but failed to set business flag: {escape(str(getattr(e,'message',e)))}")
 
     try:
+        print(f"[PAY DEBUG] Marking for printing doc_request_id={doc_request_id}")
         mark_for_printing(
             doc_request_id=doc_request_id,
             staff_id=staff_id,
             reason="Auto: after payment from Business Details"
         )
+        print(f"[PAY DEBUG] Mark for printing SUCCESS")
         messages.info(request, "Request moved to FOR_PRINTING.")
     except Exception as e:
+        print(f"[PAY DEBUG] Mark for printing FAILED: {e}")
         messages.warning(request, f"Payment ok, but failed to move to FOR_PRINTING: {escape(str(getattr(e,'message',e)))}")
 
     return redirect("treasurer:business_detail", business_id=business_id, doc_request_id=doc_request_id)

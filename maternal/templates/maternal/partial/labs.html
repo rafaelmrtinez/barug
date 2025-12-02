@@ -1,0 +1,357 @@
+<section id="labs-section" class="mb-3">
+    <div class="card mb-3 card-brand">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+                <button class="btn btn-sm p-0 me-2" type="button" data-bs-toggle="collapse" data-bs-target="#labs-collapse" aria-expanded="true" aria-controls="labs-collapse" title="Toggle Laboratory Results" style="background:transparent;border:none;color:inherit;">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill-rule="evenodd" d="M1.5 6l6 6 6-6H1.5z"/></svg>
+                </button>
+                <span>Laboratory Results</span>
+            </div>
+            <div class="d-flex gap-2">
+                <button id="btn-download-all-lab-images" type="button" class="btn btn-sm" style="background:#ffffff;color:#6d2932;border:1px solid #6d2932">Download all images</button>
+            </div>
+        </div>
+
+        <div id="labs-collapse" class="collapse">
+        <div id="labs" class="card-body">
+            <div class="row g-3">
+            <!-- header row -->
+            <div class="row align-items-center mb-2 mt-3">
+                <div class="col-md-6">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fw-semibold text-uppercase small text-muted">Results</span>
+                    <span class="flex-grow-1 border-bottom" style="opacity:.35;"></span>
+                </div>
+                </div>
+                <div class="col-md-3">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fw-semibold text-uppercase small text-muted">Date Conducted</span>
+                    <span class="flex-grow-1 border-bottom" style="opacity:.35;"></span>
+                </div>
+                </div>
+                <div class="col-md-3">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fw-semibold text-uppercase small text-muted">Attachments</span>
+                    <span class="flex-grow-1 border-bottom" style="opacity:.35;"></span>
+                </div>
+                </div>
+            </div>
+
+            <!-- Urinalysis -->
+            <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="laboratory_form">
+                <div class="col-md-6">
+                    {{ lab_form.urinalysis.label_tag }}
+                    <textarea name="{{ lab_form.urinalysis.name }}" id="{{ lab_form.urinalysis.id_for_label }}" class="form-control autosize-textarea" rows="3">{{ lab_form.urinalysis.value|default_if_none:"" }}</textarea>
+                    <div class="form-text small text-muted">Use Enter for new lines</div>
+                </div>
+                <div class="col-md-3">{{ lab_form.urinalysis_date.label_tag }} {{ lab_form.urinalysis_date }}</div>
+                <div class="col-md-3">
+                    {{ lab_form.urinalysis_images }}
+                    <div class="form-text">
+                    <a href="#gallery-urinalysis" class="preview-uploads-link"
+                        data-bs-toggle="collapse"
+                        data-input-id="{{ lab_form.urinalysis_images.id_for_label }}"
+                        data-gallery-id="gallery-urinalysis">
+                        Preview uploads
+                    </a>
+                    </div>
+                    <div id="gallery-urinalysis" class="upload-gallery collapse mt-2"></div>
+                    <div class="mt-2 d-flex justify-content-end">
+                        <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                    </div>
+                </div>
+            </form>
+            <hr class="my-3" />
+
+            <!-- CBC -->
+            <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="laboratory_form">
+                <div class="col-md-6">
+                    {{ lab_form.cbc.label_tag }}
+                    <textarea name="{{ lab_form.cbc.name }}" id="{{ lab_form.cbc.id_for_label }}" class="form-control autosize-textarea" rows="3">{{ lab_form.cbc.value|default_if_none:"" }}</textarea>
+                    <div class="form-text small text-muted">Use Enter for new lines</div>
+                </div>
+                <div class="col-md-3">{{ lab_form.cbc_date.label_tag }} {{ lab_form.cbc_date }}</div>
+                <div class="col-md-3">
+                    {{ lab_form.cbc_images }}
+                    <div class="form-text">
+                    <a href="#gallery-cbc" class="preview-uploads-link"
+                        data-bs-toggle="collapse"
+                        data-input-id="{{ lab_form.cbc_images.id_for_label }}"
+                        data-gallery-id="gallery-cbc">
+                        Preview uploads
+                    </a>
+                    </div>
+                    <div id="gallery-cbc" class="upload-gallery collapse mt-2"></div>
+                    {% if request.session.auth.role_name == 'midwife' %}
+                    <div class="mt-2 d-flex justify-content-end">
+                        <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                    </div>
+                    {% endif %}
+                </div>
+            </form>
+            <hr class="my-3" />
+
+            <!-- SGOT/SGPT -->
+            <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="laboratory_form">
+                <div class="col-md-6">
+                    {{ lab_form.sgot_sgpt.label_tag }}
+                    <textarea name="{{ lab_form.sgot_sgpt.name }}" id="{{ lab_form.sgot_sgpt.id_for_label }}" class="form-control autosize-textarea" rows="3">{{ lab_form.sgot_sgpt.value|default_if_none:"" }}</textarea>
+                    <div class="form-text small text-muted">Use Enter for new lines</div>
+                </div>
+                <div class="col-md-3">{{ lab_form.sgot_sgpt_date.label_tag }} {{ lab_form.sgot_sgpt_date }}</div>
+                <div class="col-md-3">
+                    {{ lab_form.sgot_sgpt_images }}
+                    <div class="form-text">
+                    <a href="#gallery-sgotsgpt" class="preview-uploads-link"
+                        data-bs-toggle="collapse"
+                        data-input-id="{{ lab_form.sgot_sgpt_images.id_for_label }}"
+                        data-gallery-id="gallery-sgotsgpt">
+                        Preview uploads
+                    </a>
+                    </div>
+                    <div id="gallery-sgotsgpt" class="upload-gallery collapse mt-2"></div>
+                    {% if request.session.auth.role_name == 'midwife' %}
+                    <div class="mt-2 d-flex justify-content-end">
+                        <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                    </div>
+                    {% endif %}
+                </div>
+            </form>
+            <hr class="my-3" />
+
+            <!-- Creatinine serum -->
+            <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="laboratory_form">
+                <div class="col-md-6">
+                    {{ lab_form.creatinine_serum.label_tag }}
+                    <textarea name="{{ lab_form.creatinine_serum.name }}" id="{{ lab_form.creatinine_serum.id_for_label }}" class="form-control autosize-textarea" rows="3">{{ lab_form.creatinine_serum.value|default_if_none:"" }}</textarea>
+                    <div class="form-text small text-muted">Use Enter for new lines</div>
+                </div>
+                <div class="col-md-3">{{ lab_form.creatinine_serum_date.label_tag }} {{ lab_form.creatinine_serum_date }}</div>
+                <div class="col-md-3">
+                    {{ lab_form.creatinine_serum_images }}
+                    <div class="form-text">
+                    <a href="#gallery-creatinine" class="preview-uploads-link"
+                        data-bs-toggle="collapse"
+                        data-input-id="{{ lab_form.creatinine_serum_images.id_for_label }}"
+                        data-gallery-id="gallery-creatinine">
+                        Preview uploads
+                    </a>
+                    </div>
+                    <div id="gallery-creatinine" class="upload-gallery collapse mt-2"></div>
+                    {% if request.session.auth.role_name == 'midwife' %}
+                    <div class="mt-2 d-flex justify-content-end">
+                        <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                    </div>
+                    {% endif %}
+                </div>
+            </form>
+            <hr class="my-3" />
+
+            <!-- BUA / BUN -->
+            <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="laboratory_form">
+                <div class="col-md-6">
+                    {{ lab_form.bua_bun.label_tag }}
+                    <textarea name="{{ lab_form.bua_bun.name }}" id="{{ lab_form.bua_bun.id_for_label }}" class="form-control autosize-textarea" rows="3">{{ lab_form.bua_bun.value|default_if_none:"" }}</textarea>
+                    <div class="form-text small text-muted">Use Enter for new lines</div>
+                </div>
+                <div class="col-md-3">{{ lab_form.bua_bun_date.label_tag }} {{ lab_form.bua_bun_date }}</div>
+                <div class="col-md-3">
+                    {{ lab_form.bua_bun_images }}
+                    <div class="form-text">
+                    <a href="#gallery-buabun" class="preview-uploads-link"
+                        data-bs-toggle="collapse"
+                        data-input-id="{{ lab_form.bua_bun_images.id_for_label }}"
+                        data-gallery-id="gallery-buabun">
+                        Preview uploads
+                    </a>
+                    </div>
+                    <div id="gallery-buabun" class="upload-gallery collapse mt-2"></div>
+                    {% if request.session.auth.role_name == 'midwife' %}
+                    <div class="mt-2 d-flex justify-content-end">
+                        <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                    </div>
+                    {% endif %}
+                </div>
+            </form>
+            <hr class="my-3" />
+
+            <!-- Syphilis -->
+            <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="laboratory_form">
+                <div class="col-md-6">
+                    {{ lab_form.syphilis.label_tag }}
+                    <textarea name="{{ lab_form.syphilis.name }}" id="{{ lab_form.syphilis.id_for_label }}" class="form-control autosize-textarea" rows="3">{{ lab_form.syphilis.value|default_if_none:"" }}</textarea>
+                    <div class="form-text small text-muted">Use Enter for new lines</div>
+                </div>
+                <div class="col-md-3">{{ lab_form.syphilis_date.label_tag }} {{ lab_form.syphilis_date }}</div>
+                <div class="col-md-3">
+                    {{ lab_form.syphilis_images }}
+                    <div class="form-text">
+                    <a href="#gallery-syphilis" class="preview-uploads-link"
+                        data-bs-toggle="collapse"
+                        data-input-id="{{ lab_form.syphilis_images.id_for_label }}"
+                        data-gallery-id="gallery-syphilis">
+                        Preview uploads
+                    </a>
+                    </div>
+                    <div id="gallery-syphilis" class="upload-gallery collapse mt-2"></div>
+                    {% if request.session.auth.role_name == 'midwife' %}
+                    <div class="mt-2 d-flex justify-content-end">
+                        <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                    </div>
+                    {% endif %}
+                </div>
+            </form>
+            <hr class="my-3" />
+
+            <!-- HIV -->
+            <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="laboratory_form">
+                <div class="col-md-6">
+                    {{ lab_form.hiv_test.label_tag }}
+                    <textarea name="{{ lab_form.hiv_test.name }}" id="{{ lab_form.hiv_test.id_for_label }}" class="form-control autosize-textarea" rows="3">{{ lab_form.hiv_test.value|default_if_none:"" }}</textarea>
+                    <div class="form-text small text-muted">Use Enter for new lines</div>
+                </div>
+                <div class="col-md-3">{{ lab_form.hiv_test_date.label_tag }} {{ lab_form.hiv_test_date }}</div>
+                <div class="col-md-3">
+                    {{ lab_form.hiv_test_images }}
+                    <div class="form-text">
+                    <a href="#gallery-hiv" class="preview-uploads-link"
+                        data-bs-toggle="collapse"
+                        data-input-id="{{ lab_form.hiv_test_images.id_for_label }}"
+                        data-gallery-id="gallery-hiv">
+                        Preview uploads
+                    </a>
+                    </div>
+                    <div id="gallery-hiv" class="upload-gallery collapse mt-2"></div>
+                    {% if request.session.auth.role_name == 'midwife' %}
+                    <div class="mt-2 d-flex justify-content-end">
+                        <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                    </div>
+                    {% endif %}
+                </div>
+            </form>
+            <hr class="my-3" />
+
+            <!-- HEPA B -->
+            <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="laboratory_form">
+                <div class="col-md-6">
+                    {{ lab_form.hepa_b.label_tag }}
+                    <textarea name="{{ lab_form.hepa_b.name }}" id="{{ lab_form.hepa_b.id_for_label }}" class="form-control autosize-textarea" rows="3">{{ lab_form.hepa_b.value|default_if_none:"" }}</textarea>
+                    <div class="form-text small text-muted">Use Enter for new lines</div>
+                </div>
+                <div class="col-md-3">{{ lab_form.hepa_b_date.label_tag }} {{ lab_form.hepa_b_date }}</div>
+                <div class="col-md-3">
+                    {{ lab_form.hepa_b_images }}
+                    <div class="form-text">
+                    <a href="#gallery-hepa" class="preview-uploads-link"
+                        data-bs-toggle="collapse"
+                        data-input-id="{{ lab_form.hepa_b_images.id_for_label }}"
+                        data-gallery-id="gallery-hepa">
+                        Preview uploads
+                    </a>
+                    </div>
+                    <div id="gallery-hepa" class="upload-gallery collapse mt-2"></div>
+                    {% if request.session.auth.role_name == 'midwife' %}
+                    <div class="mt-2 d-flex justify-content-end">
+                        <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                    </div>
+                    {% endif %}
+                </div>
+            </form>
+            <hr class="my-3" />
+
+            <!-- Blood typing -->
+            <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="laboratory_form">
+                <div class="col-md-6">
+                    {{ lab_form.blood_typing.label_tag }}
+                    <textarea name="{{ lab_form.blood_typing.name }}" id="{{ lab_form.blood_typing.id_for_label }}" class="form-control autosize-textarea" rows="3">{{ lab_form.blood_typing.value|default_if_none:"" }}</textarea>
+                    <div class="form-text small text-muted">Use Enter for new lines</div>
+                </div>
+                <div class="col-md-3">{{ lab_form.blood_typing_date.label_tag }} {{ lab_form.blood_typing_date }}</div>
+                <div class="col-md-3">
+                    {{ lab_form.blood_typing_images }}
+                    <div class="form-text">
+                    <a href="#gallery-bloodtyping" class="preview-uploads-link"
+                        data-bs-toggle="collapse"
+                        data-input-id="{{ lab_form.blood_typing_images.id_for_label }}"
+                        data-gallery-id="gallery-bloodtyping">
+                        Preview uploads
+                    </a>
+                    </div>
+                    <div id="gallery-bloodtyping" class="upload-gallery collapse mt-2"></div>
+                    {% if request.session.auth.role_name == 'midwife' %}
+                    <div class="mt-2 d-flex justify-content-end">
+                        <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                    </div>
+                    {% endif %}
+                </div>
+            </form>
+
+            <!-- OGCT (50g) -->
+            <form method="post" class="row g-3" action="" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="laboratory_form">
+                <div class="col-md-6">
+                    {{ lab_form.ogct_50g.label_tag }}
+                    <textarea name="{{ lab_form.ogct_50g.name }}" id="{{ lab_form.ogct_50g.id_for_label }}" class="form-control autosize-textarea" rows="3">{{ lab_form.ogct_50g.value|default_if_none:"" }}</textarea>
+                    <div class="form-text small text-muted">Use Enter for new lines</div>
+                </div>
+                <div class="col-md-3">{{ lab_form.ogct_50g_date.label_tag }} {{ lab_form.ogct_50g_date }}</div>
+                <div class="col-md-3">
+                    {{ lab_form.ogct_50g_images }}
+                    <div class="form-text">
+                    <a href="#gallery-ogct" class="preview-uploads-link"
+                        data-bs-toggle="collapse"
+                        data-input-id="{{ lab_form.ogct_50g_images.id_for_label }}"
+                        data-gallery-id="gallery-ogct">
+                        Preview uploads
+                    </a>
+                    </div>
+                    <div id="gallery-ogct" class="upload-gallery collapse mt-2"></div>
+                    {% if request.session.auth.role_name == 'midwife' %}
+                    <div class="mt-2 d-flex justify-content-end">
+                        <button type="submit" class="btn btn-sm btn-brand" style="min-width:120px">Save</button>
+                    </div>
+                    {% endif %}
+                </div>
+            </form>
+            </div>
+        </div>
+        </div>
+
+        <div class="card-footer text-end">
+            <small class="text-muted me-2">You can upload multiple images per test. Use the Save button next to each test to submit only that test's data.</small>
+        </div>
+    </div>
+</section>
+
+<!-- Image preview modal (used by imagePreview.js) -->
+<div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-header border-0">
+                <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body d-flex justify-content-center align-items-center">
+                <img id="imagePreviewModalImg" src="" alt="Preview" class="img-fluid" style="max-height:80vh; width:auto;" />
+            </div>
+        </div>
+    </div>
+</div>

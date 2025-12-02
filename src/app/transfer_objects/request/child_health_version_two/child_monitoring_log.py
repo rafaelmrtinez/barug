@@ -8,8 +8,8 @@ class ChildMonitoringLog(BaseModel):
     weight: decimal.Decimal
     temp: decimal.Decimal
     height: decimal.Decimal
-    findings: str
-    notes: str
+    findings: str | None = None
+    notes: str | None = None
     
     def __init__(self, **data):
         if 'age' in data:

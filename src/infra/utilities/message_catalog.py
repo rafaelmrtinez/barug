@@ -43,8 +43,10 @@ class MessageCatalog:
         "height_invalid": "Enter a valid height in centimeters (numbers only).",
         "height_range": "Height must be between {min} and {max} cm.",
         "findings_required": "Please provide the findings.",
+        "findings_already_present": "Findings are already recorded for this visit and cannot be changed.",
         "emoji_not_allowed": "Emoji characters are not allowed in text fields.",
         "age_negative": "Age cannot be negative.",
+        "age_sequence_invalid": "Visit ages must be non-decreasing across visits.",
         "notes_na": "N/A",
     })
 

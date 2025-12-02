@@ -795,26 +795,10 @@ def person_suggest(request: HttpRequest):
     if len(q) < 2:
         return JsonResponse({"results": []})
 
-    like = f"%{q}%"
     with connection.cursor() as cur:
         cur.execute(
-            """
-            SELECT p.person_id,
-                   trim(
-                       coalesce(p.first_name,'') || ' ' ||
-                       coalesce(p.middle_name,'') || ' ' ||
-                       coalesce(p.last_name,'')  || ' ' ||
-                       coalesce(p.suffix,'')
-                   ) AS name
-            FROM person p
-            WHERE
-                 p.first_name ILIKE %s
-              OR p.last_name  ILIKE %s
-              OR (p.first_name || ' ' || coalesce(p.middle_name,'') || ' ' || p.last_name) ILIKE %s
-            ORDER BY name
-            LIMIT 20
-            """,
-            [like, like, like],
+            "SELECT person_id, person_name FROM search_person_by_code_or_name_not_deceased(%s) LIMIT 20",
+            [q]
         )
         rows = cur.fetchall()
 

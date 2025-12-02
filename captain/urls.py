@@ -26,6 +26,10 @@ urlpatterns = [
 
     path("api/staff/search/", views.staff_search_api, name="staff_search_api"),
     path("api/staff/filter/", views.staff_filter_api, name="staff_filter_api"),
+    
+    # Staff requests list and details
+    path("staff/requests/", views.staff_requests_list, name="staff_requests_list"),
+    path("staff/requests/<int:request_id>/", views.staff_request_detail, name="staff_request_detail"),
 
     path("staff_account_requests_list/", views.staff_account_requests_list, name="staff_account_requests_list"),
     path("staff_account_requests_list/pending_staff_details/<str:p_staff_acc_req_id>/", views.pending_staff_dets , name="pending_staff_details"),

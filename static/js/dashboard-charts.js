@@ -512,8 +512,9 @@
       document.querySelector('.chart-skel-status')?.classList?.add('hidden');
     }
     if(document.getElementById('settlementStatus') && dash.settlementStatus){
-      const palette = config.palette || [DEFAULTS.BRAND700,DEFAULTS.BRAND500,DEFAULTS.BRAND300,DEFAULTS.NEU300];
-      ChartUtils.renderDonut('settlementStatus', dash.settlementStatus.labels||[], dash.settlementStatus.data||[], palette, { legendEl:'statusLegend' });
+      // Use custom colors if provided, otherwise fall back to default palette
+      const colors = dash.settlementStatus.colors || config.palette || [DEFAULTS.BRAND700,DEFAULTS.BRAND500,DEFAULTS.BRAND300,DEFAULTS.NEU300];
+      ChartUtils.renderDonut('settlementStatus', dash.settlementStatus.labels||[], dash.settlementStatus.data||[], colors, { legendEl:'statusLegend' });
       document.querySelector('.chart-skel-setstatus')?.classList?.add('hidden');
     }
     if(document.getElementById('collectionsTrend') && dash.collectionsTrend){

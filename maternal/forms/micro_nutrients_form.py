@@ -11,7 +11,7 @@ class MicroNutrientsForm(forms.Form):
     iron_folic_end = forms.DateField(required=False, widget=forms.DateInput(
         attrs={'type': 'date'}), label="Iron w/ Folic Acid (completed)")
     deworming_date = forms.DateField(required=False, widget=forms.DateInput(
-        attrs={'type': 'date'}), label="Deworming tab (preferably 3rd trimester) date given")
+        attrs={'type': 'date'}), label="Deworming tab date given")
     form_type = forms.CharField(initial="micro_nutrients_form", widget=forms.HiddenInput(
         attrs={'id': 'micro_nutrients_form'}
     ))

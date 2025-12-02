@@ -25,6 +25,14 @@ urlpatterns = [
     # Staff list & details
     path("staff_list/", views.staff_list, name="staff_list"),
     path("staff_list/staff_details/<str:staff_code>/", views.staff_dets, name="staff_details"),
+    
+    # Staff account requests
+    path("staff_account_requests_list/", views.staff_account_requests_list, name="staff_account_requests_list"),
+    path("staff_account_requests_list/pending_staff_details/<str:p_staff_acc_req_id>/", views.pending_staff_dets, name="pending_staff_details"),
+    
+    # Staff requests list and details
+    path("staff/requests/", views.staff_requests_list, name="staff_requests_list"),
+    path("staff/requests/<int:request_id>/", views.staff_request_detail, name="staff_request_detail"),
 
     # Residents
     path("residents/", views.residents_list, name="residents_list"),
@@ -56,8 +64,14 @@ urlpatterns = [
 
     # APIs: staff
     path("api/staff/search/", views.staff_search_api, name="staff_search_api"),
-    # path("api/staff/filter/", views.staff_filter_api, name="staff_filter_api"),
+    path("api/staff_account_requests/search/", views.staff_account_requests_search_api, name="staff_account_requests_search_api"),
+    
+    # Staff request processing
+    path("staff-requests/process/", views.process_staff_request, name="process_staff_request"),
 
+    # BLOTTER CASES (VIEW ONLY)
+    path("blotter-cases/", views.blotter_cases, name="blotter_cases"),
+    
     # INCIDENT HEATMAP
     path("incident-heatmap/", views.incident_heatmap, name="incident_heatmap"),
 

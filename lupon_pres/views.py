@@ -830,6 +830,7 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
                 "nationality_label":  _label("nationality", cd.get("nationality")),
                 "religion_label":     _label("religion", cd.get("religion")),
                 "city":      cd.get("city") or "",
+                "province":  cd.get("province") or "",
                 "barangay":  cd.get("barangay") or "",
                 "sitio_purok": cd.get("purok_sitio") or "",
                 "street":    cd.get("street") or "",
@@ -1150,6 +1151,7 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
             p_nationality_id=personal.get("nationality_id"),
             p_religion_id=personal.get("religion_id"),
             p_city=personal.get("city"),
+            p_province=personal.get("province"),
             p_barangay=personal.get("barangay"),
             p_sitio_purok=personal.get("sitio_purok"),
             p_street=personal.get("street"),
@@ -1307,13 +1309,14 @@ def members_list(request: HttpRequest) -> HttpResponse:
     }
 
     auth = request.session.get("auth") or {}
+    user_role = _auth_role_name(request)
     _user_fullname = auth.get("full_name") or user_fullname
     _user_role = auth.get("role_name") or user_role
     _user_role_template = (_user_role or "").lower().replace(" ", "_")
 
     return render(request, "members/members_list.html", {
-        "user_fullname": _user_fullname,
-        "user_role": _user_role,
+        # "user_fullname": _user_fullname,
+        # "user_role": _user_role,
         "page_path": f"{_user_role} / Staff List",
         "page_title": "Staff List",
         "user_role_template": _user_role_template,
@@ -1518,8 +1521,6 @@ def member_dets(request: HttpRequest, staff_code: str) -> HttpResponse:
 
     form = UpdateInfo()
     return render(request, "members/member_dets.html", {
-        "user_fullname": user_fullname,
-        "user_role": user_role,
         "page_path": f"{user_role} / Staff Details : {staff_code}",
         "page_title": f"Staff Details : {staff_code}",
         "user_role_template": user_role_template,
@@ -1555,3 +1556,20 @@ from lupon_mem.views import (
     case_timeline,
     incident_heatmap
 )
+
+# Staff requests views
+@session_login_required
+@role_required(LUPON_PRES_ROLE)
+@nocache
+def staff_requests_list(request: HttpRequest) -> HttpResponse:
+    """View staff account requests submitted by this lupon president"""
+    from common.staff_request_views_simple import staff_requests_list_view
+    return staff_requests_list_view(request, "lupon_pres", "lupon_pres/requests_list.html")
+
+@session_login_required
+@role_required(LUPON_PRES_ROLE)
+@nocache
+def staff_request_detail(request: HttpRequest, request_id: int) -> HttpResponse:
+    """View detailed information about a specific staff request"""
+    from common.staff_request_views_simple import staff_request_detail_view
+    return staff_request_detail_view(request, request_id, "lupon_pres", "lupon_pres/request_detail.html")

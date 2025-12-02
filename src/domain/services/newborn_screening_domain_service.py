@@ -55,7 +55,24 @@ class NewbornScreeningDomainService:
 
         # ensure only one record exists for this child
         existing = self.ch_repo.fetch_new_born_screening_date_by_chr_id(child_record_id)
-        if existing:
+        # existing may be a dict with keys present but values NULL/empty in DB
+        # e.g. {'feeding_type_name': None, 'referred_newborn_screening_date': None}
+        # Only treat it as an existing record when at least one column has a
+        # meaningful (non-null, non-empty) value.
+        def _has_meaningful_values(row: dict) -> bool:
+            if not row:
+                return False
+            for val in row.values():
+                if val is None:
+                    continue
+                if isinstance(val, str) and val.strip() == "":
+                    continue
+                # any non-empty string or non-None non-string value counts
+                return True
+            return False
+
+        print(f"DEBUG: Existing newborn screening data for child_record_id {child_record_id}: {existing}")
+        if existing and _has_meaningful_values(existing):
             raise NewbornScreeningDomainException("A newborn screening record already exists for this child")
 
         # return normalized values; repository expects date or None, and int or None

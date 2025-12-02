@@ -89,12 +89,12 @@ class MicroNutrientsService:
         d_parsed = coerce_date(deworm, "Deworming")
 
         # Validate dates against PH current (must be strictly before)
-        if ph_current:
-            for parsed, label in ((s_parsed, "Iron w/ Folic Acid (start)"), (e_parsed, "Iron w/ Folic Acid (completed)"), (d_parsed, "Deworming")):
-                if parsed is None:
-                    continue
-                if parsed >= ph_current:
-                    raise MicroNutrientsValidationException(f"{label}: today's date and future dates are not allowed. Please enter a date before {ph_current}.", errors={label: [f"{label}: today's date and future dates are not allowed. Please enter a date before {ph_current}."]})
+        # if ph_current:
+        #     for parsed, label in ((s_parsed, "Iron w/ Folic Acid (start)"), (e_parsed, "Iron w/ Folic Acid (completed)"), (d_parsed, "Deworming")):
+        #         if parsed is None:
+        #             continue
+        #         if parsed >= ph_current:
+        #             raise MicroNutrientsValidationException(f"{label}: today's date and future dates are not allowed. Please enter a date before {ph_current}.", errors={label: [f"{label}: today's date and future dates are not allowed. Please enter a date before {ph_current}."]})
 
         # If there is an end date but no start (submitted or initial) -> error
         existing_start = existing.get("iron_start_date") if existing and isinstance(existing, dict) else None

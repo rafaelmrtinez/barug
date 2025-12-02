@@ -28,6 +28,7 @@ from django.views.decorators.csrf import csrf_protect as csrf_required
 from django.shortcuts import render, redirect
 from django.views.decorators.http import require_GET, require_http_methods
 from django.views.decorators.csrf import csrf_protect
+from django.db import connection
 from dependency_injector.wiring import inject, Provide
 
 from authentication.guards import session_login_required, role_required
@@ -78,6 +79,7 @@ from src.app.transfer_objects.commands.schedule_cmd import ScheduleAnnouncementC
 
 from .forms import (
     StaffFilters,
+    StaffAccountRequestFilters,
     BusinessFilters,
     HouseholdFilters,
     AnnouncementDraftForm,
@@ -118,6 +120,7 @@ ROLE_BHW = 9
 ROLE_LUPON = 8
 WZ_KEY = "staff_nonres_wizard"
 STAFF_FILTER_SESSION_KEY = "secretary_staff_filters"
+STAFF_REQ_FILTER_SESSION_KEY = "secretary_staff_req_filters"
 
 SECRETARY_ROLE = "Barangay Secretary"
 
@@ -759,6 +762,7 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
                 "nationality_label":  _label_from_choices(form.fields["nationality"].choices, cd.get("nationality")),
                 "religion_label":     _label_from_choices(form.fields["religion"].choices, cd.get("religion")),
                 "city":      cd.get("city") or "",
+                "province":  cd.get("province") or "",
                 "barangay":  cd.get("barangay") or "",
                 "sitio_purok": cd.get("purok_sitio") or "",
                 "street":    cd.get("street") or "",
@@ -1168,6 +1172,7 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
             p_nationality_id=personal.get("nationality_id"),
             p_religion_id=personal.get("religion_id"),
             p_city=personal.get("city"),
+            p_province=personal.get("province"),
             p_barangay=personal.get("barangay"),
             p_sitio_purok=personal.get("sitio_purok"),
             p_street=personal.get("street"),
@@ -1413,7 +1418,103 @@ def staff_search_api(request):
 @session_login_required
 @role_required(SECRETARY_ROLE)
 @nocache
+@require_http_methods(["GET", "POST"])
 def staff_dets(request, staff_code: str):
+    # Handle POST request for personal information update
+    if request.method == "POST" and request.POST.get('action') == 'update_personal_info':
+        from authentication.models import Authentication
+        
+        auth = request.session.get("auth") or {}
+        updated_by_staff_id = auth.get("staff_id")
+        
+        if not updated_by_staff_id:
+            flash_warning(request, "Your session is missing staff credentials.")
+            return redirect(request.path)
+        
+        # Check if reason is provided
+        reason = (request.POST.get('reason') or '').strip()
+        if not reason:
+            flash_warning(request, "Please provide a reason for updating personal information.")
+            return redirect(request.path)
+        
+        try:
+            # Get current staff data first
+            rows = Secretary.get_staff_profile_display(staff_code) if staff_code else []
+            current_staff = rows[0] if rows else None
+            
+            if not current_staff:
+                flash_warning(request, "Staff not found.")
+                return redirect("secretary:staff_list")
+            
+            staff_id = current_staff.get("staff_id")
+            if not staff_id:
+                flash_warning(request, "Staff ID not found.")
+                return redirect("secretary:staff_list")
+            
+            # Extract only the fields that are in the modal
+            first_name = (request.POST.get('first_name') or '').strip() or None
+            middle_name = (request.POST.get('middle_name') or '').strip() or None
+            last_name = (request.POST.get('last_name') or '').strip() or None
+            suffix = (request.POST.get('suffix') or '').strip() or None
+            birthdate = (request.POST.get('birthdate') or '').strip() or None
+            sex_id = Authentication._to_int_or_none(request.POST.get('sex_id'))
+            civil_status_id = Authentication._to_int_or_none(request.POST.get('civil_status_id'))
+            nationality_id = Authentication._to_int_or_none(request.POST.get('nationality_id'))
+            religion_id = Authentication._to_int_or_none(request.POST.get('religion_id'))
+            mobile_num = (request.POST.get('mobile_number') or '').strip() or None
+            
+            # Address fields
+            city = (request.POST.get('city') or '').strip() or None
+            barangay = (request.POST.get('barangay') or '').strip() or None
+            sitio_purok = (request.POST.get('sitio_purok') or '').strip() or None
+            street = (request.POST.get('street') or '').strip() or None
+            province = (request.POST.get('province') or '').strip() or None
+            
+            # Call the update function with only the fields in the modal
+            result = Authentication.update_personal_information(
+                staff_id=staff_id,
+                updated_by_staff_id=updated_by_staff_id,
+                first_name=first_name,
+                middle_name=middle_name,
+                last_name=last_name,
+                suffix=suffix,
+                birthdate=birthdate,
+                sex_id=sex_id,
+                civil_status_id=civil_status_id,
+                nationality_id=nationality_id,
+                religion_id=religion_id,
+                email=None,
+                mobile_number=mobile_num,
+                occupation=None,
+                monthly_income_id=None,
+                residential_status_id=None,
+                education_id=None,
+                employment_status_id=None,
+                is_student=None,
+                gov_mem_prog_ids=None,
+                city=city,
+                barangay=barangay,
+                sitio_purok=sitio_purok,
+                street=street,
+                province=province,
+                reason=f'Personal information update by secretary: {reason}'
+            )
+            
+            if result:
+                flash_success(request, 'Personal information updated successfully!')
+            else:
+                flash_warning(request, 'No changes were made.')
+                
+        except (DatabaseError, OperationalError, IntegrityError) as e:
+            logger.error(f"Database error updating personal info: {str(e)}", exc_info=True)
+            flash_db_error(request, e)
+        except Exception as e:
+            logger.error(f"Error updating personal info: {str(e)}", exc_info=True)
+            flash_system_error(request, 'An error occurred while updating personal information.', exc=e)
+        
+        return redirect(request.path)
+    
+    # GET request handling
     try:
         rows = Secretary.get_staff_profile_display(staff_code) if staff_code else []
     except Exception:
@@ -1444,9 +1545,581 @@ def staff_dets(request, staff_code: str):
     }
     return render(request, "staff/staff_dets.html", ctx)
 
- 
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+def staff_account_requests_list(request: HttpRequest) -> HttpResponse:
+    filters = request.session.get(STAFF_REQ_FILTER_SESSION_KEY, {}) or {}
+    role_raw = (filters.get("role") or "").strip()
+    date_raw = (filters.get("date_submitted") or "").strip()
+    search_term = (filters.get("q") or "").strip()
 
- # ─────────────────────────────────────────────────────────────
+    updated = False
+    should_redirect = False
+
+    if "clear_filters" in request.GET:
+        role_raw = ""
+        date_raw = ""
+        search_term = ""
+        updated = True
+        should_redirect = True
+
+    remove_target = (request.GET.get("remove_filter") or "").strip()
+    if remove_target:
+        if remove_target == "role":
+            role_raw = ""
+        elif remove_target == "date_submitted":
+            date_raw = ""
+        elif remove_target == "search":
+            search_term = ""
+        updated = True
+        should_redirect = True
+
+    if "role" in request.GET:
+        role_raw = (request.GET.get("role") or "").strip()
+        updated = True
+    if "date_submitted" in request.GET:
+        date_raw = (request.GET.get("date_submitted") or "").strip()
+        updated = True
+    if "q" in request.GET:
+        search_term = (request.GET.get("q") or "").strip()
+        updated = True
+    if "search" in request.GET:
+        search_term = (request.GET.get("search") or "").strip()
+        updated = True
+
+    filters_state = {
+        "role": role_raw,
+        "date_submitted": date_raw,
+        "q": search_term,
+    }
+    if updated or STAFF_REQ_FILTER_SESSION_KEY not in request.session:
+        request.session[STAFF_REQ_FILTER_SESSION_KEY] = filters_state
+        request.session.modified = True
+
+    if should_redirect:
+        return redirect(request.path)
+
+    try:
+        from captain.models import Captain
+        staff_req = Captain.list_requests() or []
+    except Exception:
+        logger.exception("Error loading staff requests")
+        staff_req = []
+
+    # simple getters for dicts/objects
+    def get(row, key):
+        return row.get(key) if isinstance(row, dict) else getattr(row, key, None)
+
+    # Secretary can only view requests waiting for secretary's approval (status_id == 29)
+    filtered = []
+    for r in staff_req:
+        sid = get(r, "status_id") or get(r, "request_status_id")
+        name = (get(r, "status_name") or "").upper()
+        try:
+            sid = int(sid) if sid is not None else None
+        except (TypeError, ValueError):
+            sid = None
+        if sid == 29 or "WAITING FOR BARANGAY CAPTAIN" in name or "WAITING FOR BARANGAY SECRETARY" in name:
+            filtered.append(r)
+
+    # Apply filters
+    if role_raw:
+        role_id = int(role_raw) if role_raw.isdigit() else None
+        if role_id:
+            filtered = [r for r in filtered if get(r, "role_id") == role_id]
+
+    if date_raw:
+        from datetime import datetime
+        try:
+            target_date = datetime.strptime(date_raw, "%Y-%m-%d").date()
+        except ValueError:
+            target_date = None
+        
+        if target_date:
+            date_filtered = []
+            for r in filtered:
+                pretty_date = get(r, "date_time_submitted_pretty")
+                
+                if pretty_date and isinstance(pretty_date, str):
+                    try:
+                        # Parse "October 12, 2025 9:06 A.M" format
+                        date_part = ' '.join(pretty_date.split()[:3])  # "October 12, 2025"
+                        parsed_date = datetime.strptime(date_part, "%B %d, %Y").date()
+                        if parsed_date == target_date:
+                            date_filtered.append(r)
+                    except (ValueError, IndexError):
+                        pass
+            filtered = date_filtered
+
+    if search_term:
+        search_lower = search_term.lower()
+        filtered = [r for r in filtered if search_lower in (get(r, "name") or "").lower()]
+
+    try:
+        per_page = int(request.GET.get("per_page") or 10)
+        if per_page <= 0:
+            per_page = 10
+    except (TypeError, ValueError):
+        per_page = 10
+
+    form_initial = {
+        "role": role_raw,
+        "date_submitted": date_raw,
+        "search": search_term,
+    }
+    form = StaffAccountRequestFilters(initial=form_initial)
+
+    paginator = Paginator(filtered, per_page)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    role_choices = {str(k): v for k, v in form.fields["role"].choices}
+
+    active_filters = []
+    if role_raw:
+        label = role_choices.get(role_raw) or f"Role {role_raw}"
+        active_filters.append({
+            "label": label,
+            "remove_url": f"{request.path}?remove_filter=role",
+        })
+    if date_raw:
+        try:
+            from datetime import datetime
+            date_obj = datetime.strptime(date_raw, "%Y-%m-%d")
+            date_label = date_obj.strftime("%B %d, %Y")
+        except ValueError:
+            date_label = date_raw
+        active_filters.append({
+            "label": f"Date: {date_label}",
+            "remove_url": f"{request.path}?remove_filter=date_submitted",
+        })
+    if search_term:
+        active_filters.append({
+            "label": f"Search: \"{search_term}\"",
+            "remove_url": f"{request.path}?remove_filter=search",
+        })
+
+    clear_filters_url = f"{request.path}?clear_filters=1"
+
+    current_filters = filters_state
+    user_fullname, user_role, user_role_template = get_user_info(request)
+
+    return render(request, "secretary/staff_account_req.html", {
+        "user_fullname": user_fullname,
+        "user_role": user_role,
+        "page_path": f"{user_role} / Staff Account Requests",
+        "page_title": "Staff Account Requests",
+        "user_role_template": user_role_template,
+        "form": form,
+        "page_obj": page_obj,
+        "staff_req": page_obj.object_list,
+        "total_count": paginator.count,
+        "per_page": per_page,
+        "active_filters": active_filters,
+        "clear_filters_url": clear_filters_url,
+        "current_filters": current_filters,
+    })
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+def pending_staff_dets(request, p_staff_acc_req_id: str):
+    try:
+        from captain.models import Captain
+        rows = Captain.get_pending_staff_details(p_staff_acc_req_id) if p_staff_acc_req_id else []
+    except Exception:
+        logger.exception("get_pending_staff_details failed for staff_code=%s", p_staff_acc_req_id)
+        rows = []
+
+    # Get status history
+    status_history = []
+    try:
+        status_history = Secretary.get_staff_acc_req_status_history(int(p_staff_acc_req_id)) if p_staff_acc_req_id else []
+    except Exception:
+        logger.exception("get_staff_acc_req_status_history failed for req_id=%s", p_staff_acc_req_id)
+        status_history = []
+
+    p = rows[0] if rows else None
+    placeholder = static("images/brgy-sto-nino.png")
+    def _img(v): return (v or "").strip() or placeholder
+
+    doc_slides = []
+    if p:
+        doc_slides = [
+            {"src": _img(p.get("valid_id_front_img_path")), "label": "Front of ID"},
+            {"src": _img(p.get("valid_id_back_img_path")),  "label": "Back of ID"},
+            {"src": _img(p.get("selfie_img_path")),         "label": "Selfie w/ ID"},
+        ]
+
+    user_fullname, user_role, user_role_template = get_user_info(request)
+    ctx = {
+        "user_fullname": user_fullname,
+        "user_role": user_role,
+        "page_path": f"{user_role} / Staff Details : {p_staff_acc_req_id}",
+        "page_title": f"Staff Details : {p_staff_acc_req_id}",
+        "user_role_template": user_role_template,
+        "profile": p,
+        "doc_slides": doc_slides,
+        "staff_acc_req_id": p_staff_acc_req_id,
+        "status_history": status_history,
+    }
+    return render(request, "secretary/pending_staff_dets.html", ctx)
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@require_GET
+def staff_account_requests_search_api(request):
+    raw_query = (request.GET.get("q") or "").strip()
+
+    filters = request.session.get(STAFF_REQ_FILTER_SESSION_KEY, {}) or {}
+    role_raw = (filters.get("role") or "").strip()
+    date_raw = (filters.get("date_submitted") or "").strip()
+
+    try:
+        from captain.models import Captain
+        staff_req = Captain.list_requests() or []
+    except Exception as e:
+        logger.exception("staff_account_requests_search_api error: %s", e)
+        return JsonResponse({"results": [], "error": "Search failed"}, status=500)
+
+    def get(row, key):
+        return row.get(key) if isinstance(row, dict) else getattr(row, key, None)
+
+    # Secretary can only view requests waiting for secretary's approval (status_id == 29)
+    filtered = []
+    for r in staff_req:
+        sid = get(r, "status_id") or get(r, "request_status_id")
+        name = (get(r, "status_name") or "").upper()
+        try:
+            sid = int(sid) if sid is not None else None
+        except (TypeError, ValueError):
+            sid = None
+        if sid == 29 or sid == 47 or "WAITING FOR BARANGAY CAPTAIN'S APPROVAL" in name or "WAITING FOR BARANGAY SECRETARY'S APPROVAL" in name:
+            filtered.append(r)
+
+    # Apply role filter
+    if role_raw:
+        role_id = int(role_raw) if role_raw.isdigit() else None
+        if role_id:
+            filtered = [r for r in filtered if get(r, "role_id") == role_id]
+
+    # Apply date filter
+    if date_raw:
+        from datetime import datetime
+        try:
+            target_date = datetime.strptime(date_raw, "%Y-%m-%d").date()
+        except ValueError:
+            target_date = None
+        
+        if target_date:
+            date_filtered = []
+            for r in filtered:
+                pretty_date = get(r, "date_time_submitted_pretty")
+                
+                if pretty_date and isinstance(pretty_date, str):
+                    try:
+                        # Parse "October 12, 2025 9:06 A.M" format
+                        date_part = ' '.join(pretty_date.split()[:3])  # "October 12, 2025"
+                        parsed_date = datetime.strptime(date_part, "%B %d, %Y").date()
+                        if parsed_date == target_date:
+                            date_filtered.append(r)
+                    except (ValueError, IndexError):
+                        pass
+            filtered = date_filtered
+
+    # Apply search filter
+    if raw_query:
+        q_lower = raw_query.lower()
+        filtered = [r for r in filtered if q_lower in (get(r, "name") or "").lower()]
+
+    # Update session
+    filters.update({
+        "role": role_raw,
+        "date_submitted": date_raw,
+        "q": raw_query,
+    })
+    request.session[STAFF_REQ_FILTER_SESSION_KEY] = filters
+    request.session.modified = True
+
+    return JsonResponse({"results": filtered[:50]})
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+def staff_requests_list(request: HttpRequest) -> HttpResponse:
+    """View staff account requests submitted by this secretary"""
+    auth = request.session.get('auth', {})
+    staff_id = auth.get('staff_id')
+    user_fullname, user_role, user_role_template = get_user_info(request)
+    
+    # Get filter parameters
+    search_query = request.GET.get('q', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    role_filter = request.GET.get('role', '').strip()
+    date_filter = request.GET.get('date_submitted', '').strip()
+    
+    try:
+        requests = Secretary.get_staff_account_req_list_by_requester(staff_id)
+        stats_data = Secretary.get_staff_request_statistics_by_requester(staff_id)
+        stats = stats_data[0] if stats_data else {
+            'total_requests': 0, 'pending_requests': 0, 'approved_requests': 0, 'rejected_requests': 0
+        }
+    except Exception as e:
+        logger.exception("Error loading requests")
+        from common.flash import flash_system_error
+        flash_system_error(request, "Failed to load requests.")
+        requests = []
+        stats = {'total_requests': 0, 'pending_requests': 0, 'approved_requests': 0, 'rejected_requests': 0}
+    
+    # Apply filters
+    filtered_requests = requests
+    
+    # Search by name
+    if search_query:
+        search_lower = search_query.lower()
+        filtered_requests = [
+            r for r in filtered_requests 
+            if search_lower in (r.get('name') or '').lower()
+        ]
+    
+    # Filter by status
+    if status_filter:
+        filtered_requests = [
+            r for r in filtered_requests 
+            if str(r.get('status_id', '')) == status_filter
+        ]
+    
+    # Filter by role
+    if role_filter:
+        filtered_requests = [
+            r for r in filtered_requests 
+            if str(r.get('role_id', '')) == role_filter
+        ]
+    
+    # Filter by date
+    if date_filter:
+        from datetime import datetime
+        try:
+            target_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
+            date_filtered = []
+            for r in filtered_requests:
+                pretty_date = r.get('date_time_submitted_pretty')
+                if pretty_date and isinstance(pretty_date, str):
+                    try:
+                        # Parse "December 1, 2025 3:28 A.M." format
+                        date_part = ' '.join(pretty_date.split()[:3])  # "December 1, 2025"
+                        parsed_date = datetime.strptime(date_part, "%B %d, %Y").date()
+                        if parsed_date == target_date:
+                            date_filtered.append(r)
+                    except (ValueError, IndexError):
+                        continue
+            filtered_requests = date_filtered
+        except ValueError:
+            pass
+    
+    # Implement pagination with 9 requests per page
+    paginator = Paginator(filtered_requests, 9)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, "secretary/requests_list.html", {
+        'page_obj': page_obj,
+        'requests': filtered_requests,
+        'stats': stats,
+        'search_query': search_query,
+        'status_filter': status_filter,
+        'role_filter': role_filter,
+        'date_filter': date_filter,
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'user_role_template': user_role_template,
+        'page_path': f"{user_role} / My Requests",
+        'page_title': 'My Staff Requests',
+    })
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+def staff_request_detail(request: HttpRequest, request_id: int) -> HttpResponse:
+    """View detailed information about a specific staff request"""
+    auth = request.session.get('auth', {})
+    staff_id = auth.get('staff_id')
+    user_fullname, user_role, user_role_template = get_user_info(request)
+    
+    try:
+        details_data = Secretary.get_staff_acc_req_profile_progress(request_id)
+        history = Secretary.get_staff_acc_req_status_history(request_id)
+        
+        if not details_data:
+            from common.flash import flash_warning
+            flash_warning(request, "Request not found.")
+            return redirect('secretary:staff_requests_list')
+        
+        request_detail = details_data[0]
+        
+        # Allow access if user is the requester OR if user has appropriate role permissions
+        if request_detail.get('requested_by_id') != staff_id:
+            # For now, allow secretaries to view all requests for debugging
+            # TODO: Implement proper role-based access control
+            pass
+            
+    except Exception as e:
+        logger.exception(f"Error loading request {request_id}")
+        from common.flash import flash_system_error
+        flash_system_error(request, "Failed to load request details.")
+        return redirect('secretary:staff_requests_list')
+    
+    return render(request, "secretary/request_detail.html", {
+        'request': request_detail,
+        'history': history,
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'user_role_template': user_role_template,
+        'page_path': f"{user_role} / My Requests / Details",
+        'page_title': f"Request Details - {request_detail.get('full_name', 'Unknown')}",
+    })
+
+REQUEST_STATUS_APPROVED = 30
+REQUEST_STATUS_REJECTED = 4
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@require_http_methods(["POST"])
+def process_staff_request(request: HttpRequest) -> HttpResponse:
+    auth = request.session.get("auth") or {}
+    approver_id = auth.get("staff_id")
+    
+    if not approver_id:
+        flash_system_error(request, "Your session is missing staff credentials.")
+        return redirect(request.META.get("HTTP_REFERER") or "secretary:staff_account_requests_list")
+    
+    try:
+        approver_id = int(approver_id)
+    except (TypeError, ValueError):
+        flash_system_error(request, "Invalid staff credentials.")
+        return redirect(request.META.get("HTTP_REFERER") or "secretary:staff_account_requests_list")
+
+    staff_acc_req_id_raw = (
+        request.POST.get("staff_acc_req_id") or 
+        request.POST.get("id")
+    )
+    
+    if not staff_acc_req_id_raw:
+        flash_warning(request, "Missing staff account request ID.")
+        return redirect(request.META.get("HTTP_REFERER") or "secretary:staff_account_requests_list")
+    
+    try:
+        staff_acc_req_id = int(staff_acc_req_id_raw)
+    except (TypeError, ValueError):
+        flash_warning(request, "Invalid staff account request ID.")
+        return redirect(request.META.get("HTTP_REFERER") or "secretary:staff_account_requests_list")
+
+    status_raw = request.POST.get("p_request_status_id")
+    if not status_raw:
+        flash_warning(request, "Missing decision status.")
+        return redirect(request.META.get("HTTP_REFERER") or "secretary:staff_account_requests_list")
+    
+    try:
+        status_id = int(status_raw)
+    except (TypeError, ValueError):
+        flash_warning(request, "Invalid decision status.")
+        return redirect(request.META.get("HTTP_REFERER") or "secretary:staff_account_requests_list")
+    
+    if status_id not in (REQUEST_STATUS_APPROVED, REQUEST_STATUS_REJECTED):
+        flash_warning(request, "Invalid decision status.")
+        return redirect(request.META.get("HTTP_REFERER") or "secretary:staff_account_requests_list")
+
+    remarks = (request.POST.get("remarks") or "").strip() or None
+    email_to = (request.POST.get("email") or "").strip()
+    
+    if email_to:
+        is_valid, reason = verify_email_deliverable_abstract(email_to)
+        if not is_valid:
+            flash_warning(request, f"Email validation failed: {reason}. Request will be processed but email notifications may not be sent.")
+            email_to = ""
+
+    try:
+        result_text = Secretary.process_staff_account_request(
+            p_staff_acc_req_id=staff_acc_req_id,
+            p_approver_id=approver_id,
+            p_request_status_id=status_id,
+            p_remarks=remarks,
+        )
+
+        if status_id == REQUEST_STATUS_REJECTED:
+            if email_to:
+                try:
+                    import common.send_email as send_email
+                    reason = remarks or "No specific reason was provided."
+                    send_email.send_email(
+                        subject="Staff Account Request Rejected",
+                        to=[email_to],
+                        body_text=f"Good day!\n\nYour staff account creation request has been REJECTED.\n\nReason: {reason}\n\nPlease contact the authorized staff if you have any concern.\n\nBarangay Sto. Niño",
+                        body_html=f"<p>Good day!</p><p>Your staff account creation request has been <strong>REJECTED</strong>.</p><p><strong>Reason:</strong> {reason}</p><p>Please contact the authorized staff if you have any concern.</p><p>Barangay Sto. Niño</p>",
+                        from_name="Barangay Sto. Niño",
+                        fail_silently=True,
+                    )
+                except Exception as e:
+                    logger.warning("Failed to send rejection email: %s", e)
+            
+            flash_success(request, "Staff account request rejected.")
+        
+        elif status_id == REQUEST_STATUS_APPROVED:
+            if result_text == "TRUE":
+                if email_to:
+                    try:
+                        import common.send_email as send_email
+                        send_email.send_email(
+                            subject="Staff Account Request Update",
+                            to=[email_to],
+                            body_text="Good day!\n\nYour staff account request has been reviewed by the Barangay Secretary.\n\nCurrent Status: WAITING FOR ADMIN'S APPROVAL\n\nYou will receive another update after the Admin's final decision.\n\nBarangay Sto. Niño",
+                            body_html="<p>Good day!</p><p>Your staff account request has been reviewed by the Barangay Secretary.</p><p><strong>Current Status:</strong> WAITING FOR ADMIN'S APPROVAL</p><p>You will receive another update after the Admin's final decision.</p><p>Barangay Sto. Niño</p>",
+                            from_name="Barangay Sto. Niño",
+                            fail_silently=True,
+                        )
+                    except Exception as e:
+                        logger.warning("Failed to send approval email: %s", e)
+                
+                flash_success(request, "Request approved and forwarded to Admin for final processing.")
+            
+            elif result_text and result_text.strip():
+                staff_code = result_text.strip()
+                flash_success(request, f"Staff account approved. Staff Code: {staff_code}")
+                
+                if email_to:
+                    try:
+                        import common.send_email as send_email
+                        send_email.send_email(
+                            subject="Staff Account Request Approved",
+                            to=[email_to],
+                            body_text="Good day!\n\nYour staff account request has been APPROVED.\n\nYou will receive your login credentials in a separate email shortly.\n\nBarangay Sto. Niño",
+                            body_html="<p>Good day!</p><p>Your staff account request has been <strong>APPROVED</strong>.</p><p>You will receive your login credentials in a separate email shortly.</p><p>Barangay Sto. Niño</p>",
+                            from_name="Barangay Sto. Niño",
+                            fail_silently=True,
+                        )
+                    except Exception as e:
+                        logger.warning("Failed to send final approval email: %s", e)
+            
+            else:
+                flash_warning(request, "Request processed but no confirmation received. Please verify the status.")
+
+        logger.info(
+            "process_staff_request completed: req_id=%s approver_id=%s status=%s result=%s",
+            staff_acc_req_id, approver_id, status_id, result_text
+        )
+
+    except DatabaseError as db_err:
+        logger.exception("Database error processing staff request (req_id=%s)", staff_acc_req_id)
+        flash_db_error(request, db_err)
+    except Exception as ex:
+        logger.exception("Unexpected error processing staff request (req_id=%s)", staff_acc_req_id)
+        flash_system_error(request, "Unable to process the request.", exc=ex)
+    
+    return redirect(request.META.get("HTTP_REFERER") or "secretary:staff_account_requests_list")
+
+# ─────────────────────────────────────────────────────────────
 # NEW: Residents list (minimal) + view profile (RPC-backed)
 # ─────────────────────────────────────────────────────────────
 
@@ -3449,6 +4122,299 @@ def ajax_business_search(
     context = {**base_ctx, ("rows" if tpl_key == "rows" else "cards"): rows}
     html = render_to_string(template_name, context, request=request)
     return HttpResponse(html)
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def business_information(
+    request, 
+    b_id: int,
+    business_info: IBusinessInfoService = Provide[
+        AppContainer.owner_business_service]) -> HttpResponse:
+    user_role = _auth_role_name(request)
+    
+    person_id = request.GET.get("owner")
+    person_id = int(person_id) if person_id and str(person_id).isdigit() else None
+
+    dto = (
+        business_info.execute(person_id=person_id, business_id=b_id)
+        if person_id is not None
+        else business_info.execute_by_business_id(b_id)  # see helper below
+    )
+
+    def _compose_owner_full_name(data: dict) -> str | None:
+        last   = (data.get("last_name") or "").strip()
+        first  = (data.get("first_name") or "").strip()
+        middle = (data.get("middle_name") or "").strip()
+        suffix = (data.get("suffix") or "").strip()
+
+        parts = []
+        if last:
+            parts.append(last.upper())                   # LAST
+        if first:
+            parts.append((", " if parts else "") + first.title())  # , First
+        if middle:
+            parts.append(" " + middle[:1].upper() + ".")           #  M.
+        if suffix:
+            parts.append(" " + suffix.upper())                     #  JR / III, etc.
+        return "".join(parts) or None
+    
+    def _compose_full_address_from_owner(data: dict) -> str | None:
+        street      = (data.get("street") or "").strip()
+        sitio_purok = (data.get("sitio_purok") or "").strip()
+        barangay    = (data.get("barangay") or "").strip()
+        city        = (data.get("city") or "").strip()
+
+        # Order strictly: STREET, PUROK/SITIO, BARANGAY, CITY
+        parts = [p for p in [street, sitio_purok, barangay, city] if p]
+        return ", ".join(parts) if parts else None
+
+    owner = dict(dto.owner or {})
+    owner["owner_full_name"] = _compose_owner_full_name(owner)
+    owner["full_address"]    = _compose_full_address_from_owner(owner)
+
+    operating_days = (dto.business.get("operating_days") or "").strip()  # e.g., "Mon, Tue, Wed"
+    days = [d.strip() for d in operating_days.split(",")] if operating_days else []
+    operating_days_start_name = days[0] if days else None
+    operating_days_end_name = days[-1] if days else None
+
+    formatted_id = f"{int(b_id):06d}"
+
+    return render(
+        request,
+        "business/business_information.html",
+        {
+            "page_path": f"{user_role} / Business Records / Business Details : {formatted_id}",
+            "page_title": f"Business Details : {formatted_id}",
+            "owner": owner,
+            "business": dto.business,
+            "business_files": (dto.business_proof or {}).get("files") or [],
+            "operating_days_start_name": operating_days_start_name,
+            "operating_days_end_name": operating_days_end_name,
+        },
+    )
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@csrf_protect
+@nocache
+@inject
+def business_map_list(
+    request: HttpRequest,
+    business_service: IBusinessService = Provide[AppContainer.business_service],
+) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+    
+    user_role = _auth_role_name(request)
+    form = BusinessFilters(request.GET or None)
+
+    search = request.GET.get("search")
+    b_category = _to_int_or_none(request.GET.get("b_category"))
+    ownership_type = _to_int_or_none(request.GET.get("ownership_type"))
+    status = _to_int_or_none(request.GET.get("status"))
+
+    rows = business_service.execute(
+        search=search,
+        b_category=b_category,
+        ownership_type=ownership_type,
+        status=status,
+    )
+
+    paginator = Paginator(rows, 5)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    if (search or b_category is not None or ownership_type is not None or status is not None) and not form.is_valid():
+        form = BusinessFilters()
+
+    return render(
+        request,
+        "business/business_map_list.html",
+        {
+            'page_path': f"{user_role} / Business Map",
+            'page_title': "Business Map",
+            'form': form,
+            'page_obj' : page_obj,
+            'filters' : {
+                'search' : search,
+                'b_category' : b_category,
+                'ownership_type' :ownership_type,
+                'status' : status,
+            },
+            "pins_url": reverse("secretary:api_business_pins"),
+            'search_url': 'secretary:ajax_business_search',
+        }
+    )
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@csrf_protect
+@nocache
+@inject
+def api_business_pins(
+    request: HttpRequest,
+    business_repo: IBusinessRepository = Provide[AppContainer.infra.business],
+):
+    if request.method != "GET":
+        return HttpResponseBadRequest("GET only")
+
+    pins = business_repo.fetch_business_pins(
+        search=(request.GET.get("search") or None),
+        b_category=_to_int_or_none(request.GET.get("b_category")),
+        ownership_type=_to_int_or_none(request.GET.get("ownership_type")),
+        status=_to_int_or_none(request.GET.get("status")),
+    )
+    return JsonResponse(pins, safe=False)
+
+
+# -------------------------------
+# BLOTTER CASES (VIEW ONLY)
+# -------------------------------
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+def blotter_cases(request: HttpRequest):
+    """
+    View-only list of blotter cases for secretary.
+    Similar to lupon_mem case_list but without add/edit capabilities.
+    """
+    user_role = _auth_role_name(request)
+    
+    # Get filter parameters
+    q = (request.GET.get("q") or "").strip()
+    state = (request.GET.get("state") or "").strip()
+    settlement = (request.GET.get("settlement") or "").strip()
+    filed_from = (request.GET.get("filed_from") or "").strip()
+    filed_to = (request.GET.get("filed_to") or "").strip()
+    per_page = int(request.GET.get("per_page") or 10)
+    page = int(request.GET.get("page") or 1)
+    
+    # Build SQL query
+    with connection.cursor() as cur:
+        # Base query
+        sql = """
+            SELECT bc.blotter_case_id,
+                   bc.blotter_case_num,
+                   COALESCE(bc.blotter_case_name, 'Unnamed Case') AS case_name,
+                   bc.date_filed,
+                   bc.time_filed,
+                   COALESCE(cs.case_state_name, 'OPEN') AS case_state,
+                   COALESCE(ss.settlement_status_name, 'PENDING') AS settlement_status,
+                   COALESCE(ct.complaint_title_name, '—') AS complaint_title,
+                   COALESCE(cn.case_name, '—') AS case_nature
+            FROM blotter_case bc
+            LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
+            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+            LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
+            LEFT JOIN case_nature cn ON cn.case_nature_id = bc.case_nature_id
+            WHERE 1=1
+        """
+        params = []
+        
+        # Add filters
+        if q:
+            sql += " AND (bc.blotter_case_num ILIKE %s OR bc.blotter_case_name ILIKE %s)"
+            params.extend([f"%{q}%", f"%{q}%"])
+        
+        if state:
+            sql += " AND UPPER(cs.case_state_name) = UPPER(%s)"
+            params.append(state)
+        
+        if settlement:
+            sql += " AND UPPER(ss.settlement_status_name) = UPPER(%s)"
+            params.append(settlement)
+        
+        if filed_from:
+            sql += " AND bc.date_filed >= %s"
+            params.append(filed_from)
+        
+        if filed_to:
+            sql += " AND bc.date_filed <= %s"
+            params.append(filed_to)
+        
+        sql += " ORDER BY bc.date_filed DESC, bc.blotter_case_id DESC"
+        
+        # Get total count
+        count_sql = f"SELECT COUNT(*) FROM ({sql}) AS subq"
+        cur.execute(count_sql, params)
+        total = cur.fetchone()[0]
+        
+        # Add pagination
+        offset = (page - 1) * per_page
+        sql += f" LIMIT {per_page} OFFSET {offset}"
+        
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+        
+        # Get filter choices
+        cur.execute("SELECT DISTINCT case_state_name FROM case_state ORDER BY case_state_name")
+        state_choices = [r[0] for r in cur.fetchall()]
+        
+        cur.execute("SELECT DISTINCT settlement_status_name FROM settlement_status ORDER BY settlement_status_name")
+        settlement_choices = [r[0] for r in cur.fetchall()]
+    
+    # Calculate pagination
+    total_pages = (total + per_page - 1) // per_page
+    has_prev = page > 1
+    has_next = page < total_pages
+    prev_page = page - 1 if has_prev else 1
+    next_page = page + 1 if has_next else total_pages
+    first_item = offset + 1 if total > 0 else 0
+    last_item = min(offset + per_page, total)
+    
+    # Page numbers for pagination
+    page_numbers = []
+    if total_pages <= 7:
+        page_numbers = list(range(1, total_pages + 1))
+    else:
+        if page <= 4:
+            page_numbers = list(range(1, 6)) + [total_pages]
+        elif page >= total_pages - 3:
+            page_numbers = [1] + list(range(total_pages - 4, total_pages + 1))
+        else:
+            page_numbers = [1] + list(range(page - 1, page + 2)) + [total_pages]
+    
+    # Build query string without page
+    query_parts = []
+    if q:
+        query_parts.append(f"q={q}")
+    if state:
+        query_parts.append(f"state={state}")
+    if settlement:
+        query_parts.append(f"settlement={settlement}")
+    if filed_from:
+        query_parts.append(f"filed_from={filed_from}")
+    if filed_to:
+        query_parts.append(f"filed_to={filed_to}")
+    query_parts.append(f"per_page={per_page}")
+    query_no_page = "&".join(query_parts)
+    
+    return render(request, "secretary/blotter_cases.html", {
+        'page_path': f'{user_role} / Blotter Cases',
+        'page_title': 'Blotter Cases',
+        'rows': rows,
+        'q': q,
+        'state': state,
+        'settlement': settlement,
+        'filed_from': filed_from,
+        'filed_to': filed_to,
+        'per_page': per_page,
+        'page': page,
+        'total': total,
+        'total_pages': total_pages,
+        'has_prev': has_prev,
+        'has_next': has_next,
+        'prev_page': prev_page,
+        'next_page': next_page,
+        'first_item': first_item,
+        'last_item': last_item,
+        'page_numbers': page_numbers,
+        'query_no_page': query_no_page,
+        'state_choices': state_choices,
+        'settlement_choices': settlement_choices,
+    })
+
 
 # -------------------------------
 # INCIDENT HEATMAP

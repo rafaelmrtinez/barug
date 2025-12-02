@@ -12,6 +12,12 @@
 
     {% include "messages.html" %}
 
+    {% if is_locked %}
+    <div class="alert alert-warning" role="alert">
+        This child health record is locked (age &gt; 4). Editing is disabled.
+    </div>
+    {% endif %}
+
     <div class="row">
         <!-- Sidebar -->
         <aside class="col-md-3 d-none d-md-block child-sidebar">
@@ -19,16 +25,23 @@
                 <div class="card">
                     <div class="card-body small">
                         <ul class="nav flex-column">
+                            {# Identification, Place of Delivery and Parent Info are visible to all roles #}
                             <li class="nav-item"><a class="nav-link" href="#identification">Identification</a></li>
                             <li class="nav-item"><a class="nav-link" href="#place-of-delivery">Place of Delivery</a></li>
                             <li class="nav-item"><a class="nav-link" href="#parent-info">Parent Info</a></li>
-                            <li class="nav-item"><a class="nav-link" href="#nbs">New Born Screening</a></li>
-                            <li class="nav-item"><a class="nav-link" href="#child-details">Child Details</a></li>
-                            <li class="nav-item"><a class="nav-link" href="#immunization">Immunization</a></li>
-                            <li class="nav-item"><a class="nav-link" href="#birth-and-supplementation">Birth and Supplementation</a></li>
-                            <li class="nav-item"><a class="nav-link" href="#iron-intake">Iron Intake</a></li>
-                            <li class="nav-item"><a class="nav-link" href="#vitamin-intake">Vitamin Intake</a></li>
-                            <li class="nav-item"><a class="nav-link" href="#visit-entry">Visit Entry</a></li>
+
+                            {# The following sections were previously hidden for `midwife` users; links are now always visible #}
+                                    <li class="nav-item"><a class="nav-link" href="#nbs">New Born Screening</a></li>
+                                    <li class="nav-item"><a class="nav-link" href="#child-details">Child Details</a></li>
+
+                            {# Immunization: visible to everyone; actions will be role-restricted instead of hiding the section #}
+                                <li class="nav-item"><a class="nav-link" href="#immunization">Immunization</a></li>
+
+                            {# The following links were previously role-gated; they are now visible to all roles #}
+                                <li class="nav-item"><a class="nav-link" href="#birth-and-supplementation">Birth and Supplementation</a></li>
+                                <li class="nav-item"><a class="nav-link" href="#iron-intake">Iron Intake</a></li>
+                                <li class="nav-item"><a class="nav-link" href="#vitamin-intake">Vitamin Intake</a></li>
+                                <li class="nav-item"><a class="nav-link" href="#visit-entry">Visit Entry</a></li>
                         </ul>
                     </div>
                 </div>
@@ -36,7 +49,7 @@
         </aside>
 
         <!-- Main -->
-        <main class="col-md-9">
+        <main class="col-md-9 {% if is_locked %}mhr-locked{% endif %}">
 
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <h1 class="mb-0">Child Health Record</h1>
@@ -152,15 +165,18 @@
                     </div>
                     <input type="hidden" name="nbs_form" value="nbs_form">
                     <div class="d-flex justify-content-end gap-2 mt-3">
+                        {% if request.session.auth.role_name != "midwife" and not is_locked %}
                         <button type="submit" class="btn btn-brand btn-sm flex-fill" style="max-width:150px;">
                             <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M2 8l3 3 8-8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             Save
                         </button>
+                        {% endif %}
                     </div>
                 </div>
             </form>
         </div>
     </div>
+    
 
     <!-- Breastfeeding Check -->
     <div class="card mb-3 card-brand">
@@ -190,14 +206,17 @@
                 </div>
                 {{ bf_form.form_type }}
                 <div class="d-flex justify-content-end gap-2 mt-3">
+                    {% if request.session.auth.role_name != "midwife" and not is_locked %}
                     <button type="submit" class="btn btn-brand btn-sm flex-fill" style="max-width:150px;">
                         <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M2 8l3 3 8-8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         Save
                     </button>
+                    {% endif %}
                 </div>
             </div>
         </form>
     </div>
+    
 
     <!-- Immunization (per-row forms) -->
     <div class="card mb-3 card-brand">
@@ -214,7 +233,9 @@
                         <th>1st</th>
                         <th>2nd</th>
                         <th>3rd</th>
+                        {% if request.session.auth.role_name == "midwife" and not is_locked %}
                         <th>Action</th>
+                        {% endif %}
                     </tr>
                 </thead>
 
@@ -228,9 +249,11 @@
                             <td>{{ immunizations.bcg_1st }}</td>
                             <td>{{ immunizations.bcg_2nd }}</td>
                             <td>{{ immunizations.bcg_3rd }}</td>
+                            {% if request.session.auth.role_name != "barangay health worker" and not is_locked %}
                             <td>
                                 <button type="submit" class="btn btn-brand btn-sm w-100"><svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M2 8l3 3 8-8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>Save</button>
                             </td>
+                            {% endif %}
                         </form>
                     </tr>
 
@@ -243,9 +266,11 @@
                             <td>{{ immunizations.hepbv_1st }}</td>
                             <td>{{ immunizations.hepbv_2nd }}</td>
                             <td>{{ immunizations.hepbv_3rd }}</td>
+                            {% if request.session.auth.role_name != "barangay health worker" and not is_locked %}
                             <td>
-                                <button type="submit" class="btn btn-brand btn-sm w-100"><svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M2 8l3 3 8-8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>Save</button>
+                            <button type="submit" class="btn btn-brand btn-sm w-100"><svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M2 8l3 3 8-8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>Save</button>
                             </td>
+                            {% endif %}
                         </form>
                     </tr>
 
@@ -258,9 +283,11 @@
                             <td>{{ immunizations.pcv_1st }}</td>
                             <td>{{ immunizations.pcv_2nd }}</td>
                             <td>{{ immunizations.pcv_3rd }}</td>
+                            {% if request.session.auth.role_name != "barangay health worker" and not is_locked %}
                             <td>
-                                <button type="submit" class="btn btn-brand btn-sm w-100"><svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M2 8l3 3 8-8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>Save</button>
+                            <button type="submit" class="btn btn-brand btn-sm w-100"><svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M2 8l3 3 8-8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>Save</button>
                             </td>
+                            {% endif %}
                         </form>
                     </tr>
 
@@ -273,9 +300,11 @@
                             <td>{{ immunizations.opv_1st }}</td>
                             <td>{{ immunizations.opv_2nd }}</td>
                             <td>{{ immunizations.opv_3rd }}</td>
+                            {% if request.session.auth.role_name != "barangay health worker" and not is_locked %}
                             <td>
-                                <button type="submit" class="btn btn-brand btn-sm w-100"><svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M2 8l3 3 8-8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>Save</button>
+                            <button type="submit" class="btn btn-brand btn-sm w-100"><svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M2 8l3 3 8-8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>Save</button>
                             </td>
+                            {% endif %}
                         </form>
                     </tr>
 
@@ -288,9 +317,11 @@
                             <td>{{ immunizations.amv_1st }}</td>
                             <td>{{ immunizations.amv_2nd }}</td>
                             <td>{{ immunizations.amv_3rd }}</td>
+                            {% if request.session.auth.role_name != "barangay health worker" and not is_locked %}
                             <td>
-                                <button type="submit" class="btn btn-brand btn-sm w-100"><svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M2 8l3 3 8-8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>Save</button>
+                            <button type="submit" class="btn btn-brand btn-sm w-100"><svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M2 8l3 3 8-8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>Save</button>
                             </td>
+                            {% endif %}
                         </form>
                     </tr>
 
@@ -303,15 +334,18 @@
                             <td>{{ immunizations.pentavalent_1st }}</td>
                             <td>{{ immunizations.pentavalent_2nd }}</td>
                             <td>{{ immunizations.pentavalent_3rd }}</td>
+                            {% if request.session.auth.role_name != "barangay health worker" and not is_locked %}
                             <td>
-                                <button type="submit" class="btn btn-brand btn-sm w-100"><svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M2 8l3 3 8-8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>Save</button>
+                            <button type="submit" class="btn btn-brand btn-sm w-100"><svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M2 8l3 3 8-8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>Save</button>
                             </td>
+                            {% endif %}
                         </form>
                     </tr>
                 </tbody>
             </table>
         </div>
     </div>
+    
 
 
     <!-- Birth & Supplementation (WITH header button) -->
@@ -338,17 +372,20 @@
                     {{ form.form_type }}
 
                     <div class="d-flex justify-content-end gap-2 mt-3">
+                        {% if request.session.auth.role_name != "midwife" and not is_locked %}
                         <button type="submit" class="btn btn-brand btn-sm flex-fill" style="max-width:150px;">
                             <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M2 8l3 3 8-8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             Save
                         </button>
+                        {% endif %}
                     </div>
                 </div>
             </form>
         </div>
     </div>
+    
 
-     <!-- Birth & Supplementation (WITH header button) -->
+     <!-- Iron Intake Form -->
     <div class="card mb-3 card-brand">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span>Iron Intake Form</span>
@@ -361,17 +398,20 @@
                     <div class="col-md-3">{{ iron_intake_form.date_iron_completed.label_tag }} {{ iron_intake_form.date_iron_completed }}</div>
                     <div class="d-flex justify-content-end gap-2 mt-3">
                         {{ iron_intake_form.form_type }}
+                        {% if request.session.auth.role_name != "midwife" and not is_locked %}
                         <button type="submit" class="btn btn-brand btn-sm flex-fill" style="max-width:150px;">
                             <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M2 8l3 3 8-8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             Save
                         </button>
+                        {% endif %}
                     </div>
                 </div>
             </form>
         </div>
     </div>
+    
 
-    <!-- Birth & Supplementation (WITH header button) -->
+    <!-- Vitamin -->
     <div class="card mb-3 card-brand">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span>Vitamin</span>
@@ -393,15 +433,18 @@
                     {{ vitamin_form.form_type }}
 
                     <div class="d-flex justify-content-end gap-2 mt-3">
+                        {% if request.session.auth.role_name != "midwife" and not is_locked %}
                         <button type="submit" class="btn btn-brand btn-sm flex-fill" style="max-width:150px;">
                             <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M2 8l3 3 8-8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             Save
                         </button>
+                        {% endif %}
                     </div>
                 </div>
             </form>
         </div>
     </div>
+    
 
     <!-- Add Visit Entry (WITH header button) -->
     <div class="card mb-3 card-brand">
@@ -418,6 +461,8 @@
                     <div class="col-md-2">
                         {{ visit_form.age.label_tag }}
                         {{ visit_form.age }}
+                        <div id="age-display" class="small text-muted mt-1"></div>
+                        <div id="age-error" class="small text-danger mt-1" aria-live="polite"></div>
                     </div>
 
                     <!-- Weight -->
@@ -440,16 +485,20 @@
                 </div>
 
                 <div class="row g-3 mt-2">
-                    <!-- Findings -->
-                    <div class="col-md-6">
-                        {{ visit_form.findings.label_tag }}
-                        {{ visit_form.findings }}
+                    <!-- Notes: expand to full-width row for easier typing -->
+                    <div class="col-12">
+                        <div class="mb-2">
+                            {{ visit_form.notes.label_tag }}
+                        </div>
+                        <div>
+                            {{ visit_form.notes }}
+                        </div>
                     </div>
-
-                    <!-- Notes -->
-                    <div class="col-md-6">
-                        {{ visit_form.notes.label_tag }}
-                        {{ visit_form.notes }}
+                    
+                    <!-- Findings (hidden) -->
+                    <div class="col-md-12">
+                        <div class="mb-2">{{ visit_form.findings.label_tag }}</div>
+                        <div>{{ visit_form.findings }}</div>
                     </div>
                 </div>
 
@@ -457,16 +506,19 @@
                 {{ visit_form.form_type }}
 
                 <!-- Submit button -->
+                {% if not is_locked %}
                 <div class="d-flex justify-content-end gap-2 mt-3">
                     <button type="submit" class="btn btn-brand btn-sm flex-fill" style="max-width:150px;">
                         <svg class="btn-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><path d="M2 8l3 3 8-8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         Save
                     </button>
                 </div>
+                {% endif %}
             </form>
         </div>
 
     </div>
+    
 
     <!-- Visits (WITH header button just to jump down) -->
     <div class="card mb-3 card-brand">
@@ -477,6 +529,7 @@
             <table class="table table-striped table-sm align-middle" id="visits-table">
                 <thead>
                     <tr>
+                        <th>ID</th>
                         <th>Date</th>
                         <th>Age</th>
                         <th>Wt</th>
@@ -489,13 +542,30 @@
                 <tbody>
                     {% for v in visit_log %}
                     <tr>
+                        <td>{{ v.child_monitoring_id|default_if_none:"—" }}</td>
                         <td>{{ v.check_date|date:"Y-m-d" }}</td>
                         <td>{{ v.age|default_if_none:"—" }}</td>
                         <td>{{ v.weight|default_if_none:"—"|floatformat:"-2" }}</td>
                         <td>{{ v.temperature|default_if_none:"—"|floatformat:"-1" }}</td>
                         <td>{{ v.height|default_if_none:"—"|floatformat:"-2" }}</td>
-                        <td>{{ v.findings|default_if_none:"" }}</td>
-                        <td>{{ v.notes|default_if_none:"" }}</td>
+                        <td>
+                            {% if v.findings %}
+                                <button type="button" class="btn btn-sm btn-outline-secondary visit-text-toggle" data-type="findings" data-findings="{{ v.findings|default_if_none:''|escapejs }}" data-id="{{ v.child_monitoring_id }}" title="View findings" aria-label="View findings for visit {{ v.child_monitoring_id }}">…</button>
+                            {% else %}
+                                &nbsp;
+                                {# Show edit button only to midwives and only when findings are empty for this row #}
+                                {% if request.session.auth.role_name == "midwife" and not is_locked %}
+                                    <button type="button" class="btn btn-sm btn-outline-primary ms-1 visit-edit-btn" data-id="{{ v.child_monitoring_id }}" data-findings="{{ v.findings|default_if_none:''|escapejs }}" title="Edit findings" aria-label="Edit findings for visit {{ v.child_monitoring_id }}">✎</button>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if v.notes %}
+                                <button type="button" class="btn btn-sm btn-outline-secondary visit-text-toggle" data-type="notes" data-notes="{{ v.notes|default_if_none:''|escapejs }}" data-id="{{ v.child_monitoring_id }}" title="View notes" aria-label="View notes for visit {{ v.child_monitoring_id }}">…</button>
+                            {% else %}
+                                &nbsp;
+                            {% endif %}
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
@@ -506,6 +576,7 @@
             </table>
         </div>
     </div>
+    
 
     </main>
     </div>
@@ -521,14 +592,79 @@
     </svg>
 </button>
 
+<!-- Modal used to display full Findings or Notes when the ellipsis is clicked -->
+<div class="modal fade" id="visitTextModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="visitTextModalLabel">Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="visitTextModalBody" style="white-space:pre-wrap;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal used by midwives to edit Findings for a specific visit -->
+<div class="modal fade" id="visitEditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="visitEditModalLabel">Edit Findings</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="visitEditModalTextarea" class="form-label">Findings</label>
+                    <textarea id="visitEditModalTextarea" class="form-control" rows="6" aria-label="Findings textarea"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="visitEditModalCancel" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                {% if not is_locked %}
+                <button type="button" id="visitEditModalSave" class="btn btn-primary">Save</button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>window.__USER_ROLE = "{{ request.session.auth.role_name|escapejs }}";</script>
+<script>window.__IS_LOCKED = {% if is_locked %}true{% else %}false{% endif %};</script>
+
 {% block script %}
 <script defer src="{% static 'child_health/js/chr-sidebar.js' %}"></script>
 <script defer src="{% static 'child_health/js/sectionActions.js' %}"></script>
 <script defer src="{% static 'child_health/js/weightCalculator.js' %}"></script>
-<script defer src="{% static 'child_health/js/immunizationRequest.js' %}"></script>
+<script defer src="{% static 'child_health/js/disable_fields_by_role.js' %}"></script>
+{% if request.session.auth.role_name != "barangay health worker" %}
+    <script defer src="{% static 'child_health/js/immunizationRequest.js' %}"></script>
+{% endif %}
 <script defer src="{% static 'child_health/js/back_to_top.js' %}"></script>
 <script defer src="{% static 'child_health/js/auto_disable_sections.js' %}"></script>
 <script defer src="{% static 'child_health/js/api_post_entries.js' %}"></script>
+<script defer src="{% static 'child_health/js/visit_text_modal.js' %}"></script>
+<script defer src="{% static 'child_health/js/visit_edit_modal.js' %}"></script>
+<script defer src="{% static 'child_health/js/age_display.js' %}"></script>
 <script src="{% static 'js/toast.js' %}"></script>
+{% if is_locked %}
+<script>
+// Disable form controls when record is locked (children older than 4)
+document.addEventListener('DOMContentLoaded', function () {
+    if (!window.__IS_LOCKED) return;
+    // disable inputs, selects, textareas and submit buttons
+    document.querySelectorAll('input, select, textarea, button').forEach(function (el) {
+        // don't disable navigation/back-to-top or non-interactive elements
+        try {
+            if (el.id && el.id.indexOf('back-to-top') !== -1) return;
+            // keep modal close buttons enabled (they have data-bs-dismiss)
+            if (el.getAttribute('data-bs-dismiss')) return;
+            // disable
+            el.setAttribute('disabled', 'disabled');
+        } catch (e) {}
+    });
+});
+</script>
+{% endif %}
 {% endblock %}
 {% endblock %}

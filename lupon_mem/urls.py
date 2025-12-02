@@ -6,6 +6,7 @@ from . import views_api
 from . import views_cases
 from . import views_progress  # ← ADDED: import for flow progress API
 from . import views_hearing_api
+from . import views_hearings
 from . import views_resident_records
 from .views_case_state import update_case_state
 
@@ -49,6 +50,7 @@ urlpatterns = [
     path("cases/hearings/", views.hearing_list, name="hearing_list"),  # global listing (kept)
     path("cases/<int:case_id>/hearings/", views.case_hearing_list, name="case_hearing_list"),  # NEW per-case list
     path("cases/<int:case_id>/hearing/", views.case_hearing_schedule, name="case_hearing_schedule"),
+    path("cases/<int:case_id>/hearing/<int:sid>/", views.case_hearing_schedule, name="case_hearing"),
         # KP-16 opener used when outcome is settled
     path(
         "cases/<int:case_id>/hearing/kp16/",
@@ -69,6 +71,12 @@ urlpatterns = [
     path('case/<int:case_id>/hearing/media/upload/',
          views.hearing_media_upload,
          name='hearing_media_upload'),
+    path('case/<int:case_id>/hearing/media/delete/',
+         views.hearing_media_delete,
+         name='hearing_media_delete'),
+    path('cases/<int:case_id>/hearing/reschedule/',
+         views_hearings.reschedule_hearing,
+         name='reschedule_hearing'),
 
     path("case/<int:case_id>/mediation/<int:submission_id>/photos/upload/",
          views.mediation_photos_upload, name="mediation_photos_upload"),
@@ -92,7 +100,8 @@ urlpatterns = [
     path("reports/<int:report_id>/confirm/",  views_reports.report_confirm, name="report_confirm"), # added to views_reports
     path("reports/<int:report_id>/review/",   views_reports.report_review,  name="report_review"), # added to views_reports
     path("reports/<int:report_id>/approve/",  views_reports.report_approve, name="report_approve"), # added to views_reports
-    path("reports/<int:report_id>/decline/",  views_reports.report_decline, name="report_decline"), # added to views_reports 
+    path("reports/<int:report_id>/decline/",  views_reports.report_decline, name="report_decline"), # added to views_reports
+    path("reports/<int:report_id>/update-respondents/", views_reports.report_update_respondents, name="report_update_respondents"), # added to views_reports 
     path("reports/<int:report_id>/pay-open/", views_reports.report_pay_and_open_case, name="report_pay_and_open_case"), # added to views_reports
     path("reports/<int:report_id>/payment-details/", views_reports.report_payment_details, name="report_payment_details"), # added to views_reports
     path("store-session-values/", views_reports.store_session_values, name="store_session_values"),

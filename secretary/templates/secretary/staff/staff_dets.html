@@ -6,6 +6,7 @@
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
 <link rel="stylesheet" href="{% static 'css/form.css' %}">
 <link rel="stylesheet" href="{% static 'css/submission_dets.css' %}">
+<link rel="stylesheet" href="{% static 'css/modal.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -68,9 +69,16 @@
         <div class="col-lg-6">
           <div class="card border-0 shadow-sm h-100" style="border-radius: 14px;">
             <div class="card-body p-3">
-              <div class="d-flex align-items-center mb-3">
-                {% bs_icon 'person-fill' color='var(--bs-danger-text-emphasis)' size='1.3em' %}
-                <h6 class="mb-0 ms-2 fw-bold text-dark">Personal Information</h6>
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="d-flex align-items-center">
+                  {% bs_icon 'person-fill' color='var(--bs-danger-text-emphasis)' size='1.3em' %}
+                  <h6 class="mb-0 ms-2 fw-bold text-dark">Personal Information</h6>
+                </div>
+                {% if profile.residential_status == 'Non Resident' %}
+                  <button type="button" class="btn btn-submit btn-sm px-3 py-1" data-bs-toggle="modal" data-bs-target="#updatePersonalInfoModal">
+                    {% bs_icon 'pencil-square' %} Update
+                  </button>
+                {% endif %}
               </div>
               
               <!-- Address Card -->
@@ -183,6 +191,16 @@
                   </div>
                 </div>
               </div>
+              
+              <!-- Residential Status Info -->
+              {% if profile.residential_status != 'Non Resident' %}
+                <div class="mt-3 p-2 rounded-3" style="background: #e3f2fd; border-left: 3px solid #2196f3;">
+                  <small class="text-muted fw-medium">
+                    {% bs_icon 'info-circle' extra_classes='me-1' %}
+                    Only BHW can update resident information
+                  </small>
+                </div>
+              {% endif %}
             </div>
           </div>
         </div>
@@ -339,4 +357,431 @@
     </div>
   </div>
 </div>
+
+<!-- Update Personal Info Modal -->
+{% if profile.residential_status == 'Non Resident' %}
+<div class="modal fade" id="updatePersonalInfoModal" tabindex="-1" aria-labelledby="updatePersonalInfoModalLabel" aria-hidden="true" style="z-index: 9999;">
+  <div class="modal-dialog modal-xl" style="max-width: 1200px; margin: 1.75rem auto; position: relative; top: 50%; transform: translateY(-50%);">
+    <div class="modal-content border-0 shadow-lg px-4" style="border-radius: 16px;">
+      <div class="modal-header border-0">
+        <h5 class="modal-title" id="updatePersonalInfoModalLabel">Update Personal Information</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_personal_info">
+        <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+          <div class="row g-3">
+            <!-- Basic Information -->
+            <div class="col-12"><h6 class="text-muted mb-0">Basic Information</h6></div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="first_name" name="first_name" value="{{ profile.first_name|default:'' }}" required>
+                <label for="first_name">First Name *</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="middle_name" name="middle_name" value="{{ profile.middle_name|default:'' }}">
+                <label for="middle_name">Middle Name</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="last_name" name="last_name" value="{{ profile.last_name|default:'' }}" required>
+                <label for="last_name">Last Name *</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="suffix" name="suffix" value="{{ profile.suffix|default:'' }}">
+                <label for="suffix">Suffix</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="date" class="form-control" id="birthdate" name="birthdate" value="{{ profile.date_of_birth|date:'Y-m-d'|default:'' }}" required>
+                <label for="birthdate">Birth Date</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="sex" name="sex_id" required>
+                  <option value="">Select Sex</option>
+                  <option value="1" {% if profile.sex == 'Male' %}selected{% endif %}>Male</option>
+                  <option value="2" {% if profile.sex == 'Female' %}selected{% endif %}>Female</option>
+                </select>
+                <label for="sex">Sex*</label>
+              </div>
+            </div>
+            
+            <!-- Personal Details -->
+            <div class="col-12"><h6 class="text-muted mb-0 mt-3">Personal Details</h6></div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="civil_status" name="civil_status_id" required>
+                  <option value="">Select Civil Status</option>
+                  <option value="1" {% if profile.civil_status == 'Single' %}selected{% endif %}>Single</option>
+                  <option value="2" {% if profile.civil_status == 'Married' %}selected{% endif %}>Married</option>
+                  <option value="3" {% if profile.civil_status == 'Widowed' %}selected{% endif %}>Widowed</option>
+                  <option value="4" {% if profile.civil_status == 'Separated' %}selected{% endif %}>Separated</option>
+                  <option value="5" {% if profile.civil_status == 'Divorced' %}selected{% endif %}>Divorced</option>
+                </select>
+                <label for="civil_status">Civil Status*</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="nationality" name="nationality_id" required>
+                  <option value="">Select Nationality</option>
+                  <option value="7" {% if profile.nationality == 'Filipino' %}selected{% endif %}>Filipino</option>
+                  <option value="1" {% if profile.nationality == 'American' %}selected{% endif %}>American</option>
+                  <option value="2" {% if profile.nationality == 'Australian' %}selected{% endif %}>Australian</option>
+                  <option value="3" {% if profile.nationality == 'Brazilian' %}selected{% endif %}>Brazilian</option>
+                  <option value="4" {% if profile.nationality == 'British' %}selected{% endif %}>British</option>
+                  <option value="5" {% if profile.nationality == 'Canadian' %}selected{% endif %}>Canadian</option>
+                  <option value="6" {% if profile.nationality == 'Chinese' %}selected{% endif %}>Chinese</option>
+                  <option value="8" {% if profile.nationality == 'French' %}selected{% endif %}>French</option>
+                  <option value="9" {% if profile.nationality == 'German' %}selected{% endif %}>German</option>
+                  <option value="10" {% if profile.nationality == 'Indian' %}selected{% endif %}>Indian</option>
+                  <option value="11" {% if profile.nationality == 'Indonesian' %}selected{% endif %}>Indonesian</option>
+                  <option value="12" {% if profile.nationality == 'Italian' %}selected{% endif %}>Italian</option>
+                  <option value="13" {% if profile.nationality == 'Japanese' %}selected{% endif %}>Japanese</option>
+                  <option value="14" {% if profile.nationality == 'Korean' %}selected{% endif %}>Korean</option>
+                  <option value="15" {% if profile.nationality == 'Malaysian' %}selected{% endif %}>Malaysian</option>
+                  <option value="16" {% if profile.nationality == 'Russian' %}selected{% endif %}>Russian</option>
+                  <option value="17" {% if profile.nationality == 'Saudi' %}selected{% endif %}>Saudi</option>
+                  <option value="18" {% if profile.nationality == 'Spanish' %}selected{% endif %}>Spanish</option>
+                  <option value="19" {% if profile.nationality == 'Thai' %}selected{% endif %}>Thai</option>
+                  <option value="20" {% if profile.nationality == 'Vietnamese' %}selected{% endif %}>Vietnamese</option>
+                  <option value="21" {% if profile.nationality == 'Others' %}selected{% endif %}>Others</option>
+                </select>
+                <label for="nationality">Nationality*</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="religion" name="religion_id" required>
+                  <option value="">Select Religion</option>
+                  <option value="12" {% if profile.religion == 'Roman Catholic' %}selected{% endif %}>Roman Catholic</option>
+                  <option value="1" {% if profile.religion == 'Agnostic' %}selected{% endif %}>Agnostic</option>
+                  <option value="2" {% if profile.religion == 'Born Again' %}selected{% endif %}>Born Again</option>
+                  <option value="3" {% if profile.religion == 'Buddhist' %}selected{% endif %}>Buddhist</option>
+                  <option value="4" {% if profile.religion == 'Christian' %}selected{% endif %}>Christian</option>
+                  <option value="5" {% if profile.religion == 'Evangelical' %}selected{% endif %}>Evangelical</option>
+                  <option value="6" {% if profile.religion == 'Hindu' %}selected{% endif %}>Hindu</option>
+                  <option value="7" {% if profile.religion == 'Iglesia Ni Cristo' %}selected{% endif %}>Iglesia Ni Cristo</option>
+                  <option value="8" {% if profile.religion == 'Islam' %}selected{% endif %}>Islam</option>
+                  <option value="9" {% if profile.religion == 'Jehovah\'s Witness' %}selected{% endif %}>Jehovah's Witness</option>
+                  <option value="10" {% if profile.religion == 'Orthodox' %}selected{% endif %}>Orthodox</option>
+                  <option value="11" {% if profile.religion == 'Protestant' %}selected{% endif %}>Protestant</option>
+                  <option value="13" {% if profile.religion == 'Seventh-Day Adventist' %}selected{% endif %}>Seventh-Day Adventist</option>
+                  <option value="14" {% if profile.religion == 'Others' %}selected{% endif %}>Others</option>
+                </select>
+                <label for="religion">Religion*</label>
+              </div>
+            </div>
+            
+            <!-- Contact Information -->
+            <div class="col-12"><h6 class="text-muted mb-0 mt-3">Contact Information</h6></div>
+            <div class="col-md-6">
+              <div class="form-floating">
+                <input type="tel" class="form-control" id="mobile_number" name="mobile_number" value="{{ profile.mobile_number|default:'' }}" required>
+                <label for="mobile_number">Mobile Number*</label>
+              </div>
+            </div>
+            
+            <!-- Address Information -->
+            <div class="col-12"><h6 class="text-muted mb-0 mt-3">Address Information</h6></div>
+            <div class="col-md-6">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="street" name="street" value="{% if profile.home_street %}{{ profile.home_street|title }}{% endif %}" required>
+                <label for="street">Street*</label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="sitio_purok" name="sitio_purok" value="{% if profile.home_purok %}{{ profile.home_purok|title }}{% endif %}" required>
+                <label for="sitio_purok">Sitio/Purok*</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="barangay" name="barangay" value="{% if profile.home_barangay %}{{ profile.home_barangay|title }}{% endif %}" required>
+                <label for="barangay">Barangay*</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="city" name="city" value="{% if profile.home_city %}{{ profile.home_city|title }}{% endif %}" required>
+                <label for="city">City*</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="province" name="province" value="{% if profile.home_province %}{{ profile.home_province|title }}{% endif %}" required>
+                <label for="province">Province*</label>
+              </div>
+            </div>
+            
+            <!-- Socioeconomic Information -->
+            <!-- <div class="col-12"><h6 class="text-muted mb-0 mt-3">Socioeconomic Information</h6></div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <input type="text" class="form-control" id="occupation" name="occupation" value="{{ profile.occupation|default:'' }}">
+                <label for="occupation">Occupation</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="monthly_income" name="monthly_income_id">
+                  <option value="">Select Monthly Income</option>
+                  <option value="1">Below ₱5,000</option>
+                  <option value="2">₱5,001 - ₱10,000</option>
+                  <option value="3">₱10,001 - ₱15,000</option>
+                  <option value="4">₱15,001 - ₱20,000</option>
+                  <option value="5">₱20,001 - ₱30,000</option>
+                  <option value="6">₱30,001 - ₱50,000</option>
+                  <option value="7">₱50,001 - ₱75,000</option>
+                  <option value="8">₱75,001 - ₱100,000</option>
+                  <option value="9">Above ₱100,000</option>
+                </select>
+                <label for="monthly_income">Monthly Income</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="education" name="education_id">
+                  <option value="">Select Education Level</option>
+                  <option value="1">No Formal Education</option>
+                  <option value="2">Kinder</option>
+                  <option value="3">Elementary Student</option>
+                  <option value="4">Elementary Undergrad</option>
+                  <option value="5">Elementary Graduate</option>
+                  <option value="6">High School Student</option>
+                  <option value="7">High School Undergrad</option>
+                  <option value="8">High School Graduate</option>
+                  <option value="9">Vocational Course</option>
+                  <option value="10">College Student</option>
+                  <option value="11">College Undergrad</option>
+                  <option value="12">College Graduate</option>
+                  <option value="13">Postgraduate</option>
+                </select>
+                <label for="education">Education Level</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-floating">
+                <select class="form-select" id="employment_status" name="employment_status_id">
+                  <option value="">Select Employment Status</option>
+                  <option value="1">Employed</option>
+                  <option value="2">Unemployed</option>
+                  <option value="3">OFW</option>
+                  <option value="4">Student</option>
+                  <option value="5">Retired</option>
+                  <option value="6">Self-Employed</option>
+                  <option value="7">Pensioner</option>
+                  <option value="8">Housewife</option>
+                  <option value="9">Freelancer</option>
+                  <option value="10">Looking For Work</option>
+                  <option value="11">Part-Time</option>
+                  <option value="12">Full-Time</option>
+                  <option value="13">Underemployed</option>
+                  <option value="14">Others</option>
+                </select>
+                <label for="employment_status">Employment Status</label>
+              </div>
+            </div>
+            
+            <!-- Government Programs -->
+            <!-- <div class="col-12"><h6 class="text-muted mb-0 mt-3">Government Programs</h6></div>
+            <div class="col-12">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_4ps" name="government_programs[]" value="1">
+                <label class="form-check-label" for="prog_4ps">4PS</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_gsis" name="government_programs[]" value="2">
+                <label class="form-check-label" for="prog_gsis">GSIS</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_philhealth" name="government_programs[]" value="3">
+                <label class="form-check-label" for="prog_philhealth">PHILHEALTH</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_pwd" name="government_programs[]" value="4">
+                <label class="form-check-label" for="prog_pwd">PWD</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_senior" name="government_programs[]" value="5">
+                <label class="form-check-label" for="prog_senior">SENIOR CITIZEN</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_sss" name="government_programs[]" value="6">
+                <label class="form-check-label" for="prog_sss">SSS</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_none" name="government_programs[]" value="7">
+                <label class="form-check-label" for="prog_none">NONE</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="prog_others" name="government_programs[]" value="8">
+                <label class="form-check-label" for="prog_others">OTHERS</label>
+              </div>
+            </div> -->
+            <div class="col-md-6">
+              <div class="form-floating">
+                <select class="form-select" id="reason" name="reason" required>
+                  <option value="">Select Reason</option>
+                  <option value="update_profile">Update Personal Information</option>
+                  <option value="correction">Data Correction</option>
+                  <option value="change_status">Status Change</option>
+                  <option value="other">Other</option>
+                </select>
+                <label for="reason">Reason for Update*</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-reset" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-submit" id="savePersonalInfoBtn">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+// Personal Information Update Validation
+(function() {
+  const personalInfoForm = document.querySelector('#updatePersonalInfoModal form');
+  const saveBtn = document.getElementById('savePersonalInfoBtn');
+  let originalFormData = {};
+  
+  if (personalInfoForm) {
+    // Store original form data when modal opens
+    document.getElementById('updatePersonalInfoModal').addEventListener('show.bs.modal', function() {
+      const formData = new FormData(personalInfoForm);
+      originalFormData = {};
+      for (let [key, value] of formData.entries()) {
+        originalFormData[key] = value;
+      }
+    });
+    
+    // Validate form on submission
+    personalInfoForm.addEventListener('submit', function(e) {
+      const reason = document.getElementById('reason').value.trim();
+      
+      // Check if reason is provided
+      if (!reason) {
+        e.preventDefault();
+        showValidationError('Please provide a reason for updating personal information.');
+        return false;
+      }
+      
+      // Check if any data has changed
+      const currentFormData = new FormData(personalInfoForm);
+      let hasChanges = false;
+      
+      // Compare current data with original data
+      for (let [key, value] of currentFormData.entries()) {
+        if (key !== 'csrfmiddlewaretoken' && key !== 'action' && key !== 'reason') {
+          if (originalFormData[key] !== value) {
+            hasChanges = true;
+            break;
+          }
+        }
+      }
+      
+      // Also check for removed fields
+      if (!hasChanges) {
+        for (let key in originalFormData) {
+          if (key !== 'csrfmiddlewaretoken' && key !== 'action' && key !== 'reason') {
+            if (!currentFormData.has(key) || currentFormData.get(key) !== originalFormData[key]) {
+              hasChanges = true;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (!hasChanges) {
+        e.preventDefault();
+        showValidationError('No changes were made to the personal information.');
+        return false;
+      }
+      
+      // Show confirmation modal
+      e.preventDefault();
+      showConfirmationModal('Are you sure you want to save these changes to the personal information?', function() {
+        personalInfoForm.submit();
+      });
+    });
+  }
+  
+  // Show validation error modal
+  function showValidationError(message) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.style.zIndex = '10000';
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+          <div class="modal-body text-center p-4">
+            <div class="mb-3">
+              <div class="d-inline-flex align-items-center justify-content-center" style="width: 64px; height: 64px; background: linear-gradient(135deg, #ffc107, #ffb300); border-radius: 50%;">
+                <i class="bi bi-exclamation-triangle-fill text-white" style="font-size: 28px;"></i>
+              </div>
+            </div>
+            <h5 class="fw-semibold mb-2" style="color: #2d3748;">Warning</h5>
+            <p class="text-muted mb-4">${message}</p>
+            <button type="button" class="btn btn-submit px-4 py-2" data-bs-dismiss="modal">Got it</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    modal.addEventListener('hidden.bs.modal', () => modal.remove());
+  }
+  
+  // Show confirmation modal
+  function showConfirmationModal(message, onConfirm) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.style.zIndex = '10000';
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+          <div class="modal-body text-center p-4">
+            <div class="mb-3">
+              <div class="d-inline-flex align-items-center justify-content-center" style="width: 64px; height: 64px; background: linear-gradient(135deg, #007bff, #0056b3); border-radius: 50%;">
+                <i class="bi bi-question-circle-fill text-white" style="font-size: 28px;"></i>
+              </div>
+            </div>
+            <h5 class="fw-semibold mb-2" style="color: #2d3748;">Confirm Changes</h5>
+            <p class="text-muted mb-4">${message}</p>
+            <div class="d-flex gap-2 justify-content-center">
+              <button type="button" class="btn btn-reset px-3 py-2" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-submit px-4 py-2" id="confirmBtn">Yes, Save Changes</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    modal.querySelector('#confirmBtn').onclick = function() {
+      bsModal.hide();
+      onConfirm();
+    };
+    bsModal.show();
+    modal.addEventListener('hidden.bs.modal', () => modal.remove());
+  }
+})();
+</script>
+{% endif %}
+
 {% endblock %}

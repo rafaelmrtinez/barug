@@ -333,7 +333,7 @@ from lupon_mem.services.fields_util import get_latest_form_fields, get_field_tex
 from datetime import datetime, timedelta
 
 @session_login_required 
-@role_required(*LUPON_ROLES, "barangay treasurer")
+@role_required(*LUPON_ROLES, "barangay treasurer", "barangay secretary")
 def case_detail(request: HttpRequest, case_id: int):
     flow_steps = ['KP-7', 'KP-8', 'KP-9', 'KP-10', 'KP-11', 'KP-12', 'KP-16']
     hearing_window = get_hearing_window(case_id)
@@ -455,6 +455,29 @@ def case_detail(request: HttpRequest, case_id: int):
             ORDER BY s.submission_id DESC
         """, [case_id])
         all_form_codes = [row[0] for row in cur.fetchall()]
+        
+        # Get Pangkat members from KP-11 forms
+        pangkat_members = []
+        if 'KP-10' in all_form_codes:
+            cur.execute("""
+                SELECT a.value_json
+                FROM blotter_kp_submission s
+                JOIN kp_form kf ON kf.form_id = s.form_id
+                JOIN blotter_kp_answer a ON a.submission_id = s.submission_id
+                JOIN kp_field f ON f.field_id = a.field_id
+                WHERE s.blotter_case_id = %s
+                  AND UPPER(kf.form_code) = 'KP-11'
+                  AND LOWER(f.field_code) = 'pangkat_member_name'
+                  AND UPPER(s.status) = 'SUBMITTED'
+            """, [case_id])
+            import json
+            for row in cur.fetchall():
+                try:
+                    name = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+                    if name:
+                        pangkat_members.append(name)
+                except:
+                    pass
 
     submitted_forms = submitted_form_codes
     completed_count = sum(1 for step in flow_steps if step in submitted_forms)
@@ -516,6 +539,7 @@ def case_detail(request: HttpRequest, case_id: int):
         "page_numbers": page_numbers,
         "all_form_codes": all_form_codes,
         "repudiation_window": repudiation_window,
+        "pangkat_members": pangkat_members,
     }
 
     return render(request, "lupon_mem/case_detail.html", context)
