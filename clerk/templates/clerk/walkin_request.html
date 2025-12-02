@@ -714,8 +714,61 @@
     const modal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
     modal.hide();
     startBtnLoading();
-    form.submit();
+    
+    // Use fetch to submit form and handle errors
+    const formData = new FormData(form);
+    fetch(form.action, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+    .then(response => {
+      if (!response.ok) {
+        return response.text().then(text => {
+          throw new Error(text || 'Request failed');
+        });
+      }
+      // Check if response is a redirect
+      if (response.redirected) {
+        window.location.href = response.url;
+        return;
+      }
+      return response.text();
+    })
+    .then(data => {
+      if (data && typeof data === 'string' && data.includes('error')) {
+        stopBtnLoading();
+        setAlert('Request failed. Please try again.');
+        scrollToTop();
+      } else if (!window.location.href.includes('/detail/')) {
+        // If not redirected yet, do it manually
+        form.submit();
+      }
+    })
+    .catch(error => {
+      console.error('[WALKIN] Submit error:', error);
+      stopBtnLoading();
+      
+      let errorMsg = 'Unknown error';
+      if (error.message) {
+        errorMsg = error.message;
+        const match = errorMsg.match(/['"]message['"]\s*:\s*['"]([^'"]+)['"]/i);
+        if (match && match[1]) {
+          errorMsg = match[1];
+        }
+      }
+      
+      setAlert(errorMsg);
+      scrollToTop();
+    });
   });
+  
+  // Helper to scroll to top
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // init
   updateDocDependentToggles();
@@ -729,6 +782,13 @@
     
     clearAlert();
     const errors = [];
+    
+    // Scroll to top to show alert if there are errors
+    const scrollToAlert = () => {
+      if (errors.length > 0) {
+        formAlert.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
 
     if (!personHidden.value){ errors.push('Please select a resident (requester).'); }
     if (!docSel.value){ errors.push('Please choose a document type.'); docSel.classList.add('is-invalid'); }
@@ -760,7 +820,7 @@
     if (errors.length){
       console.log('[WALKIN] Validation errors:', errors);
       setAlert(errors.join(' '));
-      form.scrollIntoView({ behavior:'smooth', block:'start' });
+      scrollToAlert();
       return;
     }
 

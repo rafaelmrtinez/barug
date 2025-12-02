@@ -2104,6 +2104,35 @@ def incident_heatmap(request: HttpRequest):
         cur.execute(sql_streets)
         street_stats = cur.fetchall()
 
+        if not street_stats:
+            # fallback to simple query like secretary's
+            cur.execute("""
+                SELECT 
+                    COALESCE(a.street, 'Unknown Street') as street_name,
+                    COALESCE(a.barangay, 'Unknown Barangay') as barangay_name,
+                    COUNT(*) as incident_count,
+                    COUNT(CASE WHEN ss.settlement_status_id IN (2, 15, 16) OR UPPER(ss.settlement_status_name) IN ('SETTLED', 'SETTLED THROUGH MEDIATION', 'SETTLED THROUGH CONCILIATION') THEN 1 END) as settled_count,
+                    COUNT(CASE WHEN bc.date_filed >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as recent_count,
+                    MAX(bc.date_filed) as last_incident_date
+                FROM blotter_case bc
+                LEFT JOIN addresss a ON a.address_id = (
+                    SELECT br.incident_address_id 
+                    FROM blotter_report br 
+                    WHERE br.blotter_report_id = bc.blotter_report_id
+                    LIMIT 1
+                )
+                LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+                WHERE a.latitude IS NOT NULL 
+                AND a.longitude IS NOT NULL
+                AND bc.date_filed >= CURRENT_DATE - INTERVAL '1 year'
+                GROUP BY a.street, a.barangay
+                HAVING COUNT(*) >= 1
+                ORDER BY incident_count DESC, recent_count DESC
+                LIMIT 25
+            """)
+            street_stats = cur.fetchall()
+
+
         # ---------- 4) Case type options ----------
         cur.execute("""
             SELECT DISTINCT ct.complaint_title_name

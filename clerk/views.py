@@ -77,8 +77,49 @@ from .services.id_verification_service import (
     fetch_id_verification_requests,
     get_verification_status_for_person,
 )
+from notifications.service import notify_user, PERSON
 
 from treasurer.services.requests_service import build_auth_links
+
+def _notify_request_status_change(doc_request_id: int, new_status: str, message: str):
+    print(f"\n{'='*80}")
+    print(f"[NOTIFICATION] Starting notification for doc_request_id={doc_request_id}")
+    print(f"[NOTIFICATION] Status: {new_status}")
+    print(f"[NOTIFICATION] Message: {message}")
+    try:
+        bundle = _fetch_bundle(doc_request_id)
+        header = (bundle or {}).get("header", {}) or {}
+        request_code = header.get("request_code", "")
+        
+        # Use same logic as _resolve_person_id_from_header
+        person_id = _resolve_person_id_from_header(header)
+        print(f"[NOTIFICATION] Bundle fetched - person_id={person_id}, request_code={request_code}")
+        print(f"[NOTIFICATION] Header keys: {list(header.keys())}")
+        
+        if person_id:
+            print(f"[NOTIFICATION] Calling notify_user with:")
+            print(f"  - user_type_id: {PERSON}")
+            print(f"  - person_id: {person_id}")
+            print(f"  - title: Document Request {new_status}")
+            print(f"  - body: Your request {request_code}: {message}")
+            print(f"  - deep_link: /resident/document-requests/{doc_request_id}")
+            
+            notify_user(
+                user_type_id=PERSON,
+                person_id=person_id,
+                staff_id=None,
+                title=f"Document Request {new_status}",
+                body=f"Your request {request_code}: {message}",
+                deep_link=f"/(residentmodals)/docreqdetail?id={doc_request_id}"
+            )
+            print(f"[NOTIFICATION] ✓ Notification sent successfully!")
+        else:
+            print(f"[NOTIFICATION] ✗ No person_id found in header")
+    except Exception as e:
+        print(f"[NOTIFICATION ERROR] ✗ Failed to send notification: {e}")
+        import traceback
+        traceback.print_exc()
+    print(f"{'='*80}\n")
 
 
 def titleize(s):
@@ -725,6 +766,7 @@ def mark_request_ready_for_pickup(request: HttpRequest, doc_request_id: int):
 
     print("[EMAIL DEBUG] RPC ok. Now sending email …")
     messages.success(request, "Marked as ready for pickup.")
+    _notify_request_status_change(doc_request_id, "Ready for Pickup", "Your documents are ready for pickup at the barangay office.")
 
     ok, info = _send_ready_for_pickup_email(header, lines)
     print(f"[EMAIL DEBUG] _send_ready_for_pickup_email -> ok={ok}, info={info!r}")
@@ -1057,6 +1099,7 @@ def mark_released(request: HttpRequest, doc_request_id: int):
         messages.error(request, f"Failed: {escape(res.error.message)}")
     else:
         messages.success(request, "Marked as released.")
+        _notify_request_status_change(doc_request_id, "Released", "Your documents have been released.")
     return redirect("clerk:detail", doc_request_id=doc_request_id)
 
 
@@ -1123,6 +1166,7 @@ def decline(request: HttpRequest, doc_request_id: int):
             messages.error(request, f"Failed: {escape(err)}")
         else:
             messages.success(request, "Request declined.")
+            _notify_request_status_change(doc_request_id, "Declined", f"Your request has been declined. Reason: {reason or 'Not specified'}")
         return redirect("clerk:detail", doc_request_id=doc_request_id)
 
     # Path B: PAID → decline + open refund ticket (amount NULL lets SQL compute)
@@ -1147,6 +1191,7 @@ def decline(request: HttpRequest, doc_request_id: int):
         if refund_id:
             msg = f"Request declined. Refund ticket #{refund_id} created and sent for Treasurer processing."
         messages.success(request, msg)
+        _notify_request_status_change(doc_request_id, "Declined with Refund", f"Your request has been declined. A refund will be processed. Reason: {reason or 'Not specified'}")
     return redirect("clerk:detail", doc_request_id=doc_request_id)
 
 # ────────────────────────────────────────────────────────────
@@ -1761,10 +1806,14 @@ def walkin_create(request: HttpRequest):
 
     if not requested_by:
         messages.error(request, "Please select a resident first (Requester).")
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'error': 'Please select a resident first (Requester).'}, status=400)
         return redirect("clerk:walkin_new")
 
     if not req_doc_type_id or not dp_ids:
         messages.error(request, "Please choose a document and a purpose.")
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'error': 'Please choose a document and a purpose.'}, status=400)
         return redirect(f"{request.path.replace('/create/','/')}?request_document_type_id={req_doc_type_id or ''}")
 
     # Map document_purpose_id -> meta (for purpose_code & defaults)
@@ -1823,6 +1872,8 @@ def walkin_create(request: HttpRequest):
     if doc_type_name.strip().upper() in {BRGY_BUSINESS_DOC_NAME, "CERTIFIED TRUE COPY"}:
         if not business_id:
             messages.error(request, "Business is required for Barangay Business Clearance.")
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'error': 'Business is required for Barangay Business Clearance.'}, status=400)
             return redirect(f"{request.path.replace('/create/','/')}?request_document_type_id={req_doc_type_id or ''}")
         # Merge business/applicant fields into each line.details and tag the template override
         bc_details = _fetch_business_clearance_fields(business_id, subject_id or requested_by)
@@ -1849,6 +1900,8 @@ def walkin_create(request: HttpRequest):
         except Exception as e:
             print(f"[WALKIN DEBUG] Auth letter upload failed: {e}")
             messages.error(request, "Failed to upload authorization letter.")
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'error': 'Failed to upload authorization letter.'}, status=400)
             return redirect("clerk:walkin_new")
 
     # Add auth letter path to line details if uploaded
@@ -1873,6 +1926,8 @@ def walkin_create(request: HttpRequest):
     staff_id = (request.session.get("auth") or {}).get("staff_id") or _staff_id(request)
     if not staff_id:
         messages.error(request, "Missing staff context. Please login again.")
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'error': 'Missing staff context. Please login again.'}, status=400)
         return redirect("clerk:walkin_new")
 
     walkin_args = {
@@ -1903,11 +1958,22 @@ def walkin_create(request: HttpRequest):
         print("[WALKIN DEBUG] RPC result .error:", getattr(res, "error", None))
     except Exception as e:
         print("[WALKIN DEBUG] RPC raised:", e)
-        messages.error(request, f"RPC failed: {e}")
+        error_str = str(e)
+        if "'message':" in error_str:
+            import re
+            match = re.search(r"'message':\s*'([^']+)'", error_str)
+            if match:
+                error_str = match.group(1)
+        messages.error(request, error_str)
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'error': error_str}, status=500)
         return redirect("clerk:walkin_new")
 
     if getattr(res, "error", None):
-        messages.error(request, f"Supabase error: {escape(res.error.message)}")
+        error_msg = f"Supabase error: {escape(res.error.message)}"
+        messages.error(request, error_msg)
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'error': error_msg}, status=500)
         return redirect("clerk:walkin_new")
 
     # Function RETURNS int, but be defensive about shapes
@@ -1923,6 +1989,8 @@ def walkin_create(request: HttpRequest):
 
     if not new_id:
         messages.error(request, "Could not obtain new request ID from RPC.")
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'error': 'Could not obtain new request ID from RPC.'}, status=500)
         return redirect("clerk:walkin_new")
 
     # Attach authorization letter if uploaded (stores in request_document table)
@@ -1986,6 +2054,7 @@ def confirm_request(request: HttpRequest, doc_request_id: int):
         messages.error(request, f"Failed to move to FOR PRINTING: {err}")
     else:
         messages.success(request, "Confirmed. Status is now FOR PRINTING.")
+        _notify_request_status_change(doc_request_id, "For Printing", "Your request has been confirmed and is now being prepared for printing.")
     return redirect("clerk:detail", doc_request_id=doc_request_id)
 
 # ────────────────────────────────────────────────────────────
@@ -2007,6 +2076,7 @@ def confirm_forward_treasurer(request: HttpRequest, doc_request_id: int):
         messages.error(request, f"Failed to forward to Treasurer: {err}")
     else:
         messages.success(request, "Confirmed. Sent to Treasurer for payment review.")
+        _notify_request_status_change(doc_request_id, "For Treasurer Review", "Your request has been forwarded to the Treasurer for payment review.")
     return redirect("clerk:detail", doc_request_id=doc_request_id)
 
 # =========================
