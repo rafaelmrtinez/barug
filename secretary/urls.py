@@ -63,9 +63,29 @@ urlpatterns = [
     path("announcement/create_draft/", views.announcement_draft, name="announcement_draft"),
     path("announcement/draft_list/", views.announcement_draft_list, name="announcement_draft_list"),
     path("announcement/draft_view/<int:announcement_id>/", views.announcement_draft_view, name="announcement_draft_view"),
+    path("announcement/view/<int:announcement_id>/", views.announcement_view, name="announcement_view"),
+    path("announcement/draft_edit/<int:announcement_id>/", views.announcement_draft_edit, name="announcement_draft_edit"),
     path("announcement/audience_scope/", views.announcement_audience_scope, name="announcement_audience_scope"),
     path("ajax/save_audience_rules/", views.save_audience_rules, name="save_audience_rules"),
     path("ajax/announcement_draft_search/", views.ajax_announcement_draft_search, name="ajax_announcement_draft_search"),
+    path("ajax/delete_announcement_draft/", views.ajax_delete_announcement_draft, name="ajax_delete_announcement_draft"),
+    
+    # SCHEDULED ANNOUNCEMENTS
+    path("announcement/scheduled_list/", views.announcement_scheduled_list, name="announcement_scheduled_list"),
+    path("ajax/announcement_scheduled_search/", views.ajax_announcement_scheduled_search, name="ajax_announcement_scheduled_search"),
+    path("ajax/cancel_scheduled_announcement/", views.ajax_cancel_scheduled_announcement, name="ajax_cancel_scheduled_announcement"),
+    
+    # PUBLISHED ANNOUNCEMENTS
+    path("announcement/published_list/", views.announcement_published_list, name="announcement_published_list"),
+    path("ajax/announcement_published_search/", views.ajax_announcement_published_search, name="ajax_announcement_published_search"),
+    
+    # EXPIRED ANNOUNCEMENTS
+    path("announcement/expired_list/", views.announcement_expired_list, name="announcement_expired_list"),
+    path("ajax/announcement_expired_search/", views.ajax_announcement_expired_search, name="ajax_announcement_expired_search"),
+    
+    # CANCELLED ANNOUNCEMENTS
+    path("announcement/cancelled_list/", views.announcement_cancelled_list, name="announcement_cancelled_list"),
+    path("ajax/announcement_cancelled_search/", views.ajax_announcement_cancelled_search, name="ajax_announcement_cancelled_search"),
     
     # CHANNEL MANAGEMENT
     path("ajax/upsert_announcement_channels/", views.upsert_announcement_channels, name="upsert_announcement_channels"),

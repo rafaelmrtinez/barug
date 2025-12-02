@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block css %}
+<style>
+  :root{
+    --brand-900:#3a1217; --brand-700:#6d2932; --accent:#d4af37; --line:#e5e7eb;
+    --bg:#fbf6f6; --card:#fff; --ink:#0f172a; --muted:#667085;
+  }
+  body{ background:var(--bg); }
+  .card-soft{ background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:0 8px 22px rgba(16,24,40,.06); }
+  .hero{ background:linear-gradient(135deg,var(--brand-900),var(--brand-700)); color:#fff; border-radius:14px; padding:16px 18px; margin-bottom:18px; }
+  .btn-brand{ background:var(--brand-700); color:#fff; border:0; }
+  .btn-brand:hover{ filter:brightness(1.05); }
+  .btn-outline-brand{ border:1px solid var(--brand-700); color:var(--brand-700); background:#fff; }
+  .form-help{ font-size:.85rem; color:var(--muted); }
+  .req{ color:#b91c1c; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container my-4 pt-3" style="margin-top: 40px;">
+
+  <div class="hero">
+    <h1 class="h4 mb-1">Edit Announcement Draft</h1>
+    <p class="mb-0" style="opacity:.9">Update your announcement draft. You can modify publish and expiry schedules.</p>
+  </div>
+
+  <!-- {% if messages %}
+    {% for message in messages %}
+      <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %}" role="alert">
+        {{ message }}
+      </div>
+    {% endfor %}
+  {% endif %} -->
+
+  <div class="card-soft p-3 p-md-4">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {# Global non-field errors #}
+      {% if form.non_field_errors %}
+      <div class="alert alert-danger">
+        {{ form.non_field_errors }}
+      </div>
+      {% endif %}
+
+      <div class="mb-3">
+        <label for="{{ form.title.id_for_label }}" class="form-label">
+          Title <span class="req">*</span>
+        </label>
+        {{ form.title }}
+        {% if form.title.errors %}
+          <div class="text-danger small mt-1">{{ form.title.errors|join:", " }}</div>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        <label for="{{ form.body.id_for_label }}" class="form-label">
+          Body <span class="req">*</span>
+        </label>
+        {{ form.body }}
+        {% if form.body.errors %}
+          <div class="text-danger small mt-1">{{ form.body.errors|join:", " }}</div>
+        {% endif %}
+        <div class="form-help mt-1">You can paste plain text. (Tip: Keep it concise and informative.)</div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label for="{{ form.publish_at.id_for_label }}" class="form-label">Publish at</label>
+          {{ form.publish_at }}
+          {% if form.publish_at.errors %}
+            <div class="text-danger small mt-1">{{ form.publish_at.errors|join:", " }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-md-6">
+          <label for="{{ form.expire_at.id_for_label }}" class="form-label">Expire at</label>
+          {{ form.expire_at }}
+          {% if form.expire_at.errors %}
+            <div class="text-danger small mt-1">{{ form.expire_at.errors|join:", " }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-brand px-3">Update Draft</button>
+        <a href="{% url 'secretary:announcement_draft_list' %}" class="btn btn-outline-brand px-3">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -2313,7 +2313,7 @@ def announcement_draft_view(
     announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
     audience_service: IAudienceService = Provide[AppContainer.audience_service],
 ) -> HttpResponse:
-    """View announcement draft details"""
+    """View announcement draft details (editable with actions)"""
     user_role = _auth_role_name(request)
 
     form = AddChannelForm()
@@ -2339,6 +2339,159 @@ def announcement_draft_view(
         'draft': draft,
         'audiences': audiences,
     })
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def announcement_view(
+    request: HttpRequest,
+    announcement_id: int,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+    audience_service: IAudienceService = Provide[AppContainer.audience_service],
+) -> HttpResponse:
+    """View announcement details (read-only, for published/scheduled/expired/cancelled)"""
+    user_role = _auth_role_name(request)
+    
+    try:
+        # Use generic get_by_id instead of get_draft_by_id to get any status
+        announcement = announcement_service.announcement_repository.get_by_id(announcement_id)
+        
+        if not announcement:
+            messages.error(request, "Announcement not found.")
+            return redirect('secretary:announcement_draft_list')
+        
+        audiences = audience_service.get_announcement_audiences(announcement_id)
+        
+    except Exception as e:
+        messages.error(request, "Failed to load announcement details.")
+        logger.exception("Failed to load announcement: %s", e)
+        return redirect('secretary:announcement_draft_list')
+    
+    return render(request, "secretary/announcement/announcement_view.html", {
+        'page_path': f'{user_role} / Announcements / View',
+        'page_title': f'View: {announcement.announcement_title}',
+        'announcement': announcement,
+        'audiences': audiences,
+    })
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def announcement_draft_edit(
+    request: HttpRequest,
+    announcement_id: int,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    """Edit an announcement draft"""
+    user_role = _auth_role_name(request)
+    auth = request.session.get('auth', {})
+    staff_id = auth.get('staff_id')
+    
+    # Get the existing draft
+    try:
+        draft = announcement_service.get_draft_by_id(announcement_id)
+        if not draft:
+            messages.error(request, "Announcement draft not found.")
+            return redirect('secretary:announcement_draft_list')
+    except Exception as e:
+        messages.error(request, "Failed to load announcement draft.")
+        logger.exception("Failed to load draft for edit: %s", e)
+        return redirect('secretary:announcement_draft_list')
+    
+    # Populate form with existing data
+    if request.method == 'POST':
+        form = AnnouncementDraftForm(request.POST)
+        if form.is_valid():
+            try:
+                from src.app.transfer_objects.commands.announcement_cmd import UpdateAnnouncementDraftCMD
+                
+                command = UpdateAnnouncementDraftCMD(
+                    announcement_id=announcement_id,
+                    title=form.cleaned_data['title'],
+                    body=form.cleaned_data['body'],
+                    publish_at=form.cleaned_data.get('publish_at'),
+                    expire_at=form.cleaned_data.get('expire_at')
+                )
+                
+                announcement_service.update_draft(command)
+                
+                log_announcement_action(
+                    announcement_id=announcement_id,
+                    table_affected='ANNOUNCEMENT',
+                    action='UPDATE',
+                    performer_id=staff_id,
+                    details=f'Updated announcement draft ID: {announcement_id}',
+                )
+                
+                messages.success(request, "Announcement draft updated successfully!")
+                return redirect('secretary:announcement_draft_list')
+                
+            except ValueError as e:
+                messages.error(request, str(e))
+            except Exception as e:
+                messages.error(request, "An error occurred while updating the announcement draft.")
+                logger.exception("Failed to update announcement draft: %s", e)
+    else:
+        # Pre-fill form with existing data
+        initial_data = {
+            'title': draft.announcement_title,
+            'body': draft.announcement_body,
+            'publish_at': draft.announcement_published_at,
+            'expire_at': draft.announcement_expire_at,
+        }
+        form = AnnouncementDraftForm(initial=initial_data)
+    
+    return render(request, "secretary/announcement/draft_edit.html", {
+        'page_path': f'{user_role} / Announcements / Edit Draft',
+        'page_title': f'Edit Draft: {draft.announcement_title}',
+        'form': form,
+        'draft': draft,
+    })
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@inject
+def ajax_delete_announcement_draft(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> JsonResponse:
+    """Delete an announcement draft via AJAX"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        announcement_id = data.get('announcement_id')
+        
+        if not announcement_id:
+            return JsonResponse({'error': 'Announcement ID is required'}, status=400)
+        
+        auth = request.session.get('auth', {})
+        staff_id = auth.get('staff_id')
+        
+        # Delete the draft
+        success = announcement_service.delete_draft(announcement_id)
+        
+        if success:
+            log_announcement_action(
+                announcement_id=announcement_id,
+                table_affected='ANNOUNCEMENT',
+                action='DELETE',
+                performer_id=staff_id,
+                details=f'Deleted announcement draft ID: {announcement_id}',
+            )
+            
+            return JsonResponse({'success': True, 'message': 'Draft deleted successfully'})
+        else:
+            return JsonResponse({'error': 'Failed to delete draft'}, status=400)
+            
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+    except Exception as e:
+        logger.exception("Failed to delete announcement draft: %s", e)
+        return JsonResponse({'error': 'An error occurred while deleting the draft'}, status=500)
 
 @session_login_required
 @role_required(SECRETARY_ROLE)
@@ -2588,6 +2741,380 @@ def schedule_announcement(
     except Exception as e:
         logger.exception("Failed to schedule announcement: %s", e)
         return JsonResponse({'error': 'Failed to schedule announcement'}, status=500)
+
+
+# -------------------------------
+# SCHEDULED ANNOUNCEMENTS
+# -------------------------------
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def announcement_scheduled_list(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    """List all scheduled announcements"""
+    user_role = _auth_role_name(request)
+    
+    form = DraftListSearch(request.GET or None)
+    search_query = request.GET.get('search', '').strip()
+    
+    try:
+        repo = announcement_service.announcement_repository
+        
+        if search_query:
+            announcements = repo.search_scheduled(search_query)
+        else:
+            announcements = repo.get_all_scheduled()
+        
+        paginator = Paginator(announcements, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+
+        if search_query is not None and not form.is_valid:
+            form = DraftListSearch()
+        
+    except Exception as e:
+        messages.error(request, "An error occurred while loading scheduled announcements.")
+        logger.exception("Failed to load scheduled announcements: %s", e)
+        page_obj = None
+    
+    return render(request, "secretary/announcement/scheduled_list.html", {
+        'page_path': f'{user_role} / Announcements / Scheduled',
+        'page_title': 'Scheduled Announcements',
+        'form': form,
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'search_url': 'secretary:ajax_announcement_scheduled_search',
+    })
+
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@require_GET
+@inject
+def ajax_announcement_scheduled_search(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR only")
+    
+    tpl_key = (request.GET.get("tpl") or "rows").strip().lower()
+    if tpl_key != "rows":
+        return HttpResponseBadRequest("Unknown partial")
+
+    q = request.GET.get("q", "") or None
+    
+    try:
+        repo = announcement_service.announcement_repository
+        
+        if q:
+            rows = repo.search_scheduled(q)[:50]
+        else:
+            rows = repo.get_all_scheduled()[:50]
+        
+    except Exception as e:
+        logger.exception("ajax_announcement_scheduled_search error: %s", e)
+        rows = []
+
+    context = {"rows": rows}
+    html = render_to_string("announcement/_scheduled_list.html", context, request=request)
+    return HttpResponse(html)
+
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@require_http_methods(["POST"])
+@inject
+def ajax_cancel_scheduled_announcement(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> JsonResponse:
+    """Cancel a scheduled announcement"""
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return JsonResponse({'success': False, 'message': 'XHR only'}, status=400)
+    
+    try:
+        announcement_id = int(request.POST.get('announcement_id', 0))
+        if announcement_id <= 0:
+            return JsonResponse({'success': False, 'message': 'Invalid announcement ID'}, status=400)
+        
+        repo = announcement_service.announcement_repository
+        
+        # Cancel the scheduled announcement
+        success = repo.cancel_scheduled(announcement_id)
+        
+        if success:
+            log_announcement_action(
+                announcement_id=announcement_id,
+                table_affected='announcement',
+                action='CANCEL_SCHEDULED',
+                performer_id=request.session.get('auth', {}).get('staff_id'),
+                details=f"Scheduled announcement cancelled"
+            )
+            return JsonResponse({
+                'success': True,
+                'message': 'Announcement cancelled successfully'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': 'Failed to cancel announcement. It may not be in scheduled status.'
+            }, status=400)
+            
+    except ValueError:
+        return JsonResponse({'success': False, 'message': 'Invalid announcement ID'}, status=400)
+    except Exception as e:
+        logger.exception("ajax_cancel_scheduled_announcement error: %s", e)
+        return JsonResponse({
+            'success': False,
+            'message': 'An error occurred while cancelling the announcement'
+        }, status=500)
+
+
+# -------------------------------
+# PUBLISHED ANNOUNCEMENTS
+# -------------------------------
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def announcement_published_list(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    """List all published announcements"""
+    user_role = _auth_role_name(request)
+    
+    form = DraftListSearch(request.GET or None)
+    search_query = request.GET.get('search', '').strip()
+    
+    try:
+        repo = announcement_service.announcement_repository
+        
+        if search_query:
+            announcements = repo.search_published(search_query)
+        else:
+            announcements = repo.get_all_published()
+        
+        paginator = Paginator(announcements, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+
+        if search_query is not None and not form.is_valid:
+            form = DraftListSearch()
+        
+    except Exception as e:
+        messages.error(request, "An error occurred while loading published announcements.")
+        logger.exception("Failed to load published announcements: %s", e)
+        page_obj = None
+    
+    return render(request, "secretary/announcement/published_list.html", {
+        'page_path': f'{user_role} / Announcements / Published',
+        'page_title': 'Published Announcements',
+        'form': form,
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'search_url': 'secretary:ajax_announcement_published_search',
+    })
+
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@require_GET
+@inject
+def ajax_announcement_published_search(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR only")
+    
+    tpl_key = (request.GET.get("tpl") or "rows").strip().lower()
+    if tpl_key != "rows":
+        return HttpResponseBadRequest("Unknown partial")
+
+    q = request.GET.get("q", "") or None
+    
+    try:
+        repo = announcement_service.announcement_repository
+        
+        if q:
+            rows = repo.search_published(q)[:50]
+        else:
+            rows = repo.get_all_published()[:50]
+        
+    except Exception as e:
+        logger.exception("ajax_announcement_published_search error: %s", e)
+        rows = []
+
+    context = {"rows": rows}
+    html = render_to_string("announcement/_published_list.html", context, request=request)
+    return HttpResponse(html)
+
+
+# -------------------------------
+# EXPIRED ANNOUNCEMENTS
+# -------------------------------
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def announcement_expired_list(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    """List all expired announcements"""
+    user_role = _auth_role_name(request)
+    
+    form = DraftListSearch(request.GET or None)
+    search_query = request.GET.get('search', '').strip()
+    
+    try:
+        repo = announcement_service.announcement_repository
+        
+        if search_query:
+            announcements = repo.search_expired(search_query)
+        else:
+            announcements = repo.get_all_expired()
+        
+        paginator = Paginator(announcements, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+
+        if search_query is not None and not form.is_valid:
+            form = DraftListSearch()
+        
+    except Exception as e:
+        messages.error(request, "An error occurred while loading expired announcements.")
+        logger.exception("Failed to load expired announcements: %s", e)
+        page_obj = None
+    
+    return render(request, "secretary/announcement/expired_list.html", {
+        'page_path': f'{user_role} / Announcements / Expired',
+        'page_title': 'Expired Announcements',
+        'form': form,
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'search_url': 'secretary:ajax_announcement_expired_search',
+    })
+
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@require_GET
+@inject
+def ajax_announcement_expired_search(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR only")
+    
+    tpl_key = (request.GET.get("tpl") or "rows").strip().lower()
+    if tpl_key != "rows":
+        return HttpResponseBadRequest("Unknown partial")
+
+    q = request.GET.get("q", "") or None
+    
+    try:
+        repo = announcement_service.announcement_repository
+        
+        if q:
+            rows = repo.search_expired(q)[:50]
+        else:
+            rows = repo.get_all_expired()[:50]
+        
+    except Exception as e:
+        logger.exception("ajax_announcement_expired_search error: %s", e)
+        rows = []
+
+    context = {"rows": rows}
+    html = render_to_string("announcement/_expired_list.html", context, request=request)
+    return HttpResponse(html)
+
+
+# -------------------------------
+# CANCELLED ANNOUNCEMENTS
+# -------------------------------
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def announcement_cancelled_list(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    """List all cancelled announcements"""
+    user_role = _auth_role_name(request)
+    
+    form = DraftListSearch(request.GET or None)
+    search_query = request.GET.get('search', '').strip()
+    
+    try:
+        repo = announcement_service.announcement_repository
+        
+        if search_query:
+            announcements = repo.search_cancelled(search_query)
+        else:
+            announcements = repo.get_all_cancelled()
+        
+        paginator = Paginator(announcements, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+
+        if search_query is not None and not form.is_valid:
+            form = DraftListSearch()
+        
+    except Exception as e:
+        messages.error(request, "An error occurred while loading cancelled announcements.")
+        logger.exception("Failed to load cancelled announcements: %s", e)
+        page_obj = None
+    
+    return render(request, "secretary/announcement/cancelled_list.html", {
+        'page_path': f'{user_role} / Announcements / Cancelled',
+        'page_title': 'Cancelled Announcements',
+        'form': form,
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'search_url': 'secretary:ajax_announcement_cancelled_search',
+    })
+
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@require_GET
+@inject
+def ajax_announcement_cancelled_search(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR only")
+    
+    tpl_key = (request.GET.get("tpl") or "rows").strip().lower()
+    if tpl_key != "rows":
+        return HttpResponseBadRequest("Unknown partial")
+
+    q = request.GET.get("q", "") or None
+    
+    try:
+        repo = announcement_service.announcement_repository
+        
+        if q:
+            rows = repo.search_cancelled(q)[:50]
+        else:
+            rows = repo.get_all_cancelled()[:50]
+        
+    except Exception as e:
+        logger.exception("ajax_announcement_cancelled_search error: %s", e)
+        rows = []
+
+    context = {"rows": rows}
+    html = render_to_string("announcement/_cancelled_list.html", context, request=request)
+    return HttpResponse(html)
 
 
 # -------------------------------
