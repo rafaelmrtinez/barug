@@ -852,10 +852,11 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
                 "sitio_purok": cd.get("purok_sitio") or "",
                 "street":    cd.get("street") or "",
             })
-            flash_success(request, "Personal information saved successfully.")
+            # flash_success(request, "Personal information saved successfully.")
             return redirect("lupon_pres:staff_selection_non-resident_docs")
         else:
-            flash_warning(request, "Please correct the errors below.")
+            # flash_warning(request, "Please correct the errors below.")
+            logger.debug("Non-resident personal form errors: %s", form.errors.as_json())
 
     user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "members/staff_selection_nonresident.html", {
