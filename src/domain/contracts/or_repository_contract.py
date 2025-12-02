@@ -18,3 +18,12 @@ class IORRepository(ABC):
     def filter_by_payment_method(self, payment_method: int) -> list[ORDTO]:
         pass
 
+    @abstractmethod
+    def filter_by_date_range(
+        self,
+        month: Optional[int] = None,
+        year: Optional[int] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None
+    ) -> list[ORDTO]:
+        pass

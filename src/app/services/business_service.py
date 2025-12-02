@@ -69,6 +69,13 @@ class BusinessService(IBusinessService):
         
         return self._business_repo.fetch_business_list()
     
+    def execute_with_filters(self) -> list[BusinessListDTO]:
+        """
+        Fetches business list with additional fields for filtering.
+        Use this for business_map_list view to enable purok, date_range, and employee_range filters.
+        """
+        return self._business_repo.fetch_business_list_with_filters()
+    
     def check_business_duplicate(
         self,
         *,

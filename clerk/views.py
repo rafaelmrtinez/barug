@@ -18,6 +18,7 @@ import logging
 import traceback
 import uuid
 from datetime import datetime, date, time
+from dateutil.relativedelta import relativedelta
 
 from decimal import Decimal
 from django.forms import Form
@@ -116,6 +117,7 @@ from src.app.transfer_objects.commands.business_cmd import (
 )
 from src.app.services.business_notification import notify_registration_received
 from common.send_sms import send_sms
+from notifications.service import notify_user
 
 def _auth_role_name(request: HttpRequest) -> str:
     return (((request.session.get("auth") or {}).get("role_name")) or "Staff").title()
@@ -1164,7 +1166,16 @@ def dashboard(
     request: HttpRequest,
     clerk_dashboard_service=Provide[AppContainer.clerk_dashboard_service],
 ):
+    print("=" * 80)
+    print("CLERK DASHBOARD VIEW CALLED")
+    print("=" * 80)
+    
     user_role = _auth_role_name(request)
+    auth = request.session.get('auth', {})
+    person_id = auth.get('person_id')
+    
+    print(f"user_role: {user_role}")
+    print(f"person_id from session: {person_id}")
 
     kpis = {
         "doc_requests": 0,
@@ -1178,6 +1189,7 @@ def dashboard(
     }
 
     dashboard_json = None
+    announcements = []
 
     try:
         payload = clerk_dashboard_service.get_dashboard_content() or {}
@@ -1185,6 +1197,21 @@ def dashboard(
         dashboard_json = payload.get("dashboard_json")
     except Exception as exc:
         print("Error fetching clerk dashboard KPIs:", exc)
+    
+    # Fetch announcements for the logged-in user
+    if person_id:
+        try:
+            from authentication.announcement_views import get_user_announcements
+            announcements = get_user_announcements(person_id)
+            print(f"✓ Successfully fetched {len(announcements)} announcements for person_id {person_id}")
+        except Exception as exc:
+            print(f"✗ Error fetching announcements for person {person_id}:", exc)
+            import traceback
+            traceback.print_exc()
+    else:
+        print(f"✗ No person_id in session!")
+
+    print(f"DEBUG: Passing {len(announcements)} announcements to template")
 
     return render(request, "clerk/dashboard.html", {
         'page_path' : f'{user_role} / Dashboard',
@@ -1192,6 +1219,7 @@ def dashboard(
         'kpis': kpis,
         'dashboard_json': dashboard_json,
         'today': datetime.now().strftime("%B %d, %Y"),
+        'announcements': announcements,
     })
 
 @session_login_required
@@ -1538,6 +1566,7 @@ def walkin_new(request: HttpRequest):
     GET:
       - ?q= search residents
       - ?request_document_type_id= preselects doc type and loads purposes
+      - ?business_id= prefill with business data
     """
     q = (request.GET.get("q") or "").strip()
     doc_types = _fetch_request_doc_types()
@@ -1546,6 +1575,12 @@ def walkin_new(request: HttpRequest):
         chosen_req_type_id = int(request.GET.get("request_document_type_id") or 0) or None
     except Exception:
         chosen_req_type_id = None
+
+    # Get business_id if provided
+    try:
+        business_id = int(request.GET.get("business_id") or 0) or None
+    except Exception:
+        business_id = None
 
     purposes = _fetch_purposes_by_request_type(chosen_req_type_id) if chosen_req_type_id else []
 
@@ -1562,6 +1597,56 @@ def walkin_new(request: HttpRequest):
         )
         residents = res.data or []
 
+    # Prefill data if business_id is provided
+    prefill_data = None
+    prefill_resident = None
+    if business_id:
+        try:
+            # Get business and owner data
+            bq = (
+                supabase.table("business")
+                .select("business_owner_id, business_name")
+                .eq("business_id", business_id)
+                .limit(1)
+                .execute()
+            )
+            biz = (bq.data or [None])[0]
+            if biz and biz.get("business_owner_id"):
+                owner_id = biz["business_owner_id"]
+                
+                # Try to get owner from person table (resident)
+                oq = (
+                    supabase.table("person")
+                    .select("person_id, person_code, first_name, last_name, middle_name, suffix, email")
+                    .eq("person_id", owner_id)
+                    .limit(1)
+                    .execute()
+                )
+                owner = (oq.data or [None])[0]
+                
+                # If not found in person, try business_owner_info (non-resident)
+                if not owner:
+                    boi = (
+                        supabase.table("business_owner_info")
+                        .select("person_id, first_name, last_name, middle_name, suffix, email, mobile_number")
+                        .eq("person_id", owner_id)
+                        .limit(1)
+                        .execute()
+                    )
+                    owner = (boi.data or [None])[0]
+                    if owner:
+                        # Add person_code as None for non-residents
+                        owner["person_code"] = None
+                
+                if owner:
+                    prefill_resident = owner
+                    prefill_data = {
+                        "business_id": business_id,
+                        "business_name": biz.get("business_name"),
+                    }
+        except Exception as e:
+            print(f"[walkin_new] Failed to prefill business data: {e}", flush=True)
+
     user_role = _auth_role_name(request)
     return render(request, "clerk/walkin_request.html", {
         "page_path": f"{user_role} / Document Requests / Walk-in Request",
@@ -1571,6 +1656,8 @@ def walkin_new(request: HttpRequest):
         "chosen_doc_type_id": chosen_req_type_id,  # template uses this name
         "purposes": purposes,
         "residents": residents,
+        "prefill_data": prefill_data,
+        "prefill_resident": prefill_resident,
     })
 
 
@@ -2091,6 +2178,10 @@ def _json_safe(val):
     if isinstance(val, Decimal):
         # choose float for numbers (you already stringified money fields separately)
         return float(val)
+    if isinstance(val, date):
+        return val.isoformat()
+    if isinstance(val, time):
+        return val.strftime("%H:%M:%S")
     if isinstance(val, (list, tuple)):
         return [ _json_safe(v) for v in val ]
     if isinstance(val, dict):
@@ -2310,6 +2401,7 @@ def build_owner_display(owner: dict, maps: Dict[str, Dict[Any, str]]) -> Dict[st
         owner.get("purok_sitio") or "",
         owner.get("barangay") or "",
         owner.get("city") or "",
+        owner.get("province") or "",
     ])
 
     res_name = _normalize_residency_name(
@@ -2784,6 +2876,7 @@ def business_owner_nonresident(
                 "purok_sitio": (cd.get("purok_sitio") or "").strip(),
                 "barangay": (cd["barangay"]).strip(),
                 "city": (cd["city"]).strip(),
+                "province": (cd.get("province") or "").strip(),
                 "residency_name": "NON-RESIDENT",
             }
 
@@ -2852,6 +2945,213 @@ def ajax_nonresident_owner_search(
         rows = []
 
     return JsonResponse({"results": _normalize_owner_rows(rows)})
+
+@session_login_required
+@role_required(CLERK_ROLE)
+@nocache
+@inject
+def business_update(
+    request: HttpRequest,
+    b_id: int,
+    business_service: IBusinessService = Provide[AppContainer.business_service],
+    business_info: IBusinessInfoService = Provide[AppContainer.owner_business_service],
+):
+    """Update existing business information."""
+    user_role = _auth_role_name(request)
+
+    # Fetch existing business data
+    try:
+        dto = business_info.execute_by_business_id(b_id)
+        if not dto or not dto.business:
+            messages.error(request, f"Business #{b_id} not found.")
+            return redirect("clerk:business_list")
+    except Exception as e:
+        messages.error(request, f"Failed to load business: {e}")
+        return redirect("clerk:business_list")
+
+    business_dict = dict(dto.business or {})
+    owner_dict = dict(dto.owner or {})
+
+    if request.method == "POST":
+        form = BusinessDetails(request.POST, request.FILES or None)
+
+        if form.is_valid():
+            cd = form.cleaned_data
+
+            # Build update payload
+            update_payload: Dict[str, Any] = {
+                "business_id": b_id,
+                "b_name": _sstrip(cd.get("b_name")) or "",
+                "b_nature": _sstrip(cd.get("b_nature")),
+                "b_address": _sstrip(cd.get("b_address")) or "",
+                "b_desc": _sstrip(cd.get("b_desc")),
+                "dti": _sstrip(cd.get("dti")),
+                "inc_est": _to_str_num(cd.get("inc_est"), "0"),
+                "ownership_type": _to_int_or_none(cd.get("ownership_type")),
+                "b_category": _to_int_or_none(cd.get("b_category")),
+                "capital_invested": _to_str_num(cd.get("capital_invested"), "0"),
+                "prevgross": _to_str_num(cd.get("prevgross"), "0"),
+                "emp_num": _to_int_or_none(cd.get("emp_num") or 0),
+                "opt_days_start": _to_int_or_none(cd.get("opt_days_start")),
+                "opt_days_end": _to_int_or_none(cd.get("opt_days_end")),
+                "opt_start": cd["opt_start"].strftime("%H:%M:%S") if cd.get("opt_start") else None,
+                "opt_end": cd["opt_end"].strftime("%H:%M:%S") if cd.get("opt_end") else None,
+                "date_est": (cd["date_est"].isoformat() if cd.get("date_est") else None),
+                "latitude": _to_float_or_none(cd.get("latitude")),
+                "longitude": _to_float_or_none(cd.get("longitude")),
+                "street": _sstrip(cd.get("street")) or "",
+                "barangay": _sstrip(cd.get("barangay")) or "",
+                "city": _sstrip(cd.get("city")) or "",
+                "purok_sitio_id": _to_int_or_none(cd.get("purok_sitio_id")),
+                "purok_sitio": _sstrip(cd.get("purok_sitio")) or "",
+            }
+
+            # Handle new proof files if uploaded
+            proof_pairs = []
+            if request.FILES:
+                files = request.FILES.getlist("proof") if "proof" in request.FILES else []
+                for up in files:
+                    info = _save_temp_upload(up, "bizproof")
+                    if info and info.get("path"):
+                        proof_pairs.append(info)
+
+            if proof_pairs:
+                update_payload["proof_name"] = ", ".join(p["name"] for p in proof_pairs)
+                update_payload["proof_tmp_pairs"] = proof_pairs
+
+            try:
+                # Call business service to update
+                business_service.update_business(update_payload)
+
+                log_business_action(
+                    business_id=b_id,
+                    table_affected='BUSINESS',
+                    action='UPDATE',
+                    performer_id=_auth_staff_id(request),
+                    details=f'Updated business #{b_id}',
+                )
+
+                messages.success(request, f'Business #{b_id} updated successfully.')
+                return redirect("clerk:business_information", b_id=b_id)
+            except Exception as e:
+                print(f"[business_update] Failed to update business: {e}", flush=True)
+                import traceback
+                traceback.print_exc()
+                messages.error(request, f"Failed to update business: {e}")
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        # Parse operating days from string format "Mon, Tue, Wed, Thu, Fri, Sat"
+        operating_days_str = business_dict.get("operating_days") or ""
+        opt_days_start = None
+        opt_days_end = None
+        
+        if operating_days_str:
+            days = [d.strip() for d in operating_days_str.split(",")]
+            # Map day names to integers (1=Monday, 7=Sunday)
+            DAY_NAME_TO_NUM = {
+                "Mon": 1, "Monday": 1,
+                "Tue": 2, "Tuesday": 2,
+                "Wed": 3, "Wednesday": 3,
+                "Thu": 4, "Thursday": 4,
+                "Fri": 5, "Friday": 5,
+                "Sat": 6, "Saturday": 6,
+                "Sun": 7, "Sunday": 7,
+            }
+            if days:
+                opt_days_start = DAY_NAME_TO_NUM.get(days[0])
+                opt_days_end = DAY_NAME_TO_NUM.get(days[-1])
+        
+        # Parse operating hours from string format "4:15 am - 4:15 pm"
+        operating_hours_str = business_dict.get("operating_hours") or ""
+        opt_start = None
+        opt_end = None
+        
+        if operating_hours_str and " - " in operating_hours_str:
+            from datetime import datetime
+            try:
+                parts = operating_hours_str.split(" - ")
+                if len(parts) == 2:
+                    # Parse "4:15 am" to time object
+                    opt_start = datetime.strptime(parts[0].strip(), "%I:%M %p").time()
+                    opt_end = datetime.strptime(parts[1].strip(), "%I:%M %p").time()
+            except Exception as e:
+                print(f"[business_update] Failed to parse operating hours '{operating_hours_str}': {e}", flush=True)
+        
+        # Strip peso sign from monetary fields if present
+        capital_invested = business_dict.get("capital_invested")
+        if isinstance(capital_invested, str):
+            capital_invested = capital_invested.replace("₱", "").replace(",", "").strip()
+        
+        prev_gross = business_dict.get("prev_yr_total_gross_sales") or business_dict.get("prev_year_gross_sales")
+        if isinstance(prev_gross, str):
+            prev_gross = prev_gross.replace("₱", "").replace(",", "").strip()
+        
+        mnthly_income = business_dict.get("mnthly_gross_incom_est")
+        if isinstance(mnthly_income, str):
+            mnthly_income = mnthly_income.replace("₱", "").replace(",", "").strip()
+        
+        # Pre-populate form with existing business data
+        initial_data = {
+            "b_name": business_dict.get("business_name"),
+            "b_nature": business_dict.get("business_nature"),
+            "b_address": business_dict.get("business_address"),
+            "b_desc": business_dict.get("description") or business_dict.get("location_description"),
+            "dti": business_dict.get("dti_reg_num") or business_dict.get("dti_sec_reg_num"),
+            "inc_est": mnthly_income,
+            "ownership_type": business_dict.get("ownership_type_id"),
+            "b_category": business_dict.get("business_category_id"),
+            "capital_invested": capital_invested,
+            "prevgross": prev_gross,
+            "emp_num": business_dict.get("num_of_employees") or business_dict.get("num_of_emp"),
+            "opt_days_start": opt_days_start,
+            "opt_days_end": opt_days_end,
+            "opt_start": opt_start,
+            "opt_end": opt_end,
+            "date_est": business_dict.get("date_established") or business_dict.get("date_est"),
+            "latitude": business_dict.get("latitude"),
+            "longitude": business_dict.get("longitude"),
+        }
+
+        form = BusinessDetails(initial=initial_data)
+
+    # Parse operating days for display
+    operating_days = (dto.business.get("operating_days") or "").strip()
+    days = [d.strip() for d in operating_days.split(",")] if operating_days else []
+    operating_days_start_name = days[0] if days else None
+    operating_days_end_name = days[-1] if days else None
+    
+    # Map numeric day values to day names for display
+    DAY_MAP = {1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday", 5: "Friday", 6: "Saturday", 7: "Sunday"}
+    if opt_days_start and not operating_days_start_name:
+        operating_days_start_name = DAY_MAP.get(opt_days_start)
+    if opt_days_end and not operating_days_end_name:
+        operating_days_end_name = DAY_MAP.get(opt_days_end)
+
+    # Get business proof files - same as business_information
+    business_files = (dto.business_proof or {}).get("files") or []
+    print(f"[business_update] dto.business_proof = {dto.business_proof}", flush=True)
+    print(f"[business_update] business_files count = {len(business_files)}", flush=True)
+    if business_files:
+        print(f"[business_update] First file: {business_files[0]}", flush=True)
+
+    return render(
+        request,
+        "clerk/business/business_update.html",
+        {
+            "page_path": f"{user_role} / Business Records / Update Business : {b_id:06d}",
+            "page_title": f"Update Business : {b_id:06d}",
+            "form": form,
+            "business": business_dict,
+            "owner": owner_dict,
+            "b_id": b_id,
+            "business_files": business_files,
+            "operating_days_start_name": operating_days_start_name,
+            "operating_days_end_name": operating_days_end_name,
+            "operating_hours_start": opt_start,
+            "operating_hours_end": opt_end,
+        },
+    )
 
 @session_login_required
 @role_required(CLERK_ROLE)
@@ -2953,7 +3253,16 @@ def business_details(
 
             if dup_biz_id:
                 # 🚫 Do NOT redirect yet — render the same page and open a modal.
-                form = BusinessDetails(initial=cd)
+                # Convert cleaned_data to JSON-safe format for form initial
+                cd_safe = dict(cd)
+                if cd_safe.get("opt_start"):
+                    cd_safe["opt_start"] = cd_safe["opt_start"].strftime("%H:%M:%S")
+                if cd_safe.get("opt_end"):
+                    cd_safe["opt_end"] = cd_safe["opt_end"].strftime("%H:%M:%S")
+                if cd_safe.get("date_est"):
+                    cd_safe["date_est"] = cd_safe["date_est"].isoformat()
+                
+                form = BusinessDetails(initial=cd_safe)
 
                 addr_parts = [
                     payload.get("street") or "",
@@ -3007,7 +3316,8 @@ def business_details(
             messages.error(request, "Please correct the errors below.")
 
     else:
-        saved = request.session.get("bizreg_business") or {}
+        saved_raw = request.session.get("bizreg_business") or {}
+        saved = copy.deepcopy(saved_raw)  # IMPORTANT: Don't mutate session data
 
         # Convert back to proper field types for form initial
         if "date_est" in saved:
@@ -3100,25 +3410,25 @@ def business_information_review(
                         except Exception:
                             pass
 
-                # try:
-                #     notify_registration_received(owner=owner, business=business, business_id=business_id)
-                # except Exception:
-                #     pass
+                try:
+                    notify_registration_received(owner=owner, business=business, business_id=business_id)
+                except Exception:
+                    pass
 
-                # try:
-                #     owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
-                #     if owner_mobile:
-                #         bname = (business.get("b_name") or "your business").strip()
-                #         msg = (
-                #             f"BARUG: Business Registration received for '{bname}'.\n"
-                #             f"Ref: {business_id: 06d}.\n"
-                #             f"Sign in to the mobile app to request the necessary business documents."
-                #         )
-                #         # fail_silently so we don't break the user flow
-                #         send_sms(owner_mobile, msg, fail_silently=True)
-                # except Exception:
-                #     # fully swallow—logging optional
-                #     pass
+                try:
+                    owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
+                    if owner_mobile:
+                        bname = (business.get("b_name") or "your business").strip()
+                        msg = (
+                            f"BARUG: Business Registration received for '{bname}'.\n"
+                            f"Ref: {business_id: 06d}.\n"
+                            f"Sign in to the mobile app to request the necessary business documents."
+                        )
+                        # fail_silently so we don't break the user flow
+                        send_sms(owner_mobile, msg, fail_silently=True)
+                except Exception:
+                    # fully swallow—logging optional
+                    pass
 
                 request.session.pop("bizreg_owner", None)
                 request.session.pop("bizreg_business", None)
@@ -3313,9 +3623,10 @@ def business_information(
         sitio_purok = (data.get("sitio_purok") or "").strip()
         barangay    = (data.get("barangay") or "").strip()
         city        = (data.get("city") or "").strip()
+        province    = (data.get("province") or "").strip()
 
-        # Order strictly: STREET, PUROK/SITIO, BARANGAY, CITY
-        parts = [p for p in [street, sitio_purok, barangay, city] if p]
+        # Order: STREET, PUROK/SITIO, BARANGAY, CITY, PROVINCE
+        parts = [p for p in [street, sitio_purok, barangay, city, province] if p]
         return ", ".join(parts) if parts else None
 
     owner = dict(dto.owner or {})
@@ -3337,7 +3648,7 @@ def business_information(
 
     renewal_href = reverse("clerk:create_renewal_request", kwargs={"b_id": b_id})
     closure_href = reverse("clerk:initiate_business_closure", kwargs={"b_id": b_id})
-    doc_req_href = reverse("clerk:walkin_new")
+    doc_req_href = reverse("clerk:walkin_new") + f"?business_id={b_id}"
 
     try:
         _gt = grand_total if isinstance(grand_total, Decimal) else Decimal(str(grand_total or 0))
@@ -3351,7 +3662,10 @@ def business_information(
     summary_cta_label = None
     cta_mode = "link"
 
-    if status_upper == "ACTIVE":
+    if status_upper == "CLOSED":
+        # Don't show any button for closed businesses
+        show_summary_cta = False
+    elif status_upper == "ACTIVE":
         if has_dues:
             # NEW: even if ACTIVE, show Renew/Pay action when there are dues
             show_summary_cta = True
@@ -3359,7 +3673,11 @@ def business_information(
             cta_mode = "selector"
             summary_cta_label = "Create Renewal Request"
         else:
-            show_summary_cta = False
+            # ACTIVE with no dues: show Request Business Closure button
+            show_summary_cta = True
+            cta_mode = "link"
+            summary_cta_href = closure_href
+            summary_cta_label = "Request Business Closure"
     elif status_upper == "PENDING":
         show_summary_cta = True
         cta_mode = "link"
@@ -3397,6 +3715,7 @@ def business_information(
             "renewal_href": renewal_href,
             "closure_href": closure_href,
             "cta_mode": cta_mode,
+            'is_clerk': (user_role == CLERK_ROLE),
         },
     )
 
@@ -3417,13 +3736,36 @@ def business_map_list(
     b_category = _to_int_or_none(request.GET.get("b_category"))
     ownership_type = _to_int_or_none(request.GET.get("ownership_type"))
     status = _to_int_or_none(request.GET.get("status"))
+    purok = request.GET.get("purok") or None
+    date_range = request.GET.get("date_range") or None
+    employee_range = request.GET.get("employee_range") or None
 
-    rows = business_service.execute(
-        search=search,
-        b_category=b_category,
-        ownership_type=ownership_type,
-        status=status,
-    )
+    # Use execute_with_filters if any of the new filters are applied
+    # This fetches additional fields (date_established, num_of_employees, sitio_purok)
+    use_filter_query = purok or date_range or employee_range
+    
+    if use_filter_query:
+        rows = business_service.execute_with_filters()
+    else:
+        rows = business_service.execute(
+            search=search,
+            b_category=b_category,
+            ownership_type=ownership_type,
+            status=status,
+        )
+    
+    # Apply additional filters after fetching results
+    if purok:
+        rows = [r for r in rows if (r.sitio_purok or '').upper() == purok.upper()]
+    
+    if date_range:
+        months = int(date_range)
+        cutoff_date = datetime.now().date() - relativedelta(months=months)
+        rows = [r for r in rows if r.date_established and r.date_established >= cutoff_date]
+    
+    if employee_range:
+        min_emp, max_emp = map(int, employee_range.split('-'))
+        rows = [r for r in rows if r.num_of_employees and min_emp <= r.num_of_employees <= max_emp]
 
     paginator = Paginator(rows, 5)
     page_number = request.GET.get("page")
@@ -3445,6 +3787,9 @@ def business_map_list(
                 'b_category' : b_category,
                 'ownership_type' :ownership_type,
                 'status' : status,
+                'purok': purok,
+                'date_range': date_range,
+                'employee_range': employee_range,
             },
             "pins_url": reverse("clerk:api_business_pins"),
             'search_url': 'clerk:ajax_business_search',
@@ -3467,6 +3812,9 @@ def api_business_pins(
         b_category=_to_int_or_none(request.GET.get("b_category")),
         ownership_type=_to_int_or_none(request.GET.get("ownership_type")),
         status=_to_int_or_none(request.GET.get("status")),
+        purok=(request.GET.get("purok") or None),
+        date_range=(request.GET.get("date_range") or None),
+        employee_range=(request.GET.get("employee_range") or None),
     )
     return JsonResponse(pins, safe=False)
 
@@ -3582,11 +3930,95 @@ def create_renewal_request(
 
             if new_ids:
                 ids_str = ", ".join(str(i) for i in new_ids)
-                messages.success(
-                    request,
-                    f"Created {len(new_ids)} renewal request(s) for unpaid years up to {period_type} {period_year}: [{ids_str}] "
-                    f"(status: FOR_TREASURER_REVIEW)."
-                )
+                
+                # Track if document request was created
+                created_doc_request_id = None
+                
+                # Create document request for business clearance for the most recent renewal
+                try:
+                    dto = business_info.execute_by_business_id(business_id)
+                    owner = dict(dto.owner or {})
+                    owner_person_id = owner.get("person_id") or owner.get("owner_person_id")
+                    
+                    if not owner_person_id:
+                        print(f"[create_renewal_request] WARNING: No owner_person_id found for business {business_id}")
+                        messages.warning(request, "Document request not created: Business owner not found.")
+                    else:
+                        # Get Business Clearance document type ID
+                        dt_res = supabase.table("request_document_type").select("request_document_type_id, request_document_type_name").ilike("request_document_type_name", "%business clearance%").limit(1).execute()
+                        if not dt_res.data:
+                            print(f"[create_renewal_request] WARNING: Business Clearance document type not found")
+                            messages.warning(request, "Document request not created: Business Clearance document type not configured.")
+                        else:
+                            doc_type_id = dt_res.data[0].get("request_document_type_id")
+                            
+                            # Get a default purpose for business clearance
+                            purpose_res = supabase.table("document_purpose").select("document_purpose_id").eq("request_document_type_id", doc_type_id).limit(1).execute()
+                            if not purpose_res.data:
+                                print(f"[create_renewal_request] WARNING: No active document purpose found for doc_type_id {doc_type_id}")
+                                messages.warning(request, "Document request not created: No active document purpose configured.")
+                            else:
+                                purpose_id = purpose_res.data[0].get("document_purpose_id")
+                                
+                                # Create document request for the newest renewal
+                                newest_renewal_id = new_ids[0]
+                                bc_details = _fetch_business_clearance_fields(business_id, owner_person_id)
+                                bc_details["renewal_request_id"] = newest_renewal_id
+                                bc_details["period_type"] = period_type
+                                bc_details["period_year"] = period_year
+                                
+                                print(f"[create_renewal_request] Creating document request with params: business_id={business_id}, purpose_id={purpose_id}, renewal_id={newest_renewal_id}")
+                                
+                                rpc_params = {
+                                    "p_requester_person_id": owner_person_id,
+                                    "p_subject_person_id": owner_person_id,
+                                    "p_business_id": business_id,
+                                    "p_purpose_notes": f"Business renewal for {period_type} {period_year}",
+                                    "p_lines": [
+                                        {
+                                            "document_purpose_id": purpose_id,
+                                            "quantity": 1,
+                                            "offense_no": None,
+                                            "details": bc_details,
+                                        }
+                                    ],
+                                    "p_clerk_user_id": _auth_staff_id(request),
+                                }
+                                
+                                doc_res = supabase.rpc("create_document_request_walkin", rpc_params).execute()
+                                print(f"[create_renewal_request] RPC response: {doc_res.data}")
+                                
+                                if doc_res.data:
+                                    doc_request_id = doc_res.data if isinstance(doc_res.data, int) else (doc_res.data[0] if isinstance(doc_res.data, list) else doc_res.data.get("doc_request_id"))
+                                    
+                                    print(f"[create_renewal_request] Linking renewal {newest_renewal_id} to document {doc_request_id}")
+                                    
+                                    # Link renewal request to document request
+                                    supabase.table("renewal_request").update({"doc_request_id": doc_request_id}).eq("renewal_request_id", newest_renewal_id).execute()
+                                    
+                                    messages.success(
+                                        request,
+                                        f"Created {len(new_ids)} renewal request(s) for unpaid years up to {period_type} {period_year}: [{ids_str}]. "
+                                        f"Document request #{doc_request_id} created for business clearance (status: FOR_TREASURER_REVIEW)."
+                                    )
+                                    
+                                    # Store doc_request_id for redirect
+                                    created_doc_request_id = doc_request_id
+                                else:
+                                    print(f"[create_renewal_request] WARNING: RPC returned no data")
+                                    messages.warning(
+                                        request,
+                                        f"Created {len(new_ids)} renewal request(s) for unpaid years up to {period_type} {period_year}: [{ids_str}]. "
+                                        f"Warning: Document request creation failed (status: FOR_TREASURER_REVIEW)."
+                                    )
+                except Exception as e:
+                    print(f"[create_renewal_request] ERROR: Failed to create document request: {e}")
+                    traceback.print_exc()
+                    messages.warning(
+                        request,
+                        f"Created {len(new_ids)} renewal request(s) for unpaid years up to {period_type} {period_year}: [{ids_str}]. "
+                        f"Warning: Document request creation failed: {str(e)}"
+                    )
             else:
                 messages.info(
                     request,
@@ -3601,8 +4033,82 @@ def create_renewal_request(
                 details=f'Created a renewal request for business #{business_id}',
             )
 
-            print(f"[create_renewal_request] Redirecting to business_information(b_id={business_id})", flush=True)
-            return redirect("clerk:business_information", b_id=business_id)
+            # Send email, SMS, and in-app notifications
+            if new_ids:
+                try:
+                    dto = business_info.execute_by_business_id(business_id)
+                    owner = dict(dto.owner or {})
+                    business = dict(dto.business or {})
+                    
+                    owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
+                    owner_email = (owner.get("email") or "").strip()
+                    owner_person_id = owner.get("person_id") or owner.get("owner_person_id")
+                    bname = (business.get("business_name") or "your business").strip()
+                    
+                    # Send SMS
+                    if owner_mobile:
+                        msg = (
+                            f"BARUG: Renewal request created for '{bname}'.\n"
+                            f"Period: {period_type} {period_year}.\n"
+                            f"Status: FOR TREASURER REVIEW. Check with the office for payment details."
+                        )
+                        # send_sms(owner_mobile, msg, fail_silently=True)
+                    
+                    # Send Email
+                    if owner_email:
+                        try:
+                            owner_name = f"{owner.get('first_name', '')} {owner.get('last_name', '')}".strip() or "Business Owner"
+                            subject = f"Business Renewal Request Created - {bname}"
+                            body_html = f"""
+                                <p>Hi {owner_name},</p>
+                                <p>A renewal request has been created for your business <strong>{bname}</strong> (ID: {business_id:06d}).</p>
+                                <p><b>Period:</b> {period_type} {period_year}</p>
+                                <p><b>Status:</b> FOR TREASURER REVIEW</p>
+                                <p>Please check with the Barangay Office for payment details and next steps.</p>
+                                <p>Thank you,<br>Barangay Sto. Niño</p>
+                            """
+                            body_txt = (
+                                f"Hi {owner_name},\n\n"
+                                f"A renewal request has been created for your business {bname} (ID: {business_id:06d}).\n"
+                                f"Period: {period_type} {period_year}\n"
+                                f"Status: FOR TREASURER REVIEW\n\n"
+                                f"Please check with the Barangay Office for payment details and next steps.\n\n"
+                                f"Thank you,\nBarangay Sto. Niño\n"
+                            )
+                            send_email(
+                                subject=subject,
+                                to=[(owner_name, owner_email)],
+                                body_text=body_txt,
+                                body_html=body_html,
+                                from_name="Barangay Sto. Niño",
+                                fail_silently=True,
+                            )
+                        except Exception:
+                            pass
+                    
+                    # Send in-app notification
+                    if owner_person_id:
+                        try:
+                            notify_user(
+                                user_type_id=1,  # PERSON
+                                person_id=owner_person_id,
+                                staff_id=None,
+                                title="Business Renewal Request Created",
+                                body=f"Renewal request for '{bname}' has been created. Period: {period_type} {period_year}. Status: FOR TREASURER REVIEW.",
+                                deep_link=f"/business/{business_id}"
+                            )
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+            # Redirect to document request detail if created, otherwise back to business info
+            if created_doc_request_id:
+                print(f"[create_renewal_request] Redirecting to document request detail (doc_request_id={created_doc_request_id})", flush=True)
+                return redirect("clerk:detail", doc_request_id=created_doc_request_id)
+            else:
+                print(f"[create_renewal_request] Redirecting to business_information(b_id={business_id})", flush=True)
+                return redirect("clerk:business_information", b_id=business_id)
 
         except Exception as e:
             try:
@@ -3681,60 +4187,125 @@ def initiate_business_closure(
     request: HttpRequest,
     b_id: int,
     business_info: IBusinessInfoService = Provide[AppContainer.owner_business_service],
-    renewal_quote_svc: IBusinessRenewalQuoteService = Provide[AppContainer.business_renewal_quote_service],
 ):
+    """
+    Direct business closure for businesses with no outstanding dues.
+    This is a POST-only endpoint that immediately closes the business.
+    """
     user_role = _auth_role_name(request)
 
-    # Reuse the same DTO pattern used elsewhere
-    dto = business_info.execute_by_business_id(b_id)
+    if request.method != "POST":
+        messages.warning(request, "Invalid request method. Please use the business information page.")
+        return redirect("clerk:business_information", b_id=b_id)
 
-    def _compose_owner_full_name(data: dict) -> str | None:
-        last   = (data.get("last_name") or "").strip()
-        first  = (data.get("first_name") or "").strip()
-        middle = (data.get("middle_name") or "").strip()
-        suffix = (data.get("suffix") or "").strip()
-        parts = []
-        if last:   parts.append(last.upper())
-        if first:  parts.append((", " if parts else "") + first.title())
-        if middle: parts.append(" " + middle[:1].upper() + ".")
-        if suffix: parts.append(" " + suffix.upper())
-        return "".join(parts) or None
+    try:
+        business_id = int(b_id)
+        staff_id = (request.session.get("auth") or {}).get("staff_id")
+        
+        if not staff_id:
+            messages.error(request, "Session expired. Please log in again.")
+            return redirect("clerk:business_information", b_id=business_id)
 
-    owner = dict(dto.owner or {})
-    owner["owner_full_name"] = _compose_owner_full_name(owner)
+        # Get business details for notifications
+        dto = business_info.execute_by_business_id(business_id)
+        owner = dto.owner or {}
+        business = dto.business or {}
+        bname = (business.get("business_name") or "Business").strip()
+        owner_person_id = owner.get("person_id")
+        owner_email = owner.get("email")
+        contact_mobile = owner.get("mobile_num") or owner.get("mobile_no") or owner.get("contact_no")
 
-    business = dto.business or {}
-    header_status = ((business.get("business_status") or "").strip().upper())
+        # Call Supabase RPC to close business without payment
+        payload = {
+            "p_business_id": int(business_id),
+            "p_clerk_staff_id": int(staff_id),
+        }
+        
+        res = supabase.rpc("clerk_close_business_no_dues", payload).execute()
+        if getattr(res, "error", None):
+            raise RuntimeError(getattr(res.error, "message", str(res.error)))
 
-    # NEW: compute outstanding dues (reusing renewal quote)
-    current_year = date.today().year
-    grand_total, quote_rows, paid_rows = renewal_quote_svc.execute(business_id=b_id, year=current_year)
+        # Log the business closure action
+        try:
+            log_business_action(
+                business_id=business_id,
+                table_affected='BUSINESS',
+                action='UPDATE',
+                performer_id=staff_id,
+                details=f'Business #{business_id} ({bname}) closed - no outstanding dues.',
+            )
+        except Exception as log_err:
+            print(f"[WARN] Failed to log business closure action: {log_err}", flush=True)
 
-    def _to_decimal(x):
-        if x is None:
-            return Decimal("0")
-        return x if isinstance(x, Decimal) else Decimal(str(x))
+        # Send notifications
+        # SMS notification
+        if contact_mobile:
+            try:
+                from common.send_sms import send_sms
+                print(f"[SMS] Sending to {contact_mobile} for business {bname}", flush=True)
+                send_sms(
+                    to=contact_mobile,
+                    message=(
+                        f"BARUG: Your business '{bname}' has been officially closed. "
+                        f"No outstanding dues. Status: CLOSED. Thank you."
+                    )
+                )
+                print(f"[SMS] Successfully sent to {contact_mobile}", flush=True)
+            except Exception as sms_err:
+                print(f"[WARN] SMS notification failed: {sms_err}", flush=True)
+        else:
+            print(f"[WARN] No contact mobile for business {business_id}", flush=True)
 
-    quote_rows = quote_rows or []
-    base_sum  = sum(_to_decimal(getattr(r, "base_fee", 0))   for r in quote_rows)
-    surch_sum = sum(_to_decimal(getattr(r, "surcharge", 0))  for r in quote_rows)
-    has_dues  = (_to_decimal(grand_total) > 0)
+        # Email notification
+        if owner_email:
+            try:
+                print(f"[EMAIL] Sending to {owner_email} for business {bname}", flush=True)
+                subject = f"Business Closure Confirmation - {bname}"
+                html_body = f"""
+                    <h3>Business Closure Confirmation</h3>
+                    <p>Your business <strong>{bname}</strong> (ID: {business_id:06d}) has been officially closed.</p>
+                    <p><strong>Effective Date:</strong> {date.today().strftime('%B %d, %Y')}</p>
+                    <p><strong>Status:</strong> CLOSED</p>
+                    <p>All requirements have been satisfied with no outstanding dues.</p>
+                    <p>Thank you for your compliance.</p>
+                """
+                send_email(
+                    subject=subject,
+                    to=[owner_email],
+                    body_text=f"Business Closure Confirmation - {bname}\n\nYour business {bname} (ID: {business_id:06d}) has been officially closed.\nEffective Date: {date.today().strftime('%B %d, %Y')}\nStatus: CLOSED\n\nAll requirements have been satisfied with no outstanding dues.\nThank you for your compliance.",
+                    body_html=html_body,
+                )
+                print(f"[EMAIL] Successfully sent to {owner_email}", flush=True)
+            except Exception as email_err:
+                print(f"[WARN] Email notification failed: {email_err}", flush=True)
+        else:
+            print(f"[WARN] No owner email for business {business_id}", flush=True)
 
-    return render(request, "business/initiate_business_closure.html", {
-        'page_path'    : f'{user_role} / Business Closure : {b_id:06d}',
-        'page_title'   : f'Business Closure : {b_id:06d}',
-        'business'     : business,
-        'owner'        : owner,
-        'header_status': header_status,
+        # In-app notification
+        if owner_person_id:
+            try:
+                print(f"[NOTIF] Creating in-app notification for person {owner_person_id}", flush=True)
+                notify_user(
+                    user_type_id=1,  # PERSON
+                    person_id=owner_person_id,
+                    staff_id=None,
+                    title="Business Closed",
+                    body=f"Your business '{bname}' has been officially closed. No outstanding dues. Status: CLOSED.",
+                    deep_link=f"/business/{business_id}"
+                )
+                print(f"[NOTIF] Successfully created for person {owner_person_id}", flush=True)
+            except Exception as notif_err:
+                print(f"[WARN] In-app notification failed: {notif_err}", flush=True)
+        else:
+            print(f"[WARN] No owner_person_id for business {business_id}", flush=True)
 
-        # NEW context for dues display
-        'grand_total'  : grand_total,
-        'quote_rows'   : quote_rows,
-        'base_sum'     : base_sum,
-        'surch_sum'    : surch_sum,
-        'has_dues'     : has_dues,
-        'clearance_year': current_year,  # optional for display/consistency
-    })
+        messages.success(request, f"Business '{bname}' has been successfully closed.")
+        return redirect("clerk:business_information", b_id=business_id)
+
+    except Exception as e:
+        print(f"\n[initiate_business_closure][ERROR]: {repr(e)}", flush=True)
+        messages.error(request, f"Failed to close business: {e}")
+        return redirect("clerk:business_information", b_id=b_id)
 
 # clerk/views.py  (add)
 @session_login_required
@@ -3791,6 +4362,75 @@ def create_closure_payment_request(
                 performer_id=_auth_staff_id(request),
                 details=f'Created a closure request for business #{business_id}',
             )
+
+            # Send email and SMS notification
+            if new_ids:
+                try:
+                    dto = business_info.execute_by_business_id(business_id)
+                    owner = dict(dto.owner or {})
+                    business = dict(dto.business or {})
+                    
+                    owner_mobile = (owner.get("mobile") or owner.get("mob_num") or "").strip()
+                    owner_email = (owner.get("email") or "").strip()
+                    bname = (business.get("business_name") or "your business").strip()
+                    
+                    # Send SMS
+                    if owner_mobile:
+                        msg = (
+                            f"BARUG: Closure payment request created for '{bname}'.\n"
+                            f"Period: {period_type} {period_year}.\n"
+                            f"Please settle outstanding dues at the Barangay Office to complete closure."
+                        )
+                        send_sms(owner_mobile, msg, fail_silently=True)
+                    
+                    # Send Email
+                    if owner_email:
+                        try:
+                            owner_name = f"{owner.get('first_name', '')} {owner.get('last_name', '')}".strip() or "Business Owner"
+                            subject = f"Business Closure Payment Request Created - {bname}"
+                            body_html = f"""
+                                <p>Hi {owner_name},</p>
+                                <p>A closure payment request has been created for your business <strong>{bname}</strong> (ID: {business_id:06d}).</p>
+                                <p><b>Period:</b> {period_type} {period_year}</p>
+                                <p><b>Status:</b> FOR TREASURER REVIEW</p>
+                                <p>Please settle any outstanding dues at the Barangay Office to complete the closure process.</p>
+                                <p>Thank you,<br>Barangay Sto. Niño</p>
+                            """
+                            body_txt = (
+                                f"Hi {owner_name},\n\n"
+                                f"A closure payment request has been created for your business {bname} (ID: {business_id:06d}).\n"
+                                f"Period: {period_type} {period_year}\n"
+                                f"Status: FOR TREASURER REVIEW\n\n"
+                                f"Please settle any outstanding dues at the Barangay Office to complete the closure process.\n\n"
+                                f"Thank you,\nBarangay Sto. Niño\n"
+                            )
+                            send_email(
+                                subject=subject,
+                                to=[(owner_name, owner_email)],
+                                body_text=body_txt,
+                                body_html=body_html,
+                                from_name="Barangay Sto. Niño",
+                                fail_silently=True,
+                            )
+                        except Exception:
+                            pass
+                    
+                    # Send in-app notification
+                    owner_person_id = owner.get("person_id") or owner.get("owner_person_id")
+                    if owner_person_id:
+                        try:
+                            notify_user(
+                                user_type_id=1,  # PERSON
+                                person_id=owner_person_id,
+                                staff_id=None,
+                                title="Business Closure Payment Request",
+                                body=f"Closure payment request for '{bname}' has been created. Period: {period_type} {period_year}. Please settle outstanding dues.",
+                                deep_link=f"/business/{business_id}"
+                            )
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
 
             return redirect("clerk:initiate_business_closure", b_id=business_id)
         except Exception as e:

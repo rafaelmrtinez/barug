@@ -61,7 +61,7 @@ class StaffUpdateForm(forms.Form):
         widget=forms.Select(attrs={
             'class': 'form-select',
         }),
-        label='Role',
+        label='Role*',
         required=False,
     )
     assigned_purok = forms.ChoiceField(
@@ -86,7 +86,7 @@ class StaffUpdateForm(forms.Form):
         widget=forms.Select(attrs={
             'class': 'form-select',
         }),
-        label='Account Status',
+        label='Account Status*',
         required=False,
     )
     username = forms.CharField(
@@ -94,7 +94,7 @@ class StaffUpdateForm(forms.Form):
             'class': 'form-control',
             'placeholder': 'Enter username'
         }),
-        label='Username',
+        label='Username*',
         required=False,
     )
     password = forms.CharField(
@@ -514,6 +514,15 @@ class ResidentProfileform(forms.Form):
             # 'readonly' : 'readonly',
     }),
         label= 'City',
+        required= True,
+    )
+    province = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'province',
+            'class' : 'form-control',
+            'placeholder' : 'Province',
+    }),
+        label= 'Province',
         required= True,
     )
     email = forms.EmailField(

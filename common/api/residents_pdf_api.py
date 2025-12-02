@@ -16,7 +16,11 @@ from src.app.services.resident_report_service import ResidentReportService
 from src.infra.utilities.pdf_generator_h import PdfGeneratorH
 
 logger = logging.getLogger(__name__)
-authorized_role = "Barangay Secretary", "BARANGAY SECRETARY", "barangay secretary", "Barangay Captain", "BARANGAY CAPTAIN", "barangay captain"
+authorized_role = (
+    "Barangay Secretary", "BARANGAY SECRETARY", "barangay secretary",
+    "Barangay Captain", "BARANGAY CAPTAIN", "barangay captain",
+    "Barangay Health Worker", "BARANGAY HEALTH WORKER", "bhw", "Super Admin"
+)
 
 @method_decorator(session_login_required, name="dispatch")
 @method_decorator(role_required(*authorized_role), name="dispatch")

@@ -26,7 +26,7 @@
                         <li><a class="dropdown-item" href="{% url 'captain:business_map' %}">Business Map View</a></li>
                     </ul>
                 </li>
-                <li class="nav-item dropdown me-3">
+                <!-- <li class="nav-item dropdown me-3">
                     <a class="nav-link dropdown-toggle" href="#" id="staffManagementDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         Staff Directory
                     </a>
@@ -34,6 +34,9 @@
                         <li><a class="dropdown-item" href="{% url 'captain:staff_list' %}">Manage Staff Account</a></li>
                         <li><a class="dropdown-item" href="{% url 'captain:staff_account_requests_list' %}">Staff Account Requests</a></li>
                     </ul>
+                </li> -->
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'captain:staff_requests_list' %}">Staff Account Request</a>
                 </li>
             </ul>
         </div>

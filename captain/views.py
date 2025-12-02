@@ -16,8 +16,10 @@ import io
 import base64
 import logging
 from datetime import datetime, time as dtime, date
+from dateutil.relativedelta import relativedelta
 from typing import Any, Dict, List, Optional
 from django.conf import settings
+from django.contrib import messages
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import render, redirect
 from django.views.decorators.http import require_GET, require_http_methods
@@ -86,6 +88,7 @@ from .forms import (
     HouseholdFilters,
     ResidentFilters,
     ORFilters,
+    FamilyFilters,
 )
 
 
@@ -131,6 +134,8 @@ def dashboard(
     captain_dashboard_service=Provide[AppContainer.captain_dashboard_service],
 ):
     user_role = _auth_role_name(request)
+    auth = request.session.get('auth', {})
+    person_id = auth.get('person_id')
 
     kpis = {
         "ongoing_cases": 0,
@@ -144,6 +149,7 @@ def dashboard(
     }
 
     dashboard_json = None
+    announcements = []
 
     try:
         payload = captain_dashboard_service.get_dashboard_content() or {}
@@ -151,6 +157,13 @@ def dashboard(
         dashboard_json = payload.get("dashboard_json")
     except Exception as exc:
         print("Error fetching captain dashboard KPIs:", exc)
+    
+    if person_id:
+        try:
+            from authentication.announcement_views import get_user_announcements
+            announcements = get_user_announcements(person_id)
+        except Exception as exc:
+            print(f"Error fetching announcements for person {person_id}:", exc)
 
     return render(request, "captain/dashboard.html", {
         'page_path' : f'{user_role} / Dashboard',
@@ -158,6 +171,7 @@ def dashboard(
         'kpis': kpis,
         'dashboard_json': dashboard_json,
         'today': datetime.now().strftime("%B %d, %Y"),
+        'announcements': announcements,
     })
 
 def _smart_redirect(request, url_name, *args, **kwargs):
@@ -784,6 +798,7 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
                 "nationality_label":  _label_from_choices(form.fields["nationality"].choices, cd.get("nationality")),
                 "religion_label":     _label_from_choices(form.fields["religion"].choices, cd.get("religion")),
                 "city":      cd.get("city") or "",
+                "province":  cd.get("province") or "",
                 "barangay":  cd.get("barangay") or "",
                 "sitio_purok": cd.get("purok_sitio") or "",
                 "street":    cd.get("street") or "",
@@ -1135,6 +1150,7 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
             p_nationality_id=personal.get("nationality_id"),
             p_religion_id=personal.get("religion_id"),
             p_city=personal.get("city"),
+            p_province=personal.get("province"),
             p_barangay=personal.get("barangay"),
             p_sitio_purok=personal.get("sitio_purok"),
             p_street=personal.get("street"),
@@ -1845,6 +1861,162 @@ def staff_account_requests_search_api(request):
 
     return JsonResponse({"results": filtered[:50]})
 
+def get_user_info(request):
+    auth = request.session.get('auth', {})
+    staff_id = auth.get('staff_id')
+    role_name = auth.get('role_name', 'Staff').title()
+    first_name = (auth.get('first_name', '') or '').strip().title()
+    last_name = (auth.get('last_name', '') or '').strip().title()
+    middle_name = (auth.get('middle_name', '') or '').strip().title()
+    
+    name_parts = [first_name]
+    if middle_name:
+        name_parts.append(middle_name[0] + '.')
+    user_fullname = f"{last_name}, {' '.join(name_parts)}"
+    
+    return user_fullname, role_name, role_name.lower().replace(' ', '_')
+
+# Staff requests views
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@nocache
+def staff_requests_list(request: HttpRequest) -> HttpResponse:
+    """View staff account requests submitted by this captain"""
+    from secretary.models import Secretary
+    
+    auth = request.session.get('auth', {})
+    staff_id = auth.get('staff_id')
+    user_fullname, user_role, user_role_template = get_user_info(request)
+    
+    # Get filter parameters
+    search_query = request.GET.get('q', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    role_filter = request.GET.get('role', '').strip()
+    date_filter = request.GET.get('date_submitted', '').strip()
+    
+    try:
+        requests = Secretary.get_staff_account_req_list_by_requester(staff_id)
+        stats_data = Secretary.get_staff_request_statistics_by_requester(staff_id)
+        stats = stats_data[0] if stats_data else {
+            'total_requests': 0, 'pending_requests': 0, 'approved_requests': 0, 'rejected_requests': 0
+        }
+    except Exception as e:
+        logger.exception("Error loading requests")
+        from common.flash import flash_system_error
+        flash_system_error(request, "Failed to load requests.")
+        requests = []
+        stats = {'total_requests': 0, 'pending_requests': 0, 'approved_requests': 0, 'rejected_requests': 0}
+    
+    # Apply filters
+    filtered_requests = requests
+    
+    # Search by name
+    if search_query:
+        search_lower = search_query.lower()
+        filtered_requests = [
+            r for r in filtered_requests 
+            if search_lower in (r.get('name') or '').lower()
+        ]
+    
+    # Filter by status
+    if status_filter:
+        filtered_requests = [
+            r for r in filtered_requests 
+            if str(r.get('status_id', '')) == status_filter
+        ]
+    
+    # Filter by role
+    if role_filter:
+        filtered_requests = [
+            r for r in filtered_requests 
+            if str(r.get('role_id', '')) == role_filter
+        ]
+    
+    # Filter by date
+    if date_filter:
+        from datetime import datetime
+        try:
+            target_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
+            date_filtered = []
+            for r in filtered_requests:
+                pretty_date = r.get('date_time_submitted_pretty')
+                if pretty_date and isinstance(pretty_date, str):
+                    try:
+                        # Parse "December 1, 2025 3:28 A.M." format
+                        date_part = ' '.join(pretty_date.split()[:3])  # "December 1, 2025"
+                        parsed_date = datetime.strptime(date_part, "%B %d, %Y").date()
+                        if parsed_date == target_date:
+                            date_filtered.append(r)
+                    except (ValueError, IndexError):
+                        continue
+            filtered_requests = date_filtered
+        except ValueError:
+            pass
+    
+    # Implement pagination with 9 requests per page
+    paginator = Paginator(filtered_requests, 9)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, "captain/requests_list.html", {
+        'page_obj': page_obj,
+        'requests': filtered_requests,
+        'stats': stats,
+        'search_query': search_query,
+        'status_filter': status_filter,
+        'role_filter': role_filter,
+        'date_filter': date_filter,
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'user_role_template': user_role_template,
+        'page_path': f"{user_role} / My Requests",
+        'page_title': 'My Staff Requests',
+    })
+
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@nocache
+def staff_request_detail(request: HttpRequest, request_id: int) -> HttpResponse:
+    """View detailed information about a specific staff request"""
+    from secretary.models import Secretary
+    
+    auth = request.session.get('auth', {})
+    staff_id = auth.get('staff_id')
+    user_fullname, user_role, user_role_template = get_user_info(request)
+    
+    try:
+        details_data = Secretary.get_staff_acc_req_profile_progress(request_id)
+        history = Secretary.get_staff_acc_req_status_history(request_id)
+        
+        if not details_data:
+            from common.flash import flash_warning
+            flash_warning(request, "Request not found.")
+            return redirect('captain:staff_requests_list')
+        
+        request_detail = details_data[0]
+        
+        # Allow access if user is the requester OR if user has appropriate role permissions
+        if request_detail.get('requested_by_id') != staff_id:
+            # For now, allow captains to view all requests for debugging
+            # TODO: Implement proper role-based access control
+            pass
+            
+    except Exception as e:
+        logger.exception(f"Error loading request {request_id}")
+        from common.flash import flash_system_error
+        flash_system_error(request, "Failed to load request details.")
+        return redirect('captain:staff_requests_list')
+    
+    return render(request, "captain/request_detail.html", {
+        'request': request_detail,
+        'history': history,
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'user_role_template': user_role_template,
+        'page_path': f"{user_role} / My Requests / Details",
+        'page_title': f"Request Details - {request_detail.get('full_name', 'Unknown')}",
+    })
+
 # -------------------------------
 # RESIDENT
 # -------------------------------
@@ -1916,6 +2088,33 @@ def ajax_resident_search(
     context = {"rows": rows}
     html = render_to_string("resident/_resident_list.html", context, request=request)
     return HttpResponse(html)
+
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@csrf_protect
+@nocache
+@inject
+def resident_detail(
+    request: HttpRequest,
+    person_id: int,
+    resident_service: IResidentService = Provide[AppContainer.resident_service],
+) -> HttpResponse:
+    """
+    Display detailed resident information.
+    """
+    user_role = _auth_role_name(request)
+    
+    resident = resident_service.get_resident_detail(person_id)
+    
+    if not resident:
+        messages.error(request, "Resident not found.")
+        return redirect("captain:resident_list")
+    
+    return render(request, "resident/resident_detail.html", {
+        'page_path': f'{user_role} / Resident / {resident.person_code}',
+        'page_title': f'Resident {resident.person_code}',
+        'resident': resident,
+    })
 
 def resident_map_list(request):
     form = StaffFilters()
@@ -2032,6 +2231,33 @@ def ajax_household_search(
 @csrf_protect
 @nocache
 @inject
+def household_detail(
+    request: HttpRequest,
+    household_id: int,
+    household_service: IHouseholdService = Provide[AppContainer.household_service],
+) -> HttpResponse:
+    """
+    Display detailed household information including all families and members.
+    """
+    user_role = _auth_role_name(request)
+    
+    household = household_service.get_household_detail(household_id)
+    
+    if not household:
+        messages.error(request, "Household not found.")
+        return redirect("captain:household_list")
+    
+    return render(request, "household/household_detail.html", {
+        'page_path': f'{user_role} / Household / {household.household_num}',
+        'page_title': f'Household {household.household_num}',
+        'household': household,
+    })
+
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@csrf_protect
+@nocache
+@inject
 def household_map_list(
     request: HttpRequest,
     household_service: IHouseholdService = Provide[AppContainer.household_service],
@@ -2089,6 +2315,112 @@ def api_household_pins(
         ownership_type=_to_int_or_none(request.GET.get("house_ownership")),
     )
     return JsonResponse(pins, safe=False)
+
+
+# -------------------------------
+# FAMILY
+# -------------------------------
+
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@csrf_protect
+@nocache
+@inject
+def family_list(
+    request: HttpRequest,
+    household_repo: IHouseholdRepository = Provide[AppContainer.household_repository],
+) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+    
+    user_role = _auth_role_name(request)
+    form = FamilyFilters(request.GET or None)
+
+    search = request.GET.get("search")
+    household_type = _to_int_or_none(request.GET.get("household_type"))
+    nhts_status = _to_int_or_none(request.GET.get("nhts_status"))
+    indigent_status = _to_int_or_none(request.GET.get("indigent_status"))
+
+    if search:
+        rows = household_repo.search_family(search)
+    elif household_type:
+        rows = household_repo.filter_family_by_household_type(household_type)
+    elif nhts_status:
+        rows = household_repo.filter_family_by_nhts_status(nhts_status)
+    elif indigent_status:
+        rows = household_repo.filter_family_by_indigent_status(indigent_status)
+    else:
+        rows = household_repo.fetch_family_list()
+
+    paginator = Paginator(rows, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "user_role": user_role,
+        "form": form,
+        "page_obj": page_obj,
+        "search_url": "captain:ajax_family_search",
+    }
+    return render(request, "family/family_list.html", context)
+
+
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@csrf_protect
+@nocache
+@inject
+def ajax_family_search(
+    request: HttpRequest,
+    household_repo: IHouseholdRepository = Provide[AppContainer.household_repository],
+) -> HttpResponse:
+    
+    search = request.GET.get("search")
+    household_type = _to_int_or_none(request.GET.get("household_type"))
+    nhts_status = _to_int_or_none(request.GET.get("nhts_status"))
+    indigent_status = _to_int_or_none(request.GET.get("indigent_status"))
+
+    if search:
+        rows = household_repo.search_family(search)
+    elif household_type:
+        rows = household_repo.filter_family_by_household_type(household_type)
+    elif nhts_status:
+        rows = household_repo.filter_family_by_nhts_status(nhts_status)
+    elif indigent_status:
+        rows = household_repo.filter_family_by_indigent_status(indigent_status)
+    else:
+        rows = household_repo.fetch_family_list()
+
+    context = {
+        "rows": rows,
+        "search_url": "captain:ajax_family_search",
+    }
+    return render(request, "family/_family_list.html", context)
+
+
+@session_login_required
+@role_required(CAPTAIN_ROLE)
+@csrf_protect
+@nocache
+@inject
+def family_detail(
+    request: HttpRequest,
+    family_id: int,
+    household_repo: IHouseholdRepository = Provide[AppContainer.household_repository],
+) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+    
+    user_role = _auth_role_name(request)
+    family = household_repo.fetch_family_detail(family_id)
+    
+    if not family:
+        messages.error(request, "Family not found.")
+        return redirect("captain:family_list")
+
+    context = {
+        'page_path': f'{user_role} / Family / {family.get("family_num", "")}',
+        'page_title': f'Family {family.get("family_num", "")}',
+        "user_role": user_role,
+        "family": family,
+    }
+    return render(request, "family/family_detail.html", context)
 
 
 # -------------------------------
@@ -2284,13 +2616,36 @@ def business_map_list(
     b_category = _to_int_or_none(request.GET.get("b_category"))
     ownership_type = _to_int_or_none(request.GET.get("ownership_type"))
     status = _to_int_or_none(request.GET.get("status"))
+    purok = request.GET.get("purok") or None
+    date_range = request.GET.get("date_range") or None
+    employee_range = request.GET.get("employee_range") or None
 
-    rows = business_service.execute(
-        search=search,
-        b_category=b_category,
-        ownership_type=ownership_type,
-        status=status,
-    )
+    # Use execute_with_filters if any of the new filters are applied
+    # This fetches additional fields (date_established, num_of_employees, sitio_purok)
+    use_filter_query = purok or date_range or employee_range
+    
+    if use_filter_query:
+        rows = business_service.execute_with_filters()
+    else:
+        rows = business_service.execute(
+            search=search,
+            b_category=b_category,
+            ownership_type=ownership_type,
+            status=status,
+        )
+    
+    # Apply additional filters after fetching results
+    if purok:
+        rows = [r for r in rows if (r.sitio_purok or '').upper() == purok.upper()]
+    
+    if date_range:
+        months = int(date_range)
+        cutoff_date = datetime.now().date() - relativedelta(months=months)
+        rows = [r for r in rows if r.date_established and r.date_established >= cutoff_date]
+    
+    if employee_range:
+        min_emp, max_emp = map(int, employee_range.split('-'))
+        rows = [r for r in rows if r.num_of_employees and min_emp <= r.num_of_employees <= max_emp]
 
     paginator = Paginator(rows, 5)
     page_number = request.GET.get("page")
@@ -2312,6 +2667,9 @@ def business_map_list(
                 'b_category' : b_category,
                 'ownership_type' :ownership_type,
                 'status' : status,
+                'purok': purok,
+                'date_range': date_range,
+                'employee_range': employee_range,
             },
             "pins_url": reverse("captain:api_business_pins"),
             'search_url': 'captain:ajax_business_search',
@@ -2335,6 +2693,9 @@ def api_business_pins(
         b_category=_to_int_or_none(request.GET.get("b_category")),
         ownership_type=_to_int_or_none(request.GET.get("ownership_type")),
         status=_to_int_or_none(request.GET.get("status")),
+        purok=(request.GET.get("purok") or None),
+        date_range=(request.GET.get("date_range") or None),
+        employee_range=(request.GET.get("employee_range") or None),
     )
     return JsonResponse(pins, safe=False)
 
@@ -2676,6 +3037,10 @@ def financial_report(
 
     search = request.GET.get("search") or request.GET.get("q")
     pay_meth = _to_int_or_none(request.GET.get("pay_meth"))
+    month = _to_int_or_none(request.GET.get("month"))
+    year = _to_int_or_none(request.GET.get("year"))
+    date_from = request.GET.get("date_from") or None
+    date_to = request.GET.get("date_to") or None
     
     # Check if this is an AJAX request for rows only
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
@@ -2683,10 +3048,17 @@ def financial_report(
 
     rows = or_service.execute(
         search=search,
-        payment_method=pay_meth
+        payment_method=pay_meth,
+        month=month,
+        year=year,
+        date_from=date_from,
+        date_to=date_to
     )
 
-    if (search or pay_meth is not None):
+    # Calculate total
+    total_amount = sum(float(r.amount_paid or 0) for r in rows)
+
+    if (search or pay_meth is not None or month or year or date_from or date_to):
         form = ORFilters()
 
     paginator = Paginator(rows, 10)
@@ -2698,7 +3070,7 @@ def financial_report(
         return render(
             request,
             "financial/_financial_report_rows.html",
-            {"rows": page_obj.object_list}
+            {"rows": page_obj.object_list, "total_amount": total_amount}
         )
 
     return render(
@@ -2710,5 +3082,6 @@ def financial_report(
             'form': form,
             'page_obj': page_obj,
             'search_url': 'captain:financial_report_search',
+            'total_amount': total_amount,
         },
     )

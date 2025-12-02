@@ -403,6 +403,15 @@ class ResidentProfileform(forms.Form):
         label= 'City',
         required= True,
     )
+    province = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'province',
+            'class' : 'form-control',
+            'placeholder' : 'Province',
+    }),
+        label= 'Province',
+        required= True,
+    )
     email = forms.EmailField(
         widget=forms.EmailInput(attrs={
             'id' : 'email',

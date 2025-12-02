@@ -4,7 +4,8 @@ from . import web_views
 from django.conf import settings
 from django.conf.urls.static import static
 from common.api.residents_pdf_api import ResidentsPDFAPI
-from common.api.business_pdf_api import BusinessPDFAPI
+from common.api.business_pdf_api import BusinessPDFAPI, BusinessDetailPDFAPI
+from common.api.paid_history_pdf_api import PaidHistoryPDFAPI
 from common.api.household_pdf_api import HouseholdPDFAPI
 
 app_name = 'clerk'
@@ -47,6 +48,7 @@ urlpatterns = [
     path("business/business_information_review/", views.business_information_review, name="business_information_review"),
     path("business/business_list/", views.business_list, name="business_list"),
     path("business/business_information/<int:b_id>/", views.business_information, name="business_information"),
+    path("business/business_update/<int:b_id>/", views.business_update, name="business_update"),
     path("business/business_map/", views.business_map_list, name="business_map_list"),
     path("business/business_renewal/", views.renewal_list, name="renewal_list"),
     path("business/create_renewal_request/<int:b_id>/", views.create_renewal_request, name="create_renewal_request"),
@@ -71,4 +73,6 @@ urlpatterns = [
     # People request history
     path("people/requests/", views.people_requests, name="people_requests"),
     path("people/<int:person_id>/requests/", views.person_request_history, name="person_request_history"),
+    path("api/business/<int:b_id>/pdf/", BusinessDetailPDFAPI.as_view(), name="api_business_detail_pdf"),
+    path("api/business/<int:b_id>/paid-history/pdf/", PaidHistoryPDFAPI.as_view(), name="api_paid_history_pdf"),
 ]

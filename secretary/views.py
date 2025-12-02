@@ -9,6 +9,7 @@ import io
 import logging
 from uuid import uuid4
 from datetime import datetime, time as dtime, date
+from dateutil.relativedelta import relativedelta
 import logging
 log = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ from django.views.decorators.csrf import csrf_protect as csrf_required
 from django.shortcuts import render, redirect
 from django.views.decorators.http import require_GET, require_http_methods
 from django.views.decorators.csrf import csrf_protect
+from django.db import connection
 from dependency_injector.wiring import inject, Provide
 
 from authentication.guards import session_login_required, role_required
@@ -77,6 +79,7 @@ from src.app.transfer_objects.commands.schedule_cmd import ScheduleAnnouncementC
 
 from .forms import (
     StaffFilters,
+    StaffAccountRequestFilters,
     BusinessFilters,
     HouseholdFilters,
     AnnouncementDraftForm,
@@ -84,6 +87,7 @@ from .forms import (
     ResidentFilters,
     AudienceScope,
     AddChannelForm,
+    FamilyFilters,
 )
 
 
@@ -116,6 +120,7 @@ ROLE_BHW = 9
 ROLE_LUPON = 8
 WZ_KEY = "staff_nonres_wizard"
 STAFF_FILTER_SESSION_KEY = "secretary_staff_filters"
+STAFF_REQ_FILTER_SESSION_KEY = "secretary_staff_req_filters"
 
 SECRETARY_ROLE = "Barangay Secretary"
 
@@ -311,6 +316,8 @@ def dashboard(
 ):
 
     user_role = _auth_role_name(request)
+    auth = request.session.get('auth', {})
+    person_id = auth.get('person_id')
 
     kpis = {
         "ongoing_cases": 0,
@@ -322,6 +329,7 @@ def dashboard(
     }
 
     dashboard_json = None
+    announcements = []
 
     try:
         payload = secretary_dashboard_service.get_dashboard_content() or {}
@@ -329,6 +337,13 @@ def dashboard(
         dashboard_json = payload.get("dashboard_json")
     except Exception as exc:
         print("Error fetching secretary dashboard KPIs:", exc)
+    
+    if person_id:
+        try:
+            from authentication.announcement_views import get_user_announcements
+            announcements = get_user_announcements(person_id)
+        except Exception as exc:
+            print(f"Error fetching announcements for person {person_id}:", exc)
 
     return render(request, "secretary/dashboard.html", {
         'page_path' : f'{user_role} / Dashboard',
@@ -336,6 +351,7 @@ def dashboard(
         'kpis': kpis,
         'dashboard_json': dashboard_json,
         'today': datetime.now().strftime("%B %d, %Y"),
+        'announcements': announcements,
     })
 
 @session_login_required
@@ -746,6 +762,7 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
                 "nationality_label":  _label_from_choices(form.fields["nationality"].choices, cd.get("nationality")),
                 "religion_label":     _label_from_choices(form.fields["religion"].choices, cd.get("religion")),
                 "city":      cd.get("city") or "",
+                "province":  cd.get("province") or "",
                 "barangay":  cd.get("barangay") or "",
                 "sitio_purok": cd.get("purok_sitio") or "",
                 "street":    cd.get("street") or "",
@@ -1155,6 +1172,7 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
             p_nationality_id=personal.get("nationality_id"),
             p_religion_id=personal.get("religion_id"),
             p_city=personal.get("city"),
+            p_province=personal.get("province"),
             p_barangay=personal.get("barangay"),
             p_sitio_purok=personal.get("sitio_purok"),
             p_street=personal.get("street"),
@@ -1400,7 +1418,103 @@ def staff_search_api(request):
 @session_login_required
 @role_required(SECRETARY_ROLE)
 @nocache
+@require_http_methods(["GET", "POST"])
 def staff_dets(request, staff_code: str):
+    # Handle POST request for personal information update
+    if request.method == "POST" and request.POST.get('action') == 'update_personal_info':
+        from authentication.models import Authentication
+        
+        auth = request.session.get("auth") or {}
+        updated_by_staff_id = auth.get("staff_id")
+        
+        if not updated_by_staff_id:
+            flash_warning(request, "Your session is missing staff credentials.")
+            return redirect(request.path)
+        
+        # Check if reason is provided
+        reason = (request.POST.get('reason') or '').strip()
+        if not reason:
+            flash_warning(request, "Please provide a reason for updating personal information.")
+            return redirect(request.path)
+        
+        try:
+            # Get current staff data first
+            rows = Secretary.get_staff_profile_display(staff_code) if staff_code else []
+            current_staff = rows[0] if rows else None
+            
+            if not current_staff:
+                flash_warning(request, "Staff not found.")
+                return redirect("secretary:staff_list")
+            
+            staff_id = current_staff.get("staff_id")
+            if not staff_id:
+                flash_warning(request, "Staff ID not found.")
+                return redirect("secretary:staff_list")
+            
+            # Extract only the fields that are in the modal
+            first_name = (request.POST.get('first_name') or '').strip() or None
+            middle_name = (request.POST.get('middle_name') or '').strip() or None
+            last_name = (request.POST.get('last_name') or '').strip() or None
+            suffix = (request.POST.get('suffix') or '').strip() or None
+            birthdate = (request.POST.get('birthdate') or '').strip() or None
+            sex_id = Authentication._to_int_or_none(request.POST.get('sex_id'))
+            civil_status_id = Authentication._to_int_or_none(request.POST.get('civil_status_id'))
+            nationality_id = Authentication._to_int_or_none(request.POST.get('nationality_id'))
+            religion_id = Authentication._to_int_or_none(request.POST.get('religion_id'))
+            mobile_num = (request.POST.get('mobile_number') or '').strip() or None
+            
+            # Address fields
+            city = (request.POST.get('city') or '').strip() or None
+            barangay = (request.POST.get('barangay') or '').strip() or None
+            sitio_purok = (request.POST.get('sitio_purok') or '').strip() or None
+            street = (request.POST.get('street') or '').strip() or None
+            province = (request.POST.get('province') or '').strip() or None
+            
+            # Call the update function with only the fields in the modal
+            result = Authentication.update_personal_information(
+                staff_id=staff_id,
+                updated_by_staff_id=updated_by_staff_id,
+                first_name=first_name,
+                middle_name=middle_name,
+                last_name=last_name,
+                suffix=suffix,
+                birthdate=birthdate,
+                sex_id=sex_id,
+                civil_status_id=civil_status_id,
+                nationality_id=nationality_id,
+                religion_id=religion_id,
+                email=None,
+                mobile_number=mobile_num,
+                occupation=None,
+                monthly_income_id=None,
+                residential_status_id=None,
+                education_id=None,
+                employment_status_id=None,
+                is_student=None,
+                gov_mem_prog_ids=None,
+                city=city,
+                barangay=barangay,
+                sitio_purok=sitio_purok,
+                street=street,
+                province=province,
+                reason=f'Personal information update by secretary: {reason}'
+            )
+            
+            if result:
+                flash_success(request, 'Personal information updated successfully!')
+            else:
+                flash_warning(request, 'No changes were made.')
+                
+        except (DatabaseError, OperationalError, IntegrityError) as e:
+            logger.error(f"Database error updating personal info: {str(e)}", exc_info=True)
+            flash_db_error(request, e)
+        except Exception as e:
+            logger.error(f"Error updating personal info: {str(e)}", exc_info=True)
+            flash_system_error(request, 'An error occurred while updating personal information.', exc=e)
+        
+        return redirect(request.path)
+    
+    # GET request handling
     try:
         rows = Secretary.get_staff_profile_display(staff_code) if staff_code else []
     except Exception:
@@ -1431,9 +1545,581 @@ def staff_dets(request, staff_code: str):
     }
     return render(request, "staff/staff_dets.html", ctx)
 
- 
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+def staff_account_requests_list(request: HttpRequest) -> HttpResponse:
+    filters = request.session.get(STAFF_REQ_FILTER_SESSION_KEY, {}) or {}
+    role_raw = (filters.get("role") or "").strip()
+    date_raw = (filters.get("date_submitted") or "").strip()
+    search_term = (filters.get("q") or "").strip()
 
- # ─────────────────────────────────────────────────────────────
+    updated = False
+    should_redirect = False
+
+    if "clear_filters" in request.GET:
+        role_raw = ""
+        date_raw = ""
+        search_term = ""
+        updated = True
+        should_redirect = True
+
+    remove_target = (request.GET.get("remove_filter") or "").strip()
+    if remove_target:
+        if remove_target == "role":
+            role_raw = ""
+        elif remove_target == "date_submitted":
+            date_raw = ""
+        elif remove_target == "search":
+            search_term = ""
+        updated = True
+        should_redirect = True
+
+    if "role" in request.GET:
+        role_raw = (request.GET.get("role") or "").strip()
+        updated = True
+    if "date_submitted" in request.GET:
+        date_raw = (request.GET.get("date_submitted") or "").strip()
+        updated = True
+    if "q" in request.GET:
+        search_term = (request.GET.get("q") or "").strip()
+        updated = True
+    if "search" in request.GET:
+        search_term = (request.GET.get("search") or "").strip()
+        updated = True
+
+    filters_state = {
+        "role": role_raw,
+        "date_submitted": date_raw,
+        "q": search_term,
+    }
+    if updated or STAFF_REQ_FILTER_SESSION_KEY not in request.session:
+        request.session[STAFF_REQ_FILTER_SESSION_KEY] = filters_state
+        request.session.modified = True
+
+    if should_redirect:
+        return redirect(request.path)
+
+    try:
+        from captain.models import Captain
+        staff_req = Captain.list_requests() or []
+    except Exception:
+        logger.exception("Error loading staff requests")
+        staff_req = []
+
+    # simple getters for dicts/objects
+    def get(row, key):
+        return row.get(key) if isinstance(row, dict) else getattr(row, key, None)
+
+    # Secretary can only view requests waiting for secretary's approval (status_id == 29)
+    filtered = []
+    for r in staff_req:
+        sid = get(r, "status_id") or get(r, "request_status_id")
+        name = (get(r, "status_name") or "").upper()
+        try:
+            sid = int(sid) if sid is not None else None
+        except (TypeError, ValueError):
+            sid = None
+        if sid == 29 or "WAITING FOR BARANGAY CAPTAIN" in name or "WAITING FOR BARANGAY SECRETARY" in name:
+            filtered.append(r)
+
+    # Apply filters
+    if role_raw:
+        role_id = int(role_raw) if role_raw.isdigit() else None
+        if role_id:
+            filtered = [r for r in filtered if get(r, "role_id") == role_id]
+
+    if date_raw:
+        from datetime import datetime
+        try:
+            target_date = datetime.strptime(date_raw, "%Y-%m-%d").date()
+        except ValueError:
+            target_date = None
+        
+        if target_date:
+            date_filtered = []
+            for r in filtered:
+                pretty_date = get(r, "date_time_submitted_pretty")
+                
+                if pretty_date and isinstance(pretty_date, str):
+                    try:
+                        # Parse "October 12, 2025 9:06 A.M" format
+                        date_part = ' '.join(pretty_date.split()[:3])  # "October 12, 2025"
+                        parsed_date = datetime.strptime(date_part, "%B %d, %Y").date()
+                        if parsed_date == target_date:
+                            date_filtered.append(r)
+                    except (ValueError, IndexError):
+                        pass
+            filtered = date_filtered
+
+    if search_term:
+        search_lower = search_term.lower()
+        filtered = [r for r in filtered if search_lower in (get(r, "name") or "").lower()]
+
+    try:
+        per_page = int(request.GET.get("per_page") or 10)
+        if per_page <= 0:
+            per_page = 10
+    except (TypeError, ValueError):
+        per_page = 10
+
+    form_initial = {
+        "role": role_raw,
+        "date_submitted": date_raw,
+        "search": search_term,
+    }
+    form = StaffAccountRequestFilters(initial=form_initial)
+
+    paginator = Paginator(filtered, per_page)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    role_choices = {str(k): v for k, v in form.fields["role"].choices}
+
+    active_filters = []
+    if role_raw:
+        label = role_choices.get(role_raw) or f"Role {role_raw}"
+        active_filters.append({
+            "label": label,
+            "remove_url": f"{request.path}?remove_filter=role",
+        })
+    if date_raw:
+        try:
+            from datetime import datetime
+            date_obj = datetime.strptime(date_raw, "%Y-%m-%d")
+            date_label = date_obj.strftime("%B %d, %Y")
+        except ValueError:
+            date_label = date_raw
+        active_filters.append({
+            "label": f"Date: {date_label}",
+            "remove_url": f"{request.path}?remove_filter=date_submitted",
+        })
+    if search_term:
+        active_filters.append({
+            "label": f"Search: \"{search_term}\"",
+            "remove_url": f"{request.path}?remove_filter=search",
+        })
+
+    clear_filters_url = f"{request.path}?clear_filters=1"
+
+    current_filters = filters_state
+    user_fullname, user_role, user_role_template = get_user_info(request)
+
+    return render(request, "secretary/staff_account_req.html", {
+        "user_fullname": user_fullname,
+        "user_role": user_role,
+        "page_path": f"{user_role} / Staff Account Requests",
+        "page_title": "Staff Account Requests",
+        "user_role_template": user_role_template,
+        "form": form,
+        "page_obj": page_obj,
+        "staff_req": page_obj.object_list,
+        "total_count": paginator.count,
+        "per_page": per_page,
+        "active_filters": active_filters,
+        "clear_filters_url": clear_filters_url,
+        "current_filters": current_filters,
+    })
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+def pending_staff_dets(request, p_staff_acc_req_id: str):
+    try:
+        from captain.models import Captain
+        rows = Captain.get_pending_staff_details(p_staff_acc_req_id) if p_staff_acc_req_id else []
+    except Exception:
+        logger.exception("get_pending_staff_details failed for staff_code=%s", p_staff_acc_req_id)
+        rows = []
+
+    # Get status history
+    status_history = []
+    try:
+        status_history = Secretary.get_staff_acc_req_status_history(int(p_staff_acc_req_id)) if p_staff_acc_req_id else []
+    except Exception:
+        logger.exception("get_staff_acc_req_status_history failed for req_id=%s", p_staff_acc_req_id)
+        status_history = []
+
+    p = rows[0] if rows else None
+    placeholder = static("images/brgy-sto-nino.png")
+    def _img(v): return (v or "").strip() or placeholder
+
+    doc_slides = []
+    if p:
+        doc_slides = [
+            {"src": _img(p.get("valid_id_front_img_path")), "label": "Front of ID"},
+            {"src": _img(p.get("valid_id_back_img_path")),  "label": "Back of ID"},
+            {"src": _img(p.get("selfie_img_path")),         "label": "Selfie w/ ID"},
+        ]
+
+    user_fullname, user_role, user_role_template = get_user_info(request)
+    ctx = {
+        "user_fullname": user_fullname,
+        "user_role": user_role,
+        "page_path": f"{user_role} / Staff Details : {p_staff_acc_req_id}",
+        "page_title": f"Staff Details : {p_staff_acc_req_id}",
+        "user_role_template": user_role_template,
+        "profile": p,
+        "doc_slides": doc_slides,
+        "staff_acc_req_id": p_staff_acc_req_id,
+        "status_history": status_history,
+    }
+    return render(request, "secretary/pending_staff_dets.html", ctx)
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@require_GET
+def staff_account_requests_search_api(request):
+    raw_query = (request.GET.get("q") or "").strip()
+
+    filters = request.session.get(STAFF_REQ_FILTER_SESSION_KEY, {}) or {}
+    role_raw = (filters.get("role") or "").strip()
+    date_raw = (filters.get("date_submitted") or "").strip()
+
+    try:
+        from captain.models import Captain
+        staff_req = Captain.list_requests() or []
+    except Exception as e:
+        logger.exception("staff_account_requests_search_api error: %s", e)
+        return JsonResponse({"results": [], "error": "Search failed"}, status=500)
+
+    def get(row, key):
+        return row.get(key) if isinstance(row, dict) else getattr(row, key, None)
+
+    # Secretary can only view requests waiting for secretary's approval (status_id == 29)
+    filtered = []
+    for r in staff_req:
+        sid = get(r, "status_id") or get(r, "request_status_id")
+        name = (get(r, "status_name") or "").upper()
+        try:
+            sid = int(sid) if sid is not None else None
+        except (TypeError, ValueError):
+            sid = None
+        if sid == 29 or sid == 47 or "WAITING FOR BARANGAY CAPTAIN'S APPROVAL" in name or "WAITING FOR BARANGAY SECRETARY'S APPROVAL" in name:
+            filtered.append(r)
+
+    # Apply role filter
+    if role_raw:
+        role_id = int(role_raw) if role_raw.isdigit() else None
+        if role_id:
+            filtered = [r for r in filtered if get(r, "role_id") == role_id]
+
+    # Apply date filter
+    if date_raw:
+        from datetime import datetime
+        try:
+            target_date = datetime.strptime(date_raw, "%Y-%m-%d").date()
+        except ValueError:
+            target_date = None
+        
+        if target_date:
+            date_filtered = []
+            for r in filtered:
+                pretty_date = get(r, "date_time_submitted_pretty")
+                
+                if pretty_date and isinstance(pretty_date, str):
+                    try:
+                        # Parse "October 12, 2025 9:06 A.M" format
+                        date_part = ' '.join(pretty_date.split()[:3])  # "October 12, 2025"
+                        parsed_date = datetime.strptime(date_part, "%B %d, %Y").date()
+                        if parsed_date == target_date:
+                            date_filtered.append(r)
+                    except (ValueError, IndexError):
+                        pass
+            filtered = date_filtered
+
+    # Apply search filter
+    if raw_query:
+        q_lower = raw_query.lower()
+        filtered = [r for r in filtered if q_lower in (get(r, "name") or "").lower()]
+
+    # Update session
+    filters.update({
+        "role": role_raw,
+        "date_submitted": date_raw,
+        "q": raw_query,
+    })
+    request.session[STAFF_REQ_FILTER_SESSION_KEY] = filters
+    request.session.modified = True
+
+    return JsonResponse({"results": filtered[:50]})
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+def staff_requests_list(request: HttpRequest) -> HttpResponse:
+    """View staff account requests submitted by this secretary"""
+    auth = request.session.get('auth', {})
+    staff_id = auth.get('staff_id')
+    user_fullname, user_role, user_role_template = get_user_info(request)
+    
+    # Get filter parameters
+    search_query = request.GET.get('q', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    role_filter = request.GET.get('role', '').strip()
+    date_filter = request.GET.get('date_submitted', '').strip()
+    
+    try:
+        requests = Secretary.get_staff_account_req_list_by_requester(staff_id)
+        stats_data = Secretary.get_staff_request_statistics_by_requester(staff_id)
+        stats = stats_data[0] if stats_data else {
+            'total_requests': 0, 'pending_requests': 0, 'approved_requests': 0, 'rejected_requests': 0
+        }
+    except Exception as e:
+        logger.exception("Error loading requests")
+        from common.flash import flash_system_error
+        flash_system_error(request, "Failed to load requests.")
+        requests = []
+        stats = {'total_requests': 0, 'pending_requests': 0, 'approved_requests': 0, 'rejected_requests': 0}
+    
+    # Apply filters
+    filtered_requests = requests
+    
+    # Search by name
+    if search_query:
+        search_lower = search_query.lower()
+        filtered_requests = [
+            r for r in filtered_requests 
+            if search_lower in (r.get('name') or '').lower()
+        ]
+    
+    # Filter by status
+    if status_filter:
+        filtered_requests = [
+            r for r in filtered_requests 
+            if str(r.get('status_id', '')) == status_filter
+        ]
+    
+    # Filter by role
+    if role_filter:
+        filtered_requests = [
+            r for r in filtered_requests 
+            if str(r.get('role_id', '')) == role_filter
+        ]
+    
+    # Filter by date
+    if date_filter:
+        from datetime import datetime
+        try:
+            target_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
+            date_filtered = []
+            for r in filtered_requests:
+                pretty_date = r.get('date_time_submitted_pretty')
+                if pretty_date and isinstance(pretty_date, str):
+                    try:
+                        # Parse "December 1, 2025 3:28 A.M." format
+                        date_part = ' '.join(pretty_date.split()[:3])  # "December 1, 2025"
+                        parsed_date = datetime.strptime(date_part, "%B %d, %Y").date()
+                        if parsed_date == target_date:
+                            date_filtered.append(r)
+                    except (ValueError, IndexError):
+                        continue
+            filtered_requests = date_filtered
+        except ValueError:
+            pass
+    
+    # Implement pagination with 9 requests per page
+    paginator = Paginator(filtered_requests, 9)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, "secretary/requests_list.html", {
+        'page_obj': page_obj,
+        'requests': filtered_requests,
+        'stats': stats,
+        'search_query': search_query,
+        'status_filter': status_filter,
+        'role_filter': role_filter,
+        'date_filter': date_filter,
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'user_role_template': user_role_template,
+        'page_path': f"{user_role} / My Requests",
+        'page_title': 'My Staff Requests',
+    })
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+def staff_request_detail(request: HttpRequest, request_id: int) -> HttpResponse:
+    """View detailed information about a specific staff request"""
+    auth = request.session.get('auth', {})
+    staff_id = auth.get('staff_id')
+    user_fullname, user_role, user_role_template = get_user_info(request)
+    
+    try:
+        details_data = Secretary.get_staff_acc_req_profile_progress(request_id)
+        history = Secretary.get_staff_acc_req_status_history(request_id)
+        
+        if not details_data:
+            from common.flash import flash_warning
+            flash_warning(request, "Request not found.")
+            return redirect('secretary:staff_requests_list')
+        
+        request_detail = details_data[0]
+        
+        # Allow access if user is the requester OR if user has appropriate role permissions
+        if request_detail.get('requested_by_id') != staff_id:
+            # For now, allow secretaries to view all requests for debugging
+            # TODO: Implement proper role-based access control
+            pass
+            
+    except Exception as e:
+        logger.exception(f"Error loading request {request_id}")
+        from common.flash import flash_system_error
+        flash_system_error(request, "Failed to load request details.")
+        return redirect('secretary:staff_requests_list')
+    
+    return render(request, "secretary/request_detail.html", {
+        'request': request_detail,
+        'history': history,
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'user_role_template': user_role_template,
+        'page_path': f"{user_role} / My Requests / Details",
+        'page_title': f"Request Details - {request_detail.get('full_name', 'Unknown')}",
+    })
+
+REQUEST_STATUS_APPROVED = 30
+REQUEST_STATUS_REJECTED = 4
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@require_http_methods(["POST"])
+def process_staff_request(request: HttpRequest) -> HttpResponse:
+    auth = request.session.get("auth") or {}
+    approver_id = auth.get("staff_id")
+    
+    if not approver_id:
+        flash_system_error(request, "Your session is missing staff credentials.")
+        return redirect(request.META.get("HTTP_REFERER") or "secretary:staff_account_requests_list")
+    
+    try:
+        approver_id = int(approver_id)
+    except (TypeError, ValueError):
+        flash_system_error(request, "Invalid staff credentials.")
+        return redirect(request.META.get("HTTP_REFERER") or "secretary:staff_account_requests_list")
+
+    staff_acc_req_id_raw = (
+        request.POST.get("staff_acc_req_id") or 
+        request.POST.get("id")
+    )
+    
+    if not staff_acc_req_id_raw:
+        flash_warning(request, "Missing staff account request ID.")
+        return redirect(request.META.get("HTTP_REFERER") or "secretary:staff_account_requests_list")
+    
+    try:
+        staff_acc_req_id = int(staff_acc_req_id_raw)
+    except (TypeError, ValueError):
+        flash_warning(request, "Invalid staff account request ID.")
+        return redirect(request.META.get("HTTP_REFERER") or "secretary:staff_account_requests_list")
+
+    status_raw = request.POST.get("p_request_status_id")
+    if not status_raw:
+        flash_warning(request, "Missing decision status.")
+        return redirect(request.META.get("HTTP_REFERER") or "secretary:staff_account_requests_list")
+    
+    try:
+        status_id = int(status_raw)
+    except (TypeError, ValueError):
+        flash_warning(request, "Invalid decision status.")
+        return redirect(request.META.get("HTTP_REFERER") or "secretary:staff_account_requests_list")
+    
+    if status_id not in (REQUEST_STATUS_APPROVED, REQUEST_STATUS_REJECTED):
+        flash_warning(request, "Invalid decision status.")
+        return redirect(request.META.get("HTTP_REFERER") or "secretary:staff_account_requests_list")
+
+    remarks = (request.POST.get("remarks") or "").strip() or None
+    email_to = (request.POST.get("email") or "").strip()
+    
+    if email_to:
+        is_valid, reason = verify_email_deliverable_abstract(email_to)
+        if not is_valid:
+            flash_warning(request, f"Email validation failed: {reason}. Request will be processed but email notifications may not be sent.")
+            email_to = ""
+
+    try:
+        result_text = Secretary.process_staff_account_request(
+            p_staff_acc_req_id=staff_acc_req_id,
+            p_approver_id=approver_id,
+            p_request_status_id=status_id,
+            p_remarks=remarks,
+        )
+
+        if status_id == REQUEST_STATUS_REJECTED:
+            if email_to:
+                try:
+                    import common.send_email as send_email
+                    reason = remarks or "No specific reason was provided."
+                    send_email.send_email(
+                        subject="Staff Account Request Rejected",
+                        to=[email_to],
+                        body_text=f"Good day!\n\nYour staff account creation request has been REJECTED.\n\nReason: {reason}\n\nPlease contact the authorized staff if you have any concern.\n\nBarangay Sto. Niño",
+                        body_html=f"<p>Good day!</p><p>Your staff account creation request has been <strong>REJECTED</strong>.</p><p><strong>Reason:</strong> {reason}</p><p>Please contact the authorized staff if you have any concern.</p><p>Barangay Sto. Niño</p>",
+                        from_name="Barangay Sto. Niño",
+                        fail_silently=True,
+                    )
+                except Exception as e:
+                    logger.warning("Failed to send rejection email: %s", e)
+            
+            flash_success(request, "Staff account request rejected.")
+        
+        elif status_id == REQUEST_STATUS_APPROVED:
+            if result_text == "TRUE":
+                if email_to:
+                    try:
+                        import common.send_email as send_email
+                        send_email.send_email(
+                            subject="Staff Account Request Update",
+                            to=[email_to],
+                            body_text="Good day!\n\nYour staff account request has been reviewed by the Barangay Secretary.\n\nCurrent Status: WAITING FOR ADMIN'S APPROVAL\n\nYou will receive another update after the Admin's final decision.\n\nBarangay Sto. Niño",
+                            body_html="<p>Good day!</p><p>Your staff account request has been reviewed by the Barangay Secretary.</p><p><strong>Current Status:</strong> WAITING FOR ADMIN'S APPROVAL</p><p>You will receive another update after the Admin's final decision.</p><p>Barangay Sto. Niño</p>",
+                            from_name="Barangay Sto. Niño",
+                            fail_silently=True,
+                        )
+                    except Exception as e:
+                        logger.warning("Failed to send approval email: %s", e)
+                
+                flash_success(request, "Request approved and forwarded to Admin for final processing.")
+            
+            elif result_text and result_text.strip():
+                staff_code = result_text.strip()
+                flash_success(request, f"Staff account approved. Staff Code: {staff_code}")
+                
+                if email_to:
+                    try:
+                        import common.send_email as send_email
+                        send_email.send_email(
+                            subject="Staff Account Request Approved",
+                            to=[email_to],
+                            body_text="Good day!\n\nYour staff account request has been APPROVED.\n\nYou will receive your login credentials in a separate email shortly.\n\nBarangay Sto. Niño",
+                            body_html="<p>Good day!</p><p>Your staff account request has been <strong>APPROVED</strong>.</p><p>You will receive your login credentials in a separate email shortly.</p><p>Barangay Sto. Niño</p>",
+                            from_name="Barangay Sto. Niño",
+                            fail_silently=True,
+                        )
+                    except Exception as e:
+                        logger.warning("Failed to send final approval email: %s", e)
+            
+            else:
+                flash_warning(request, "Request processed but no confirmation received. Please verify the status.")
+
+        logger.info(
+            "process_staff_request completed: req_id=%s approver_id=%s status=%s result=%s",
+            staff_acc_req_id, approver_id, status_id, result_text
+        )
+
+    except DatabaseError as db_err:
+        logger.exception("Database error processing staff request (req_id=%s)", staff_acc_req_id)
+        flash_db_error(request, db_err)
+    except Exception as ex:
+        logger.exception("Unexpected error processing staff request (req_id=%s)", staff_acc_req_id)
+        flash_system_error(request, "Unable to process the request.", exc=ex)
+    
+    return redirect(request.META.get("HTTP_REFERER") or "secretary:staff_account_requests_list")
+
+# ─────────────────────────────────────────────────────────────
 # NEW: Residents list (minimal) + view profile (RPC-backed)
 # ─────────────────────────────────────────────────────────────
 
@@ -1565,6 +2251,33 @@ def ajax_resident_search(
     html = render_to_string("resident/_resident_list.html", context, request=request)
     return HttpResponse(html)
 
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@csrf_protect
+@nocache
+@inject
+def resident_detail(
+    request: HttpRequest,
+    person_id: int,
+    resident_service: IResidentService = Provide[AppContainer.resident_service],
+) -> HttpResponse:
+    """
+    Display detailed resident information.
+    """
+    user_role = _auth_role_name(request)
+    
+    resident = resident_service.get_resident_detail(person_id)
+    
+    if not resident:
+        messages.error(request, "Resident not found.")
+        return redirect("secretary:resident_list")
+    
+    return render(request, "resident/resident_detail.html", {
+        'page_path': f'{user_role} / Resident / {resident.person_code}',
+        'page_title': f'Resident {resident.person_code}',
+        'resident': resident,
+    })
+
 def resident_map_list(request):
     form = StaffFilters()
     list = []
@@ -1681,6 +2394,33 @@ def ajax_household_search(
 @csrf_protect
 @nocache
 @inject
+def household_detail(
+    request: HttpRequest,
+    household_id: int,
+    household_service: IHouseholdService = Provide[AppContainer.household_service],
+) -> HttpResponse:
+    """
+    Display detailed household information including all families and members.
+    """
+    user_role = _auth_role_name(request)
+    
+    household = household_service.get_household_detail(household_id)
+    
+    if not household:
+        messages.error(request, "Household not found.")
+        return redirect("secretary:household_list")
+    
+    return render(request, "household/household_detail.html", {
+        'page_path': f'{user_role} / Household / {household.household_num}',
+        'page_title': f'Household {household.household_num}',
+        'household': household,
+    })
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@csrf_protect
+@nocache
+@inject
 def household_map_list(
     request: HttpRequest,
     household_service: IHouseholdService = Provide[AppContainer.household_service],
@@ -1738,6 +2478,109 @@ def api_household_pins(
         ownership_type=_to_int_or_none(request.GET.get("house_ownership")),
     )
     return JsonResponse(pins, safe=False)
+
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@csrf_protect
+@nocache
+@inject
+def family_list(
+    request: HttpRequest,
+    household_repo: IHouseholdRepository = Provide[AppContainer.household_repository],
+) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+    
+    user_role = _auth_role_name(request)
+    form = FamilyFilters(request.GET or None)
+
+    search = request.GET.get("search")
+    household_type = _to_int_or_none(request.GET.get("household_type"))
+    nhts_status = _to_int_or_none(request.GET.get("nhts_status"))
+    indigent_status = _to_int_or_none(request.GET.get("indigent_status"))
+
+    if search:
+        rows = household_repo.search_family(search)
+    elif household_type:
+        rows = household_repo.filter_family_by_household_type(household_type)
+    elif nhts_status:
+        rows = household_repo.filter_family_by_nhts_status(nhts_status)
+    elif indigent_status:
+        rows = household_repo.filter_family_by_indigent_status(indigent_status)
+    else:
+        rows = household_repo.fetch_family_list()
+
+    paginator = Paginator(rows, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "user_role": user_role,
+        "form": form,
+        "page_obj": page_obj,
+        "search_url": "secretary:ajax_family_search",
+    }
+    return render(request, "family/family_list.html", context)
+
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@csrf_protect
+@nocache
+@inject
+def ajax_family_search(
+    request: HttpRequest,
+    household_repo: IHouseholdRepository = Provide[AppContainer.household_repository],
+) -> HttpResponse:
+    
+    search = request.GET.get("search")
+    household_type = _to_int_or_none(request.GET.get("household_type"))
+    nhts_status = _to_int_or_none(request.GET.get("nhts_status"))
+    indigent_status = _to_int_or_none(request.GET.get("indigent_status"))
+
+    if search:
+        rows = household_repo.search_family(search)
+    elif household_type:
+        rows = household_repo.filter_family_by_household_type(household_type)
+    elif nhts_status:
+        rows = household_repo.filter_family_by_nhts_status(nhts_status)
+    elif indigent_status:
+        rows = household_repo.filter_family_by_indigent_status(indigent_status)
+    else:
+        rows = household_repo.fetch_family_list()
+
+    context = {
+        "rows": rows,
+        "search_url": "secretary:ajax_family_search",
+    }
+    return render(request, "family/_family_list.html", context)
+
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@csrf_protect
+@nocache
+@inject
+def family_detail(
+    request: HttpRequest,
+    family_id: int,
+    household_repo: IHouseholdRepository = Provide[AppContainer.household_repository],
+) -> HttpResponseRedirect | HttpResponsePermanentRedirect | HttpResponse:
+    
+    user_role = _auth_role_name(request)
+    family = household_repo.fetch_family_detail(family_id)
+    
+    if not family:
+        messages.error(request, "Family not found.")
+        return redirect("secretary:family_list")
+
+    context = {
+        'page_path': f'{user_role} / Family / {family.get("family_num", "")}',
+        'page_title': f'Family {family.get("family_num", "")}',
+        "user_role": user_role,
+        "family": family,
+    }
+    return render(request, "family/family_detail.html", context)
+
 
 # -------------------------------
 # BUSINESS
@@ -1932,13 +2775,35 @@ def business_map_list(
     b_category = _to_int_or_none(request.GET.get("b_category"))
     ownership_type = _to_int_or_none(request.GET.get("ownership_type"))
     status = _to_int_or_none(request.GET.get("status"))
+    purok = request.GET.get("purok") or None
+    date_range = request.GET.get("date_range") or None
+    employee_range = request.GET.get("employee_range") or None
 
-    rows = business_service.execute(
-        search=search,
-        b_category=b_category,
-        ownership_type=ownership_type,
-        status=status,
-    )
+    # Use execute_with_filters if any of the new filters are applied
+    use_filter_query = purok or date_range or employee_range
+    
+    if use_filter_query:
+        rows = business_service.execute_with_filters()
+    else:
+        rows = business_service.execute(
+            search=search,
+            b_category=b_category,
+            ownership_type=ownership_type,
+            status=status,
+        )
+    
+    # Apply additional filters after fetching results
+    if purok:
+        rows = [r for r in rows if (r.sitio_purok or '').upper() == purok.upper()]
+    
+    if date_range:
+        months = int(date_range)
+        cutoff_date = datetime.now().date() - relativedelta(months=months)
+        rows = [r for r in rows if r.date_established and r.date_established >= cutoff_date]
+    
+    if employee_range:
+        min_emp, max_emp = map(int, employee_range.split('-'))
+        rows = [r for r in rows if r.num_of_employees and min_emp <= r.num_of_employees <= max_emp]
 
     paginator = Paginator(rows, 5)
     page_number = request.GET.get("page")
@@ -1960,6 +2825,9 @@ def business_map_list(
                 'b_category' : b_category,
                 'ownership_type' :ownership_type,
                 'status' : status,
+                'purok': purok,
+                'date_range': date_range,
+                'employee_range': employee_range,
             },
             "pins_url": reverse("secretary:api_business_pins"),
             'search_url': 'secretary:ajax_business_search',
@@ -1983,6 +2851,9 @@ def api_business_pins(
         b_category=_to_int_or_none(request.GET.get("b_category")),
         ownership_type=_to_int_or_none(request.GET.get("ownership_type")),
         status=_to_int_or_none(request.GET.get("status")),
+        purok=(request.GET.get("purok") or None),
+        date_range=(request.GET.get("date_range") or None),
+        employee_range=(request.GET.get("employee_range") or None),
     )
     return JsonResponse(pins, safe=False)
 
@@ -2126,10 +2997,11 @@ def announcement_draft_view(
     announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
     audience_service: IAudienceService = Provide[AppContainer.audience_service],
 ) -> HttpResponse:
-    """View announcement draft details"""
+    """View announcement draft details (editable with actions)"""
     user_role = _auth_role_name(request)
 
-    form = AddChannelForm()
+    channel_form = AddChannelForm()
+    audience_form = AudienceScope()
     
     try:
         draft = announcement_service.get_draft_by_id(announcement_id)
@@ -2148,10 +3020,164 @@ def announcement_draft_view(
     return render(request, "secretary/announcement/draft_view.html", {
         'page_path': f'{user_role} / Announcements / View Draft',
         'page_title': f'View Draft: {draft.announcement_title}',
-        'form' : form,
+        'form' : channel_form,
+        'audience_form': audience_form,
         'draft': draft,
         'audiences': audiences,
     })
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def announcement_view(
+    request: HttpRequest,
+    announcement_id: int,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+    audience_service: IAudienceService = Provide[AppContainer.audience_service],
+) -> HttpResponse:
+    """View announcement details (read-only, for published/scheduled/expired/cancelled)"""
+    user_role = _auth_role_name(request)
+    
+    try:
+        # Use generic get_by_id instead of get_draft_by_id to get any status
+        announcement = announcement_service.announcement_repository.get_by_id(announcement_id)
+        
+        if not announcement:
+            messages.error(request, "Announcement not found.")
+            return redirect('secretary:announcement_draft_list')
+        
+        audiences = audience_service.get_announcement_audiences(announcement_id)
+        
+    except Exception as e:
+        messages.error(request, "Failed to load announcement details.")
+        logger.exception("Failed to load announcement: %s", e)
+        return redirect('secretary:announcement_draft_list')
+    
+    return render(request, "secretary/announcement/announcement_view.html", {
+        'page_path': f'{user_role} / Announcements / View',
+        'page_title': f'View: {announcement.announcement_title}',
+        'announcement': announcement,
+        'audiences': audiences,
+    })
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def announcement_draft_edit(
+    request: HttpRequest,
+    announcement_id: int,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    """Edit an announcement draft"""
+    user_role = _auth_role_name(request)
+    auth = request.session.get('auth', {})
+    staff_id = auth.get('staff_id')
+    
+    # Get the existing draft
+    try:
+        draft = announcement_service.get_draft_by_id(announcement_id)
+        if not draft:
+            messages.error(request, "Announcement draft not found.")
+            return redirect('secretary:announcement_draft_list')
+    except Exception as e:
+        messages.error(request, "Failed to load announcement draft.")
+        logger.exception("Failed to load draft for edit: %s", e)
+        return redirect('secretary:announcement_draft_list')
+    
+    # Populate form with existing data
+    if request.method == 'POST':
+        form = AnnouncementDraftForm(request.POST)
+        if form.is_valid():
+            try:
+                from src.app.transfer_objects.commands.announcement_cmd import UpdateAnnouncementDraftCMD
+                
+                command = UpdateAnnouncementDraftCMD(
+                    announcement_id=announcement_id,
+                    title=form.cleaned_data['title'],
+                    body=form.cleaned_data['body'],
+                    publish_at=form.cleaned_data.get('publish_at'),
+                    expire_at=form.cleaned_data.get('expire_at')
+                )
+                
+                announcement_service.update_draft(command)
+                
+                log_announcement_action(
+                    announcement_id=announcement_id,
+                    table_affected='ANNOUNCEMENT',
+                    action='UPDATE',
+                    performer_id=staff_id,
+                    details=f'Updated announcement draft ID: {announcement_id}',
+                )
+                
+                messages.success(request, "Announcement draft updated successfully!")
+                return redirect('secretary:announcement_draft_list')
+                
+            except ValueError as e:
+                messages.error(request, str(e))
+            except Exception as e:
+                messages.error(request, "An error occurred while updating the announcement draft.")
+                logger.exception("Failed to update announcement draft: %s", e)
+    else:
+        # Pre-fill form with existing data
+        initial_data = {
+            'title': draft.announcement_title,
+            'body': draft.announcement_body,
+            'publish_at': draft.announcement_published_at,
+            'expire_at': draft.announcement_expire_at,
+        }
+        form = AnnouncementDraftForm(initial=initial_data)
+    
+    return render(request, "secretary/announcement/draft_edit.html", {
+        'page_path': f'{user_role} / Announcements / Edit Draft',
+        'page_title': f'Edit Draft: {draft.announcement_title}',
+        'form': form,
+        'draft': draft,
+    })
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@inject
+def ajax_delete_announcement_draft(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> JsonResponse:
+    """Delete an announcement draft via AJAX"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        announcement_id = data.get('announcement_id')
+        
+        if not announcement_id:
+            return JsonResponse({'error': 'Announcement ID is required'}, status=400)
+        
+        auth = request.session.get('auth', {})
+        staff_id = auth.get('staff_id')
+        
+        # Delete the draft
+        success = announcement_service.delete_draft(announcement_id)
+        
+        if success:
+            log_announcement_action(
+                announcement_id=announcement_id,
+                table_affected='ANNOUNCEMENT',
+                action='DELETE',
+                performer_id=staff_id,
+                details=f'Deleted announcement draft ID: {announcement_id}',
+            )
+            
+            return JsonResponse({'success': True, 'message': 'Draft deleted successfully'})
+        else:
+            return JsonResponse({'error': 'Failed to delete draft'}, status=400)
+            
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+    except Exception as e:
+        logger.exception("Failed to delete announcement draft: %s", e)
+        return JsonResponse({'error': 'An error occurred while deleting the draft'}, status=500)
 
 @session_login_required
 @role_required(SECRETARY_ROLE)
@@ -2182,7 +3208,7 @@ def save_audience_rules(
     request: HttpRequest,
     audience_service: IAudienceService = Provide[AppContainer.audience_service],
 ) -> JsonResponse:
-    """Save all audience rules to database"""
+    """Save all audience rules to database with duplicate prevention"""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
     
@@ -2195,26 +3221,88 @@ def save_audience_rules(
         if not announcement_id:
             return JsonResponse({'error': 'Announcement ID required'}, status=400)
         
+        # Get existing audiences to check for duplicates
+        existing_audiences = audience_service.get_announcement_audiences(announcement_id)
+        
         saved_count = 0
+        skipped_count = 0
+        
         for rule in rules:
+            scope_id = rule.get('scope_id')
+            role_id = rule.get('role_id')
+            purok_id = rule.get('purok_id')
+            
+            # Check for duplicate
+            is_duplicate = any(
+                aud.audience_scope_id == scope_id and
+                aud.role_id == role_id and
+                aud.purok_sitio_id == purok_id
+                for aud in existing_audiences
+            )
+            
+            if is_duplicate:
+                skipped_count += 1
+                continue
+            
             command = AddAnnouncementAudienceCMD(
                 announcement_id=announcement_id,
-                audience_scope_id=rule.get('scope_id'),
-                role_id=rule.get('role_id'),
-                purok_sitio_id=rule.get('purok_id'),
-                person_ids=rule.get('person_ids')
+                audience_scope_id=scope_id,
+                role_id=role_id,
+                purok_sitio_id=purok_id,
+                person_ids=None  # No longer used for scope 6 (STUDENTS)
             )
             
             audience_id, inserted_persons = audience_service.add_announcement_audience(command)
             saved_count += inserted_persons
         
+        message = f'{len(rules) - skipped_count} rules saved, {saved_count} persons added'
+        if skipped_count > 0:
+            message += f' ({skipped_count} duplicate(s) skipped)'
+        
         return JsonResponse({
             'success': True,
-            'message': f'{len(rules)} rules saved, {saved_count} persons added'
+            'message': message
         })
         
     except Exception as e:
         logger.exception("Failed to save audience rules: %s", e)
+        return JsonResponse({'error': str(e)}, status=500)
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def remove_audience(
+    request: HttpRequest,
+    audience_service: IAudienceService = Provide[AppContainer.audience_service],
+) -> JsonResponse:
+    """Remove an audience scope from an announcement"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        audience_id = data.get('audience_id')
+        
+        if not audience_id:
+            return JsonResponse({'error': 'Audience ID required'}, status=400)
+        
+        # Delete from audience_person_list first (foreign key constraint)
+        sql_delete_persons = "DELETE FROM public.audience_person_list WHERE audience_id = %s"
+        audience_service.audience_repository.ctx.execute_command(sql_delete_persons, (audience_id,))
+        
+        # Delete from audience
+        sql_delete_audience = "DELETE FROM public.audience WHERE audience_id = %s"
+        audience_service.audience_repository.ctx.execute_command(sql_delete_audience, (audience_id,))
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Audience removed successfully'
+        })
+        
+    except Exception as e:
+        logger.exception("Failed to remove audience: %s", e)
         return JsonResponse({'error': str(e)}, status=500)
 
 @session_login_required
@@ -2404,6 +3492,380 @@ def schedule_announcement(
 
 
 # -------------------------------
+# SCHEDULED ANNOUNCEMENTS
+# -------------------------------
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def announcement_scheduled_list(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    """List all scheduled announcements"""
+    user_role = _auth_role_name(request)
+    
+    form = DraftListSearch(request.GET or None)
+    search_query = request.GET.get('search', '').strip()
+    
+    try:
+        repo = announcement_service.announcement_repository
+        
+        if search_query:
+            announcements = repo.search_scheduled(search_query)
+        else:
+            announcements = repo.get_all_scheduled()
+        
+        paginator = Paginator(announcements, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+
+        if search_query is not None and not form.is_valid:
+            form = DraftListSearch()
+        
+    except Exception as e:
+        messages.error(request, "An error occurred while loading scheduled announcements.")
+        logger.exception("Failed to load scheduled announcements: %s", e)
+        page_obj = None
+    
+    return render(request, "secretary/announcement/scheduled_list.html", {
+        'page_path': f'{user_role} / Announcements / Scheduled',
+        'page_title': 'Scheduled Announcements',
+        'form': form,
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'search_url': 'secretary:ajax_announcement_scheduled_search',
+    })
+
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@require_GET
+@inject
+def ajax_announcement_scheduled_search(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR only")
+    
+    tpl_key = (request.GET.get("tpl") or "rows").strip().lower()
+    if tpl_key != "rows":
+        return HttpResponseBadRequest("Unknown partial")
+
+    q = request.GET.get("q", "") or None
+    
+    try:
+        repo = announcement_service.announcement_repository
+        
+        if q:
+            rows = repo.search_scheduled(q)[:50]
+        else:
+            rows = repo.get_all_scheduled()[:50]
+        
+    except Exception as e:
+        logger.exception("ajax_announcement_scheduled_search error: %s", e)
+        rows = []
+
+    context = {"rows": rows}
+    html = render_to_string("announcement/_scheduled_list.html", context, request=request)
+    return HttpResponse(html)
+
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@require_http_methods(["POST"])
+@inject
+def ajax_cancel_scheduled_announcement(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> JsonResponse:
+    """Cancel a scheduled announcement"""
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return JsonResponse({'success': False, 'message': 'XHR only'}, status=400)
+    
+    try:
+        announcement_id = int(request.POST.get('announcement_id', 0))
+        if announcement_id <= 0:
+            return JsonResponse({'success': False, 'message': 'Invalid announcement ID'}, status=400)
+        
+        repo = announcement_service.announcement_repository
+        
+        # Cancel the scheduled announcement
+        success = repo.cancel_scheduled(announcement_id)
+        
+        if success:
+            log_announcement_action(
+                announcement_id=announcement_id,
+                table_affected='announcement',
+                action='CANCEL_SCHEDULED',
+                performer_id=request.session.get('auth', {}).get('staff_id'),
+                details=f"Scheduled announcement cancelled"
+            )
+            return JsonResponse({
+                'success': True,
+                'message': 'Announcement cancelled successfully'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': 'Failed to cancel announcement. It may not be in scheduled status.'
+            }, status=400)
+            
+    except ValueError:
+        return JsonResponse({'success': False, 'message': 'Invalid announcement ID'}, status=400)
+    except Exception as e:
+        logger.exception("ajax_cancel_scheduled_announcement error: %s", e)
+        return JsonResponse({
+            'success': False,
+            'message': 'An error occurred while cancelling the announcement'
+        }, status=500)
+
+
+# -------------------------------
+# PUBLISHED ANNOUNCEMENTS
+# -------------------------------
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def announcement_published_list(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    """List all published announcements"""
+    user_role = _auth_role_name(request)
+    
+    form = DraftListSearch(request.GET or None)
+    search_query = request.GET.get('search', '').strip()
+    
+    try:
+        repo = announcement_service.announcement_repository
+        
+        if search_query:
+            announcements = repo.search_published(search_query)
+        else:
+            announcements = repo.get_all_published()
+        
+        paginator = Paginator(announcements, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+
+        if search_query is not None and not form.is_valid:
+            form = DraftListSearch()
+        
+    except Exception as e:
+        messages.error(request, "An error occurred while loading published announcements.")
+        logger.exception("Failed to load published announcements: %s", e)
+        page_obj = None
+    
+    return render(request, "secretary/announcement/published_list.html", {
+        'page_path': f'{user_role} / Announcements / Published',
+        'page_title': 'Published Announcements',
+        'form': form,
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'search_url': 'secretary:ajax_announcement_published_search',
+    })
+
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@require_GET
+@inject
+def ajax_announcement_published_search(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR only")
+    
+    tpl_key = (request.GET.get("tpl") or "rows").strip().lower()
+    if tpl_key != "rows":
+        return HttpResponseBadRequest("Unknown partial")
+
+    q = request.GET.get("q", "") or None
+    
+    try:
+        repo = announcement_service.announcement_repository
+        
+        if q:
+            rows = repo.search_published(q)[:50]
+        else:
+            rows = repo.get_all_published()[:50]
+        
+    except Exception as e:
+        logger.exception("ajax_announcement_published_search error: %s", e)
+        rows = []
+
+    context = {"rows": rows}
+    html = render_to_string("announcement/_published_list.html", context, request=request)
+    return HttpResponse(html)
+
+
+# -------------------------------
+# EXPIRED ANNOUNCEMENTS
+# -------------------------------
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def announcement_expired_list(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    """List all expired announcements"""
+    user_role = _auth_role_name(request)
+    
+    form = DraftListSearch(request.GET or None)
+    search_query = request.GET.get('search', '').strip()
+    
+    try:
+        repo = announcement_service.announcement_repository
+        
+        if search_query:
+            announcements = repo.search_expired(search_query)
+        else:
+            announcements = repo.get_all_expired()
+        
+        paginator = Paginator(announcements, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+
+        if search_query is not None and not form.is_valid:
+            form = DraftListSearch()
+        
+    except Exception as e:
+        messages.error(request, "An error occurred while loading expired announcements.")
+        logger.exception("Failed to load expired announcements: %s", e)
+        page_obj = None
+    
+    return render(request, "secretary/announcement/expired_list.html", {
+        'page_path': f'{user_role} / Announcements / Expired',
+        'page_title': 'Expired Announcements',
+        'form': form,
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'search_url': 'secretary:ajax_announcement_expired_search',
+    })
+
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@require_GET
+@inject
+def ajax_announcement_expired_search(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR only")
+    
+    tpl_key = (request.GET.get("tpl") or "rows").strip().lower()
+    if tpl_key != "rows":
+        return HttpResponseBadRequest("Unknown partial")
+
+    q = request.GET.get("q", "") or None
+    
+    try:
+        repo = announcement_service.announcement_repository
+        
+        if q:
+            rows = repo.search_expired(q)[:50]
+        else:
+            rows = repo.get_all_expired()[:50]
+        
+    except Exception as e:
+        logger.exception("ajax_announcement_expired_search error: %s", e)
+        rows = []
+
+    context = {"rows": rows}
+    html = render_to_string("announcement/_expired_list.html", context, request=request)
+    return HttpResponse(html)
+
+
+# -------------------------------
+# CANCELLED ANNOUNCEMENTS
+# -------------------------------
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+@inject
+def announcement_cancelled_list(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    """List all cancelled announcements"""
+    user_role = _auth_role_name(request)
+    
+    form = DraftListSearch(request.GET or None)
+    search_query = request.GET.get('search', '').strip()
+    
+    try:
+        repo = announcement_service.announcement_repository
+        
+        if search_query:
+            announcements = repo.search_cancelled(search_query)
+        else:
+            announcements = repo.get_all_cancelled()
+        
+        paginator = Paginator(announcements, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+
+        if search_query is not None and not form.is_valid:
+            form = DraftListSearch()
+        
+    except Exception as e:
+        messages.error(request, "An error occurred while loading cancelled announcements.")
+        logger.exception("Failed to load cancelled announcements: %s", e)
+        page_obj = None
+    
+    return render(request, "secretary/announcement/cancelled_list.html", {
+        'page_path': f'{user_role} / Announcements / Cancelled',
+        'page_title': 'Cancelled Announcements',
+        'form': form,
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'search_url': 'secretary:ajax_announcement_cancelled_search',
+    })
+
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@require_GET
+@inject
+def ajax_announcement_cancelled_search(
+    request: HttpRequest,
+    announcement_service: IAnnouncementService = Provide[AppContainer.announcement_service],
+) -> HttpResponse:
+    if request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return HttpResponseBadRequest("XHR only")
+    
+    tpl_key = (request.GET.get("tpl") or "rows").strip().lower()
+    if tpl_key != "rows":
+        return HttpResponseBadRequest("Unknown partial")
+
+    q = request.GET.get("q", "") or None
+    
+    try:
+        repo = announcement_service.announcement_repository
+        
+        if q:
+            rows = repo.search_cancelled(q)[:50]
+        else:
+            rows = repo.get_all_cancelled()[:50]
+        
+    except Exception as e:
+        logger.exception("ajax_announcement_cancelled_search error: %s", e)
+        rows = []
+
+    context = {"rows": rows}
+    html = render_to_string("announcement/_cancelled_list.html", context, request=request)
+    return HttpResponse(html)
+
+
+# -------------------------------
 # HOUSEHOLD
 # -------------------------------
 @session_login_required
@@ -2803,6 +4265,155 @@ def api_business_pins(
         status=_to_int_or_none(request.GET.get("status")),
     )
     return JsonResponse(pins, safe=False)
+
+
+# -------------------------------
+# BLOTTER CASES (VIEW ONLY)
+# -------------------------------
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+def blotter_cases(request: HttpRequest):
+    """
+    View-only list of blotter cases for secretary.
+    Similar to lupon_mem case_list but without add/edit capabilities.
+    """
+    user_role = _auth_role_name(request)
+    
+    # Get filter parameters
+    q = (request.GET.get("q") or "").strip()
+    state = (request.GET.get("state") or "").strip()
+    settlement = (request.GET.get("settlement") or "").strip()
+    filed_from = (request.GET.get("filed_from") or "").strip()
+    filed_to = (request.GET.get("filed_to") or "").strip()
+    per_page = int(request.GET.get("per_page") or 10)
+    page = int(request.GET.get("page") or 1)
+    
+    # Build SQL query
+    with connection.cursor() as cur:
+        # Base query
+        sql = """
+            SELECT bc.blotter_case_id,
+                   bc.blotter_case_num,
+                   COALESCE(bc.blotter_case_name, 'Unnamed Case') AS case_name,
+                   bc.date_filed,
+                   bc.time_filed,
+                   COALESCE(cs.case_state_name, 'OPEN') AS case_state,
+                   COALESCE(ss.settlement_status_name, 'PENDING') AS settlement_status,
+                   COALESCE(ct.complaint_title_name, '—') AS complaint_title,
+                   COALESCE(cn.case_name, '—') AS case_nature
+            FROM blotter_case bc
+            LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
+            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+            LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
+            LEFT JOIN case_nature cn ON cn.case_nature_id = bc.case_nature_id
+            WHERE 1=1
+        """
+        params = []
+        
+        # Add filters
+        if q:
+            sql += " AND (bc.blotter_case_num ILIKE %s OR bc.blotter_case_name ILIKE %s)"
+            params.extend([f"%{q}%", f"%{q}%"])
+        
+        if state:
+            sql += " AND UPPER(cs.case_state_name) = UPPER(%s)"
+            params.append(state)
+        
+        if settlement:
+            sql += " AND UPPER(ss.settlement_status_name) = UPPER(%s)"
+            params.append(settlement)
+        
+        if filed_from:
+            sql += " AND bc.date_filed >= %s"
+            params.append(filed_from)
+        
+        if filed_to:
+            sql += " AND bc.date_filed <= %s"
+            params.append(filed_to)
+        
+        sql += " ORDER BY bc.date_filed DESC, bc.blotter_case_id DESC"
+        
+        # Get total count
+        count_sql = f"SELECT COUNT(*) FROM ({sql}) AS subq"
+        cur.execute(count_sql, params)
+        total = cur.fetchone()[0]
+        
+        # Add pagination
+        offset = (page - 1) * per_page
+        sql += f" LIMIT {per_page} OFFSET {offset}"
+        
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+        
+        # Get filter choices
+        cur.execute("SELECT DISTINCT case_state_name FROM case_state ORDER BY case_state_name")
+        state_choices = [r[0] for r in cur.fetchall()]
+        
+        cur.execute("SELECT DISTINCT settlement_status_name FROM settlement_status ORDER BY settlement_status_name")
+        settlement_choices = [r[0] for r in cur.fetchall()]
+    
+    # Calculate pagination
+    total_pages = (total + per_page - 1) // per_page
+    has_prev = page > 1
+    has_next = page < total_pages
+    prev_page = page - 1 if has_prev else 1
+    next_page = page + 1 if has_next else total_pages
+    first_item = offset + 1 if total > 0 else 0
+    last_item = min(offset + per_page, total)
+    
+    # Page numbers for pagination
+    page_numbers = []
+    if total_pages <= 7:
+        page_numbers = list(range(1, total_pages + 1))
+    else:
+        if page <= 4:
+            page_numbers = list(range(1, 6)) + [total_pages]
+        elif page >= total_pages - 3:
+            page_numbers = [1] + list(range(total_pages - 4, total_pages + 1))
+        else:
+            page_numbers = [1] + list(range(page - 1, page + 2)) + [total_pages]
+    
+    # Build query string without page
+    query_parts = []
+    if q:
+        query_parts.append(f"q={q}")
+    if state:
+        query_parts.append(f"state={state}")
+    if settlement:
+        query_parts.append(f"settlement={settlement}")
+    if filed_from:
+        query_parts.append(f"filed_from={filed_from}")
+    if filed_to:
+        query_parts.append(f"filed_to={filed_to}")
+    query_parts.append(f"per_page={per_page}")
+    query_no_page = "&".join(query_parts)
+    
+    return render(request, "secretary/blotter_cases.html", {
+        'page_path': f'{user_role} / Blotter Cases',
+        'page_title': 'Blotter Cases',
+        'rows': rows,
+        'q': q,
+        'state': state,
+        'settlement': settlement,
+        'filed_from': filed_from,
+        'filed_to': filed_to,
+        'per_page': per_page,
+        'page': page,
+        'total': total,
+        'total_pages': total_pages,
+        'has_prev': has_prev,
+        'has_next': has_next,
+        'prev_page': prev_page,
+        'next_page': next_page,
+        'first_item': first_item,
+        'last_item': last_item,
+        'page_numbers': page_numbers,
+        'query_no_page': query_no_page,
+        'state_choices': state_choices,
+        'settlement_choices': settlement_choices,
+    })
 
 
 # -------------------------------

@@ -11,6 +11,8 @@ class AudienceDTO:
     role_id: Optional[int] = None
     purok_sitio_id: Optional[int] = None
     audience_scope_name: Optional[str] = None
+    role_name: Optional[str] = None
+    purok_sitio_name: Optional[str] = None
     inserted_persons: Optional[int] = None
 
 

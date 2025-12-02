@@ -221,6 +221,7 @@ class Secretary(models.Model):
 
         # address (when p_person_id IS NULL)
         p_city=None,
+        p_province=None,
         p_barangay=None,
         p_sitio_purok=None,
         p_street=None,
@@ -261,7 +262,7 @@ class Secretary(models.Model):
                             %s,                    -- bhw_purok_ids INT[]
                             %s,%s,%s,%s,%s,%s,%s,  -- first/last/middle/suffix/birthdate/email/mobile
                             %s,%s,%s,%s,           -- sex_id, civil_status_id, nationality_id, religion_id
-                            %s,%s,%s,%s,           -- city, barangay, sitio_purok, street
+                            %s,%s,%s,%s,%s,           -- city, barangay, sitio_purok, street
                             %s,%s,%s,%s            -- valid_id_front, valid_id_back, valid_id_type_id, selfie_path
                         );
                         """,
@@ -290,6 +291,7 @@ class Secretary(models.Model):
                             p_barangay,
                             p_sitio_purok,
                             p_street,
+                            p_province,
 
                             p_valid_id_front,
                             p_valid_id_back,
@@ -327,7 +329,7 @@ class Secretary(models.Model):
                             %s::int[],             -- bhw_purok_ids
                             %s,%s,%s,%s,%s,%s,%s,  -- first/last/middle/suffix/birthdate/email/mobile
                             %s,%s,%s,%s,           -- sex_id, civil_status_id, nationality_id, religion_id
-                            %s,%s,%s,%s,           -- city, barangay, sitio_purok, street
+                            %s,%s,%s,%s,%s,           -- city, barangay, sitio_purok, street, province
                             %s,%s,%s,%s            -- valid_id_front, valid_id_back, valid_id_type_id, selfie_path
                         );
                         """,
@@ -356,6 +358,7 @@ class Secretary(models.Model):
                             p_barangay,
                             p_sitio_purok,
                             p_street,
+                            p_province,
 
                             p_valid_id_front,
                             p_valid_id_back,
@@ -381,3 +384,107 @@ class Secretary(models.Model):
                 p_person_id, p_role_id, _docs_for_log, _sched_for_log, _purok_for_log
             )
             raise
+
+    @staticmethod
+    def process_staff_account_request(
+        p_staff_acc_req_id: int,
+        p_approver_id: int,
+        p_request_status_id: int,
+        p_remarks: str | None = None,
+    ) -> str | None:
+        try:
+            with connection.cursor() as cursor:
+                logger.info(
+                    "DB > process_staff_account_request_approval(req_id=%s, by=%s, new_status=%s, remarks=%s)",
+                    p_staff_acc_req_id, p_approver_id, p_request_status_id, p_remarks
+                )
+
+                cursor.execute(
+                    "SELECT process_staff_account_request_approval(%s, %s, %s, %s)",
+                    [p_staff_acc_req_id, p_approver_id, p_request_status_id, p_remarks]
+                )
+
+                row = cursor.fetchone()
+                result_text = row[0] if row else None
+
+                logger.info(
+                    "DB OK process_staff_account_request_approval(req_id=%s) result=%s",
+                    p_staff_acc_req_id, result_text
+                )
+                return result_text
+
+        except Exception:
+            logger.exception(
+                "DB ERROR process_staff_account_request_approval failed (req_id=%s, by=%s, new_status=%s, remarks=%s)",
+                p_staff_acc_req_id, p_approver_id, p_request_status_id, p_remarks
+            )
+            raise
+    # ===== SHARED FUNCTIONS FOR ALL ROLES =====
+    # These functions can be used by secretary, midwife, lupon_pres, and captain
+    
+    @staticmethod
+    def get_staff_account_req_list_by_requester(p_requested_by_id):
+        """Get staff account requests list filtered by requester ID"""
+        try:
+            with connection.cursor() as cursor:
+                cursor.callproc('get_staff_account_req_list_by_requester', [p_requested_by_id])
+                cols = [col[0] for col in cursor.description]
+                rows = cursor.fetchall()
+                return [dict(zip(cols, row)) for row in rows]
+        except Exception as e:
+            logger.error("Error getting staff account requests by requester: %s", e)
+            raise e
+
+    @staticmethod
+    def get_staff_acc_req_profile_progress(p_staff_acc_req_id):
+        """Get detailed staff account request profile with progress info"""
+        try:
+            with connection.cursor() as cursor:
+                cursor.callproc('get_staff_acc_req_profile_progress', [p_staff_acc_req_id])
+                cols = [col[0] for col in cursor.description]
+                rows = cursor.fetchall()
+                return [dict(zip(cols, row)) for row in rows]
+        except Exception as e:
+            logger.error("Error getting staff account request profile: %s", e)
+            raise e
+
+    @staticmethod
+    def get_staff_acc_req_status_history(p_staff_acc_req_id):
+        """Get status history for a staff account request"""
+        try:
+            with connection.cursor() as cursor:
+                cursor.callproc('get_staff_acc_req_status_history', [p_staff_acc_req_id])
+                cols = [col[0] for col in cursor.description]
+                rows = cursor.fetchall()
+                return [dict(zip(cols, row)) for row in rows]
+        except Exception as e:
+            logger.error("Error getting staff account request status history: %s", e)
+            raise e
+
+    @staticmethod
+    def get_staff_request_statistics_by_requester(p_requested_by_id):
+        """Get request statistics for a specific requester"""
+        try:
+            with connection.cursor() as cursor:
+                cursor.callproc('get_staff_request_statistics_by_requester', [p_requested_by_id])
+                cols = [col[0] for col in cursor.description]
+                rows = cursor.fetchall()
+                return [dict(zip(cols, row)) for row in rows]
+        except Exception as e:
+            logger.error("Error getting staff request statistics: %s", e)
+            raise e
+
+    @staticmethod
+    def get_next_status_for_role(p_current_status_id, p_requester_role_id, p_is_approved):
+        """Get next status based on workflow rules"""
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT get_next_status_for_role(%s, %s, %s)",
+                    [p_current_status_id, p_requester_role_id, p_is_approved]
+                )
+                row = cursor.fetchone()
+                return row[0] if row else None
+        except Exception as e:
+            logger.error("Error getting next status for role: %s", e)
+            raise e

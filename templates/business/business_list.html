@@ -50,6 +50,43 @@
     text-align:left;
     font-weight:600;            /* normalize weight */
   }
+
+  /* Status pills with distinct colors */
+  .status-pill {
+    display: inline-block;
+    padding: .25rem .75rem;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: .75rem;
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+    border: 1px solid;
+  }
+
+  .status-pending {
+    background: #fff3cd;
+    color: #856404;
+    border-color: #ffc107;
+  }
+
+  .status-active {
+    background: #d1e7dd;
+    color: #0f5132;
+    border-color: #198754;
+  }
+
+  .status-expired {
+    background: #f8d7da;
+    color: #842029;
+    border-color: #dc3545;
+  }
+
+  .status-closed {
+    background: #e2e3e5;
+    color: #41464b;
+    border-color: #6c757d;
+  }
 </style>
 
 {% endblock %}

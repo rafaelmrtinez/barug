@@ -213,6 +213,54 @@ class BusinessFilters(forms.Form):
         label= 'Status',
         required= False,
     )
+    
+    # New filters for map view
+    purok = forms.ChoiceField(
+        choices=[
+            ("", "— All Puroks —"),
+            ("KANIPAAN", "Kanipaan"),
+            ("PAMPANGO", "Pampango"),
+            ("LUTAW-LUTAW", "Lutaw-Lutaw"),
+            ("MAUCO", "Mauco"),
+        ],
+        widget=forms.Select(attrs={
+            'id': 'purok',
+            'class': 'form-select',
+        }),
+        label='Purok/Sitio',
+        required=False,
+    )
+    
+    date_range = forms.ChoiceField(
+        choices=[
+            ("", "— Any Time —"),
+            ("6", "Last 6 Months"),
+            ("12", "Last Year"),
+            ("24", "Last 2 Years"),
+            ("60", "Last 5 Years"),
+        ],
+        widget=forms.Select(attrs={
+            'id': 'date_range',
+            'class': 'form-select',
+        }),
+        label='Date Established',
+        required=False,
+    )
+    
+    employee_range = forms.ChoiceField(
+        choices=[
+            ("", "— Any Size —"),
+            ("1-5", "Small (1-5 employees)"),
+            ("6-20", "Medium (6-20 employees)"),
+            ("21-999", "Large (20+ employees)"),
+        ],
+        widget=forms.Select(attrs={
+            'id': 'employee_range',
+            'class': 'form-select',
+        }),
+        label='Number of Employees',
+        required=False,
+    )
 
 class RenewalFilters(forms.Form):
     search = forms.CharField(
@@ -258,22 +306,41 @@ def _norm_email(txt: str | None) -> str | None:
 MOBILE_RE = re.compile(r"\D+")
 def _norm_mobile(txt: str | None) -> str | None:
     """
-    Keep digits only; PH-friendly:
-    - strip +63 or leading 0
-    - return last 11 (or last 10) digits if present
+    Normalize to 09XXXXXXXXX format (11 digits) for PH mobile numbers.
+    Accepts: 09XXXXXXXXX, 9XXXXXXXXX, +639XXXXXXXXX, 639XXXXXXXXX
+    Database expects: 09XXXXXXXXX or +639XXXXXXXXX
     """
     if not txt:
         return None
-    digits = MOBILE_RE.sub("", txt)
-    if digits.startswith("63"):
-        digits = digits[2:]
-    if digits.startswith("0"):
-        digits = digits[1:]
-    if len(digits) >= 11:
-        return digits[-11:]
-    if len(digits) >= 10:
-        return digits[-10:]
-    return digits or None
+    
+    # Keep only digits and + sign
+    cleaned = MOBILE_RE.sub("", txt)
+    
+    # Handle +639 format - keep it as is if valid
+    if txt.strip().startswith("+63"):
+        digits = cleaned  # Remove the +
+        if len(digits) == 12 and digits.startswith("63") and digits[2] == "9":
+            return "+" + digits  # Return +639XXXXXXXXX
+    
+    # Remove country code 63 if present (without +)
+    if cleaned.startswith("63") and not txt.strip().startswith("+"):
+        cleaned = cleaned[2:]
+    
+    # Remove leading 0 if present
+    if cleaned.startswith("0"):
+        cleaned = cleaned[1:]
+    
+    # Should have 10 digits now (9XXXXXXXXX)
+    if len(cleaned) == 10 and cleaned.startswith("9"):
+        return "0" + cleaned  # Return 09XXXXXXXXX
+    elif len(cleaned) >= 10:
+        # Take last 10 digits and ensure it starts with 9
+        last10 = cleaned[-10:]
+        if last10.startswith("9"):
+            return "0" + last10  # Return 09XXXXXXXXX
+    
+    # If format is invalid, return as-is to trigger validation error in form
+    return cleaned if cleaned else None
  
 class BusinessOwnerInfo(forms.Form):
     # PERSONAL INFORMATION
@@ -423,6 +490,16 @@ class BusinessOwnerInfo(forms.Form):
             'style': 'text-transform: uppercase;',
     }),
         label= 'City',
+        required= True,
+    )
+    province = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'province',
+            'class' : 'form-control',
+            'placeholder' : 'Province',
+            'style': 'text-transform: uppercase;',
+    }),
+        label= 'Province',
         required= True,
     )
     email = forms.EmailField(

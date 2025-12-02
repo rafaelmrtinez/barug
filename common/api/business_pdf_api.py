@@ -87,3 +87,59 @@ class BusinessPDFAPI(View):
         except Exception as e:
             logger.exception('Failed generating business PDF')
             return JsonResponse({'success': False, 'message': 'Failed to generate PDF report.'}, status=500)
+
+
+@method_decorator(session_login_required, name="dispatch")
+@method_decorator(role_required(*authorized_role), name="dispatch")
+@method_decorator(csrf_required, name="dispatch")
+class BusinessDetailPDFAPI(View):
+    """Generate PDF report for a single business detail.
+    
+    URL params:
+      - b_id: int (required) -- business ID
+    """
+    
+    @inject
+    def get(
+        self, 
+        request: HttpRequest, 
+        b_id: int,
+        business_info = Provide[AppContainer.owner_business_service]
+    ):
+        try:
+            # Get business details
+            dto = business_info.execute_by_business_id(b_id)
+            
+            if not dto or not dto.business:
+                return JsonResponse({'success': False, 'message': f'Business #{b_id} not found.'}, status=404)
+            
+            # Get user info for signature
+            auth = request.session.get('auth', {}) if hasattr(request, 'session') else {}
+            gen_name = None
+            gen_role = None
+            try:
+                fn = auth.get('first_name') or ''
+                ln = auth.get('last_name') or ''
+                gen_name = (fn + ' ' + ln).strip() or None
+                gen_role = auth.get('role_name')
+            except Exception:
+                gen_name = None
+                gen_role = None
+            
+            # Generate PDF using ReportLab
+            service = BusinessReportService(pdf_generator=PdfGeneratorH())
+            pdf_bytes, filename = service.generate_business_detail_pdf(
+                business_dto=dto,
+                generated_by_name=gen_name,
+                generated_by_role=gen_role,
+            )
+            
+            # Create response
+            response = HttpResponse(pdf_bytes, content_type='application/pdf')
+            response['Content-Disposition'] = f'inline; filename="{filename}"'
+            
+            return response
+            
+        except Exception as e:
+            logger.exception(f'Failed generating business detail PDF for b_id={b_id}')
+            return JsonResponse({'success': False, 'message': 'Failed to generate PDF report.'}, status=500)

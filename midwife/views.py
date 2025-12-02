@@ -460,6 +460,8 @@ def dashboard(
     midwife_dashboard_service=Provide[AppContainer.midwife_dashboard_service],
 ):
     user_role = _auth_role_name(request)
+    auth = request.session.get('auth', {})
+    person_id = auth.get('person_id')
 
     bhw_id = _auth_staff_id(request)
 
@@ -475,6 +477,7 @@ def dashboard(
 }
 
     dashboard_json = None
+    announcements = []
 
     try:
         payload = midwife_dashboard_service.get_dashboard_content(bhw_id) or {}
@@ -482,6 +485,13 @@ def dashboard(
         dashboard_json = payload.get("dashboard_json")
     except Exception as exc:
         print("Error fetching midwife dashboard KPIs:", exc)
+    
+    if person_id:
+        try:
+            from authentication.announcement_views import get_user_announcements
+            announcements = get_user_announcements(person_id)
+        except Exception as exc:
+            print(f"Error fetching announcements for person {person_id}:", exc)
 
     return render(
         request,
@@ -492,6 +502,7 @@ def dashboard(
             'kpis': kpis,
             'dashboard_json': dashboard_json,
             'today': datetime.now().strftime("%B %d, %Y"),
+            'announcements': announcements,
         },
     )
 
@@ -1425,6 +1436,7 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
                 "nationality_label":  _label_from_choices(form.fields["nationality"].choices, cd.get("nationality")),
                 "religion_label":     _label_from_choices(form.fields["religion"].choices, cd.get("religion")),
                 "city":      cd.get("city") or "",
+                "province":  cd.get("province") or "",
                 "barangay":  cd.get("barangay") or "",
                 "sitio_purok": cd.get("purok_sitio") or "",
                 "street":    cd.get("street") or "",
@@ -1820,6 +1832,7 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
             p_nationality_id=personal.get("nationality_id"),
             p_religion_id=personal.get("religion_id"),
             p_city=personal.get("city"),
+            p_province=personal.get("province"),
             p_barangay=personal.get("barangay"),
             p_sitio_purok=personal.get("sitio_purok"),
             p_street=personal.get("street"),
@@ -2215,3 +2228,20 @@ def staff_dets(request, staff_code: str):
         "purok_list": purok_list,
     }
     return render(request, "acc_management/staff_dets.html", ctx)
+
+# Staff requests views
+@session_login_required
+@role_required(*ROLE_MIDWIFE)
+@nocache
+def staff_requests_list(request: HttpRequest) -> HttpResponse:
+    """View staff account requests submitted by this midwife"""
+    from common.staff_request_views import staff_requests_list_view
+    return staff_requests_list_view(request, "midwife", "midwife/acc_management/requests_list.html")
+
+@session_login_required
+@role_required(*ROLE_MIDWIFE)
+@nocache
+def staff_request_detail(request: HttpRequest, request_id: int) -> HttpResponse:
+    """View detailed information about a specific staff request"""
+    from common.staff_request_views import staff_request_detail_view
+    return staff_request_detail_view(request, request_id, "midwife", "midwife/acc_management/request_detail.html")
