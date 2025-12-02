@@ -115,8 +115,8 @@ PUROK_SITIO_CHOICES = [
 
 STAFF_ROLE_CHOICES = [
     ("", "— Select Staff Role —"),
-    (1, "SUPER ADMIN"),
-    (2, "ADMIN"),
+    # (1, "SUPER ADMIN"),
+    # (2, "ADMIN"),
     (3, "BARANGAY CAPTAIN"),
     (4, "BARANGAY SECRETARY"),
     (5, "BARANGAY TREASURER"),
@@ -124,21 +124,21 @@ STAFF_ROLE_CHOICES = [
     (7, "BARANGAY LUPON PRESIDENT"),
     (8, "BARANGAY LUPON MEMBER"),
     (9, "BARANGAY HEALTH WORKER"),
-    (10, "NURSE"),
-    (11, "MIDWIFE"),
-    (12, "SYSTEM"),
+    # (10, "NURSE"),
+    # (11, "MIDWIFE"),
+    # (12, "SYSTEM"),
 ]
 
 AUDIENCE_SCOPE =[
     ("", "— Select Audience Scope —"),
     (1, "ALL"),
     (2, "RESIDENTS"),
-    (8, "PUROK"),
-    (3, "STAFF"),
     (4, "HOUSEHOLD HEAD"),
     (5, "FAMILY HEAD"),
+    (6, "STUDENTS"),
+    (8, "PUROK"),
     (7, "BUSINESS OWNER"),
-    (6, "PERSON LIST"),
+    (3, "STAFF"),
 ]
 
 CHANNEL_CHOICES = [
@@ -765,15 +765,7 @@ class AudienceScope(forms.Form):
         label= 'Purok / Sitio',
         required= False,
     )
-    search_person = forms.CharField(
-        widget=forms.TextInput(attrs={
-            'id' : 'search_person',
-            'class' : 'form-control', 
-            'placeholder' : 'Search Person',
-        }),
-        label= 'Search Person',
-        required= False,
-    )
+    # search_person field removed - scope 6 is now STUDENTS (no person selection needed)
 
 class ResidentFilters(forms.Form):
     search = forms.CharField(

@@ -117,6 +117,30 @@
     gap: 0.5rem;
   }
 
+  .audience-list {
+    max-height: 250px;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+  }
+
+  .audience-list::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .audience-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+  }
+
+  .audience-list::-webkit-scrollbar-thumb {
+    background: #6d2932;
+    border-radius: 10px;
+  }
+
+  .audience-list::-webkit-scrollbar-thumb:hover {
+    background: #8a3a47;
+  }
+
   .audience-item {
     background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
     border: 1px solid #dee2e6;
@@ -390,34 +414,42 @@
                   <h6>
                     <i class="bi bi-people-fill"></i>Target Audiences
                   </h6>
-                  {% if audiences %}
-                    {% for audience in audiences %}
-                      <div class="audience-item" id="audience-{{ audience.audience_id }}">
-                        <div class="d-flex justify-content-between align-items-start">
-                          <div class="flex-grow-1">
-                            <strong>{{ audience.audience_scope_name }}</strong>
-                            <br>
-                            <small class="text-muted">
-                              <i class="bi bi-person-check me-1"></i>{{ audience.inserted_persons }} recipients
-                            </small>
-                          </div>
-                          <div class="d-flex align-items-center gap-2">
-                            <span class="audience-badge">{{ audience.inserted_persons }}</span>
-                            <button type="button" 
-                                    class="btn btn-sm btn-outline-danger" 
-                                    onclick="removeAudience({{ audience.audience_id }}, '{{ audience.audience_scope_name }}')"
-                                    title="Remove audience"><i class="bi bi-x-lg"></i>
-                            </button>
+                  <div class="audience-list">
+                    {% if audiences %}
+                      {% for audience in audiences %}
+                        <div class="audience-item" id="audience-{{ audience.audience_id }}">
+                          <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                              <strong>{{ audience.audience_scope_name }}</strong>
+                              {% if audience.role_name %}
+                                <br><small class="text-primary"><i class="bi bi-briefcase me-1"></i>{{ audience.role_name }}</small>
+                              {% endif %}
+                              {% if audience.purok_sitio_name %}
+                                <br><small class="text-success"><i class="bi bi-geo-alt me-1"></i>{{ audience.purok_sitio_name }}</small>
+                              {% endif %}
+                              <br>
+                              <small class="text-muted">
+                                <i class="bi bi-person-check me-1"></i>{{ audience.inserted_persons }} recipients
+                              </small>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                              <span class="audience-badge">{{ audience.inserted_persons }}</span>
+                              <button type="button" 
+                                      class="btn btn-sm btn-outline-danger" 
+                                      onclick="removeAudience({{ audience.audience_id }}, '{{ audience.audience_scope_name }}')"
+                                      title="Remove audience"><i class="bi bi-x-lg"></i>
+                              </button>
+                            </div>
                           </div>
                         </div>
+                      {% endfor %}
+                    {% else %}
+                      <div class="empty-state">
+                        <i class="bi bi-people"></i>
+                        <p class="mb-0">No audience configured</p>
                       </div>
-                    {% endfor %}
-                  {% else %}
-                    <div class="empty-state">
-                      <i class="bi bi-people"></i>
-                      <p class="mb-0">No audience configured</p>
-                    </div>
-                  {% endif %}
+                    {% endif %}
+                  </div>
                   
                   <div class="mt-3">
                     <button type="button" 
@@ -600,10 +632,14 @@ function showErrorModal(title, message) {
   let appliedChannels = [];   // latest fetched channels for applied list
 
   // Publish Now functionality
-  window.publishNow = async function() {
-    if (!confirm('Are you sure you want to publish this announcement now? This action cannot be undone.')) {
-      return;
-    }
+  window.publishNow = function() {
+    const modal = new bootstrap.Modal(document.getElementById('publishConfirmModal'));
+    modal.show();
+  };
+
+  window.confirmPublish = async function() {
+    const confirmModal = bootstrap.Modal.getInstance(document.getElementById('publishConfirmModal'));
+    confirmModal.hide();
 
     const publishBtn = document.getElementById('publish-now-btn');
     const originalText = publishBtn.innerHTML;
@@ -625,25 +661,35 @@ function showErrorModal(title, message) {
       const data = await response.json();
 
       if (data.success) {
-        alert(`Success! ${data.message}`);
-        window.location.href = '{% url "secretary:announcement_draft_list" %}';
+        document.getElementById('successModalTitle').textContent = 'Published Successfully';
+        document.getElementById('successModalMessage').textContent = data.message;
+        const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+        successModal.show();
+        setTimeout(() => {
+          window.location.href = '{% url "secretary:announcement_draft_list" %}';
+        }, 2000);
       } else {
-        alert('Error: ' + (data.error || 'Failed to publish announcement'));
+        showErrorModal('Publish Failed', data.error || 'Failed to publish announcement');
+        publishBtn.disabled = false;
+        publishBtn.innerHTML = originalText;
       }
     } catch (error) {
       console.error('Publish error:', error);
-      alert('Error: Failed to publish announcement');
-    } finally {
+      showErrorModal('Publish Failed', 'An unexpected error occurred while publishing the announcement.');
       publishBtn.disabled = false;
       publishBtn.innerHTML = originalText;
     }
   };
 
   // Schedule functionality
-  window.scheduleAnnouncement = async function() {
-    if (!confirm('Are you sure you want to schedule this announcement? Make sure publish and expire dates are set.')) {
-      return;
-    }
+  window.scheduleAnnouncement = function() {
+    const modal = new bootstrap.Modal(document.getElementById('scheduleConfirmModal'));
+    modal.show();
+  };
+
+  window.confirmSchedule = async function() {
+    const confirmModal = bootstrap.Modal.getInstance(document.getElementById('scheduleConfirmModal'));
+    confirmModal.hide();
 
     const scheduleBtn = document.getElementById('schedule-btn');
     const originalText = scheduleBtn.innerHTML;
@@ -665,15 +711,21 @@ function showErrorModal(title, message) {
       const data = await response.json();
 
       if (data.success) {
-        alert(`Success! ${data.message}`);
-        window.location.reload();
+        document.getElementById('successModalTitle').textContent = 'Scheduled Successfully';
+        document.getElementById('successModalMessage').textContent = data.message;
+        const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+        successModal.show();
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
       } else {
-        alert('Error: ' + (data.error || 'Failed to schedule announcement'));
+        showErrorModal('Schedule Failed', data.error || 'Failed to schedule announcement');
+        scheduleBtn.disabled = false;
+        scheduleBtn.innerHTML = originalText;
       }
     } catch (error) {
       console.error('Schedule error:', error);
-      alert('Error: Failed to schedule announcement');
-    } finally {
+      showErrorModal('Schedule Failed', 'An unexpected error occurred while scheduling the announcement.');
       scheduleBtn.disabled = false;
       scheduleBtn.innerHTML = originalText;
     }
@@ -891,7 +943,6 @@ function showErrorModal(title, message) {
     const scopeSelect = document.getElementById('scope');
     const purokSection = document.getElementById('purok-section');
     const staffSection = document.getElementById('staff-section');
-    const personSection = document.getElementById('person-section');
     const rulesList = document.getElementById('rules-list');
     const addRuleBtn = document.getElementById('add-rule-btn');
     const saveAudienceBtn = document.getElementById('save-audience-btn');
@@ -901,7 +952,6 @@ function showErrorModal(title, message) {
       scopeSelect: !!scopeSelect,
       purokSection: !!purokSection,
       staffSection: !!staffSection,
-      personSection: !!personSection,
       rulesList: !!rulesList,
       addRuleBtn: !!addRuleBtn,
       saveAudienceBtn: !!saveAudienceBtn
@@ -913,15 +963,13 @@ function showErrorModal(title, message) {
       
       if (purokSection) purokSection.style.display = 'none';
       if (staffSection) staffSection.style.display = 'none';
-      if (personSection) personSection.style.display = 'none';
       
-      if (selectedValue === '8' && purokSection) {
+      if ((selectedValue === '8' || selectedValue === '4' || selectedValue === '5') && purokSection) {
         purokSection.style.display = 'block';
       } else if (selectedValue === '3' && staffSection) {
         staffSection.style.display = 'block';
-      } else if (selectedValue === '6' && personSection) {
-        personSection.style.display = 'block';
       }
+      // Scope 6 (STUDENTS) no longer shows person section
     }
     
     function updateRulesList() {
@@ -973,11 +1021,17 @@ function showErrorModal(title, message) {
           person_ids: null
         };
         
-        if (scopeValue === '8' && purokSection && purokSection.style.display !== 'none') {
+        if ((scopeValue === '8' || scopeValue === '4' || scopeValue === '5') && purokSection && purokSection.style.display !== 'none') {
           const purokSelect = document.getElementById('purok_sitio');
-          if (purokSelect && purokSelect.value && purokSelect.value !== '0') {
+          if (!purokSelect || !purokSelect.value || purokSelect.value === '0') {
+            if (scopeValue === '8') {
+              showErrorModal('Purok Required', 'Please select a Purok/Sitio when using the PUROK scope.');
+              return;
+            }
+            // For household head and family head, purok is optional
+          } else {
             rule.purok_id = parseInt(purokSelect.value);
-            rule.value = purokSelect.options[purokSelect.selectedIndex].text;
+            rule.value = `${scopeText} - ${purokSelect.options[purokSelect.selectedIndex].text}`;
           }
         } else if (scopeValue === '3' && staffSection && staffSection.style.display !== 'none') {
           const staffSelect = document.getElementById('staff_role');
@@ -985,13 +1039,8 @@ function showErrorModal(title, message) {
             rule.role_id = parseInt(staffSelect.value);
             rule.value = staffSelect.options[staffSelect.selectedIndex].text;
           }
-        } else if (scopeValue === '6' && personSection && personSection.style.display !== 'none') {
-          const personSelect = document.getElementById('search_person');
-          if (personSelect && personSelect.value) {
-            rule.person_ids = [parseInt(personSelect.value)];
-            rule.value = personSelect.options[personSelect.selectedIndex].text;
-          }
         }
+        // Scope 6 (STUDENTS) removed - no person selection needed
         
         console.log('Rule created:', rule);
         
@@ -1108,10 +1157,7 @@ function showErrorModal(title, message) {
             {{ audience_form.staff_role }}
           </div>
 
-          <div class="col-md-6" id="person-section" style="display:none;">
-            <label class="form-label fw-semibold">Person</label>
-            {{ audience_form.search_person }}
-          </div>
+          <!-- person-section removed - scope 6 is now STUDENTS (no person selection) -->
         </div>
 
         <div class="mt-3">
@@ -1180,6 +1226,80 @@ function showErrorModal(title, message) {
       </div>
       <div class="modal-footer border-0">
         <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+          <i class="bi bi-check-lg"></i> OK
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Publish Confirmation Modal -->
+<div class="modal fade" id="publishConfirmModal" tabindex="-1" aria-labelledby="publishConfirmModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0" style="background: linear-gradient(135deg, #6d2932 0%, #8a3a47 100%); color: white;">
+        <h5 class="modal-title" id="publishConfirmModalLabel">
+          <i class="bi bi-send-fill me-2"></i>Confirm Publish
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">Are you sure you want to publish this announcement now?</p>
+        <p class="text-muted small mb-0">This action will immediately send the announcement to all configured recipients and cannot be undone.</p>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-circle"></i> Cancel
+        </button>
+        <button type="button" class="btn btn-primary" onclick="confirmPublish()">
+          <i class="bi bi-send-fill"></i> Publish Now
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Schedule Confirmation Modal -->
+<div class="modal fade" id="scheduleConfirmModal" tabindex="-1" aria-labelledby="scheduleConfirmModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0" style="background: linear-gradient(135deg, #6d2932 0%, #8a3a47 100%); color: white;">
+        <h5 class="modal-title" id="scheduleConfirmModalLabel">
+          <i class="bi bi-calendar-event me-2"></i>Confirm Schedule
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">Are you sure you want to schedule this announcement?</p>
+        <p class="text-muted small mb-0">Please make sure publish and expire dates are set correctly before proceeding.</p>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-circle"></i> Cancel
+        </button>
+        <button type="button" class="btn btn-primary" onclick="confirmSchedule()">
+          <i class="bi bi-calendar-check"></i> Schedule
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white;">
+        <h5 class="modal-title" id="successModalLabel">
+          <i class="bi bi-check-circle-fill me-2"></i><span id="successModalTitle">Success</span>
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0" id="successModalMessage"></p>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-success" data-bs-dismiss="modal">
           <i class="bi bi-check-lg"></i> OK
         </button>
       </div>

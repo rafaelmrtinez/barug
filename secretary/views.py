@@ -2565,7 +2565,7 @@ def save_audience_rules(
                 audience_scope_id=scope_id,
                 role_id=role_id,
                 purok_sitio_id=purok_id,
-                person_ids=rule.get('person_ids')
+                person_ids=None  # No longer used for scope 6 (STUDENTS)
             )
             
             audience_id, inserted_persons = audience_service.add_announcement_audience(command)
