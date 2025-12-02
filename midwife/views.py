@@ -1572,10 +1572,10 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
             _wiz_set(request, "docs", docs_payload)
         except Exception as e:
             logger.error("Step2 ✗ Preview preparation failed: %s", e)
-            flash_system_error(request, "Could not prepare previews.", exc=e)
+            # flash_system_error(request, "Could not prepare previews.", exc=e)
             return redirect(request.path)
 
-        flash_success(request, "Documents loaded for preview. Please review and choose role.")
+        # flash_success(request, "Documents loaded for preview. Please review and choose role.")
         logger.info("Step2 ✓ Preview-only complete (no uploads).")
         return redirect("midwife:staff_selection_non-resident_role_review")
 

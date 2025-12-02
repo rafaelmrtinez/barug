@@ -930,7 +930,7 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
             flash_system_error(request, "Could not prepare previews.", exc=e)
             return redirect(request.path)
 
-        flash_success(request, "Documents loaded for preview. Please review and choose role.")
+        # flash_success(request, "Documents loaded for preview. Please review and choose role.")
         logger.info("Step2 ✓ Preview-only complete (no uploads).")
         return redirect("captain:staff_selection_non-resident_role_review")
 
