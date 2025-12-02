@@ -13,6 +13,9 @@ class BusinessListDTO:
     business_address: str
     business_status_name: str
     ownership_type_name: str
+    date_established: Optional[date] = None
+    num_of_employees: Optional[int] = None
+    sitio_purok: Optional[str] = None
 
 @dataclass(frozen=True)
 class ResidentOwnerDTO:

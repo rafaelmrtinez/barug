@@ -7,7 +7,19 @@
         </div>
 
         <div class="biz-meta">
-        <span class="badge badge-status">{{ r.business_status_name|title }}</span>
+        {% with status=r.business_status_name|upper %}
+          {% if status == 'PENDING' %}
+            <span class="badge badge-status status-pending">{{ r.business_status_name|title }}</span>
+          {% elif status == 'ACTIVE' %}
+            <span class="badge badge-status status-active">{{ r.business_status_name|title }}</span>
+          {% elif status == 'EXPIRED' %}
+            <span class="badge badge-status status-expired">{{ r.business_status_name|title }}</span>
+          {% elif status == 'CLOSED' %}
+            <span class="badge badge-status status-closed">{{ r.business_status_name|title }}</span>
+          {% else %}
+            <span class="badge badge-status">{{ r.business_status_name|title }}</span>
+          {% endif %}
+        {% endwith %}
         <span><span class="meta-label">Category:</span> <span class="meta-val">{{ r.business_category_name|title }}</span></span>
         <span><span class="meta-label">Nature:</span> <span class="meta-val">{{ r.business_nature|title }}</span></span>
         <span><span class="meta-label">Ownership:</span> <span class="meta-val">{{ r.ownership_type_name|title }}</span></span>

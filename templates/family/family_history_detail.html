@@ -1,0 +1,318 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+  <link rel="stylesheet" href="{% static 'css/button.css' %}">
+  <style>
+    :root{
+      --brand:#6d2932;
+      --section-border:#e9ecef;
+      --section-bg:#fff;
+      --section-cap-bg:#f8f9fa;
+      --muted:#6c757d;
+    }
+
+    .btn-outline-brand{
+      color:#6d2932;
+      border-color:#6d2932;
+      background:#fff;
+    }
+    .btn-outline-brand:hover{
+      background:#6d2932;
+      color:#fff;
+    }
+
+    .section-block{
+      background:var(--section-bg);
+      border:1px solid var(--section-border);
+      border-left:4px solid var(--brand);
+      border-radius:12px;
+      padding:1.5rem;
+      margin-bottom:1.5rem;
+      box-shadow:0 1px 3px rgba(16,24,40,.08);
+    }
+
+    .section-header{
+      display:flex;
+      align-items:center;
+      gap:.75rem;
+      margin-bottom:1.25rem;
+      padding-bottom:1rem;
+      border-bottom:2px solid #f1f3f5;
+    }
+
+    .section-icon{
+      width:40px;
+      height:40px;
+      border-radius:10px;
+      background:linear-gradient(135deg, #6d2932 0%, #8a3843 100%);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#fff;
+      font-size:1.25rem;
+    }
+
+    .section-title{
+      font-weight:700;
+      font-size:1.25rem;
+      margin:0;
+      color:#1a1a1a;
+    }
+
+    .info-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));
+      gap:1.25rem;
+    }
+
+    .info-item{
+      display:flex;
+      flex-direction:column;
+      gap:.25rem;
+    }
+
+    .info-label{
+      font-size:.8125rem;
+      font-weight:600;
+      color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:.5px;
+    }
+
+    .info-value{
+      font-size:1rem;
+      font-weight:600;
+      color:#1a1a1a;
+    }
+
+    .badge-custom{
+      display:inline-flex;
+      align-items:center;
+      gap:.375rem;
+      padding:.375rem .75rem;
+      border-radius:999px;
+      font-size:.8125rem;
+      font-weight:600;
+    }
+
+    .badge-nhts{
+      background:#e8f7ef;
+      color:#0f5132;
+      border:1px solid #cce7da;
+    }
+
+    .badge-indigent{
+      background:#fff3cd;
+      color:#664d03;
+      border:1px solid #ffe69c;
+    }
+
+    .badge-active{
+      background:#d1e7dd;
+      color:#0f5132;
+      border:1px solid #badbcc;
+    }
+
+    .badge-inactive{
+      background:#f8d7da;
+      color:#842029;
+      border:1px solid #f5c2c7;
+    }
+
+    .back-link{
+      display:inline-flex;
+      align-items:center;
+      gap:.5rem;
+      color:#6d2932;
+      text-decoration:none;
+      font-weight:600;
+      margin-bottom:1.5rem;
+      transition:all .2s ease;
+    }
+
+    .back-link:hover{
+      gap:.75rem;
+      color:#8a3843;
+    }
+
+    .page-header{
+      margin-bottom:2rem;
+    }
+
+    .family-number{
+      font-size:2rem;
+      font-weight:800;
+      color:#6d2932;
+      margin-bottom:.5rem;
+    }
+
+    .family-head{
+      font-size:1.25rem;
+      color:#495057;
+      font-weight:500;
+    }
+
+    .history-badge{
+      display:inline-block;
+      padding:.375rem .75rem;
+      border-radius:4px;
+      background:#ffc107;
+      color:#000;
+      font-weight:600;
+      font-size:.875rem;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="margin-top:60px;">
+
+  <div class="page-header">
+    <div class="family-number">
+      Family {{ family.family_num }} 
+      <span class="history-badge">HISTORICAL</span>
+      {% if family.is_active %}
+        <span class="badge-custom badge-active">Active</span>
+      {% else %}
+        <span class="badge-custom badge-inactive">Inactive</span>
+      {% endif %}
+    </div>
+    <div class="family-head">
+      {% bs_icon 'person-fill' %} {{ family.family_head_name }}
+    </div>
+  </div>
+
+  <!-- Family Information Section -->
+  <div class="section-block">
+    <div class="section-header">
+      <div class="section-icon">
+        {% bs_icon 'people-fill' %}
+      </div>
+      <h2 class="section-title">Family Information</h2>
+    </div>
+    
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">Family Number</div>
+        <div class="info-value">{{ family.family_num|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">UFC Number</div>
+        <div class="info-value">{{ family.ufc_num|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Family Head</div>
+        <div class="info-value">{{ family.family_head_name|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Household Number</div>
+        <div class="info-value">{{ family.household_num|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Household Type</div>
+        <div class="info-value">{{ family.household_type_name|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">NHTS Status</div>
+        <div>
+          {% if family.nhts_status_name %}
+            <span class="badge-custom badge-nhts">{{ family.nhts_status_name }}</span>
+          {% else %}
+            <span class="info-value">—</span>
+          {% endif %}
+        </div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Indigent Status</div>
+        <div>
+          {% if family.indigent_status_name %}
+            <span class="badge-custom badge-indigent">{{ family.indigent_status_name }}</span>
+          {% else %}
+            <span class="info-value">—</span>
+          {% endif %}
+        </div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Monthly Income</div>
+        <div class="info-value">
+          {% if family.hhold_mnthly_income %}
+            ₱{{ family.hhold_mnthly_income|floatformat:2 }}
+          {% else %}
+            —
+          {% endif %}
+        </div>
+      </div>
+      
+      <div class="info-item" style="grid-column:1/-1;">
+        <div class="info-label">Source of Income</div>
+        <div class="info-value">{{ family.source_of_income|default:"—" }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Record Information Section -->
+  <div class="section-block">
+    <div class="section-header">
+      <div class="section-icon">
+        {% bs_icon 'calendar-check' %}
+      </div>
+      <h2 class="section-title">Record Information</h2>
+    </div>
+    
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="info-label">Created Date</div>
+        <div class="info-value">{{ family.created_date|date:"F d, Y" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Year</div>
+        <div class="info-value">{{ family.year_created|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Quarter</div>
+        <div class="info-value">Q{{ family.quarter_number|default:"—" }} {% if family.quarter_name %}({{ family.quarter_name }}){% endif %}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Registration Method</div>
+        <div class="info-value">{{ family.registration_method_name|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Added By</div>
+        <div class="info-value">{{ family.added_by_name|default:"—" }}</div>
+      </div>
+      
+      <div class="info-item">
+        <div class="info-label">Quarterly Visited</div>
+        <div>
+          {% if family.is_quarterly_visited %}
+            <span class="badge-custom badge-active">Yes</span>
+          {% else %}
+            <span class="badge-custom badge-inactive">No</span>
+          {% endif %}
+        </div>
+      </div>
+      
+      {% if family.visited_by_name %}
+        <div class="info-item">
+          <div class="info-label">Visited By</div>
+          <div class="info-value">{{ family.visited_by_name }}</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

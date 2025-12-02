@@ -27,6 +27,10 @@ class FinancialPDFAPI(View):
     Query params:
       - search: string (optional) -- search term
       - pay_meth: string (optional) -- payment method filter
+      - month: int (optional) -- month filter (1-12)
+      - year: int (optional) -- year filter
+      - date_from: date (optional) -- date range start
+      - date_to: date (optional) -- date range end
     """
     
     @inject
@@ -35,14 +39,24 @@ class FinancialPDFAPI(View):
             # Get filter parameters
             search = request.GET.get('search')
             pay_meth = request.GET.get('pay_meth')
+            month_str = request.GET.get('month')
+            year_str = request.GET.get('year')
+            date_from = request.GET.get('date_from')
+            date_to = request.GET.get('date_to')
             
-            # Convert payment method to int if provided
+            # Convert to appropriate types
             payment_method = int(pay_meth) if pay_meth else None
+            month = int(month_str) if month_str else None
+            year = int(year_str) if year_str else None
             
             # Get filtered OR data
             rows = or_service.execute(
                 search=search,
                 payment_method=payment_method,
+                month=month,
+                year=year,
+                date_from=date_from,
+                date_to=date_to,
             )
             
             # Get user info for signature
@@ -64,6 +78,10 @@ class FinancialPDFAPI(View):
                 or_data=rows,
                 search_term=search,
                 payment_method=pay_meth,
+                month=month_str,
+                year=year_str,
+                date_from=date_from,
+                date_to=date_to,
                 generated_by_name=gen_name,
                 generated_by_role=gen_role,
             )

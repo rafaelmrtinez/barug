@@ -137,6 +137,22 @@ PAYMENT_METHOD_CHOICES = [
     (5, "ONLINE GCASH"),
 ]
 
+MONTH_CHOICES = [
+    ("", "— Select Month —"),
+    (1, "January"),
+    (2, "February"),
+    (3, "March"),
+    (4, "April"),
+    (5, "May"),
+    (6, "June"),
+    (7, "July"),
+    (8, "August"),
+    (9, "September"),
+    (10, "October"),
+    (11, "November"),
+    (12, "December"),
+]
+
 class ORFilters(forms.Form):
     search = forms.CharField(
         widget=forms.TextInput(attrs={
@@ -155,6 +171,43 @@ class ORFilters(forms.Form):
         }),
         label= 'Payment Method',
         required= False,
+    )
+    month = forms.ChoiceField(
+        choices=MONTH_CHOICES,
+        widget=forms.Select(attrs={
+            'id': 'month',
+            'class': 'form-select',
+        }),
+        label='Month',
+        required=False,
+    )
+    year = forms.IntegerField(
+        widget=forms.NumberInput(attrs={
+            'id': 'year',
+            'class': 'form-control',
+            'placeholder': 'Year',
+            'min': '2000',
+        }),
+        label='Year',
+        required=False,
+    )
+    date_from = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'id': 'date_from',
+            'class': 'form-control',
+            'type': 'date',
+        }),
+        label='Date From',
+        required=False,
+    )
+    date_to = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'id': 'date_to',
+            'class': 'form-control',
+            'type': 'date',
+        }),
+        label='Date To',
+        required=False,
     )
 
 class Schedule(forms.Form):
@@ -256,6 +309,50 @@ class BusinessFilters(forms.Form):
         }),
         label= 'Status',
         required= False,
+    )
+    purok = forms.ChoiceField(
+        choices=[
+            ("", "— All Puroks —"),
+            ("KANIPAAN", "Kanipaan"),
+            ("PAMPANGO", "Pampango"),
+            ("LUTAW-LUTAW", "Lutaw-Lutaw"),
+            ("MAUCO", "Mauco"),
+        ],
+        widget=forms.Select(attrs={
+            'id': 'purok',
+            'class': 'form-select',
+        }),
+        label='Purok/Sitio',
+        required=False,
+    )
+    date_range = forms.ChoiceField(
+        choices=[
+            ("", "— All Time —"),
+            ("6", "Last 6 Months"),
+            ("12", "Last Year"),
+            ("24", "Last 2 Years"),
+            ("60", "Last 5 Years"),
+        ],
+        widget=forms.Select(attrs={
+            'id': 'date_range',
+            'class': 'form-select',
+        }),
+        label='Date Established',
+        required=False,
+    )
+    employee_range = forms.ChoiceField(
+        choices=[
+            ("", "— All Sizes —"),
+            ("1-5", "Small (1-5 employees)"),
+            ("6-20", "Medium (6-20 employees)"),
+            ("21-999", "Large (20+ employees)"),
+        ],
+        widget=forms.Select(attrs={
+            'id': 'employee_range',
+            'class': 'form-select',
+        }),
+        label='Number of Employees',
+        required=False,
     )
 
 class StaffAccountRequestFilters(forms.Form):
@@ -680,5 +777,66 @@ class ResidentFilters(forms.Form):
             'class' : 'form-select',
         }),
         label= 'Purok / Sitio',
+        required= False,
+    )
+
+HOUSEHOLD_TYPE_CHOICES = [
+    ("", "— All household types —"),
+    (1, "NUCLEAR FAMILY"),
+    (2, "EXTENDED FAMILY"),
+    (3, "BOARDING HOUSE"),
+    (4, "SHARED APARTMENT"),
+    (5, "SOLO HOUSEHOLD"),
+    (6, "GOVERNMENT HOUSING"),
+    (7, "INFORMAL SETTLER"),
+]
+
+NHTS_STATUS_CHOICES = [
+    ("", "— All NHTS status —"),
+    (1, "NHTS MEMBER"),
+    (2, "NOT NHTS MEMBER"),
+]
+
+INDIGENT_STATUS_CHOICES = [
+    ("", "— All indigent status —"),
+    (1, "INDIGENT"),
+    (2, "NOT INDIGENT"),
+]
+
+class FamilyFilters(forms.Form):
+    search = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'id' : 'search',
+            'class' : 'form-control', 
+            'placeholder' : 'Search',
+        }),
+        label= 'Search',
+        required= False,
+    )
+    household_type = forms.ChoiceField(
+        choices= HOUSEHOLD_TYPE_CHOICES,
+        widget=forms.Select(attrs={
+            'id' : 'household_type',
+            'class' : 'form-select',
+        }),
+        label= 'Household Type',
+        required= False,
+    )
+    nhts_status = forms.ChoiceField(
+        choices= NHTS_STATUS_CHOICES,
+        widget=forms.Select(attrs={
+            'id' : 'nhts_status',
+            'class' : 'form-select',
+        }),
+        label= 'NHTS Status',
+        required= False,
+    )
+    indigent_status = forms.ChoiceField(
+        choices= INDIGENT_STATUS_CHOICES,
+        widget=forms.Select(attrs={
+            'id' : 'indigent_status',
+            'class' : 'form-select',
+        }),
+        label= 'Indigent Status',
         required= False,
     )

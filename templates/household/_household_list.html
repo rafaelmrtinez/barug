@@ -9,9 +9,19 @@
   <td><span class="cat-badge">{{ r.house_type_name }}</span></td>
   <td>{{ r.household_ownership_name }}</td>
   <td class="text-end">
-    <a class="btn btn-outline-brand btn-sm" href="#">
-        View
-    </a>
+    {% if request.resolver_match.namespace == 'captain' %}
+      <a class="btn btn-outline-brand btn-sm" href="{% url 'captain:household_detail' household_id=r.household_id %}">
+          View
+      </a>
+    {% elif request.resolver_match.namespace == 'bhw' %}
+      <a class="btn btn-outline-brand btn-sm" href="{% url 'bhw:household_detail' household_id=r.household_id %}">
+          View
+      </a>
+    {% else %}
+      <a class="btn btn-outline-brand btn-sm" href="{% url 'secretary:household_detail' household_id=r.household_id %}">
+          View
+      </a>
+    {% endif %}
   </td>
 </tr>
 {% empty %}

@@ -81,10 +81,14 @@
 
         {# preserve selected payment method when searching #}
         <input type="hidden" name="pay_meth" value="{{ request.GET.pay_meth|default:'' }}">
+        <input type="hidden" name="month" value="{{ request.GET.month|default:'' }}">
+        <input type="hidden" name="year" value="{{ request.GET.year|default:'' }}">
+        <input type="hidden" name="date_from" value="{{ request.GET.date_from|default:'' }}">
+        <input type="hidden" name="date_to" value="{{ request.GET.date_to|default:'' }}">
 
-        {# Filters button with badge count (only pay_meth available) #}
-        {% with pm=request.GET.pay_meth|yesno:"1,0" %}
-          {% with fc=0|add:pm %}
+        {# Filters button with badge count #}
+        {% with pm=request.GET.pay_meth|yesno:"1,0" m=request.GET.month|yesno:"1,0" y=request.GET.year|yesno:"1,0" df=request.GET.date_from|yesno:"1,0" dt=request.GET.date_to|yesno:"1,0" %}
+          {% with fc=0|add:pm|add:m|add:y|add:df|add:dt %}
             <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
                     type="button"
                     data-bs-toggle="offcanvas"
@@ -104,17 +108,57 @@
 
       {# ─── Active filter chips (show selected labels) ─── #}
       <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
-        {% if request.GET.pay_meth %}
+        {% if request.GET.pay_meth or request.GET.month or request.GET.year or request.GET.date_from or request.GET.date_to %}
           <span class="text-muted me-1">Active:</span>
 
           {# Payment Method chip #}
-          {% with label=form.pay_meth|choice_label:request.GET.pay_meth %}
+          {% if request.GET.pay_meth %}
+            {% with label=form.pay_meth|choice_label:request.GET.pay_meth %}
+              <a class="filter-chip"
+                 href="?search={{ request.GET.search|urlencode }}&month={{ request.GET.month|urlencode }}&year={{ request.GET.year|urlencode }}&date_from={{ request.GET.date_from|urlencode }}&date_to={{ request.GET.date_to|urlencode }}">
+                {{ label }}
+                <span class="x" aria-hidden="true">×</span>
+              </a>
+            {% endwith %}
+          {% endif %}
+
+          {# Month chip #}
+          {% if request.GET.month %}
+            {% with label=form.month|choice_label:request.GET.month %}
+              <a class="filter-chip"
+                 href="?search={{ request.GET.search|urlencode }}&pay_meth={{ request.GET.pay_meth|urlencode }}&year={{ request.GET.year|urlencode }}&date_from={{ request.GET.date_from|urlencode }}&date_to={{ request.GET.date_to|urlencode }}">
+                Month: {{ label }}
+                <span class="x" aria-hidden="true">×</span>
+              </a>
+            {% endwith %}
+          {% endif %}
+
+          {# Year chip #}
+          {% if request.GET.year %}
             <a class="filter-chip"
-               href="?search={{ request.GET.search|urlencode }}">
-              {{ label }}
+               href="?search={{ request.GET.search|urlencode }}&pay_meth={{ request.GET.pay_meth|urlencode }}&month={{ request.GET.month|urlencode }}&date_from={{ request.GET.date_from|urlencode }}&date_to={{ request.GET.date_to|urlencode }}">
+              Year: {{ request.GET.year }}
               <span class="x" aria-hidden="true">×</span>
             </a>
-          {% endwith %}
+          {% endif %}
+
+          {# Date From chip #}
+          {% if request.GET.date_from %}
+            <a class="filter-chip"
+               href="?search={{ request.GET.search|urlencode }}&pay_meth={{ request.GET.pay_meth|urlencode }}&month={{ request.GET.month|urlencode }}&year={{ request.GET.year|urlencode }}&date_to={{ request.GET.date_to|urlencode }}">
+              From: {{ request.GET.date_from }}
+              <span class="x" aria-hidden="true">×</span>
+            </a>
+          {% endif %}
+
+          {# Date To chip #}
+          {% if request.GET.date_to %}
+            <a class="filter-chip"
+               href="?search={{ request.GET.search|urlencode }}&pay_meth={{ request.GET.pay_meth|urlencode }}&month={{ request.GET.month|urlencode }}&year={{ request.GET.year|urlencode }}&date_from={{ request.GET.date_from|urlencode }}">
+              To: {{ request.GET.date_to }}
+              <span class="x" aria-hidden="true">×</span>
+            </a>
+          {% endif %}
 
           <a class="btn btn-sm btn-outline-brand ms-1" href="?search={{ request.GET.search|urlencode }}">
             {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
@@ -140,6 +184,13 @@
           <tbody id="results-body">
             {% include "financial/_financial_report_rows.html" with rows=page_obj.object_list %}
           </tbody>
+          <tfoot>
+            <tr style="border-top: 2px solid #6d2932;">
+              <td colspan="2" class="text-end fw-bold" style="font-size: 0.9rem;">Total:</td>
+              <td class="fw-bold" style="font-size: 0.9rem; color: #6d2932;">₱{{ total_amount|floatformat:2 }}</td>
+              <td colspan="3"></td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>
@@ -151,7 +202,7 @@
     </div>
   {% endif %}
 
-  {# ─── Offcanvas Filters (only Payment Method available) ─── #}
+  {# ─── Offcanvas Filters ─── #}
   <div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
        aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150px;">
     <div class="offcanvas-header">
@@ -164,6 +215,31 @@
         <div class="mb-3">
           <label class="form-label">Payment Method</label>
           {{ form.pay_meth }}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Month</label>
+          {{ form.month }}
+          <small class="form-text text-muted">Select month (works best with year)</small>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Year</label>
+          {{ form.year }}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Date Range</label>
+          <div class="row">
+            <div class="col-6">
+              {{ form.date_from }}
+              <small class="form-text text-muted">From</small>
+            </div>
+            <div class="col-6">
+              {{ form.date_to }}
+              <small class="form-text text-muted">To</small>
+            </div>
+          </div>
         </div>
 
         {# keep search term when applying filters #}
@@ -196,6 +272,14 @@
     params.set('tpl', 'rows');  
     const payMeth = document.querySelector('input[name="pay_meth"]')?.value || '';
     if (payMeth) params.set('pay_meth', payMeth);
+    const month = document.querySelector('input[name="month"]')?.value || '';
+    if (month) params.set('month', month);
+    const year = document.querySelector('input[name="year"]')?.value || '';
+    if (year) params.set('year', year);
+    const dateFrom = document.querySelector('input[name="date_from"]')?.value || '';
+    if (dateFrom) params.set('date_from', dateFrom);
+    const dateTo = document.querySelector('input[name="date_to"]')?.value || '';
+    if (dateTo) params.set('date_to', dateTo);
     return params.toString();
   }
 
