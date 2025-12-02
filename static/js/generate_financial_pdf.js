@@ -47,14 +47,26 @@
         // Get current search and filter parameters
         const searchInput = document.getElementById('search');
         const payMethInput = document.querySelector('input[name="pay_meth"]');
+        const monthInput = document.querySelector('input[name="month"]');
+        const yearInput = document.querySelector('input[name="year"]');
+        const dateFromInput = document.querySelector('input[name="date_from"]');
+        const dateToInput = document.querySelector('input[name="date_to"]');
         
         const searchValue = searchInput ? searchInput.value.trim() : '';
         const payMethValue = payMethInput ? payMethInput.value.trim() : '';
+        const monthValue = monthInput ? monthInput.value.trim() : '';
+        const yearValue = yearInput ? yearInput.value.trim() : '';
+        const dateFromValue = dateFromInput ? dateFromInput.value.trim() : '';
+        const dateToValue = dateToInput ? dateToInput.value.trim() : '';
 
         // Build URL with current filters
         const params = new URLSearchParams();
         if (searchValue) params.set('search', searchValue);
         if (payMethValue) params.set('pay_meth', payMethValue);
+        if (monthValue) params.set('month', monthValue);
+        if (yearValue) params.set('year', yearValue);
+        if (dateFromValue) params.set('date_from', dateFromValue);
+        if (dateToValue) params.set('date_to', dateToValue);
 
         // Detect role from current URL path
         const currentPath = window.location.pathname;

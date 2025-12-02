@@ -6,6 +6,11 @@
     // disable all inputs/selects/textareas inside container, but allow status dropdown to remain active
     const controls = container.querySelectorAll('input, select, textarea, button[type="submit"], button.section-action, button');
     controls.forEach(el => {
+        // Skip controls inside modals - modals should remain functional even when record is locked
+        if (el.closest('.modal')) {
+            return;
+        }
+
         // Buttons: hide all except the status action button (id="btn-mark-complete")
         if (el.tagName === 'BUTTON') {
             if (el.id === 'btn-mark-complete' || el.classList.contains('status-action')) {

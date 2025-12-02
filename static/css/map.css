@@ -61,6 +61,12 @@
     border:1px solid rgba(0,0,0,.06); background:#fff;
   }
   .badge-status{ color:#fff; background:var(--brand-700); border-color:transparent; }
+  
+  /* Status color variations */
+  .status-pending { background: #fff3cd; color: #856404; border-color: #ffc107; }
+  .status-active { background: #d1e7dd; color: #0f5132; border-color: #198754; }
+  .status-expired { background: #f8d7da; color: #842029; border-color: #dc3545; }
+  .status-closed { background: #e2e3e5; color: #41464b; border-color: #6c757d; }
   .biz-grid{
     display:grid; grid-template-columns: 1.5fr 1fr auto; gap:.75rem; align-items:center;
   }

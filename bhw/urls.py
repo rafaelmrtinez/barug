@@ -1,6 +1,11 @@
 # bhw/urls.py
 from django.urls import path
 from . import views
+from common.api.household_history_pdf_api import HouseholdHistoryPDFAPI
+from common.api.family_history_pdf_api import FamilyHistoryPDFAPI
+from common.api.household_pdf_api import HouseholdPDFAPI
+from common.api.residents_pdf_api import ResidentsPDFAPI
+from common.api.family_pdf_api import FamilyPDFAPI
 
 app_name = "bhw"
 
@@ -29,4 +34,33 @@ urlpatterns = [
     path("household/household_map/", views.household_map_list, name="household_map"),
     path("ajax/household_search/", views.ajax_household_search, name="ajax_household_search"),
     path("api/household/pins", views.api_household_pins, name="api_household_pins"),
+
+    # RESIDENT LIST
+    path("resident/resident_list/", views.resident_list, name="resident_list"),
+    path("resident/<int:person_id>/", views.resident_detail, name="resident_detail"),
+    path("ajax/resident_search/", views.ajax_resident_search, name="ajax_resident_search"),
+
+    # HOUSEHOLD LIST
+    path("household/household_list/", views.household_list, name="household_list"),
+    path("household/<int:household_id>/", views.household_detail, name="household_detail"),
+
+    # FAMILY
+    path('families/', views.family_list, name='family_list'),
+    path('api/families/search/', views.ajax_family_search, name='ajax_family_search'),
+    path('families/<int:family_id>/', views.family_detail, name='family_detail'),
+
+    # HOUSEHOLD HISTORY
+    path("household/history/", views.household_history_list, name="household_history_list"),
+    path("household/history/<int:household_history_id>/", views.household_history_detail, name="household_history_detail"),
+    path("family/history/<int:family_id>/", views.family_history_detail, name="family_history_detail"),
+    
+    # FAMILY HISTORY
+    path("family/history/", views.family_history_list, name="family_history_list"),
+    
+    # PDF APIs
+    path("api/household/history/pdf/", HouseholdHistoryPDFAPI.as_view(), name="household_history_pdf_api"),
+    path("api/family/history/pdf/", FamilyHistoryPDFAPI.as_view(), name="family_history_pdf_api"),
+    path("api/household/pdf/", HouseholdPDFAPI.as_view(), name="household_pdf_api"),
+    path("api/family/pdf/", FamilyPDFAPI.as_view(), name="family_pdf_api"),
+    path("api/residents/pdf/", ResidentsPDFAPI.as_view(), name="residents_pdf_api"),
 ]

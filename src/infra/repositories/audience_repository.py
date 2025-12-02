@@ -59,9 +59,12 @@ class AudienceRepository(IAudienceRepository):
         sql = """
             SELECT a.audience_id, a.announcement_id, a.audience_scope_id,
                    a.role_id, a.purok_sitio_id, aus.audience_scope_name,
+                   r.role_name, ps.purok_sitio_name,
                    (SELECT COUNT(*) FROM public.audience_person_list apl WHERE apl.audience_id = a.audience_id) as inserted_persons
             FROM public.audience a
             LEFT JOIN public.audience_scope aus ON aus.audience_scope_id = a.audience_scope_id
+            LEFT JOIN public.rolee r ON r.role_id = a.role_id
+            LEFT JOIN public.purok_sitio ps ON ps.purok_sitio_id = a.purok_sitio_id
             WHERE a.announcement_id = %s
             ORDER BY a.audience_id
         """
@@ -75,7 +78,9 @@ class AudienceRepository(IAudienceRepository):
                 role_id=row[3],
                 purok_sitio_id=row[4],
                 audience_scope_name=row[5],
-                inserted_persons=row[6]
+                role_name=row[6],
+                purok_sitio_name=row[7],
+                inserted_persons=row[8]
             )
             for row in result
         ]

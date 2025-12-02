@@ -476,6 +476,8 @@ def dashboard(
     midwife_dashboard_service=Provide[AppContainer.midwife_dashboard_service],
 ):
     user_role = _auth_role_name(request)
+    auth = request.session.get('auth', {})
+    person_id = auth.get('person_id')
 
     bhw_id = _auth_staff_id(request)
 
@@ -491,6 +493,7 @@ def dashboard(
 }
 
     dashboard_json = None
+    announcements = []
 
     try:
         payload = midwife_dashboard_service.get_dashboard_content(bhw_id) or {}
@@ -498,6 +501,13 @@ def dashboard(
         dashboard_json = payload.get("dashboard_json")
     except Exception as exc:
         print("Error fetching midwife dashboard KPIs:", exc)
+    
+    if person_id:
+        try:
+            from authentication.announcement_views import get_user_announcements
+            announcements = get_user_announcements(person_id)
+        except Exception as exc:
+            print(f"Error fetching announcements for person {person_id}:", exc)
 
     return render(
         request,
@@ -508,6 +518,7 @@ def dashboard(
             'kpis': kpis,
             'dashboard_json': dashboard_json,
             'today': datetime.now().strftime("%B %d, %Y"),
+            'announcements': announcements,
         },
     )
 

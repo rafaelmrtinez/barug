@@ -29,11 +29,10 @@ class AudienceService(IAudienceService):
         if command.audience_scope_id == 3 and not command.role_id:  # Staff scope
             raise ValueError("Role ID is required for staff scope")
         
-        if command.audience_scope_id in [4, 5, 8] and not command.purok_sitio_id:  # Household/Family/Purok scopes
-            raise ValueError("Purok/Sitio ID is required for this scope")
+        if command.audience_scope_id == 8 and not command.purok_sitio_id:  # Purok scope requires selection
+            raise ValueError("Purok/Sitio ID is required for Purok scope")
         
-        if command.audience_scope_id == 6 and not command.person_ids:  # Specific persons
-            raise ValueError("Person IDs are required for specific persons scope")
+        # Scope 6 is now STUDENTS - no additional validation needed
         
         return self.audience_repository.add_announcement_audience(command)
 

@@ -1,6 +1,11 @@
 (function () {
     'use strict';
 
+    // Expose fetchSidePanel globally so it can be called from row clicks
+    window.fetchMaternalSidePanel = async function(mhrId) {
+        await fetchSidePanel(mhrId);
+    };
+
     async function fetchSidePanel(mhrId) {
         if (!mhrId) return;
         try {
@@ -20,13 +25,23 @@
             }
 
             const result = data && data.result ? data.result : {};
-            const prenatal_history = data && data.prenatal_schedule_history ? data.prenatal_schedule_history : [];
-            const postpartum_history = data && data.postpartum_schedule_history ? data.postpartum_schedule_history : [];
+            const visit_schedules = data && data.visit_schedules ? data.visit_schedules : [];
+            const postpartum_visit_schedules = data && data.postpartum_visit_schedules ? data.postpartum_visit_schedules : [];
+            const maternal_anc_visits = data && data.maternal_anc_visit_history ? data.maternal_anc_visit_history : [];
             const latest_union = data && data.latest_scheduled_visit ? data.latest_scheduled_visit : null;
 
-            // latest items are the first elements of the history arrays (API returns ordered DESC)
-            const latest_prenatal = Array.isArray(prenatal_history) && prenatal_history.length ? prenatal_history[0] : null;
-            const latest_postpartum = Array.isArray(postpartum_history) && postpartum_history.length ? postpartum_history[0] : null;
+            // Debug logging
+            console.log('Side panel data received:', data);
+            console.log('Maternal ANC visits:', maternal_anc_visits);
+            console.log('Postpartum visit schedules:', postpartum_visit_schedules);
+
+            // latest schedule is the first element (API returns ordered DESC)
+            const latest_schedule = Array.isArray(visit_schedules) && visit_schedules.length ? visit_schedules[0] : null;
+            
+            // Find latest PENDING postpartum schedule (status_id = 1)
+            const latest_pending_postpartum = Array.isArray(postpartum_visit_schedules) && postpartum_visit_schedules.length
+                ? postpartum_visit_schedules.find(s => s.status_id === 1)
+                : null;
 
             // populate fields (fall back to empty strings)
             const setText = (id, val) => {
@@ -125,59 +140,582 @@
                 setText('last_danger', result.last_danger || '-');
             }
 
-            // Populate separate Prenatal/Postpartum schedule cards.
-            const showSchedule = (cardId, dtId, sched, visitType) => {
-                const card = document.getElementById(cardId);
-                const dtEl = document.getElementById(dtId);
-                if (!card || !dtEl) return;
-                // Determine status_id: prefer sched.status_id if present; otherwise
-                // fall back to the union latest visit (latest_union) when it matches type & id.
-                let statusId = null;
-                let displayDate = null;
-                let displayTime = null;
+            // Populate latest schedule card
+            const scheduleCard = document.getElementById('visit_schedule_card');
+            const scheduleDateEl = document.getElementById('visit_sched_date');
+            const scheduleTimeEl = document.getElementById('visit_sched_time');
+            const schedulePurposeEl = document.getElementById('visit_sched_purpose');
+            const scheduleNotesEl = document.getElementById('visit_sched_notes');
+            const scheduleCreatorEl = document.getElementById('visit_sched_creator');
 
-                if (sched) {
-                    // sched includes status_id from repository now
-                    if (typeof sched.status_id !== 'undefined' && sched.status_id !== null) {
-                        statusId = Number(sched.status_id);
-                    }
-                    // Prefer server-side formatted fields when available
-                    displayDate = sched.scheduled_date_str || sched.scheduled_date || '';
-                    displayTime = sched.scheduled_time_hm || sched.scheduled_time || '';
+            if (scheduleCard && latest_schedule) {
+                const statusId = typeof latest_schedule.status_id !== 'undefined' && latest_schedule.status_id !== null ? Number(latest_schedule.status_id) : null;
+                
+                if (scheduleDateEl) {
+                    scheduleDateEl.textContent = latest_schedule.scheduled_date_str || latest_schedule.scheduled_date || '-';
+                }
+                if (scheduleTimeEl) {
+                    scheduleTimeEl.textContent = latest_schedule.scheduled_time_hm || latest_schedule.scheduled_time || '-';
+                }
+                if (schedulePurposeEl) {
+                    schedulePurposeEl.textContent = latest_schedule.visit_purpose || '-';
+                }
+                if (scheduleNotesEl) {
+                    scheduleNotesEl.textContent = latest_schedule.notes || '-';
+                }
+                if (scheduleCreatorEl) {
+                    scheduleCreatorEl.textContent = latest_schedule.created_by_name || '-';
+                }
+                
+                scheduleCard.style.display = '';
+            } else if (scheduleCard) {
+                scheduleCard.style.display = 'none';
+            }
+
+            // Populate latest PENDING postpartum schedule card
+            const postpartumCard = document.getElementById('postpartum_schedule_card');
+            const postpartumDateEl = document.getElementById('postpartum_sched_date');
+            const postpartumTimeEl = document.getElementById('postpartum_sched_time');
+            const postpartumPurposeEl = document.getElementById('postpartum_sched_purpose');
+            const postpartumNotesEl = document.getElementById('postpartum_sched_notes');
+            const postpartumCreatorEl = document.getElementById('postpartum_sched_creator');
+
+            if (postpartumCard && latest_pending_postpartum) {
+                if (postpartumDateEl) {
+                    postpartumDateEl.textContent = latest_pending_postpartum.scheduled_date_str || latest_pending_postpartum.scheduled_date || '-';
+                }
+                if (postpartumTimeEl) {
+                    postpartumTimeEl.textContent = latest_pending_postpartum.scheduled_time_hm || latest_pending_postpartum.scheduled_time || '-';
+                }
+                if (postpartumPurposeEl) {
+                    postpartumPurposeEl.textContent = latest_pending_postpartum.visit_purpose || '-';
+                }
+                if (postpartumNotesEl) {
+                    postpartumNotesEl.textContent = latest_pending_postpartum.notes || '-';
+                }
+                if (postpartumCreatorEl) {
+                    postpartumCreatorEl.textContent = latest_pending_postpartum.created_by_name || '-';
+                }
+                
+                postpartumCard.style.display = '';
+            } else if (postpartumCard) {
+                postpartumCard.style.display = 'none';
+            }
+
+            // Populate schedule history table
+            const fillScheduleHistoryTable = (tbodyId, rows) => {
+                const tbody = document.getElementById(tbodyId);
+                if (!tbody) return;
+                tbody.innerHTML = '';
+                
+                const paginationNav = document.getElementById('schedule_pagination_nav');
+                
+                if (!Array.isArray(rows) || rows.length === 0) {
+                    const tr = document.createElement('tr');
+                    const td = document.createElement('td');
+                    td.setAttribute('colspan', '6');
+                    td.className = 'text-center small text-muted';
+                    td.textContent = 'No scheduled visits.';
+                    tr.appendChild(td);
+                    tbody.appendChild(tr);
+                    if (paginationNav) paginationNav.style.display = 'none';
+                    return;
                 }
 
-                // fallback: use latest_union if it matches this visitType and schedule id
-                if ((statusId === null || typeof statusId === 'undefined') && latest_union) {
-                    if (latest_union.visit_type === visitType) {
-                        // if sched exists, match by schedule_id; otherwise accept latest_union
-                        if (sched && typeof sched.schedule_id !== 'undefined' && sched.schedule_id !== null) {
-                            if (Number(latest_union.schedule_id) === Number(sched.schedule_id)) {
-                                statusId = Number(latest_union.status_id);
-                                displayDate = latest_union.scheduled_date_str || latest_union.scheduled_date || displayDate;
-                                displayTime = latest_union.scheduled_time_hm || latest_union.scheduled_time || displayTime;
-                            }
-                        } else {
-                            statusId = Number(latest_union.status_id);
-                            displayDate = latest_union.scheduled_date_str || latest_union.scheduled_date || displayDate;
-                            displayTime = latest_union.scheduled_time_hm || latest_union.scheduled_time || displayTime;
+                // Pagination setup
+                const itemsPerPage = 5;
+                let currentPage = 1;
+                const totalPages = Math.ceil(rows.length / itemsPerPage);
+
+                const renderPage = (page) => {
+                    tbody.innerHTML = '';
+                    const start = (page - 1) * itemsPerPage;
+                    const end = start + itemsPerPage;
+                    const pageRows = rows.slice(start, end);
+
+                    pageRows.forEach(function (r) {
+                        const tr = document.createElement('tr');
+                        const scheduledDate = r.scheduled_date_str || r.scheduled_date || '-';
+                        const scheduledTime = r.scheduled_time_hm || (r.scheduled_time ? (String(r.scheduled_time).slice(0,5)) : '-');
+                        const purpose = r.visit_purpose || '-';
+                        const notes = r.notes || '-';
+                        const creator = r.created_by_name || '-';
+                        const status = r.status_name || '-';
+                        const statusId = typeof r.status_id !== 'undefined' && r.status_id !== null ? Number(r.status_id) : null;
+
+                        const makeTd = (txt) => { 
+                            const td = document.createElement('td');
+                            td.style.overflow = 'hidden';
+                            td.style.textOverflow = 'ellipsis';
+                            td.style.whiteSpace = 'nowrap';
+                            td.textContent = txt;
+                            td.title = txt;
+                            return td;
+                        };
+
+                        const makeClickableTd = (txt, title) => {
+                            const td = document.createElement('td');
+                            td.style.overflow = 'hidden';
+                            td.style.textOverflow = 'ellipsis';
+                            td.style.whiteSpace = 'nowrap';
+                            td.style.cursor = 'pointer';
+                            td.style.color = '#6d2932';
+                            td.style.textDecoration = 'underline';
+                            td.textContent = txt;
+                            td.title = 'Click to view full ' + title;
+                            td.onclick = () => {
+                                const modal = new bootstrap.Modal(document.getElementById('scheduleTextDetailModal'));
+                                document.getElementById('scheduleTextDetailModalLabel').textContent = title;
+                                document.getElementById('scheduleTextDetailContent').textContent = txt;
+                                modal.show();
+                            };
+                            return td;
+                        };
+
+                        tr.appendChild(makeTd(scheduledDate));
+                        tr.appendChild(makeTd(scheduledTime));
+                        tr.appendChild(makeClickableTd(purpose, 'Purpose'));
+                        tr.appendChild(makeClickableTd(notes, 'Notes'));
+                        tr.appendChild(makeTd(creator));
+                        
+                        // status badge
+                        const tdStatus = document.createElement('td');
+                        tdStatus.style.overflow = 'hidden';
+                        tdStatus.style.textOverflow = 'ellipsis';
+                        tdStatus.style.whiteSpace = 'nowrap';
+                        const span = document.createElement('span');
+                        span.className = 'badge';
+                        if (statusId === 1) { span.className += ' bg-warning text-dark'; }
+                        else if (statusId === 2) { span.className += ' bg-success'; }
+                        else if (statusId === 3) { span.className += ' bg-info text-dark'; }
+                        else if (statusId === 4) { span.className += ' bg-secondary'; }
+                        else if (statusId === 5) { span.className += ' bg-danger'; }
+                        else { span.className += ' bg-light text-dark'; }
+                        span.textContent = status;
+                        tdStatus.appendChild(span);
+                        tr.appendChild(tdStatus);
+                        
+                        tbody.appendChild(tr);
+                    });
+                };
+
+                const renderPagination = () => {
+                    if (!paginationNav) return;
+                    const paginationList = paginationNav.querySelector('.pagination');
+                    if (!paginationList) return;
+                    
+                    paginationList.innerHTML = '';
+
+                    // Previous button
+                    const prevLi = document.createElement('li');
+                    prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+                    const prevLink = document.createElement('a');
+                    prevLink.className = 'page-link';
+                    prevLink.href = '#';
+                    prevLink.textContent = 'Previous';
+                    prevLink.onclick = (e) => {
+                        e.preventDefault();
+                        if (currentPage > 1) {
+                            currentPage--;
+                            renderPage(currentPage);
+                            renderPagination();
                         }
-                    }
-                }
+                    };
+                    prevLi.appendChild(prevLink);
+                    paginationList.appendChild(prevLi);
 
-                // Always show the container. If status_id === 1 show date/time,
-                // otherwise show '-' to indicate no active schedule.
-                const d = displayDate || '';
-                const t = displayTime || '';
-                if (statusId === 1) {
-                    dtEl.textContent = (d ? d : '-') + (t ? (' ' + (String(t).slice(0,5))) : '');
+                    // Page numbers
+                    for (let i = 1; i <= totalPages; i++) {
+                        const li = document.createElement('li');
+                        li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+                        const link = document.createElement('a');
+                        link.className = 'page-link';
+                        link.href = '#';
+                        link.textContent = i;
+                        link.onclick = (e) => {
+                            e.preventDefault();
+                            currentPage = i;
+                            renderPage(currentPage);
+                            renderPagination();
+                        };
+                        li.appendChild(link);
+                        paginationList.appendChild(li);
+                    }
+
+                    // Next button
+                    const nextLi = document.createElement('li');
+                    nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+                    const nextLink = document.createElement('a');
+                    nextLink.className = 'page-link';
+                    nextLink.href = '#';
+                    nextLink.textContent = 'Next';
+                    nextLink.onclick = (e) => {
+                        e.preventDefault();
+                        if (currentPage < totalPages) {
+                            currentPage++;
+                            renderPage(currentPage);
+                            renderPagination();
+                        }
+                    };
+                    nextLi.appendChild(nextLink);
+                    paginationList.appendChild(nextLi);
+                };
+
+                // Initial render
+                renderPage(currentPage);
+                if (totalPages > 1) {
+                    renderPagination();
+                    if (paginationNav) paginationNav.style.display = '';
                 } else {
-                    dtEl.textContent = 'TBD';
+                    if (paginationNav) paginationNav.style.display = 'none';
                 }
-                card.style.display = '';
             };
 
-            showSchedule('prenatal_schedule_card', 'prenatal_sched_dt', latest_prenatal, 'maternal');
-            showSchedule('postpartum_schedule_card', 'postpartum_sched_dt', latest_postpartum, 'postpartum');
+            // Populate postpartum visit schedule history table
+            const fillPostpartumScheduleHistoryTable = (tbodyId, rows) => {
+                const tbody = document.getElementById(tbodyId);
+                if (!tbody) return;
+                tbody.innerHTML = '';
+                
+                const paginationNav = document.getElementById('postpartum_pagination_nav');
+                
+                if (!Array.isArray(rows) || rows.length === 0) {
+                    const tr = document.createElement('tr');
+                    const td = document.createElement('td');
+                    td.setAttribute('colspan', '6');
+                    td.className = 'text-center small text-muted';
+                    td.textContent = 'No postpartum visit schedules.';
+                    tr.appendChild(td);
+                    tbody.appendChild(tr);
+                    if (paginationNav) paginationNav.style.display = 'none';
+                    return;
+                }
+
+                // Pagination setup
+                const itemsPerPage = 5;
+                let currentPage = 1;
+                const totalPages = Math.ceil(rows.length / itemsPerPage);
+
+                const renderPage = (page) => {
+                    tbody.innerHTML = '';
+                    const start = (page - 1) * itemsPerPage;
+                    const end = start + itemsPerPage;
+                    const pageRows = rows.slice(start, end);
+
+                    pageRows.forEach(function (r) {
+                        const tr = document.createElement('tr');
+                        const scheduledDate = r.scheduled_date_str || r.scheduled_date || '-';
+                        const scheduledTime = r.scheduled_time_hm || (r.scheduled_time ? (String(r.scheduled_time).slice(0,5)) : '-');
+                        const purpose = r.visit_purpose || '-';
+                        const notes = r.notes || '-';
+                        const creator = r.created_by_name || '-';
+                        const status = r.status_name || '-';
+                        const statusId = typeof r.status_id !== 'undefined' && r.status_id !== null ? Number(r.status_id) : null;
+
+                        const makeTd = (txt) => { 
+                            const td = document.createElement('td');
+                            td.style.overflow = 'hidden';
+                            td.style.textOverflow = 'ellipsis';
+                            td.style.whiteSpace = 'nowrap';
+                            td.textContent = txt;
+                            td.title = txt;
+                            return td;
+                        };
+
+                        const makeClickableTd = (txt, title) => {
+                            const td = document.createElement('td');
+                            td.style.overflow = 'hidden';
+                            td.style.textOverflow = 'ellipsis';
+                            td.style.whiteSpace = 'nowrap';
+                            td.style.cursor = 'pointer';
+                            td.style.color = '#6d2932';
+                            td.style.textDecoration = 'underline';
+                            td.textContent = txt;
+                            td.title = 'Click to view full ' + title;
+                            td.onclick = () => {
+                                const modal = new bootstrap.Modal(document.getElementById('postpartumTextDetailModal'));
+                                document.getElementById('postpartumTextDetailModalLabel').textContent = title;
+                                document.getElementById('postpartumTextDetailContent').textContent = txt;
+                                modal.show();
+                            };
+                            return td;
+                        };
+
+                        tr.appendChild(makeTd(scheduledDate));
+                        tr.appendChild(makeTd(scheduledTime));
+                        tr.appendChild(makeClickableTd(purpose, 'Purpose'));
+                        tr.appendChild(makeClickableTd(notes, 'Notes'));
+                        tr.appendChild(makeTd(creator));
+                        
+                        // status badge
+                        const tdStatus = document.createElement('td');
+                        tdStatus.style.overflow = 'hidden';
+                        tdStatus.style.textOverflow = 'ellipsis';
+                        tdStatus.style.whiteSpace = 'nowrap';
+                        const span = document.createElement('span');
+                        span.className = 'badge';
+                        if (statusId === 1) { span.className += ' bg-warning text-dark'; }
+                        else if (statusId === 2) { span.className += ' bg-success'; }
+                        else if (statusId === 3) { span.className += ' bg-info text-dark'; }
+                        else if (statusId === 4) { span.className += ' bg-secondary'; }
+                        else if (statusId === 5) { span.className += ' bg-danger'; }
+                        else { span.className += ' bg-light text-dark'; }
+                        span.textContent = status;
+                        tdStatus.appendChild(span);
+                        tr.appendChild(tdStatus);
+                        
+                        tbody.appendChild(tr);
+                    });
+                };
+
+                const renderPagination = () => {
+                    if (!paginationNav) return;
+                    const paginationList = paginationNav.querySelector('.pagination');
+                    if (!paginationList) return;
+                    
+                    paginationList.innerHTML = '';
+
+                    // Previous button
+                    const prevLi = document.createElement('li');
+                    prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+                    const prevLink = document.createElement('a');
+                    prevLink.className = 'page-link';
+                    prevLink.href = '#';
+                    prevLink.textContent = 'Previous';
+                    prevLink.onclick = (e) => {
+                        e.preventDefault();
+                        if (currentPage > 1) {
+                            currentPage--;
+                            renderPage(currentPage);
+                            renderPagination();
+                        }
+                    };
+                    prevLi.appendChild(prevLink);
+                    paginationList.appendChild(prevLi);
+
+                    // Page numbers
+                    for (let i = 1; i <= totalPages; i++) {
+                        const li = document.createElement('li');
+                        li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+                        const link = document.createElement('a');
+                        link.className = 'page-link';
+                        link.href = '#';
+                        link.textContent = i;
+                        link.onclick = (e) => {
+                            e.preventDefault();
+                            currentPage = i;
+                            renderPage(currentPage);
+                            renderPagination();
+                        };
+                        li.appendChild(link);
+                        paginationList.appendChild(li);
+                    }
+
+                    // Next button
+                    const nextLi = document.createElement('li');
+                    nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+                    const nextLink = document.createElement('a');
+                    nextLink.className = 'page-link';
+                    nextLink.href = '#';
+                    nextLink.textContent = 'Next';
+                    nextLink.onclick = (e) => {
+                        e.preventDefault();
+                        if (currentPage < totalPages) {
+                            currentPage++;
+                            renderPage(currentPage);
+                            renderPagination();
+                        }
+                    };
+                    nextLi.appendChild(nextLink);
+                    paginationList.appendChild(nextLi);
+                };
+
+                // Initial render
+                renderPage(currentPage);
+                if (totalPages > 1) {
+                    renderPagination();
+                    if (paginationNav) paginationNav.style.display = '';
+                } else {
+                    if (paginationNav) paginationNav.style.display = 'none';
+                }
+            };
+
+            // Populate maternal ANC visit history table
+            const fillAncVisitHistoryTable = (tbodyId, rows) => {
+                const tbody = document.getElementById(tbodyId);
+                if (!tbody) return;
+                tbody.innerHTML = '';
+                
+                const paginationNav = document.getElementById('anc_pagination_nav');
+                
+                if (!Array.isArray(rows) || rows.length === 0) {
+                    const tr = document.createElement('tr');
+                    const td = document.createElement('td');
+                    td.setAttribute('colspan', '9');
+                    td.className = 'text-center small text-muted';
+                    td.textContent = 'No ANC visit records.';
+                    tr.appendChild(td);
+                    tbody.appendChild(tr);
+                    if (paginationNav) paginationNav.style.display = 'none';
+                    return;
+                }
+
+                // Pagination setup
+                const itemsPerPage = 5;
+                let currentPage = 1;
+                const totalPages = Math.ceil(rows.length / itemsPerPage);
+
+                const renderPage = (page) => {
+                    tbody.innerHTML = '';
+                    const start = (page - 1) * itemsPerPage;
+                    const end = start + itemsPerPage;
+                    const pageRows = rows.slice(start, end);
+
+                    pageRows.forEach(function (r) {
+                        const tr = document.createElement('tr');
+                        const visitNo = r.visit_no || '-';
+                        const visitDate = r.visit_date_str || r.visit_date || '-';
+                        const trimester = r.trimester_stage_name || '-';
+                        const aog = (r.aog_weeks || '-') + 'w ' + (r.aog_days || '-') + 'd';
+                        const weight = r.weight_kg ? r.weight_kg + ' kg' : '-';
+                        const bp = (r.bp_systolic && r.bp_diastolic) ? r.bp_systolic + '/' + r.bp_diastolic : '-';
+                        const leopolds = r.leopolds_findings || '-';
+                        const notes = r.notes || '-';
+                        const statusId = typeof r.visit_status_id !== 'undefined' && r.visit_status_id !== null ? Number(r.visit_status_id) : null;
+                        
+                        let statusName = '-';
+                        if (statusId === 1) statusName = 'Scheduled';
+                        else if (statusId === 2) statusName = 'Completed';
+                        else if (statusId === 3) statusName = 'Cancelled';
+
+                        const makeTd = (txt) => { 
+                            const td = document.createElement('td');
+                            td.style.overflow = 'hidden';
+                            td.style.textOverflow = 'ellipsis';
+                            td.style.whiteSpace = 'nowrap';
+                            td.textContent = txt;
+                            td.title = txt; // Show full text on hover
+                            return td;
+                        };
+
+                        const makeClickableTd = (txt, title) => {
+                            const td = document.createElement('td');
+                            td.style.overflow = 'hidden';
+                            td.style.textOverflow = 'ellipsis';
+                            td.style.whiteSpace = 'nowrap';
+                            td.style.cursor = 'pointer';
+                            td.style.color = '#6d2932';
+                            td.style.textDecoration = 'underline';
+                            td.textContent = txt;
+                            td.title = 'Click to view full ' + title;
+                            td.onclick = () => {
+                                const modal = new bootstrap.Modal(document.getElementById('ancTextDetailModal'));
+                                document.getElementById('ancTextDetailModalLabel').textContent = title;
+                                document.getElementById('ancTextDetailContent').textContent = txt;
+                                modal.show();
+                            };
+                            return td;
+                        };
+                        
+                        tr.appendChild(makeTd(visitNo));
+                        tr.appendChild(makeTd(visitDate));
+                        tr.appendChild(makeTd(trimester));
+                        tr.appendChild(makeTd(aog));
+                        tr.appendChild(makeTd(weight));
+                        tr.appendChild(makeTd(bp));
+                        tr.appendChild(makeClickableTd(leopolds, "Leopold's Findings"));
+                        tr.appendChild(makeClickableTd(notes, "Notes"));
+                        
+                        // status badge
+                        const tdStatus = document.createElement('td');
+                        tdStatus.style.overflow = 'hidden';
+                        tdStatus.style.textOverflow = 'ellipsis';
+                        tdStatus.style.whiteSpace = 'nowrap';
+                        const span = document.createElement('span');
+                        span.className = 'badge';
+                        if (statusId === 1) { span.className += ' bg-info text-dark'; }
+                        else if (statusId === 2) { span.className += ' bg-success'; }
+                        else if (statusId === 3) { span.className += ' bg-warning text-dark'; }
+                        else { span.className += ' bg-light text-dark'; }
+                        span.textContent = statusName;
+                        tdStatus.appendChild(span);
+                        tr.appendChild(tdStatus);
+                        
+                        tbody.appendChild(tr);
+                    });
+                };
+
+                const renderPagination = () => {
+                    if (!paginationNav) return;
+                    const paginationList = paginationNav.querySelector('.pagination');
+                    if (!paginationList) return;
+                    
+                    paginationList.innerHTML = '';
+
+                    // Previous button
+                    const prevLi = document.createElement('li');
+                    prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+                    const prevLink = document.createElement('a');
+                    prevLink.className = 'page-link';
+                    prevLink.href = '#';
+                    prevLink.textContent = 'Previous';
+                    prevLink.onclick = (e) => {
+                        e.preventDefault();
+                        if (currentPage > 1) {
+                            currentPage--;
+                            renderPage(currentPage);
+                            renderPagination();
+                        }
+                    };
+                    prevLi.appendChild(prevLink);
+                    paginationList.appendChild(prevLi);
+
+                    // Page numbers
+                    for (let i = 1; i <= totalPages; i++) {
+                        const li = document.createElement('li');
+                        li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+                        const link = document.createElement('a');
+                        link.className = 'page-link';
+                        link.href = '#';
+                        link.textContent = i;
+                        link.onclick = (e) => {
+                            e.preventDefault();
+                            currentPage = i;
+                            renderPage(currentPage);
+                            renderPagination();
+                        };
+                        li.appendChild(link);
+                        paginationList.appendChild(li);
+                    }
+
+                    // Next button
+                    const nextLi = document.createElement('li');
+                    nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+                    const nextLink = document.createElement('a');
+                    nextLink.className = 'page-link';
+                    nextLink.href = '#';
+                    nextLink.textContent = 'Next';
+                    nextLink.onclick = (e) => {
+                        e.preventDefault();
+                        if (currentPage < totalPages) {
+                            currentPage++;
+                            renderPage(currentPage);
+                            renderPagination();
+                        }
+                    };
+                    nextLi.appendChild(nextLink);
+                    paginationList.appendChild(nextLi);
+                };
+
+                // Initial render
+                renderPage(currentPage);
+                if (totalPages > 1) {
+                    renderPagination();
+                    if (paginationNav) paginationNav.style.display = '';
+                } else {
+                    if (paginationNav) paginationNav.style.display = 'none';
+                }
+            };
 
             // Populate history modals tables and show history buttons when present
             const fillHistoryTable = (tbodyId, rows) => {
@@ -231,15 +769,20 @@
                 });
             };
 
-            // Fill prenatal & postpartum history tables
-            fillHistoryTable('prenatal_history_tbody', prenatal_history);
-            fillHistoryTable('postpartum_history_tbody', postpartum_history);
+            // Fill schedule history and ANC visit history tables
+            fillScheduleHistoryTable('visit_schedule_history_tbody', visit_schedules);
+            fillPostpartumScheduleHistoryTable('postpartum_visit_schedule_tbody', postpartum_visit_schedules);
+            fillAncVisitHistoryTable('maternal_anc_visit_history_tbody', maternal_anc_visits);
 
             // Show history buttons when histories are present
-            const btnPren = document.getElementById('btn_prenatal_history');
-            const btnPost = document.getElementById('btn_postpartum_history');
-            if (btnPren) btnPren.style.display = (Array.isArray(prenatal_history) && prenatal_history.length) ? '' : 'none';
-            if (btnPost) btnPost.style.display = (Array.isArray(postpartum_history) && postpartum_history.length) ? '' : 'none';
+            const btnSchedules = document.getElementById('btn_visit_schedules');
+            const btnPostpartumVisits = document.getElementById('btn_postpartum_visits');
+            const btnAncVisits = document.getElementById('btn_maternal_anc_visits');
+            console.log('ANC Visits button element:', btnAncVisits);
+            console.log('Should show ANC button?', Array.isArray(maternal_anc_visits) && maternal_anc_visits.length);
+            if (btnSchedules) btnSchedules.style.display = (Array.isArray(visit_schedules) && visit_schedules.length) ? '' : 'none';
+            if (btnPostpartumVisits) btnPostpartumVisits.style.display = (Array.isArray(postpartum_visit_schedules) && postpartum_visit_schedules.length) ? '' : 'none';
+            if (btnAncVisits) btnAncVisits.style.display = (Array.isArray(maternal_anc_visits) && maternal_anc_visits.length) ? '' : 'none';
 
         } catch (err) {
             console.error('Failed to fetch side panel data', err);

@@ -110,17 +110,18 @@ class AnnouncementService(IAnnouncementService):
         )
 
     def delete_draft(self, announcement_id: int) -> bool:
-        """Delete an announcement draft with validation"""
+        """Delete an announcement draft (or cancelled announcement) after validation"""
         if not announcement_id:
             raise ValueError("Announcement ID is required")
         
-        # Check if draft exists
+        # Check if announcement exists
         existing = self.announcement_repository.get_by_id(announcement_id)
         if not existing:
             raise ValueError("Announcement not found")
         
-        if existing.announcement_status_id != 1:  # Not a draft
-            raise ValueError("Can only delete draft announcements")
+        # Allow deletion of drafts (status 1) and cancelled announcements (status 4)
+        if existing.announcement_status_id not in [1, 4]:
+            raise ValueError("Can only delete draft or cancelled announcements")
         
         return self.announcement_repository.delete_draft(announcement_id)
     

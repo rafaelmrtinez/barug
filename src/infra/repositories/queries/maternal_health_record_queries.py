@@ -273,7 +273,7 @@ class MaternalHealthRecordQueries:
             return rows[0]['count'] if rows else 0
         except Exception:
             raise
-
+    
     def get_postpartum_visit_rows_by_mhr_id(self, maternal_record_id: int) -> list:
         """Return all postpartum visit rows for a maternal health record.
         

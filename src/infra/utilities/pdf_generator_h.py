@@ -6,7 +6,7 @@ from reportlab.lib.units import inch
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import (
     SimpleDocTemplate,
@@ -51,6 +51,7 @@ class PdfGeneratorH:
             fontName="Times-Bold",
             fontSize=12,
             leading=14,
+            alignment=TA_LEFT,
             # increase spacing around headings so horizontal rules and
             # tables don't collide with heading text
             spaceBefore=10,
