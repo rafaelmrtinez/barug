@@ -46,13 +46,13 @@ class MaternalScheduleService(IMaternalScheduleService):
             # creating a new prenatal schedule when the latest prenatal schedule is
             # still pending/active. This duplicates domain intent but provides a
             # clear, user-friendly error at the service boundary.
-            try:
-                latest_pr_status = self.repo.fetch_latest_prenatal_status_by_mhr_id(mhr_id)
-            except Exception:
-                raise MaternalHealthRecordException('Unable to validate existing prenatal schedules. Please try again.')
+            # try:
+            #     latest_pr_status = self.repo.fetch_latest_prenatal_status_by_mhr_id(mhr_id)
+            # except Exception:
+            #     raise MaternalHealthRecordException('Unable to validate existing prenatal schedules. Please try again.')
 
-            if latest_pr_status and int(latest_pr_status.get('status_id') or 0) == 1:
-                raise MaternalHealthRecordException('A pending prenatal schedule already exists. Complete or cancel it before adding a new prenatal schedule.')
+            # if latest_pr_status and int(latest_pr_status.get('status_id') or 0) == 1:
+            #     raise MaternalHealthRecordException('A pending prenatal schedule already exists. Complete or cancel it before adding a new prenatal schedule.')
 
             result = self.repo.insert_maternal_visit_schedule(mhr_id, date, time, staff_id, purpose, notes)
 
