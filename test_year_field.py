@@ -3,10 +3,18 @@ from pypdf import PdfReader, PdfWriter
 from pypdf.generic import NameObject, BooleanObject
 import io
 
-template_path = r"d:\CAPSTONE 2\cloned_repo\barug\pdf_templates\barangay-residency.pdf"
+from pathlib import Path
+from pypdf import PdfReader
 
-# Test filling the year field with "2025"
-reader = PdfReader(template_path)
+# folder where test_year_field.py lives (repo root: /home/runner/work/barug/barug)
+BASE_DIR = Path(__file__).resolve().parent
+
+# adjust this if pdf_templates is in a different folder
+template_path = BASE_DIR / "pdf_templates" / "barangay-residency.pdf"
+
+print("Using template:", template_path)
+
+reader = PdfReader(str(template_path))
 writer = PdfWriter()
 writer.clone_document_from_reader(reader)
 
