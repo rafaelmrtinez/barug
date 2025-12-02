@@ -2967,6 +2967,10 @@ def financial_report(
 
     search = request.GET.get("search") or request.GET.get("q")
     pay_meth = _to_int_or_none(request.GET.get("pay_meth"))
+    month = _to_int_or_none(request.GET.get("month"))
+    year = _to_int_or_none(request.GET.get("year"))
+    date_from = request.GET.get("date_from") or None
+    date_to = request.GET.get("date_to") or None
     
     # Check if this is an AJAX request for rows only
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
@@ -2974,10 +2978,17 @@ def financial_report(
 
     rows = or_service.execute(
         search=search,
-        payment_method=pay_meth
+        payment_method=pay_meth,
+        month=month,
+        year=year,
+        date_from=date_from,
+        date_to=date_to
     )
 
-    if (search or pay_meth is not None):
+    # Calculate total
+    total_amount = sum(float(r.amount_paid or 0) for r in rows)
+
+    if (search or pay_meth is not None or month or year or date_from or date_to):
         form = ORFilters()
 
     paginator = Paginator(rows, 10)
@@ -2989,7 +3000,7 @@ def financial_report(
         return render(
             request,
             "financial/_financial_report_rows.html",
-            {"rows": page_obj.object_list}
+            {"rows": page_obj.object_list, "total_amount": total_amount}
         )
 
     return render(
@@ -3001,6 +3012,7 @@ def financial_report(
             'form': form,
             'page_obj': page_obj,
             'search_url': 'treasurer:financial_report_search',
+            'total_amount': total_amount,
         },
     )
 

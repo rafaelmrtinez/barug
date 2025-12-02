@@ -10,7 +10,11 @@ class IORService(ABC):
     def execute(
         self,
         search: Optional[str] = None,
-        payment_method: Optional[int] = None
+        payment_method: Optional[int] = None,
+        month: Optional[int] = None,
+        year: Optional[int] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None
     ) -> list[ORDTO]:
         """
         Returns:
