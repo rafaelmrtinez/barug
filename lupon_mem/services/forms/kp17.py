@@ -489,11 +489,18 @@ class KP17Handler:
         out["intimidation_chkbx"] = "Yes" if self._boolish(out.get("intimidation_chkbx", "")) else ""
 
         # -------- Chairman / Brgy Captain syncing --------
+        from .util import get_captain_name
         chair = (out.get("chairman") or "").strip()
         capt  = (out.get("brgy_capt") or "").strip()
-        if chair and not capt:
+        
+        # Auto-fill both if empty, using default "LOURDES RAMIREZ"
+        if not chair and not capt:
+            default_name = get_captain_name(default="LOURDES RAMIREZ")
+            out["chairman"] = default_name
+            out["brgy_capt"] = default_name
+        elif chair and not capt:
             out["brgy_capt"] = chair
-        if capt and not chair:
+        elif capt and not chair:
             out["chairman"] = capt
 
         # -------- TODAY (PH) split trio for filed date (as requested) --------
