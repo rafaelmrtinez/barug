@@ -60,12 +60,12 @@
                     <h1 class="mb-0">Maternal Health Record</h1>
                 </div>
                 <input type="hidden" id="mhr-id" value="{{ mhr_id }}">
-                {% if request.session.auth.role_name == 'barangay health worker' %}
+                {% comment %} {% if request.session.auth.role_name == 'barangay health worker' %} {% endcomment %}
                 <div class="mhr-action-group d-flex align-items-center gap-2">
                     {{ mhr_status.confirm_complete }}
                     <button id="btn-mark-complete" type="button" class="btn btn-brand btn-sm">Record Status</button>
                 </div>
-                {% endif %}
+                {% comment %} {% endif %} {% endcomment %}
             </div>
 
                 <!-- Mobile sidebar toggle (icon button) -->
