@@ -489,9 +489,30 @@
 
         <div class="modal-footer">
           <button type="button" class="btn btn-reset" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-submit">Save Changes</button>
+          <button type="button" class="btn btn-submit" id="saveChangesBtn">Save Changes</button>
         </div>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true" style="z-index: 10000;">
+  <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+      <div class="modal-body text-center p-4">
+        <div class="mb-3">
+          <div class="d-inline-flex align-items-center justify-content-center" style="width: 64px; height: 64px; background: linear-gradient(135deg, #28a745, #20c997); border-radius: 50%; margin-bottom: 16px;">
+            <i class="bi bi-question-circle-fill text-white" style="font-size: 28px;"></i>
+          </div>
+        </div>
+        <h5 class="modal-title fw-semibold mb-2" style="color: #2d3748;">Confirm Changes</h5>
+        <p class="text-muted mb-4" style="line-height: 1.5;">Are you sure you want to save these changes to the member information?</p>
+        <div class="d-flex gap-2 justify-content-center">
+          <button type="button" class="btn btn-reset px-4 py-2" data-bs-dismiss="modal" style="border-radius: 8px; font-weight: 500; min-width: 80px;">Cancel</button>
+          <button type="button" class="btn btn-submit px-4 py-2" id="confirmSaveBtn" style="border-radius: 8px; font-weight: 500; min-width: 80px;">Save</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -653,14 +674,14 @@
     return currentSerialized !== originalSerialized;
   }
   
-  // Form submission validation
-  const form = document.querySelector('#updateModal form');
-  if (form) {
-    form.addEventListener('submit', function(e) {
+  // Save Changes button click handler
+  const saveChangesBtn = document.getElementById('saveChangesBtn');
+  if (saveChangesBtn) {
+    saveChangesBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      
       // Check if any data has changed
       if (!hasFormChanged()) {
-        e.preventDefault();
-        e.stopPropagation();
         showErrorModal('No changes were made to the schedule.');
         return false;
       }
@@ -668,10 +689,23 @@
       const scheduleValid = validateScheduleSelections();
       
       if (!scheduleValid) {
-        e.preventDefault();
-        e.stopPropagation();
         showErrorModal('Only one schedule is allowed per day for each staff.');
         return false;
+      }
+      
+      // Show confirmation modal
+      const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+      confirmModal.show();
+    });
+  }
+  
+  // Confirm save button click handler
+  const confirmSaveBtn = document.getElementById('confirmSaveBtn');
+  if (confirmSaveBtn) {
+    confirmSaveBtn.addEventListener('click', function() {
+      const form = document.querySelector('#updateModal form');
+      if (form) {
+        form.submit();
       }
     });
   }

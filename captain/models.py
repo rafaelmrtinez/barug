@@ -94,7 +94,7 @@ class Captain(models.Model):
         ) RETURNS BOOLEAN
         """
         if p_is_credentials_sent is None:
-            # Postgres NULL (don’t log “sent”)
+            # Postgres NULL (don't log "sent")
             sent_arg = None
         else:
             # Ensure proper boolean for psycopg2

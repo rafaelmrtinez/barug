@@ -79,7 +79,8 @@
                         {{ personal.street|default:""|title }},
                         {{ personal.sitio_purok|default:""|title }},
                         {{ personal.barangay|default:""|title }},
-                        {{ personal.city|default:""|title }}
+                        {{ personal.city|default:""|title }},
+                        {{ personal.province|default:""|title }}
                       </span>
                     </div>
                     <div class="kv-item"><span class="kv-key">Email Address</span><span class="kv-val">{{ personal.email|default:"" }}</span></div>
@@ -232,7 +233,7 @@
 
         <div class="mt-3 button-container justify-content-end mb-2 d-flex gap-2">
           <a type="button" class="btn btn-reset" href="{% url 'lupon_pres:staff_selection_non-resident_docs' %}">Back</a>
-          <button type="submit" class="btn btn-submit">Submit</button>
+          <button type="button" class="btn btn-submit" id="submitBtn">Submit</button>
         </div>
       </form>
     </section>
@@ -375,6 +376,40 @@
   hideRoleSectionsInitially();
   document.addEventListener('DOMContentLoaded', applyRoleVisibility);
   roleSel?.addEventListener('change', () => setTimeout(applyRoleVisibility, 0));
+
+  // ── Confirmation modal for Submit button
+  document.getElementById('submitBtn')?.addEventListener('click', function() {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.style.zIndex = '10000';
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+          <div class="modal-body text-center p-4">
+            <div class="mb-3">
+              <div class="d-inline-flex align-items-center justify-content-center" style="width: 64px; height: 64px; background: linear-gradient(135deg, #007bff, #0056b3); border-radius: 50%;">
+                <i class="bi bi-question-circle-fill text-white" style="font-size: 28px;"></i>
+              </div>
+            </div>
+            <h5 class="fw-semibold mb-2" style="color: #2d3748;">Confirm Submission</h5>
+            <p class="text-muted mb-4">Are you sure you want to submit this staff account creation request?</p>
+            <div class="d-flex gap-2 justify-content-center">
+              <button type="button" class="btn btn-reset px-3 py-2" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-submit px-4 py-2" id="confirmSubmit">Yes, Submit</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    modal.querySelector('#confirmSubmit').onclick = function() {
+      bsModal.hide();
+      form.submit();
+    };
+    bsModal.show();
+    modal.addEventListener('hidden.bs.modal', () => modal.remove());
+  });
 
   // ── Submit gate
   form?.addEventListener('submit', (e) => {

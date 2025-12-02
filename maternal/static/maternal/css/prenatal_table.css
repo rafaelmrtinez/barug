@@ -39,11 +39,16 @@
 .prenatal-card .row { justify-content: center; }
 .prenatal-card .card-footer { display: flex; justify-content: center; gap: .5rem; }
 
-/* Ensure inputs are visually centered within their columns */
+/* Ensure labels stay on the left side (removed center alignment) */
 .prenatal-card .col-md-2, .prenatal-card .col-md-4 {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch; /* Changed from center to stretch */
 }
-.prenatal-card label { text-align: center; width: 100%; }
-.prenatal-card .form-control { margin: 0 auto; }
+.prenatal-card label { 
+  text-align: left; /* Changed from center to left */
+  width: 100%; 
+}
+.prenatal-card .form-control { 
+  width: 100%; /* Changed from margin auto to full width */
+}

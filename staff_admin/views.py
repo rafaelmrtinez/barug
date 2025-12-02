@@ -1543,6 +1543,73 @@ def staff_dets(request, staff_code: str):
                 flash_warning(request, "Staff ID not found.")
                 return redirect("staff_admin:staff_list")
             
+            # Handle personal information update
+            if request.POST.get('action') == 'update_personal_info':
+                from authentication.models import Authentication
+                
+                # Check if reason is provided
+                reason = (request.POST.get('reason') or '').strip()
+                if not reason:
+                    flash_warning(request, "Please provide a reason for updating personal information.")
+                    return redirect(request.path)
+                
+                # Extract only the fields that are in the modal
+                first_name = (request.POST.get('first_name') or '').strip() or None
+                middle_name = (request.POST.get('middle_name') or '').strip() or None
+                last_name = (request.POST.get('last_name') or '').strip() or None
+                suffix = (request.POST.get('suffix') or '').strip() or None
+                birthdate = (request.POST.get('birthdate') or '').strip() or None
+                sex_id = Authentication._to_int_or_none(request.POST.get('sex_id'))
+                civil_status_id = Authentication._to_int_or_none(request.POST.get('civil_status_id'))
+                nationality_id = Authentication._to_int_or_none(request.POST.get('nationality_id'))
+                religion_id = Authentication._to_int_or_none(request.POST.get('religion_id'))
+                mobile_num = (request.POST.get('mobile_number') or '').strip() or None
+                
+                # Address fields
+                city = (request.POST.get('city') or '').strip() or None
+                barangay = (request.POST.get('barangay') or '').strip() or None
+                sitio_purok = (request.POST.get('sitio_purok') or '').strip() or None
+                street = (request.POST.get('street') or '').strip() or None
+                province = (request.POST.get('province') or '').strip() or None
+                
+                # Call the update function with only the fields in the modal
+                result = Authentication.update_personal_information(
+                    staff_id=staff_id,
+                    updated_by_staff_id=updated_by_staff_id,
+                    first_name=first_name,
+                    middle_name=middle_name,
+                    last_name=last_name,
+                    suffix=suffix,
+                    birthdate=birthdate,
+                    sex_id=sex_id,
+                    civil_status_id=civil_status_id,
+                    nationality_id=nationality_id,
+                    religion_id=religion_id,
+                    email=None,
+                    mobile_number=mobile_num,
+                    occupation=None,
+                    monthly_income_id=None,
+                    residential_status_id=None,
+                    education_id=None,
+                    employment_status_id=None,
+                    is_student=None,
+                    gov_mem_prog_ids=None,
+                    city=city,
+                    barangay=barangay,
+                    sitio_purok=sitio_purok,
+                    street=street,
+                    province=province,
+                    reason=f'Personal information update by admin: {reason}'
+                )
+                
+                if result:
+                    flash_success(request, 'Personal information updated successfully!')
+                else:
+                    flash_warning(request, 'No changes were made.')
+                    
+                return redirect(request.path)
+            
+            # Handle staff information update (existing functionality)
             # Extract form data
             role_id = _to_int_or_none(request.POST.get("role_id"))
             acc_status_id = _to_int_or_none(request.POST.get("acc_status_id"))
@@ -1589,6 +1656,12 @@ def staff_dets(request, staff_code: str):
                 flash_warning(request, "Account status is required.")
                 return redirect(request.path)
             
+            # Get reason from form
+            staff_reason = (request.POST.get("staff_reason") or "").strip()
+            if not staff_reason:
+                flash_warning(request, "Please provide a reason for updating staff information.")
+                return redirect(request.path)
+            
             # Call the database function
             logger.info("Updating staff %s with role_id=%s, acc_status_id=%s", staff_id, role_id, acc_status_id)
             result = Admin.update_staff_information(
@@ -1600,7 +1673,8 @@ def staff_dets(request, staff_code: str):
                 password=password,
                 email=email,
                 purok_ids=purok_ids if purok_ids else None,
-                schedules_json=schedules_json if schedules_json else None
+                schedules_json=schedules_json if schedules_json else None,
+                reason=staff_reason
             )
             
             logger.info("Update result: %s", result)
@@ -1995,6 +2069,15 @@ def pending_staff_dets(request, p_staff_acc_req_id: str):
         logger.exception("get_pending_staff_details failed for staff_code=%s", p_staff_acc_req_id)
         rows = []
 
+    # Get status history
+    status_history = []
+    try:
+        from staff_admin.models import Admin
+        status_history = Admin.get_staff_acc_req_status_history(int(p_staff_acc_req_id)) if p_staff_acc_req_id else []
+    except Exception:
+        logger.exception("get_staff_acc_req_status_history failed for req_id=%s", p_staff_acc_req_id)
+        status_history = []
+
     p = rows[0] if rows else None
     placeholder = static("images/brgy-sto-nino.png")
     def _img(v): return (v or "").strip() or placeholder
@@ -2017,6 +2100,7 @@ def pending_staff_dets(request, p_staff_acc_req_id: str):
         "profile": p,
         "doc_slides": doc_slides,
         "staff_acc_req_id": p_staff_acc_req_id,
+        "status_history": status_history,
     }
     return render(request, "staff_admin/staff/pending_staff_dets.html", ctx)
 
@@ -2251,6 +2335,194 @@ def process_staff_request(request: HttpRequest) -> HttpResponse:
         flash_system_error(request, "Unable to process the request.", exc=ex)
     
     return redirect(request.META.get("HTTP_REFERER") or "staff_admin:staff_account_requests_list")
+
+@session_login_required
+@role_required(ADMIN_ROLE)
+@nocache
+def all_staff_requests_list(request: HttpRequest) -> HttpResponse:
+    """View all staff account requests in the system"""
+    user_fullname, user_role, user_role_template = get_user_info(request)
+    
+    search_query = request.GET.get('q', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    role_filter = request.GET.get('role', '').strip()
+    date_filter = request.GET.get('date_submitted', '').strip()
+    
+    try:
+        requests = Admin.get_staff_account_req_list_by_all()
+        stats_data = Admin.get_staff_request_statistics()
+        stats = stats_data[0] if stats_data else {
+            'total_requests': 0, 'pending_requests': 0, 'approved_requests': 0, 'rejected_requests': 0
+        }
+    except Exception as e:
+        logger.exception("Error loading all requests")
+        flash_system_error(request, "Failed to load requests.")
+        requests = []
+        stats = {'total_requests': 0, 'pending_requests': 0, 'approved_requests': 0, 'rejected_requests': 0}
+    
+    filtered_requests = requests
+    
+    if search_query:
+        search_lower = search_query.lower()
+        filtered_requests = [r for r in filtered_requests if search_lower in (r.get('name') or '').lower()]
+    
+    if status_filter:
+        filtered_requests = [r for r in filtered_requests if str(r.get('status_id', '')) == status_filter]
+    
+    if role_filter:
+        filtered_requests = [r for r in filtered_requests if str(r.get('role_id', '')) == role_filter]
+    
+    if date_filter:
+        from datetime import datetime
+        try:
+            target_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
+            date_filtered = []
+            for r in filtered_requests:
+                pretty_date = r.get('date_time_submitted_pretty')
+                if pretty_date and isinstance(pretty_date, str):
+                    try:
+                        date_part = ' '.join(pretty_date.split()[:3])
+                        parsed_date = datetime.strptime(date_part, "%B %d, %Y").date()
+                        if parsed_date == target_date:
+                            date_filtered.append(r)
+                    except (ValueError, IndexError):
+                        continue
+            filtered_requests = date_filtered
+        except ValueError:
+            pass
+    
+    from django.core.paginator import Paginator
+    paginator = Paginator(filtered_requests, 9)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, "staff_admin/requests_list.html", {
+        'page_obj': page_obj,
+        'requests': filtered_requests,
+        'stats': stats,
+        'search_query': search_query,
+        'status_filter': status_filter,
+        'role_filter': role_filter,
+        'date_filter': date_filter,
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'user_role_template': user_role_template,
+        'page_path': f"{user_role} / All Staff Requests",
+        'page_title': 'All Staff Requests',
+        'show_requester': True,  # Show requester column for all requests view
+    })
+
+@session_login_required
+@role_required(ADMIN_ROLE)
+@nocache
+def staff_requests_list(request: HttpRequest) -> HttpResponse:
+    """View staff account requests submitted by this admin"""
+    auth = request.session.get('auth', {})
+    staff_id = auth.get('staff_id')
+    user_fullname, user_role, user_role_template = get_user_info(request)
+    
+    search_query = request.GET.get('q', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    role_filter = request.GET.get('role', '').strip()
+    date_filter = request.GET.get('date_submitted', '').strip()
+    
+    try:
+        requests = Admin.get_staff_account_req_list_by_requester(staff_id)
+        stats_data = Admin.get_staff_request_statistics_by_requester(staff_id)
+        stats = stats_data[0] if stats_data else {
+            'total_requests': 0, 'pending_requests': 0, 'approved_requests': 0, 'rejected_requests': 0
+        }
+    except Exception as e:
+        logger.exception("Error loading requests")
+        flash_system_error(request, "Failed to load requests.")
+        requests = []
+        stats = {'total_requests': 0, 'pending_requests': 0, 'approved_requests': 0, 'rejected_requests': 0}
+    
+    filtered_requests = requests
+    
+    if search_query:
+        search_lower = search_query.lower()
+        filtered_requests = [r for r in filtered_requests if search_lower in (r.get('name') or '').lower()]
+    
+    if status_filter:
+        filtered_requests = [r for r in filtered_requests if str(r.get('status_id', '')) == status_filter]
+    
+    if role_filter:
+        filtered_requests = [r for r in filtered_requests if str(r.get('role_id', '')) == role_filter]
+    
+    if date_filter:
+        from datetime import datetime
+        try:
+            target_date = datetime.strptime(date_filter, "%Y-%m-%d").date()
+            date_filtered = []
+            for r in filtered_requests:
+                pretty_date = r.get('date_time_submitted_pretty')
+                if pretty_date and isinstance(pretty_date, str):
+                    try:
+                        date_part = ' '.join(pretty_date.split()[:3])
+                        parsed_date = datetime.strptime(date_part, "%B %d, %Y").date()
+                        if parsed_date == target_date:
+                            date_filtered.append(r)
+                    except (ValueError, IndexError):
+                        continue
+            filtered_requests = date_filtered
+        except ValueError:
+            pass
+    
+    from django.core.paginator import Paginator
+    paginator = Paginator(filtered_requests, 9)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, "staff_admin/requests_list.html", {
+        'page_obj': page_obj,
+        'requests': filtered_requests,
+        'stats': stats,
+        'search_query': search_query,
+        'status_filter': status_filter,
+        'role_filter': role_filter,
+        'date_filter': date_filter,
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'user_role_template': user_role_template,
+        'page_path': f"{user_role} / My Requests",
+        'page_title': 'My Staff Requests',
+        'show_requester': False,  # Don't show requester column for personal requests
+    })
+
+@session_login_required
+@role_required(ADMIN_ROLE)
+@nocache
+def staff_request_detail(request: HttpRequest, request_id: int) -> HttpResponse:
+    """View detailed information about a specific staff request"""
+    auth = request.session.get('auth', {})
+    staff_id = auth.get('staff_id')
+    user_fullname, user_role, user_role_template = get_user_info(request)
+    
+    try:
+        details_data = Admin.get_staff_acc_req_profile_progress(request_id)
+        history = Admin.get_staff_acc_req_status_history(request_id)
+        
+        if not details_data:
+            flash_warning(request, "Request not found.")
+            return redirect('staff_admin:staff_requests_list')
+        
+        request_detail = details_data[0]
+        
+    except Exception as e:
+        logger.exception(f"Error loading request {request_id}")
+        flash_system_error(request, "Failed to load request details.")
+        return redirect('staff_admin:staff_requests_list')
+    
+    return render(request, "staff_admin/request_detail.html", {
+        'request': request_detail,
+        'history': history,
+        'user_fullname': user_fullname,
+        'user_role': user_role,
+        'user_role_template': user_role_template,
+        'page_path': f"{user_role} / My Requests / Details",
+        'page_title': f"Request Details - {request_detail.get('full_name', 'Unknown')}",
+    })
 
 ACCESS_LOG_FILTER_SESSION_KEY = "admin_access_log_filters"
 

@@ -151,6 +151,7 @@ def _get_all_pdf_field_names(template_path: str) -> List[str]:
     return names
 
 def _fill_pdf_with_values(template_path: str, merged: Dict[str, str], is_ctc: bool = False) -> bytes:
+def _fill_pdf_with_values(template_path: str, merged: Dict[str, str], is_ctc: bool = False) -> bytes:
     if PdfReader is None:
         raise RuntimeError("pypdf is not installed. Run: pip install pypdf")
     
@@ -161,6 +162,7 @@ def _fill_pdf_with_values(template_path: str, merged: Dict[str, str], is_ctc: bo
     print(f"[PDF DEBUG] Template exists: {os.path.exists(template_path)}")
     print(f"[PDF DEBUG] Values to fill: {len(merged)} fields")
     print(f"[PDF DEBUG] Is CTC: {is_ctc}")
+    print(f"[PDF DEBUG] Is CTC: {is_ctc}")
     
     reader = PdfReader(template_path)
     writer = PdfWriter()
@@ -169,6 +171,7 @@ def _fill_pdf_with_values(template_path: str, merged: Dict[str, str], is_ctc: bo
     # Check if PDF has form fields
     form_fields = reader.get_form_text_fields() if hasattr(reader, 'get_form_text_fields') else {}
     print(f"[PDF DEBUG] Form fields found: {len(form_fields)}")
+    print(f"[PDF DEBUG] ALL Form field names: {list(form_fields.keys())}")
     print(f"[PDF DEBUG] ALL Form field names: {list(form_fields.keys())}")
     
     if "/AcroForm" in writer._root_object:
@@ -192,6 +195,24 @@ def _fill_pdf_with_values(template_path: str, merged: Dict[str, str], is_ctc: bo
     for page_num, page in enumerate(writer.pages):
         print(f"[PDF DEBUG] Updating page {page_num + 1}")
         writer.update_page_form_field_values(page, merged)
+        
+        # Add CTC watermark if this is a certified true copy
+        if is_ctc:
+            from reportlab.pdfgen import canvas
+            from reportlab.lib.pagesizes import letter
+            packet = io.BytesIO()
+            can = canvas.Canvas(packet, pagesize=letter)
+            can.setFont("Helvetica-Bold", 60)
+            can.setFillColorRGB(0.3, 0.3, 0.3, alpha=0.15)
+            can.saveState()
+            can.translate(300, 400)
+            can.rotate(45)
+            can.drawCentredString(0, 0, "CERTIFIED TRUE COPY")
+            can.restoreState()
+            can.save()
+            packet.seek(0)
+            watermark = PdfReader(packet)
+            page.merge_page(watermark.pages[0])
         
         # Add CTC watermark if this is a certified true copy
         if is_ctc:
@@ -294,8 +315,10 @@ def _fill_fields_for_line(header: Dict[str, Any], line: Dict[str, Any]) -> Dict[
             "full_name": subject_full_name, "age": subject_age, "civil_status": subject_civil, "nationality": subject_nat,
             "barangay_name": barangay, "city_municipality": city, "province": province,
             "total_earning": family_income_range or "No data", "purpose": purpose,
+            "total_earning": family_income_range or "No data", "purpose": purpose,
             "day": d, "month": m, "year": y,
             "issued_at_brgy": barangay, "issued_at_city_municipality": city, "issued_at_province": province,
+            "amnt": paid_amt_str, "official_reciept": or_no or "—",
             "amnt": paid_amt_str, "official_reciept": or_no or "—",
         }
 

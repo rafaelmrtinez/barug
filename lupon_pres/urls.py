@@ -1,6 +1,7 @@
 # lupon_pres/urls.py
 from django.urls import path
 from . import views
+from .staff_request_views import staff_requests_list, staff_request_detail
 from lupon_mem import views_reports
 from lupon_mem import views_api
 from lupon_mem import views_cases
@@ -35,6 +36,10 @@ urlpatterns = [
 
     path("api/staff/search/", views.staff_search_api, name="staff_search_api"),
     path("api/staff/filter/", views.staff_filter_api, name="staff_filter_api"),
+    
+    # Staff requests list and details
+    path("staff/requests/", staff_requests_list, name="staff_requests_list"),
+    path("staff/requests/<int:request_id>/", staff_request_detail, name="staff_request_detail"),
     # submissions (existing)
     path("submissions/<int:pk>/",      SubmissionViewSQL.as_view(),
         name="kp_submission_view"),

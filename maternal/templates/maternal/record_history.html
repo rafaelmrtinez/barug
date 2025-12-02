@@ -4,6 +4,7 @@
 {% load bootstrap_icons %} 
 {% block css %}
   <link rel="stylesheet" href="{% static 'maternal/css/record_history.css' %}">
+  <link rel="stylesheet" href="{% static 'maternal/css/health_record_form_extra.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -33,8 +34,9 @@
             data-bs-toggle="modal"
             data-bs-target="#createMaternalModal"
           >
-            <i class="bi bi-file-plus me-1"></i>
-                Add Maternal Health Record
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+            </svg>
           </button>
           {% endif %}
         </div>
@@ -51,7 +53,7 @@
           </div>
 
           <div class="table-responsive mt-2 position-static">
-            <table class="table table-sm visit-table align-middle">
+            <table class="table table-sm visit-table record-history-table align-middle">
               <thead>
                 <tr>
                   <th>MHR #</th>

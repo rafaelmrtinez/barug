@@ -20,7 +20,7 @@
 
     <div class="row">
         <!-- Sidebar: quick navigation for midwives -->
-        <aside class="col-md-3 d-none d-md-block maternal-sidebar">
+        <aside class="col-md-3 maternal-sidebar">
             <nav class="sticky-top pt-4">
                 <div class="card">
 
@@ -257,7 +257,7 @@
                 <div class="small text-white">Read-only</div>
             </div>
             <div class="card-body table-responsive">
-                <table class="table table-sm align-middle">
+                <table class="table table-sm align-middle prev-preg-table">
                     <thead>
                         <tr>
                             <th>Date of delivery</th>
@@ -493,8 +493,9 @@
                                 </div>
                             </div>
 
-                            <div class="row g-3">
+                            <div class="row g-3 mt-3">
                                 <div class="col-md-6">
+                                    <h6 class="small fw-bold mb-2">Obstetric risk types:</h6>
                                     <ul class="list-bullet small text-muted mb-0">
                                         <li>Increased BP</li>
                                         <li>Epigastic Pain</li>
@@ -504,6 +505,7 @@
                                     </ul>
                                 </div>
                                 <div class="col-md-6">
+                                    <h6 class="small fw-bold mb-2">Medical comorbidity risk types:</h6>
                                     <ul class="list-bullet small text-muted mb-0">
                                         <li>Abnormal Vaginal Discharge</li>
                                         <li>Vaginal Bleeding</li>
@@ -543,7 +545,6 @@
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                                 <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
                             </svg>
-                            Add Visit
                         </button>
                         {% endif %}
                         {% if request.session.auth.role_name == 'midwife' and postpartum_visit_data %}
@@ -556,7 +557,7 @@
                     </div>
                 </div>
                 <div class="card-body table-responsive">
-                    <table class="table table-sm table-hover align-middle">
+                    <table class="table table-sm table-hover align-middle postpartum-table">
                         <thead>
                             <tr>
                                 <th>Date of Visit</th>
