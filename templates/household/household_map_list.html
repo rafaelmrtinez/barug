@@ -25,6 +25,20 @@
 {% block content %}
 <div class="page-wrap" style="margin-top: 40px;">
 
+  <div style="margin-bottom:1rem; display:flex; gap:1rem; align-items:center">
+    {% if assigned_puroks %}
+    <button class="btn btn-brand" id="showMyAreaBtn" data-names="{{ assigned_purok_names|join:',' }}">
+      {% bs_icon 'geo-alt-fill' %} Show My Assigned Area{% if assigned_purok_names %}: {{ assigned_purok_names|join:', ' }}{% endif %}
+    </button>
+    {% endif %}
+    <select id="purokFilter" class="form-select" style="max-width:200px">
+      <option value="">All Puroks</option>
+      {% for p in all_puroks %}
+      <option value="{{ p.name }}">{{ p.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
   {% if visit_counts %}
   <div class="visit-cards">
     <div class="visit-card visited" data-filter="households_visited">
