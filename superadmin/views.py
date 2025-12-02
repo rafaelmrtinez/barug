@@ -2755,7 +2755,7 @@ def operational_logs(request):
     try:
         rows = Admin.get_common_logs_with_names()
     except Exception as e:
-        logger.exception("Failed to load operational logs: %s", e)
+        logger.exception("Failed to load user logs: %s", e)
         rows = []
 
     # Apply filters
@@ -2867,8 +2867,8 @@ def operational_logs(request):
     return render(request, "superadmin/user_logs/operational_logs.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
-        'page_path': f'{user_role} / Operational Logs',
-        'page_title': 'Operational Logs',
+        'page_path': f'{user_role} / User Logs',
+        'page_title': 'User Logs',
         'user_role_template': user_role_template,
         'page_obj': page_obj,
         'total_count': paginator.count,
@@ -2925,19 +2925,19 @@ def operational_log_details(request, log_id):
     try:
         log_detail = Admin.get_common_log_detail(int(log_id))
     except Exception as e:
-        logger.exception("Failed to load operational log details: %s", e)
+        logger.exception("Failed to load user log details: %s", e)
         log_detail = None
 
     if not log_detail:
-        flash_warning(request, f"No operational log found with ID {log_id}.")
+        flash_warning(request, f"No user log found with ID {log_id}.")
         return redirect("superadmin:operational_logs")
 
     user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "superadmin/user_logs/operational_log_details.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
-        'page_path': f'{user_role} / Operational Log Details',
-        'page_title': 'Operational Log Details',
+        'page_path': f'{user_role} / User Log Details',
+        'page_title': 'User Log Details',
         'user_role_template': user_role_template,
         'log_detail': log_detail,
     })

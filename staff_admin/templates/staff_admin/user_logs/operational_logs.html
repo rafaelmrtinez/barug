@@ -117,7 +117,7 @@
                     <div style="max-width: 250px;">
                       {% if log.details %}
                         <div class="text-truncate" title="{{ log.details }}">
-                          {{ log.details|lower|capfirst }}{% if not log.details|last == '.' %}.{% endif %}
+                          {{ log.details}}{% if not log.details|last == '.' %}.{% endif %}
                         </div>
                         {% if log.reason %}
                           <small class="text-muted d-block mt-1" title="{{ log.reason }}">
@@ -146,7 +146,7 @@
                 </tr>
               {% endfor %}
             {% else %}
-              <tr><td colspan="7" class="text-center">No operational logs found</td></tr>
+              <tr><td colspan="7" class="text-center">No user logs found</td></tr>
             {% endif %}
           </tbody>
         </table>
