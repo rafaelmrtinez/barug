@@ -23,6 +23,14 @@
 .child-sidebar .nav-link.active{ background: rgba(255,255,255,0.06) !important; }
 .child-sidebar .nav-link, .child-sidebar .dropdown-item{ color: var(--chr-contrast) !important; }
 
+/* Sidebar toggle button icon */
+.sidebar-toggle-icon {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  fill: none;
+}
+
 @media (max-width:767.98px){
   .child-sidebar{ position: fixed; top: 56px; left: calc(-1 * var(--chr-msb-width)); width: var(--chr-msb-width); height: calc(100% - 56px); z-index:1050; transition:left .25s ease; }
   .child-sidebar.open{ left: 0; }

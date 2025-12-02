@@ -163,6 +163,7 @@
                                     <td>{{ record.father_full_name }}</td>
                                     <td>{{ record.record_created_at|date:"Y-m-d H:i" }}</td>
                                     <td>
+                                        {% if request.session.auth.role_name == "barangay health worker" %}
                                         <div class="dropdown">
                                             <button class="btn btn-outline-brand btn-sm dropdown-toggle" type="button" id="actionDropdown{{ record.child_record_id }}" data-bs-toggle="dropdown" data-bs-auto-close="true" data-bs-reference="parent" aria-expanded="false">
                                                 {% bs_icon 'three-dots-vertical' extra_classes='me-1' %} Actions
@@ -200,6 +201,12 @@
                                                 {% endif %}
                                             </ul>
                                         </div>
+                                        {% else %}
+                                            <a class="btn btn-outline-secondary btn-sm"
+                                            href="{% url 'child_health:child_health_entry' record.child_record_id %}">
+                                            {% bs_icon 'folder2-open' extra_classes='me-1' %} Open
+                                            </a>
+                                        {% endif %}
                                     </td>
                                 </tr>
                             {% endfor %}
