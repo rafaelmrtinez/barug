@@ -9,8 +9,8 @@ from zoneinfo import ZoneInfo
 from .. import form_shared as FS
 from .util import get_lupon_chair_name  # Pangkat Chairman (Lupon Chair/President)
 from lupon_mem.services.fields_util import (
-    get_latest_form_fields,
-    get_field_text,
+    get_this_case_kp7_date_filed,
+    get_this_case_kp7_time_filed,
 )
 
 logger = logging.getLogger(__name__)
@@ -373,77 +373,6 @@ class KP19Handler:
         return KP19Handler._try_parse_date(txt)
 
 
-    # ---------- KP-7 helpers via fields_util ----------
-
-    @staticmethod
-    def _kp7_latest_fields(case_id: Optional[int]) -> Optional[Dict[str, Optional[str]]]:
-        """
-        Use fields_util.get_latest_form_fields(case_id, 'KP-7') and return a tiny map of relevant codes.
-        Returns dict with keys: month_created, date_created, year_received, case_time_filed (values may be None).
-        """
-        if not case_id:
-            return None
-        try:
-            rows = get_latest_form_fields(case_id, 'KP-7')
-        except Exception as e:
-            logger.warning("[KP18] get_latest_form_fields failed: %s", e)
-            return None
-        if not rows:
-            return None
-        month_created = get_field_text(rows, "month_created")
-        date_created  = get_field_text(rows, "date_created")
-        year_received = get_field_text(rows, "year_received")
-        time_filed    = get_field_text(rows, "case_time_filed") or get_field_text(rows, "time_filed")
-        return {
-            "month_created": month_created,
-            "date_created": date_created,
-            "year_received": year_received,
-            "case_time_filed": time_filed,
-        }
-
-    @staticmethod
-    def _build_date_from_kp7_fields(month_txt: Optional[str], day_txt: Optional[str], year_txt: Optional[str]) -> Optional[_date]:
-        """
-        Build a date from KP-7 pieces, tolerating swapped inputs:
-          - month_txt may be "October", "Oct", or "10" (also accidentally "29")
-          - day_txt may be "29" (also accidentally "October")
-          - year_txt must be 4-digit numeric
-        Returns a date or None if impossible.
-        """
-        m_raw = (month_txt or "").strip()
-        d_raw = (day_txt or "").strip()
-        y_raw = (year_txt or "").strip()
-
-        if not (y_raw.isdigit() and len(y_raw) == 4):
-            return None
-        year = int(y_raw)
-
-        month_full = KP19Handler._month_to_fullname(m_raw)
-        day_int = int(d_raw) if d_raw.isdigit() else None
-
-        # If month invalid and day looks like month text/num, try swap
-        if month_full is None and not day_int:
-            month_full = KP19Handler._month_to_fullname(d_raw)
-
-        # If still no day, check if m_raw is actually a day number
-        if day_int is None and m_raw.isdigit():
-            try:
-                v = int(m_raw)
-                if 1 <= v <= 31:
-                    day_int = v
-            except Exception:
-                pass
-
-        if not month_full or not day_int:
-            return None
-
-        try:
-            month_num = _dt.strptime(month_full, "%B").month
-            return _date(year, month_num, day_int)
-        except Exception:
-            return None
-
-
     def build_name_value_map(self, form_id:int, submission_id:int)->dict:
         answers = FS.load_answers(submission_id)
 
@@ -494,39 +423,12 @@ class KP19Handler:
         if (not case_num) and case_num_from_sub:
             out["brgy_case_number"] = str(case_num_from_sub)
 
-        # -------- Pull LATEST KP-7 (PRIMARY SOURCE for filed date/time) --------
-        kp7_date_obj: Optional[_date] = None
-        kp7_time_obj: Optional[_time] = None
-        kp7_fields = self._kp7_latest_fields(case_id)
-
-        if kp7_fields:
-            month_txt = kp7_fields.get("month_created")
-            day_txt   = kp7_fields.get("date_created")
-            year_txt  = kp7_fields.get("year_received")
-            time_txt  = kp7_fields.get("case_time_filed")
-
-            logger.info("[KP18][KP7 latest] month_created=%r date_created=%r year_received=%r case_time_filed=%r",
-                        month_txt, day_txt, year_txt, time_txt)
-
-            kp7_date_obj = self._build_date_from_kp7_fields(month_txt, day_txt, year_txt)
-            if time_txt:
-                kp7_time_obj = self._parse_time_any(time_txt)
-
         # -------- date_filed/time_filed MUST come from KP-7 --------
-        if kp7_date_obj:
-            out["date_filed"] = _fmt_full(kp7_date_obj)
-        if kp7_time_obj:
-            out["time_filed"] = _fmt12(kp7_time_obj)
-
-        # date_filed (Month DD, YYYY) - fallback if KP-7 failed
-        if not out.get("date_filed"):
-            d_obj = date_by_num or date_by_sub or _dt.now(ZoneInfo("Asia/Manila")).date()
-            out["date_filed"] = _fmt_full(d_obj)
-
-        # time_filed (12h) - fallback if KP-7 failed  
-        if not out.get("time_filed"):
-            t_obj = time_by_num or time_by_sub
-            out["time_filed"] = _fmt12(t_obj) if t_obj else ""
+        kp7_date = get_this_case_kp7_date_filed(case_id or 0)
+        kp7_time = get_this_case_kp7_time_filed(case_id or 0)
+        
+        out["date_filed"] = kp7_date or ""
+        out["time_filed"] = kp7_time or ""
 
         # -------- Process appearance fields from form UI --------
         # Parse appearance_date if it's a full date string
