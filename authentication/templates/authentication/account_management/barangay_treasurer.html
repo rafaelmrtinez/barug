@@ -84,7 +84,7 @@
                     </ul>
                 </li>
                 <li class="nav-item me-3">
-                    <a class="nav-link" href="{% url 'clerk:dashboard' %}">Report of Collections and Deposits</a>
+                    <a class="nav-link" href="{% url 'treasurer:financial_report' %}">Financial Report</a>
                 </li>
                 <li class="nav-item me-3">
                     <a class="nav-link" href="{% url 'lupon_mem:report_list' %}">Lupon Case Filing{% if lupon_unpaid_count %}<span class="count-badge">{{ lupon_unpaid_count }}</span>{% endif %}</a>
