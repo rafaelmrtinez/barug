@@ -118,17 +118,31 @@ from common.db_errors import _pg_err_tuple
 
 logger = logging.getLogger(__name__)
 
-import logging
-
-logger = logging.getLogger(__name__)
+def get_user_info(request):
+    """Get user info from session - call this in each view"""
+    auth = request.session.get('auth', {})
+    first_name = (auth.get('first_name', '') or '').strip().title()
+    middle_name = (auth.get('middle_name', '') or '').strip().title()
+    last_name = (auth.get('last_name', '') or '').strip().title()
+    suffix = (auth.get('suffix', '') or '').strip().upper()
+    
+    # Format: "Last Name, First Name Middle Initial Suffix"
+    name_parts = [first_name]
+    if middle_name:
+        name_parts.append(middle_name[0] + '.')  # Middle initial with period
+    if suffix:
+        name_parts.append(suffix)
+    
+    user_fullname = f"{last_name}, {' '.join(name_parts)}"
+    user_role = auth.get('role_name', 'Staff').title()
+    user_role_template = user_role.lower().replace(' ', '_')
+    
+    return user_fullname, user_role, user_role_template
 
 # -------------------- Role / UI globals (unchanged) --------------------
 ROLE_MIDWIFE = ("MIDWIFE", "Midwife", "midwife")
 # This was added to allow extended roles to access/re-use features such as resident search
 FEATURE_ACCESS = ("MIDWIFE", "Midwife", "midwife", "Barangay Health Worker", "Super Admin")
-user_fullname = "laname fname mname suffix"
-user_role = "MIDWIFE"
-user_role_template = user_role.lower().replace(" ", "_")
 
 ROLE_BHW = 9
 ROLE_LUPON = 8
@@ -412,6 +426,7 @@ def ajax_person_card(request: HttpRequest) -> JsonResponse:
 
 # -------------------- Pages --------------------
 def active_schedule(request: HttpRequest) -> HttpResponse:
+    user_fullname, user_role, user_role_template = get_user_info(request)
     pending: List[Dict[str, Any]] = []
     page_obj = Paginator(pending, 10).get_page(request.GET.get("page"))
     return render(
@@ -433,6 +448,7 @@ def active_schedule(request: HttpRequest) -> HttpResponse:
 
 
 def household_info(request: HttpRequest) -> HttpResponse:
+    user_fullname, user_role, user_role_template = get_user_info(request)
     return render(
         request,
         "household/household_info.html",
@@ -1038,6 +1054,7 @@ def _file_to_data_url(fileobj, fallback_mime="image/jpeg") -> str:
 @role_required(*ROLE_MIDWIFE)
 @nocache
 def staff_selection(request: HttpRequest) -> HttpResponse:
+    user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "acc_management/staff_selection.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
@@ -1343,6 +1360,7 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
     except Exception as e:
         flash_system_error(request, "Error loading resident details.", exc=e)
 
+    user_fullname, user_role, user_role_template = get_user_info(request)
     role_form = ChooseRole()
     proof_form = ResidentProfileform()
     return render(request, "acc_management/staff_selection_resident.html", {
@@ -1450,6 +1468,7 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
             flash_warning(request, "Please correct the errors below.")
             # fall-through to re-render with form errors
 
+    user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "acc_management/staff_selection_nonresident.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
@@ -1561,6 +1580,7 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
         return redirect("midwife:staff_selection_non-resident_role_review")
 
     # GET
+    user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "acc_management/supporting_docs.html", {
         "user_fullname": user_fullname,
         "user_role": user_role,
@@ -1673,6 +1693,7 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
         if birth_display:
             personal_display["birthdate_display"] = birth_display
 
+        user_fullname, user_role, user_role_template = get_user_info(request)
         return render(
             request,
             "acc_management/role.html",
@@ -2010,19 +2031,15 @@ def staff_list(request):
 
     clear_filters_url = f"{request.path}?clear_filters=1"
 
-    auth = request.session.get("auth") or {}
-    _user_fullname = auth.get("full_name") or user_fullname
-    _user_role = auth.get("role_name") or user_role
-    _user_role_template = (_user_role or "").lower().replace(" ", "_")
-
+    user_fullname, user_role, user_role_template = get_user_info(request)
     current_filters = filters_state
 
     return render(request, "midwife/acc_management/staff_list.html", {
-        "user_fullname": _user_fullname,
-        "user_role": _user_role,
-        "page_path": f"{_user_role} / Staff List",
+        "user_fullname": user_fullname,
+        "user_role": user_role,
+        "page_path": f"{user_role} / Staff List",
         "page_title": "Staff List (BHW Only)",
-        "user_role_template": _user_role_template,
+        "user_role_template": user_role_template,
         "form": form,
         "page_obj": page_obj,
         "total_count": paginator.count,
@@ -2216,6 +2233,7 @@ def staff_dets(request, staff_code: str):
                 purok_names = [item.strip() for item in purok_text.replace('\n', ',').split(',') if item.strip()]
                 purok_list = [purok_name_to_id.get(name, '') for name in purok_names if purok_name_to_id.get(name)]
     
+    user_fullname, user_role, user_role_template = get_user_info(request)
     ctx = {
         "user_fullname": user_fullname,
         "user_role": user_role,

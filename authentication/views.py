@@ -1177,6 +1177,697 @@ def account_settings(request):
         except Exception:
             return JsonResponse({'success': False})
     
+    # Handle sending username verification code
+    if request.method == 'POST' and request.POST.get('form_type') == 'send_username_code':
+        import secrets
+        import string
+        from common.send_email import send_email
+        from django.http import JsonResponse
+        
+        try:
+            # Verify current password first
+            current_password = request.POST.get('current_password', '').strip()
+            new_username = request.POST.get('new_username', '').strip()
+            
+            if not current_password or not new_username:
+                return JsonResponse({'success': False, 'error': 'Current password and new username are required'})
+            
+            # Check if current password is correct
+            is_valid = Authentication.check_staff_current_password(staff_id, current_password)
+            if not is_valid:
+                return JsonResponse({'success': False, 'error': 'Current password is incorrect'})
+            
+            # Generate 6-digit code
+            code = ''.join(secrets.choice(string.digits) for _ in range(6))
+            
+            # Store code in session with expiry
+            from django.utils import timezone as tz
+            request.session['username_verification_code'] = code
+            request.session['username_verification_code_expiry'] = (tz.now() + tz.timedelta(minutes=5)).isoformat()
+            
+            # Get user email
+            profile = Authentication.get_staff_profile_by_id(staff_id)
+            email = profile.get('email_address')
+            
+            if not email:
+                return JsonResponse({'success': False, 'error': 'No email address found'})
+            
+            # Validate email deliverability
+            is_valid, reason = verify_email_deliverable_abstract(email)
+            if not is_valid:
+                return JsonResponse({'success': False, 'error': f'Email validation failed: {reason}. Please update your email address.'})
+            
+            # Send email
+            subject = 'Username Change Verification Code'
+            body_text = f'Your verification code for username change is: {code}\n\nThis code will expire in 5 minutes.'
+            body_html = f'''
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Username Change Verification</h2>
+                <p>Your verification code for username change is:</p>
+                <div style="background: #f8f9fa; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+                    <h1 style="color: #dc3545; font-size: 32px; margin: 0; letter-spacing: 8px;">{code}</h1>
+                </div>
+                <p style="color: #666;">This code will expire in 5 minutes.</p>
+                <p style="color: #666;">If you did not request this code, please ignore this email.</p>
+            </div>
+            '''
+            
+            resp = send_email(
+                subject=subject,
+                to=[email],
+                body_text=body_text,
+                body_html=body_html,
+                from_name="Barangay Sto. Niño",
+                fail_silently=False
+            )
+            
+            if getattr(resp, 'ok', False):
+                return JsonResponse({'success': True})
+            else:
+                return JsonResponse({'success': False, 'error': 'Failed to send verification email. Please check your email address or try again later.'})
+                
+        except Exception as e:
+            logger.error(f"Error sending username verification code: {str(e)}", exc_info=True)
+            return JsonResponse({'success': False, 'error': 'Failed to send verification email. Please check your email address or try again later.'})
+    
+    # Handle sending old email verification code
+    if request.method == 'POST' and request.POST.get('form_type') == 'send_old_email_code':
+        import secrets
+        import string
+        from common.send_email import send_email
+        from django.http import JsonResponse
+        
+        try:
+            # Verify current password first
+            current_password = request.POST.get('current_password', '').strip()
+            new_email = request.POST.get('new_email', '').strip()
+            
+            if not current_password or not new_email:
+                return JsonResponse({'success': False, 'error': 'Current password and new email are required'})
+            
+            # Check if current password is correct
+            is_valid = Authentication.check_staff_current_password(staff_id, current_password)
+            if not is_valid:
+                return JsonResponse({'success': False, 'error': 'Current password is incorrect'})
+            
+            # Validate new email deliverability
+            is_valid, reason = verify_email_deliverable_abstract(new_email)
+            if not is_valid:
+                return JsonResponse({'success': False, 'error': f'Email validation failed: {reason}. Please provide a valid email address.'})
+            
+            # Generate 6-digit code
+            code = ''.join(secrets.choice(string.digits) for _ in range(6))
+            
+            # Get current user email
+            profile = Authentication.get_staff_profile_by_id(staff_id)
+            current_email = profile.get('email_address')
+            
+            if not current_email:
+                return JsonResponse({'success': False, 'error': 'No current email address found'})
+            
+            # Store code and new email in session with expiry
+            from django.utils import timezone as tz
+            request.session['old_email_verification_code'] = code
+            request.session['old_email_verification_code_expiry'] = (tz.now() + tz.timedelta(minutes=5)).isoformat()
+            request.session['new_email_address'] = new_email
+            
+            # Send email to CURRENT address for verification
+            subject = 'Email Change Verification - Current Email'
+            body_text = f'You requested to change your email address. Please verify your current email with this code: {code}\n\nThis code will expire in 5 minutes.'
+            body_html = f'''
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Email Change Verification</h2>
+                <p>You requested to change your email address. Please verify your current email with this code:</p>
+                <div style="background: #f8f9fa; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+                    <h1 style="color: #dc3545; font-size: 32px; margin: 0; letter-spacing: 8px;">{code}</h1>
+                </div>
+                <p style="color: #666;">This code will expire in 5 minutes.</p>
+                <p style="color: #666;">If you did not request this change, please contact support immediately.</p>
+            </div>
+            '''
+            
+            resp = send_email(
+                subject=subject,
+                to=[current_email],
+                body_text=body_text,
+                body_html=body_html,
+                from_name="Barangay Sto. Niño",
+                fail_silently=False
+            )
+            
+            if getattr(resp, 'ok', False):
+                return JsonResponse({'success': True})
+            else:
+                return JsonResponse({'success': False, 'error': 'Failed to send verification email. Please check your email address or try again later.'})
+                
+        except Exception as e:
+            logger.error(f"Error sending old email verification code: {str(e)}", exc_info=True)
+            return JsonResponse({'success': False, 'error': 'Failed to send verification email. Please check your email address or try again later.'})
+    
+    # Handle old email verification and send new email code
+    if request.method == 'POST' and request.POST.get('form_type') == 'verify_old_email':
+        from django.http import JsonResponse
+        from datetime import datetime
+        import secrets
+        import string
+        from common.send_email import send_email
+        
+        try:
+            code = request.POST.get('code', '').strip()
+            new_email = request.POST.get('new_email', '').strip()
+            current_password = request.POST.get('current_password', '').strip()
+            
+            # Verify old email code
+            stored_code = request.session.get('old_email_verification_code')
+            expiry_str = request.session.get('old_email_verification_code_expiry')
+            
+            if not stored_code or not expiry_str:
+                return JsonResponse({'success': False, 'error': 'No verification code found. Please request a new code.'})
+            
+            # Check expiry
+            from django.utils import timezone as tz
+            try:
+                expiry_time = datetime.fromisoformat(expiry_str.replace('Z', '+00:00'))
+                if not expiry_time.tzinfo:
+                    expiry_time = tz.make_aware(expiry_time)
+            except ValueError:
+                expiry_time = tz.now() - tz.timedelta(minutes=1)
+            
+            if tz.now() > expiry_time:
+                request.session.pop('old_email_verification_code', None)
+                request.session.pop('old_email_verification_code_expiry', None)
+                return JsonResponse({'success': False, 'error': 'Verification code has expired. Please request a new code.'})
+            
+            # Check code match
+            if code != stored_code:
+                return JsonResponse({'success': False, 'error': 'Invalid verification code. Please try again.'})
+            
+            # Re-verify current password
+            if not Authentication.check_staff_current_password(staff_id, current_password):
+                return JsonResponse({'success': False, 'error': 'Current password verification failed. Please try again.'})
+            
+            # Clear old email verification code
+            request.session.pop('old_email_verification_code', None)
+            request.session.pop('old_email_verification_code_expiry', None)
+            
+            # Generate new code for new email
+            new_code = ''.join(secrets.choice(string.digits) for _ in range(6))
+            
+            # Store new email verification code
+            request.session['email_verification_code'] = new_code
+            request.session['email_verification_code_expiry'] = (tz.now() + tz.timedelta(minutes=5)).isoformat()
+            
+            # Send code to new email
+            subject = 'Email Change Verification - New Email'
+            body_text = f'Please verify your new email address with this code: {new_code}\n\nThis code will expire in 5 minutes.'
+            body_html = f'''
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Verify Your New Email</h2>
+                <p>Please verify your new email address with this code:</p>
+                <div style="background: #f8f9fa; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+                    <h1 style="color: #dc3545; font-size: 32px; margin: 0; letter-spacing: 8px;">{new_code}</h1>
+                </div>
+                <p style="color: #666;">This code will expire in 5 minutes.</p>
+                <p style="color: #666;">If you did not request this change, please ignore this email.</p>
+            </div>
+            '''
+            
+            resp = send_email(
+                subject=subject,
+                to=[new_email],
+                body_text=body_text,
+                body_html=body_html,
+                from_name="Barangay Sto. Niño",
+                fail_silently=False
+            )
+            
+            if getattr(resp, 'ok', False):
+                return JsonResponse({'success': True})
+            else:
+                return JsonResponse({'success': False, 'error': 'Failed to send verification email to new address.'})
+                
+        except Exception as e:
+            logger.error(f"Error verifying old email: {str(e)}", exc_info=True)
+            return JsonResponse({'success': False, 'error': 'An error occurred during verification. Please try again.'})
+    
+    # Handle username verification and change
+    if request.method == 'POST' and request.POST.get('form_type') == 'verify_change_username':
+        from django.http import JsonResponse
+        from datetime import datetime
+        
+        try:
+            code = request.POST.get('code', '').strip()
+            new_username = request.POST.get('new_username', '').strip()
+            current_password = request.POST.get('current_password', '').strip()
+            
+            # Verify code
+            stored_code = request.session.get('username_verification_code')
+            expiry_str = request.session.get('username_verification_code_expiry')
+            
+            if not stored_code or not expiry_str:
+                return JsonResponse({'success': False, 'error': 'No verification code found. Please request a new code.'})
+            
+            # Check expiry
+            from django.utils import timezone as tz
+            try:
+                expiry_time = datetime.fromisoformat(expiry_str.replace('Z', '+00:00'))
+                if not expiry_time.tzinfo:
+                    expiry_time = tz.make_aware(expiry_time)
+            except ValueError:
+                expiry_time = tz.now() - tz.timedelta(minutes=1)  # Force expired
+            
+            if tz.now() > expiry_time:
+                request.session.pop('username_verification_code', None)
+                request.session.pop('username_verification_code_expiry', None)
+                return JsonResponse({'success': False, 'error': 'Verification code has expired. Please request a new code.'})
+            
+            # Check code match
+            if code != stored_code:
+                return JsonResponse({'success': False, 'error': 'Invalid verification code. Please try again.'})
+            
+            # Re-verify current password
+            if not Authentication.check_staff_current_password(staff_id, current_password):
+                return JsonResponse({'success': False, 'error': 'Current password verification failed. Please try again.'})
+            
+            # Get reason from request
+            reason = request.POST.get('reason', '').strip()
+            if not reason:
+                return JsonResponse({'success': False, 'error': 'Reason is required for username change.'})
+            
+            # Change username
+            success = Authentication.change_staff_username(staff_id, staff_id, new_username, f'Username change from account settings: {reason}')
+            
+            if success:
+                # Clear verification code from session
+                request.session.pop('username_verification_code', None)
+                request.session.pop('username_verification_code_expiry', None)
+                
+                # Clear profile cache
+                cache_key = f"staff_profile_{staff_id}"
+                cache.delete(cache_key)
+                
+                    # Send success email notification
+                try:
+                    profile = Authentication.get_staff_profile_by_id(staff_id)
+                    email = profile.get('email_address')
+                    user_name = f"{profile.get('first_name', '')} {profile.get('last_name', '')}".strip()
+                    
+                    if email:
+                        from common.send_email import send_email
+                        from django.utils import timezone
+                        import pytz
+                        
+                        # Get Philippines timezone
+                        ph_tz = pytz.timezone('Asia/Manila')
+                        ph_time = timezone.now().astimezone(ph_tz)
+                        
+                        subject = 'Username Changed Successfully'
+                        body_text = f'Hello {user_name},\n\nYour username has been successfully changed to "{new_username}" on {ph_time.strftime("%B %d, %Y at %I:%M %p")}.\n\nIf you did not make this change, please contact your administrator immediately.\n\nBest regards,\nBarangay Sto. Niño'
+                        body_html = f'''
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                            <h2 style="color: #333;">Username Changed Successfully</h2>
+                            <p>Hello {user_name},</p>
+                            <p>Your username has been successfully changed to <strong>"{new_username}"</strong> on <strong>{ph_time.strftime("%B %d, %Y at %I:%M %p")}</strong>.</p>
+                            <div style="background: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #28a745;">
+                                <p style="margin: 0; color: #155724;"><strong>Security Notice:</strong> If you did not make this change, please contact your administrator immediately.</p>
+                            </div>
+                            <p>Best regards,<br>Barangay Sto. Niño</p>
+                        </div>
+                        '''
+                        
+                        send_email(
+                            subject=subject,
+                            to=[email],
+                            body_text=body_text,
+                            body_html=body_html,
+                            from_name="Barangay Sto. Niño",
+                            fail_silently=True
+                        )
+                except Exception as e:
+                    logger.error(f"Failed to send username change notification: {str(e)}", exc_info=True)
+                
+                return JsonResponse({'success': True, 'message': 'Username changed successfully!'})
+            else:
+                return JsonResponse({'success': False, 'error': 'Failed to change username.'})
+                
+        except (DatabaseError, OperationalError, IntegrityError) as e:
+            logger.error(f"Database error changing username: {str(e)}", exc_info=True)
+            from common.flash import _extract_psycopg_diag
+            pgcode, primary = _extract_psycopg_diag(e)
+            error_msg = primary if primary else 'Database error occurred while changing username. Please try again.'
+            return JsonResponse({'success': False, 'error': error_msg})
+        except Exception as e:
+            logger.error(f"Error changing username: {str(e)}", exc_info=True)
+            return JsonResponse({'success': False, 'error': 'An error occurred while changing username. Please try again.'})
+    
+    # Handle email verification and change
+    if request.method == 'POST' and request.POST.get('form_type') == 'verify_change_email':
+        from django.http import JsonResponse
+        from datetime import datetime
+        
+        try:
+            code = request.POST.get('code', '').strip()
+            new_email = request.POST.get('new_email', '').strip()
+            current_password = request.POST.get('current_password', '').strip()
+            
+            # Verify code
+            stored_code = request.session.get('email_verification_code')
+            expiry_str = request.session.get('email_verification_code_expiry')
+            
+            if not stored_code or not expiry_str:
+                return JsonResponse({'success': False, 'error': 'No verification code found. Please request a new code.'})
+            
+            # Check expiry
+            from django.utils import timezone as tz
+            try:
+                expiry_time = datetime.fromisoformat(expiry_str.replace('Z', '+00:00'))
+                if not expiry_time.tzinfo:
+                    expiry_time = tz.make_aware(expiry_time)
+            except ValueError:
+                expiry_time = tz.now() - tz.timedelta(minutes=1)  # Force expired
+            
+            if tz.now() > expiry_time:
+                request.session.pop('email_verification_code', None)
+                request.session.pop('email_verification_code_expiry', None)
+                return JsonResponse({'success': False, 'error': 'Verification code has expired. Please request a new code.'})
+            
+            # Check code match
+            if code != stored_code:
+                return JsonResponse({'success': False, 'error': 'Invalid verification code. Please try again.'})
+            
+            # Re-verify current password
+            if not Authentication.check_staff_current_password(staff_id, current_password):
+                return JsonResponse({'success': False, 'error': 'Current password verification failed. Please try again.'})
+            
+            # Get person_id from staff_id
+            profile = Authentication.get_staff_profile_by_id(staff_id)
+            if not profile:
+                return JsonResponse({'success': False, 'error': 'Staff profile not found.'})
+            
+            person_id = profile.get('person_id')
+            if not person_id:
+                return JsonResponse({'success': False, 'error': 'Person ID not found.'})
+            
+            # Get reason from request
+            reason = request.POST.get('reason', '').strip()
+            if not reason:
+                return JsonResponse({'success': False, 'error': 'Reason is required for email change.'})
+            
+            # Change email
+            success = Authentication.change_person_email(staff_id, person_id, new_email, f'Email change from account settings: {reason}')
+            
+            if success:
+                # Clear verification code from session
+                request.session.pop('email_verification_code', None)
+                request.session.pop('email_verification_code_expiry', None)
+                
+                # Clear profile cache
+                cache_key = f"staff_profile_{staff_id}"
+                cache.delete(cache_key)
+                
+                # Send success email notification to both old and new email
+                try:
+                    profile = Authentication.get_staff_profile_by_id(staff_id)
+                    old_email = profile.get('email_address')  # This should be the old email before change
+                    user_name = f"{profile.get('first_name', '')} {profile.get('last_name', '')}".strip()
+                    
+                    from common.send_email import send_email
+                    from django.utils import timezone
+                    import pytz
+                    
+                    # Get Philippines timezone
+                    ph_tz = pytz.timezone('Asia/Manila')
+                    ph_time = timezone.now().astimezone(ph_tz)
+                    
+                    # Send to new email (confirmation)
+                    if new_email:
+                        subject = 'Email Address Changed Successfully'
+                        body_text = f'Hello {user_name},\n\nYour email address has been successfully changed to this address on {ph_time.strftime("%B %d, %Y at %I:%M %p")}.\n\nYou will now receive all account notifications at this email address.\n\nIf you did not make this change, please contact your administrator immediately.\n\nBest regards,\nBarangay Sto. Niño'
+                        body_html = f'''
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                            <h2 style="color: #333;">Email Address Changed Successfully</h2>
+                            <p>Hello {user_name},</p>
+                            <p>Your email address has been successfully changed to <strong>this address</strong> on <strong>{ph_time.strftime("%B %d, %Y at %I:%M %p")}</strong>.</p>
+                            <p>You will now receive all account notifications at this email address.</p>
+                            <div style="background: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #28a745;">
+                                <p style="margin: 0; color: #155724;"><strong>Security Notice:</strong> If you did not make this change, please contact your administrator immediately.</p>
+                            </div>
+                            <p>Best regards,<br>Barangay Sto. Niño</p>
+                        </div>
+                        '''
+                        
+                        send_email(
+                            subject=subject,
+                            to=[new_email],
+                            body_text=body_text,
+                            body_html=body_html,
+                            from_name="Barangay Sto. Niño",
+                            fail_silently=True
+                        )
+                    
+                    # Send to old email (notification of change) if different from new email
+                    if old_email and old_email != new_email:
+                        subject = 'Email Address Changed - Security Notice'
+                        body_text = f'Hello {user_name},\n\nYour account email address has been changed from this address to {new_email} on {ph_time.strftime("%B %d, %Y at %I:%M %p")}.\n\nFuture notifications will be sent to the new email address.\n\nIf you did not make this change, please contact your administrator immediately.\n\nBest regards,\nBarangay Sto. Niño'
+                        body_html = f'''
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                            <h2 style="color: #333;">Email Address Changed - Security Notice</h2>
+                            <p>Hello {user_name},</p>
+                            <p>Your account email address has been changed from <strong>this address</strong> to <strong>{new_email}</strong> on <strong>{ph_time.strftime("%B %d, %Y at %I:%M %p")}</strong>.</p>
+                            <p>Future notifications will be sent to the new email address.</p>
+                            <div style="background: #fff3cd; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #ffc107;">
+                                <p style="margin: 0; color: #856404;"><strong>Security Notice:</strong> If you did not make this change, please contact your administrator immediately.</p>
+                            </div>
+                            <p>Best regards,<br>Barangay Sto. Niño</p>
+                        </div>
+                        '''
+                        
+                        send_email(
+                            subject=subject,
+                            to=[old_email],
+                            body_text=body_text,
+                            body_html=body_html,
+                            from_name="Barangay Sto. Niño",
+                            fail_silently=True
+                        )
+                        
+                except Exception as e:
+                    logger.error(f"Failed to send email change notification: {str(e)}", exc_info=True)
+                
+                return JsonResponse({'success': True, 'message': 'Email changed successfully!'})
+            else:
+                return JsonResponse({'success': False, 'error': 'Failed to change email.'})
+                
+        except (DatabaseError, OperationalError, IntegrityError) as e:
+            logger.error(f"Database error changing email: {str(e)}", exc_info=True)
+            from common.flash import _extract_psycopg_diag
+            pgcode, primary = _extract_psycopg_diag(e)
+            error_msg = primary if primary else 'Database error occurred while changing email. Please try again.'
+            return JsonResponse({'success': False, 'error': error_msg})
+        except Exception as e:
+            logger.error(f"Error changing email: {str(e)}", exc_info=True)
+            return JsonResponse({'success': False, 'error': 'An error occurred while changing email. Please try again.'})
+    
+    # Handle resend username code
+    if request.method == 'POST' and request.POST.get('form_type') == 'resend_username_code':
+        import secrets
+        import string
+        from common.send_email import send_email
+        from django.http import JsonResponse
+        
+        try:
+            # Generate new 6-digit code
+            code = ''.join(secrets.choice(string.digits) for _ in range(6))
+            
+            # Store code in session with expiry
+            from django.utils import timezone as tz
+            request.session['username_verification_code'] = code
+            request.session['username_verification_code_expiry'] = (tz.now() + tz.timedelta(minutes=5)).isoformat()
+            
+            # Get user email
+            profile = Authentication.get_staff_profile_by_id(staff_id)
+            email = profile.get('email_address')
+            
+            if not email:
+                return JsonResponse({'success': False, 'error': 'No email address found'})
+            
+            # Send email
+            subject = 'Username Change Verification Code'
+            body_text = f'Your verification code for username change is: {code}\n\nThis code will expire in 5 minutes.'
+            body_html = f'''
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Username Change Verification</h2>
+                <p>Your verification code for username change is:</p>
+                <div style="background: #f8f9fa; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+                    <h1 style="color: #dc3545; font-size: 32px; margin: 0; letter-spacing: 8px;">{code}</h1>
+                </div>
+                <p style="color: #666;">This code will expire in 5 minutes.</p>
+                <p style="color: #666;">If you did not request this code, please ignore this email.</p>
+            </div>
+            '''
+            
+            resp = send_email(
+                subject=subject,
+                to=[email],
+                body_text=body_text,
+                body_html=body_html,
+                from_name="Barangay Sto. Niño",
+                fail_silently=False
+            )
+            
+            if getattr(resp, 'ok', False):
+                return JsonResponse({'success': True})
+            else:
+                return JsonResponse({'success': False, 'error': 'Failed to resend verification email. Please try again later.'})
+                
+        except Exception as e:
+            logger.error(f"Error resending username verification code: {str(e)}", exc_info=True)
+            return JsonResponse({'success': False, 'error': 'Failed to resend verification email. Please try again later.'})
+    
+    # Handle resend email code
+    if request.method == 'POST' and request.POST.get('form_type') == 'resend_email_code':
+        import secrets
+        import string
+        from common.send_email import send_email
+        from django.http import JsonResponse
+        
+        try:
+            # Get the new email from session
+            new_email = request.session.get('new_email_address')
+            if not new_email:
+                return JsonResponse({'success': False, 'error': 'Unable to resend code. Please start the process again.'})
+            
+            # Generate new 6-digit code
+            code = ''.join(secrets.choice(string.digits) for _ in range(6))
+            
+            # Store code in session with expiry
+            from django.utils import timezone as tz
+            request.session['email_verification_code'] = code
+            request.session['email_verification_code_expiry'] = (tz.now() + tz.timedelta(minutes=5)).isoformat()
+            
+            # Send email to new address
+            subject = 'Email Change Verification Code'
+            body_text = f'Your verification code for email change is: {code}\n\nThis code will expire in 5 minutes.'
+            body_html = f'''
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Email Change Verification</h2>
+                <p>Your verification code for email change is:</p>
+                <div style="background: #f8f9fa; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+                    <h1 style="color: #dc3545; font-size: 32px; margin: 0; letter-spacing: 8px;">{code}</h1>
+                </div>
+                <p style="color: #666;">This code will expire in 5 minutes.</p>
+                <p style="color: #666;">If you did not request this code, please ignore this email.</p>
+            </div>
+            '''
+            
+            resp = send_email(
+                subject=subject,
+                to=[new_email],
+                body_text=body_text,
+                body_html=body_html,
+                from_name="Barangay Sto. Niño",
+                fail_silently=False
+            )
+            
+            if getattr(resp, 'ok', False):
+                return JsonResponse({'success': True})
+            else:
+                return JsonResponse({'success': False, 'error': 'Failed to resend verification email. Please try again later.'})
+                
+        except Exception as e:
+            logger.error(f"Error resending email verification code: {str(e)}", exc_info=True)
+            return JsonResponse({'success': False, 'error': 'Failed to resend verification email. Please try again later.'})
+    
+    # Handle clearing username verification code
+    if request.method == 'POST' and request.POST.get('form_type') == 'clear_username_code':
+        from django.http import JsonResponse
+        
+        try:
+            request.session.pop('username_verification_code', None)
+            request.session.pop('username_verification_code_expiry', None)
+            return JsonResponse({'success': True})
+        except Exception:
+            return JsonResponse({'success': False})
+    
+    # Handle resend old email code
+    if request.method == 'POST' and request.POST.get('form_type') == 'resend_old_email_code':
+        import secrets
+        import string
+        from common.send_email import send_email
+        from django.http import JsonResponse
+        
+        try:
+            # Generate new 6-digit code
+            code = ''.join(secrets.choice(string.digits) for _ in range(6))
+            
+            # Store code in session with expiry
+            from django.utils import timezone as tz
+            request.session['old_email_verification_code'] = code
+            request.session['old_email_verification_code_expiry'] = (tz.now() + tz.timedelta(minutes=5)).isoformat()
+            
+            # Get user email
+            profile = Authentication.get_staff_profile_by_id(staff_id)
+            email = profile.get('email_address')
+            
+            if not email:
+                return JsonResponse({'success': False, 'error': 'No email address found'})
+            
+            # Send email to current address
+            subject = 'Email Change Verification - Current Email'
+            body_text = f'You requested to change your email address. Please verify your current email with this code: {code}\n\nThis code will expire in 5 minutes.'
+            body_html = f'''
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Email Change Verification</h2>
+                <p>You requested to change your email address. Please verify your current email with this code:</p>
+                <div style="background: #f8f9fa; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+                    <h1 style="color: #dc3545; font-size: 32px; margin: 0; letter-spacing: 8px;">{code}</h1>
+                </div>
+                <p style="color: #666;">This code will expire in 5 minutes.</p>
+                <p style="color: #666;">If you did not request this change, please contact support immediately.</p>
+            </div>
+            '''
+            
+            resp = send_email(
+                subject=subject,
+                to=[email],
+                body_text=body_text,
+                body_html=body_html,
+                from_name="Barangay Sto. Niño",
+                fail_silently=False
+            )
+            
+            if getattr(resp, 'ok', False):
+                return JsonResponse({'success': True})
+            else:
+                return JsonResponse({'success': False, 'error': 'Failed to resend verification email. Please try again later.'})
+                
+        except Exception as e:
+            logger.error(f"Error resending old email verification code: {str(e)}", exc_info=True)
+            return JsonResponse({'success': False, 'error': 'Failed to resend verification email. Please try again later.'})
+    
+    # Handle clearing old email verification code
+    if request.method == 'POST' and request.POST.get('form_type') == 'clear_old_email_code':
+        from django.http import JsonResponse
+        
+        try:
+            request.session.pop('old_email_verification_code', None)
+            request.session.pop('old_email_verification_code_expiry', None)
+            return JsonResponse({'success': True})
+        except Exception:
+            return JsonResponse({'success': False})
+    
+    # Handle clearing email verification code
+    if request.method == 'POST' and request.POST.get('form_type') == 'clear_email_code':
+        from django.http import JsonResponse
+        
+        try:
+            request.session.pop('email_verification_code', None)
+            request.session.pop('email_verification_code_expiry', None)
+            request.session.pop('new_email_address', None)
+            return JsonResponse({'success': True})
+        except Exception:
+            return JsonResponse({'success': False})
+    
     # Handle personal information update
     if request.method == 'POST' and request.POST.get('form_type') == 'update_personal_info':
         from django.db import DatabaseError, OperationalError, IntegrityError

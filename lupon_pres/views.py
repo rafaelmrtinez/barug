@@ -49,17 +49,32 @@ from common.db_errors import _pg_err_tuple
 
 logger = logging.getLogger(__name__)
 
+def get_user_info(request):
+    """Get user info from session - call this in each view"""
+    auth = request.session.get('auth', {})
+    first_name = (auth.get('first_name', '') or '').strip().title()
+    middle_name = (auth.get('middle_name', '') or '').strip().title()
+    last_name = (auth.get('last_name', '') or '').strip().title()
+    suffix = (auth.get('suffix', '') or '').strip().upper()
+    
+    # Format: "Last Name, First Name Middle Initial Suffix"
+    name_parts = [first_name]
+    if middle_name:
+        name_parts.append(middle_name[0] + '.')  # Middle initial with period
+    if suffix:
+        name_parts.append(suffix)
+    
+    user_fullname = f"{last_name}, {' '.join(name_parts)}"
+    user_role = auth.get('role_name', 'Staff').title()
+    user_role_template = user_role.lower().replace(' ', '_')
+    
+    return user_fullname, user_role, user_role_template
 
 ROLE_LUPON = 8
 WZ_KEY = "lpres_nonres_wizard"
 
 # App/role for guard
 LUPON_PRES_ROLE = "Barangay Lupon President"
-
-# Demo identity (replace with session-context if you wire it later)
-user_fullname = "lname, fname mname suffix"
-user_role = LUPON_PRES_ROLE
-user_role_template = user_role.lower().replace(" ", "_")
 
 STAFF_FILTER_SESSION_KEY = "lupon_pres_member_filters"
 
@@ -446,6 +461,7 @@ def _upload_to_storage_retry(
 # @role_required(LUPON_PRES_ROLE)
 # @nocache
 def staff_selection(request: HttpRequest) -> HttpResponse:
+    user_fullname, user_role, user_role_template = get_user_info(request)
     # Landing selector (Resident vs Non-Resident)
     return render(request, "members/staff_selection.html", {
         "user_fullname": user_fullname,
@@ -763,6 +779,7 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
     except Exception as e:
         flash_system_error(request, "Error loading resident details.", exc=e)
 
+    user_fullname, user_role, user_role_template = get_user_info(request)
     role_form = UpdateInfo()
     sched_form = Schedule()
     proof_form = ResidentProfileform()
@@ -840,6 +857,7 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
         else:
             flash_warning(request, "Please correct the errors below.")
 
+    user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "members/staff_selection_nonresident.html", {
         "user_fullname": user_fullname,
         "user_role": user_role,
@@ -936,6 +954,7 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
         flash_success(request, "Documents loaded for preview. Please review and choose role.")
         return redirect("lupon_pres:staff_selection_non-resident_role_review")
 
+    user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "members/supporting_docs.html", {
         "user_fullname": user_fullname,
         "user_role": user_role,
@@ -974,6 +993,7 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
         if birth_display:
             personal_display["birthdate_display"] = birth_display
 
+        user_fullname, user_role, user_role_template = get_user_info(request)
         return render(request, "members/schedule.html", {
             "user_fullname": user_fullname,
             "user_role": user_role,
@@ -1308,18 +1328,14 @@ def members_list(request: HttpRequest) -> HttpResponse:
         "q": search_term,
     }
 
-    auth = request.session.get("auth") or {}
-    user_role = _auth_role_name(request)
-    _user_fullname = auth.get("full_name") or user_fullname
-    _user_role = auth.get("role_name") or user_role
-    _user_role_template = (_user_role or "").lower().replace(" ", "_")
+    user_fullname, user_role, user_role_template = get_user_info(request)
 
     return render(request, "members/members_list.html", {
-        # "user_fullname": _user_fullname,
-        # "user_role": _user_role,
-        "page_path": f"{_user_role} / Staff List",
+        "user_fullname": user_fullname,
+        "user_role": user_role,
+        "page_path": f"{user_role} / Staff List",
         "page_title": "Staff List",
-        "user_role_template": _user_role_template,
+        "user_role_template": user_role_template,
         "form": form,
         "page_obj": page_obj,
         "total_count": paginator.count,
@@ -1519,8 +1535,11 @@ def member_dets(request: HttpRequest, staff_code: str) -> HttpResponse:
     from .forms import DAY_CHOICES
     day_choices = DAY_CHOICES
 
+    user_fullname, user_role, user_role_template = get_user_info(request)
     form = UpdateInfo()
     return render(request, "members/member_dets.html", {
+        "user_fullname": user_fullname,
+        "user_role": user_role,
         "page_path": f"{user_role} / Staff Details : {staff_code}",
         "page_title": f"Staff Details : {staff_code}",
         "user_role_template": user_role_template,
