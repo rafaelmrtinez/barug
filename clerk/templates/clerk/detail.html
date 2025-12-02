@@ -92,6 +92,18 @@
     <div class="me-auto">
       <div class="fw-bold fs-5">{{ header.request_code }}</div>
       <div class="text-white-50 small">{{ header.created_fmt }}</div>
+      {% if is_business_clearance and business_name %}
+        <div class="mt-2 d-flex align-items-center gap-2 flex-wrap">
+          <span class="badge" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); padding: 6px 12px;">
+            <i class="bi bi-building me-1"></i> {{ business_name|title }}
+          </span>
+          {% if business_id_display %}
+            <span class="badge" style="background: rgba(242,201,76,0.3); border: 1px solid rgba(242,201,76,0.5); padding: 6px 12px;">
+              <i class="bi bi-hash me-1"></i> {{ business_id_display }}
+            </span>
+          {% endif %}
+        </div>
+      {% endif %}
     </div>
     <div class="d-flex flex-column align-items-end gap-2">
       <span class="chip">{{ status_ui.label }}</span>
@@ -134,12 +146,23 @@
                     {% if l.purpose_display %}{{ l.purpose_display }}
                     {% elif l.purpose_label %}{{ l.purpose_label }}
                     {% else %}&mdash;{% endif %}
+                    {% if is_business_renewal %}
+                      <div class="small text-muted mt-1">
+                        <i class="bi bi-calendar-check"></i> {{ renewal_totals.years_count }} year{{ renewal_totals.years_count|pluralize }} 
+                        ({{ renewal_totals.period_type }} up to {{ renewal_totals.period_year }})
+                      </div>
+                    {% endif %}
                   </td>
                   <td class="text-center">{{ l.quantity }}</td>
                   <td class="text-end fw-bold">
-                    ₱{{ l.line_total|floatformat:2 }}
-                    {% if l.is_exempt %}
-                      <span class="badge text-bg-success ms-2">Exempt</span>
+                    {% if is_business_renewal %}
+                      ₱{{ renewal_totals.total_amount|floatformat:2 }}
+                      <div class="small text-muted">{{ renewal_totals.years_count }} year{{ renewal_totals.years_count|pluralize }}</div>
+                    {% else %}
+                      ₱{{ l.line_total|floatformat:2 }}
+                      {% if l.is_exempt %}
+                        <span class="badge text-bg-success ms-2">Exempt</span>
+                      {% endif %}
                     {% endif %}
                   </td>
                 </tr>
@@ -187,6 +210,92 @@
 
         </div>
       </div>
+
+      {% if is_business_renewal and renewal_breakdown %}
+      <!-- Business Renewal Breakdown -->
+      <div class="card card-soft mb-3">
+        <div class="card-body">
+          <div class="section-title mb-3">
+            <span class="dot"></span> Business Renewal Breakdown
+            <span class="badge rounded-pill text-bg-info ms-2">
+              {{ renewal_totals.years_count }} year{{ renewal_totals.years_count|pluralize }}
+            </span>
+          </div>
+
+          <div class="alert alert-info border-0 mb-3" style="background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);">
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-info-circle-fill text-primary"></i>
+              <div class="small">
+                <strong>Multi-Year Renewal:</strong> This request covers {{ renewal_totals.years_count }} unpaid year(s) 
+                up to {{ renewal_totals.period_type }} {{ renewal_totals.period_year }}.
+              </div>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Year</th>
+                  <th>Type</th>
+                  <th class="text-end">Base Fee</th>
+                  <th class="text-end">Surcharge</th>
+                  <th class="text-end">Total</th>
+                  <th class="text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in renewal_breakdown %}
+                <tr>
+                  <td class="fw-semibold">{{ item.year }}</td>
+                  <td>
+                    <span class="badge {% if item.kind == 'CURRENT' %}bg-success-subtle text-success{% else %}bg-warning-subtle text-warning{% endif %}">
+                      {{ item.kind }}
+                    </span>
+                  </td>
+                  <td class="text-end">₱{{ item.base_fee|floatformat:2 }}</td>
+                  <td class="text-end">
+                    {% if item.surcharge > 0 %}
+                      <span class="text-danger">₱{{ item.surcharge|floatformat:2 }}</span>
+                      {% if item.days_late %}
+                        <small class="text-muted d-block">{{ item.days_late }} day{{ item.days_late|pluralize }} late</small>
+                      {% endif %}
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end fw-bold">₱{{ item.total|floatformat:2 }}</td>
+                  <td class="text-center">
+                    <span class="badge bg-warning-subtle text-warning">Unpaid</span>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot class="table-light">
+                <tr>
+                  <td colspan="2" class="fw-bold">TOTAL ({{ renewal_totals.years_count }} year{{ renewal_totals.years_count|pluralize }})</td>
+                  <td class="text-end fw-bold">₱{{ renewal_totals.total_base_fee|floatformat:2 }}</td>
+                  <td class="text-end fw-bold text-danger">₱{{ renewal_totals.total_surcharge|floatformat:2 }}</td>
+                  <td class="text-end fw-bold fs-5 text-primary">₱{{ renewal_totals.total_amount|floatformat:2 }}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div class="alert alert-warning border-0 mt-3 mb-0" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
+            <div class="d-flex align-items-start gap-2">
+              <i class="bi bi-exclamation-triangle-fill text-warning mt-1"></i>
+              <div class="small">
+                <strong>Payment Note:</strong> The treasurer will process a single payment for all {{ renewal_totals.years_count }} year(s) 
+                totaling <strong>₱{{ renewal_totals.total_amount|floatformat:2 }}</strong>. All renewal requests will be marked as paid together.
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      {% endif %}
 
       <!-- Resident / On-behalf + Authorization Letter -->
       <div class="card card-soft mb-3">
@@ -503,9 +612,13 @@
                   </td>
                   <td class="text-center">{{ l.quantity }}</td>
                   <td class="text-end fw-bold">
-                    ₱{{ l.line_total|floatformat:2 }}
-                    {% if l.is_exempt %}
-                      <span class="badge text-bg-success ms-2">Exempt</span>
+                    {% if is_business_renewal %}
+                      ₱{{ renewal_totals.total_amount|floatformat:2 }}
+                    {% else %}
+                      ₱{{ l.line_total|floatformat:2 }}
+                      {% if l.is_exempt %}
+                        <span class="badge text-bg-success ms-2">Exempt</span>
+                      {% endif %}
                     {% endif %}
                   </td>
                 </tr>

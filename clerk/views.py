@@ -671,6 +671,56 @@ def detail(request: HttpRequest, doc_request_id: int):
                 was_marked_paid = True
                 break
 
+    # === NEW: Detect business renewal and extract breakdown ===
+    is_business_renewal = False
+    renewal_breakdown = []
+    renewal_totals = {}
+    is_business_clearance = False
+    business_name = None
+    business_id_display = None
+    
+    try:
+        for l in lines:
+            det = l.get("details") or {}
+            doc_type = (l.get("document_type_name") or "").strip().upper()
+            
+            # Check if this is a business clearance
+            if "BUSINESS" in doc_type and "CLEARANCE" in doc_type:
+                is_business_clearance = True
+                
+                # Try to get business info from header first
+                bid = header.get("business_id")
+                if bid:
+                    business_id_display = f"{int(bid):06d}"
+                    try:
+                        # Fetch business name
+                        bq = supabase.table("business").select("business_name").eq("business_id", bid).limit(1).execute()
+                        b = (bq.data or [None])[0] or {}
+                        business_name = b.get("business_name")
+                    except Exception as e:
+                        print(f"[clerk detail] Error fetching business name: {e}")
+            
+            # Check if this is a business clearance with renewal data
+            if det.get("renewal_breakdown") and det.get("years_count"):
+                is_business_renewal = True
+                renewal_breakdown = det.get("renewal_breakdown", [])
+                renewal_totals = {
+                    "total_base_fee": det.get("total_base_fee", 0),
+                    "total_surcharge": det.get("total_surcharge", 0),
+                    "total_amount": det.get("total_amount", 0),
+                    "years_count": det.get("years_count", 0),
+                    "period_type": det.get("period_type", ""),
+                    "period_year": det.get("period_year", ""),
+                }
+                
+                # Override the header amount_due with the actual total from renewal breakdown
+                header["amount_due"] = det.get("total_amount", 0)
+                print(f"[clerk detail] Business renewal detected: {renewal_totals['years_count']} year(s), total: ₱{renewal_totals['total_amount']:.2f}")
+                break
+    except Exception as e:
+        print(f"[clerk detail] Error extracting renewal breakdown: {e}")
+        pass
+
     user_role = _auth_role_name(request)
     return render(request, "clerk/detail.html", {
         "page_path": f"{user_role} / Document Requests / Request Detail",
@@ -685,7 +735,13 @@ def detail(request: HttpRequest, doc_request_id: int):
         "ctc_ref_request_id": ctc_ref_request_id,
         "ctc_ref_code": ctc_ref_code,
         "auth_links": auth_links,
-        "was_marked_paid": was_marked_paid,  # <-- used by the template
+        "was_marked_paid": was_marked_paid,
+        "is_business_renewal": is_business_renewal,
+        "renewal_breakdown": renewal_breakdown,
+        "renewal_totals": renewal_totals,
+        "is_business_clearance": is_business_clearance,
+        "business_name": business_name,
+        "business_id_display": business_id_display,
     })
 
 # ────────────────────────────────────────────────────────────
@@ -1602,6 +1658,7 @@ def walkin_new(request: HttpRequest):
     prefill_resident = None
     if business_id:
         try:
+            print(f"[WALKIN PREFILL] Fetching business data for business_id={business_id}", flush=True)
             # Get business and owner data
             bq = (
                 supabase.table("business")
@@ -1611,8 +1668,10 @@ def walkin_new(request: HttpRequest):
                 .execute()
             )
             biz = (bq.data or [None])[0]
+            print(f"[WALKIN PREFILL] Business data: {biz}", flush=True)
             if biz and biz.get("business_owner_id"):
                 owner_id = biz["business_owner_id"]
+                print(f"[WALKIN PREFILL] Owner ID: {owner_id}", flush=True)
                 
                 # Try to get owner from person table (resident)
                 oq = (
@@ -1622,10 +1681,14 @@ def walkin_new(request: HttpRequest):
                     .limit(1)
                     .execute()
                 )
+                print(f"[WALKIN PREFILL] Person query result: {oq.data}", flush=True)
+                print(f"[WALKIN PREFILL] Person query result: {oq.data}", flush=True)
                 owner = (oq.data or [None])[0]
+                print(f"[WALKIN PREFILL] Owner from person table: {owner}", flush=True)
                 
                 # If not found in person, try business_owner_info (non-resident)
                 if not owner:
+                    print(f"[WALKIN PREFILL] Not found in person table, trying business_owner_info", flush=True)
                     boi = (
                         supabase.table("business_owner_info")
                         .select("person_id, first_name, last_name, middle_name, suffix, email, mobile_number")
@@ -1633,10 +1696,12 @@ def walkin_new(request: HttpRequest):
                         .limit(1)
                         .execute()
                     )
+                    print(f"[WALKIN PREFILL] Business owner info query result: {boi.data}", flush=True)
                     owner = (boi.data or [None])[0]
                     if owner:
                         # Add person_code as None for non-residents
                         owner["person_code"] = None
+                        print(f"[WALKIN PREFILL] Found non-resident owner: {owner}", flush=True)
                 
                 if owner:
                     prefill_resident = owner
@@ -1644,6 +1709,10 @@ def walkin_new(request: HttpRequest):
                         "business_id": business_id,
                         "business_name": biz.get("business_name"),
                     }
+                    print(f"[WALKIN PREFILL] Prefill data set: {prefill_data}", flush=True)
+                    print(f"[WALKIN PREFILL] Prefill resident set: {prefill_resident}", flush=True)
+                else:
+                    print(f"[WALKIN PREFILL] Owner not found in either table", flush=True)
         except Exception as e:
             print(f"[walkin_new] Failed to prefill business data: {e}", flush=True)
 
@@ -3687,7 +3756,7 @@ def business_information(
         show_summary_cta = True
         # summary_cta_href = renewal_href
         cta_mode = "selector"
-        summary_cta_label = "Create Renewal Request"
+        summary_cta_label = "Choose Action"
     else:
         # Fallback: show renewal CTA for other non-active statuses
         show_summary_cta = True
@@ -3934,7 +4003,7 @@ def create_renewal_request(
                 # Track if document request was created
                 created_doc_request_id = None
                 
-                # Create document request for business clearance for the most recent renewal
+                # Create document request for business clearance with total calculation
                 try:
                     dto = business_info.execute_by_business_id(business_id)
                     owner = dict(dto.owner or {})
@@ -3960,20 +4029,57 @@ def create_renewal_request(
                             else:
                                 purpose_id = purpose_res.data[0].get("document_purpose_id")
                                 
-                                # Create document request for the newest renewal
+                                # Fetch renewal quote for all unpaid years
+                                print(f"[create_renewal_request] Calculating fees for all unpaid years up to {period_year}")
+                                grand_total, quote_rows, paid_rows = renewal_quote_svc.execute(business_id, period_year)
+                                
+                                # Build breakdown for display
+                                renewal_breakdown = []
+                                total_base = 0.0
+                                total_surcharge = 0.0
+                                total_amount = 0.0
+                                
+                                for row in quote_rows:
+                                    if not row.is_paid:  # Only include unpaid years
+                                        base_fee = float(row.base_fee or 0)
+                                        surcharge = float(row.surcharge or 0)
+                                        total = float(row.total or 0)
+                                        
+                                        renewal_breakdown.append({
+                                            "year": row.item_year,
+                                            "base_fee": base_fee,
+                                            "surcharge": surcharge,
+                                            "total": total,
+                                            "kind": row.kind,
+                                            "deadline": str(row.deadline) if row.deadline else None,
+                                            "days_late": row.days_late,
+                                        })
+                                        
+                                        total_base += base_fee
+                                        total_surcharge += surcharge
+                                        total_amount += total
+                                
+                                print(f"[create_renewal_request] Calculated total: ₱{total_amount:.2f} for {len(renewal_breakdown)} year(s)")
+                                
+                                # Create document request with calculated totals
                                 newest_renewal_id = new_ids[0]
                                 bc_details = _fetch_business_clearance_fields(business_id, owner_person_id)
-                                bc_details["renewal_request_id"] = newest_renewal_id
+                                bc_details["renewal_request_ids"] = new_ids  # Store ALL renewal IDs
                                 bc_details["period_type"] = period_type
                                 bc_details["period_year"] = period_year
+                                bc_details["renewal_breakdown"] = renewal_breakdown
+                                bc_details["total_base_fee"] = total_base
+                                bc_details["total_surcharge"] = total_surcharge
+                                bc_details["total_amount"] = total_amount
+                                bc_details["years_count"] = len(renewal_breakdown)
                                 
-                                print(f"[create_renewal_request] Creating document request with params: business_id={business_id}, purpose_id={purpose_id}, renewal_id={newest_renewal_id}")
+                                print(f"[create_renewal_request] Creating document request with breakdown for {len(new_ids)} renewal(s)")
                                 
                                 rpc_params = {
                                     "p_requester_person_id": owner_person_id,
                                     "p_subject_person_id": owner_person_id,
                                     "p_business_id": business_id,
-                                    "p_purpose_notes": f"Business renewal for {period_type} {period_year}",
+                                    "p_purpose_notes": f"Business renewal for {len(renewal_breakdown)} year(s) - {period_type} up to {period_year}",
                                     "p_lines": [
                                         {
                                             "document_purpose_id": purpose_id,
@@ -3991,15 +4097,16 @@ def create_renewal_request(
                                 if doc_res.data:
                                     doc_request_id = doc_res.data if isinstance(doc_res.data, int) else (doc_res.data[0] if isinstance(doc_res.data, list) else doc_res.data.get("doc_request_id"))
                                     
-                                    print(f"[create_renewal_request] Linking renewal {newest_renewal_id} to document {doc_request_id}")
+                                    print(f"[create_renewal_request] Linking ALL {len(new_ids)} renewal(s) to document {doc_request_id}")
                                     
-                                    # Link renewal request to document request
-                                    supabase.table("renewal_request").update({"doc_request_id": doc_request_id}).eq("renewal_request_id", newest_renewal_id).execute()
+                                    # Link ALL renewal requests to this document request
+                                    for renewal_id in new_ids:
+                                        supabase.table("renewal_request").update({"doc_request_id": doc_request_id}).eq("renewal_request_id", renewal_id).execute()
                                     
                                     messages.success(
                                         request,
-                                        f"Created {len(new_ids)} renewal request(s) for unpaid years up to {period_type} {period_year}: [{ids_str}]. "
-                                        f"Document request #{doc_request_id} created for business clearance (status: FOR_TREASURER_REVIEW)."
+                                        f"Created {len(new_ids)} renewal request(s) for unpaid years up to {period_type} {period_year}. "
+                                        f"Total amount: ₱{total_amount:,.2f}. Document request #{doc_request_id} created."
                                     )
                                     
                                     # Store doc_request_id for redirect
@@ -4102,12 +4209,14 @@ def create_renewal_request(
                 except Exception:
                     pass
 
-            # Redirect to document request detail if created, otherwise back to business info
+            # ALWAYS redirect to document request detail if created
             if created_doc_request_id:
-                print(f"[create_renewal_request] Redirecting to document request detail (doc_request_id={created_doc_request_id})", flush=True)
+                print(f"[create_renewal_request] Redirecting to clerk detail view (doc_request_id={created_doc_request_id})", flush=True)
                 return redirect("clerk:detail", doc_request_id=created_doc_request_id)
             else:
-                print(f"[create_renewal_request] Redirecting to business_information(b_id={business_id})", flush=True)
+                # Fallback: redirect back to business info if document creation failed
+                print(f"[create_renewal_request] Document not created, redirecting to business_information(b_id={business_id})", flush=True)
+                messages.warning(request, "Renewal requests created but document request failed. Please contact support.")
                 return redirect("clerk:business_information", b_id=business_id)
 
         except Exception as e:
