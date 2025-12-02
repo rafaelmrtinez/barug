@@ -1620,7 +1620,7 @@ def staff_account_requests_list(request: HttpRequest) -> HttpResponse:
             sid = int(sid) if sid is not None else None
         except (TypeError, ValueError):
             sid = None
-        if sid == 29 or "WAITING FOR BARANGAY CAPTAIN" in name or "WAITING FOR BARANGAY SECRETARY" in name:
+        if sid == 29 or sid == 47 or "WAITING FOR BARANGAY CAPTAIN" in name or "WAITING FOR BARANGAY SECRETARY" in name:
             filtered.append(r)
 
     # Apply filters

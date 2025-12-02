@@ -64,7 +64,7 @@
                 </div>
                 <div class="mb-0">
                   {% with s=profile.latest_request_status_name|default_if_none:"" i=profile.latest_request_status_id %}
-                  <span class="badge px-2 py-1 rounded-pill {% if i == 46 or s|upper == 'WAITING FOR ID VALIDATION' %}bg-info text-secondary{% elif i == 29 or s|upper == 'WAITING FOR BARANGAY CAPTAIN\'S APPROVAL' %}bg-primary{% elif i == 30 or s|upper == 'WAITING FOR ADMIN\'S APPROVAL' %}bg-info{% elif i == 30 or s|upper == 'APPROVED' %}bg-success{% elif i == 4 or s|upper == 'REJECTED' %}bg-danger{% else %}bg-warning text-dark{% endif %}" style="font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">{{ s|default_if_none:"PENDING" }}</span>
+                  <span class="badge px-2 py-1 rounded-pill {% if i == 46 or s|upper == 'WAITING FOR ID VALIDATION' %}bg-info text-secondary{% elif i == 29 or s|upper == 'WAITING FOR BARANGAY CAPTAIN\'S APPROVAL' %}bg-primary{% elif i == 30 or s|upper == 'WAITING FOR ADMIN\'S APPROVAL' %}bg-info{% elif i == 3 or s|upper == 'APPROVED' %}bg-success{% elif i == 4 or s|upper == 'REJECTED' %}bg-danger{% else %}bg-warning text-dark{% endif %}" style="font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">{{ s|default_if_none:"PENDING" }}</span>
                   {% endwith %}
                 </div>
               </div>
@@ -392,7 +392,7 @@
                     <textarea name="remarks" class="form-control border-0 shadow-sm" rows="2" placeholder="Please provide a reason for rejection..." style="resize: none; background: white;"></textarea>
                   </div>
                 </div>
-              {% elif profile.latest_request_status_id == 30 and profile.latest_request_status_name|upper == 'APPROVED' %}
+              {% elif profile.latest_request_status_id == 3 and profile.latest_request_status_name|upper == 'APPROVED' %}
                 <div class="text-center p-3">
                   <div class="alert alert-success border-0 mb-3" style="background: #d1e7dd;">
                     {% bs_icon 'check-circle-fill' color='#0f5132' size='1.5em' %}
@@ -491,7 +491,7 @@
     if (choice === 'approve') {
       segApprove.classList.add('active');
       segApprove.setAttribute('aria-pressed', 'true');
-      statusEl.value = '30';
+      statusEl.value = '3';
       remarksBox.classList.add('d-none');
     } else if (choice === 'reject') {
       segReject.classList.add('active');
@@ -510,7 +510,7 @@
   submitBtn.addEventListener('click', function() {
     if (submitBtn.disabled) return;
     
-    const decision = statusEl.value === '30' ? 'approve' : 'reject';
+    const decision = statusEl.value === '3' ? 'approve' : 'reject';
     const message = decision === 'approve' 
       ? 'Are you sure you want to approve this staff account request?' 
       : 'Are you sure you want to reject this staff account request?';

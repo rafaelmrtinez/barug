@@ -50,7 +50,7 @@ from staff_admin.models import Admin
 logger = logging.getLogger(__name__)
 
 ADMIN_ROLE = "Admin"
-REQUEST_STATUS_APPROVED = 30
+REQUEST_STATUS_APPROVED = 3
 REQUEST_STATUS_REJECTED = 4
 WAITING_FOR_ADMIN = 30
 
