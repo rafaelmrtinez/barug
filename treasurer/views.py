@@ -1091,6 +1091,33 @@ def business_detail(request: HttpRequest, business_id: int, doc_request_id: int)
         None
     )
 
+    # === NEW: Detect business renewal and override amount_due ===
+    is_business_renewal = False
+    renewal_totals = {}
+    
+    try:
+        for l in lines:
+            det = l.get("details") or {}
+            # Check if this is a business clearance with renewal data
+            if det.get("renewal_breakdown") and det.get("years_count"):
+                is_business_renewal = True
+                renewal_totals = {
+                    "total_base_fee": det.get("total_base_fee", 0),
+                    "total_surcharge": det.get("total_surcharge", 0),
+                    "total_amount": det.get("total_amount", 0),
+                    "years_count": det.get("years_count", 0),
+                    "period_type": det.get("period_type", ""),
+                    "period_year": det.get("period_year", ""),
+                }
+                
+                # Override the header amount_due with the actual total from renewal breakdown
+                header["amount_due"] = det.get("total_amount", 0)
+                print(f"[treasurer business_detail] Business renewal detected: {renewal_totals['years_count']} year(s), total: ₱{renewal_totals['total_amount']:.2f}")
+                break
+    except Exception as e:
+        print(f"[treasurer business_detail] Error extracting renewal breakdown: {e}")
+        pass
+
     user_role = _auth_role_name(request)
     return render(request, "treasurer/business_details.html", {
         'page_path': f'{user_role} / Business Details',
@@ -1113,6 +1140,8 @@ def business_detail(request: HttpRequest, business_id: int, doc_request_id: int)
         "ctc_ref_request_id": ctc_ref_request_id,
         "ctc_ref_header": ctc_ref_header,
         "ctc_ref_lines": ctc_ref_lines,
+        "is_business_renewal": is_business_renewal,
+        "renewal_totals": renewal_totals,
     })
 
 
@@ -1179,6 +1208,112 @@ def business_pay_and_print(request: HttpRequest, business_id: int, doc_request_i
     except Exception as e:
         print(f"[PAY DEBUG] Business flag FAILED: {e}")
         messages.warning(request, f"Payment ok, but failed to set business flag: {escape(str(getattr(e,'message',e)))}")
+
+    # Update business status to ACTIVE after successful renewal payment
+    try:
+        print(f"[PAY DEBUG] Updating business status to ACTIVE for business_id={business_id}")
+        update_res = (
+            supabase.table("business")
+            .update({"business_status_id": 1})  # 1 = ACTIVE
+            .eq("business_id", business_id)
+            .execute()
+        )
+        print(f"[PAY DEBUG] Business status update result: {update_res.data}, error: {getattr(update_res, 'error', None)}")
+        messages.success(request, "Business status updated to ACTIVE.")
+    except Exception as e:
+        print(f"[PAY DEBUG] Business status update FAILED: {e}")
+        messages.warning(request, f"Payment ok, but failed to update business status: {escape(str(getattr(e,'message',e)))}")
+
+    # Mark all renewal requests as PAID
+    try:
+        print(f"[PAY DEBUG] Fetching renewal request IDs from document details")
+        # Fetch the document bundle to get line details
+        try:
+            bundle = fetch_detail_bundle(doc_request_id)
+            lines = bundle.get("lines") or []
+        except Exception as e:
+            print(f"[PAY DEBUG] Failed to fetch bundle: {e}")
+            lines = []
+        
+        renewal_request_ids = []
+        if lines:
+            for line in lines:
+                details = line.get("details") or {}
+                ids = details.get("renewal_request_ids", [])
+                if ids:
+                    renewal_request_ids.extend(ids)
+        
+        print(f"[PAY DEBUG] Found renewal request IDs: {renewal_request_ids}")
+        
+        if renewal_request_ids:
+            # Get OR number and payment date for the renewal requests
+            or_number = None
+            paid_on = None
+            try:
+                or_res = supabase.table("official_receipt").select("or_number, created_at").eq("or_id", or_id).single().execute()
+                if or_res.data:
+                    or_number = or_res.data.get("or_number")
+                    paid_on = or_res.data.get("created_at")
+            except Exception as e:
+                print(f"[PAY DEBUG] Could not fetch OR details: {e}")
+            
+            # Fetch renewal request details to get period_year for each
+            renewal_years = {}
+            try:
+                for renewal_id in renewal_request_ids:
+                    rr_res = supabase.table("renewal_request").select("period_year").eq("renewal_request_id", renewal_id).single().execute()
+                    if rr_res.data:
+                        renewal_years[renewal_id] = rr_res.data.get("period_year")
+            except Exception as e:
+                print(f"[PAY DEBUG] Could not fetch renewal request years: {e}")
+            
+            # Update all renewal requests to PAID
+            for renewal_id in renewal_request_ids:
+                try:
+                    update_data = {
+                        "paid": True,
+                        "or_id": or_id,
+                    }
+                    if or_number:
+                        update_data["or_number"] = or_number
+                    if paid_on:
+                        update_data["paid_on"] = paid_on
+                    
+                    renewal_update = (
+                        supabase.table("renewal_request")
+                        .update(update_data)
+                        .eq("renewal_request_id", renewal_id)
+                        .execute()
+                    )
+                    print(f"[PAY DEBUG] Marked renewal_request_id {renewal_id} as PAID with OR {or_number}")
+                    
+                    # Also update business_clearance_status_record for paid history
+                    period_year = renewal_years.get(renewal_id)
+                    if period_year:
+                        try:
+                            status_update = (
+                                supabase.table("business_clearance_status_record")
+                                .update({
+                                    "or_number": or_number,
+                                    "paid_on": paid_on
+                                })
+                                .eq("business_id", business_id)
+                                .eq("period_year", period_year)
+                                .eq("period_type", "ANNUAL")
+                                .execute()
+                            )
+                            print(f"[PAY DEBUG] Updated business_clearance_status_record for year {period_year}")
+                        except Exception as e:
+                            print(f"[PAY DEBUG] Failed to update business_clearance_status_record for year {period_year}: {e}")
+                except Exception as e:
+                    print(f"[PAY DEBUG] Failed to mark renewal_request_id {renewal_id} as paid: {e}")
+            
+            messages.success(request, f"Marked {len(renewal_request_ids)} renewal request(s) as PAID.")
+    except Exception as e:
+        print(f"[PAY DEBUG] Failed to mark renewal requests as paid: {e}")
+        import traceback
+        print(f"[PAY DEBUG] Traceback: {traceback.format_exc()}")
+        messages.warning(request, f"Payment ok, but failed to mark renewal requests as paid: {escape(str(getattr(e,'message',e)))}")
 
     try:
         print(f"[PAY DEBUG] Marking for printing doc_request_id={doc_request_id}")
