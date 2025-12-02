@@ -91,9 +91,9 @@
   <button type="submit" class="btn btn-brand px-4" id="save-btn">
     <i class="bi bi-save me-1"></i> Save
   </button>
-  <a href="#" class="btn btn-outline-brand px-4">
-    <i class="bi bi-x-circle me-1"></i> Cancel
-  </a>
+  <button type="button" class="btn btn-outline-brand px-4" id="clear-btn">
+    <i class="bi bi-eraser me-1"></i> Clear
+  </button>
 </div>
 </form>
 </div>
@@ -103,5 +103,89 @@
 <script defer src="{% static 'child_health/js/findPerson.js' %}"></script>
 {% comment %} <script defer src="{% static 'child_health/js/fetchParentBasics.js' %}"></script> {% endcomment %}
 <script defer src="{% static 'child_health/js/fetchChildBasics.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const nameField = document.getElementById('id_name');
+  const form = document.getElementById('child-information-form');
+  const clearBtn = document.getElementById('clear-btn');
+  const saveBtn = document.getElementById('save-btn');
+  let isSubmitting = false;
+
+  // Clear all form fields except CSRF token
+  const clearAllFields = () => {
+    // Clear all visible form inputs except CSRF token
+    form.querySelectorAll('input, select, textarea').forEach(field => {
+      // Skip CSRF token field
+      if (field.name === 'csrfmiddlewaretoken') return;
+      
+      if (field.type === 'checkbox' || field.type === 'radio') {
+        field.checked = false;
+      } else {
+        field.value = '';
+      }
+    });
+    
+    // Clear hidden person IDs
+    const childPersonId = document.getElementById('child_person_id');
+    const motherPersonId = document.getElementById('mother_person_id');
+    const fatherPersonId = document.getElementById('father_person_id');
+    
+    if (childPersonId) childPersonId.value = '';
+    if (motherPersonId) motherPersonId.value = '';
+    if (fatherPersonId) fatherPersonId.value = '';
+  };
+
+  // Listen to name field changes
+  if (nameField) {
+    nameField.addEventListener('input', (e) => {
+      // If name field is completely empty, clear all fields
+      if (e.target.value.trim() === '') {
+        clearAllFields();
+      }
+    });
+  }
+
+  // Clear button functionality
+  if (clearBtn) {
+    clearBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (isSubmitting) return; // Prevent action during submission
+      clearAllFields();
+      // Focus back on name field
+      if (nameField) nameField.focus();
+    });
+  }
+
+  // Form submission with button state management
+  if (form && saveBtn) {
+    form.addEventListener('submit', (e) => {
+      if (isSubmitting) {
+        e.preventDefault();
+        return false;
+      }
+
+      isSubmitting = true;
+
+      // Disable save button and show loading state
+      saveBtn.disabled = true;
+      const originalHtml = saveBtn.innerHTML;
+      saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Saving...';
+
+      // Disable clear button during submission
+      if (clearBtn) clearBtn.disabled = true;
+
+      // Re-enable buttons if form validation fails (no actual submit)
+      setTimeout(() => {
+        if (form.checkValidity && !form.checkValidity()) {
+          saveBtn.disabled = false;
+          saveBtn.innerHTML = originalHtml;
+          if (clearBtn) clearBtn.disabled = false;
+          isSubmitting = false;
+        }
+      }, 100);
+    });
+  }
+});
+</script>
 {% endblock %}
 {% endblock %}

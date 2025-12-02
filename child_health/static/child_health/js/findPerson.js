@@ -38,6 +38,10 @@
             }
 
             const parent = nameInput.parentElement;
+            if (!parent) {
+                console.warn(`Parent element not found for input: ${inputId}`);
+                return;
+            }
             if (getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
 
             const dd = document.createElement('div');
