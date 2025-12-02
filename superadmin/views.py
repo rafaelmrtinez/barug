@@ -872,10 +872,12 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
                 "sitio_purok": cd.get("purok_sitio") or "",
                 "street":    cd.get("street") or "",
             })
-            flash_success(request, "Personal information saved.")
+            # flash_success(request, "Personal information saved.")
+            logger.info("Step1 personal info saved to wizard")
             return redirect("superadmin:staff_selection_nonres_docs")
         else:
-            flash_warning(request, "Please correct the errors below.")
+            # flash_warning(request, "Please correct the errors below.")
+            logger.error("Validation ✗ Form errors: %s", form.errors.as_json())
 
     user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "superadmin/staff/staff_selection_nonresident.html", {
@@ -2350,7 +2352,7 @@ def all_staff_requests_list(request: HttpRequest) -> HttpResponse:
     
     try:
         requests = Admin.get_staff_account_req_list_by_all()
-        stats_data = Admin.get_staff_request_statistics()
+        stats_data = Admin.get_staff_request_statistics() 
         stats = stats_data[0] if stats_data else {
             'total_requests': 0, 'pending_requests': 0, 'approved_requests': 0, 'rejected_requests': 0
         }

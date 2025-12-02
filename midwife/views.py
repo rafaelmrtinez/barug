@@ -1459,13 +1459,13 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
                 "sitio_purok": cd.get("purok_sitio") or "",
                 "street":    cd.get("street") or "",
             })
-            flash_success(request, "Personal information saved successfully.")
+            # flash_success(request, "Personal information saved successfully.")
             logger.info("Step1 ✓ personal info saved to wizard")
             return redirect("midwife:staff_selection_non-resident_docs")
         else:
             # Keep same logic: show validation message; do not expose internals
             logger.error("Validation ✗ Form errors: %s", form.errors.as_json())
-            flash_warning(request, "Please correct the errors below.")
+            # flash_warning(request, "Please correct the errors below.")
             # fall-through to re-render with form errors
 
     user_fullname, user_role, user_role_template = get_user_info(request)
