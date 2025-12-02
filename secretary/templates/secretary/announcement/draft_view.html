@@ -2,173 +2,496 @@
 {% load static %}
 
 {% block css %}
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
 <style>
+  .draft-view-container {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .main-card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .card-header {
+    background: linear-gradient(135deg, #6d2932 0%, #8a3a47 100%);
+    color: white;
+    padding: 1.5rem;
+    border-bottom: none;
+  }
+
+  .card-header h5 {
+    font-weight: 600;
+    font-size: 1.5rem;
+    margin-bottom: 0;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .content-section {
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #e9ecef;
+  }
+
+  .content-body {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    min-height: 200px;
+    line-height: 1.8;
+    border-left: 4px solid #6d2932;
+  }
+
+  .info-card {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 8px;
+    padding: 1rem;
+    border: none;
+    height: 100%;
+  }
+
+  .info-card-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .info-card-icon.publish {
+    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+    color: white;
+  }
+
+  .info-card-icon.expire {
+    background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+    color: white;
+  }
+
+  .info-card h6 {
+    color: #495057;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.25rem;
+  }
+
+  .info-card p {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #212529;
+    margin: 0;
+  }
+
+  .sidebar-section {
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #e9ecef;
+  }
+
+  .sidebar-section h6 {
+    color: #212529;
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #6d2932;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .audience-item {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    transition: all 0.3s ease;
+  }
+
+  .audience-item:hover {
+    border-color: #6d2932;
+    box-shadow: 0 2px 8px rgba(109, 41, 50, 0.1);
+  }
+
+  .audience-badge {
+    background: linear-gradient(135deg, #6d2932 0%, #8a3a47 100%);
+    color: white;
+    padding: 0.35rem 0.75rem;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+
+  .channel-item {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+  }
+
+  .channel-item:hover {
+    background: #fff;
+    border-color: #6d2932;
+  }
+
+  .channel-item strong {
+    color: #212529;
+    font-size: 0.9rem;
+  }
+
   .channel-chip {
     display: inline-flex;
     align-items: center;
-    gap: .5rem;
-    padding: .25rem .5rem;
-    border-radius: 999px;
-    background: #f1f3f5;
-    margin: .15rem;
-    font-size: .9rem;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #6d2932 0%, #8a3a47 100%);
+    color: white;
+    margin: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
   }
+
   .channel-chip .remove {
     cursor: pointer;
     font-weight: 700;
-    padding: 0 .25rem;
+    padding: 0 0.25rem;
+    transition: transform 0.2s;
   }
 
-  /* small helper to visually hide the form area when collapsed */
-  .hidden { display: none !important; }
+  .channel-chip .remove:hover {
+    transform: scale(1.2);
+  }
 
-  /* spacing for applied channels list */
-  #applied-channels .list-group-item { padding: .5rem .75rem; }
+  .channel-form-card {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    border: 2px dashed #dee2e6;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+  }
+
+  .btn-action {
+    padding: 0.5rem 1.25rem;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #6d2932 0%, #8a3a47 100%);
+    border: none;
+  }
+
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #8a3a47 0%, #6d2932 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(109, 41, 50, 0.3);
+  }
+
+  .btn-outline-primary {
+    color: #6d2932;
+    border-color: #6d2932;
+  }
+
+  .btn-outline-primary:hover {
+    background: #6d2932;
+    border-color: #6d2932;
+    color: white;
+    transform: translateY(-1px);
+  }
+
+  .btn-success {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    border: none;
+  }
+
+  .btn-success:hover {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+  }
+
+  .btn-outline-danger {
+    color: #dc2626;
+    border-color: #dc2626;
+  }
+
+  .btn-outline-danger:hover {
+    background: #dc2626;
+    border-color: #dc2626;
+    color: white;
+  }
+
+  .card-footer {
+    background: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+    padding: 1rem 1.5rem;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: #6c757d;
+  }
+
+  .empty-state i {
+    font-size: 3rem;
+    color: #dee2e6;
+    margin-bottom: 1rem;
+  }
+
+  #selected-channels {
+    min-height: 50px;
+    padding: 0.75rem;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+  }
+
+  .form-select {
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    padding: 0.75rem;
+  }
+
+  .form-select:focus {
+    border-color: #6d2932;
+    box-shadow: 0 0 0 0.2rem rgba(109, 41, 50, 0.25);
+  }
+
+  .hidden { 
+    display: none !important; 
+  }
+
+  @media (max-width: 768px) {
+    .header-actions {
+      width: 100%;
+      margin-top: 1rem;
+    }
+
+    .btn-action {
+      flex: 1;
+      justify-content: center;
+    }
+  }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="page-wrap" style="margin-top: 40px;">
-  <div class="container-fluid pt-3 page-main">
+  <div class="container-fluid pt-3 page-main draft-view-container">
     <div class="row">
       <div class="col-12">
-        <div class="card">
-          <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">{{ draft.announcement_title }}</h5>
-            <div>
-              <a href="{% url 'secretary:announcement_draft_list' %}" class="btn btn-outline-secondary btn-sm me-2">
-                <i class="bi bi-arrow-left"></i> Back to List
-              </a>
-              <!-- Publish Now button -->
-            <button id="publish-now-btn" type="button" class="btn btn-primary btn-sm" onclick="publishNow()">
-              <i class="bi bi-send-fill"></i> Publish Now
-            </button>
-
-            <!-- Schedule button -->
-            <button id="schedule-btn" type="button" class="btn btn-outline-primary btn-sm" onclick="scheduleAnnouncement()">
-              <i class="bi bi-calendar-event"></i> Schedule
-            </button>
-              <!-- Save button (only saves when form visible and channels chosen) -->
-              <button id="save-channels-btn" class="btn btn-success btn-sm" type="button" onclick="saveChannels()" disabled>
-                <i class="bi bi-save"></i> Save Channels
-              </button>
+        <div class="card main-card">
+          <div class="card-header">
+            <div class="d-flex justify-content-between align-items-start flex-wrap">
+              <div>
+                <h5 class="mb-1">
+                  <i class="bi bi-file-earmark-text me-2"></i>{{ draft.announcement_title }}
+                </h5>
+                <small class="text-white-50">
+                  <i class="bi bi-calendar3 me-1"></i>Created: {{ draft.announcement_created_at|date:"M d, Y g:i A" }}
+                </small>
+              </div>
+              <div class="header-actions">
+                <button id="publish-now-btn" type="button" class="btn btn-light btn-action btn-sm" onclick="publishNow()">
+                  <i class="bi bi-send-fill"></i> Publish Now
+                </button>
+                <button id="schedule-btn" type="button" class="btn btn-outline-light btn-action btn-sm" onclick="scheduleAnnouncement()">
+                  <i class="bi bi-calendar-event"></i> Schedule
+                </button>
+              </div>
             </div>
           </div>
 
-          <div class="card-body">
-            <div class="row">
-              <div class="col-md-8">
-                <h6>Content</h6>
-                <div class="border rounded p-3 mb-3" style="background-color: #f8f9fa;">
-                  {{ draft.announcement_body|linebreaks }}
+          <div class="card-body p-4">
+            <div class="row g-4">
+              <div class="col-lg-8">
+                <div class="content-section">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0">
+                      <i class="bi bi-file-text me-2"></i>Announcement Content
+                    </h6>
+                    <a href="{% url 'secretary:announcement_draft_edit' draft.announcement_id %}" 
+                       class="btn btn-outline-primary btn-sm btn-action">
+                      <i class="bi bi-pencil"></i> Update
+                    </a>
+                  </div>
+                  <div class="content-body">
+                    {{ draft.announcement_body|linebreaks }}
+                  </div>
                 </div>
 
-                <div class="row">
+                <div class="row g-3">
                   <div class="col-md-6">
-                    <h6>Publish Date</h6>
-                    <p class="text-muted">
-                      {% if draft.announcement_published_at %}
-                        {{ draft.announcement_published_at|date:"M d, Y g:i A" }}
-                      {% else %}
-                        Not scheduled
-                      {% endif %}
-                    </p>
+                    <div class="info-card">
+                      <div class="info-card-icon publish">
+                        <i class="bi bi-calendar-check"></i>
+                      </div>
+                      <h6>Scheduled For</h6>
+                      <p>
+                        {% if draft.announcement_published_at %}
+                          {{ draft.announcement_published_at|date:"M d, Y" }}<br>
+                          <small class="text-muted">{{ draft.announcement_published_at|date:"g:i A" }}</small>
+                        {% else %}
+                          <span class="text-muted">Not scheduled</span>
+                        {% endif %}
+                      </p>
+                    </div>
                   </div>
                   <div class="col-md-6">
-                    <h6>Expire Date</h6>
-                    <p class="text-muted">
-                      {% if draft.announcement_expire_at %}
-                        {{ draft.announcement_expire_at|date:"M d, Y g:i A" }}
-                      {% else %}
-                        No expiry
-                      {% endif %}
-                    </p>
+                    <div class="info-card">
+                      <div class="info-card-icon expire">
+                        <i class="bi bi-calendar-x"></i>
+                      </div>
+                      <h6>Expires On</h6>
+                      <p>
+                        {% if draft.announcement_expire_at %}
+                          {{ draft.announcement_expire_at|date:"M d, Y" }}<br>
+                          <small class="text-muted">{{ draft.announcement_expire_at|date:"g:i A" }}</small>
+                        {% else %}
+                          <span class="text-muted">No expiry</span>
+                        {% endif %}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div class="col-md-4">
-                <h6>Audiences</h6>
-                {% if audiences %}
-                  <div class="list-group mb-3">
+              <div class="col-lg-4">
+                <div class="sidebar-section">
+                  <h6>
+                    <i class="bi bi-people-fill"></i>Target Audiences
+                  </h6>
+                  {% if audiences %}
                     {% for audience in audiences %}
-                      <div class="list-group-item">
+                      <div class="audience-item">
                         <div class="d-flex justify-content-between align-items-center">
                           <div>
                             <strong>{{ audience.audience_scope_name }}</strong>
                             <br>
-                            <small class="text-muted">{{ audience.inserted_persons }} persons</small>
+                            <small class="text-muted">
+                              <i class="bi bi-person-check me-1"></i>{{ audience.inserted_persons }} recipients
+                            </small>
                           </div>
-                          <span class="badge bg-primary rounded-pill">{{ audience.inserted_persons }}</span>
+                          <span class="audience-badge">{{ audience.inserted_persons }}</span>
                         </div>
                       </div>
                     {% endfor %}
+                  {% else %}
+                    <div class="empty-state">
+                      <i class="bi bi-people"></i>
+                      <p class="mb-0">No audience configured</p>
+                    </div>
+                  {% endif %}
+                  
+                  <div class="mt-3">
+                    <button type="button" 
+                            class="btn btn-outline-primary btn-sm btn-action w-100"
+                            data-bs-toggle="modal"
+                            data-bs-target="#audienceModal">
+                      <i class="bi bi-plus-circle"></i> Add Audience
+                    </button>
                   </div>
-                {% else %}
-                  <p class="text-muted">No audiences added yet.</p>
-                  <a href="{% url 'secretary:announcement_audience_scope' %}?announcement_id={{ draft.announcement_id }}" class="btn btn-outline-primary btn-sm">
-                    <i class="bi bi-plus"></i> Add Audience
-                  </a>
-                {% endif %}
-
-                <hr>
-
-                <h6>Channel Types</h6>
-
-                <!-- Applied channels area (shows existing channels if any) -->
-                <div id="applied-channels" class="mb-3">
-                  <!-- Filled by JS on load -->
                 </div>
 
-                <!-- action buttons: Add or Update; toggled by JS depending on applied channels -->
-                <div id="channel-action-area" class="mb-3">
-                  <button id="add-channels-btn" type="button" class="btn btn-outline-primary btn-sm me-2 hidden">
-                    <i class="bi bi-plus"></i> Add Channel
-                  </button>
-                  <button id="update-channels-btn" type="button" class="btn btn-outline-secondary btn-sm hidden">
-                    <i class="bi bi-pencil"></i> Update Channels
-                  </button>
-                </div>
+                <div class="sidebar-section">
+                  <h6>
+                    <i class="bi bi-broadcast"></i>Delivery Channels
+                  </h6>
 
-                <!-- Channel form area (initially hidden) -->
-                <div id="channel-form-area" class="card p-3 hidden">
-                  <div id="selected-channels" class="mb-3"></div>
+                  <div id="applied-channels" class="mb-3">
+                    <!-- Filled by JS on load -->
+                  </div>
 
-                  <form id="channelForm" onsubmit="return false;">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                      {{ form.channel }}
+                  <div id="channel-action-area" class="mb-3">
+                    <button id="add-channels-btn" type="button" class="btn btn-outline-primary btn-sm btn-action w-100 hidden">
+                      <i class="bi bi-plus-circle"></i> Add Channels
+                    </button>
+                    <button id="update-channels-btn" type="button" class="btn btn-outline-secondary btn-sm btn-action w-100 hidden">
+                      <i class="bi bi-pencil-square"></i> Update Channels
+                    </button>
+                  </div>
+
+                  <div id="channel-form-area" class="hidden">
+                    <div class="channel-form-card">
+                      <div id="selected-channels" class="mb-3">
+                        <small class="text-muted">Selected channels will appear here</small>
+                      </div>
+
+                      <form id="channelForm" onsubmit="return false;">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                          <label class="form-label fw-semibold">
+                            <i class="bi bi-broadcast me-1"></i>Select Channel Type
+                          </label>
+                          {{ form.channel }}
+                        </div>
+
+                        <div class="d-flex gap-2 flex-wrap">
+                          <button type="button" class="btn btn-outline-success btn-sm" onclick="addChannel()">
+                            <i class="bi bi-plus-circle"></i> Add
+                          </button>
+                          <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearChannels()">
+                            <i class="bi bi-x-circle"></i> Clear
+                          </button>
+                          <button id="cancel-channels-btn" type="button" class="btn btn-light btn-sm ms-auto" onclick="hideChannelForm()">
+                            <i class="bi bi-x"></i> Cancel
+                          </button>
+                        </div>
+
+                        <small class="form-text text-muted d-block mt-3">
+                          <i class="bi bi-info-circle me-1"></i>
+                          Add channels and click <strong>Save Channels</strong> to apply.
+                        </small>
+
+                        <div id="save-channels-area" class="mt-3 hidden">
+                          <button id="save-channels-btn" class="btn btn-success btn-sm btn-action w-100" type="button" onclick="saveChannels()">
+                            <i class="bi bi-save"></i> Save Channels
+                          </button>
+                          <small id="save-status" class="text-muted d-block mt-2 text-center"></small>
+                        </div>
+                      </form>
                     </div>
-
-                    <div class="d-flex gap-2 mb-2">
-                      <button type="button" class="btn btn-outline-success btn-sm" onclick="addChannel()">
-                        <i class="bi bi-plus"></i> Add to Selection
-                      </button>
-                      <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearChannels()">
-                        <i class="bi bi-x-circle"></i> Clear Selection
-                      </button>
-
-                      <button id="cancel-channels-btn" type="button" class="btn btn-light btn-sm ms-auto" onclick="hideChannelForm()">
-                        Cancel
-                      </button>
-                    </div>
-
-                    <small class="form-text text-muted mt-2">
-                      Add channel types and click <strong>Save Channels</strong> to persist.
-                    </small>
-                  </form>
+                  </div>
                 </div>
-
               </div>
             </div>
           </div>
 
-          <div class="card-footer d-flex justify-content-between align-items-center">
-            <small class="text-muted">
-              Created: {{ draft.announcement_created_at|date:"M d, Y g:i A" }} |
-              Status: {{ draft.announcement_status_name|default:"Draft" }}
-            </small>
-            <small id="save-status" class="text-muted"></small>
+          <div class="card-footer">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <small class="text-muted">
+                <i class="bi bi-calendar3 me-1"></i>Last updated: {{ draft.updated_at|date:"M d, Y g:i A"|default:draft.announcement_created_at|date:"M d, Y g:i A" }}
+              </small>
+            </div>
           </div>
 
           <!-- data container for JS -->
@@ -199,6 +522,7 @@
   const selectedEl = document.getElementById('selected-channels');
   const selectEl = document.querySelector('select[name="channel"]');
   const saveBtn = document.getElementById('save-channels-btn');
+  const saveChannelsArea = document.getElementById('save-channels-area');
   const saveStatus = document.getElementById('save-status');
 
   // Internal stores
@@ -307,13 +631,15 @@
       appliedChannels = payload.channels || [];
 
       if (!appliedChannels.length) {
-        appliedContainer.innerHTML = '<p class="text-muted">No channels applied yet.</p>';
+        appliedContainer.innerHTML = '<div class="empty-state"><i class="bi bi-broadcast"></i><p class="mb-0">No channels configured</p></div>';
       } else {
         let html = '';
         appliedChannels.forEach(ch => {
-          html += `<div class="list-group-item d-flex justify-content-between align-items-center">
-                     <strong>${escapeHtml(ch.channel_type_name)}</strong>
-                     <span class="btn btn-sm btn-outline-danger remove-applied" data-id="${ch.channel_type_id}" title="Remove channel">&times;</span>
+          html += `<div class="channel-item">
+                     <strong><i class="bi bi-check-circle-fill text-success me-2"></i>${escapeHtml(ch.channel_type_name)}</strong>
+                     <button class="btn btn-sm btn-outline-danger remove-applied" data-id="${ch.channel_type_id}" title="Remove channel">
+                       <i class="bi bi-x-lg"></i>
+                     </button>
                    </div>`;
         });
         appliedContainer.innerHTML = html;
@@ -422,7 +748,13 @@
     updateSaveButtonState();
   };
   window.clearChannels = () => { selectedChannels = []; selectedEl.innerHTML = ''; updateSaveButtonState(); };
-  function updateSaveButtonState() { saveBtn.disabled = selectedChannels.length === 0; }
+  function updateSaveButtonState() { 
+    if (selectedChannels.length > 0) {
+      show(saveChannelsArea);
+    } else {
+      hide(saveChannelsArea);
+    }
+  }
 
   // Save selected channels to server
   window.saveChannels = async () => {
@@ -457,6 +789,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     loadAppliedChannels();
     hide(channelFormArea);
+    hide(saveChannelsArea);
     updateSaveButtonState();
   });
 
@@ -464,6 +797,248 @@
   window.showChannelForm = showChannelForm;
   window.loadAppliedChannels = loadAppliedChannels;
 })();
+
+// Audience Scope Modal Logic
+(function() {
+  let appliedRules = [];
+  
+  function initAudienceModal() {
+    const scopeSelect = document.getElementById('scope');
+    const purokSection = document.getElementById('purok-section');
+    const staffSection = document.getElementById('staff-section');
+    const personSection = document.getElementById('person-section');
+    const rulesList = document.getElementById('rules-list');
+    const addRuleBtn = document.getElementById('add-rule-btn');
+    const saveAudienceBtn = document.getElementById('save-audience-btn');
+    
+    console.log('Initializing audience modal...'); 
+    console.log('Elements found:', {
+      scopeSelect: !!scopeSelect,
+      purokSection: !!purokSection,
+      staffSection: !!staffSection,
+      personSection: !!personSection,
+      rulesList: !!rulesList,
+      addRuleBtn: !!addRuleBtn,
+      saveAudienceBtn: !!saveAudienceBtn
+    });
+    
+    function toggleSections() {
+      if (!scopeSelect) return;
+      const selectedValue = scopeSelect.value;
+      
+      if (purokSection) purokSection.style.display = 'none';
+      if (staffSection) staffSection.style.display = 'none';
+      if (personSection) personSection.style.display = 'none';
+      
+      if (selectedValue === '8' && purokSection) {
+        purokSection.style.display = 'block';
+      } else if (selectedValue === '3' && staffSection) {
+        staffSection.style.display = 'block';
+      } else if (selectedValue === '6' && personSection) {
+        personSection.style.display = 'block';
+      }
+    }
+    
+    function updateRulesList() {
+      if (!rulesList) return;
+      if (appliedRules.length === 0) {
+        rulesList.innerHTML = '<small class="text-muted">No rules added yet</small>';
+      } else {
+        let html = '';
+        appliedRules.forEach((rule, index) => {
+          html += `<div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded" style="background: white;">
+                     <div><strong>${rule.type}</strong>: ${rule.value}</div>
+                     <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeAudienceRule(${index})">
+                       <i class="bi bi-x-lg"></i>
+                     </button>
+                   </div>`;
+        });
+        rulesList.innerHTML = html;
+      }
+      if (saveAudienceBtn) saveAudienceBtn.disabled = appliedRules.length === 0;
+    }
+    
+    window.removeAudienceRule = function(index) {
+      appliedRules.splice(index, 1);
+      updateRulesList();
+    };
+    
+    if (addRuleBtn) {
+      addRuleBtn.addEventListener('click', function() {
+        console.log('Add Rule clicked');
+        console.log('scopeSelect:', scopeSelect);
+        console.log('scopeSelect value:', scopeSelect ? scopeSelect.value : 'null');
+        
+        if (!scopeSelect || !scopeSelect.value || scopeSelect.value === '' || scopeSelect.value === '0') {
+          alert('Please select a scope first');
+          return;
+        }
+        
+        const scopeValue = scopeSelect.value;
+        const scopeText = scopeSelect.options[scopeSelect.selectedIndex].text;
+        
+        console.log('Creating rule with scope:', scopeValue, scopeText);
+        
+        let rule = {
+          scope_id: parseInt(scopeValue),
+          type: scopeText,
+          value: scopeText,
+          role_id: null,
+          purok_id: null,
+          person_ids: null
+        };
+        
+        if (scopeValue === '8' && purokSection && purokSection.style.display !== 'none') {
+          const purokSelect = document.getElementById('purok_sitio');
+          if (purokSelect && purokSelect.value && purokSelect.value !== '0') {
+            rule.purok_id = parseInt(purokSelect.value);
+            rule.value = purokSelect.options[purokSelect.selectedIndex].text;
+          }
+        } else if (scopeValue === '3' && staffSection && staffSection.style.display !== 'none') {
+          const staffSelect = document.getElementById('staff_role');
+          if (staffSelect && staffSelect.value && staffSelect.value !== '0') {
+            rule.role_id = parseInt(staffSelect.value);
+            rule.value = staffSelect.options[staffSelect.selectedIndex].text;
+          }
+        } else if (scopeValue === '6' && personSection && personSection.style.display !== 'none') {
+          const personSelect = document.getElementById('search_person');
+          if (personSelect && personSelect.value) {
+            rule.person_ids = [parseInt(personSelect.value)];
+            rule.value = personSelect.options[personSelect.selectedIndex].text;
+          }
+        }
+        
+        console.log('Rule created:', rule);
+        appliedRules.push(rule);
+        updateRulesList();
+      });
+    } else {
+      console.error('Add Rule button not found!');
+    }
+    
+    if (saveAudienceBtn) {
+      saveAudienceBtn.addEventListener('click', async function() {
+        const announcementId = {{ draft.announcement_id }};
+        
+        if (appliedRules.length === 0) {
+          alert('Please add at least one rule');
+          return;
+        }
+        
+        try {
+          const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+          const response = await fetch('{% url "secretary:save_audience_rules" %}', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': csrfToken,
+              'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+              announcement_id: announcementId,
+              rules: appliedRules
+            })
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            bootstrap.Modal.getInstance(document.getElementById('audienceModal')).hide();
+            window.location.reload();
+          } else {
+            alert('Error: ' + result.error);
+          }
+        } catch (error) {
+          alert('Failed to save audience: ' + error.message);
+        }
+      });
+    }
+    
+    if (scopeSelect) scopeSelect.addEventListener('change', toggleSections);
+    
+    const audienceModal = document.getElementById('audienceModal');
+    if (audienceModal) {
+      audienceModal.addEventListener('hidden.bs.modal', function() {
+        appliedRules = [];
+        updateRulesList();
+        if (scopeSelect) scopeSelect.value = '';
+        toggleSections();
+      });
+    }
+    
+    toggleSections();
+    updateRulesList();
+  }
+  
+  // Initialize when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAudienceModal);
+  } else {
+    initAudienceModal();
+  }
+})();
 </script>
+
+<!-- Audience Scope Modal -->
+<div class="modal fade" id="audienceModal" tabindex="-1" aria-labelledby="audienceModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background: linear-gradient(135deg, #6d2932 0%, #8a3a47 100%); color: white;">
+        <h5 class="modal-title" id="audienceModalLabel">
+          <i class="bi bi-people-fill me-2"></i>Add Audience Scope
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <p class="small text-muted">Add targeting rules to define your audience. You can add multiple rules.</p>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Scope</label>
+            {{ audience_form.scope }}
+          </div>
+
+          <div class="col-md-6" id="purok-section" style="display:none;">
+            <label class="form-label fw-semibold">Purok</label>
+            {{ audience_form.purok_sitio }}
+          </div>
+
+          <div class="col-md-6" id="staff-section" style="display:none;">
+            <label class="form-label fw-semibold">Role</label>
+            {{ audience_form.staff_role }}
+          </div>
+
+          <div class="col-md-6" id="person-section" style="display:none;">
+            <label class="form-label fw-semibold">Person</label>
+            {{ audience_form.search_person }}
+          </div>
+        </div>
+
+        <div class="mt-3">
+          <button type="button" id="add-rule-btn" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-person-plus"></i> Add Rule
+          </button>
+        </div>
+
+        <div class="mt-4">
+          <h6 class="mb-2">Rules Applied</h6>
+          <div id="rules-list" class="border rounded p-3" style="background: #f8f9fa; min-height: 100px;">
+            <small class="text-muted">No rules added yet</small>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-circle"></i> Cancel
+        </button>
+        <button type="button" id="save-audience-btn" class="btn btn-success" disabled>
+          <i class="bi bi-check-lg"></i> Save Audience
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 {% endblock %}

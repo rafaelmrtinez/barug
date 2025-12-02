@@ -2316,7 +2316,8 @@ def announcement_draft_view(
     """View announcement draft details (editable with actions)"""
     user_role = _auth_role_name(request)
 
-    form = AddChannelForm()
+    channel_form = AddChannelForm()
+    audience_form = AudienceScope()
     
     try:
         draft = announcement_service.get_draft_by_id(announcement_id)
@@ -2335,7 +2336,8 @@ def announcement_draft_view(
     return render(request, "secretary/announcement/draft_view.html", {
         'page_path': f'{user_role} / Announcements / View Draft',
         'page_title': f'View Draft: {draft.announcement_title}',
-        'form' : form,
+        'form' : channel_form,
+        'audience_form': audience_form,
         'draft': draft,
         'audiences': audiences,
     })
