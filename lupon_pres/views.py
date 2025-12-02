@@ -951,7 +951,7 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
         }
         _wiz_set(request, "docs", docs_payload)
 
-        flash_success(request, "Documents loaded for preview. Please review and choose role.")
+        # flash_success(request, "Documents loaded for preview. Please review and choose role.")
         return redirect("lupon_pres:staff_selection_non-resident_role_review")
 
     user_fullname, user_role, user_role_template = get_user_info(request)

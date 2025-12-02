@@ -50,7 +50,7 @@ from staff_admin.models import Admin
 logger = logging.getLogger(__name__)
 
 ADMIN_ROLE = "Super Admin"
-REQUEST_STATUS_APPROVED = 30
+REQUEST_STATUS_APPROVED = 3
 REQUEST_STATUS_REJECTED = 4
 WAITING_FOR_ADMIN = 30
 
@@ -982,7 +982,7 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
             flash_system_error(request, "Could not prepare previews.", exc=e)
             return redirect(request.path)
 
-        flash_success(request, "Documents loaded for preview. Please review and choose role.")
+        # flash_success(request, "Documents loaded for preview. Please review and choose role.")
         return redirect("superadmin:staff_selection_nonres_role_review")
 
     user_fullname, user_role, user_role_template = get_user_info(request)

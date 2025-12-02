@@ -17,17 +17,17 @@ def _staff_account_requests_count() -> int:
     sql = """
         SELECT COUNT(*) AS pending_staff_acc_requests
         FROM (
-            SELECT DISTINCT ON (sara.staff_acc_req_id)
-                   sara.staff_acc_req_id,
-                   TRIM(UPPER(rs.request_status_name)) AS status_name
-            FROM staff_acc_req_approval sara
-            JOIN request_status rs
-              ON rs.request_status_id = sara.request_status_id
+            SELECT DISTINCT ON (sar.staff_acc_req_id)
+                   sar.staff_acc_req_id,
+                   COALESCE(sara.request_status_id, 46) AS current_status_id
+            FROM staff_account_req sar
+            LEFT JOIN staff_acc_req_approval sara 
+              ON sar.staff_acc_req_id = sara.staff_acc_req_id
             ORDER BY
-              sara.staff_acc_req_id,
-              sara.staff_acc_req_approval_id DESC
+              sar.staff_acc_req_id,
+              sara.approval_date DESC NULLS LAST
         ) latest
-        WHERE latest.status_name = 'WAITING FOR ADMIN''S APPROVAL'
+        WHERE latest.current_status_id = 30
     """
     return _count_sql(sql)
 
