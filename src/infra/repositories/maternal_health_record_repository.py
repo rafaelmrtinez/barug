@@ -204,9 +204,9 @@ class MaternalHealthRecordRepository(IMaternalHealthRecordRepository):
                 raise MaternalHealthRecordException(e.message) from e
             raise e
 
-    def update_maternal_record_status(self, mhr_id, status_id, staff_id):
-        sql = """SELECT * FROM set_maternal_record_status(%s::INTEGER, %s::INTEGER, %s::INTEGER);"""
-        params = (mhr_id, status_id, staff_id)
+    def update_maternal_record_status(self, mhr_id, status_id, staff_id, p_closing_notes=None):
+        sql = """SELECT * FROM set_maternal_record_status(%s::INTEGER, %s::INTEGER, %s::INTEGER, %s::TEXT);"""
+        params = (mhr_id, status_id, staff_id, p_closing_notes)
         try:
             rows = self.ctx.execute_query(sql, params)
             return rows[0] if rows else None
