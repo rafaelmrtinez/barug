@@ -27,6 +27,7 @@ from django.views.decorators.csrf import csrf_protect as csrf_required
 from django.shortcuts import render, redirect
 from django.views.decorators.http import require_GET, require_http_methods
 from django.views.decorators.csrf import csrf_protect
+from django.db import connection
 from dependency_injector.wiring import inject, Provide
 
 from authentication.guards import session_login_required, role_required
@@ -3475,6 +3476,155 @@ def api_business_pins(
         status=_to_int_or_none(request.GET.get("status")),
     )
     return JsonResponse(pins, safe=False)
+
+
+# -------------------------------
+# BLOTTER CASES (VIEW ONLY)
+# -------------------------------
+
+@session_login_required
+@role_required(SECRETARY_ROLE)
+@nocache
+def blotter_cases(request: HttpRequest):
+    """
+    View-only list of blotter cases for secretary.
+    Similar to lupon_mem case_list but without add/edit capabilities.
+    """
+    user_role = _auth_role_name(request)
+    
+    # Get filter parameters
+    q = (request.GET.get("q") or "").strip()
+    state = (request.GET.get("state") or "").strip()
+    settlement = (request.GET.get("settlement") or "").strip()
+    filed_from = (request.GET.get("filed_from") or "").strip()
+    filed_to = (request.GET.get("filed_to") or "").strip()
+    per_page = int(request.GET.get("per_page") or 10)
+    page = int(request.GET.get("page") or 1)
+    
+    # Build SQL query
+    with connection.cursor() as cur:
+        # Base query
+        sql = """
+            SELECT bc.blotter_case_id,
+                   bc.blotter_case_num,
+                   COALESCE(bc.blotter_case_name, 'Unnamed Case') AS case_name,
+                   bc.date_filed,
+                   bc.time_filed,
+                   COALESCE(cs.case_state_name, 'OPEN') AS case_state,
+                   COALESCE(ss.settlement_status_name, 'PENDING') AS settlement_status,
+                   COALESCE(ct.complaint_title_name, '—') AS complaint_title,
+                   COALESCE(cn.case_name, '—') AS case_nature
+            FROM blotter_case bc
+            LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
+            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+            LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
+            LEFT JOIN case_nature cn ON cn.case_nature_id = bc.case_nature_id
+            WHERE 1=1
+        """
+        params = []
+        
+        # Add filters
+        if q:
+            sql += " AND (bc.blotter_case_num ILIKE %s OR bc.blotter_case_name ILIKE %s)"
+            params.extend([f"%{q}%", f"%{q}%"])
+        
+        if state:
+            sql += " AND UPPER(cs.case_state_name) = UPPER(%s)"
+            params.append(state)
+        
+        if settlement:
+            sql += " AND UPPER(ss.settlement_status_name) = UPPER(%s)"
+            params.append(settlement)
+        
+        if filed_from:
+            sql += " AND bc.date_filed >= %s"
+            params.append(filed_from)
+        
+        if filed_to:
+            sql += " AND bc.date_filed <= %s"
+            params.append(filed_to)
+        
+        sql += " ORDER BY bc.date_filed DESC, bc.blotter_case_id DESC"
+        
+        # Get total count
+        count_sql = f"SELECT COUNT(*) FROM ({sql}) AS subq"
+        cur.execute(count_sql, params)
+        total = cur.fetchone()[0]
+        
+        # Add pagination
+        offset = (page - 1) * per_page
+        sql += f" LIMIT {per_page} OFFSET {offset}"
+        
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+        
+        # Get filter choices
+        cur.execute("SELECT DISTINCT case_state_name FROM case_state ORDER BY case_state_name")
+        state_choices = [r[0] for r in cur.fetchall()]
+        
+        cur.execute("SELECT DISTINCT settlement_status_name FROM settlement_status ORDER BY settlement_status_name")
+        settlement_choices = [r[0] for r in cur.fetchall()]
+    
+    # Calculate pagination
+    total_pages = (total + per_page - 1) // per_page
+    has_prev = page > 1
+    has_next = page < total_pages
+    prev_page = page - 1 if has_prev else 1
+    next_page = page + 1 if has_next else total_pages
+    first_item = offset + 1 if total > 0 else 0
+    last_item = min(offset + per_page, total)
+    
+    # Page numbers for pagination
+    page_numbers = []
+    if total_pages <= 7:
+        page_numbers = list(range(1, total_pages + 1))
+    else:
+        if page <= 4:
+            page_numbers = list(range(1, 6)) + [total_pages]
+        elif page >= total_pages - 3:
+            page_numbers = [1] + list(range(total_pages - 4, total_pages + 1))
+        else:
+            page_numbers = [1] + list(range(page - 1, page + 2)) + [total_pages]
+    
+    # Build query string without page
+    query_parts = []
+    if q:
+        query_parts.append(f"q={q}")
+    if state:
+        query_parts.append(f"state={state}")
+    if settlement:
+        query_parts.append(f"settlement={settlement}")
+    if filed_from:
+        query_parts.append(f"filed_from={filed_from}")
+    if filed_to:
+        query_parts.append(f"filed_to={filed_to}")
+    query_parts.append(f"per_page={per_page}")
+    query_no_page = "&".join(query_parts)
+    
+    return render(request, "secretary/blotter_cases.html", {
+        'page_path': f'{user_role} / Blotter Cases',
+        'page_title': 'Blotter Cases',
+        'rows': rows,
+        'q': q,
+        'state': state,
+        'settlement': settlement,
+        'filed_from': filed_from,
+        'filed_to': filed_to,
+        'per_page': per_page,
+        'page': page,
+        'total': total,
+        'total_pages': total_pages,
+        'has_prev': has_prev,
+        'has_next': has_next,
+        'prev_page': prev_page,
+        'next_page': next_page,
+        'first_item': first_item,
+        'last_item': last_item,
+        'page_numbers': page_numbers,
+        'query_no_page': query_no_page,
+        'state_choices': state_choices,
+        'settlement_choices': settlement_choices,
+    })
 
 
 # -------------------------------

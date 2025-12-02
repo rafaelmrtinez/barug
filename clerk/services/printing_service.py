@@ -170,7 +170,8 @@ def process_printing(doc_request_id: int, include_debug: bool=False) -> Tuple[by
         friendly_applied = friendly_date_text(created_any)
         combined_values["numberfive"] = friendly_applied or _safe_str(created_any)
 
-        combined_values.setdefault("numbersixteen", header.get("captain_name") or "Lourdes R. Ramirez")
+        from .pdf_service import _get_barangay_captain_name
+        combined_values.setdefault("numbersixteen", _get_barangay_captain_name())
         combined_values.setdefault("year_issued", timezone.localtime().strftime("%Y"))
 
         combined_values.setdefault("paid_amount", header.get("paid_amount"))

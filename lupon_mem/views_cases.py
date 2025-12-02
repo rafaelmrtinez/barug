@@ -333,7 +333,7 @@ from lupon_mem.services.fields_util import get_latest_form_fields, get_field_tex
 from datetime import datetime, timedelta
 
 @session_login_required 
-@role_required(*LUPON_ROLES, "barangay treasurer")
+@role_required(*LUPON_ROLES, "barangay treasurer", "barangay secretary")
 def case_detail(request: HttpRequest, case_id: int):
     flow_steps = ['KP-7', 'KP-8', 'KP-9', 'KP-10', 'KP-11', 'KP-12', 'KP-16']
     hearing_window = get_hearing_window(case_id)

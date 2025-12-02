@@ -60,6 +60,9 @@ urlpatterns = [
     # Staff request processing
     path("staff-requests/process/", views.process_staff_request, name="process_staff_request"),
 
+    # BLOTTER CASES (VIEW ONLY)
+    path("blotter-cases/", views.blotter_cases, name="blotter_cases"),
+    
     # INCIDENT HEATMAP
     path("incident-heatmap/", views.incident_heatmap, name="incident_heatmap"),
 
