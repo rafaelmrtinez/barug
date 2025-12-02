@@ -1,0 +1,513 @@
+<style>
+  .announcement-container {
+    width: 100%;
+    max-width: 100%;
+    margin: 2rem 0;
+    padding: 0;
+    position: relative;
+  }
+
+  .announcement-carousel {
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px;
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    width: 100%;
+  }
+
+  .announcement-slides {
+    display: flex;
+    transition: transform 0.5s ease-in-out;
+    width: 100%;
+  }
+
+  .announcement-slide {
+    min-width: 100%;
+    max-width: 100%;
+    flex-shrink: 0;
+    box-sizing: border-box;
+  }
+
+  .announcement-card {
+    background: #ffffff;
+    border: none;
+    overflow: hidden;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .announcement-header {
+    background: linear-gradient(135deg, #6d2932 0%, #8a3a47 100%);
+    color: white;
+    padding: 1.5rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .announcement-icon {
+    width: 48px;
+    height: 48px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+  }
+
+  .announcement-header-text {
+    flex: 1;
+  }
+
+  .announcement-header-text h5 {
+    margin: 0;
+    font-weight: 600;
+    font-size: 1.35rem;
+  }
+
+  .announcement-meta {
+    margin: 0.25rem 0 0 0;
+    font-size: 0.875rem;
+    opacity: 0.9;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .announcement-body {
+    padding: 2rem;
+    padding-bottom: 5rem;
+  }
+
+  .announcement-content {
+    background: #f8f9fa;
+    border-left: 4px solid #6d2932;
+    border-radius: 8px;
+    padding: 1.5rem;
+    line-height: 1.8;
+    color: #212529;
+    font-size: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .announcement-content p:last-child {
+    margin-bottom: 0;
+  }
+
+  .announcement-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .announcement-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .badge-new {
+    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+    color: white;
+  }
+
+  .badge-urgent {
+    background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+    color: white;
+  }
+
+  .badge-info {
+    background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%);
+    color: white;
+  }
+
+  .announcement-date {
+    color: #6c757d;
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  /* Carousel Controls */
+  .carousel-controls {
+    position: absolute;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    display: flex;
+    gap: 0.75rem;
+    z-index: 20;
+  }
+
+  .carousel-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #6d2932;
+    border: none;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 1.25rem;
+    box-shadow: 0 2px 8px rgba(109, 41, 50, 0.3);
+  }
+
+  .carousel-btn:hover:not(:disabled) {
+    background: #8a3a47;
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(109, 41, 50, 0.4);
+  }
+
+  .carousel-btn:disabled {
+    background: rgba(109, 41, 50, 0.4);
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  /* Carousel Indicators */
+  .carousel-indicators {
+    position: absolute;
+    bottom: 1.5rem;
+    left: 1.5rem;
+    display: flex;
+    gap: 0.5rem;
+    z-index: 20;
+  }
+
+  .indicator-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(109, 41, 50, 0.3);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+  }
+
+  .indicator-dot:hover {
+    background: rgba(109, 41, 50, 0.6);
+  }
+
+  .indicator-dot.active {
+    background: #6d2932;
+    width: 28px;
+    border-radius: 5px;
+  }
+
+  .carousel-counter {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    background: rgba(109, 41, 50, 0.9);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    z-index: 20;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  .empty-icon {
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    font-size: 3rem;
+    color: #adb5bd;
+  }
+
+  .empty-state h5 {
+    color: #495057;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .empty-state p {
+    color: #6c757d;
+    margin: 0;
+  }
+
+  @media (max-width: 768px) {
+    .announcement-header {
+      padding: 1.25rem 1.5rem;
+    }
+
+    .announcement-body {
+      padding: 1.5rem;
+      padding-bottom: 5rem;
+    }
+
+    .carousel-controls {
+      bottom: 1rem;
+      right: 1rem;
+      gap: 0.5rem;
+    }
+
+    .carousel-btn {
+      width: 38px;
+      height: 38px;
+      font-size: 1.1rem;
+    }
+
+    .carousel-counter {
+      top: 1rem;
+      right: 1rem;
+      font-size: 0.75rem;
+      padding: 0.35rem 0.75rem;
+    }
+
+    .carousel-indicators {
+      bottom: 1rem;
+      left: 1rem;
+    }
+
+    .indicator-dot.active {
+      width: 20px;
+    }
+  }
+</style>
+
+<div class="announcement-container">
+  <!-- Carousel -->
+  <div class="announcement-carousel">
+    <!-- Counter -->
+    <div class="carousel-counter">
+      <span id="current-slide">1</span> / <span id="total-slides">3</span>
+    </div>
+
+    <!-- Slides Container -->
+    <div class="announcement-slides" id="announcement-slides">
+      
+      <!-- Slide 1 -->
+      <div class="announcement-slide">
+        <div class="announcement-card">
+          <div class="announcement-header">
+            <div class="announcement-icon">
+              <i class="bi bi-megaphone-fill"></i>
+            </div>
+            <div class="announcement-header-text">
+              <h5>Important Community Meeting</h5>
+            </div>
+          </div>
+          <div class="announcement-body">
+            <div class="announcement-content">
+              <p>All residents are invited to attend the monthly community meeting scheduled for this Saturday, December 7, 2025, at 9:00 AM in the barangay hall. Topics include waste management improvements, upcoming events, and budget allocation discussions.</p>
+              <p class="mb-0">Your participation is highly encouraged. Light refreshments will be served.</p>
+            </div>
+            <div class="announcement-footer">
+              <div class="announcement-date">
+                <i class="bi bi-clock"></i>
+                Posted: December 2, 2025 at 10:30 AM
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 2 -->
+      <div class="announcement-slide">
+        <div class="announcement-card">
+          <div class="announcement-header">
+            <div class="announcement-icon">
+              <i class="bi bi-info-circle-fill"></i>
+            </div>
+            <div class="announcement-header-text">
+              <h5>Holiday Schedule Notice</h5>
+            </div>
+          </div>
+          <div class="announcement-body">
+            <div class="announcement-content">
+              <p class="mb-0">Please be informed that the barangay office will be closed on December 25-26, 2025 in observance of the Christmas holiday. Regular operations will resume on December 27, 2025.</p>
+            </div>
+            <div class="announcement-footer">
+              <div class="announcement-date">
+                <i class="bi bi-clock"></i>
+                Posted: November 28, 2025 at 2:15 PM
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Slide 3 -->
+      <div class="announcement-slide">
+        <div class="announcement-card">
+          <div class="announcement-header">
+            <div class="announcement-icon">
+              <i class="bi bi-stars"></i>
+            </div>
+            <div class="announcement-header-text">
+              <h5>New Online Services Available</h5>
+            </div>
+          </div>
+          <div class="announcement-body">
+            <div class="announcement-content">
+              <p>We are pleased to announce that you can now request barangay clearances and certificates online through our new portal. Simply log in to your account and navigate to the Services section.</p>
+              <p class="mb-0">Processing time is 3-5 business days. Payment can be made online or during pickup.</p>
+            </div>
+            <div class="announcement-footer">
+              <div class="announcement-date">
+                <i class="bi bi-clock"></i>
+                Posted: December 1, 2025 at 8:45 AM
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Navigation Controls -->
+    <div class="carousel-controls">
+      <button class="carousel-btn" id="prev-btn" onclick="prevSlide()">
+        <i class="bi bi-chevron-left"></i>
+      </button>
+      <button class="carousel-btn" id="next-btn" onclick="nextSlide()">
+        <i class="bi bi-chevron-right"></i>
+      </button>
+    </div>
+
+    <!-- Indicators -->
+    <div class="carousel-indicators" id="carousel-indicators">
+      <!-- Indicators will be generated by JavaScript -->
+    </div>
+  </div>
+
+  <!-- Empty State (hidden by default) -->
+  <div class="empty-state" style="display: none;" id="empty-state">
+    <div class="empty-icon">
+      <i class="bi bi-inbox"></i>
+    </div>
+    <h5>No Announcements</h5>
+    <p>There are currently no announcements to display.</p>
+  </div>
+</div>
+
+<script>
+  // Carousel functionality
+  let currentSlide = 0;
+  const slides = document.querySelectorAll('.announcement-slide');
+  const totalSlides = slides.length;
+  const slidesContainer = document.getElementById('announcement-slides');
+  const currentSlideEl = document.getElementById('current-slide');
+  const totalSlidesEl = document.getElementById('total-slides');
+  const prevBtn = document.getElementById('prev-btn');
+  const nextBtn = document.getElementById('next-btn');
+  const indicatorsContainer = document.getElementById('carousel-indicators');
+
+  // Initialize
+  function initCarousel() {
+    totalSlidesEl.textContent = totalSlides;
+    
+    // Create indicators
+    for (let i = 0; i < totalSlides; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'indicator-dot';
+      if (i === 0) dot.classList.add('active');
+      dot.onclick = () => goToSlide(i);
+      indicatorsContainer.appendChild(dot);
+    }
+    
+    updateCarousel();
+  }
+
+  function updateCarousel() {
+    // Update slide position
+    slidesContainer.style.transform = `translateX(-${currentSlide * 100}%)`;
+    
+    // Update counter
+    currentSlideEl.textContent = currentSlide + 1;
+    
+    // Update buttons
+    prevBtn.disabled = currentSlide === 0;
+    nextBtn.disabled = currentSlide === totalSlides - 1;
+    
+    // Update indicators
+    document.querySelectorAll('.indicator-dot').forEach((dot, index) => {
+      dot.classList.toggle('active', index === currentSlide);
+    });
+  }
+
+  function nextSlide() {
+    if (currentSlide < totalSlides - 1) {
+      currentSlide++;
+      updateCarousel();
+    }
+  }
+
+  function prevSlide() {
+    if (currentSlide > 0) {
+      currentSlide--;
+      updateCarousel();
+    }
+  }
+
+  function goToSlide(index) {
+    currentSlide = index;
+    updateCarousel();
+  }
+
+  // Auto-advance carousel (optional)
+  let autoAdvance = setInterval(() => {
+    if (currentSlide < totalSlides - 1) {
+      nextSlide();
+    } else {
+      currentSlide = 0;
+      updateCarousel();
+    }
+  }, 8000); // Change slide every 8 seconds
+
+  // Pause auto-advance on hover
+  const carousel = document.querySelector('.announcement-carousel');
+  carousel.addEventListener('mouseenter', () => {
+    clearInterval(autoAdvance);
+  });
+
+  carousel.addEventListener('mouseleave', () => {
+    autoAdvance = setInterval(() => {
+      if (currentSlide < totalSlides - 1) {
+        nextSlide();
+      } else {
+        currentSlide = 0;
+        updateCarousel();
+      }
+    }, 8000);
+  });
+
+  // Keyboard navigation
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') prevSlide();
+    if (e.key === 'ArrowRight') nextSlide();
+  });
+
+  // Initialize on load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCarousel);
+  } else {
+    initCarousel();
+  }
+</script>
