@@ -34,7 +34,7 @@ class MaternalRecordStatusService(IMaternalRecordStatusService):
                     continue
         return int(status_id) in ids
 
-    def update_status(self, mhr_id: int, status_id: int, staff_id: int):
+    def update_status(self, mhr_id: int, status_id: int, staff_id: int, closure_reason: Optional[str] = None):
         # ensure the MHR exists and extract current status id/name
         existing = self.repo.fetch_maternal_health_record_status_by_mhr_id(mhr_id)
         if existing is None:
@@ -110,9 +110,13 @@ class MaternalRecordStatusService(IMaternalRecordStatusService):
             if latest_mhr_id is not None and int(latest_mhr_id) != int(mhr_id):
                 raise ValueError("Archived maternal status can not be opened once another maternal health record is started")
 
+        # Validate closure_reason is always provided
+        if not closure_reason or not closure_reason.strip():
+            raise ValueError("Closure reason is required for all status changes.")
+
         # perform update using repository
         try:
-            return self.repo.update_maternal_record_status(mhr_id, incoming_id, staff_id)
+            return self.repo.update_maternal_record_status(mhr_id, incoming_id, staff_id, closure_reason)
         except MaternalHealthRecordException:
             # re-raise repository/domain-specific exceptions to the caller
             raise

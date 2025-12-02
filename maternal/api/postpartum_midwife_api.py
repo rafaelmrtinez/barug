@@ -79,9 +79,11 @@ class PostpartumFollowupMidwifeAPI(View):
                 p_findings=findings,
                 p_nurse_notes=notes,
             )
-
+            
             if not res:
                 return JsonResponse({'success': False, 'message': 'Failed to update postpartum findings.'}, status=500)
+            
+            complete_visit = repo.complete_postpartum_visit_and_schedule(mhr_id=mhr_id, staff_id=staff_id)
 
             return JsonResponse({'success': True, 'message': 'Postpartum findings updated.'})
 

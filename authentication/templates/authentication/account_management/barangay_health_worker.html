@@ -14,6 +14,9 @@
                     <a class="nav-link dropdown-toggle" href="#" id="healthRecordsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         Health Records
                     </a>
+                    <ul class="dropdown-menu" aria-labelledby="resident_dropdown">
+                        <li><a class="dropdown-item" href="{% url 'maternal:maternal_records' %}">Maternal Health Record</a></li>
+                        <li><a class="dropdown-item" href="{% url 'child_health:child_record_list' %}">Child Health Record</a></li>
                     <ul class="dropdown-menu" aria-labelledby="healthRecordsDropdown">
                         <li><h6 class="dropdown-header">Records Management</h6></li>
                         <li><a class="dropdown-item" href="{% url 'bhw:records' %}"><i class="bi bi-clipboard2-pulse me-2"></i>All Health Records</a></li>
