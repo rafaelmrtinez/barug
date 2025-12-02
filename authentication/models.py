@@ -128,6 +128,28 @@ class Authentication(models.Model):
             raise e
     
     @staticmethod
+    def change_person_email(editor_staff_id, person_id, new_email, reason):
+        """Change person's email address"""
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT change_person_email(%s, %s, %s, %s)", 
+                             [editor_staff_id, person_id, new_email, reason])
+                return cursor.fetchone()[0]
+        except Exception:
+            raise
+    
+    @staticmethod
+    def change_staff_username(editor_staff_id, staff_id, new_username, reason):
+        """Change staff's username"""
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT change_staff_username(%s, %s, %s, %s)", 
+                             [editor_staff_id, staff_id, new_username, reason])
+                return cursor.fetchone()[0]
+        except Exception:
+            raise
+    
+    @staticmethod
     def _to_int_or_none(val):
         """Helper function to convert value to int or None"""
         try:

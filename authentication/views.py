@@ -67,7 +67,7 @@ def _role_home(role_name: str) -> str:
     if is_secy:             return "secretary:dashboard"
     if is_nurse:            return "nurse:dashboard"
     if is_admin:            return "staff_admin:dashboard"     # << NEW
-    if is_super_admin:      return "metrics:health_check"
+    if is_super_admin:      return "superadmin:dashboard"
 
     # NEW: targets for Lupon roles (separate apps)
     if is_lupon_member:     return "lupon_mem:dashboard"

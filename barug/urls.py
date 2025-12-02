@@ -25,6 +25,7 @@ from process_scheduled_deliveries_endpoint import process_scheduled_deliveries
 urlpatterns = [
     path("", auth_view.login, name="login"),
     path("admin/", include("staff_admin.urls", namespace="staff_admin")),
+    path("superadmin/", include("superadmin.urls", namespace="superadmin")),
     path("authentication/", include("authentication.urls", namespace="authentication")),
     path("bhw/", include("bhw.urls", namespace="bhw")),
     path("midwife/", include("midwife.urls", namespace="midwife")),
