@@ -48,6 +48,28 @@ from django.urls import reverse
 from django.shortcuts import redirect
 
 logger = logging.getLogger(__name__)
+
+def get_user_info(request):
+    """Get user info from session - call this in each view"""
+    auth = request.session.get('auth', {})
+    first_name = (auth.get('first_name', '') or '').strip().title()
+    middle_name = (auth.get('middle_name', '') or '').strip().title()
+    last_name = (auth.get('last_name', '') or '').strip().title()
+    suffix = (auth.get('suffix', '') or '').strip().upper()
+    
+    # Format: "Last Name, First Name Middle Initial Suffix"
+    name_parts = [first_name]
+    if middle_name:
+        name_parts.append(middle_name[0] + '.')  # Middle initial with period
+    if suffix:
+        name_parts.append(suffix)
+    
+    user_fullname = f"{last_name}, {' '.join(name_parts)}"
+    user_role = auth.get('role_name', 'Staff').title()
+    user_role_template = user_role.lower().replace(' ', '_')
+    
+    return user_fullname, user_role, user_role_template
+
 from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect, HttpResponsePermanentRedirect, HttpResponseBadRequest
 from django.template.loader import render_to_string
@@ -101,16 +123,8 @@ STAFF_REQ_FILTER_SESSION_KEY = "captain_staff_req_filters"
 
 CAPTAIN_ROLE = "Barangay Captain"
 
-# Demo identity (display only; real values usually come from session)
-user_role = CAPTAIN_ROLE
-
 BUCKET_FINAL = getattr(settings, "SUPABASE_ID_UPLOADS_BUCKET", "id-uploads")
 BUCKET_STAFF_PROOF = getattr(settings, "SUPABASE_STAFF_PROOF_BUCKET", "staff-proof")
-
-
-user_fullname = 'lname fname mname suffix'
-user_role = 'Barangay Captain'
-user_role_template = user_role.lower().replace(' ', '_')
 
 # Create your views here.
 
@@ -422,6 +436,7 @@ def _key_from_personal(personal: dict) -> str:
 @role_required(CAPTAIN_ROLE)
 @nocache
 def staff_selection(request: HttpRequest) -> HttpResponse:
+    user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "staff_selection.html", {
         "user_fullname": user_fullname,
         "user_role": user_role,
@@ -734,6 +749,7 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
     except Exception as e:
         flash_system_error(request, "Error loading resident details.", exc=e)
 
+    user_fullname, user_role, user_role_template = get_user_info(request)
     role_form = ChooseRole()
     sched_form = Schedule()
     proof_form = ResidentProfileform()
@@ -803,13 +819,14 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
                 "sitio_purok": cd.get("purok_sitio") or "",
                 "street":    cd.get("street") or "",
             })
-            flash_success(request, "Personal information saved successfully.")
+            # flash_success(request, "Personal information saved successfully.")
             logger.info("Step1 ✓ personal info saved to wizard")
             return redirect("captain:staff_selection_non-resident_docs")
         else:
             logger.error("Validation ✗ Form errors: %s", form.errors.as_json())
-            flash_warning(request, "Please correct the errors below.")
+            # flash_warning(request, "Please correct the errors below.")
 
+    user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "staff_selection_nonresident.html", {
         "user_fullname": user_fullname,
         "user_role": user_role,
@@ -913,11 +930,12 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
             flash_system_error(request, "Could not prepare previews.", exc=e)
             return redirect(request.path)
 
-        flash_success(request, "Documents loaded for preview. Please review and choose role.")
+        # flash_success(request, "Documents loaded for preview. Please review and choose role.")
         logger.info("Step2 ✓ Preview-only complete (no uploads).")
         return redirect("captain:staff_selection_non-resident_role_review")
 
     # GET
+    user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "supporting_docs.html", {
         "user_fullname": user_fullname,
         "user_role": user_role,
@@ -961,6 +979,7 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
         if birth_display:
             personal_display["birthdate_display"] = birth_display
 
+        user_fullname, user_role, user_role_template = get_user_info(request)
         return render(
             request,
             "role.html",
@@ -1315,19 +1334,15 @@ def staff_list(request: HttpRequest) -> HttpResponse:
 
     clear_filters_url = f"{request.path}?clear_filters=1"
 
-    auth = request.session.get("auth") or {}
-    _user_fullname = auth.get("full_name") or user_fullname
-    _user_role = auth.get("role_name") or user_role
-    _user_role_template = (_user_role or "").lower().replace(" ", "_")
-
+    user_fullname, user_role, user_role_template = get_user_info(request)
     current_filters = filters_state
 
     return render(request, "staff_list.html", {
-        "user_fullname": _user_fullname,
-        "user_role": _user_role,
-        "page_path": f"{_user_role} / Staff List",
+        "user_fullname": user_fullname,
+        "user_role": user_role,
+        "page_path": f"{user_role} / Staff List",
         "page_title": "Staff List",
-        "user_role_template": _user_role_template,
+        "user_role_template": user_role_template,
         "form": form,
         "page_obj": page_obj,
         "total_count": paginator.count,
@@ -1417,6 +1432,7 @@ def staff_dets(request, staff_code: str):
             {"src": _img(p.get("selfie_img_path")),         "label": "Selfie w/ ID"},
         ]
 
+    user_fullname, user_role, user_role_template = get_user_info(request)
     ctx = {
         "user_fullname": user_fullname,
         "user_role": user_role,
@@ -1587,6 +1603,7 @@ def staff_account_requests_list(request: HttpRequest) -> HttpResponse:
 
     current_filters = filters_state
 
+    user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "staff_account_req.html", {
         "user_fullname": user_fullname,
         "user_role": user_role,
@@ -1628,6 +1645,7 @@ def pending_staff_dets(request, p_staff_acc_req_id: str):
             {"src": _img(p.get("selfie_img_path")),         "label": "Selfie w/ ID"},
         ]
 
+    user_fullname, user_role, user_role_template = get_user_info(request)
     ctx = {
         "user_fullname": user_fullname,
         "user_role": user_role,

@@ -773,6 +773,129 @@ console.log('Account settings JS loaded');
     startResendTimer();
   });
   
+  // Initialize timers for username verification modal
+  document.getElementById('usernameVerificationModal')?.addEventListener('shown.bs.modal', function() {
+    let usernameExpiryTime = 300;
+    let usernameResendTime = 60;
+    document.getElementById('username_code1').focus();
+    
+    // Start expiry timer
+    const usernameExpiryTimer = setInterval(() => {
+      const minutes = Math.floor(usernameExpiryTime / 60);
+      const seconds = usernameExpiryTime % 60;
+      document.getElementById('username-expiry-timer').textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      
+      if (usernameExpiryTime <= 0) {
+        clearInterval(usernameExpiryTimer);
+        document.getElementById('username-verification-message').textContent = 'Code has expired. Please request a new code.';
+        document.getElementById('username-verification-message').style.display = 'block';
+        document.getElementById('verify-username-code').disabled = true;
+        
+        for (let i = 1; i <= 6; i++) {
+          document.getElementById(`username_code${i}`).disabled = true;
+        }
+      }
+      usernameExpiryTime--;
+    }, 1000);
+    
+    // Start resend timer
+    const usernameResendBtn = document.getElementById('resend-username-code');
+    const usernameResendTimerElement = document.getElementById('username-resend-timer');
+    
+    const usernameResendTimer = setInterval(() => {
+      usernameResendTimerElement.textContent = usernameResendTime;
+      
+      if (usernameResendTime <= 0) {
+        clearInterval(usernameResendTimer);
+        usernameResendBtn.disabled = false;
+        usernameResendBtn.innerHTML = '<small>Resend code</small>';
+      }
+      usernameResendTime--;
+    }, 1000);
+  });
+  
+  // Initialize timers for old email verification modal
+  document.getElementById('oldEmailVerificationModal')?.addEventListener('shown.bs.modal', function() {
+    let oldEmailExpiryTime = 300;
+    let oldEmailResendTime = 60;
+    document.getElementById('old_email_code1').focus();
+    
+    // Start expiry timer
+    const oldEmailExpiryTimer = setInterval(() => {
+      const minutes = Math.floor(oldEmailExpiryTime / 60);
+      const seconds = oldEmailExpiryTime % 60;
+      document.getElementById('old-email-expiry-timer').textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      
+      if (oldEmailExpiryTime <= 0) {
+        clearInterval(oldEmailExpiryTimer);
+        document.getElementById('old-email-verification-message').textContent = 'Code has expired. Please request a new code.';
+        document.getElementById('old-email-verification-message').style.display = 'block';
+        document.getElementById('verify-old-email-code').disabled = true;
+        
+        for (let i = 1; i <= 6; i++) {
+          document.getElementById(`old_email_code${i}`).disabled = true;
+        }
+      }
+      oldEmailExpiryTime--;
+    }, 1000);
+    
+    // Start resend timer
+    const oldEmailResendBtn = document.getElementById('resend-old-email-code');
+    const oldEmailResendTimerElement = document.getElementById('old-email-resend-timer');
+    
+    const oldEmailResendTimer = setInterval(() => {
+      oldEmailResendTimerElement.textContent = oldEmailResendTime;
+      
+      if (oldEmailResendTime <= 0) {
+        clearInterval(oldEmailResendTimer);
+        oldEmailResendBtn.disabled = false;
+        oldEmailResendBtn.innerHTML = '<small>Resend code</small>';
+      }
+      oldEmailResendTime--;
+    }, 1000);
+  });
+  
+  // Initialize timers for email change verification modal
+  document.getElementById('emailChangeVerificationModal')?.addEventListener('shown.bs.modal', function() {
+    let emailExpiryTime = 300;
+    let emailResendTime = 60;
+    document.getElementById('email_code1').focus();
+    
+    // Start expiry timer
+    const emailExpiryTimer = setInterval(() => {
+      const minutes = Math.floor(emailExpiryTime / 60);
+      const seconds = emailExpiryTime % 60;
+      document.getElementById('email-expiry-timer').textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      
+      if (emailExpiryTime <= 0) {
+        clearInterval(emailExpiryTimer);
+        document.getElementById('email-verification-message').textContent = 'Code has expired. Please request a new code.';
+        document.getElementById('email-verification-message').style.display = 'block';
+        document.getElementById('verify-email-code').disabled = true;
+        
+        for (let i = 1; i <= 6; i++) {
+          document.getElementById(`email_code${i}`).disabled = true;
+        }
+      }
+      emailExpiryTime--;
+    }, 1000);
+    
+    // Start resend timer
+    const emailResendBtn = document.getElementById('resend-email-code');
+    const emailResendTimerElement = document.getElementById('email-resend-timer');
+    
+    const emailResendTimer = setInterval(() => {
+      emailResendTimerElement.textContent = emailResendTime;
+      
+      if (emailResendTime <= 0) {
+        clearInterval(emailResendTimer);
+        emailResendBtn.disabled = false;
+        emailResendBtn.innerHTML = '<small>Resend code</small>';
+      }
+      emailResendTime--;
+    }, 1000);
+  });
+  
   // Clean up timers when modal is hidden
   document.getElementById('emailVerificationModal')?.addEventListener('hidden.bs.modal', function() {
     clearInterval(expiryTimer);
@@ -877,6 +1000,32 @@ console.log('Account settings JS loaded');
       req.element.querySelector('span').textContent = '✗';
     });
   });
+  
+  // Clear username modal fields when cancelled
+  document.getElementById('editUsernameModal')?.addEventListener('hidden.bs.modal', function() {
+    if (usernameVerificationFlow) {
+      new bootstrap.Modal(document.getElementById('usernameVerificationModal')).show();
+      return;
+    }
+    
+    clearUsernameCache();
+    document.getElementById('edit_username').value = profileData.username || '';
+    document.getElementById('username_current_password').value = '';
+    document.getElementById('username_reason').value = '';
+  });
+  
+  // Clear email modal fields when cancelled
+  document.getElementById('editEmailModal')?.addEventListener('hidden.bs.modal', function() {
+    if (emailVerificationFlow) {
+      new bootstrap.Modal(document.getElementById('emailChangeVerificationModal')).show();
+      return;
+    }
+    
+    clearEmailCache();
+    document.getElementById('edit_email_field').value = profileData.email_address || '';
+    document.getElementById('email_current_password').value = '';
+    document.getElementById('email_reason').value = '';
+  });
 
   // Simplified access logs - no pagination needed for 10 items
 
@@ -966,76 +1115,826 @@ console.log('Account settings JS loaded');
       new bootstrap.Modal(document.getElementById('editPersonalInfoModal')).show();
     });
     
-    // Edit Username
-    document.getElementById('editUsernameBtn')?.addEventListener('click', function() {
-      new bootstrap.Modal(document.getElementById('editUsernameModal')).show();
-    });
-    
-    // Edit Email
-    document.getElementById('editEmailBtn')?.addEventListener('click', function() {
-      new bootstrap.Modal(document.getElementById('editEmailModal')).show();
-    });
-    
 
     
 
     
-    // Handle Username Form Submission (Placeholder)
+    // Username change functionality
+    let usernameVerificationFlow = false;
+    let usernameCache = { current: null, new: null, reason: null };
+    const clearUsernameCache = () => { usernameCache.current = usernameCache.new = usernameCache.reason = null; };
+    
+    // Email change functionality
+    let emailVerificationFlow = false;
+    let emailStep = 1; // 1 = verify old email, 2 = verify new email
+    let emailCache = { current: null, new: null, reason: null };
+    const clearEmailCache = () => { emailCache.current = emailCache.new = emailCache.reason = null; emailStep = 1; };
+    
+    // Handle Username Form Submission
     document.getElementById('editUsernameForm')?.addEventListener('submit', function(e) {
       e.preventDefault();
       
+      const newUsername = document.getElementById('edit_username').value.trim();
+      const currentPassword = document.getElementById('username_current_password')?.value || '';
+      const reason = document.getElementById('username_reason')?.value || '';
+      
+      if (!newUsername) {
+        showMessage('Please enter a new username.', 'error');
+        return;
+      }
+      
+      if (!currentPassword) {
+        showMessage('Please enter your current password to verify this change.', 'error');
+        return;
+      }
+      
+      if (!reason) {
+        showMessage('Please select a reason for this change.', 'error');
+        return;
+      }
+      
       const submitBtn = this.querySelector('button[type="submit"]');
       const originalText = submitBtn.textContent;
       
       // Show loading state
       submitBtn.disabled = true;
-      submitBtn.innerHTML = '<div class="spinner-border spinner-border-sm me-2" role="status"></div>Saving...';
+      submitBtn.innerHTML = '<div class="spinner-border spinner-border-sm me-2" role="status"></div>Verifying...';
       
-      // Get CSRF token for future implementation
-      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+      // Show modal loading overlay
+      const modalBody = document.querySelector('#editUsernameModal .modal-body');
+      const loadingOverlay = document.createElement('div');
+      loadingOverlay.id = 'username-loading-overlay';
+      loadingOverlay.className = 'position-absolute w-100 h-100 d-flex align-items-center justify-content-center';
+      loadingOverlay.style.cssText = 'top: 0; left: 0; background: rgba(255,255,255,0.9); z-index: 1050; border-radius: 16px;';
+      loadingOverlay.innerHTML = `
+        <div class="text-center">
+          <div class="spinner-border text-danger mb-3" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <div class="fw-bold text-dark">Verifying password...</div>
+        </div>
+      `;
+      modalBody.style.position = 'relative';
+      modalBody.appendChild(loadingOverlay);
       
-      // TODO: When implementing, ensure HTTPS is used for secure communication
-      // Simulate API call
-      setTimeout(() => {
-        alert('Username update functionality will be implemented in the backend.');
+      // Send verification code
+      const formData = new FormData();
+      formData.append('form_type', 'send_username_code');
+      formData.append('new_username', newUsername);
+      formData.append('current_password', currentPassword);
+      formData.append('reason', reason);
+      formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+      
+      fetch(window.location.href, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Update loading message
+          const overlay = document.getElementById('username-loading-overlay');
+          if (overlay) {
+            overlay.innerHTML = `
+              <div class="text-center">
+                <div class="spinner-border text-danger mb-3" role="status" style="width: 3rem; height: 3rem;">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                <div class="fw-bold text-dark">Sending verification code...</div>
+              </div>
+            `;
+          }
+          
+          setTimeout(() => {
+            // Reset button and remove overlay
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+            const overlay = document.getElementById('username-loading-overlay');
+            if (overlay) overlay.remove();
+            
+            // Store data and show verification modal
+            usernameCache.current = currentPassword;
+            usernameCache.new = newUsername;
+            usernameCache.reason = reason;
+            usernameVerificationFlow = true;
+            
+            // Clear form fields
+            document.getElementById('edit_username').value = '';
+            document.getElementById('username_current_password').value = '';
+            document.getElementById('username_reason').value = '';
+            
+            // Hide username modal and show verification modal
+            const usernameModal = bootstrap.Modal.getInstance(document.getElementById('editUsernameModal'));
+            usernameModal.hide();
+            
+            // Set masked email and show verification modal
+            const email = profileEmail || '';
+            if (email) {
+              const [localPart, domain] = email.split('@');
+              const maskedLocal = localPart.charAt(0) + '*'.repeat(Math.max(0, localPart.length - 2)) + localPart.slice(-1);
+              document.getElementById('username-masked-email').textContent = maskedLocal + '@' + domain;
+            }
+            
+            new bootstrap.Modal(document.getElementById('usernameVerificationModal')).show();
+          }, 1500);
+        } else {
+          // Reset button and remove overlay
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+          const overlay = document.getElementById('username-loading-overlay');
+          if (overlay) overlay.remove();
+          
+          showMessage(data.error || 'Failed to send verification code', 'error');
+        }
+      })
+      .catch(error => {
+        // Reset button and remove overlay
         submitBtn.disabled = false;
         submitBtn.textContent = originalText;
+        const overlay = document.getElementById('username-loading-overlay');
+        if (overlay) overlay.remove();
         
-        // Close modal
-        const modal = bootstrap.Modal.getInstance(document.getElementById('editUsernameModal'));
-        modal.hide();
-      }, 1000);
+        showMessage('Network error. Please try again.', 'error');
+      });
     });
     
-    // Handle Email Form Submission (Placeholder)
+    // Handle Email Form Submission
     document.getElementById('editEmailForm')?.addEventListener('submit', function(e) {
       e.preventDefault();
       
+      const newEmail = document.getElementById('edit_email_field').value.trim();
+      const currentPassword = document.getElementById('email_current_password')?.value || '';
+      const reason = document.getElementById('email_reason')?.value || '';
+      
+      if (!newEmail) {
+        showMessage('Please enter a new email address.', 'error');
+        return;
+      }
+      
+      if (!currentPassword) {
+        showMessage('Please enter your current password to verify this change.', 'error');
+        return;
+      }
+      
+      if (!reason) {
+        showMessage('Please select a reason for this change.', 'error');
+        return;
+      }
+      
       const submitBtn = this.querySelector('button[type="submit"]');
       const originalText = submitBtn.textContent;
       
       // Show loading state
       submitBtn.disabled = true;
-      submitBtn.innerHTML = '<div class="spinner-border spinner-border-sm me-2" role="status"></div>Saving...';
+      submitBtn.innerHTML = '<div class="spinner-border spinner-border-sm me-2" role="status"></div>Verifying...';
       
-      // Get CSRF token for future implementation
-      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+      // Show modal loading overlay
+      const modalBody = document.querySelector('#editEmailModal .modal-body');
+      const loadingOverlay = document.createElement('div');
+      loadingOverlay.id = 'email-loading-overlay';
+      loadingOverlay.className = 'position-absolute w-100 h-100 d-flex align-items-center justify-content-center';
+      loadingOverlay.style.cssText = 'top: 0; left: 0; background: rgba(255,255,255,0.9); z-index: 1050; border-radius: 16px;';
+      loadingOverlay.innerHTML = `
+        <div class="text-center">
+          <div class="spinner-border text-danger mb-3" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <div class="fw-bold text-dark">Verifying password...</div>
+        </div>
+      `;
+      modalBody.style.position = 'relative';
+      modalBody.appendChild(loadingOverlay);
       
-      // TODO: When implementing, ensure HTTPS is used for secure communication
-      // Simulate API call
-      setTimeout(() => {
-        alert('Email update functionality will be implemented in the backend.');
+      // Send verification code to OLD email first
+      const formData = new FormData();
+      formData.append('form_type', 'send_old_email_code');
+      formData.append('new_email', newEmail);
+      formData.append('current_password', currentPassword);
+      formData.append('reason', reason);
+      formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+      
+      fetch(window.location.href, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Update loading message
+          const overlay = document.getElementById('email-loading-overlay');
+          if (overlay) {
+            overlay.innerHTML = `
+              <div class="text-center">
+                <div class="spinner-border text-danger mb-3" role="status" style="width: 3rem; height: 3rem;">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                <div class="fw-bold text-dark">Sending verification code...</div>
+              </div>
+            `;
+          }
+          
+          setTimeout(() => {
+            // Reset button and remove overlay
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+            const overlay = document.getElementById('email-loading-overlay');
+            if (overlay) overlay.remove();
+            
+            // Store data and show verification modal
+            emailCache.current = currentPassword;
+            emailCache.new = newEmail;
+            emailCache.reason = reason;
+            emailVerificationFlow = true;
+            
+            // Clear form fields
+            document.getElementById('edit_email_field').value = '';
+            document.getElementById('email_current_password').value = '';
+            document.getElementById('email_reason').value = '';
+            
+            // Hide email modal and show OLD email verification modal
+            const emailModal = bootstrap.Modal.getInstance(document.getElementById('editEmailModal'));
+            emailModal.hide();
+            
+            // Set masked OLD email and show verification modal
+            const email = profileEmail || '';
+            if (email) {
+              const [localPart, domain] = email.split('@');
+              const maskedLocal = localPart.charAt(0) + '*'.repeat(Math.max(0, localPart.length - 2)) + localPart.slice(-1);
+              document.getElementById('old-email-masked-email').textContent = maskedLocal + '@' + domain;
+            }
+            
+            emailStep = 1;
+            new bootstrap.Modal(document.getElementById('oldEmailVerificationModal')).show();
+          }, 1500);
+        } else {
+          // Reset button and remove overlay
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+          const overlay = document.getElementById('email-loading-overlay');
+          if (overlay) overlay.remove();
+          
+          showMessage(data.error || 'Failed to send verification code', 'error');
+        }
+      })
+      .catch(error => {
+        // Reset button and remove overlay
         submitBtn.disabled = false;
         submitBtn.textContent = originalText;
+        const overlay = document.getElementById('email-loading-overlay');
+        if (overlay) overlay.remove();
         
-        // Close modal
-        const modal = bootstrap.Modal.getInstance(document.getElementById('editEmailModal'));
-        modal.hide();
-      }, 1000);
+        showMessage('Network error. Please try again.', 'error');
+      });
     });
     
 
     
+
+    // Username verification handlers
+    document.getElementById('verify-username-code')?.addEventListener('click', function() {
+      const code = Array.from({length: 6}, (_, i) => document.getElementById(`username_code${i + 1}`).value).join('');
+      
+      if (code.length !== 6) {
+        document.getElementById('username-verification-message').textContent = 'Please enter all 6 digits';
+        document.getElementById('username-verification-message').className = 'alert alert-warning small mb-3';
+        document.getElementById('username-verification-message').style.display = 'block';
+        return;
+      }
+      
+      const verifyBtn = this;
+      verifyBtn.disabled = true;
+      verifyBtn.innerHTML = '<div class="spinner-border spinner-border-sm me-2" role="status"></div>Verifying...';
+      
+      // Show modal loading overlay
+      const modalBody = document.querySelector('#usernameVerificationModal .modal-body');
+      const loadingOverlay = document.createElement('div');
+      loadingOverlay.id = 'username-verify-loading-overlay';
+      loadingOverlay.className = 'position-absolute w-100 h-100 d-flex align-items-center justify-content-center';
+      loadingOverlay.style.cssText = 'top: 0; left: 0; background: rgba(255,255,255,0.9); z-index: 1050; border-radius: 16px;';
+      loadingOverlay.innerHTML = `
+        <div class="text-center">
+          <div class="spinner-border text-danger mb-3" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <div class="fw-bold text-dark">Changing username...</div>
+        </div>
+      `;
+      modalBody.style.position = 'relative';
+      modalBody.appendChild(loadingOverlay);
+      
+      const formData = new FormData();
+      formData.append('form_type', 'verify_change_username');
+      formData.append('code', code);
+      formData.append('new_username', usernameCache.new);
+      formData.append('current_password', usernameCache.current);
+      formData.append('reason', usernameCache.reason);
+      formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+      
+      fetch(window.location.href, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        verifyBtn.disabled = false;
+        verifyBtn.innerHTML = 'Verify Code';
+        const overlay = document.getElementById('username-verify-loading-overlay');
+        if (overlay) overlay.remove();
+        
+        if (data.success) {
+          document.getElementById('username-verification-message').textContent = 'Username changed successfully!';
+          document.getElementById('username-verification-message').className = 'alert alert-success small mb-3';
+          document.getElementById('username-verification-message').style.display = 'block';
+          
+          clearUsernameCache();
+          
+          setTimeout(() => {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('usernameVerificationModal'));
+            modal.hide();
+            location.reload();
+          }, 2000);
+        } else {
+          document.getElementById('username-verification-message').textContent = data.error || 'Verification failed';
+          document.getElementById('username-verification-message').className = 'alert alert-danger small mb-3';
+          document.getElementById('username-verification-message').style.display = 'block';
+          
+          if (data.error && data.error.includes('Invalid verification code')) {
+            for (let i = 1; i <= 6; i++) {
+              document.getElementById(`username_code${i}`).value = '';
+            }
+            document.getElementById('username_code1').focus();
+          }
+        }
+      })
+      .catch(error => {
+        verifyBtn.disabled = false;
+        verifyBtn.innerHTML = 'Verify Code';
+        const overlay = document.getElementById('username-verify-loading-overlay');
+        if (overlay) overlay.remove();
+        
+        document.getElementById('username-verification-message').textContent = 'Network error. Please try again.';
+        document.getElementById('username-verification-message').className = 'alert alert-danger small mb-3';
+        document.getElementById('username-verification-message').style.display = 'block';
+      });
+    });
+    
+    // Old email verification handlers
+    document.getElementById('verify-old-email-code')?.addEventListener('click', function() {
+      const code = Array.from({length: 6}, (_, i) => document.getElementById(`old_email_code${i + 1}`).value).join('');
+      
+      if (code.length !== 6) {
+        document.getElementById('old-email-verification-message').textContent = 'Please enter all 6 digits';
+        document.getElementById('old-email-verification-message').className = 'alert alert-warning small mb-3';
+        document.getElementById('old-email-verification-message').style.display = 'block';
+        return;
+      }
+      
+      const verifyBtn = this;
+      verifyBtn.disabled = true;
+      verifyBtn.innerHTML = '<div class="spinner-border spinner-border-sm me-2" role="status"></div>Verifying...';
+      
+      // Show modal loading overlay
+      const modalBody = document.querySelector('#oldEmailVerificationModal .modal-body');
+      const loadingOverlay = document.createElement('div');
+      loadingOverlay.id = 'old-email-verify-loading-overlay';
+      loadingOverlay.className = 'position-absolute w-100 h-100 d-flex align-items-center justify-content-center';
+      loadingOverlay.style.cssText = 'top: 0; left: 0; background: rgba(255,255,255,0.9); z-index: 1050; border-radius: 16px;';
+      loadingOverlay.innerHTML = `
+        <div class="text-center">
+          <div class="spinner-border text-danger mb-3" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <div class="fw-bold text-dark">Verifying current email...</div>
+        </div>
+      `;
+      modalBody.style.position = 'relative';
+      modalBody.appendChild(loadingOverlay);
+      
+      const formData = new FormData();
+      formData.append('form_type', 'verify_old_email');
+      formData.append('code', code);
+      formData.append('new_email', emailCache.new);
+      formData.append('current_password', emailCache.current);
+      formData.append('reason', emailCache.reason);
+      formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+      
+      fetch(window.location.href, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        verifyBtn.disabled = false;
+        verifyBtn.innerHTML = 'Verify Code';
+        const overlay = document.getElementById('old-email-verify-loading-overlay');
+        if (overlay) overlay.remove();
+        
+        if (data.success) {
+          // Hide old email modal and show new email modal
+          const oldEmailModal = bootstrap.Modal.getInstance(document.getElementById('oldEmailVerificationModal'));
+          oldEmailModal.hide();
+          
+          // Set masked NEW email and show verification modal
+          const [localPart, domain] = emailCache.new.split('@');
+          const maskedLocal = localPart.charAt(0) + '*'.repeat(Math.max(0, localPart.length - 2)) + localPart.slice(-1);
+          document.getElementById('email-masked-email').textContent = maskedLocal + '@' + domain;
+          
+          emailStep = 2;
+          new bootstrap.Modal(document.getElementById('emailChangeVerificationModal')).show();
+        } else {
+          document.getElementById('old-email-verification-message').textContent = data.error || 'Verification failed';
+          document.getElementById('old-email-verification-message').className = 'alert alert-danger small mb-3';
+          document.getElementById('old-email-verification-message').style.display = 'block';
+          
+          if (data.error && data.error.includes('Invalid verification code')) {
+            for (let i = 1; i <= 6; i++) {
+              document.getElementById(`old_email_code${i}`).value = '';
+            }
+            document.getElementById('old_email_code1').focus();
+          }
+        }
+      })
+      .catch(error => {
+        verifyBtn.disabled = false;
+        verifyBtn.innerHTML = 'Verify Code';
+        const overlay = document.getElementById('old-email-verify-loading-overlay');
+        if (overlay) overlay.remove();
+        
+        document.getElementById('old-email-verification-message').textContent = 'Network error. Please try again.';
+        document.getElementById('old-email-verification-message').className = 'alert alert-danger small mb-3';
+        document.getElementById('old-email-verification-message').style.display = 'block';
+      });
+    });
+    
+    // New email verification handlers
+    document.getElementById('verify-email-code')?.addEventListener('click', function() {
+      const code = Array.from({length: 6}, (_, i) => document.getElementById(`email_code${i + 1}`).value).join('');
+      
+      if (code.length !== 6) {
+        document.getElementById('email-verification-message').textContent = 'Please enter all 6 digits';
+        document.getElementById('email-verification-message').className = 'alert alert-warning small mb-3';
+        document.getElementById('email-verification-message').style.display = 'block';
+        return;
+      }
+      
+      const verifyBtn = this;
+      verifyBtn.disabled = true;
+      verifyBtn.innerHTML = '<div class="spinner-border spinner-border-sm me-2" role="status"></div>Verifying...';
+      
+      // Show modal loading overlay
+      const modalBody = document.querySelector('#emailChangeVerificationModal .modal-body');
+      const loadingOverlay = document.createElement('div');
+      loadingOverlay.id = 'email-verify-loading-overlay';
+      loadingOverlay.className = 'position-absolute w-100 h-100 d-flex align-items-center justify-content-center';
+      loadingOverlay.style.cssText = 'top: 0; left: 0; background: rgba(255,255,255,0.9); z-index: 1050; border-radius: 16px;';
+      loadingOverlay.innerHTML = `
+        <div class="text-center">
+          <div class="spinner-border text-danger mb-3" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <div class="fw-bold text-dark">Changing email...</div>
+        </div>
+      `;
+      modalBody.style.position = 'relative';
+      modalBody.appendChild(loadingOverlay);
+      
+      const formData = new FormData();
+      formData.append('form_type', 'verify_change_email');
+      formData.append('code', code);
+      formData.append('new_email', emailCache.new);
+      formData.append('current_password', emailCache.current);
+      formData.append('reason', emailCache.reason);
+      formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+      
+      fetch(window.location.href, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        verifyBtn.disabled = false;
+        verifyBtn.innerHTML = 'Verify Code';
+        const overlay = document.getElementById('email-verify-loading-overlay');
+        if (overlay) overlay.remove();
+        
+        if (data.success) {
+          document.getElementById('email-verification-message').textContent = 'Email changed successfully!';
+          document.getElementById('email-verification-message').className = 'alert alert-success small mb-3';
+          document.getElementById('email-verification-message').style.display = 'block';
+          
+          clearEmailCache();
+          
+          setTimeout(() => {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('emailChangeVerificationModal'));
+            modal.hide();
+            location.reload();
+          }, 2000);
+        } else {
+          document.getElementById('email-verification-message').textContent = data.error || 'Verification failed';
+          document.getElementById('email-verification-message').className = 'alert alert-danger small mb-3';
+          document.getElementById('email-verification-message').style.display = 'block';
+          
+          if (data.error && data.error.includes('Invalid verification code')) {
+            for (let i = 1; i <= 6; i++) {
+              document.getElementById(`email_code${i}`).value = '';
+            }
+            document.getElementById('email_code1').focus();
+          }
+        }
+      })
+      .catch(error => {
+        verifyBtn.disabled = false;
+        verifyBtn.innerHTML = 'Verify Code';
+        const overlay = document.getElementById('email-verify-loading-overlay');
+        if (overlay) overlay.remove();
+        
+        document.getElementById('email-verification-message').textContent = 'Network error. Please try again.';
+        document.getElementById('email-verification-message').className = 'alert alert-danger small mb-3';
+        document.getElementById('email-verification-message').style.display = 'block';
+      });
+    });
+    
+    // Resend code handlers
+    document.getElementById('resend-username-code')?.addEventListener('click', function() {
+      if (this.disabled) return;
+      
+      const formData = new FormData();
+      formData.append('form_type', 'resend_username_code');
+      formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+      
+      this.innerHTML = '<small>Sending...</small>';
+      
+      fetch(window.location.href, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          document.getElementById('username-verification-message').textContent = 'Verification code sent successfully!';
+          document.getElementById('username-verification-message').className = 'alert alert-success small mb-3';
+          document.getElementById('username-verification-message').style.display = 'block';
+          
+          // Reset timer
+          this.disabled = true;
+          let countdown = 60;
+          this.innerHTML = `<small>Resend code in ${countdown}s</small>`;
+          
+          const timer = setInterval(() => {
+            countdown--;
+            this.innerHTML = `<small>Resend code in ${countdown}s</small>`;
+            if (countdown <= 0) {
+              clearInterval(timer);
+              this.disabled = false;
+              this.innerHTML = '<small>Resend code</small>';
+            }
+          }, 1000);
+        } else {
+          document.getElementById('username-verification-message').textContent = data.error || 'Failed to resend code';
+          document.getElementById('username-verification-message').className = 'alert alert-danger small mb-3';
+          document.getElementById('username-verification-message').style.display = 'block';
+          this.innerHTML = '<small>Resend code</small>';
+        }
+      })
+      .catch(error => {
+        document.getElementById('username-verification-message').textContent = 'Network error. Please try again.';
+        document.getElementById('username-verification-message').className = 'alert alert-danger small mb-3';
+        document.getElementById('username-verification-message').style.display = 'block';
+        this.innerHTML = '<small>Resend code</small>';
+      });
+    });
+    
+    document.getElementById('resend-old-email-code')?.addEventListener('click', function() {
+      if (this.disabled) return;
+      
+      const formData = new FormData();
+      formData.append('form_type', 'resend_old_email_code');
+      formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+      
+      this.innerHTML = '<small>Sending...</small>';
+      
+      fetch(window.location.href, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          document.getElementById('old-email-verification-message').textContent = 'Verification code sent successfully!';
+          document.getElementById('old-email-verification-message').className = 'alert alert-success small mb-3';
+          document.getElementById('old-email-verification-message').style.display = 'block';
+          
+          // Reset timer
+          this.disabled = true;
+          let countdown = 60;
+          this.innerHTML = `<small>Resend code in ${countdown}s</small>`;
+          
+          const timer = setInterval(() => {
+            countdown--;
+            this.innerHTML = `<small>Resend code in ${countdown}s</small>`;
+            if (countdown <= 0) {
+              clearInterval(timer);
+              this.disabled = false;
+              this.innerHTML = '<small>Resend code</small>';
+            }
+          }, 1000);
+        } else {
+          document.getElementById('old-email-verification-message').textContent = data.error || 'Failed to resend code';
+          document.getElementById('old-email-verification-message').className = 'alert alert-danger small mb-3';
+          document.getElementById('old-email-verification-message').style.display = 'block';
+          this.innerHTML = '<small>Resend code</small>';
+        }
+      })
+      .catch(error => {
+        document.getElementById('old-email-verification-message').textContent = 'Network error. Please try again.';
+        document.getElementById('old-email-verification-message').className = 'alert alert-danger small mb-3';
+        document.getElementById('old-email-verification-message').style.display = 'block';
+        this.innerHTML = '<small>Resend code</small>';
+      });
+    });
+    
+    document.getElementById('resend-email-code')?.addEventListener('click', function() {
+      if (this.disabled) return;
+      
+      const formData = new FormData();
+      formData.append('form_type', 'resend_email_code');
+      formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+      
+      this.innerHTML = '<small>Sending...</small>';
+      
+      fetch(window.location.href, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          document.getElementById('email-verification-message').textContent = 'Verification code sent successfully!';
+          document.getElementById('email-verification-message').className = 'alert alert-success small mb-3';
+          document.getElementById('email-verification-message').style.display = 'block';
+          
+          // Reset timer
+          this.disabled = true;
+          let countdown = 60;
+          this.innerHTML = `<small>Resend code in ${countdown}s</small>`;
+          
+          const timer = setInterval(() => {
+            countdown--;
+            this.innerHTML = `<small>Resend code in ${countdown}s</small>`;
+            if (countdown <= 0) {
+              clearInterval(timer);
+              this.disabled = false;
+              this.innerHTML = '<small>Resend code</small>';
+            }
+          }, 1000);
+        } else {
+          document.getElementById('email-verification-message').textContent = data.error || 'Failed to resend code';
+          document.getElementById('email-verification-message').className = 'alert alert-danger small mb-3';
+          document.getElementById('email-verification-message').style.display = 'block';
+          this.innerHTML = '<small>Resend code</small>';
+        }
+      })
+      .catch(error => {
+        document.getElementById('email-verification-message').textContent = 'Network error. Please try again.';
+        document.getElementById('email-verification-message').className = 'alert alert-danger small mb-3';
+        document.getElementById('email-verification-message').style.display = 'block';
+        this.innerHTML = '<small>Resend code</small>';
+      });
+    });
+    
+    // Modal cleanup handlers
+    document.getElementById('usernameVerificationModal')?.addEventListener('hidden.bs.modal', function() {
+      usernameVerificationFlow = false;
+      clearUsernameCache();
+      
+      // Clear code inputs
+      for (let i = 1; i <= 6; i++) {
+        document.getElementById(`username_code${i}`).value = '';
+      }
+      document.getElementById('username-verification-message').style.display = 'none';
+      
+      // Clear verification code from server
+      const formData = new FormData();
+      formData.append('form_type', 'clear_username_code');
+      formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+      fetch(window.location.href, { 
+        method: 'POST', 
+        body: formData,
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+      }).catch(() => {});
+    });
+    
+    document.getElementById('oldEmailVerificationModal')?.addEventListener('hidden.bs.modal', function() {
+      // Clear code inputs
+      for (let i = 1; i <= 6; i++) {
+        document.getElementById(`old_email_code${i}`).value = '';
+      }
+      document.getElementById('old-email-verification-message').style.display = 'none';
+      
+      // Clear verification code from server
+      const formData = new FormData();
+      formData.append('form_type', 'clear_old_email_code');
+      formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+      fetch(window.location.href, { 
+        method: 'POST', 
+        body: formData,
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+      }).catch(() => {});
+    });
+    
+    document.getElementById('emailChangeVerificationModal')?.addEventListener('hidden.bs.modal', function() {
+      emailVerificationFlow = false;
+      clearEmailCache();
+      
+      // Clear code inputs
+      for (let i = 1; i <= 6; i++) {
+        document.getElementById(`email_code${i}`).value = '';
+      }
+      document.getElementById('email-verification-message').style.display = 'none';
+      
+      // Clear verification code from server
+      const formData = new FormData();
+      formData.append('form_type', 'clear_email_code');
+      formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+      fetch(window.location.href, { 
+        method: 'POST', 
+        body: formData,
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+      }).catch(() => {});
+    });
+    
+    // Code input navigation for username
+    document.addEventListener('input', function(e) {
+      if (e.target.id && e.target.id.startsWith('username_code')) {
+        const currentIndex = parseInt(e.target.id.replace('username_code', ''));
+        if (e.target.value && currentIndex < 6) {
+          document.getElementById(`username_code${currentIndex + 1}`)?.focus();
+        }
+      }
+      if (e.target.id && e.target.id.startsWith('email_code')) {
+        const currentIndex = parseInt(e.target.id.replace('email_code', ''));
+        if (e.target.value && currentIndex < 6) {
+          document.getElementById(`email_code${currentIndex + 1}`)?.focus();
+        }
+      }
+      if (e.target.id && e.target.id.startsWith('old_email_code')) {
+        const currentIndex = parseInt(e.target.id.replace('old_email_code', ''));
+        if (e.target.value && currentIndex < 6) {
+          document.getElementById(`old_email_code${currentIndex + 1}`)?.focus();
+        }
+      }
+    });
+    
+    document.addEventListener('keydown', function(e) {
+      if (e.target.id && e.target.id.startsWith('username_code') && e.key === 'Backspace' && !e.target.value) {
+        const currentIndex = parseInt(e.target.id.replace('username_code', ''));
+        if (currentIndex > 1) {
+          document.getElementById(`username_code${currentIndex - 1}`)?.focus();
+        }
+      }
+      if (e.target.id && e.target.id.startsWith('email_code') && e.key === 'Backspace' && !e.target.value) {
+        const currentIndex = parseInt(e.target.id.replace('email_code', ''));
+        if (currentIndex > 1) {
+          document.getElementById(`email_code${currentIndex - 1}`)?.focus();
+        }
+      }
+      if (e.target.id && e.target.id.startsWith('old_email_code') && e.key === 'Backspace' && !e.target.value) {
+        const currentIndex = parseInt(e.target.id.replace('old_email_code', ''));
+        if (currentIndex > 1) {
+          document.getElementById(`old_email_code${currentIndex - 1}`)?.focus();
+        }
+      }
+    });
 
   }
 
@@ -1115,6 +2014,24 @@ console.log('Account settings JS loaded');
     }
   }, true);
 
+  // Edit Username (for Super Admin)
+  const editUsernameBtn = document.getElementById('editUsernameBtn');
+  if (editUsernameBtn) {
+    editUsernameBtn.addEventListener('click', function() {
+      console.log('Username button clicked');
+      new bootstrap.Modal(document.getElementById('editUsernameModal')).show();
+    });
+  }
+  
+  // Edit Email (for Super Admin)
+  const editEmailBtn = document.getElementById('editEmailBtn');
+  if (editEmailBtn) {
+    editEmailBtn.addEventListener('click', function() {
+      console.log('Email button clicked');
+      new bootstrap.Modal(document.getElementById('editEmailModal')).show();
+    });
+  }
+
 })();
 
 // Personal info validation outside IIFE
@@ -1161,6 +2078,14 @@ function showMessage(message, type = 'info') {
   text.textContent = message;
   new bootstrap.Modal(modal).show();
 }
+
+// Event delegation for Got it button
+document.addEventListener('click', function(e) {
+  if (e.target.matches('#errorModal .btn-submit')) {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('errorModal'));
+    if (modal) modal.hide();
+  }
+});
 
 // Global function for form validation
 function checkPersonalInfoChanges(event) {

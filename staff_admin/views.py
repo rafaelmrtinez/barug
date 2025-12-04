@@ -50,7 +50,7 @@ from staff_admin.models import Admin
 logger = logging.getLogger(__name__)
 
 ADMIN_ROLE = "Admin"
-REQUEST_STATUS_APPROVED = 30
+REQUEST_STATUS_APPROVED = 3
 REQUEST_STATUS_REJECTED = 4
 WAITING_FOR_ADMIN = 30
 
@@ -883,10 +883,11 @@ def staff_selection_nonres(request: HttpRequest) -> HttpResponse:
                 "sitio_purok": cd.get("purok_sitio") or "",
                 "street":    cd.get("street") or "",
             })
-            flash_success(request, "Personal information saved.")
+            # flash_success(request, "Personal information saved.")
             return redirect("staff_admin:staff_selection_nonres_docs")
         else:
-            flash_warning(request, "Please correct the errors below.")
+            # flash_warning(request, "Please correct the errors below.")
+            logger.debug("Non-resident personal form errors: %s", form.errors.as_json())
 
     user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "staff_admin/staff/staff_selection_nonresident.html", {
@@ -993,7 +994,7 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
             flash_system_error(request, "Could not prepare previews.", exc=e)
             return redirect(request.path)
 
-        flash_success(request, "Documents loaded for preview. Please review and choose role.")
+        # flash_success(request, "Documents loaded for preview. Please review and choose role.")
         return redirect("staff_admin:staff_selection_nonres_role_review")
 
     user_fullname, user_role, user_role_template = get_user_info(request)
@@ -2766,7 +2767,7 @@ def operational_logs(request):
     try:
         rows = Admin.get_common_logs_with_names()
     except Exception as e:
-        logger.exception("Failed to load operational logs: %s", e)
+        logger.exception("Failed to load user logs: %s", e)
         rows = []
 
     # Apply filters
@@ -2878,8 +2879,8 @@ def operational_logs(request):
     return render(request, "staff_admin/user_logs/operational_logs.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
-        'page_path': f'{user_role} / Operational Logs',
-        'page_title': 'Operational Logs',
+        'page_path': f'{user_role} / User Logs',
+        'page_title': 'User Logs',
         'user_role_template': user_role_template,
         'page_obj': page_obj,
         'total_count': paginator.count,
@@ -2936,19 +2937,19 @@ def operational_log_details(request, log_id):
     try:
         log_detail = Admin.get_common_log_detail(int(log_id))
     except Exception as e:
-        logger.exception("Failed to load operational log details: %s", e)
+        logger.exception("Failed to load user log details: %s", e)
         log_detail = None
 
     if not log_detail:
-        flash_warning(request, f"No operational log found with ID {log_id}.")
+        flash_warning(request, f"No user log found with ID {log_id}.")
         return redirect("staff_admin:operational_logs")
 
     user_fullname, user_role, user_role_template = get_user_info(request)
     return render(request, "staff_admin/user_logs/operational_log_details.html", {
         'user_fullname': user_fullname,
         'user_role': user_role,
-        'page_path': f'{user_role} / Operational Log Details',
-        'page_title': 'Operational Log Details',
+        'page_path': f'{user_role} / User Log Details',
+        'page_title': 'User Log Details',
         'user_role_template': user_role_template,
         'log_detail': log_detail,
     })

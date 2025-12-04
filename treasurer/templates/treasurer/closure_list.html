@@ -31,7 +31,6 @@
 
 {% block content %}
 <div class="container-fluid pt-3" style="margin-top: 40px;">
-  <h5 class="mb-3">Business <strong>Closure Payments</strong></h5>
 
   <!-- Toolbar -->
   <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get" id="toolbarForm">
@@ -40,9 +39,9 @@
       <input type="text" class="form-control" id="search" name="q" placeholder="Search code / OR / year / business id" value="{{ q }}" />
     </div>
     <input type="hidden" name="per_page" value="{{ per_page }}">
-    <button type="submit" class="btn btn-brand d-flex align-items-center">
+    <!-- <button type="submit" class="btn btn-brand d-flex align-items-center">
       {% bs_icon 'search' extra_classes='me-2' %} Search
-    </button>
+    </button> -->
   </form>
 
   <div class="table-responsive">

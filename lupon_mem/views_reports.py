@@ -462,18 +462,19 @@ def report_new(request: HttpRequest):
     with connection.cursor() as cur:
         cur.execute(
             """
-            SELECT create_blotter_report(%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb)
+            SELECT create_blotter_report(%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)
             """,
             [
-                staff_id,
+                complainant_id,  # p_reported_by (person who reported)
                 incident_subject,
                 incident_desc,
                 incident_date,
                 incident_time,
-                incident_address_id,  # <— now filled if we created one
-                complainant_id,
+                incident_address_id,
+                complainant_id,  # p_complainant_id
                 respondent_ids if respondent_ids else None,
                 None,  # evidence jsonb
+                staff_id,  # p_staff_id for set_report_status
             ],
         )
         report_id = cur.fetchone()[0]

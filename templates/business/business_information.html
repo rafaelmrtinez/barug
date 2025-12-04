@@ -79,9 +79,9 @@
          class="btn btn-outline-brand btn-sm">
         {% bs_icon 'file-earmark-pdf' %} Generate PDF
       </a>
-      <a href="{% url 'clerk:business_update' b_id=business.business_id %}" class="btn btn-outline-brand btn-sm">
+      <!-- <a href="{% url 'clerk:business_update' b_id=business.business_id %}" class="btn btn-outline-brand btn-sm">
         {% bs_icon 'pencil-square' %} Update
-      </a>
+      </a> -->
     </div>
   {% endif %}
 
@@ -259,7 +259,7 @@
         {% endif %}
       </div>
 
-      <!-- ===================== NEW: QUOTE BREAKDOWN (STATIC) ================== -->
+      {% comment %} <!-- ===================== NEW: QUOTE BREAKDOWN (STATIC) ================== -->
       {% if is_clerk %}
       <div class="section-block">
         <div class="section-cap">
@@ -353,7 +353,7 @@
         </div>
       </div>
       {% endif %}
-      <!-- ===================================================================== -->
+      <!-- ===================================================================== --> {% endcomment %}
 
       <!-- METADATA -->
       <div class="section-block">
@@ -454,9 +454,6 @@
           <div class="list-group">
             <a href="{{ renewal_href }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
               <i class="bi bi-arrow-repeat"></i> Renew Business
-            </a>
-            <a href="{{ closure_href }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
-              <i class="bi bi-x-octagon"></i> Request Closure
             </a>
             <a href="{% url 'clerk:create_closure_payment_request' b_id=business.business_id %}"
               class="list-group-item list-group-item-action d-flex align-items-center gap-2">

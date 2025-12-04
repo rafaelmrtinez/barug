@@ -20,18 +20,11 @@
                 <li class="nav-item dropdown me-3">
                     <a class="nav-link dropdown-toggle" href="#" id="staffManagementDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         Staff Directory
-                        <!-- Debug: {{ staff_admin_badge_counts.staff_account_requests_pending|default:"NOT_LOADED" }} -->
-                        {% if staff_admin_badge_counts.staff_account_requests_pending > 0 %}
-                            <span class="badge bg-danger rounded-pill ms-1">{{ staff_admin_badge_counts.staff_account_requests_pending }}</span>
-                        {% endif %}
                     </a>
                     <ul class="dropdown-menu" aria-labelledby="staffManagementDropdown">
                         <li>
                             <a class="dropdown-item d-flex justify-content-between align-items-center" href="{% url 'staff_admin:staff_account_requests_list' %}">
                                 Staff Account Requests
-                                {% if staff_admin_badge_counts.staff_account_requests_pending > 0 %}
-                                    <span class="badge bg-danger rounded-pill ms-2">{{ staff_admin_badge_counts.staff_account_requests_pending }}</span>
-                                {% endif %}
                             </a>
                         </li>
                         <li><a class="dropdown-item" href="{% url 'staff_admin:staff_requests_list' %}">My Staff Requests</a></li>
