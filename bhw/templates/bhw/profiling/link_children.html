@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/progress_bar.css' %}">
+<style>
+.chip{display:inline-flex;align-items:center;padding:8px 12px;background:#7a1212;color:#fff;border-radius:16px;margin:4px;cursor:pointer}
+.chip:hover{background:#5a0e0e}
+.search-results{max-height:300px;overflow-y:auto;border:1px solid #ddd;border-radius:4px;margin-top:8px}
+.search-item{padding:12px;border-bottom:1px solid #eee;cursor:pointer}
+.search-item:hover{background:#f5f5f5}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3 d-flex flex-column flex-grow-1" style="margin-top: 40px;">
+    <div class="step-progress mb-2">
+        <div class="step completed"><div class="circle">1</div><div class="label">Personal Info</div></div>
+        <div class="step completed"><div class="circle">2</div><div class="label">Link Parent/Guardian</div></div>
+        <div class="step active"><div class="circle">3</div><div class="label">Link Children</div></div>
+        <div class="step"><div class="circle">4</div><div class="label">Socioeconomic</div></div>
+    </div>
+
+    <form method="post" class="d-flex flex-column flex-grow-1">
+        {% csrf_token %}
+        <h5>Link Child / Children</h5>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h6>Linked Children</h6>
+                <div id="linked-chips">
+                    {% for child in children %}
+                    <span class="chip" data-id="{{ child.id }}">{{ child.name }} • CHILD <button type="button" onclick="unlinkChild('{{ child.id }}')" style="border:none;background:none;color:#fff;margin-left:8px">×</button></span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h6>Search & Link Child</h6>
+                <div class="form-floating mb-3">
+                    <input type="text" class="form-control" id="search-input" placeholder="Search resident">
+                    <label>Search Resident</label>
+                </div>
+                <div id="search-results" class="search-results" style="display:none"></div>
+            </div>
+        </div>
+
+        <input type="hidden" name="child_ids" id="child_ids" value="{{ child_ids }}">
+        <input type="hidden" name="child_names" id="child_names" value="[]">
+
+        <div class="mt-auto button-container">
+            <a href="{% url 'bhw:profile_link_parent' %}" class="btn btn-reset">Back</a>
+            <button type="submit" class="btn btn-submit">Continue</button>
+        </div>
+    </form>
+</div>
+
+<script>
+let childIds = {{ child_ids|default:"[]" }};
+let childNames = {};
+let searchTimeout;
+
+document.getElementById('search-input').addEventListener('input', function(e) {
+    clearTimeout(searchTimeout);
+    const q = e.target.value.trim();
+    if (q.length < 2) { document.getElementById('search-results').style.display = 'none'; return; }
+    searchTimeout = setTimeout(() => {
+        fetch(`/bhw/ajax/resident-search/?q=${encodeURIComponent(q)}`)
+            .then(r => r.json())
+            .then(data => {
+                const div = document.getElementById('search-results');
+                div.innerHTML = data.html;
+                div.style.display = 'block';
+                attachPickHandlers();
+            });
+    }, 300);
+});
+
+function attachPickHandlers() {
+    document.querySelectorAll('.pick-resident').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const id = this.dataset.personId;
+            const name = this.dataset.personName;
+            selectResident(id, name);
+        });
+    });
+}
+
+function selectResident(id, name) {
+    if (childIds.includes(parseInt(id))) { alert('Already linked'); return; }
+    childIds.push(parseInt(id));
+    childNames[id] = name;
+    document.getElementById('child_ids').value = JSON.stringify(childIds);
+    document.getElementById('child_names').value = JSON.stringify(Object.values(childNames));
+    const chip = `<span class="chip" data-id="${id}">${name} • CHILD <button type="button" onclick="unlinkChild('${id}')" style="border:none;background:none;color:#fff;margin-left:8px">×</button></span>`;
+    document.getElementById('linked-chips').insertAdjacentHTML('beforeend', chip);
+    document.getElementById('search-input').value = '';
+    document.getElementById('search-results').style.display = 'none';
+}
+
+function unlinkChild(id) {
+    childIds = childIds.filter(cid => cid != parseInt(id));
+    delete childNames[id];
+    document.getElementById('child_ids').value = JSON.stringify(childIds);
+    document.getElementById('child_names').value = JSON.stringify(Object.values(childNames));
+    document.querySelector(`.chip[data-id="${id}"]`).remove();
+}
+</script>
+{% endblock %}

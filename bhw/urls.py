@@ -63,4 +63,11 @@ urlpatterns = [
     path("api/household/pdf/", HouseholdPDFAPI.as_view(), name="household_pdf_api"),
     path("api/family/pdf/", FamilyPDFAPI.as_view(), name="family_pdf_api"),
     path("api/residents/pdf/", ResidentsPDFAPI.as_view(), name="residents_pdf_api"),
+    
+    # RESIDENT PROFILING
+    path("profiling/personal-info/", views.profile_personal_info, name="profile_personal_info"),
+    path("profiling/link-parent/", views.profile_link_parent, name="profile_link_parent"),
+    path("profiling/link-children/", views.profile_link_children, name="profile_link_children"),
+    path("profiling/socioeconomic/", views.profile_socioeconomic, name="profile_socioeconomic"),
+    path("profiling/review/", views.profile_review, name="profile_review"),
 ]
