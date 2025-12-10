@@ -182,6 +182,8 @@
         </div>
         
         <input type="hidden" name="added_by_id" id="added_by_id" value="{{ request.user.id }}">
+        <input type="hidden" name="latitude" id="latitude" value=""> 
+        <input type="hidden" name="longitude" id="longitude" value=""> 
 
         <div class="mt-auto button-container">
             <button class="btn btn-reset" type="button" id="clearHouseholdBtn">Clear</button>
@@ -197,7 +199,8 @@
 <script defer src="{% static 'js/map_registration.js' %}"></script>
 <script defer src="{% static 'js/household_head_search.js' %}"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function () {
+(() => {
+    document.addEventListener('DOMContentLoaded', function () {
     const submitBtn = document.getElementById('submitHouseholdBtn');
     const clearBtn = document.getElementById('clearHouseholdBtn');
     const nextUrl = "{% url 'resident:family_info' %}";
@@ -216,8 +219,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const formEl = document.querySelector('form');
     if (formEl){
-        // Prevent native form submit (e.g. Enter key) — we handle submission via fetch
-        formEl.addEventListener('submit', function(e){ e.preventDefault(); });
+        // Prevent native form submit (e.g. Enter key) — capture phase to stop early events
+        formEl.addEventListener('submit', function(e){ e.preventDefault(); }, true);
+        // As a defensive override for any inline handlers, ensure onsubmit returns false
+        formEl.onsubmit = function(){ return false; };
     }
 
     clearBtn && clearBtn.addEventListener('click', function(){
@@ -228,11 +233,15 @@ document.addEventListener('DOMContentLoaded', function () {
     // prevent double-submit
     let inFlight = false;
 
+    // lightweight dataset lock to avoid duplicate handlers (pointerdown+click) or duplicate listeners
+    if (submitBtn) submitBtn.dataset.locked = submitBtn.dataset.locked || '0';
+
     submitBtn && submitBtn.addEventListener('click', async function(){
+        // If a previous submit locked this button, ignore
+        if (submitBtn.dataset.locked === '1') return;
         if (inFlight) return;
-        inFlight = true;
-        submitBtn.disabled = true;
-        // collect required fields
+
+        // collect required fields (validation happens before setting the locked/inFlight state)
         const payload = {
             p_house_type_id: getField('{{ form.house_type.name }}') || getField('house_type_id') || null,
             p_house_ownership_id: getField('{{ form.house_ownership.name }}') || getField('house_ownership_id') || null,
@@ -265,13 +274,20 @@ document.addEventListener('DOMContentLoaded', function () {
         payload.p_latitude = payload.p_latitude ? Number(payload.p_latitude) : null;
         payload.p_longitude = payload.p_longitude ? Number(payload.p_longitude) : null;
 
+        // All validation passed — set locks so duplicate handlers/rapid events do not send twice
+        submitBtn.dataset.locked = '1';
+        inFlight = true;
+        submitBtn.disabled = true;
+
         try{
+            console.debug('submit payload', payload);
             const res = await fetch('/resident/api/household/create/', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCsrf(),
+                    'X-Client-Submit-Id': Math.random().toString(36).slice(2, 10)
                 },
                 body: JSON.stringify(payload),
             });
@@ -290,17 +306,20 @@ document.addEventListener('DOMContentLoaded', function () {
             }catch(e){}
 
             alert('Failed to create household: ' + (bodyText || res.statusText || 'Unknown error'));
-            // allow retry
+            // allow retry — reset locks
             inFlight = false;
             submitBtn.disabled = false;
+            submitBtn.dataset.locked = '0';
         }catch(err){
             console.error('create household error', err);
             alert('An unexpected error occurred while creating household.');
             inFlight = false;
             submitBtn.disabled = false;
+            submitBtn.dataset.locked = '0';
         }
     });
 });
+})();
 </script>
 {% endblock  %}
 {% endblock %}

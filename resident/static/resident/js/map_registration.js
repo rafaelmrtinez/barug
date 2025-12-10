@@ -18,6 +18,17 @@ function fill_home_address() {
 
   const homeAddrEl = document.getElementById('home_address') || document.getElementById('id_home_address');
   if (homeAddrEl) homeAddrEl.value = fullAddress;
+  // Persist current marker coordinates into hidden form inputs if present
+  try {
+    const latEl = document.getElementById('latitude') || document.getElementById('id_latitude');
+    const lngEl = document.getElementById('longitude') || document.getElementById('id_longitude');
+    if (typeof currentLngLat !== 'undefined') {
+      if (latEl) latEl.value = String(currentLngLat.lat);
+      if (lngEl) lngEl.value = String(currentLngLat.lng);
+    }
+  } catch (err) {
+    console.warn('Could not set hidden lat/lng inputs', err);
+  }
 }
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -240,6 +251,15 @@ document.addEventListener("DOMContentLoaded", function () {
       if (inside) {
         marker.setLngLat([coords.lng, coords.lat]);
         currentLngLat = coords;
+        // Persist coordinates immediately so form payloads pick them up without requiring modal Save
+        try {
+          const latEl = document.getElementById('latitude') || document.getElementById('id_latitude');
+          const lngEl = document.getElementById('longitude') || document.getElementById('id_longitude');
+          if (latEl) latEl.value = String(coords.lat);
+          if (lngEl) lngEl.value = String(coords.lng);
+        } catch (err) {
+          console.warn('Could not persist lat/lng inputs from attemptUpdate', err);
+        }
         // detect Purok by checking polygon features first
         try {
           const hit = purokGeojson.features.find(f => turf.booleanPointInPolygon(point, f));

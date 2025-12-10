@@ -2,12 +2,12 @@ from django.views import View
 from django.http import HttpRequest, JsonResponse, HttpResponseBadRequest, HttpResponse
 import json
 import logging
-import uuid
 
 from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.repositories.queries.person_queries import PersonQuery
 from src.infra.repositories.commands.household_commands import HouseholdCommand
 from src.infra.exceptions.household_membership_exception import HouseholdMembershipException
+from src.app.services.household_create_service import HouseholdCreateService
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,14 @@ class ResidentSearchAPI(View):
 		person_code = request.GET.get('code')
 		q = request.GET.get('q')
 		limit = request.GET.get('limit')
+		logger.info(
+			"ResidentSearchAPI GET called: id=%s code=%s q=%s limit=%s remote=%s",
+			person_id,
+			person_code,
+			q,
+			limit,
+			request.META.get('REMOTE_ADDR', '<unknown>'),
+		)
 
 		try:
 			limit_val = int(limit) if limit is not None else None
@@ -43,19 +51,23 @@ class ResidentSearchAPI(View):
 				except ValueError:
 					return HttpResponseBadRequest('invalid id')
 				person = pq.get_person_by_id(pid)
+				logger.info('ResidentSearchAPI: found person by id=%s', pid)
 				return JsonResponse(person, safe=False)
 
 			if person_code:
 				person = pq.get_person_by_code(person_code)
+				logger.info('ResidentSearchAPI: found person by code=%s', person_code)
 				return JsonResponse(person, safe=False)
 
 			if q:
 				rows = pq.search_active_people_by_key(q, limit=limit_val)
+				logger.info('ResidentSearchAPI: search returned %d rows for q="%s"', len(rows) if rows is not None else 0, q)
 				return JsonResponse(rows, safe=False)
 
 			return HttpResponseBadRequest('missing query parameter: one of id, code, or q is required')
 		except Exception as exc:
-			# Return 500 with minimal information; logging left to caller environment
+			logger.exception('Unhandled exception in ResidentSearchAPI.get')
+			# Return 500 with minimal information; logs contain details
 			return HttpResponse(status=500, content=str(exc))
 
 
@@ -76,17 +88,28 @@ class HouseholdCreateAPI(View):
 	- latitude (optional)
 	- longitude (optional)
 	"""
+ 
+	def __init__(self, **kwargs):
+		super().__init__(**kwargs)
+		self._service: HouseholdCreateService | None = HouseholdCreateService(
+      household_command=HouseholdCommand(
+          ctx=ConnectionAdapter()
+          )
+      )
 
 	def post(self, request: HttpRequest, *args, **kwargs) -> HttpResponseBadRequest | JsonResponse | HttpResponse:
 		# Accept both JSON and form-encoded data
+		logger.info('HouseholdCreateAPI POST called (content_type=%s from=%s)', request.content_type, request.META.get('REMOTE_ADDR', '<unknown>'))
 		if request.content_type and request.content_type.startswith('application/json'):
 			try:
 				data = json.loads(request.body.decode('utf-8') or '{}')
 			except Exception:
+				logger.warning('HouseholdCreateAPI: invalid JSON body')
 				return HttpResponseBadRequest('invalid JSON body')
 		else:
 			# QueryDict -> regular dict access
 			data = {k: v for k, v in request.POST.items()}
+		logger.debug('HouseholdCreateAPI: raw payload keys=%s', list(data.keys()))
 
 		# helper to pick field from multiple possible keys
 		def pick(*keys):
@@ -105,25 +128,27 @@ class HouseholdCreateAPI(View):
 			p_household_num = pick('household_num', 'p_household_num')
 			p_house_num = pick('house_num', 'p_house_num')
 			p_household_head_id = int(pick('household_head_id', 'p_household_head_id', 'household_head'))
-			lat = pick('latitude', 'lat')
-			lng = pick('longitude', 'lng', 'long')
+			lat = pick('p_latitude', 'lat')
+			lng = pick('p_longitude', 'lng', 'long')
 
 			p_latitude = float(lat) if lat not in (None, '') else None
 			p_longitude = float(lng) if lng not in (None, '') else None
 		except TypeError as e:
 			return HttpResponseBadRequest('missing required field or invalid type')
 		except ValueError as e:
+			logger.warning('HouseholdCreateAPI: invalid numeric value: %s', e)
 			return HttpResponseBadRequest('invalid numeric value')
 
 		# Basic presence checks
 		if not all([p_city, p_barangay, p_household_num, p_house_num]):
+			logger.warning('HouseholdCreateAPI: missing required address/household fields')
 			return HttpResponseBadRequest('missing required address/household fields')
 
-		ctx = ConnectionAdapter()
-		cmd = HouseholdCommand(ctx)
 		try:
-			logger.info('request %s: inserting household')
-			result = cmd.insert_household(
+			staff = request.session.get('auth') and request.session.get('auth').get('staff_id')
+			logger.info('HouseholdCreateAPI: creating household by staff_id=%s for head_id=%s', staff, p_household_head_id)
+			logger.debug('HouseholdCreateAPI: insert params: city=%s barangay=%s purok=%s street=%s household_num=%s house_num=%s lat=%s lng=%s', p_city, p_barangay, p_sitio_purok, p_street, p_household_num, p_house_num, p_latitude, p_longitude)
+			result = self._service.create_household(
 				p_house_type_id,
 				p_house_ownership_id,
 				p_city,
@@ -137,12 +162,12 @@ class HouseholdCreateAPI(View):
 				p_latitude,
 				p_longitude,
 			)
-			logger.info('request %s: insert result=%s', result)
+			logger.info('HouseholdCreateAPI: service.create_household returned result=%s', result)
 			return JsonResponse({'result': result}, status=201)
 		except HouseholdMembershipException as he:
-			logger.warning('request %s: membership error %s', he)
+			logger.warning('HouseholdCreateAPI: membership exception: %s', getattr(he, 'message', str(he)))
 			return JsonResponse({'error': getattr(he, 'message', str(he))}, status=400)
 		except Exception as exc:
-			logger.exception('request %s: unexpected error while creating household')
+			logger.exception('Unhandled exception in HouseholdCreateAPI.post')
 			return HttpResponse(status=500, content="Something went wrong while creating household.")
 
