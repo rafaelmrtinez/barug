@@ -1,14 +1,23 @@
 function fill_home_address() {
-    const street = document.getElementById('street').value.trim();
-    const purokSitio = document.getElementById('purok_sitio').value.trim();
-    const barangay = document.getElementById('barangay').value.trim();
-    const city = document.getElementById('city').value.trim();
+  // Support multiple possible DOM ids (Django form ids vary). Prefer house number first.
+  const houseNumEl = document.getElementById('house_num') || document.getElementById('id_house_num') || document.getElementById('houseNumber') || document.getElementById('id_houseNumber');
+  const streetEl = document.getElementById('street') || document.getElementById('id_street');
+  const purokEl = document.getElementById('purok_sitio') || document.getElementById('id_purok_sitio');
+  const barangayEl = document.getElementById('barangay') || document.getElementById('id_barangay');
+  const cityEl = document.getElementById('city') || document.getElementById('id_city');
 
-    // Filter out empty values, then join with comma
-    const parts = [street, purokSitio, barangay, city].filter(part => part !== '');
-    const fullAddress = parts.join(', ');
+  const houseNum = houseNumEl ? houseNumEl.value.trim() : '';
+  const street = streetEl ? streetEl.value.trim() : '';
+  const purokSitio = purokEl ? purokEl.value.trim() : '';
+  const barangay = barangayEl ? barangayEl.value.trim() : '';
+  const city = cityEl ? cityEl.value.trim() : '';
 
-    document.getElementById('home_address').value = fullAddress;
+  // Build address with house number before street
+  const parts = [houseNum, street, purokSitio, barangay, city].filter(part => part !== '');
+  const fullAddress = parts.join(', ');
+
+  const homeAddrEl = document.getElementById('home_address') || document.getElementById('id_home_address');
+  if (homeAddrEl) homeAddrEl.value = fullAddress;
 }
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -51,6 +60,68 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     };
 
+    // === Estimated PUROK polygons from annotated map ===
+    // Coordinates provided as [lat, lng]. We'll convert to [lng, lat] for GeoJSON.
+    const PUROKS = [
+      {
+        code: "S01", name: "KANIPAAN", coords: [
+          [10.29760,123.89850],
+          [10.29785,123.90005],
+          [10.29695,123.90150],
+          [10.29610,123.90135],
+          [10.29555,123.90005],
+          [10.29605,123.89900],
+          [10.29700,123.89870],
+          [10.29760,123.89850]
+        ]
+      },
+      {
+        code: "S02", name: "PAMPANGO", coords: [
+          [10.29460,123.90160],
+          [10.29475,123.90360],
+          [10.29330,123.90350],
+          [10.29260,123.90250],
+          [10.29285,123.90120],
+          [10.29380,123.90100],
+          [10.29460,123.90160]
+        ]
+      },
+      {
+        code: "S03", name: "LUTAW-LUTAW", coords: [
+          [10.29485,123.89990],
+          [10.29455,123.90140],
+          [10.29355,123.90120],
+          [10.29280,123.90000],
+          [10.29355,123.89905],
+          [10.29430,123.89900],
+          [10.29485,123.89990]
+        ]
+      },
+      {
+        code: "S04", name: "MAUCO", coords: [
+          [10.29650,123.90200],
+          [10.29605,123.90345],
+          [10.29495,123.90370],
+          [10.29460,123.90225],
+          [10.29525,123.90155],
+          [10.29650,123.90200]
+        ]
+      }
+    ];
+
+    // Convert PUROKS to a GeoJSON FeatureCollection (mapbox/turf expect [lng, lat])
+    const purokGeojson = {
+      type: 'FeatureCollection',
+      features: PUROKS.map(p => ({
+        type: 'Feature',
+        properties: { code: p.code, name: p.name },
+        geometry: {
+          type: 'Polygon',
+          coordinates: [ p.coords.map(([lat, lng]) => [lng, lat]) ]
+        }
+      }))
+    };
+
     const map = new mapboxgl.Map({
       container: 'map',
       style: 'mapbox://styles/mapbox/streets-v11',
@@ -68,6 +139,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     map.on('load', () => {
       boundary_layers();
+      // keep purokGeojson for detection, but do not add visible purok layers
       getAddressFromCoordinates(currentLngLat.lng, currentLngLat.lat);
     });
 
@@ -103,7 +175,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     marker.on('dragend', () => {
         const lngLat = marker.getLngLat();
-        attemptUpdate({ lng: lngLat.lng, lat: lngLat.lat });
+      attemptUpdate({ lng: lngLat.lng, lat: lngLat.lat });
     });
 
     map.on('click', (e) => {
@@ -148,7 +220,8 @@ document.addEventListener("DOMContentLoaded", function () {
                     const cityInput = document.getElementById('city');
 
                     if (streetInput) streetInput.value = street;
-                    if (purokInput) purokInput.value = purok;
+                    // Only set purok from geocoding if not already set by polygon detection
+                    if (purokInput && !purokInput.value) purokInput.value = purok;
                     if (barangayInput) barangayInput.value = barangay;
                     if (cityInput) cityInput.value = city;
 
@@ -167,6 +240,18 @@ document.addEventListener("DOMContentLoaded", function () {
       if (inside) {
         marker.setLngLat([coords.lng, coords.lat]);
         currentLngLat = coords;
+        // detect Purok by checking polygon features first
+        try {
+          const hit = purokGeojson.features.find(f => turf.booleanPointInPolygon(point, f));
+          const purokInput = document.getElementById('purok_sitio');
+          if (hit && purokInput) {
+            purokInput.value = hit.properties.name || hit.properties.code || '';
+          }
+        } catch (err) {
+          console.warn('Purok detection error', err);
+        }
+
+        // then call reverse geocode to fill street/city etc.
         getAddressFromCoordinates(coords.lng, coords.lat);
       } else {
         new mapboxgl.Popup()

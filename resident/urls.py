@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, api
 
 app_name = 'resident'
 
@@ -16,4 +16,8 @@ urlpatterns = [
     path("register_household/household_information/", views.household_info, name="household_info"),
     path("register_household/family_information/", views.family_info, name="family_info"),
     path("<str:res_id>/", views.resident_record, name="resident_record"),
+    
+    # API CALLS
+    path("api/search/", api.ResidentSearchAPI.as_view(), name="person_search_api"),
+    path("api/household/create/", api.HouseholdCreateAPI.as_view(), name="household_create_api"),
 ]

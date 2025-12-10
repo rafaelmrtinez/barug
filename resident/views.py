@@ -17,7 +17,7 @@ user_role_template = user_role.lower().replace(' ', '_')
 from typing import Any, Dict, List
 
 from django.contrib import messages
-from django.http import HttpResponseForbidden
+from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import redirect, render
 from django.utils.html import escape
 
@@ -212,9 +212,10 @@ def resident_record(request, res_id):
         'form' : form,
     })
 
-def household_info(request):
+def household_info(request: HttpRequest) -> HttpResponse:
     form = HouseholdProfileForm()
-
+    user_role=request.session.get('auth').get('role_name')
+    user_role_template=user_role.lower().replace(' ', '_')
     return render(request, 'household_profiling/household_info.html', {
         'user_fullname' : user_fullname,
         'user_role' : user_role,
@@ -224,9 +225,10 @@ def household_info(request):
         'form' : form,
     })
 
-def family_info(request):
+def family_info(request: HttpRequest) -> HttpResponse:
     form = FamilyProfileForm()
-
+    user_role=request.session.get('auth').get('role_name')
+    user_role_template=user_role.lower().replace(' ', '_')
     return render(request, 'household_profiling/family_info.html', {
         'user_fullname' : user_fullname,
         'user_role' : user_role,
