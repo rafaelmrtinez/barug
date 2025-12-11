@@ -104,6 +104,41 @@ class FamilyMembershipService:
                 self._logger.warning("Invalid rel_to_hhold_head_id provided.")
                 raise MembershipException("Please select a valid relationship to household head.")
 
+            # Rule 1: If the member is household head, relationship must be household head
+            household_head_id = household[0].get("household_head_id") if isinstance(household[0], dict) else getattr(household[0], "household_head_id", None)
+            if household_head_id and family_head_id == household_head_id and rel_to_hhold_head_id != 1:
+                self._logger.warning("Household head must have relationship 'HOUSEHOLD HEAD'.")
+                raise MembershipException("If the member is the household head, the relationship to household head must be 'HOUSEHOLD HEAD'.")
+
+            # Rule 2: Do not allow membership if family_head_id exists on other families
+            families_with_head = self._household_query.search_families_by_head_id(family_head_id)
+            if families_with_head:
+                for fam in families_with_head:
+                    if fam.get("family_head_id") == family_head_id:
+                        self._logger.warning("Family head already exists in another family.")
+                        raise MembershipException("This person is already a family head in another family. Please select a different family head.")
+
+            # Rule 3: Do not allow membership if family_head_id is household head of another household
+            households_with_head = self._household_query.search_households_by_head_id(family_head_id)
+            if households_with_head:
+                for hh in households_with_head:
+                    hh_id = hh.get("household_id") if isinstance(hh, dict) else getattr(hh, "household_id", None)
+                    if hh_id != household_id:
+                        self._logger.warning("Family head is household head of another household.")
+                        raise MembershipException("This person is already a household head of another household. Please select a different family head.")
+
+            # Rule 4a: No duplicate family number allowed
+            duplicate_family_num = self._household_query.search_family_unit_by_num(family_num)
+            if duplicate_family_num:
+                self._logger.warning("Family number already exists.")
+                raise MembershipException("A family with this Family Number already exists. Please use a unique Family Number.")
+
+            # Rule 4b: No duplicate UFC number allowed
+            duplicate_ufc_num = self._household_query.search_family_unit_by_ufc(ufc_num)
+            if duplicate_ufc_num:
+                self._logger.warning("UFC code already exists.")
+                raise MembershipException("A family with this UFC Code already exists. Please use a unique UFC Code.")
+
             self._logger.info(f"All validations passed for household_num='{household_num}', family_num='{family_num}'. Proceeding to create family unit.")
             result = self._family_commands.insert_family_unit(
                 household_id,

@@ -4,11 +4,37 @@ import logging
 
 
 class HouseholdQuery:
+    
     _logger = logging.getLogger("HouseholdQuery")
     
+    def search_family_unit_by_num(self, family_num):
+        self._logger.info("Searching family unit by family_num.")
+        sql = "SELECT * FROM family_unit WHERE family_num = %s"
+        return self._ctx.execute_query_to_dict(sql, (family_num,))
+
+    def search_family_unit_by_ufc(self, ufc_num):
+        self._logger.info("Searching family unit by ufc_num.")
+        sql = "SELECT * FROM family_unit WHERE ufc_num = %s"
+        return self._ctx.execute_query_to_dict(sql, (ufc_num,))
+        
     def __init__(self, ctx: ConnectionAdapter):
         self._ctx = ctx
         self._logger.debug("HouseholdQuery initialized.")
+    
+    def search_families_by_head_id(self, family_head_id):
+        self._logger.info("Searching families by family_head_id.")
+        sql = "SELECT * FROM family_unit WHERE family_head_id = %s"
+        return self._ctx.execute_query_to_dict(sql, (family_head_id,))
+
+    def search_households_by_head_id(self, household_head_id):
+        self._logger.info("Searching households by household_head_id.")
+        sql = "SELECT * FROM household_info WHERE household_head_id = %s"
+        return self._ctx.execute_query_to_dict(sql, (household_head_id,))
+
+    def search_family_by_num_and_ufc(self, family_num, ufc_num):
+        self._logger.info("Searching family by family_num and ufc_num.")
+        sql = "SELECT * FROM family_unit WHERE family_num = %s AND ufc_num = %s"
+        return self._ctx.execute_query_to_dict(sql, (family_num, ufc_num))
         
     # 1. Individual table queries
     def get_household_by_id(self, household_id):
