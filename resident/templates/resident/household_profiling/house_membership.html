@@ -1,0 +1,239 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block css %}
+    <link rel="stylesheet" href="{% static 'css/form.css' %}">
+    <link rel="stylesheet" href="{% static 'css/button.css' %}">
+    <link rel="stylesheet" href="{% static 'css/progress_bar.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3 d-flex flex-column flex-grow-1" style="margin-top: 40px;">
+    <div class="step-progress mb-2">
+        <div class="step completed">
+            <div class="circle">1</div>
+            <div class="label">Household Information</div>
+        </div>
+        <div class="step completed">
+            <div class="circle">2</div>
+            <div class="label">Family Information</div>
+        </div>
+        <div class="step active">
+            <div class="circle">3</div>
+            <div class="label">Household Members</div>
+        </div>
+    </div>
+    <h3 class="mb-3">Add Household Members</h3>
+    <form id="addMemberForm" class="mb-4">
+        <div class="row mb-2">
+            <div class="col-lg-5 col-md-12 col-sm-12 mb-3">
+                <div class="form-floating mb-3 position-relative" style="width:100%;">
+                    <input type="text" class="form-control" id="person_search" name="person_search" placeholder="Search Person" autocomplete="off" style="width:100%;">
+                    <label for="person_search">Search Person</label>
+                    <input type="hidden" id="person_id" name="person_id">
+                    <div id="person_search_results" class="list-group position-absolute" style="top:100%; left:0; width:100%; z-index:10;"></div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    <select id="rel_to_hhold_head_id" name="rel_to_hhold_head_id" class="form-select" required>
+                        <option value="">Relationship to Household Head</option>
+                        <option value="1">HOUSEHOLD HEAD</option>
+                        <option value="2">FAMILY HEAD</option>
+                        <option value="3">SPOUSE</option>
+                        <option value="4">MOTHER</option>
+                        <option value="5">FATHER</option>
+                        <option value="6">GUARDIAN</option>
+                        <option value="7">CHILD</option>
+                        <option value="8">SON</option>
+                        <option value="9">DAUGHTER</option>
+                        <option value="10">SIBLING</option>
+                        <option value="11">GRANDCHILD</option>
+                        <option value="12">GRANDPARENT</option>
+                        <option value="13">NEPHEW</option>
+                        <option value="14">NIECE</option>
+                        <option value="15">UNCLE</option>
+                        <option value="16">AUNT</option>
+                        <option value="17">COUSIN</option>
+                        <option value="18">IN-LAW (E.G., BROTHER-IN-LAW, SISTER-IN-LAW, PARENT-IN-LAW)</option>
+                        <option value="19">BOARDER</option>
+                        <option value="20">RENTER</option>
+                        <option value="21">DOMESTIC HELPER</option>
+                        <option value="22">OTHER RELATIVE</option>
+                        <option value="23">NON-RELATIVE</option>
+                    </select>
+                    <label for="rel_to_hhold_head_id">Relationship to Household Head</label>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    <select id="rel_to_family_head_id" name="rel_to_family_head_id" class="form-select" required>
+                        <option value="">Relationship to Family Head</option>
+                        <option value="2">FAMILY HEAD</option>
+                        <option value="3">SPOUSE</option>
+                        <option value="4">MOTHER</option>
+                        <option value="5">FATHER</option>
+                        <option value="6">GUARDIAN</option>
+                        <option value="7">CHILD</option>
+                        <option value="8">SON</option>
+                        <option value="9">DAUGHTER</option>
+                        <option value="10">SIBLING</option>
+                        <option value="11">GRANDCHILD</option>
+                        <option value="12">GRANDPARENT</option>
+                        <option value="13">NEPHEW</option>
+                        <option value="14">NIECE</option>
+                        <option value="15">UNCLE</option>
+                        <option value="16">AUNT</option>
+                        <option value="17">COUSIN</option>
+                        <option value="18">IN-LAW (E.G., BROTHER-IN-LAW, SISTER-IN-LAW, PARENT-IN-LAW)</option>
+                        <option value="19">BOARDER</option>
+                        <option value="20">RENTER</option>
+                        <option value="21">DOMESTIC HELPER</option>
+                        <option value="22">OTHER RELATIVE</option>
+                        <option value="23">NON-RELATIVE</option>
+                    </select>
+                    <label for="rel_to_family_head_id">Relationship to Family Head</label>
+                </div>
+            </div>
+        </div>
+        <div class="d-flex justify-content-end">
+            <button type="button" class="btn btn-primary" id="addMemberBtn">Add Member</button>
+        </div>
+    </form>
+    <h5>Members to be Added</h5>
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped table-hover align-middle" id="membersPreviewTable" style="background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <thead class="table-dark">
+                <tr>
+                    <th class="text-center">Name</th>
+                    <th class="text-center">Relationship to Household Head</th>
+                    <th class="text-center">Relationship to Family Head</th>
+                    <th class="text-center">Action</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+{% block js %}
+<script>
+(function() {
+    const members = [];
+    document.addEventListener('DOMContentLoaded', function () {
+        // Person search logic
+        const searchInput = document.getElementById('person_search');
+        const resultsContainer = document.getElementById('person_search_results');
+        const hiddenIdInput = document.getElementById('person_id');
+        let debounceTimeout = null;
+
+        searchInput.addEventListener('input', function () {
+            const query = searchInput.value.trim();
+            resultsContainer.innerHTML = '';
+            hiddenIdInput.value = '';
+            if (debounceTimeout) clearTimeout(debounceTimeout);
+            if (query.length < 2) return;
+            debounceTimeout = setTimeout(() => {
+                fetch(`/resident/api/search/?q=${encodeURIComponent(query)}&limit=10`)
+                    .then(response => response.json())
+                    .then(data => {
+                        resultsContainer.innerHTML = '';
+                        if (Array.isArray(data) && data.length > 0) {
+                            data.forEach(person => {
+                                const item = document.createElement('button');
+                                item.type = 'button';
+                                item.className = 'list-group-item list-group-item-action';
+                                const name = `${person.first_name} ${person.last_name}`;
+                                const code = person.person_code ? ` [${person.person_code}]` : '';
+                                const address = person.full_address ? `${person.full_address}` : '';
+                                item.innerHTML = `<strong>${name}</strong>${code}<br><small>${address}</small>`;
+                                item.addEventListener('click', function () {
+                                    searchInput.value = name;
+                                    hiddenIdInput.value = person.person_id;
+                                    resultsContainer.innerHTML = '';
+                                });
+                                resultsContainer.appendChild(item);
+                            });
+                        } else {
+                            const noResult = document.createElement('div');
+                            noResult.className = 'list-group-item';
+                            noResult.textContent = 'No results found.';
+                            resultsContainer.appendChild(noResult);
+                        }
+                    })
+                    .catch(() => {
+                        resultsContainer.innerHTML = '<div class="list-group-item">Error searching.</div>';
+                    });
+            }, 300);
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!resultsContainer.contains(e.target) && e.target !== searchInput) {
+                resultsContainer.innerHTML = '';
+            }
+        });
+
+        // Add member logic
+        document.getElementById('addMemberBtn').addEventListener('click', function () {
+            const personId = hiddenIdInput.value;
+            const personName = searchInput.value.trim();
+            const relToHholdHead = document.getElementById('rel_to_hhold_head_id').selectedOptions[0].text;
+            const relToHholdHeadId = document.getElementById('rel_to_hhold_head_id').value;
+            const relToFamilyHead = document.getElementById('rel_to_family_head_id').selectedOptions[0].text;
+            const relToFamilyHeadId = document.getElementById('rel_to_family_head_id').value;
+
+            if (!personId || !personName || !relToHholdHeadId || !relToFamilyHeadId) {
+                alert('Please select a person and both relationships.');
+                return;
+            }
+
+            // Prevent duplicate person
+            if (members.some(m => m.personId === personId)) {
+                alert('This person is already added.');
+                return;
+            }
+
+            members.push({
+                personId,
+                personName,
+                relToHholdHead,
+                relToHholdHeadId,
+                relToFamilyHead,
+                relToFamilyHeadId
+            });
+            renderMembersTable();
+            // Reset form fields
+            searchInput.value = '';
+            hiddenIdInput.value = '';
+            document.getElementById('rel_to_hhold_head_id').value = '';
+            document.getElementById('rel_to_family_head_id').value = '';
+        });
+
+        function renderMembersTable() {
+            const tbody = document.querySelector('#membersPreviewTable tbody');
+            tbody.innerHTML = '';
+            members.forEach((m, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="text-center align-middle">${m.personName}</td>
+                    <td class="text-center align-middle">${m.relToHholdHead}</td>
+                    <td class="text-center align-middle">${m.relToFamilyHead}</td>
+                    <td class="text-center align-middle"><button type="button" class="btn btn-danger btn-sm" data-idx="${idx}">Remove</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+            // Remove member logic
+            tbody.querySelectorAll('button[data-idx]').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const idx = parseInt(btn.getAttribute('data-idx'));
+                    members.splice(idx, 1);
+                    renderMembersTable();
+                });
+            });
+        }
+    });
+})();
+</script>
+{% endblock %}
+{% endblock %}
