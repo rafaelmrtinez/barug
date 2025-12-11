@@ -225,7 +225,7 @@ def household_info(request: HttpRequest) -> HttpResponse:
         'form' : form,
     })
 
-def family_info(request: HttpRequest) -> HttpResponse:
+def family_info(request: HttpRequest, household_id: int) -> HttpResponse:
     form = FamilyProfileForm()
     user_role=request.session.get('auth').get('role_name')
     user_role_template=user_role.lower().replace(' ', '_')
@@ -236,4 +236,5 @@ def family_info(request: HttpRequest) -> HttpResponse:
         'page_title' : 'Resident Records',
         'user_role_template' : user_role_template,
         'form' : form,
+        'household_id' : household_id,
     })

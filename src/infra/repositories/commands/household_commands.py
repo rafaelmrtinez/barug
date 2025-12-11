@@ -3,7 +3,7 @@ from typing import Optional
 import logging
 
 from src.infra.database.connection_adapter import ConnectionAdapter
-from src.infra.exceptions.household_membership_exception import HouseholdMembershipException
+from src.infra.exceptions.membership_exception import MembershipException
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +70,8 @@ class HouseholdCommand:
             # map known membership error codes to a domain exception so callers
             # (e.g. API views) can return user-friendly responses.
             pgcode = getattr(exc, 'pgcode', None)
-            if pgcode and HouseholdMembershipException.is_membership_exception(pgcode):
-                raise HouseholdMembershipException(str(exc)) from exc
+            if pgcode and MembershipException.is_membership_exception(pgcode):
+                raise MembershipException(str(exc)) from exc
 
             # Some adapters may wrap the original exception; try to inspect args
             # for a textual code like 'P6035'. Fall back to re-raising the
@@ -79,8 +79,8 @@ class HouseholdCommand:
             try:
                 # look for known code in exception message
                 msg = str(exc)
-                if any(code in msg for code in HouseholdMembershipException.ERROR_CODES):
-                    raise HouseholdMembershipException(msg) from exc
+                if any(code in msg for code in MembershipException.ERROR_CODES):
+                    raise MembershipException(msg) from exc
             except Exception:
                 pass
 

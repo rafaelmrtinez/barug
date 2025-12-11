@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   // Render list of persons
+  
   function renderResults(list){
     resultsEl.innerHTML = '';
     if (!list || list.length === 0){

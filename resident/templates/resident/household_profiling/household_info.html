@@ -203,7 +203,7 @@
     document.addEventListener('DOMContentLoaded', function () {
     const submitBtn = document.getElementById('submitHouseholdBtn');
     const clearBtn = document.getElementById('clearHouseholdBtn');
-    const nextUrl = "{% url 'resident:family_info' %}";
+    const nextUrl = "{% url 'resident:family_info' household_id=0 %}";
 
     function getField(name){
         const elByName = document.querySelector('[name="' + name + '"]');
@@ -294,7 +294,9 @@
 
             if (res.status === 201){
                 // created -> proceed
-                window.location.href = nextUrl;
+                const resJson = await res.json()
+                console.debug('household created', resJson);
+                window.location.href = nextUrl.replace('0', resJson.result);
                 return;
             }
 

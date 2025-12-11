@@ -6,8 +6,86 @@ import logging
 from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.repositories.queries.person_queries import PersonQuery
 from src.infra.repositories.commands.household_commands import HouseholdCommand
-from src.infra.exceptions.household_membership_exception import HouseholdMembershipException
+from src.infra.repositories.commands.family_commands import FamilyCommands
+from src.infra.repositories.queries.household_queries import HouseholdQuery
+from src.infra.exceptions.membership_exception import MembershipException
 from src.app.services.household_create_service import HouseholdCreateService
+from src.app.services.family_membership_service import FamilyMembershipService
+
+
+class FamilyMembershipAPI(View):
+	"""
+	API endpoint to create a family unit.
+	Accepts POSTed family data (JSON or form-encoded).
+	"""
+
+	def __init__(self, **kwargs):
+		super().__init__(**kwargs)
+		ctx = ConnectionAdapter()
+		self._service: FamilyMembershipService = FamilyMembershipService(
+			family_commands=FamilyCommands(ctx),
+			household_query=HouseholdQuery(ctx)
+		)
+		self._logger = logging.getLogger("FamilyMembershipAPI")
+
+	def post(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
+		self._logger.info('FamilyMembershipAPI POST called (content_type=%s from=%s)', request.content_type, request.META.get('REMOTE_ADDR', '<unknown>'))
+		if request.content_type and request.content_type.startswith('application/json'):
+			try:
+				data = json.loads(request.body.decode('utf-8') or '{}')
+			except Exception:
+				self._logger.warning('FamilyMembershipAPI: invalid JSON body')
+				return HttpResponseBadRequest('invalid JSON body')
+		else:
+			data = {k: v for k, v in request.POST.items()}
+		self._logger.debug('FamilyMembershipAPI: raw payload keys=%s', list(data.keys()))
+
+		def pick(*keys):
+			for k in keys:
+				if k in data and data[k] is not None and data[k] != '':
+					return data[k]
+			return None
+
+		try:
+			household_num = pick('household_num', 'p_household_num')
+			added_by_id = int(request.session.get('auth').get('staff_id', {}))
+			family_num = pick('family_num', 'p_family_num')
+			ufc_num = pick('ufc_num', 'p_ufc_num')
+			source_of_income = pick('source_of_income', 'p_source_of_income')
+			family_mnthly_icnome_id = int(pick('family_mnthly_icnome_id', 'p_family_mnthly_icnome_id'))
+			nhts_status_id = int(pick('nhts_status_id', 'p_nhts_status_id'))
+			indigent_status_id = int(pick('indigent_status_id', 'p_indigent_status_id'))
+			household_type_id = int(pick('household_type_id', 'p_household_type_id'))
+			family_head_id = int(pick('family_head_id', 'p_family_head_id'))
+			rel_to_hhold_head_id = int(pick('rel_to_hhold_head_id', 'p_rel_to_hhold_head_id'))
+		except (TypeError, ValueError) as e:
+			self._logger.warning('FamilyMembershipAPI: missing or invalid field: %s', e)
+			return HttpResponseBadRequest('missing required field or invalid type')
+
+		self._logger.info('FamilyMembershipAPI: creating family unit for household_num=%s family_num=%s', household_num, family_num)
+		try:
+			result = self._service.create_family_unit(
+				household_num,
+				added_by_id,
+				family_num,
+				ufc_num,
+				source_of_income,
+				family_mnthly_icnome_id,
+				nhts_status_id,
+				indigent_status_id,
+				household_type_id,
+				family_head_id,
+				rel_to_hhold_head_id,
+			)
+			self._logger.info('FamilyMembershipAPI: service.create_family_unit returned result')
+			return JsonResponse({'result': result}, status=201)
+		except MembershipException as me:
+			self._logger.warning('FamilyMembershipAPI: membership exception: %s', getattr(me, 'message', str(me)))
+			print(f"FAMILY MEMBERSHIP ERROR: {me.message}")
+			return JsonResponse({'error': me.message}, status=400)
+		except Exception as exc:
+			self._logger.exception('Unhandled exception in FamilyMembershipAPI.post')
+			return HttpResponse(status=500, content="Something went wrong while creating family unit.")
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +242,7 @@ class HouseholdCreateAPI(View):
 			)
 			logger.info('HouseholdCreateAPI: service.create_household returned result=%s', result)
 			return JsonResponse({'result': result}, status=201)
-		except HouseholdMembershipException as he:
+		except MembershipException as he:
 			logger.warning('HouseholdCreateAPI: membership exception: %s', getattr(he, 'message', str(he)))
 			return JsonResponse({'error': getattr(he, 'message', str(he))}, status=400)
 		except Exception as exc:

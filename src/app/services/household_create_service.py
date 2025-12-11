@@ -2,7 +2,7 @@ from typing import Optional, Any, Dict
 
 from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.repositories.commands.household_commands import HouseholdCommand
-from src.infra.exceptions.household_membership_exception import HouseholdMembershipException
+from src.infra.exceptions.membership_exception import MembershipException
 
 
 class HouseholdCreateService:
@@ -35,7 +35,7 @@ class HouseholdCreateService:
 		]
 		missing = [k for k in required if payload.get(k) in (None, '')]
 		if missing:
-			raise HouseholdMembershipException(f"Missing required fields: {', '.join(missing)}")
+			raise MembershipException(f"Missing required fields: {', '.join(missing)}")
 
 	def create_household(self,
 			p_house_type_id: int,
