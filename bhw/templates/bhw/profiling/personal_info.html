@@ -53,4 +53,22 @@
         </div>
     </form>
 </div>
+<script>
+const mobileInput = document.querySelector('input[name="mobile_num"]');
+if (mobileInput) {
+    mobileInput.addEventListener('input', function(e) {
+        let val = e.target.value;
+        if (!val.startsWith('+63')) {
+            e.target.value = '+63';
+        } else if (val.length > 13) {
+            e.target.value = val.slice(0, 13);
+        }
+    });
+    mobileInput.addEventListener('keydown', function(e) {
+        if ((e.key === 'Backspace' || e.key === 'Delete') && e.target.selectionStart <= 3) {
+            e.preventDefault();
+        }
+    });
+}
+</script>
 {% endblock %}
