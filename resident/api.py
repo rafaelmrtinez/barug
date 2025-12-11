@@ -11,7 +11,53 @@ from src.infra.repositories.queries.household_queries import HouseholdQuery
 from src.infra.exceptions.membership_exception import MembershipException
 from src.app.services.household_create_service import HouseholdCreateService
 from src.app.services.family_membership_service import FamilyMembershipService
+from src.app.services.household_membership_service import HouseholdMembershipService
 
+
+class HouseholdMembershipAPI(View):
+	"""
+	API endpoint to add multiple household members.
+	Accepts POSTed member data (JSON array of member dicts) and added_by_id.
+	"""
+
+	def __init__(self, **kwargs):
+		super().__init__(**kwargs)
+		ctx = ConnectionAdapter()
+		self._service: HouseholdMembershipService = HouseholdMembershipService(
+			household_command=HouseholdCommand(ctx),
+			household_query=HouseholdQuery(ctx)
+		)
+		self._logger = logging.getLogger("HouseholdMembershipAPI")
+
+	def post(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
+		self._logger.info('HouseholdMembershipAPI POST called (content_type=%s from=%s)', request.content_type, request.META.get('REMOTE_ADDR', '<unknown>'))
+		if request.content_type and request.content_type.startswith('application/json'):
+			try:
+				data = json.loads(request.body.decode('utf-8') or '{}')
+			except Exception:
+				self._logger.warning('HouseholdMembershipAPI: invalid JSON body')
+				return HttpResponseBadRequest('invalid JSON body')
+		else:
+			data = {k: v for k, v in request.POST.items()}
+		self._logger.debug('HouseholdMembershipAPI: raw payload keys=%s', list(data.keys()))
+
+		# Expecting: { "members": [ ... ], "added_by_id": ... }
+		members_payload = data.get('members')
+		added_by_id = data.get('added_by_id')
+		if not isinstance(members_payload, list) or not added_by_id:
+			return HttpResponseBadRequest('Missing members or added_by_id')
+		try:
+			added_by_id = int(added_by_id)
+		except Exception:
+			return HttpResponseBadRequest('Invalid added_by_id')
+
+		self._logger.info('HouseholdMembershipAPI: adding %d members by staff_id=%s', len(members_payload), added_by_id)
+		try:
+			results = self._service.add_household_members(members_payload, added_by_id)
+			return JsonResponse({'results': results}, status=201)
+		except Exception as exc:
+			self._logger.exception('Unhandled exception in HouseholdMembershipAPI.post')
+			return HttpResponse(status=500, content="Something went wrong while adding household members.")
 
 class FamilyMembershipAPI(View):
 	"""

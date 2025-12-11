@@ -22,4 +22,5 @@ urlpatterns = [
     path("api/search/", api.ResidentSearchAPI.as_view(), name="person_search_api"),
     path("api/household/create/", api.HouseholdCreateAPI.as_view(), name="household_create_api"),
     path("api/register/family_unit/", api.FamilyMembershipAPI.as_view(), name="family_membership"),
+    path("api/register/household_members/", api.HouseholdMembershipAPI.as_view(), name="household_membership_api"),
 ]

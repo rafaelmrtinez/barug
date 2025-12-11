@@ -127,11 +127,15 @@
         const resultsContainer = document.getElementById('person_search_results');
         const hiddenIdInput = document.getElementById('person_id');
         let debounceTimeout = null;
+        let personSelected = false;
 
         searchInput.addEventListener('input', function () {
             const query = searchInput.value.trim();
             resultsContainer.innerHTML = '';
-            hiddenIdInput.value = '';
+            if (!personSelected) {
+                hiddenIdInput.value = '';
+            }
+            personSelected = false;
             if (debounceTimeout) clearTimeout(debounceTimeout);
             if (query.length < 2) return;
             debounceTimeout = setTimeout(() => {
@@ -151,6 +155,7 @@
                                 item.addEventListener('click', function () {
                                     searchInput.value = name;
                                     hiddenIdInput.value = person.person_id;
+                                    personSelected = true;
                                     resultsContainer.innerHTML = '';
                                 });
                                 resultsContainer.appendChild(item);
@@ -175,40 +180,53 @@
         });
 
         // Add member logic
-        document.getElementById('addMemberBtn').addEventListener('click', function () {
-            const personId = hiddenIdInput.value;
-            const personName = searchInput.value.trim();
-            const relToHholdHead = document.getElementById('rel_to_hhold_head_id').selectedOptions[0].text;
-            const relToHholdHeadId = document.getElementById('rel_to_hhold_head_id').value;
-            const relToFamilyHead = document.getElementById('rel_to_family_head_id').selectedOptions[0].text;
-            const relToFamilyHeadId = document.getElementById('rel_to_family_head_id').value;
+        const addMemberBtn = document.getElementById('addMemberBtn');
+        let addMemberLocked = false;
+        if (!addMemberBtn.hasAttribute('data-listener-bound')) {
+            addMemberBtn.setAttribute('data-listener-bound', 'true');
+            addMemberBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                if (addMemberLocked) return;
+                addMemberLocked = true;
+                addMemberBtn.disabled = true;
+                const personId = hiddenIdInput.value;
+                const personName = searchInput.value.trim();
+                const relToHholdHeadSelect = document.getElementById('rel_to_hhold_head_id');
+                const relToFamilyHeadSelect = document.getElementById('rel_to_family_head_id');
+                const relToHholdHead = relToHholdHeadSelect.selectedOptions[0].text;
+                const relToHholdHeadId = relToHholdHeadSelect.value;
+                const relToFamilyHead = relToFamilyHeadSelect.selectedOptions[0].text;
+                const relToFamilyHeadId = relToFamilyHeadSelect.value;
 
-            if (!personId || !personName || !relToHholdHeadId || !relToFamilyHeadId) {
-                alert('Please select a person and both relationships.');
-                return;
-            }
-
-            // Prevent duplicate person
-            if (members.some(m => m.personId === personId)) {
-                alert('This person is already added.');
-                return;
-            }
-
-            members.push({
-                personId,
-                personName,
-                relToHholdHead,
-                relToHholdHeadId,
-                relToFamilyHead,
-                relToFamilyHeadId
+                if (!personId || !personName || !relToHholdHeadId || !relToFamilyHeadId) {
+                    alert('Please select a person from the search results and both relationships.');
+                    addMemberBtn.disabled = false;
+                    addMemberLocked = false;
+                    return;
+                }
+                if (members.some(m => m.personId === personId)) {
+                    alert('This person is already added.');
+                    addMemberBtn.disabled = false;
+                    addMemberLocked = false;
+                    return;
+                }
+                members.push({
+                    personId,
+                    personName,
+                    relToHholdHead,
+                    relToHholdHeadId,
+                    relToFamilyHead,
+                    relToFamilyHeadId
+                });
+                renderMembersTable();
+                searchInput.value = '';
+                hiddenIdInput.value = '';
+                relToHholdHeadSelect.value = '';
+                relToFamilyHeadSelect.value = '';
+                addMemberBtn.disabled = false;
+                addMemberLocked = false;
             });
-            renderMembersTable();
-            // Reset form fields
-            searchInput.value = '';
-            hiddenIdInput.value = '';
-            document.getElementById('rel_to_hhold_head_id').value = '';
-            document.getElementById('rel_to_family_head_id').value = '';
-        });
+        }
 
         function renderMembersTable() {
             const tbody = document.querySelector('#membersPreviewTable tbody');
@@ -223,7 +241,6 @@
                 `;
                 tbody.appendChild(tr);
             });
-            // Remove member logic
             tbody.querySelectorAll('button[data-idx]').forEach(btn => {
                 btn.addEventListener('click', function () {
                     const idx = parseInt(btn.getAttribute('data-idx'));

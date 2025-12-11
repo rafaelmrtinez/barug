@@ -10,6 +10,49 @@ logger = logging.getLogger(__name__)
 
 class HouseholdCommand:
 
+    def insert_house_member(
+        self,
+        p_family_id: int,
+        p_added_by_id: int,
+        p_existing_person_id: int,
+        p_relationship_to_hholdhead_id: int,
+        p_relationship_to_family_head_id: int,
+    ) -> Optional[int]:
+        """
+        Call the database stored procedure `insert_house_member` and return
+        the created member id (if the procedure returns one).
+        """
+        sql = (
+            "SELECT insert_house_member(%s, %s, %s, %s, %s)"
+        )
+        params = (
+            p_family_id,
+            p_added_by_id,
+            p_existing_person_id,
+            p_relationship_to_hholdhead_id,
+            p_relationship_to_family_head_id,
+        )
+        try:
+            logger.debug('Calling insert_house_member stored-proc with params=%s', params)
+            result = None
+            if hasattr(self._ctx, 'execute_scalar'):
+                result = self._ctx.execute_scalar(sql, params)
+            else:
+                result = self._ctx.execute_query(sql, params)
+            logger.debug('insert_house_member returned %s', result)
+            return result
+        except Exception as exc:
+            pgcode = getattr(exc, 'pgcode', None)
+            if pgcode and MembershipException.is_membership_exception(pgcode):
+                raise MembershipException(str(exc)) from exc
+            try:
+                msg = str(exc)
+                if any(code in msg for code in MembershipException.ERROR_CODES):
+                    raise MembershipException(msg) from exc
+            except Exception:
+                pass
+            raise
+
     def __init__(self, ctx: ConnectionAdapter):
         self._ctx = ctx
 
