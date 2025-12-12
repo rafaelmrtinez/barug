@@ -1069,7 +1069,7 @@ def household_detail(
     user_role = request.session.get("authenticated_role_name", "")
     
     household = household_service.get_household_detail(household_id)
-    
+    print(f'[household_detail] household: {household}')
     if not household:
         messages.error(request, "Household not found.")
         return redirect("bhw:household_list")
