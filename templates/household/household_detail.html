@@ -4,6 +4,8 @@
 
 {% block css %}
   <link rel="stylesheet" href="{% static 'css/button.css' %}">
+  <link rel="stylesheet" href="{% static 'css/map_registration.css' %}">
+  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"/>
   <style>
     :root{
       --brand:#6d2932;
@@ -235,6 +237,10 @@
     <div class="household-head">
       {% bs_icon 'person-fill' %} {{ household.household_head_name }}
     </div>
+    <div style="margin-top:1rem; display:flex; gap:.5rem;">
+      <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#updateHouseholdModal">Update Household Information</button>
+      <button type="button" class="btn btn-outline-brand" onclick="openFamilyModalNoSelect(event)">Update Family Information</button>
+    </div>
   </div>
 
   <!-- Household Information Section -->
@@ -293,10 +299,13 @@
                 Head: <strong>{{ family.family_head_name }}</strong>
               </div>
             </div>
-            <button class="toggle-members-btn" onclick="toggleMembers({{ forloop.counter0 }})">
+            <div style="display:flex; gap:.5rem; align-items:center">
+              <button class="toggle-members-btn" onclick="toggleMembers({{ forloop.counter0 }}, this)">
               <span class="toggle-text">Show Members ({{ family.members|length }})</span>
               {% bs_icon 'chevron-down' extra_classes='toggle-icon' %}
             </button>
+                <!-- per-family Update button removed; use header-level Update Family Information -->
+            </div>
           </div>
 
           <div class="info-grid" style="gap:.75rem;">
@@ -339,6 +348,8 @@
               </div>
             {% endif %}
           </div>
+
+          
 
           <!-- Members Container -->
           <div class="members-container" id="members-{{ forloop.counter0 }}">
@@ -391,22 +402,497 @@
 
 </div>
 
+<!-- Household Update Modal -->
+<div class="modal fade" id="updateHouseholdModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Update Household Information - {{ household.household_num }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form method="post" action="#">
+          {% csrf_token %}
+          <div class="accordion" id="householdAccordion">
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#householdSection1" aria-expanded="true">Household Details</button>
+              </h2>
+              <div id="householdSection1" class="accordion-collapse collapse show" data-bs-parent="#householdAccordion">
+                <div class="accordion-body">
+                  <div class="mb-3">
+                    <label class="form-label">Household Number</label>
+                    <input class="form-control" name="household_num" value="{{ household.household_num }}" readonly>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Household Head</label>
+                    <input class="form-control" name="household_head" value="{{ household.household_head_name }}" readonly>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Home Address</label>
+                    <input id="household_address_input" class="form-control" name="address" value="{{ household.address }}" readonly style="cursor:pointer;" data-bs-toggle="modal" data-bs-target="#address_modal" title="Click to edit on map">
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label">House Type</label>
+                      <select class="form-select" name="house_type">
+                        <option value="">-- Select --</option>
+                        <option value="1">NUCLEAR FAMILY</option>
+                        <option value="2">EXTENDED FAMILY</option>
+                        <option value="3">BOARDING HOUSE</option>
+                        <option value="4">SHARED APARTMET</option>
+                        <option value="5">SOLO HOUSEHOLD</option>
+                        <option value="6">GOVERNMENT HOUSING</option>
+                        <option value="7">INFORMAL SETTLER</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">House Ownership</label>
+                      <select class="form-select" name="house_ownership">
+                        <option value="">-- Select --</option>
+                        <option value="1">OWNED</option>
+                        <option value="2">RENTED</option>
+                        <option value="3">FAMILY-OWNED</option>
+                        <option value="4">GOVERNMENT HOUSING</option>
+                        <option value="5">INFORMAL SETTLER</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="text-end mt-3">
+                    <button class="btn btn-primary" type="submit">Save Household Details</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#householdSection2" aria-expanded="false">Change Household Head</button>
+              </h2>
+              <div id="householdSection2" class="accordion-collapse collapse" data-bs-parent="#householdAccordion">
+                <div class="accordion-body">
+                  <div class="mb-3">
+                    <label class="form-label">Current Household Head</label>
+                    <input class="form-control" value="{{ household.household_head_name }}" readonly>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Select New Household Head</label>
+                    <select class="form-select" name="new_household_head">
+                      <option value="">-- Select member --</option>
+                      {% for family in household.families %}
+                        {% for member in family.members %}
+                          <option value="{{ member.id }}">{{ member.full_name }} ({{ member.id }})</option>
+                        {% endfor %}
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Reason for change</label>
+                    <textarea class="form-control" name="household_head_change_reason" rows="3"></textarea>
+                  </div>
+                  <div class="text-end">
+                    <button class="btn btn-primary" type="submit">Save Head Change</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Shared Family Update Modal -->
+<div class="modal fade" id="updateFamilyModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Update Family Information</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form method="post" action="#">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label">Select Family</label>
+            <select id="familySelector" class="form-select" onchange="populateFamilyFields(this.value)">
+              <option value="">-- Select Family --</option>
+              {% for f in household.families %}
+                <option value="{{ forloop.counter0 }}">Family {{ f.family_num }}{% if f.family_head_name %} — {{ f.family_head_name }}{% endif %}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="accordion" id="sharedFamilyAccordion">
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#sharedFamilySection1" aria-expanded="true">Family Details</button>
+              </h2>
+              <div id="sharedFamilySection1" class="accordion-collapse collapse show" data-bs-parent="#sharedFamilyAccordion">
+                <div class="accordion-body">
+                  <div class="mb-3">
+                    <label class="form-label">Family Number</label>
+                    <input id="sf_family_num" class="form-control" name="family_num" readonly>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Family Head</label>
+                    <input id="sf_family_head" class="form-control" name="family_head" readonly>
+                  </div>
+
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label">Relationship to Household Head</label>
+                      <select id="sf_relationship" class="form-select" name="relationship_to_household_head">
+                        <option value="">-- Select --</option>
+                        <option value="1">HOUSEHOLD HEAD</option>
+                        <option value="2">FAMILY HEAD</option>
+                        <option value="3">SPOUSE</option>
+                        <option value="4">MOTHER</option>
+                        <option value="5">FATHER</option>
+                        <option value="6">GUARDIAN</option>
+                        <option value="7">CHILD</option>
+                        <option value="8">SON</option>
+                        <option value="9">DAUGHTER</option>
+                        <option value="10">SIBLING</option>
+                        <option value="11">GRANDCHILD</option>
+                        <option value="12">GRANDPARENT</option>
+                        <option value="13">NEPHEW</option>
+                        <option value="14">NIECE</option>
+                        <option value="15">UNCLE</option>
+                        <option value="16">AUNT</option>
+                        <option value="17">COUSIN</option>
+                        <option value="18">IN-LAW (E.G., BROTHER-IN-LAW, SISTER-IN-LAW, PARENT-IN-LAW)</option>
+                        <option value="19">BOARDER</option>
+                        <option value="20">RENTER</option>
+                        <option value="21">DOMESTIC HELPER</option>
+                        <option value="22">OTHER RELATIVE</option>
+                        <option value="23">NON-RELATIVE</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">Household Type</label>
+                      <select id="sf_household_type" class="form-select" name="household_type">
+                        <option value="">-- Select --</option>
+                        <option>NUCLEAR FAMILY</option>
+                        <option>EXTENDED FAMILY</option>
+                        <option>BOARDING HOUSE</option>
+                        <option>SHARED APARTMET</option>
+                        <option>SOLO HOUSEHOLD</option>
+                        <option>GOVERNMENT HOUSING</option>
+                        <option>INFORMAL SETTLER</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="row g-3 mt-3">
+                    <div class="col-md-6">
+                      <label class="form-label">NHTS Status</label>
+                      <select id="sf_nhts_status" class="form-select" name="nhts_status">
+                        <option>NHTS</option>
+                        <option>NON-NHTS</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">Indigent Status</label>
+                      <select id="sf_indigent_status" class="form-select" name="indigent_status">
+                        <option>INDIGENT</option>
+                        <option>NON-INDIGENT</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="mb-3 mt-3">
+                    <label class="form-label">Source of Income</label>
+                    <input id="sf_source_of_income" class="form-control" name="source_of_income">
+                  </div>
+
+                  <div class="mb-3">
+                    <label class="form-label">Family Monthly Income</label>
+                    <select id="sf_monthly_income_range" class="form-select" name="monthly_income_range">
+                      <option>Below ₱5,000</option>
+                      <option>₱5,001 - ₱10,000</option>
+                      <option>₱10,001 - ₱15,000</option>
+                      <option>₱15,001 - ₱20,000</option>
+                      <option>₱20,001 - ₱30,000</option>
+                      <option>₱30,001 - ₱50,000</option>
+                      <option>₱50,001 - ₱75,000</option>
+                      <option>₱75,001 - ₱100,000</option>
+                      <option>Above ₱100,000</option>
+                    </select>
+                  </div>
+                  <div class="text-end">
+                    <button class="btn btn-primary" type="submit">Save Family Details</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sharedFamilySection2" aria-expanded="false">Change Family Head</button>
+              </h2>
+              <div id="sharedFamilySection2" class="accordion-collapse collapse" data-bs-parent="#sharedFamilyAccordion">
+                <div class="accordion-body">
+                  <div class="mb-3">
+                    <label class="form-label">Current Family Head</label>
+                    <input id="sf_current_head" class="form-control" readonly>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Family Members</label>
+                    <select id="sf_members_select" class="form-select" name="new_family_head"></select>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Reason for change</label>
+                    <textarea class="form-control" name="change_reason" rows="3"></textarea>
+                  </div>
+                  <div class="text-end">
+                    <button class="btn btn-primary" type="submit">Save Head Change</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="address_modal" tabindex="-1" aria-labelledby="home_address" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+          <div class="modal-header">
+              <h5 class="modal-title" id="home_address">Home Address</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+              <div class="row">
+                  <div class="col">
+                      <div class="map-container">
+                          <div id="map"></div>
+                          <div class="control">
+                              <select id="style-selector">
+                                  <option value="mapbox/streets-v11">Streets</option>
+                                  <option value="mapbox/satellite-streets-v11">Satellite Streets</option>
+                              </select>
+                          </div>
+                      </div>
+                  </div>
+
+                  <div class="col">
+                      <div class="col">
+                          <div class="col-lg-12 col-md-12 col-sm-12">
+                              <div class="form-floating mb-3">
+                                  <input type="text" name="house_num" id="house_num" class="form-control" placeholder="House Number" required="">
+                                  <label for="house_num">House Number</label>
+                              </div>  
+                          </div>
+
+                          <div class="col-lg-12 col-md-12 col-sm-12">
+                              <div class="form-floating mb-3">
+                                  <input type="text" name="street" id="street" class="form-control" placeholder="Street" required="">
+                                  <label for="street">Street</label>
+                              </div>  
+                          </div>
+
+                          <div class="col-lg-12 col-md-12 col-sm-12">
+                              <div class="form-floating mb-3">
+                                  <input type="text" name="purok_sitio" id="purok_sitio" class="form-control" placeholder="Purok / Sitio" required="">
+                                  <label for="purok_sitio">Purok / Sitio</label>
+                              </div>   
+                          </div>
+
+                          <div class="col-lg-12 col-md-12 col-sm-12">
+                              <div class="form-floating mb-3">
+                                  <input type="text" name="barangay" id="barangay" class="form-control" placeholder="Barangay" required="">
+                                  <label for="barangay">Barangay</label>
+                              </div>   
+                          </div>
+
+                          <div class="col-lg-12 col-md-12 col-sm-12">
+                              <div class="form-floating mb-3">
+                                  <input type="text" name="city" id="city" class="form-control" placeholder="City" required="">
+                                  <label for="city">City</label>
+                              </div>   
+                          </div>
+                        </div>
+                  </div>
+              </div>
+          </div>
+
+          <div class="modal-footer">
+              <button class="btn btn-reset">Clear</button>
+              <button type="button" class="btn btn-submit" onclick="fill_home_address()" data-bs-dismiss="modal">Save</button>
+          </div>
+      </div>
+  </div>
+</div>
+
+{% block scripts %}
+<script defer src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script defer src="{% static 'js/map_registration.js' %}"></script>
+
 <script>
-  function toggleMembers(index) {
+  // families data for shared modal
+  const FAMILY_DATA = [
+    {% for f in household.families %}
+      {
+        family_num: "{{ f.family_num|escapejs }}",
+        family_head_name: "{{ f.family_head_name|default:''|escapejs }}",
+        relationship: "{{ f.relationship_to_household_head|default:''|escapejs }}",
+        household_type: "{{ f.household_type|default:''|escapejs }}",
+        nhts_status: "{{ f.nhts_status|default:''|escapejs }}",
+        indigent_status: "{{ f.indigent_status|default:''|escapejs }}",
+        source_of_income: "{{ f.source_of_income|default:''|escapejs }}",
+        monthly_income: "{{ f.monthly_income|default:''|escapejs }}",
+        members: [
+          {% for m in f.members %}
+            { id: "{{ m.id }}", name: "{{ m.full_name|escapejs }}" }{% if not forloop.last %},{% endif %}
+          {% endfor %}
+        ]
+      }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  function openFamilyModal(index, e) {
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    const idx = parseInt(index);
+    if (isNaN(idx) || idx < 0 || idx >= FAMILY_DATA.length) return;
+    // set selector value
+    const selector = document.getElementById('familySelector');
+    if (selector) selector.value = String(idx);
+    populateFamilyFields(idx);
+    const modalEl = document.getElementById('updateFamilyModal');
+    if (modalEl) new bootstrap.Modal(modalEl).show();
+  }
+
+  function openFamilyModalNoSelect(e) {
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    const selector = document.getElementById('familySelector');
+    if (selector) selector.value = '';
+    // clear fields
+    const clearIfExists = id => { const el = document.getElementById(id); if (el) el.value = ''; };
+    clearIfExists('sf_family_num');
+    clearIfExists('sf_family_head');
+    clearIfExists('sf_current_head');
+    clearIfExists('sf_source_of_income');
+    const membersSelect = document.getElementById('sf_members_select');
+    if (membersSelect) { membersSelect.innerHTML = ''; const empty = document.createElement('option'); empty.value=''; empty.text='-- Select member --'; membersSelect.appendChild(empty); }
+    const modalEl = document.getElementById('updateFamilyModal');
+    if (modalEl) new bootstrap.Modal(modalEl).show();
+  }
+
+  function populateFamilyFields(index) {
+    const idx = parseInt(index);
+    if (isNaN(idx) || idx < 0 || idx >= FAMILY_DATA.length) return;
+    const data = FAMILY_DATA[idx];
+    document.getElementById('sf_family_num').value = data.family_num || '';
+    document.getElementById('sf_family_head').value = data.family_head_name || '';
+    document.getElementById('sf_current_head').value = data.family_head_name || '';
+    // helper to set selects by matching option text
+    const setByText = (id, text) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      for (let i = 0; i < el.options.length; i++) {
+        if (el.options[i].text === text) { el.selectedIndex = i; return; }
+      }
+      el.value = '';
+    };
+    setByText('sf_relationship', data.relationship || '');
+    setByText('sf_household_type', data.household_type || '');
+    setByText('sf_nhts_status', data.nhts_status || '');
+    setByText('sf_indigent_status', data.indigent_status || '');
+    document.getElementById('sf_source_of_income').value = data.source_of_income || '';
+    setByText('sf_monthly_income_range', data.monthly_income || '');
+
+    // populate members select
+    const membersSelect = document.getElementById('sf_members_select');
+    if (membersSelect) {
+      membersSelect.innerHTML = '';
+      const empty = document.createElement('option'); empty.value = ''; empty.text = '-- Select member --';
+      membersSelect.appendChild(empty);
+      data.members.forEach(m => {
+        const opt = document.createElement('option'); opt.value = m.id; opt.text = `${m.name} (${m.id})`;
+        membersSelect.appendChild(opt);
+      });
+    }
+  }
+
+  function toggleMembers(index, btn) {
     const container = document.getElementById(`members-${index}`);
-    const btn = event.currentTarget;
+    if (!container || !btn) return;
     const text = btn.querySelector('.toggle-text');
     const icon = btn.querySelector('.toggle-icon');
-    
+
     if (container.classList.contains('show')) {
       container.classList.remove('show');
-      text.textContent = text.textContent.replace('Hide', 'Show');
-      icon.style.transform = 'rotate(0deg)';
+      if (text) text.textContent = text.textContent.replace('Hide', 'Show');
+      if (icon) icon.style.transform = 'rotate(0deg)';
     } else {
       container.classList.add('show');
-      text.textContent = text.textContent.replace('Show', 'Hide');
-      icon.style.transform = 'rotate(180deg)';
+      if (text) text.textContent = text.textContent.replace('Show', 'Hide');
+      if (icon) icon.style.transform = 'rotate(180deg)';
     }
   }
 </script>
+  <script>
+    (function(){
+      // Ensure we call the real fill_home_address (even if it's defined later)
+      function updateHouseholdAddressFromModal(){
+        try{
+          const parts = [];
+          ['house_num','street','purok_sitio','barangay','city'].forEach(id=>{
+            const el = document.getElementById(id);
+            if (el && el.value && el.value.trim()) parts.push(el.value.trim());
+          });
+          const addr = parts.join(', ');
+          const input = document.getElementById('household_address_input');
+          if (input) input.value = addr;
+        } catch(err){ console.error('updateHouseholdAddressFromModal failed', err); }
+      }
+
+      function wrapOriginal(orig){
+        return function(){
+          try{ if (typeof orig === 'function') orig.apply(this, arguments); } catch(e){ console.error(e); }
+          updateHouseholdAddressFromModal();
+        };
+      }
+
+      // If already defined, wrap it immediately
+      if (typeof window.fill_home_address === 'function'){
+        window.fill_home_address = wrapOriginal(window.fill_home_address);
+      } else {
+        // Intercept future assignment to window.fill_home_address
+        try{
+          Object.defineProperty(window, 'fill_home_address', {
+            configurable: true,
+            enumerable: false,
+            set: function(fn){
+              // replace with wrapped version
+              const wrapped = wrapOriginal(fn);
+              // redefine as normal function property
+              Object.defineProperty(window, 'fill_home_address', {
+                configurable: true,
+                writable: true,
+                enumerable: false,
+                value: wrapped
+              });
+            },
+            get: function(){ return undefined; }
+          });
+        } catch(err){
+          // fallback: poll until function exists then wrap
+          const checkInterval = setInterval(()=>{
+            if (typeof window.fill_home_address === 'function'){
+              window.fill_home_address = wrapOriginal(window.fill_home_address);
+              clearInterval(checkInterval);
+            }
+          }, 100);
+        }
+      }
+    })();
+  </script>
+{% endblock %}
 {% endblock %}
