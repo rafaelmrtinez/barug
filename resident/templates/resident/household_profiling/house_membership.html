@@ -26,6 +26,7 @@
     </div>
     <h3 class="mb-3">Add Household Members</h3>
     <form id="addMemberForm" class="mb-4">
+        <input type="hidden" id="family_id" name="family_id" value="{{ family_id }}">
         <div class="row mb-2">
             <div class="col-lg-5 col-md-12 col-sm-12 mb-3">
                 <div class="form-floating mb-3 position-relative" style="width:100%;">
@@ -114,6 +115,9 @@
             </thead>
             <tbody></tbody>
         </table>
+    </div>
+    <div class="d-flex justify-content-end mt-3">
+        <button type="button" class="btn btn-success" id="submitMembersBtn">Submit Members</button>
     </div>
 </div>
 
@@ -247,6 +251,104 @@
                     members.splice(idx, 1);
                     renderMembersTable();
                 });
+            });
+        }
+
+        // Helper to get CSRF token from cookie
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    // Does this cookie string begin with the name we want?
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // API call to register household members (with CSRF token)
+        async function registerHouseholdMembers(familyId) {
+            const membersPayload = members.map(m => ({
+                p_family_id: familyId,
+                p_existing_person_id: m.personId,
+                p_relationship_to_hholdhead_id: m.relToHholdHeadId,
+                p_relationship_to_family_head_id: m.relToFamilyHeadId,
+                person_name: m.personName
+            }));
+            const payload = {
+                members: membersPayload
+            };
+            const csrftoken = getCookie('csrftoken');
+            try {
+                const response = await fetch('/resident/api/register/household_members/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': csrftoken
+                    },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    alert('Failed to register members: ' + errorText);
+                    return null;
+                }
+                const data = await response.json();
+                // Check for non-critical errors in results
+                if (data && Array.isArray(data.results)) {
+                    const errorMessages = data.results
+                        .filter(r => r && typeof r === 'object' && r.error)
+                        .map(r => r.error);
+                    if (errorMessages.length > 0) {
+                        alert('Some members were not added or have issues:\n' + errorMessages.join('\n'));
+                        members.length = 0;
+                        renderMembersTable();
+                    } else {
+                        // Success: clear table, hidden data, and redirect
+                        alert('Members registered successfully!');
+                        members.length = 0;
+                        renderMembersTable();
+                        document.getElementById('family_id').value = '';
+                        window.location.href = '/resident/register_household/household_information/';
+                    }
+                } else {
+                    // Success: clear table, hidden data, and redirect
+                    alert('Members registered successfully!');
+                    members.length = 0;
+                    renderMembersTable();
+                    document.getElementById('family_id').value = '';
+                    window.location.href = '/resident/register_household/household_information/';
+                }
+                return data;
+            } catch (err) {
+                alert('Error registering members: ' + err);
+                return null;
+            }
+        }
+
+        // Submit button logic
+        const submitBtn = document.getElementById('submitMembersBtn');
+        if (submitBtn) {
+            submitBtn.addEventListener('click', async function () {
+                if (members.length === 0) {
+                    alert('No members to submit.');
+                    return;
+                }
+                const familyIdInput = document.getElementById('family_id');
+                const familyId = familyIdInput ? familyIdInput.value : null;
+                if (!familyId) {
+                    alert('Family ID is missing.');
+                    return;
+                }
+                submitBtn.disabled = true;
+                await registerHouseholdMembers(familyId);
+                submitBtn.disabled = false;
             });
         }
     });

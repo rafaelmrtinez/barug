@@ -12,6 +12,7 @@ class MembershipException(QueryExecutionException):
         "P6039",  # Relationship "FAMILY HEAD" not configured in relationship table
         "P5009",  # Failed to create a family unit
         "P5010",
+        "P5022",
     }
 
     def __init__(self, message: str):

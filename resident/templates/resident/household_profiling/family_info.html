@@ -168,6 +168,7 @@
                 const submitBtn = form.querySelector('button[type="submit"]');
                 if (submitBtn.disabled) return; // Prevent double submit
                 submitBtn.disabled = true;
+                const household_id = document.getElementById('household_num')?.value || '';
                 const data = {
                     household_num: document.getElementById('household_num')?.value || document.getElementById('p_household_num')?.value || '',
                     family_num: document.getElementById('family_num')?.value || document.getElementById('p_family_num')?.value || '',
@@ -192,7 +193,13 @@
                 .then(response => response.json().then(json => ({status: response.status, json})))
                 .then(({status, json}) => {
                     if (status === 201 && json.result) {
-                        // window.location.href = '/resident/supporting_documents/';
+                        // Redirect to house membership page for the new family unit
+                        const familyId = json.result.family_id || json.result.id || json.result; // support various backend return formats
+                        if (familyId) {
+                            window.location.href = `/resident/house/membership/${familyId}/`;
+                        } else {
+                            alert('Family unit created, but could not determine family ID for redirect.');
+                        }
                     } else if (json.error) {
                         console.log('error', json);
                         alert(json.error);

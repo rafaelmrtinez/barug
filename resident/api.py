@@ -41,22 +41,31 @@ class HouseholdMembershipAPI(View):
 			data = {k: v for k, v in request.POST.items()}
 		self._logger.debug('HouseholdMembershipAPI: raw payload keys=%s', list(data.keys()))
 
-		# Expecting: { "members": [ ... ], "added_by_id": ... }
+		# Expecting: { "members": [ { ..., "person_name": ... } ], "added_by_id": ... }
 		members_payload = data.get('members')
-		added_by_id = data.get('added_by_id')
+		added_by_id = request.session.get('auth', {}).get('staff_id')
 		if not isinstance(members_payload, list) or not added_by_id:
 			return HttpResponseBadRequest('Missing members or added_by_id')
+		# Validate and log member names
+		missing_names = [m for m in members_payload if 'person_name' not in m or not m['person_name']]
+		if missing_names:
+			self._logger.warning('HouseholdMembershipAPI: one or more members missing person_name')
+			return HttpResponseBadRequest('Each member must include person_name (full name)')
+		member_names = [m['person_name'] for m in members_payload]
 		try:
 			added_by_id = int(added_by_id)
 		except Exception:
 			return HttpResponseBadRequest('Invalid added_by_id')
 
-		self._logger.info('HouseholdMembershipAPI: adding %d members by staff_id=%s', len(members_payload), added_by_id)
+		self._logger.info('HouseholdMembershipAPI: adding %d members by staff_id=%s. Names: %s', len(members_payload), added_by_id, member_names)
 		try:
 			results = self._service.add_household_members(members_payload, added_by_id)
 			return JsonResponse({'results': results}, status=201)
+		except MembershipException as me:
+			self._logger.warning(f'HouseholdMembershipAPI: membership exception while adding members: {member_names} - {str(me)}')
+			return JsonResponse({'error': me.message}, status=400)
 		except Exception as exc:
-			self._logger.exception('Unhandled exception in HouseholdMembershipAPI.post')
+			self._logger.exception(f'Unhandled exception in HouseholdMembershipAPI.post while adding members: {member_names}', exc_info=exc)
 			return HttpResponse(status=500, content="Something went wrong while adding household members.")
 
 class FamilyMembershipAPI(View):

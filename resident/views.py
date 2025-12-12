@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from django.shortcuts import render
 from django.core.paginator import Paginator
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_protect
+
+from authentication.guards import role_required, session_login_required
+from authentication.utils import nocache
 from .forms import ResidentProfileform
 from .forms import HouseholdProfileForm
 from .forms import FamilyProfileForm
@@ -212,6 +217,11 @@ def resident_record(request, res_id):
         'form' : form,
     })
 
+@session_login_required
+@role_required(("barangay health worker"))
+@nocache
+@require_http_methods(["GET"])
+@csrf_protect
 def household_info(request: HttpRequest) -> HttpResponse:
     form = HouseholdProfileForm()
     user_role=request.session.get('auth').get('role_name')
@@ -225,6 +235,11 @@ def household_info(request: HttpRequest) -> HttpResponse:
         'form' : form,
     })
 
+@session_login_required
+@role_required(("barangay health worker"))
+@nocache
+@require_http_methods(["GET"])
+@csrf_protect
 def family_info(request: HttpRequest, household_id: int) -> HttpResponse:
     form = FamilyProfileForm()
     user_role=request.session.get('auth').get('role_name')
@@ -239,6 +254,11 @@ def family_info(request: HttpRequest, household_id: int) -> HttpResponse:
         'household_id' : household_id,
     })
     
+@session_login_required
+@role_required(("barangay health worker"))
+@nocache
+@require_http_methods(["GET"])
+@csrf_protect
 def house_membership(request: HttpRequest, family_id: int) -> HttpResponse:
     user_role=request.session.get('auth').get('role_name')
     user_role_template=user_role.lower().replace(' ', '_')

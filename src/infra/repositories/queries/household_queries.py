@@ -4,8 +4,29 @@ import logging
 
 
 class HouseholdQuery:
-    
+        
     _logger = logging.getLogger("HouseholdQuery")
+    
+    def is_person_already_house_member(self, person_id):
+            """Check if person is already a member in any house_member record (active or not)."""
+            self._logger.info("Checking for duplicate house membership.")
+            sql = "SELECT COUNT(*) as count FROM house_member WHERE person_id = %s"
+            result = self._ctx.execute_query_to_dict(sql, (person_id,))
+            return result[0]['count'] > 0 if result else False
+
+    def is_household_active(self, household_id):
+        """Check if a household is active."""
+        self._logger.info("Checking if household is active.")
+        sql = "SELECT is_active FROM household_info WHERE household_id = %s"
+        result = self._ctx.execute_query_to_dict(sql, (household_id,))
+        return result[0]['is_active'] if result else False
+
+    def is_family_unit_active(self, family_id):
+        """Check if a family unit is active."""
+        self._logger.info("Checking if family unit is active.")
+        sql = "SELECT is_active FROM family_unit WHERE family_id = %s"
+        result = self._ctx.execute_query_to_dict(sql, (family_id,))
+        return result[0]['is_active'] if result else False
     
     def search_family_unit_by_num(self, family_num):
         self._logger.info("Searching family unit by family_num.")

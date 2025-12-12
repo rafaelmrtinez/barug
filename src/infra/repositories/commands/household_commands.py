@@ -42,9 +42,9 @@ class HouseholdCommand:
             logger.debug('insert_house_member returned %s', result)
             return result
         except Exception as exc:
-            pgcode = getattr(exc, 'pgcode', None)
+            pgcode = getattr(exc, 'code', None)
             if pgcode and MembershipException.is_membership_exception(pgcode):
-                raise MembershipException(str(exc)) from exc
+                raise MembershipException(str(exc.message)) from exc
             try:
                 msg = str(exc)
                 if any(code in msg for code in MembershipException.ERROR_CODES):
