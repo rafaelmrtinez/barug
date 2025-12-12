@@ -481,7 +481,7 @@
                       <option value="">-- Select member --</option>
                       {% for family in household.families %}
                         {% for member in family.members %}
-                          <option value="{{ member.id }}">{{ member.full_name }} ({{ member.id }})</option>
+                          <option value="{{ member.person_id }}">{{ member.full_name }}</option>
                         {% endfor %}
                       {% endfor %}
                     </select>
@@ -749,7 +749,7 @@
         monthly_income: "{{ f.monthly_income|default:''|escapejs }}",
         members: [
           {% for m in f.members %}
-            { id: "{{ m.id }}", name: "{{ m.full_name|escapejs }}" }{% if not forloop.last %},{% endif %}
+            { id: "{{ m.person_id }}", name: "{{ m.full_name|escapejs }}" }{% if not forloop.last %},{% endif %}
           {% endfor %}
         ]
       }{% if not forloop.last %},{% endif %}
