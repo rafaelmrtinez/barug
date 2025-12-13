@@ -15,6 +15,7 @@ urlpatterns = [
     path("resident_records/", views.resident_records, name="resident_records"),
     path("register_household/household_information/", views.household_info, name="household_info"),
     path("register_household/family_information/<int:household_id>/", views.family_info, name="family_info"),
+    path("register/family/<int:household_id>/", views.add_family, name="register_family"),
     path("<str:res_id>/", views.resident_record, name="resident_record"),
     path("house/membership/<int:family_id>/", views.house_membership, name="house_membership"),
     

@@ -240,6 +240,7 @@
     <div style="margin-top:1rem; display:flex; gap:.5rem;">
       <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#updateHouseholdModal">Update Household Information</button>
       <button type="button" class="btn btn-outline-brand" onclick="openFamilyModalNoSelect(event)">Update Family Information</button>
+      <a href="{% url 'resident:register_family' household.household_num  %}" class="btn btn-outline-brand">Register New Family</a>
     </div>
   </div>
 

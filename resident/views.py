@@ -259,6 +259,41 @@ def family_info(request: HttpRequest, household_id: int) -> HttpResponse:
 @nocache
 @require_http_methods(["GET"])
 @csrf_protect
+def add_family(request: HttpRequest, household_id: int) -> HttpResponse:
+    """
+    IMPORTANT: The difference of this method and family_info is this is for add new family for
+    an existing household.
+    
+    family_info on the other hand is for registering family during household registration.
+    
+    See function: family_info() for more details.
+    
+    :param request: Takes household_id as parameter
+    :type request: HttpRequest
+    :param household_id: ID of the household to which the new family will be added
+    :type household_id: int
+    :return: Renders the add_family template with the necessary context
+    :rtype: HttpResponse
+    """
+    
+    form = FamilyProfileForm()
+    user_role=request.session.get('auth').get('role_name')
+    user_role_template=user_role.lower().replace(' ', '_')
+    return render(request, 'household_profiling/register_family.html', {
+        'user_fullname' : user_fullname,
+        'user_role' : user_role,
+        'page_path' : f'{user_role} / Resident Management / Resident Records',
+        'page_title' : 'Resident Records',
+        'user_role_template' : user_role_template,
+        'form' : form,
+        'household_id' : household_id,
+    })
+    
+@session_login_required
+@role_required(("barangay health worker"))
+@nocache
+@require_http_methods(["GET"])
+@csrf_protect
 def house_membership(request: HttpRequest, family_id: int) -> HttpResponse:
     user_role=request.session.get('auth').get('role_name')
     user_role_template=user_role.lower().replace(' ', '_')
