@@ -71,7 +71,7 @@ class HouseholdCommand:
             logger.info('update_fam_info returned %s', result)
             return result
         except Exception as exc:
-            pgcode = getattr(exc, 'pgcode', None)
+            pgcode = getattr(exc, 'code', None)
             if pgcode and HouseholdUpdateException.is_household_update_exception(pgcode):
                 raise HouseholdUpdateException(str(exc)) from exc
             try:
@@ -84,28 +84,54 @@ class HouseholdCommand:
                 pass
             raise
 
-    # Command to invoke the change_family_head SQL function
-    def change_family_head(p_family_id: int, p_new_head_person_id: int, p_performed_by: int, p_reason: str):
+    def change_family_head(
+        self,
+        p_family_id: int,
+        p_new_head_person_id: int,
+        p_performed_by: int,
+        p_reason: str
+    ) -> Optional[int]:
         """
-        Invokes the change_family_head SQL function to update the family head.
+        Call the database function `change_family_head` and return its result.
         Args:
-            p_family_id (int): The family ID.
-            p_new_head_person_id (int): The new head's person ID.
-            p_performed_by (int): The user performing the change.
-            p_reason (str): Reason for the change.
+            p_family_id: The family ID.
+            p_new_head_person_id: The new head's person ID.
+            p_performed_by: The user performing the change.
+            p_reason: Reason for the change.
         Returns:
-            The result of the SQL function execution.
+            The result of the function (e.g., updated family id or status), or None.
+        Raises:
+            HouseholdUpdateException if a known household update error occurs.
         """
-        from django.db import connection
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT * FROM change_family_head(%s, %s, %s, %s)", [
-                p_family_id,
-                p_new_head_person_id,
-                p_performed_by,
-                p_reason
-            ])
-            result = cursor.fetchone()
-        return result
+        sql = "SELECT change_family_head(%s, %s, %s, %s)"
+        params = (
+            p_family_id,
+            p_new_head_person_id,
+            p_performed_by,
+            p_reason
+        )
+        try:
+            logger.info('Calling change_family_head with params=%s', params)
+            result = None
+            if hasattr(self._ctx, 'execute_scalar'):
+                result = self._ctx.execute_scalar(sql, params)
+            else:
+                result = self._ctx.execute_query(sql, params)
+            logger.info('change_family_head returned %s', result)
+            return result
+        except Exception as exc:
+            pgcode = getattr(exc, 'code', None)
+            if pgcode and HouseholdUpdateException.is_household_update_exception(pgcode):
+                raise HouseholdUpdateException(str(exc)) from exc
+            try:
+                msg = str(exc)
+                if any(code in msg for code in HouseholdUpdateException.ERROR_CODES):
+                    logger.warning('Raising HouseholdUpdateException for message: %s', msg)
+                    raise HouseholdUpdateException(msg) from exc
+            except Exception:
+                logger.error('Failed to inspect exception message for HouseholdUpdateException mapping.')
+                pass
+            raise
 
     def update_hhold_info(
         self,
@@ -164,7 +190,7 @@ class HouseholdCommand:
             logger.info('update_hhold_info returned %s', result)
             return result
         except Exception as exc:
-            pgcode = getattr(exc, 'pgcode', None)
+            pgcode = getattr(exc, 'code', None)
             if pgcode and HouseholdUpdateException.is_household_update_exception(pgcode):
                 raise HouseholdUpdateException(str(exc)) from exc
             try:
@@ -258,7 +284,7 @@ class HouseholdCommand:
             logger.info('change_household_head returned %s', result)
             return result
         except Exception as exc:
-            pgcode = getattr(exc, 'pgcode', None)
+            pgcode = getattr(exc, 'code', None)
             if pgcode and HouseholdUpdateException.is_household_update_exception(pgcode):
                 raise HouseholdUpdateException(str(exc)) from exc
             try:
@@ -327,7 +353,7 @@ class HouseholdCommand:
             # If the underlying DB error exposes a Postgres error code (pgcode),
             # map known membership error codes to a domain exception so callers
             # (e.g. API views) can return user-friendly responses.
-            pgcode = getattr(exc, 'pgcode', None)
+            pgcode = getattr(exc, 'code', None)
             if pgcode and MembershipException.is_membership_exception(pgcode):
                 raise MembershipException(str(exc)) from exc
 
