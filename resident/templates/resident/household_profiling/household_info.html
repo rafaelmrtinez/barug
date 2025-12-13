@@ -81,13 +81,9 @@
                 <div class="form-floating mb-3">
                     <select id="{{ form.house_type.id_for_label }}" name="{{ form.house_type.name }}" class="form-select">
                         <option value="">Select house type</option>
-                        <option value="1" {% if form.house_type.value == "1" %}selected{% endif %}>NUCLEAR FAMILY</option>
-                        <option value="2" {% if form.house_type.value == "2" %}selected{% endif %}>EXTENDED FAMILY</option>
-                        <option value="3" {% if form.house_type.value == "3" %}selected{% endif %}>BOARDING HOUSE</option>
-                        <option value="4" {% if form.house_type.value == "4" %}selected{% endif %}>SHARED APPARTMET</option>
-                        <option value="5" {% if form.house_type.value == "5" %}selected{% endif %}>SOLO HOUSEHOLD</option>
-                        <option value="6" {% if form.house_type.value == "6" %}selected{% endif %}>GOVERNMENT HOUSING</option>
-                        <option value="7" {% if form.house_type.value == "7" %}selected{% endif %}>INFORMAL SETTLER</option>
+                        <option value="1" {% if form.house_type.value == "1" %}selected{% endif %}>CONCRETE</option>
+                        <option value="2" {% if form.house_type.value == "2" %}selected{% endif %}>SEMI-CONCRETE</option>
+                        <option value="3" {% if form.house_type.value == "3" %}selected{% endif %}>LIGHT MATERIAL</option>
                     </select>
                     <label for="{{ form.house_type.id_for_label }}">{{ form.house_type.label }}</label>
                 </div>   
