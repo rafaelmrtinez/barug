@@ -521,7 +521,8 @@
               {% endfor %}
             </select>
           </div>
-
+          <!-- Hidden input for household_num to ensure JS can always capture it in family modal -->
+          <input type="hidden" name="household_num" value="{{ household.household_num }}">
           <div class="accordion" id="sharedFamilyAccordion">
             <div class="accordion-item">
               <h2 class="accordion-header">
@@ -572,13 +573,13 @@
                       <label class="form-label">Household Type</label>
                       <select id="sf_household_type" class="form-select" name="household_type">
                         <option value="">-- Select --</option>
-                        <option>NUCLEAR FAMILY</option>
-                        <option>EXTENDED FAMILY</option>
-                        <option>BOARDING HOUSE</option>
-                        <option>SHARED APARTMET</option>
-                        <option>SOLO HOUSEHOLD</option>
-                        <option>GOVERNMENT HOUSING</option>
-                        <option>INFORMAL SETTLER</option>
+                        <option value="1">NUCLEAR FAMILY</option>
+                        <option value="2">EXTENDED FAMILY</option>
+                        <option value="3">BOARDING HOUSE</option>
+                        <option value="4">SHARED APARTMET</option>
+                        <option value="5">SOLO HOUSEHOLD</option>
+                        <option value="6">GOVERNMENT HOUSING</option>
+                        <option value="7">INFORMAL SETTLER</option>
                       </select>
                     </div>
                   </div>
@@ -587,15 +588,15 @@
                     <div class="col-md-6">
                       <label class="form-label">NHTS Status</label>
                       <select id="sf_nhts_status" class="form-select" name="nhts_status">
-                        <option>NHTS</option>
-                        <option>NON-NHTS</option>
+                        <option value="1">NHTS</option>
+                        <option value="2">NON-NHTS</option>
                       </select>
                     </div>
                     <div class="col-md-6">
                       <label class="form-label">Indigent Status</label>
                       <select id="sf_indigent_status" class="form-select" name="indigent_status">
-                        <option>INDIGENT</option>
-                        <option>NON-INDIGENT</option>
+                        <option value="1">INDIGENT</option>
+                        <option value="2">NON-INDIGENT</option>
                       </select>
                     </div>
                   </div>
@@ -608,15 +609,15 @@
                   <div class="mb-3">
                     <label class="form-label">Family Monthly Income</label>
                     <select id="sf_monthly_income_range" class="form-select" name="monthly_income_range">
-                      <option>Below ₱5,000</option>
-                      <option>₱5,001 - ₱10,000</option>
-                      <option>₱10,001 - ₱15,000</option>
-                      <option>₱15,001 - ₱20,000</option>
-                      <option>₱20,001 - ₱30,000</option>
-                      <option>₱30,001 - ₱50,000</option>
-                      <option>₱50,001 - ₱75,000</option>
-                      <option>₱75,001 - ₱100,000</option>
-                      <option>Above ₱100,000</option>
+                      <option value="1">Below ₱5,000</option>
+                      <option value="2">₱5,001 - ₱10,000</option>
+                      <option value="3">₱10,001 - ₱15,000</option>
+                      <option value="4">₱15,001 - ₱20,000</option>
+                      <option value="5">₱20,001 - ₱30,000</option>
+                      <option value="6">₱30,001 - ₱50,000</option>
+                      <option value="7">₱50,001 - ₱75,000</option>
+                      <option value="8">₱75,001 - ₱100,000</option>
+                      <option value="9">Above ₱100,000</option>
                     </select>
                   </div>
                   <div class="text-end">
@@ -732,6 +733,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
 <script defer src="{% static 'js/map_registration.js' %}"></script>
 <script defer src="{% static 'js/update_household.js' %}"></script>
+<script defer src="{% static 'js/update_family.js' %}"></script>
 
 <script>
   // families data for shared modal
