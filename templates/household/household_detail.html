@@ -301,10 +301,11 @@
               </div>
             </div>
             <div style="display:flex; gap:.5rem; align-items:center">
-              <button class="toggle-members-btn" onclick="toggleMembers({{ forloop.counter0 }}, this)">
-              <span class="toggle-text">Show Members ({{ family.members|length }})</span>
-              {% bs_icon 'chevron-down' extra_classes='toggle-icon' %}
-            </button>
+                <button class="toggle-members-btn" onclick="toggleMembers({{ forloop.counter0 }}, this)">
+                  <span class="toggle-text">Show Members ({{ family.members|length }})</span>
+                  {% bs_icon 'chevron-down' extra_classes='toggle-icon' %}
+                </button>
+                <a href="{% url 'resident:add_member_existing_household' family.family_id %}" class="btn btn-outline-brand" style="padding:.375rem .75rem; font-size:.875rem;">Add Member</a>
                 <!-- per-family Update button removed; use header-level Update Family Information -->
             </div>
           </div>

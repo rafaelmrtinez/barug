@@ -18,6 +18,7 @@ urlpatterns = [
     path("register/family/<int:household_id>/", views.add_family, name="register_family"),
     path("<str:res_id>/", views.resident_record, name="resident_record"),
     path("house/membership/<int:family_id>/", views.house_membership, name="house_membership"),
+    path("add/member/<int:family_id>/", views.house_membership_with_existing_household, name="add_member_existing_household"),
     
     # API CALLS
     path("api/search/", api.ResidentSearchAPI.as_view(), name="person_search_api"),

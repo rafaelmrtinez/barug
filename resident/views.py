@@ -305,3 +305,20 @@ def house_membership(request: HttpRequest, family_id: int) -> HttpResponse:
         'user_role_template' : user_role_template,
         'family_id' : family_id,
     })
+    
+@session_login_required
+@role_required(("barangay health worker"))
+@nocache
+@require_http_methods(["GET"])
+@csrf_protect
+def house_membership_with_existing_household(request: HttpRequest, family_id: int) -> HttpResponse:
+    user_role=request.session.get('auth').get('role_name')
+    user_role_template=user_role.lower().replace(' ', '_')
+    return render(request, 'household_profiling/house_membership_existing_household.html', {
+        'user_fullname' : user_fullname,
+        'user_role' : user_role,
+        'page_path' : f'{user_role} / Resident Management / Resident Records',
+        'page_title' : 'Resident Records',
+        'user_role_template' : user_role_template,
+        'family_id' : family_id,
+    })
