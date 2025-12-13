@@ -3,12 +3,86 @@ from typing import Optional
 import logging
 
 from src.infra.database.connection_adapter import ConnectionAdapter
+from src.infra.exceptions.household_update_exception import HouseholdUpdateException
 from src.infra.exceptions.membership_exception import MembershipException
 
 logger = logging.getLogger(__name__)
 
 
 class HouseholdCommand:
+    
+    def __init__(self, ctx: ConnectionAdapter):
+        self._ctx = ctx
+
+    def update_hhold_info(
+        self,
+        p_performed_by: int,
+        p_household_id: int,
+        p_reason: str,
+        p_house_type_id: int,
+        p_house_ownership_id: int,
+        p_city: str,
+        p_barangay: str,
+        p_street: str,
+        p_purok_sitio_name: str,
+        p_latitude: float,
+        p_longitude: float
+    ) -> Optional[int]:
+        """
+        Call the database function `update_hhold_info` and return its result.
+        Args:
+            p_performed_by: User ID performing the update
+            p_household_id: Household ID to update
+            p_reason: Reason for the update
+            p_house_type_id: House type ID
+            p_house_ownership_id: House ownership ID
+            p_city: City name
+            p_barangay: Barangay name
+            p_street: Street name
+            p_purok_sitio_name: Purok/Sitio name
+            p_latitude: Latitude
+            p_longitude: Longitude
+        Returns:
+            The result of the function (e.g., updated household id or status), or None.
+        Raises:
+            MembershipException if a known membership error occurs.
+        """
+        sql = "SELECT update_hhold_info(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        params = (
+            p_performed_by,
+            p_household_id,
+            p_reason,
+            p_house_type_id,
+            p_house_ownership_id,
+            p_city,
+            p_barangay,
+            p_street,
+            p_purok_sitio_name,
+            p_latitude,
+            p_longitude
+        )
+        try:
+            logger.info('Calling update_hhold_info with params=%s', params)
+            result = None
+            if hasattr(self._ctx, 'execute_scalar'):
+                result = self._ctx.execute_scalar(sql, params)
+            else:
+                result = self._ctx.execute_query(sql, params)
+            logger.info('update_hhold_info returned %s', result)
+            return result
+        except Exception as exc:
+            pgcode = getattr(exc, 'pgcode', None)
+            if pgcode and HouseholdUpdateException.is_household_update_exception(pgcode):
+                raise HouseholdUpdateException(str(exc)) from exc
+            try:
+                msg = str(exc)
+                if any(code in msg for code in HouseholdUpdateException.ERROR_CODES):
+                    logger.warning('Raising HouseholdUpdateException for message: %s', msg)
+                    raise HouseholdUpdateException(msg) from exc
+            except Exception:
+                logger.error('Failed to inspect exception message for HouseholdUpdateException mapping.')
+                pass
+            raise
 
     def insert_house_member(
         self,
@@ -33,13 +107,13 @@ class HouseholdCommand:
             p_relationship_to_family_head_id,
         )
         try:
-            logger.debug('Calling insert_house_member stored-proc with params=%s', params)
+            logger.info('Calling insert_house_member stored-proc with params=%s', params)
             result = None
             if hasattr(self._ctx, 'execute_scalar'):
                 result = self._ctx.execute_scalar(sql, params)
             else:
                 result = self._ctx.execute_query(sql, params)
-            logger.debug('insert_house_member returned %s', result)
+            logger.info('insert_house_member returned %s', result)
             return result
         except Exception as exc:
             pgcode = getattr(exc, 'code', None)
@@ -48,13 +122,61 @@ class HouseholdCommand:
             try:
                 msg = str(exc)
                 if any(code in msg for code in MembershipException.ERROR_CODES):
+                    logger.warning('Raising MembershipException for message: %s', msg)
                     raise MembershipException(msg) from exc
             except Exception:
+                logger.error('Failed to inspect exception message for MembershipException mapping.')
                 pass
             raise
-
-    def __init__(self, ctx: ConnectionAdapter):
-        self._ctx = ctx
+    
+    def change_household_head(
+        self,
+        p_household_id: int,
+        p_new_head_person_id: int,
+        p_performed_by: int,
+        p_reason: str
+    ) -> Optional[int]:
+        """
+        Call the database function `change_household_head` and return its result.
+        Args:
+            p_household_id: ID of the household to update
+            p_new_head_person_id: Person ID of the new household head
+            p_performed_by: User ID performing the change
+            p_reason: Reason for the change
+        Returns:
+            The result of the function (e.g., updated household id or status), or None.
+        Raises:
+            MembershipException if a known membership error occurs.
+        """
+        sql = "SELECT change_household_head(%s, %s, %s, %s)"
+        params = (
+            p_household_id,
+            p_new_head_person_id,
+            p_performed_by,
+            p_reason,
+        )
+        try:
+            logger.info('Calling change_household_head with params=%s', params)
+            result = None
+            if hasattr(self._ctx, 'execute_scalar'):
+                result = self._ctx.execute_scalar(sql, params)
+            else:
+                result = self._ctx.execute_query(sql, params)
+            logger.info('change_household_head returned %s', result)
+            return result
+        except Exception as exc:
+            pgcode = getattr(exc, 'pgcode', None)
+            if pgcode and HouseholdUpdateException.is_household_update_exception(pgcode):
+                raise HouseholdUpdateException(str(exc)) from exc
+            try:
+                msg = str(exc)
+                if any(code in msg for code in HouseholdUpdateException.ERROR_CODES):
+                    logger.warning('Raising HouseholdUpdateException for message: %s', msg)                    
+                    raise HouseholdUpdateException(msg) from exc
+            except Exception:
+                logger.error('Failed to inspect exception message for HouseholdUpdateException mapping.')
+                pass
+            raise
 
     def insert_household(
         self,
