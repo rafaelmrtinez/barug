@@ -72,5 +72,6 @@ urlpatterns = [
     path("api/update-household-head/", api.UpdateHouseholdHeadAPI.as_view(), name="update_household_head_api"),
     path("api/update-family-head/", api.UpdateFamilyHeadAPI.as_view(), name="update_family_head_api"),
     path("api/update-family-information/", api.UpdateFamilyInformationAPI.as_view(), name="update_family_information_api"),
+    path("api/quarterly-visit-completion/", api.MarkQuarterlyVisitAPI.as_view(), name="mark_quarterly_visit_api"),
 ]
 

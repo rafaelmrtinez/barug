@@ -246,7 +246,7 @@
         <ul class="dropdown-menu">
           <li><a class="dropdown-item" href="#" onclick="openFamilyModalNoSelect(event)">Update Family Information</a></li>
           <li><a class="dropdown-item" href="{% url 'resident:register_family' household.household_num  %}">Register New Family</a></li>
-          <li><a class="dropdown-item" href="#" data-household-id="{{ household.household_num }}" onclick="/* handle complete visit */">Complete Visit</a></li>
+          <li><a class="dropdown-item" href="#" data-household-id="{{ household.household_num }}" onclick="completeHouseholdVisit('{{ household.household_id }}'); return false;">Complete Visit</a></li>
         </ul>
       </div>
     </div>
@@ -314,7 +314,7 @@
                   {% bs_icon 'chevron-down' extra_classes='toggle-icon' %}
                 </button>
                 <a href="{% url 'resident:add_member_existing_household' family.family_id %}" class="btn btn-outline-brand" style="padding:.375rem .75rem; font-size:.875rem;">Add Member</a>
-                  <button type="button" class="btn btn-outline-success" data-family-id="{{ family.family_id }}">Complete Visit</button>
+                  <button type="button" class="btn btn-outline-success" data-family-id="{{ family.family_id }}" onclick="completeHouseholdVisit('{{ family.family_id }}', '{{ request.user.id }}', 'family'); return false;">Complete Visit</button>
                   <!-- per-family Update button removed; use header-level Update Family Information -->
             </div>
           </div>
@@ -740,6 +740,7 @@
 </div>
 
 {% block scripts %}
+<script defer src="{% static 'js/complete_visit.js' %}"></script>
 <script defer src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
 <script defer src="{% static 'js/map_registration.js' %}"></script>
