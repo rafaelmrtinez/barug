@@ -239,8 +239,16 @@
     </div>
     <div style="margin-top:1rem; display:flex; gap:.5rem;">
       <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#updateHouseholdModal">Update Household Information</button>
-      <button type="button" class="btn btn-outline-brand" onclick="openFamilyModalNoSelect(event)">Update Family Information</button>
-      <a href="{% url 'resident:register_family' household.household_num  %}" class="btn btn-outline-brand">Register New Family</a>
+      <div class="btn-group">
+        <button type="button" class="btn btn-outline-brand dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+          More Actions
+        </button>
+        <ul class="dropdown-menu">
+          <li><a class="dropdown-item" href="#" onclick="openFamilyModalNoSelect(event)">Update Family Information</a></li>
+          <li><a class="dropdown-item" href="{% url 'resident:register_family' household.household_num  %}">Register New Family</a></li>
+          <li><a class="dropdown-item" href="#" data-household-id="{{ household.household_num }}" onclick="/* handle complete visit */">Complete Visit</a></li>
+        </ul>
+      </div>
     </div>
   </div>
 
@@ -306,7 +314,8 @@
                   {% bs_icon 'chevron-down' extra_classes='toggle-icon' %}
                 </button>
                 <a href="{% url 'resident:add_member_existing_household' family.family_id %}" class="btn btn-outline-brand" style="padding:.375rem .75rem; font-size:.875rem;">Add Member</a>
-                <!-- per-family Update button removed; use header-level Update Family Information -->
+                  <button type="button" class="btn btn-outline-success" data-family-id="{{ family.family_id }}">Complete Visit</button>
+                  <!-- per-family Update button removed; use header-level Update Family Information -->
             </div>
           </div>
 
