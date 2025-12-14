@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from django.shortcuts import render
 from django.core.paginator import Paginator
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_protect
+
+from authentication.guards import role_required, session_login_required
+from authentication.utils import nocache
 from .forms import ResidentProfileform
 from .forms import HouseholdProfileForm
 from .forms import FamilyProfileForm
@@ -17,7 +22,7 @@ user_role_template = user_role.lower().replace(' ', '_')
 from typing import Any, Dict, List
 
 from django.contrib import messages
-from django.http import HttpResponseForbidden
+from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import redirect, render
 from django.utils.html import escape
 
@@ -212,9 +217,15 @@ def resident_record(request, res_id):
         'form' : form,
     })
 
-def household_info(request):
+@session_login_required
+@role_required(("barangay health worker"))
+@nocache
+@require_http_methods(["GET"])
+@csrf_protect
+def household_info(request: HttpRequest) -> HttpResponse:
     form = HouseholdProfileForm()
-
+    user_role=request.session.get('auth').get('role_name')
+    user_role_template=user_role.lower().replace(' ', '_')
     return render(request, 'household_profiling/household_info.html', {
         'user_fullname' : user_fullname,
         'user_role' : user_role,
@@ -224,9 +235,15 @@ def household_info(request):
         'form' : form,
     })
 
-def family_info(request):
+@session_login_required
+@role_required(("barangay health worker"))
+@nocache
+@require_http_methods(["GET"])
+@csrf_protect
+def family_info(request: HttpRequest, household_id: int) -> HttpResponse:
     form = FamilyProfileForm()
-
+    user_role=request.session.get('auth').get('role_name')
+    user_role_template=user_role.lower().replace(' ', '_')
     return render(request, 'household_profiling/family_info.html', {
         'user_fullname' : user_fullname,
         'user_role' : user_role,
@@ -234,4 +251,22 @@ def family_info(request):
         'page_title' : 'Resident Records',
         'user_role_template' : user_role_template,
         'form' : form,
+        'household_id' : household_id,
+    })
+    
+@session_login_required
+@role_required(("barangay health worker"))
+@nocache
+@require_http_methods(["GET"])
+@csrf_protect
+def house_membership(request: HttpRequest, family_id: int) -> HttpResponse:
+    user_role=request.session.get('auth').get('role_name')
+    user_role_template=user_role.lower().replace(' ', '_')
+    return render(request, 'household_profiling/house_membership.html', {
+        'user_fullname' : user_fullname,
+        'user_role' : user_role,
+        'page_path' : f'{user_role} / Resident Management / Resident Records',
+        'page_title' : 'Resident Records',
+        'user_role_template' : user_role_template,
+        'family_id' : family_id,
     })
