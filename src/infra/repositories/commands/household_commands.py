@@ -5,14 +5,103 @@ import logging
 from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.exceptions.household_update_exception import HouseholdUpdateException
 from src.infra.exceptions.membership_exception import MembershipException
+from src.infra.exceptions.household_exception import HouseholdException
 
 logger = logging.getLogger(__name__)
 
 
 class HouseholdCommand:
-    
+
     def __init__(self, ctx: ConnectionAdapter):
         self._ctx = ctx
+
+    def mark_family_quarterly_visit(
+        self,
+        p_family_id: int,
+        p_staff_id: int
+    ) -> Optional[int]:
+        """
+        Call the database function `mark_family_quarterly_visited` and return its result.
+        Args:
+            p_family_id: Family ID to mark as visited
+            p_staff_id: Staff ID performing the visit
+        Returns:
+            The result of the function (e.g., status or affected row id), or None.
+        Raises:
+            HouseholdException if a known household error occurs.
+        """
+        sql = "SELECT mark_family_quarterly_visited(%s, %s)"
+        params = (
+            p_family_id,
+            p_staff_id
+        )
+        try:
+            logger.info('Calling mark_family_quarterly_visited with params=%s', params)
+            result = None
+            if hasattr(self._ctx, 'execute_scalar'):
+                result = self._ctx.execute_scalar(sql, params)
+            else:
+                result = self._ctx.execute_query(sql, params)
+            logger.info('mark_family_quarterly_visited returned %s', result)
+            return result
+        except Exception as exc:
+            pgcode = getattr(exc, 'code', None)
+            if pgcode and HouseholdException.is_household_exception(pgcode):
+                raise HouseholdException(str(exc.message)) from exc
+            try:
+                msg = str(exc)
+                if any(code in msg for code in HouseholdException.ERROR_CODES):
+                    logger.warning('Raising HouseholdException for message: %s', msg)
+                    raise HouseholdException(msg.message) from exc
+            except Exception:
+                logger.error('Failed to inspect exception message for HouseholdException mapping.')
+                pass
+            logger.error('Error in mark_family_quarterly_visited: %s', exc)
+            raise
+
+    def mark_household_quarterly_visit(
+        self,
+        p_household_id: int,
+        p_staff_id: int
+    ) -> Optional[int]:
+        """
+        Call the database function `mark_household_quarterly_visited` and return its result.
+        Args:
+            p_household_id: Household ID to mark as visited
+            p_staff_id: Staff ID performing the visit
+        Returns:
+            The result of the function (e.g., status or affected row id), or None.
+        Raises:
+            HouseholdException if a known household error occurs.
+        """
+        sql = "SELECT mark_household_quarterly_visited(%s, %s)"
+        params = (
+            p_household_id,
+            p_staff_id
+        )
+        try:
+            logger.info('Calling mark_household_quarterly_visited with params=%s', params)
+            result = None
+            if hasattr(self._ctx, 'execute_scalar'):
+                result = self._ctx.execute_scalar(sql, params)
+            else:
+                result = self._ctx.execute_query(sql, params)
+            logger.info('mark_household_quarterly_visited returned %s', result)
+            return result
+        except Exception as exc:
+            pgcode = getattr(exc, 'code', None)
+            if pgcode and HouseholdException.is_household_exception(pgcode):
+                raise HouseholdException(str(exc.message)) from exc
+            try:
+                msg = str(exc)
+                if any(code in msg for code in HouseholdException.ERROR_CODES):
+                    logger.warning('Raising HouseholdException for message: %s', msg)
+                    raise HouseholdException(msg.message) from exc
+            except Exception:
+                logger.error('Failed to inspect exception message for HouseholdException mapping.')
+                pass
+            logger.error('Error in mark_household_quarterly_visited: %s', exc)
+            raise
         
     def update_fam_info(
         self,
