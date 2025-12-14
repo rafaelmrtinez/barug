@@ -43,6 +43,8 @@ from .forms import (
     WeekRangeActiveScheduleFilter,
     Reschedule,
     MaternalBhwIntakeForm,
+    ResidentPersonalInfoForm,
+    ResidentSocioeconomicForm,
 )
 
 
@@ -136,21 +138,7 @@ def ajax_person_details(request: HttpRequest):
     return JsonResponse({"ok": True, "person": payload})
 
 
-@session_login_required
-@role_required(*ROLE_BHW)
-@nocache
-def ajax_resident_search(request: HttpRequest) -> JsonResponse:
-    q = (request.GET.get("q") or "").strip()
-    rows: List[Dict[str, Any]] = []
-    if len(q) >= 2:
-        try:
-            resp = supabase.rpc("search_person_by_code_or_name", {"raphael": q}).execute()
-            rows = resp.data or []
-        except Exception:
-            rows = []
 
-    html = render_to_string("bhw/_resident_results.html", {"residents": rows})
-    return JsonResponse({"ok": True, "html": html})
 
 @session_login_required
 @role_required(*ROLE_BHW)
@@ -882,29 +870,26 @@ def resident_list(
 @nocache
 @require_http_methods(["GET"])
 @inject
-def ajax_resident_search(
-    request: HttpRequest,
-    resident_service = Provide[AppContainer.resident_service],
-) -> HttpResponse:
-    """AJAX search for residents."""
-    if request.headers.get("x-requested-with") != "XMLHttpRequest":
-        return HttpResponseBadRequest("XHR required")
+def ajax_resident_search(request: HttpRequest, resident_service = Provide[AppContainer.resident_service]) -> HttpResponse:
+    tpl = request.GET.get("tpl", "")
     
-    tpl_key = (request.GET.get("tpl") or "rows").strip().lower()
-    if tpl_key != "rows":
-        return HttpResponseBadRequest("Unknown partial")
-
-    q = request.GET.get("q", "") or None
-    purok_sitio = request.GET.get("purok_sitio")
-
-    rows = resident_service.execute(
-        search=q,
-        purok=purok_sitio,
-    )[:50]
-
-    context = {"rows": rows}
-    html = render_to_string("resident/_resident_list.html", context, request=request)
-    return HttpResponse(html)
+    if tpl == "rows":
+        search = request.GET.get("q")
+        purok_sitio = request.GET.get("purok_sitio")
+        rows = resident_service.execute(search=search, purok=purok_sitio)[:50]
+        html = render_to_string("resident/_resident_list.html", {"rows": rows}, request=request)
+        return HttpResponse(html)
+    else:
+        q = (request.GET.get("q") or "").strip()
+        rows: List[Dict[str, Any]] = []
+        if len(q) >= 2:
+            try:
+                resp = supabase.rpc("search_person_by_code_or_name_not_deceased", {"p_key": q}).execute()
+                rows = resp.data or []
+            except Exception:
+                rows = []
+        html = render_to_string("bhw/_resident_results.html", {"residents": rows})
+        return JsonResponse({"ok": True, "html": html})
 
 
 @session_login_required
@@ -1570,3 +1555,196 @@ def family_history_detail(
         'page_title': f'Family History {family_data.get("family_num", "")}',
         'family': family_data,
     })
+
+# -------------------------------
+# RESIDENT PROFILING
+# -------------------------------
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@csrf_protect
+@nocache
+def profile_personal_info(request: HttpRequest) -> HttpResponse:
+    user_role = _auth_role_name(request)
+    if request.method == 'POST':
+        form = ResidentPersonalInfoForm(request.POST)
+        if form.is_valid():
+            data = form.cleaned_data.copy()
+            if 'dob' in data and data['dob']:
+                data['dob'] = str(data['dob'])
+            if data.get('mobile_num') and data['mobile_num'].strip() in ('', '+63'):
+                data['mobile_num'] = None
+            request.session['profile_data'] = data
+            return redirect('bhw:profile_link_parent')
+    else:
+        initial = request.session.get('profile_data', {})
+        form = ResidentPersonalInfoForm(initial=initial)
+    return render(request, 'bhw/profiling/personal_info.html', {'form': form, 'page_path': f'{user_role} / Profile Resident / Personal Information', 'page_title': 'Profile Resident - Personal Information'})
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@csrf_protect
+@nocache
+def profile_link_parent(request: HttpRequest) -> HttpResponse:
+    user_role = _auth_role_name(request)
+    profile_data = request.session.get('profile_data', {})
+    if request.method == 'POST':
+        profile_data['mother_id'] = request.POST.get('mother_id') or None
+        profile_data['father_id'] = request.POST.get('father_id') or None
+        profile_data['guardian_id'] = request.POST.get('guardian_id') or None
+        profile_data['mother_name'] = request.POST.get('mother_name') or None
+        profile_data['father_name'] = request.POST.get('father_name') or None
+        profile_data['guardian_name'] = request.POST.get('guardian_name') or None
+        request.session['profile_data'] = profile_data
+        return redirect('bhw:profile_link_children')
+    return render(request, 'bhw/profiling/link_parent.html', {
+        'mother_id': profile_data.get('mother_id'),
+        'father_id': profile_data.get('father_id'),
+        'guardian_id': profile_data.get('guardian_id'),
+        'mother_name': profile_data.get('mother_name'),
+        'father_name': profile_data.get('father_name'),
+        'guardian_name': profile_data.get('guardian_name'),
+        'page_path': f'{user_role} / Profile Resident / Link Parent/Guardian',
+        'page_title': 'Profile Resident - Link Parent/Guardian',
+    })
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@csrf_protect
+@nocache
+def profile_link_children(request: HttpRequest) -> HttpResponse:
+    import json
+    user_role = _auth_role_name(request)
+    profile_data = request.session.get('profile_data', {})
+    if request.method == 'POST':
+        child_ids = request.POST.get('child_ids', '[]')
+        child_names = request.POST.get('child_names', '[]')
+        profile_data['child_ids'] = json.loads(child_ids) if child_ids else []
+        profile_data['child_names'] = json.loads(child_names) if child_names else []
+        request.session['profile_data'] = profile_data
+        return redirect('bhw:profile_socioeconomic')
+    children = profile_data.get('children', [])
+    child_ids = profile_data.get('child_ids', [])
+    return render(request, 'bhw/profiling/link_children.html', {'children': children, 'child_ids': json.dumps(child_ids), 'page_path': f'{user_role} / Profile Resident / Link Children', 'page_title': 'Profile Resident - Link Children'})
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@csrf_protect
+@nocache
+def profile_socioeconomic(request: HttpRequest) -> HttpResponse:
+    user_role = _auth_role_name(request)
+    profile_data = request.session.get('profile_data', {})
+    if request.method == 'POST':
+        form = ResidentSocioeconomicForm(request.POST)
+        if form.is_valid():
+            profile_data.update(form.cleaned_data)
+            profile_data['is_student'] = request.POST.get('is_student') == '1'
+            profile_data['gov_programs'] = [int(p) for p in request.POST.getlist('gov_programs') if p]
+            request.session['profile_data'] = profile_data
+            return redirect('bhw:profile_review')
+    else:
+        form = ResidentSocioeconomicForm(initial=profile_data)
+    gov_programs = [{'id': 7, 'name': 'None'}, {'id': 1, 'name': '4Ps'}, {'id': 2, 'name': 'GSIS'}, {'id': 3, 'name': 'PhilHealth'}, {'id': 4, 'name': 'PWD'}, {'id': 5, 'name': 'Senior Citizen'}, {'id': 6, 'name': 'SSS'}]
+    return render(request, 'bhw/profiling/socioeconomic_info.html', {
+        'form': form,
+        'gov_programs': gov_programs,
+        'selected_programs': profile_data.get('gov_programs', []),
+        'is_student': profile_data.get('is_student', False),
+        'page_path': f'{user_role} / Profile Resident / Socioeconomic Information',
+        'page_title': 'Profile Resident - Socioeconomic Information',
+    })
+
+@session_login_required
+@role_required(*ROLE_BHW)
+@csrf_protect
+@nocache
+def profile_review(request: HttpRequest) -> HttpResponse:
+    import logging
+    logger = logging.getLogger(__name__)
+    profile_data = request.session.get('profile_data', {})
+    if not profile_data:
+        return redirect('bhw:profile_personal_info')
+    
+    if request.method == 'POST':
+        try:
+            auth = request.session.get('auth', {})
+            performer_id = auth.get('person_id', 1)
+            def safe_int(val):
+                if val and str(val).strip() and str(val).strip().lower() != 'none':
+                    return int(val)
+                return None
+            
+            payload = {
+                'p_performer_id': performer_id,
+                'p_first_name': profile_data.get('first_name'),
+                'p_middle_name': profile_data.get('middle_name') or None,
+                'p_last_name': profile_data.get('last_name'),
+                'p_suffix': profile_data.get('suffix') or None,
+                'p_birthdate': str(profile_data.get('dob')),
+                'p_sex_id': int(profile_data.get('sex', 1)),
+                'p_civil_status_id': int(profile_data.get('civil_status', 1)),
+                'p_nationality_id': int(profile_data.get('nationality', 1)),
+                'p_religion_id': int(profile_data.get('religion', 1)),
+                'p_mobile_num': profile_data.get('mobile_num') if profile_data.get('mobile_num') and profile_data.get('mobile_num').strip() not in ('', '+63') else None,
+                'p_email': profile_data.get('email') or None,
+                'p_education_id': safe_int(profile_data.get('educational_attainment')) or 0,
+                'p_employment_status_id': int(profile_data.get('employment_status', 1)),
+                'p_occupation': profile_data.get('occupation', ''),
+                'p_mnthly_personal_income_id': int(profile_data.get('monthly_income', 1)),
+                'p_residency_period': ((datetime.now().year - int(profile_data.get('residency_year', datetime.now().year))) * 12 + (datetime.now().month - int(profile_data.get('residency_month', 1)))),
+                'p_is_student': profile_data.get('is_student', False),
+                'p_mother_person_id': safe_int(profile_data.get('mother_id')),
+                'p_father_person_id': safe_int(profile_data.get('father_id')),
+                'p_guardian_person_ids': [safe_int(profile_data.get('guardian_id'))] if safe_int(profile_data.get('guardian_id')) else [],
+                'p_child_person_ids': [int(cid) for cid in profile_data.get('child_ids', []) if cid],
+                'p_gov_mem_prog_ids': [int(pid) for pid in profile_data.get('gov_programs', []) if pid and str(pid).strip() and str(pid).strip().lower() != 'none'],
+                'p_is_business_owner': False,
+                'p_is_email_verified': False,
+                'p_is_id_valid': False,
+            }
+            logger.info(f'[BHW PROFILING] Submitting resident profile: {profile_data.get("first_name")} {profile_data.get("last_name")}')
+            result = supabase.rpc('profile_resident', payload).execute()
+            logger.info(f'[BHW PROFILING] SUCCESS - Resident profile created: {profile_data.get("first_name")} {profile_data.get("last_name")}')
+            del request.session['profile_data']
+            request.session.modified = True
+            
+            months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+            profile_data['residency_month_name'] = months[int(profile_data.get('residency_month', 1)) - 1] if profile_data.get('residency_month') else ''
+            profile_data['mother_display'] = profile_data.get('mother_name') or '—'
+            profile_data['father_display'] = profile_data.get('father_name') or '—'
+            profile_data['guardian_display'] = profile_data.get('guardian_name') or '—'
+            profile_data['children_display'] = ', '.join(profile_data.get('child_names', [])) if profile_data.get('child_names') else '—'
+            profile_data['sex_display'] = 'Male' if profile_data.get('sex') == '1' else 'Female'
+            profile_data['civil_status_display'] = {1: 'Single', 2: 'Married', 3: 'Widowed', 4: 'Separated', 5: 'Divorced'}.get(int(profile_data.get('civil_status', 1)))
+            profile_data['nationality_display'] = {1: 'American', 2: 'Australian', 3: 'Brazilian', 4: 'British', 5: 'Canadian', 6: 'Chinese', 7: 'Filipino', 8: 'French', 9: 'German', 10: 'Indian', 11: 'Indonesian', 12: 'Italian', 13: 'Japanese', 14: 'Korean', 15: 'Malaysian', 16: 'Russian', 17: 'Saudi', 18: 'Spanish', 19: 'Thai', 20: 'Vietnamese'}.get(int(profile_data.get('nationality', 7)))
+            profile_data['religion_display'] = {1: 'Agnostic', 2: 'Born Again', 3: 'Buddhist', 4: 'Christian', 5: 'Evangelical', 6: 'Hindu', 7: 'Iglesia Ni Cristo', 8: 'Islam', 9: "Jehovah's Witness", 10: 'Orthodox', 11: 'Protestant', 12: 'Roman Catholic', 13: 'Seventh-Day Adventist', 14: 'Others'}.get(int(profile_data.get('religion', 12)))
+            profile_data['education_display'] = {1: 'No Formal Education', 2: 'Kinder', 3: 'Elementary Student', 4: 'Elementary Undergrad', 5: 'Elementary Graduate', 6: 'High School Student', 7: 'High School Undergrad', 8: 'High School Graduate', 9: 'Vocational Course', 10: 'College Student', 11: 'College Undergrad', 12: 'College Graduate', 13: 'Postgraduate'}.get(int(profile_data.get('educational_attainment', 0))) if profile_data.get('educational_attainment') else None
+            profile_data['employment_display'] = {1: 'Employed', 2: 'Unemployed', 3: 'OFW', 5: 'Retired', 6: 'Self-Employed', 7: 'Pensioner', 8: 'Housewife', 9: 'Freelancer', 10: 'Disabled', 11: 'Looking for Work', 12: 'Part-Time', 13: 'Full-Time', 14: 'Underemployed'}.get(int(profile_data.get('employment_status', 1)))
+            profile_data['income_display'] = {1: 'Below ₱5,000', 2: '₱5,001 - ₱10,000', 3: '₱10,001 - ₱15,000', 4: '₱15,001 - ₱20,000', 5: '₱20,001 - ₱30,000', 6: '₱30,001 - ₱50,000', 7: '₱50,001 - ₱75,000', 8: '₱75,001 - ₱100,000', 9: 'Above ₱100,000'}.get(int(profile_data.get('monthly_income', 1)))
+            gov_map = {1: '4Ps', 2: 'GSIS', 3: 'PhilHealth', 4: 'PWD', 5: 'Senior Citizen', 6: 'SSS', 7: 'None'}
+            gov_programs_display = [gov_map.get(pid, str(pid)) for pid in profile_data.get('gov_programs', []) if pid and isinstance(pid, int)]
+            
+            user_role = _auth_role_name(request)
+            return render(request, 'bhw/profiling/review.html', {'data': profile_data, 'gov_programs_display': gov_programs_display, 'success': True, 'page_path': f'{user_role} / Profile Resident / Review', 'page_title': 'Profile Resident - Review'})
+        except Exception as e:
+            logger.error(f'[BHW PROFILING] FAILED - Error creating resident profile: {str(e)}')
+            messages.error(request, f'Error: {str(e)}')
+    
+    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    profile_data['residency_month_name'] = months[int(profile_data.get('residency_month', 1)) - 1] if profile_data.get('residency_month') else ''
+    profile_data['mother_display'] = profile_data.get('mother_name') or '—'
+    profile_data['father_display'] = profile_data.get('father_name') or '—'
+    profile_data['guardian_display'] = profile_data.get('guardian_name') or '—'
+    profile_data['children_display'] = ', '.join(profile_data.get('child_names', [])) if profile_data.get('child_names') else '—'
+    profile_data['sex_display'] = 'Male' if profile_data.get('sex') == '1' else 'Female'
+    profile_data['civil_status_display'] = {1: 'Single', 2: 'Married', 3: 'Widowed', 4: 'Separated', 5: 'Divorced'}.get(int(profile_data.get('civil_status', 1)))
+    profile_data['nationality_display'] = {1: 'American', 2: 'Australian', 3: 'Brazilian', 4: 'British', 5: 'Canadian', 6: 'Chinese', 7: 'Filipino', 8: 'French', 9: 'German', 10: 'Indian', 11: 'Indonesian', 12: 'Italian', 13: 'Japanese', 14: 'Korean', 15: 'Malaysian', 16: 'Russian', 17: 'Saudi', 18: 'Spanish', 19: 'Thai', 20: 'Vietnamese'}.get(int(profile_data.get('nationality', 7)))
+    profile_data['religion_display'] = {1: 'Agnostic', 2: 'Born Again', 3: 'Buddhist', 4: 'Christian', 5: 'Evangelical', 6: 'Hindu', 7: 'Iglesia Ni Cristo', 8: 'Islam', 9: "Jehovah's Witness", 10: 'Orthodox', 11: 'Protestant', 12: 'Roman Catholic', 13: 'Seventh-Day Adventist', 14: 'Others'}.get(int(profile_data.get('religion', 12)))
+    profile_data['education_display'] = {1: 'No Formal Education', 2: 'Kinder', 3: 'Elementary Student', 4: 'Elementary Undergrad', 5: 'Elementary Graduate', 6: 'High School Student', 7: 'High School Undergrad', 8: 'High School Graduate', 9: 'Vocational Course', 10: 'College Student', 11: 'College Undergrad', 12: 'College Graduate', 13: 'Postgraduate'}.get(int(profile_data.get('educational_attainment', 0))) if profile_data.get('educational_attainment') else None
+    profile_data['employment_display'] = {1: 'Employed', 2: 'Unemployed', 3: 'OFW', 5: 'Retired', 6: 'Self-Employed', 7: 'Pensioner', 8: 'Housewife', 9: 'Freelancer', 10: 'Disabled', 11: 'Looking for Work', 12: 'Part-Time', 13: 'Full-Time', 14: 'Underemployed'}.get(int(profile_data.get('employment_status', 1)))
+    profile_data['income_display'] = {1: 'Below ₱5,000', 2: '₱5,001 - ₱10,000', 3: '₱10,001 - ₱15,000', 4: '₱15,001 - ₱20,000', 5: '₱20,001 - ₱30,000', 6: '₱30,001 - ₱50,000', 7: '₱50,001 - ₱75,000', 8: '₱75,001 - ₱100,000', 9: 'Above ₱100,000'}.get(int(profile_data.get('monthly_income', 1)))
+    gov_map = {1: '4Ps', 2: 'GSIS', 3: 'PhilHealth', 4: 'PWD', 5: 'Senior Citizen', 6: 'SSS', 7: 'None'}
+    gov_programs_display = [gov_map.get(pid, str(pid)) for pid in profile_data.get('gov_programs', []) if pid and isinstance(pid, int)]
+    
+    user_role = _auth_role_name(request)
+    return render(request, 'bhw/profiling/review.html', {'data': profile_data, 'gov_programs_display': gov_programs_display, 'success': False, 'page_path': f'{user_role} / Profile Resident / Review', 'page_title': 'Profile Resident - Review'})
