@@ -312,6 +312,7 @@ class BusinessRepository(IBusinessRepository):
                 "p_owner_barangay": None,
                 "p_owner_street": None,
                 "p_owner_purok_sitio_name": None,
+                "p_owner_province": None,
                 # "p_owner_valid_id_front": None,
                 # "p_owner_valid_id_back": None,
                 # "p_owner_valid_id_type_id": None,

@@ -1,6 +1,6 @@
 # bhw/urls.py
 from django.urls import path
-from . import views
+from . import views, cb_views, api
 from common.api.household_history_pdf_api import HouseholdHistoryPDFAPI
 from common.api.family_history_pdf_api import FamilyHistoryPDFAPI
 from common.api.household_pdf_api import HouseholdPDFAPI
@@ -70,4 +70,15 @@ urlpatterns = [
     path("profiling/link-children/", views.profile_link_children, name="profile_link_children"),
     path("profiling/socioeconomic/", views.profile_socioeconomic, name="profile_socioeconomic"),
     path("profiling/review/", views.profile_review, name="profile_review"),
+
+    # Class Based Views for Household Registration
+    path("household/register/", cb_views.HouseholdView.as_view(), name="household_register"),
+    
+    # API's 
+    path("api/update-household-information/", api.UpdateHouseholdInformationAPI.as_view(), name="update_household_information_api"),
+    path("api/update-household-head/", api.UpdateHouseholdHeadAPI.as_view(), name="update_household_head_api"),
+    path("api/update-family-head/", api.UpdateFamilyHeadAPI.as_view(), name="update_family_head_api"),
+    path("api/update-family-information/", api.UpdateFamilyInformationAPI.as_view(), name="update_family_information_api"),
+    path("api/quarterly-visit-completion/", api.MarkQuarterlyVisitAPI.as_view(), name="mark_quarterly_visit_api"),
 ]
+

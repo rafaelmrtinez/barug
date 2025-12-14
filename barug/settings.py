@@ -275,11 +275,15 @@ AUTH_PASSWORD_VALIDATORS = [
 #     },
 # }
 
-LOG_LEVEL = os.getenv("DJANGO_LOG_LEVEL", "INFO")
+LOG_LEVEL = os.getenv("DJANGO_LOG_LEVEL", "DEBUG" if DEBUG else "INFO").upper()
 
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "require_debug_true": {"()": "django.utils.log.RequireDebugTrue"},
+        "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"},
+    },
 
     "formatters": {
         "verbose": {
@@ -297,7 +301,9 @@ LOGGING = {
     },
 
     "handlers": {
-        "console": {"class": "logging.StreamHandler"},
+        "console": {"class": "logging.StreamHandler", "level": LOG_LEVEL, "formatter": "simple", "filters": ["require_debug_true"]},
+
+        "console_prod": {"class": "logging.StreamHandler", "level": "WARNING", "formatter": "simple", "filters": ["require_debug_false"]},
 
         "file_all": {
             "class": "logging.FileHandler",
@@ -317,11 +323,6 @@ LOGGING = {
             "level": os.getenv("SQL_LOG_LEVEL", "ERROR"),
             "formatter": "sql",
         },
-        "console_app": {
-            "class": "logging.StreamHandler",
-            "level": LOG_LEVEL,
-            "formatter": "simple",
-        },
         "console_db_error": {
             "class": "logging.StreamHandler",
             "level": "ERROR",
@@ -332,29 +333,28 @@ LOGGING = {
     "loggers": {
         # our views module (adjust if your file path differs)
         "authentication.views": {
-            "handlers": ["console"],
-            "level": "DEBUG",       # show everything from DEBUG up
+            "handlers": ["console", "console_prod"],
+            "level": LOG_LEVEL,
             "propagate": False,
         },
         # optional: DB to see SQL errors clearly
         "django.db.backends": {
             "handlers": ["console_db_error", "file_sql"],
-            "level": "DEBUG",
+            "level": os.getenv("SQL_LOG_LEVEL", "ERROR"),
             "propagate": False,
         },
-
         "": {
-            "handlers": ["file_all", "file_errors", "console_app"],
-            "level": "DEBUG",
+            "handlers": ["file_all", "file_errors", "console", "console_prod"],
+            "level": LOG_LEVEL,
             "propagate": True,
         },
         "django": {
-            "handlers": ["file_all", "file_errors", "console_app"],
+            "handlers": ["file_all", "file_errors", "console", "console_prod"],
             "level": "INFO",
             "propagate": False,
         },
         "django.request": {
-            "handlers": ["file_errors", "console_app"],
+            "handlers": ["file_errors", "console_db_error"],
             "level": "ERROR",
             "propagate": False,
         },
