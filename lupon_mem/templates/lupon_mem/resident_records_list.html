@@ -108,6 +108,20 @@
   .pagination .page-link:hover{ background:var(--brand-050); border-color:var(--brand-700); color:var(--brand-800); }
   .pagination .page-item.active .page-link{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
   .pagination .page-item.disabled .page-link{ color:#999; background:#faf7f7; border-color:rgba(109,41,50,.15); }
+
+  /* ---------- Print Styles ---------- */
+  @media print {
+    .no-print, .toolbar, .hero-right, .btn, .actions, .pager-wrap, .searchbox { display: none !important; }
+    .hero { position: static; background: white !important; border: none !important; color: black !important; }
+    .hero-title, .stat-pill { color: black !important; }
+    .table { font-size: 9pt; }
+    .table thead th { background: #f0f0f0 !important; color: black !important; }
+    .table tbody tr { page-break-inside: avoid; }
+    .resident-card { page-break-inside: avoid; }
+    @page { margin: 1cm; }
+    body { background: white; }
+    .container-fluid { padding: 0 !important; }
+  }
 </style>
 {% endblock %}
 
@@ -130,6 +144,9 @@
         {% endif %}
       </div>
       <div class="hero-right">
+        <button onclick="window.print()" class="btn btn-hero d-none d-md-inline-flex me-2">
+          {% bs_icon 'printer' extra_classes='me-2' %} Print
+        </button>
         <a href="{% url 'lupon_mem:report_list' %}" class="btn btn-hero d-none d-md-inline-flex">
           {% bs_icon 'file-earmark-text' extra_classes='me-2' %} View Reports
         </a>

@@ -493,18 +493,18 @@ class LuponMemberDashboardService:
 
         # Define distinct colors for each settlement status
         status_color_map = {
-            "SETTLED": "#2ecc71",  # Green
-            "ARBITRATED": "#3498db",  # Blue
-            "SETTLED THROUGH CONCILIATION": "#1abc9c",  # Turquoise
-            "ISSUANCE OF CFA": "#9b59b6",  # Purple
-            "DISMISSED – NON-APPEARANCE OF BOTH PARTIES": "#e74c3c",  # Red
+            "ISSUANCE OF CFA": "#010002",  # Purple
             "ONGOING": "#f39c12",  # Orange
-            "DISMISSED – NON-APPEARANCE OF COMPLAINANT": "#e67e22",  # Dark Orange
-            "REPUDIATED": "#c0392b",  # Dark Red
             "SETTLED THROUGH MEDIATION": "#27ae60",  # Dark Green
+            "ARBITRATED": "#3498db",  # Blue
+            "NOT SETTLED": "#95a5a6",  # Gray
+            "DISMISSED – NON-APPEARANCE OF BOTH PARTIES": "#e74c3c",  # Red
+            "REPUDIATED": "#c0392b",  # Dark Red
             "FOR EXECUTION (SETTLEMENT)": "#16a085",  # Dark Turquoise
-            "WITHDRAWN BY COMPLAINANT": "#8e44ad",  # Dark Purple
-            "NOT SETTLED": "#95a5a6"  # Gray
+            "DISMISSED – NON-APPEARANCE OF COMPLAINANT": "#e67e22",  # Dark Orange
+            "SETTLED THROUGH CONCILIATION": "#1abc9c",  # Turquoise
+            "SETTLED": "#2ecc71",  # Green
+            "WITHDRAWN BY COMPLAINANT": "#8e44ad"  # Dark Purple
         }
         
         # Assign colors based on labels
