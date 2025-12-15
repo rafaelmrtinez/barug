@@ -282,10 +282,10 @@ def _prep_image_for_upload(file_obj, *, max_w=2200, max_h=2200, default_bg="whit
         return file_obj, getattr(file_obj, "content_type", "application/octet-stream"), "jpg"
 
 # NEW: data-url helpers for preview-only flow (no bucket writes in Step 2)
-import base64
+import base64 as b64
 
 def _bytes_to_data_url(b: bytes, mime: str = "image/jpeg") -> str:
-    return f"data:{mime};base64,{base64.b64encode(b).decode('ascii')}"
+    return f"data:{mime};base64,{b64.b64encode(b).decode('ascii')}"
 
 def _file_to_data_url(fileobj, fallback_mime="image/jpeg") -> str:
     mime = getattr(fileobj, "content_type", None) or fallback_mime
@@ -600,11 +600,11 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
         # Process data URLs from chips and other sources
         for i, proof_url in enumerate(proof_urls):
             try:
-                import re, base64
+                import re
                 m = re.match(r"^data:(.+?);base64,(.+)$", proof_url)
                 if m:
-                    _mime_hint, b64 = m.groups()
-                    raw = io.BytesIO(base64.b64decode(b64))
+                    _mime_hint, b64_data = m.groups()
+                    raw = io.BytesIO(b64.b64decode(b64_data))
                     buf, mime, ext = _prep_image_for_upload(raw)
                     proof_rel_path = f"{final_base}/staff-app-proof-{role_id}-{timestamp}-data-{i+1}.{ext}"
                     res_up = _upload_to_storage_retry(
@@ -865,26 +865,13 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
         back_in   = request.FILES.get("back_id")
         selfie_in = request.FILES.get("res_img")
         
-        # Handle multiple proof files
-        proof_files = []
-        primary_proof = request.FILES.get("proof")
-        if primary_proof:
-            proof_files.append(primary_proof)
-        
-        # Additional proof files
-        for proof_file in request.FILES.getlist("proof_files[]"):
-            if proof_file:
-                proof_files.append(proof_file)
+
 
         if not (front_in and back_in and selfie_in):
             flash_warning(request, "Front ID, Back ID, and Selfie with ID are required.")
             logger.error("Step2 ✗ Missing files: front=%s back=%s selfie=%s", bool(front_in), bool(back_in), bool(selfie_in))
             return redirect(request.path)
-            
-        if not proof_files:
-            flash_warning(request, "At least one proof of employment is required.")
-            logger.error("Step2 ✗ No proof files provided")
-            return redirect(request.path)
+
 
         if _same_file(front_in, back_in):
             flash_warning(request, "Front and Back photos appear to be the same file. Please upload the actual back side of the ID.")
@@ -896,15 +883,12 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
             front_buf  = _pil_autorotate_and_jpeg(front_in)
             back_buf   = _pil_autorotate_and_jpeg(back_in)
             selfie_buf = _pil_autorotate_and_jpeg(selfie_in)
-            proof_bufs = [_pil_autorotate_and_jpeg(pf) for pf in proof_files]
+
         except Exception as e:
             logger.warning("Step2 ⚠ image preprocess failed; using originals: %s", e)
             try: front_in.seek(0); back_in.seek(0); selfie_in.seek(0)
             except Exception: pass
-            for pf in proof_files:
-                try: pf.seek(0)
-                except Exception: pass
-            front_buf, back_buf, selfie_buf, proof_bufs = front_in, back_in, selfie_in, proof_files
+            front_buf, back_buf, selfie_buf = front_in, back_in, selfie_in
 
         # 3) Build previews + store base64 (no uploads here)
         try:
@@ -916,7 +900,7 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
             b_front  = _readall(front_buf)
             b_back   = _readall(back_buf)
             b_selfie = _readall(selfie_buf)
-            b_proofs = [_readall(pb) for pb in proof_bufs]
+
 
             docs_payload = {
                 "valid_id_type_id": valid_id_type_id,
@@ -925,12 +909,12 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
                 "front_preview": _bytes_to_data_url(b_front,  "image/jpeg"),
                 "back_preview":  _bytes_to_data_url(b_back,   "image/jpeg"),
                 "selfie_preview":_bytes_to_data_url(b_selfie, "image/jpeg"),
-                "proof_previews": [_bytes_to_data_url(bp, "image/jpeg") for bp in b_proofs],
+
                 # raw b64
-                "front_b64": base64.b64encode(b_front).decode("ascii"),
-                "back_b64": base64.b64encode(b_back).decode("ascii"),
-                "selfie_b64": base64.b64encode(b_selfie).decode("ascii"),
-                "proof_b64s": [base64.b64encode(bp).decode("ascii") for bp in b_proofs],
+                "front_b64": b64.b64encode(b_front).decode("ascii"),
+                "back_b64": b64.b64encode(b_back).decode("ascii"),
+                "selfie_b64": b64.b64encode(b_selfie).decode("ascii"),
+
             }
             _wiz_set(request, "docs", docs_payload)
         except Exception as e:
@@ -938,7 +922,7 @@ def staff_selection_nonres_docs(request: HttpRequest) -> HttpResponse:
             flash_system_error(request, "Could not prepare previews.", exc=e)
             return redirect(request.path)
 
-        flash_success(request, "Documents loaded for preview. Please review and choose role.")
+        # flash_success(request, "Documents loaded for preview. Please review and choose role.")
         logger.info("Step2 ✓ Preview-only complete (no uploads).")
         return redirect("secretary:staff_selection_non-resident_role_review")
 
@@ -1120,6 +1104,43 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
             flash_warning(request, "Duplicate day selections in schedule are not allowed.")
             return redirect(request.path)
 
+    # Collect proof of employment files from this step
+    proof_files = []
+    proof_urls = []
+    
+    # Handle data URLs from chips (base64 encoded files)
+    for proof_data in request.POST.getlist("proof_files[]"):
+        if proof_data and proof_data.startswith("data:"):
+            proof_urls.append(proof_data)
+    
+    # Primary proof file (fallback for direct upload)
+    if hasattr(request, "FILES"):
+        primary_proof = (
+            request.FILES.get("proof")
+            or request.FILES.get("proof_file")
+            or None
+        )
+        if primary_proof:
+            proof_files.append(primary_proof)
+        
+        # Additional proof files (if any direct uploads)
+        for proof_file in request.FILES.getlist("proof_files[]"):
+            if proof_file:
+                proof_files.append(proof_file)
+
+    # Handle other proof URLs
+    primary_proof_url = (request.POST.get("proof") or "").strip() or None
+    if primary_proof_url and primary_proof_url.startswith(("http://", "https://")):
+        proof_urls.append(primary_proof_url)
+    elif primary_proof_url and primary_proof_url.startswith("data:"):
+        proof_urls.append(primary_proof_url)
+    elif primary_proof_url:
+        logger.warning("Ignoring non-URL, non-data proof value: %r", primary_proof_url)
+
+    if not (proof_files or proof_urls):
+        flash_warning(request, "Please attach at least one proof of employment.")
+        return redirect(request.path)
+
     if not personal:
         flash_warning(request, "Personal information is missing. Please go back to Step 1.")
         return redirect("secretary:staff_selection_non-resident")
@@ -1139,33 +1160,27 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
     front_b64 = docs.get("front_b64")
     back_b64  = docs.get("back_b64")
     selfie_b64= docs.get("selfie_b64")
-    proof_b64s = docs.get("proof_b64s") or []
     valid_id_type_id = docs.get("valid_id_type_id")
 
     if not (front_b64 and back_b64 and selfie_b64):
         logger.error("Step3 ✗ Missing base64 docs: %s", list(docs.keys()))
         flash_warning(request, "Supporting documents are incomplete. Please re-upload.")
         return redirect("secretary:staff_selection_non-resident_docs")
-        
-    if not proof_b64s:
-        logger.error("Step3 ✗ Missing proof documents")
-        flash_warning(request, "Proof of employment is required. Please re-upload.")
-        return redirect("secretary:staff_selection_non-resident_docs")
 
     final_base = f"person/{_key_from_personal(personal)}"
     proof_final_base = f"staff_acc_req_proof/{_key_from_personal(personal)}"
 
     try:
-        b_front  = base64.b64decode(front_b64)
-        b_back   = base64.b64decode(back_b64)
-        b_selfie = base64.b64decode(selfie_b64)
-        b_proofs = [base64.b64decode(pb64) for pb64 in proof_b64s]
+        b_front  = b64.b64decode(front_b64)
+        b_back   = b64.b64decode(back_b64)
+        b_selfie = b64.b64decode(selfie_b64)
     except Exception as e:
-        logger.error("Step3 ✗ Base64 decode failed: %s", e)
-        flash_system_error(request, "Images could not be decoded from session.", exc=e)
+        logger.error("Step3 Base64 decode failed: %s", e)
+        from django.contrib import messages
+        messages.error(request, "Images could not be decoded from session. Please re-upload your documents.")
         return redirect("secretary:staff_selection_non-resident_docs")
 
-    proof_urls = []
+    uploaded_proof_urls = []
     try:
         f_buf, f_mime, f_ext = _prep_image_for_upload(io.BytesIO(b_front))
         b_buf, b_mime, b_ext = _prep_image_for_upload(io.BytesIO(b_back))
@@ -1195,26 +1210,63 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
 
         # Upload multiple proof files
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        for i, b_proof in enumerate(b_proofs):
-            p_buf, p_mime, p_ext = _prep_image_for_upload(io.BytesIO(b_proof))
-            proof_rel_path = f"{proof_final_base}/staff-app-proof-{role_id}-{timestamp}-{i+1}.{p_ext}"
-            up_proof = _upload_to_storage_retry(
-                p_buf,
-                path=proof_rel_path,
-                bucket=BUCKET_STAFF_PROOF,
-                content_type=p_mime,
-                make_public=True,
-            )
-            proof_url = (
-                (up_proof.get("public_url") if isinstance(up_proof, dict) else None)
-                or (up_proof.get("signed_url") if isinstance(up_proof, dict) else None)
-            )
-            if proof_url:
-                proof_urls.append(proof_url)
-            else:
-                logger.error("Non-resident proof upload returned no usable URL: %s", proof_rel_path)
         
-        if not proof_urls:
+        # Process file uploads
+        for i, proof_file in enumerate(proof_files):
+            try:
+                buf, mime, ext = _prep_image_for_upload(proof_file)
+                proof_rel_path = f"{proof_final_base}/staff-app-proof-{role_id}-{timestamp}-{i+1}.{ext}"
+                res_up = _upload_to_storage_retry(
+                    buf,
+                    path=proof_rel_path,
+                    bucket=BUCKET_STAFF_PROOF,
+                    content_type=mime,
+                    make_public=True,
+                )
+                uploaded_url = (
+                    (res_up.get("public_url") if isinstance(res_up, dict) else None)
+                    or (res_up.get("signed_url") if isinstance(res_up, dict) else None)
+                )
+                if uploaded_url:
+                    uploaded_proof_urls.append(uploaded_url)
+                else:
+                    logger.error("Proof upload returned no usable URL for %s", proof_rel_path)
+            except Exception as e:
+                logger.error("Failed to upload proof file %d: %s", i+1, e)
+                continue
+
+        # Process data URLs from chips and other sources
+        for i, proof_url in enumerate(proof_urls):
+            try:
+                import re
+                m = re.match(r"^data:(.+?);base64,(.+)$", proof_url)
+                if m:
+                    _mime_hint, b64_data = m.groups()
+                    raw = io.BytesIO(b64.b64decode(b64_data))
+                    buf, mime, ext = _prep_image_for_upload(raw)
+                    proof_rel_path = f"{proof_final_base}/staff-app-proof-{role_id}-{timestamp}-data-{i+1}.{ext}"
+                    res_up = _upload_to_storage_retry(
+                        buf,
+                        path=proof_rel_path,
+                        bucket=BUCKET_STAFF_PROOF,
+                        content_type=mime,
+                        make_public=True,
+                    )
+                    uploaded_url = (
+                        (res_up.get("public_url") if isinstance(res_up, dict) else None)
+                        or (res_up.get("signed_url") if isinstance(res_up, dict) else None)
+                    )
+                    if uploaded_url:
+                        uploaded_proof_urls.append(uploaded_url)
+                else:
+                    # Direct URL
+                    if proof_url.startswith(("http://", "https://")):
+                        uploaded_proof_urls.append(proof_url)
+            except Exception as e:
+                logger.error("Failed to process proof URL %d: %s", i+1, e)
+                continue
+        
+        if not uploaded_proof_urls:
             flash_system_error(request, "Failed to upload proof files. Please try again.")
             return redirect(request.path)
     except Exception as e:
@@ -1227,7 +1279,7 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
     self_url  = up_selfie.get("public_url") or up_selfie.get("signed_url")
 
     # Validate all proof URLs
-    for proof_url in proof_urls:
+    for proof_url in uploaded_proof_urls:
         if not proof_url.startswith(("http://", "https://")):
             logger.error("Refusing to store non-URL proof value: %r", proof_url)
             flash_system_error(request, "Proof upload failed to produce valid URLs.")
@@ -1239,7 +1291,7 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
             p_requested_by_id=staff_id,
             p_person_id=None,
             p_role_ids=role_ids,
-            p_supporting_docs=proof_urls if proof_urls else None,
+            p_supporting_docs=uploaded_proof_urls if uploaded_proof_urls else None,
             p_lupon_sched=schedules if schedules and ROLE_LUPON in role_ids else None,
             p_bhw_purok_ids=sorted(set(purok_ids)) if purok_ids and ROLE_BHW in role_ids else None,
                 p_first_name=personal.get("first_name"),
@@ -1286,7 +1338,7 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
     # Clean heavy base64 previews from session after success
     try:
         if "docs" in wiz:
-            for k in ("front_b64","back_b64","selfie_b64","proof_b64s","front_preview","back_preview","selfie_preview","proof_previews"):
+            for k in ("front_b64","back_b64","selfie_b64","front_preview","back_preview","selfie_preview"):
                 wiz["docs"].pop(k, None)
             _wiz_set(request, "docs", wiz["docs"])
     except Exception:

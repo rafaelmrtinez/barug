@@ -384,24 +384,50 @@ def _key_from_personal(personal: dict) -> str:
 @require_http_methods(["GET","POST"])
 def staff_selection_resident(request: HttpRequest) -> HttpResponse:
     pid = (request.POST.get("pid") or "").strip()
-    role_str = (request.POST.get("role") or "").strip()
-    role_id = int(role_str) if role_str.isdigit() else None
+    
+    # --- Collect multiple roles from chips
+    role_ids: List[int] = []
+    for x in request.POST.getlist("role_ids[]"):
+        x = (x or "").strip()
+        if x.isdigit():
+            role_ids.append(int(x))
+    role_ids = sorted(set(role_ids))  # Remove duplicates
+    
+    # For backward compatibility, use first role as primary
+    role_id = role_ids[0] if role_ids else None
 
-    # ▼▼▼ CHANGED: accept uploads from either `proof` (template field) or `proof_file` (legacy)
-    proof_file = None  # CHANGED
-    if hasattr(request, "FILES"):  # CHANGED
-        proof_file = (request.FILES.get("proof") or  # CHANGED
-                      request.FILES.get("proof_file") or  # CHANGED
-                      None)  # CHANGED
+    # --- Collect multiple proof files
+    proof_files = []
+    proof_urls = []
+    
+    # Handle data URLs from chips (base64 encoded files)
+    for proof_data in request.POST.getlist("proof_files[]"):
+        if proof_data and proof_data.startswith("data:"):
+            proof_urls.append(proof_data)
+    
+    # Primary proof file (fallback for direct upload)
+    if hasattr(request, "FILES"):
+        primary_proof = (
+            request.FILES.get("proof")
+            or request.FILES.get("proof_file")
+            or None
+        )
+        if primary_proof:
+            proof_files.append(primary_proof)
+        
+        # Additional proof files (if any direct uploads)
+        for proof_file in request.FILES.getlist("proof_files[]"):
+            if proof_file:
+                proof_files.append(proof_file)
 
-    # Keep reading any textual proof value (data: URL or plain URL)
-    proof_url = (request.POST.get("proof") or "").strip() or None  # CHANGED
-
-    # ▼▼▼ CHANGED: ignore bare filenames like 'sheet.jpg' or 'C:\fakepath\file.jpg'
-    if proof_url and not (proof_url.startswith("http://") or proof_url.startswith("https://") or proof_url.startswith("data:")):  # CHANGED
-        logger.warning("Ignoring non-URL, non-data proof value: %r", proof_url)  # CHANGED
-        proof_url = None  # CHANGED
-    # ▲▲▲ END CHANGED
+    # Handle other proof URLs
+    primary_proof_url = (request.POST.get("proof") or "").strip() or None
+    if primary_proof_url and primary_proof_url.startswith(("http://", "https://")):
+        proof_urls.append(primary_proof_url)
+    elif primary_proof_url and primary_proof_url.startswith("data:"):
+        proof_urls.append(primary_proof_url)
+    elif primary_proof_url:
+        logger.warning("Ignoring non-URL, non-data proof value: %r", primary_proof_url)
 
     auth = request.session.get("auth") or {}
     staff_id = auth.get("staff_id")
@@ -434,8 +460,8 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
         _push_sched(d, s, e)
 
     if request.method == "POST":
-        logger.debug("POST ▶ pid=%s role_id=%s staff_id=%s purok_ids=%s schedules=%s proof_url=%s file=%s",
-                     pid, role_id, staff_id, purok_ids, schedules, bool(proof_url), bool(proof_file))
+        logger.debug("POST ▶ pid=%s role_ids=%s staff_id=%s purok_ids=%s schedules=%s proof_files=%d proof_urls=%d",
+                     pid, role_ids, staff_id, purok_ids, schedules, len(proof_files), len(proof_urls))
 
     # POST: Create Staff flow
     if request.method == "POST" and pid:
@@ -450,22 +476,25 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
             flash_warning(request, "Your session is missing staff credentials.")
             return redirect(request.META.get("HTTP_REFERER") or request.path)
 
-        if not role_id:
-            logger.error("Validation error: No role selected")
-            flash_warning(request, "Please choose a staff role.")
+        if not role_ids:
+            logger.error("Validation ✗ No roles selected")
+            flash_warning(request, "Please choose at least one staff role.")
             return redirect(request.META.get("HTTP_REFERER") or request.path)
 
-        if role_id == ROLE_BHW and len(purok_ids) < 1:
-            logger.error("Validation error: BHW requires at least one purok")
+        # Check BHW requirements for any BHW role
+        if ROLE_BHW in role_ids and len(purok_ids) < 1:
+            logger.error("Validation ✗ BHW requires ≥1 purok")
             flash_warning(request, "BHW must be assigned to at least one Purok/Sitio.")
             return redirect(request.META.get("HTTP_REFERER") or request.path)
 
-        if role_id == ROLE_LUPON and len(schedules) < 1:
-            logger.error("Validation error: Lupon requires at least one schedule")
+        # Check Lupon requirements for any Lupon role
+        if ROLE_LUPON in role_ids and len(schedules) < 1:
+            logger.error("Validation ✗ Lupon requires ≥1 schedule")
             flash_warning(request, "Lupon Member must have at least one schedule.")
             return redirect(request.META.get("HTTP_REFERER") or request.path)
 
-        if role_id == ROLE_BHW:
+        # Validate purok duplicates for BHW
+        if ROLE_BHW in role_ids:
             _raw_purok_ids: List[int] = []
             if base_purok.isdigit():
                 _raw_purok_ids.append(int(base_purok))
@@ -474,22 +503,21 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
                 if x.isdigit():
                     _raw_purok_ids.append(int(x))
             if len(_raw_purok_ids) != len(set(_raw_purok_ids)):
-                logger.error("Validation error: Duplicate Purok/Sitio selections are not allowed: %s", _raw_purok_ids)
+                logger.error("Validation ✗ Duplicate Purok/Sitio selections are not allowed: %s", _raw_purok_ids)
                 flash_warning(request, "Duplicate Purok/Sitio selections are not allowed.")
                 return redirect(request.META.get("HTTP_REFERER") or request.path)
 
-        if role_id == ROLE_LUPON and schedules:
+        # Validate schedule duplicates for Lupon
+        if ROLE_LUPON in role_ids and schedules:
             _days = [s["day"] for s in schedules]
             if len(_days) != len(set(_days)):
-                logger.error("Validation error: Duplicate day selections in schedule are not allowed: %s", _days)
+                logger.error("Validation ✗ Duplicate day selections in schedule are not allowed: %s", _days)
                 flash_warning(request, "Duplicate day selections in schedule are not allowed.")
                 return redirect(request.META.get("HTTP_REFERER") or request.path)
 
-        # ▼▼▼ CHANGED: after sanitization above, enforce proof presence
-        if not (proof_file or proof_url):
-            flash_warning(request, "Please attach a proof of employment.")
+        if not (proof_files or proof_urls):
+            flash_warning(request, "Please attach at least one proof of employment.")
             return redirect(request.META.get("HTTP_REFERER") or request.path)
-        # ▲▲▲ END CHANGED
 
         BUCKET_FOR_PROOF = BUCKET_STAFF_PROOF
 
@@ -519,90 +547,82 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
         except Exception:
             final_base = f"staff_acc_req_proof/{pid}"
 
-        # ── Upload/Sanitize proof and ALWAYS store a PUBLIC (permanent) URL ───────────
-        uploaded_proof_url = None
+        # Upload multiple proof files
+        uploaded_proof_urls = []
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-        if proof_file:
+        
+        # Process file uploads
+        for i, proof_file in enumerate(proof_files):
             try:
                 buf, mime, ext = _prep_image_for_upload(proof_file)
-                proof_rel_path = f"{final_base}/staff-app-proof-{role_id}-{timestamp}.{ext}"
-                up_res = _upload_to_storage_retry(
+                proof_rel_path = f"{final_base}/staff-app-proof-{role_id}-{timestamp}-{i+1}.{ext}"
+                res_up = _upload_to_storage_retry(
                     buf,
                     path=proof_rel_path,
                     bucket=BUCKET_FOR_PROOF,
                     content_type=mime,
-                    make_public=True,   # public permanent URL
+                    make_public=True,
                 )
-                uploaded_proof_url = (
-                    (up_res.get("public_url") if isinstance(up_res, dict) else None)
-                    or (up_res.get("signed_url") if isinstance(up_res, dict) else None)
+                uploaded_url = (
+                    (res_up.get("public_url") if isinstance(res_up, dict) else None)
+                    or (res_up.get("signed_url") if isinstance(res_up, dict) else None)
                 )
-                if not uploaded_proof_url:
+                if uploaded_url:
+                    uploaded_proof_urls.append(uploaded_url)
+                else:
                     logger.error("Proof upload returned no usable URL for %s", proof_rel_path)
-                    flash_system_error(request, "Proof upload did not return a usable URL.")
-                    return redirect(request.META.get("HTTP_REFERER") or request.path)
-            except (DatabaseError, OperationalError, IntegrityError) as e:
-                flash_db_error(request, e)
-                return redirect(request.META.get("HTTP_REFERER") or request.path)
             except Exception as e:
-                flash_system_error(request, "Proof upload failed.", exc=e)
-                return redirect(request.META.get("HTTP_REFERER") or request.path)
+                logger.error("Failed to upload proof file %d: %s", i+1, e)
+                continue
 
-        elif proof_url:
-            # Accept a data-URL or https URL, re-host data-URL as permanent public URL
-            m = re.match(r"^data:(.+?);base64,(.+)$", proof_url)
-            if m:
-                _mime_hint, b64 = m.groups()
-                raw = io.BytesIO(base64.b64decode(b64))
-                buf, mime, ext = _prep_image_for_upload(raw)
-                proof_rel_path = f"{final_base}/staff-app-proof-{role_id}-{timestamp}.{ext}"
-                up_res = _upload_to_storage_retry(
-                    buf,
-                    path=proof_rel_path,
-                    bucket=BUCKET_FOR_PROOF,
-                    content_type=mime,
-                    make_public=True,  # public permanent URL
-                )
-                uploaded_proof_url = (
-                    (up_res.get("public_url") if isinstance(up_res, dict) else None)
-                    or (up_res.get("signed_url") if isinstance(up_res, dict) else None)
-                )
-                if not uploaded_proof_url:
-                    logger.error("Proof upload returned no usable URL for %s", proof_rel_path)
-                    flash_system_error(request, "Proof upload did not return a usable URL.")
-                    return redirect(request.META.get("HTTP_REFERER") or request.path)
-            else:
-                # Already-hosted https URL — accept as-is
-                uploaded_proof_url = proof_url
+        # Process data URLs from chips and other sources
+        for i, proof_url in enumerate(proof_urls):
+            try:
+                import re
+                m = re.match(r"^data:(.+?);base64,(.+)$", proof_url)
+                if m:
+                    _mime_hint, b64_data = m.groups()
+                    raw = io.BytesIO(base64.b64decode(b64_data))
+                    buf, mime, ext = _prep_image_for_upload(raw)
+                    proof_rel_path = f"{final_base}/staff-app-proof-{role_id}-{timestamp}-data-{i+1}.{ext}"
+                    res_up = _upload_to_storage_retry(
+                        buf,
+                        path=proof_rel_path,
+                        bucket=BUCKET_FOR_PROOF,
+                        content_type=mime,
+                        make_public=True,
+                    )
+                    uploaded_url = (
+                        (res_up.get("public_url") if isinstance(res_up, dict) else None)
+                        or (res_up.get("signed_url") if isinstance(res_up, dict) else None)
+                    )
+                    if uploaded_url:
+                        uploaded_proof_urls.append(uploaded_url)
+                else:
+                    # Direct URL
+                    if proof_url.startswith(("http://", "https://")):
+                        uploaded_proof_urls.append(proof_url)
+            except Exception as e:
+                logger.error("Failed to process proof URL %d: %s", i+1, e)
+                continue
 
-        # ▼▼▼ CHANGED: final guard — refuse non-URL value just in case
-        if uploaded_proof_url and not uploaded_proof_url.startswith(("http://", "https://")):
-            logger.error("Refusing to store non-URL proof value: %r", uploaded_proof_url)
-            flash_system_error(request, "Proof upload failed to produce a valid URL.")
+        if not uploaded_proof_urls:
+            flash_system_error(request, "Failed to upload any proof files.")
             return redirect(request.META.get("HTTP_REFERER") or request.path)
-        # ▲▲▲ END CHANGED
 
-        # (1) CREATE STAFF DIRECTLY — returns (out_staff_id, out_staff_code)
+        # Create staff directly for multiple roles
         try:
             res_direct = Admin.create_staff_direct(
                 p_requested_by_id=staff_id,
                 p_person_id=int(pid),
-                p_role_id=role_id,
-                p_supporting_docs=([uploaded_proof_url] if uploaded_proof_url else None),
-                p_lupon_sched=(schedules if schedules else None),
-                p_bhw_purok_ids=(purok_ids if purok_ids else None),
+                p_role_ids=role_ids,
+                p_supporting_docs=uploaded_proof_urls if uploaded_proof_urls else None,
+                p_lupon_sched=(schedules if schedules and ROLE_LUPON in role_ids else None),
+                p_bhw_purok_ids=(purok_ids if purok_ids and ROLE_BHW in role_ids else None),
             )
 
-            new_staff_id = int(
-                (res_direct.get("staff_id") if isinstance(res_direct, dict) else None)
-                or (res_direct.get("out_staff_id") if isinstance(res_direct, dict) else None)
-            )
-            staff_code = (
-                (res_direct.get("staff_code") if isinstance(res_direct, dict) else None)
-                or (res_direct.get("out_staff_code") if isinstance(res_direct, dict) else None)
-                or ""
-            ).strip()
+            new_staff_id = res_direct.get("staff_id")
+            staff_code = res_direct.get("staff_code")
 
             if not new_staff_id or not staff_code:
                 flash_warning(request, "Staff created, but no identifier returned. Please verify in the Staff List.")
@@ -643,7 +663,7 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
                 last=srow.get("last_name"),
                 suffix=srow.get("suffix"),
             )
-            username = f"brgySN.{initials}{staff_code}"
+            username = f"brgySN.{initials}{staff_code}".lower()
             temp_password = _rand_password(8)
 
             email_to = (request.POST.get("email") or "").strip() or (srow.get("email") or "").strip()
@@ -678,25 +698,24 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
         try:
             if email_to:
                 try:
-                    rl = _label_from_choices(ChooseRole().fields["role"].choices, role_id) if role_id else None
+                    role_labels = [_label_from_choices(ChooseRole().fields["role"].choices, rid) for rid in role_ids]
+                    rl = ", ".join([rl for rl in role_labels if rl]) or "Staff"
                 except Exception:
-                    rl = None
-                rl = rl or f"Role ID {role_id}" if role_id else "staff"
+                    rl = "Staff"
 
-                subj = f"Barangay Sto. Niño Staff Account Creation and Credentials ({rl})"
+                subj = f"Barangay Sto. Niño Staff Account Created - {rl}"
                 body_txt = (
                     f"Good day!\n\n"
-                    f"We are pleased to inform you that your {rl} staff account request has been created. "
-                    "Below are your login credentials:\n\n"
-                    f"  Username: {username}\n"
-                    f"  Temporary Password: {temp_password}\n\n"
+                    f"Your {rl} staff account has been created. Below are your login credentials:\n\n"
+                    f"Username: {username}\n"
+                    f"Temporary Password: {temp_password}\n\n"
                     "For your security, please sign in as soon as possible and change your password immediately.\n\n"
                     "Thank you,\n"
                     "Barangay Sto. Niño"
                 )
                 body_html = f"""
                 <p>Good day!</p>
-                <p>We are pleased to inform you that your <strong>{rl}</strong> staff account request has been created. Below are your login credentials:</p>
+                <p>Your <strong>{rl}</strong> staff account has been created. Below are your login credentials:</p>
                 <ul>
                     <li><strong>Username:</strong> {username}</li>
                     <li><strong>Temporary Password:</strong> {temp_password}</li>
@@ -713,14 +732,14 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
                     fail_silently=True,
                 )
                 if getattr(resp, "ok", False):
-                    flash_success(request, f"Staff account created. Credentials have been emailed to this staff.")
+                    flash_success(request, f"Staff account created and credentials sent to the requested staff.")
                 else:
-                    flash_warning(request, f"Staff account created. Email sending failed; please resend manually.")
+                    flash_warning(request, f"Staff account created but email sending failed.")
             else:
-                flash_success(request, f"Staff account created. No email on file; credentials stored.")
+                flash_success(request, "Staff account created successfully.")
         except Exception as e:
             logger.warning("Email send failed for staff_code=%s: %s", staff_code, e)
-            flash_warning(request, f"Staff account created and credentials stored, but emailing failed. Please resend manually.")
+            flash_success(request, "Staff account created but email sending failed.")
 
         return redirect(request.META.get("HTTP_REFERER") or request.path)
 
@@ -1031,8 +1050,25 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
             "docs": docs,
         })
 
-    role_str = (request.POST.get("role") or "").strip()
-    role_id = int(role_str) if role_str.isdigit() else None
+    # --- Collect multiple roles from chips
+    role_ids: List[int] = []
+    for x in request.POST.getlist("role_ids[]"):
+        x = (x or "").strip()
+        if x.isdigit():
+            role_ids.append(int(x))
+    role_ids = sorted(set(role_ids))  # Remove duplicates
+    
+    # For backward compatibility, use first role as primary
+    role_id = role_ids[0] if role_ids else None
+
+    # --- Collect multiple proof files
+    proof_files = []
+    proof_urls = []
+    
+    # Handle data URLs from chips (base64 encoded files)
+    for proof_data in request.POST.getlist("proof_files[]"):
+        if proof_data and proof_data.startswith("data:"):
+            proof_urls.append(proof_data)
 
     purok_ids: List[int] = []
     base_purok = (request.POST.get("purok_sitio") or "").strip()
@@ -1058,11 +1094,12 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
     ):
         _push(d, s, e)
 
-    if not role_id:
-        flash_warning(request, "Please choose a staff role.")
+    if not role_ids:
+        flash_warning(request, "Please choose at least one staff role.")
         return redirect(request.path)
 
-    if role_id == ROLE_BHW:
+    # Check BHW requirements for any BHW role
+    if ROLE_BHW in role_ids:
         if len(purok_ids) < 1:
             flash_warning(request, "Barangay Health Worker must be assigned to at least one Purok/Sitio.")
             return redirect(request.path)
@@ -1070,7 +1107,8 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
             flash_warning(request, "Duplicate Purok/Sitio selections are not allowed.")
             return redirect(request.path)
 
-    if role_id == ROLE_LUPON:
+    # Check Lupon requirements for any Lupon role
+    if ROLE_LUPON in role_ids:
         if len(schedules) < 1:
             flash_warning(request, "Lupon Member must have at least one schedule.")
             return redirect(request.path)
@@ -1078,6 +1116,10 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
         if len(_days) != len(set(_days)):
             flash_warning(request, "Duplicate day selections in schedule are not allowed.")
             return redirect(request.path)
+
+    if not proof_urls:
+        flash_warning(request, "Please attach at least one proof of employment.")
+        return redirect(request.path)
 
     if not personal or not docs:
         flash_warning(request, "Missing information. Please complete previous steps.")
@@ -1161,12 +1203,50 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
         suffix=personal.get("suffix"),
     )
     
+    # Process multiple proof files from chips
+    uploaded_proof_urls = []
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    for i, proof_url in enumerate(proof_urls):
+        try:
+            import re
+            m = re.match(r"^data:(.+?);base64,(.+)$", proof_url)
+            if m:
+                _mime_hint, b64_data = m.groups()
+                raw = io.BytesIO(base64.b64decode(b64_data))
+                buf, mime, ext = _prep_image_for_upload(raw)
+                proof_rel_path = f"{proof_final_base}/staff-app-proof-{role_id}-{timestamp}-{i+1}.{ext}"
+                res_up = _upload_to_storage_retry(
+                    buf,
+                    path=proof_rel_path,
+                    bucket=BUCKET_STAFF_PROOF,
+                    content_type=mime,
+                    make_public=True,
+                )
+                uploaded_url = (
+                    (res_up.get("public_url") if isinstance(res_up, dict) else None)
+                    or (res_up.get("signed_url") if isinstance(res_up, dict) else None)
+                )
+                if uploaded_url:
+                    uploaded_proof_urls.append(uploaded_url)
+            else:
+                # Direct URL
+                if proof_url.startswith(("http://", "https://")):
+                    uploaded_proof_urls.append(proof_url)
+        except Exception as e:
+            logger.error("Failed to process proof URL %d: %s", i+1, e)
+            continue
+
+    if not uploaded_proof_urls:
+        flash_system_error(request, "Failed to upload any proof files.")
+        return redirect(request.path)
+
     # Create staff directly
     try:
         result = Admin.insert_person_and_staff(
             p_added_by_id=staff_id,
-            p_role_id=role_id,
-            p_supporting_docs=([proof_url] if proof_url else None),
+            p_role_ids=role_ids,
+            p_supporting_docs=uploaded_proof_urls if uploaded_proof_urls else None,
             p_first_name=personal.get("first_name"),
             p_last_name=personal.get("last_name"),
             p_birthdate=personal.get("birthdate"),
@@ -1219,7 +1299,7 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
         return redirect(request.path)
 
     # Generate and store credentials (same as process_staff_request)
-    username = f"brgySN.{initials}{staff_code}"
+    username = f"brgySN.{initials}{staff_code}".lower()
     final_password = _rand_password(8)
     
     try:
@@ -1254,13 +1334,16 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
     
     if applicant_email:
         try:
-            role_label = None
+            role_labels = []
             try:
-                if role_id and hasattr(role_form, "fields") and "role" in role_form.fields:
-                    role_label = _label_from_choices(role_form.fields["role"].choices, role_id)
+                if role_ids and hasattr(role_form, "fields") and "role" in role_form.fields:
+                    for rid in role_ids:
+                        label = _label_from_choices(role_form.fields["role"].choices, rid)
+                        if label:
+                            role_labels.append(label)
             except Exception:
-                role_label = None
-            role_label = role_label or f"Role ID {role_id}" if role_id else "Staff"
+                role_labels = []
+            role_label = ", ".join(role_labels) if role_labels else "Staff"
 
             # Send account creation and credentials email
             subj = f"Barangay Sto. Niño Staff Account Created - {role_label}"
@@ -2227,7 +2310,12 @@ def process_staff_request(request: HttpRequest) -> HttpResponse:
         try:
             _rows = Captain.get_pending_staff_details(staff_acc_req_id) or []
             _req = _rows[0] if _rows else {}
-            role_label = (_req.get("role_name") or _req.get("role") or _req.get("role_label"))
+            # Handle multiple roles
+            role_names = _req.get("role_names") or _req.get("role_name") or _req.get("role") or _req.get("role_label")
+            if isinstance(role_names, list):
+                role_label = ", ".join(role_names)
+            else:
+                role_label = role_names
         except Exception:
             role_label = None
 
@@ -2272,7 +2360,7 @@ def process_staff_request(request: HttpRequest) -> HttpResponse:
                         last=staff_row["last_name"],
                         suffix=staff_row["suffix"],
                     )
-                    username = f"brgySN.{initials}{staff_code}"
+                    username = f"brgySN.{initials}{staff_code}".lower()
                     temp_password = _rand_password(8)
 
                     email_to = email_from_form or (staff_row.get("email") or "").strip()

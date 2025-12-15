@@ -1102,7 +1102,7 @@ def switch_role(request):
             auth["selected_role"] = new_role
             request.session["auth"] = auth
             
-            messages.success(request, f"Switched to {new_role} role.")
+            # messages.success(request, f"Switched to {new_role} role.")
             dest = _role_home(new_role.lower())
             return redirect(dest)
         else:

@@ -152,7 +152,7 @@ class Admin(models.Model):
                         """
                         SELECT out_staff_id, out_person_id
                         FROM insert_person_and_staff(
-                            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s
+                            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s
                         );
                         """,
                         [
@@ -169,7 +169,7 @@ class Admin(models.Model):
                         """
                         SELECT out_staff_id, out_person_id
                         FROM insert_person_and_staff(
-                            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s
+                            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s
                         );
                         """,
                         [

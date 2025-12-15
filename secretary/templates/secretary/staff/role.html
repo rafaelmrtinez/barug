@@ -241,7 +241,6 @@
           </div>
         </div>
 
-        <!-- Multiple Roles -->
         <div class="modern-card p-4 mt-4">
           <!-- Selected Items Display -->
           <div class="row g-4 mb-4">
@@ -454,8 +453,8 @@
 
   function applyRoleVisibility() {
     // Use selectedRoles array instead of collecting from DOM
-    const isBHW   = selectedRoles.includes('9'); // BHW
-    const isLupon = selectedRoles.includes('8'); // Lupon
+    const isBHW   = selectedRoles.some(role => role.value === '9'); // BHW
+    const isLupon = selectedRoles.some(role => role.value === '8'); // Lupon
 
     // Show/hide
     if (purokSection) purokSection.classList.toggle('d-none', !isBHW);
@@ -574,6 +573,11 @@
   return { ok:true };
   }
 
+  // Multiple roles and proof management
+  let selectedRoles = [];
+  let selectedProofs = [];
+  let proofCounter = 0;
+
   // ── Wire up
   hideRoleSectionsInitially();
   document.addEventListener('DOMContentLoaded', applyRoleVisibility);
@@ -586,11 +590,6 @@
   applyRoleVisibility();
   renderSelectedRoles();
   renderSelectedProofs();
-
-  // Multiple roles and proof management
-  let selectedRoles = [];
-  let selectedProofs = [];
-  let proofCounter = 0;
 
   function renderSelectedRoles() {
     const container = document.getElementById('selected-roles');
@@ -747,8 +746,74 @@
     }
   });
 
+  // ── Validation function
+  function validateForm() {
+    let errorMessage = '';
+    
+    if (selectedRoles.length === 0) { 
+      errorMessage = 'Please choose at least one staff role.';
+    } else if (selectedProofs.length === 0) {
+      errorMessage = 'Please attach at least one proof of employment.';
+    } else {
+      // Apply one last time in case visibility changed and another script re-added required attrs
+      applyRoleVisibility();
+
+      if (selectedRoles.some(role => role.value === '9')) {
+        const v = checkDuplicatePurok();
+        if (!v.ok) { errorMessage = v.msg; }
+      }
+
+      if (!errorMessage && selectedRoles.some(role => role.value === '8')) {
+        const v = validateSchedules();
+        if (!v.ok) { errorMessage = v.msg; }
+      }
+    }
+
+    if (errorMessage) {
+      showErrorModal(errorMessage);
+      return false;
+    }
+
+    return true;
+  }
+
+  // ── Error modal function
+  function showErrorModal(message) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.style.zIndex = '10000';
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+          <div class="modal-body text-center p-4">
+            <div class="mb-3">
+              <div class="d-inline-flex align-items-center justify-content-center" style="width: 64px; height: 64px; background: linear-gradient(135deg, #dc3545, #b02a37); border-radius: 50%;">
+                <i class="bi bi-exclamation-triangle-fill text-white" style="font-size: 28px;"></i>
+              </div>
+            </div>
+            <h5 class="fw-semibold mb-2" style="color: #2d3748;">Validation Error</h5>
+            <p class="text-muted mb-4">${message}</p>
+            <div class="d-flex gap-2 justify-content-center">
+              <button type="button" class="btn btn-submit px-4 py-2" data-bs-dismiss="modal">OK</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    modal.addEventListener('hidden.bs.modal', () => modal.remove());
+  }
+
   // ── Confirmation modal for Submit button
   document.getElementById('submitBtn')?.addEventListener('click', function() {
+    // Validate first, only show modal if validation passes
+    if (!validateForm()) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     const modal = document.createElement('div');
     modal.className = 'modal fade';
     modal.style.zIndex = '10000';
@@ -781,27 +846,8 @@
     modal.addEventListener('hidden.bs.modal', () => modal.remove());
   });
 
-  // ── Submit gate
+  // ── Submit gate (simplified since validation is done before modal)
   form?.addEventListener('submit', (e) => {
-    if (selectedRoles.length === 0) { 
-      e.preventDefault(); 
-      showAlert('Please choose at least one staff role.', 'warning'); 
-      return; 
-    }
-
-    // Apply one last time in case visibility changed and another script re-added required attrs
-    applyRoleVisibility();
-
-    if (selectedRoles.includes('9')) {
-      const v = checkDuplicatePurok();
-      if (!v.ok) { e.preventDefault(); showAlert(v.msg, v.type); return; }
-    }
-
-    if (selectedRoles.includes('8')) {
-      const v = validateSchedules();
-      if (!v.ok) { e.preventDefault(); showAlert(v.msg, v.type); return; }
-    }
-
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, { passive:false });
 })();
