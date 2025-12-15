@@ -2401,7 +2401,18 @@ def account_settings(request):
         name_parts.append(suffix)
     
     user_fullname = ' '.join(name_parts)
-    role_title = (profile.get('role') or '').title()
+    
+    # Handle role - it might be a string or a list
+    role_data = profile.get('role') or ''
+    if isinstance(role_data, list):
+        # If it's a list, join all roles with ' | '
+        role_title = ' | '.join(role.title() for role in role_data if role) if role_data else ''
+        # For template, use the first role only
+        template_role = role_data[0].lower().replace(' ', '_') if role_data else 'staff'
+    else:
+        # If it's a string, use it directly
+        role_title = role_data.title()
+        template_role = role_data.lower().replace(' ', '_') if role_data else 'staff'
     
     # Security status based on actual data
     account_status = (profile.get('account_status') or '').lower()
@@ -2438,14 +2449,20 @@ def account_settings(request):
             logger.error(f"Error loading operation logs: {str(e)}", exc_info=True)
             operation_logs = []
     
+    # Get current active role from session
+    current_role = auth.get('selected_role') or auth.get('role_name', '')
+    current_role_title = current_role.title() if current_role else ''
+    
     return render(request, "account_settings.html", {
         'user_fullname': user_fullname,
-        'user_role': role_title,
+        'user_role': current_role_title,  # Current active role for header
+        'all_roles': role_title,  # All roles for profile section
+        'current_role': current_role_title,  # Current active role for sidebar
         'staff_id': staff_id,
         'staff_code': profile.get('staff_code'),
-        'page_path': f"{role_title} / Account Settings",
+        'page_path': f"{current_role_title} / Account Settings",
         'page_title': 'Account Settings',
-        'user_role_template': role_title.lower().replace(' ', '_'),
+        'user_role_template': template_role,
         'profile': profile,
         'is_account_active': is_account_active,
         'is_secure_pass': is_secure_pass,

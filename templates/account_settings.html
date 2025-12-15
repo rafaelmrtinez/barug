@@ -37,7 +37,7 @@
                 </div>
               {% endif %}
               <h5 class="mb-1">{{ user_fullname|default:"User" }}</h5>
-              <small class="opacity-75">{{ staff_code|default:"—" }} - {{ user_role|default:"—" }}</small>
+              <small class="opacity-75">{{ staff_code|default:"—" }} - {{ current_role|default:"—" }}</small>
             </div>
             
             <nav class="nav flex-column">
@@ -485,10 +485,10 @@
                               {% bs_icon 'person-workspace' color='var(--bs-danger-text-emphasis)' %}
                               <small class="text-muted fw-semibold">Position</small>
                             </div>
-                            <div class="fw-bold text-dark">{{ profile.role|default:"—" }}</div>
+                            <div class="fw-bold text-dark">{{ user_role|default:"—" }}</div>
                           </div>
                         </div>
-                        {% if profile.role == 'Barangay Health Worker' %}
+                        {% if 'Barangay Health Worker' in user_role %}
                         <div class="col-md-8">
                           <div class="info-card">
                             <div class="d-flex align-items-center gap-2 mb-2">
@@ -502,7 +502,7 @@
                             {% endif %}
                           </div>
                         </div>
-                        {% elif profile.role == 'Barangay Lupon Member' %}
+                        {% elif 'Barangay Lupon Member' in user_role %}
                         <div class="col-md-8">
                           <div class="info-card">
                             <div class="d-flex align-items-center gap-2 mb-2">

@@ -49,6 +49,32 @@ from django.shortcuts import redirect
 
 logger = logging.getLogger(__name__)
 
+def _process_staff_role_names(rows: List[Dict[str, Any]]) -> None:
+    """Process staff rows to ensure role_names is properly formatted as a list"""
+    for row in rows:
+        if isinstance(row, dict):
+            # Ensure role_names exists and is a list
+            if 'role_names' not in row:
+                # Check if role_name exists (singular)
+                if 'role_name' in row:
+                    role_name = row.get('role_name')
+                    row['role_names'] = [role_name] if role_name else []
+                else:
+                    row['role_names'] = []
+            elif not isinstance(row['role_names'], list):
+                # Convert non-list role_names to list
+                role_names = row.get('role_names')
+                if isinstance(role_names, str):
+                    # Split comma-separated string
+                    row['role_names'] = [name.strip() for name in role_names.split(',') if name.strip()]
+                elif role_names:
+                    row['role_names'] = [str(role_names)]
+                else:
+                    row['role_names'] = []
+            # Ensure empty lists are handled
+            elif not row['role_names']:
+                row['role_names'] = []
+
 def get_user_info(request):
     """Get user info from session - call this in each view"""
     auth = request.session.get('auth', {})
@@ -1556,9 +1582,22 @@ def staff_list(request: HttpRequest) -> HttpResponse:
                 term = search_term.lower()
                 rows = [r for r in rows if term in (r.get("full_name") or "").lower()]
         elif search_term:
-            rows = Secretary.search_staff_by_name(search_term) or []
+            # Get all staff first, then filter by search term to maintain role information
+            all_rows = Secretary.get_all_staff_info_summary() or []
+            term = search_term.lower()
+            rows = [r for r in all_rows if term in (r.get("full_name") or "").lower()]
         else:
             rows = Secretary.get_all_staff_info_summary() or []
+        
+        # Process rows to ensure role_names is properly formatted
+        _process_staff_role_names(rows)
+        
+        # Debug: Log a sample row to see the structure
+        if rows:
+            sample_row = rows[0]
+            logger.info("Sample staff row structure: %s", sample_row)
+            logger.info("Role names field: %s (type: %s)", sample_row.get('role_names'), type(sample_row.get('role_names')))
+            logger.info("Total rows: %d", len(rows))
     except Exception as e:
         logger.exception("Failed to load staff summaries: %s", e)
         rows = []
@@ -1612,7 +1651,7 @@ def staff_list(request: HttpRequest) -> HttpResponse:
     user_fullname, user_role, user_role_template = get_user_info(request)
     current_filters = filters_state
 
-    return render(request, "staff_list.html", {
+    return render(request, "captain/staff_list.html", {
         "user_fullname": user_fullname,
         "user_role": user_role,
         "page_path": f"{user_role} / Staff List",
@@ -1651,6 +1690,9 @@ def staff_search_api(request):
             q_lower = raw_query.lower()
             rows = [r for r in rows if q_lower in (r.get("full_name") or "").lower()]
 
+        # Process rows to ensure role_names is properly formatted
+        _process_staff_role_names(rows)
+
         filters.update({
             "role": role_raw,
             "account_stat": acc_raw,
@@ -1680,6 +1722,10 @@ def staff_filter_api(request):
             rows = Secretary.get_all_staff_info_summary()
         else:
             rows = Secretary.filter_staff_by_role_and_account(role_id, acc_id)
+        
+        # Process rows to ensure role_names is properly formatted
+        _process_staff_role_names(rows)
+        
         return JsonResponse({"results": rows})
     except Exception as e:
         logger.exception("staff_filter_api error: %s", e)

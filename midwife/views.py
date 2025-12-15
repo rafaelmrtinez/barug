@@ -118,6 +118,32 @@ from common.db_errors import _pg_err_tuple
 
 logger = logging.getLogger(__name__)
 
+def _process_staff_role_names(rows: List[Dict[str, Any]]) -> None:
+    """Process staff rows to ensure role_names is properly formatted as a list"""
+    for row in rows:
+        if isinstance(row, dict):
+            # Ensure role_names exists and is a list
+            if 'role_names' not in row:
+                # Check if role_name exists (singular)
+                if 'role_name' in row:
+                    role_name = row.get('role_name')
+                    row['role_names'] = [role_name] if role_name else []
+                else:
+                    row['role_names'] = []
+            elif not isinstance(row['role_names'], list):
+                # Convert non-list role_names to list
+                role_names = row.get('role_names')
+                if isinstance(role_names, str):
+                    # Split comma-separated string
+                    row['role_names'] = [name.strip() for name in role_names.split(',') if name.strip()]
+                elif role_names:
+                    row['role_names'] = [str(role_names)]
+                else:
+                    row['role_names'] = []
+            # Ensure empty lists are handled
+            elif not row['role_names']:
+                row['role_names'] = []
+
 def get_user_info(request):
     """Get user info from session - call this in each view"""
     auth = request.session.get('auth', {})
@@ -157,6 +183,20 @@ BUCKET_STAFF_PROOF = getattr(settings, "SUPABASE_STAFF_PROOF_BUCKET", "staff-pro
 def _is_bhw_row(row: Dict[str, Any]) -> bool:
     if not isinstance(row, dict):
         return False
+    
+    # Check role_ids array (new structure)
+    role_ids = row.get("role_ids", [])
+    if isinstance(role_ids, list) and ROLE_BHW in role_ids:
+        return True
+    
+    # Check role_names array (new structure)
+    role_names = row.get("role_names", [])
+    if isinstance(role_names, list):
+        for role_name in role_names:
+            if (role_name or "").strip().upper() == ROLE_BHW_NAME:
+                return True
+    
+    # Fallback to old structure for backward compatibility
     role_id = row.get("role_id")
     try:
         if role_id is not None and int(role_id) == ROLE_BHW:
@@ -2217,6 +2257,9 @@ def staff_dets(request, staff_code: str):
     # GET request handling
     try:
         rows = Secretary.get_staff_profile_display(staff_code) if staff_code else []
+        # Process role names to ensure proper formatting
+        if rows:
+            _process_staff_role_names(rows)
     except Exception:
         logger.exception("get_staff_profile_display failed for staff_code=%s", staff_code)
         rows = []

@@ -34,13 +34,17 @@ def auth_context(request):
         except Exception:
             header_profile = {}
 
+    # Get currently selected role for header display
+    # For single role users, selected_role might not be set, so use role_name as fallback
+    selected_role = auth.get("selected_role") or role_name
+    
     return {
         "staff_id": staff_id or 0,
         "user_fullname": user_fullname.strip(),
-        "user_role": role_name,  # Primary role for display
+        "user_role": selected_role,  # Current active role for header display
         "user_roles": role_names_list,  # All roles list
         "user_roles_display": role_original,  # Comma-separated roles from DB
-        "selected_role": auth.get("selected_role", role_name),  # Currently selected role
+        "selected_role": selected_role,  # Currently selected role
         "user_role_template": role_name.lower().replace(" ", "_") if role_name else "",
         "header_profile": header_profile,
         "lupon_sched": auth.get("lupon_sched", []),

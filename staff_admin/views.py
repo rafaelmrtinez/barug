@@ -49,6 +49,32 @@ from staff_admin.models import Admin
 
 logger = logging.getLogger(__name__)
 
+def _process_staff_role_names(rows: List[Dict[str, Any]]) -> None:
+    """Process staff rows to ensure role_names is properly formatted as a list"""
+    for row in rows:
+        if isinstance(row, dict):
+            # Ensure role_names exists and is a list
+            if 'role_names' not in row:
+                # Check if role_name exists (singular)
+                if 'role_name' in row:
+                    role_name = row.get('role_name')
+                    row['role_names'] = [role_name] if role_name else []
+                else:
+                    row['role_names'] = []
+            elif not isinstance(row['role_names'], list):
+                # Convert non-list role_names to list
+                role_names = row.get('role_names')
+                if isinstance(role_names, str):
+                    # Split comma-separated string
+                    row['role_names'] = [name.strip() for name in role_names.split(',') if name.strip()]
+                elif role_names:
+                    row['role_names'] = [str(role_names)]
+                else:
+                    row['role_names'] = []
+            # Ensure empty lists are handled
+            elif not row['role_names']:
+                row['role_names'] = []
+
 ADMIN_ROLE = "Admin"
 REQUEST_STATUS_APPROVED = 3
 REQUEST_STATUS_REJECTED = 4
@@ -1423,9 +1449,22 @@ def staff_list(request: HttpRequest) -> HttpResponse:
                 term = search_term.lower()
                 rows = [r for r in rows if term in (r.get("full_name") or "").lower()]
         elif search_term:
-            rows = Secretary.search_staff_by_name(search_term) or []
+            # Get all staff first, then filter by search term to maintain role information
+            all_rows = Secretary.get_all_staff_info_summary() or []
+            term = search_term.lower()
+            rows = [r for r in all_rows if term in (r.get("full_name") or "").lower()]
         else:
             rows = Secretary.get_all_staff_info_summary() or []
+        
+        # Process rows to ensure role_names is properly formatted
+        _process_staff_role_names(rows)
+        
+        # Debug: Log a sample row to see the structure
+        if rows:
+            sample_row = rows[0]
+            logger.info("Sample staff row structure: %s", sample_row)
+            logger.info("Role names field: %s (type: %s)", sample_row.get('role_names'), type(sample_row.get('role_names')))
+            logger.info("Total rows: %d", len(rows))
     except Exception as e:
         logger.exception("Failed to load staff summaries: %s", e)
         rows = []
@@ -1518,6 +1557,9 @@ def staff_search_api(request):
             q_lower = raw_query.lower()
             rows = [r for r in rows if q_lower in (r.get("full_name") or "").lower()]
 
+        # Process rows to ensure role_names is properly formatted
+        _process_staff_role_names(rows)
+
         filters.update({
             "role": role_raw,
             "account_stat": acc_raw,
@@ -1547,6 +1589,10 @@ def staff_filter_api(request):
             rows = Secretary.get_all_staff_info_summary()
         else:
             rows = Secretary.filter_staff_by_role_and_account(role_id, acc_id)
+        
+        # Process rows to ensure role_names is properly formatted
+        _process_staff_role_names(rows)
+        
         return JsonResponse({"results": rows})
     except Exception as e:
         logger.exception("staff_filter_api error: %s", e)
@@ -1649,8 +1695,18 @@ def staff_dets(request, staff_code: str):
                 return redirect(request.path)
             
             # Handle staff information update (existing functionality)
-            # Extract form data
-            role_id = _to_int_or_none(request.POST.get("role_id"))
+            # Extract multiple role IDs
+            role_ids = []
+            for role_id in request.POST.getlist("role_ids[]"):
+                if role_id and role_id.isdigit():
+                    role_ids.append(int(role_id))
+            
+            # Fallback to single role_id for backward compatibility
+            if not role_ids:
+                role_id = _to_int_or_none(request.POST.get("role_id"))
+                if role_id:
+                    role_ids = [role_id]
+            
             acc_status_id = _to_int_or_none(request.POST.get("acc_status_id"))
             username = (request.POST.get("username") or "").strip() or None
             password = (request.POST.get("password") or "").strip() or None
@@ -1687,8 +1743,8 @@ def staff_dets(request, staff_code: str):
                         })
             
             # Validate required fields
-            if not role_id:
-                flash_warning(request, "Role is required.")
+            if not role_ids:
+                flash_warning(request, "Please select at least one role.")
                 return redirect(request.path)
             
             if not acc_status_id:
@@ -1702,11 +1758,11 @@ def staff_dets(request, staff_code: str):
                 return redirect(request.path)
             
             # Call the database function
-            logger.info("Updating staff %s with role_id=%s, acc_status_id=%s", staff_id, role_id, acc_status_id)
+            logger.info("Updating staff %s with role_ids=%s, acc_status_id=%s", staff_id, role_ids, acc_status_id)
             result = Admin.update_staff_information(
                 staff_id=staff_id,
                 updated_by_staff_id=updated_by_staff_id,
-                role_id=role_id,
+                role_ids=role_ids,
                 acc_status_id=acc_status_id,
                 username=username,
                 password=password,
