@@ -8,6 +8,100 @@
   <link rel="stylesheet" href="{% static 'css/submission_dets.css' %}">
 
   <script src="{% static 'js/schedule.js' %}"></script>
+  
+  <style>
+    .modern-card {
+      background: #ffffff;
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+    
+    .chip-container {
+      background: rgba(255,255,255,0.7);
+      border: 2px dashed rgba(var(--bs-danger-text-emphasis-rgb), 0.3);
+      border-radius: 12px;
+      min-height: 60px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .chip-container:hover {
+      border-color: var(--bs-danger-text-emphasis);
+      background: rgba(var(--bs-danger-text-emphasis-rgb), 0.05);
+    }
+    
+    .modern-chip {
+      background: var(--bs-danger-text-emphasis);
+      color: white;
+      border: none;
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      box-shadow: 0 2px 8px rgba(var(--bs-danger-text-emphasis-rgb), 0.3);
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .modern-chip:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(var(--bs-danger-text-emphasis-rgb), 0.4);
+    }
+    
+    .modern-btn {
+      background: var(--bs-danger-text-emphasis);
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-weight: 500;
+      color: white;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(var(--bs-danger-text-emphasis-rgb), 0.2);
+      font-size: 0.875rem;
+    }
+    
+    .modern-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(var(--bs-danger-text-emphasis-rgb), 0.4);
+      color: white;
+    }
+    
+    .modern-input {
+      border: 2px solid rgba(0,0,0,0.1);
+      border-radius: 12px;
+      transition: all 0.3s ease;
+      background: rgba(255,255,255,0.9);
+    }
+    
+    .modern-input:focus {
+      border-color: var(--bs-danger-text-emphasis);
+      box-shadow: 0 0 0 4px rgba(var(--bs-danger-text-emphasis-rgb), 0.1);
+      background: white;
+    }
+    
+    .section-label {
+      font-weight: 600;
+      color: #2d3748;
+      font-size: 0.9rem;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .empty-state {
+      color: #64748b;
+      font-size: 0.85rem;
+      font-style: italic;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      min-height: 40px;
+    }
+  </style>
 {% endblock %}
 
 {% block content %}
@@ -31,7 +125,7 @@
       </p>
 
       <!-- Form #1: search/select (POST to same view) -->
-      <form id="controlsForm1" method="post" action="{% url 'staff_admin:staff_selection_resident' %}">
+      <form id="controlsForm6" method="post" action="{% url 'staff_admin:staff_selection_resident' %}">
         {% csrf_token %}
         <div class="rounded-3 border bg-light p-3">
           <label class="form-label small">Find Resident Record</label>
@@ -185,29 +279,56 @@
       </div>
 
       <!-- ONLY SHOW THIS PART AFTER SELECTING A RESIDENT-->
-      <form id="controlsForm2" method="post" action="{% url 'staff_admin:staff_selection_resident' %}" enctype="multipart/form-data" novalidate>
+      <form id="controlsForm5" method="post" action="{% url 'staff_admin:staff_selection_resident' %}" enctype="multipart/form-data" novalidate>
         {% csrf_token %}
         <input type="hidden" name="pid" id="pid" value="{{ res_details.person_id|default_if_none:'' }}">
 
-        <div class="rounded-3 border bg-light p-3 mt-4">
-          <div class="row g-3 align-items-end">
-            <!-- Role -->
-            <div class="col-12 col-md-6">
-              <label class="form-label small">Select Staff Role</label>
+        <div class="modern-card p-4 mt-4">
+          <!-- Selected Items Display -->
+          <div class="row g-4 mb-4">
+            <div class="col-md-6">
+              <div class="section-label">
+                {% bs_icon 'person-badge' size='1.1em' color='var(--bs-danger-text-emphasis)' %}
+                Selected Roles
+              </div>
+              <div id="selected-roles" class="chip-container d-flex flex-wrap gap-2 p-3">
+                <div class="empty-state" id="no-roles-text">
+                  {% bs_icon 'plus-circle-dotted' size='1.2em' %}
+                  <span class="ms-2">No roles selected</span>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="section-label">
+                {% bs_icon 'file-earmark-check' size='1.1em' color='var(--bs-danger-text-emphasis)' %}
+                Proof Documents
+              </div>
+              <div id="selected-proofs" class="chip-container d-flex flex-wrap gap-2 p-3">
+                <div class="empty-state" id="no-proofs-text">
+                  {% bs_icon 'cloud-upload' size='1.2em' %}
+                  <span class="ms-2">No files selected</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add New Items -->
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small">Add Staff Role</label>
               <div class="form-floating">
                 {{ role_form.role }}
                 <label for="{{ role_form.role.id_for_label }}">{{ role_form.role.label }}</label>
               </div>
-              <div class="form-text">Choose the role to assign to this resident.</div>
+              <div class="form-text">Select a role to automatically add it as a chip above.</div>
             </div>
-
-            <div class="col-12 col-md-6">
-              <label class="form-label small">Proof of Employment</label>
+            <div class="col-md-6">
+              <label class="form-label small">Add Proof of Employment</label>
               <div class="form-floating">
-                  {{ proof_form.proof }}
-                  <label for="{{ proof_form.proof.id_for_label }}">{{ proof_form.proof.label }}</label>
+                {{ proof_form.proof }}
+                <label for="{{ proof_form.proof.id_for_label }}">{{ proof_form.proof.label }}</label>
               </div>
-              <div class="form-text">Upload valid proof of staff employment.</div>
+              <div class="form-text">Select a file to automatically add it as a chip above.</div>
             </div>
           </div>
         </div>
@@ -296,7 +417,7 @@
 
         <div class="mt-3 button-container justify-content-end mb-2 d-flex gap-2">
           <a type="button" class="btn btn-reset" href="{% url 'staff_admin:staff_selection' %}">Back</a>
-          <button type="button" class="btn btn-submit" id="addBtn">Add</button>
+          <button type="button" class="btn btn-submit" id="continueBtn">Continue</button>
         </div>
 
       </form>
@@ -320,8 +441,8 @@
   };
 
   const el = {
-    formSearch: document.getElementById('controlsForm1'),
-    formMain:   document.getElementById('controlsForm2'),
+    formSearch: document.getElementById('controlsForm6'),
+    formMain:   document.getElementById('controlsForm5'),
     inputSearch:document.getElementById('residentSearch'),
     dd:         document.getElementById('residentDropdown'),
     pid:        document.getElementById('pid'),
@@ -443,16 +564,167 @@
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // Role-based visibility
+  // Multiple roles and proof management
   // ─────────────────────────────────────────────────────────────────────────────
-  function applyRoleVisibility() {
-    const v = el.role ? String(el.role.value) : '';
-    const isBHW   = v === '9';
-    const isLupon = v === '8';
-    if (el.purokWrap) el.purokWrap.classList.toggle('d-none', !isBHW);
-    if (el.schedWrap) el.schedWrap.classList.toggle('d-none', !isLupon);
+  let selectedRoles = [];
+  let selectedProofs = [];
+  let proofCounter = 0;
+
+  function updateRoleVisibility() {
+    const hasBHW = selectedRoles.some(role => role.value === '9');
+    const hasLupon = selectedRoles.some(role => role.value === '8');
+    if (el.purokWrap) el.purokWrap.classList.toggle('d-none', !hasBHW);
+    if (el.schedWrap) el.schedWrap.classList.toggle('d-none', !hasLupon);
   }
-  if (el.role) { applyRoleVisibility(); el.role.addEventListener('change', applyRoleVisibility); }
+
+  function renderSelectedRoles() {
+    const container = document.getElementById('selected-roles');
+    const noRolesText = document.getElementById('no-roles-text');
+    
+    if (selectedRoles.length === 0) {
+      noRolesText.style.display = 'flex';
+      container.querySelectorAll('.modern-chip').forEach(chip => chip.remove());
+      return;
+    }
+    
+    noRolesText.style.display = 'none';
+    
+    container.innerHTML = '';
+    container.appendChild(noRolesText);
+    
+    selectedRoles.forEach((role, index) => {
+      const chip = document.createElement('div');
+      chip.className = 'modern-chip';
+      chip.innerHTML = `
+        <span>${role.text}</span>
+        <button type="button" class="btn p-0 text-white" onclick="removeRoleAt(${index})" style="background: none; border: none; font-size: 1.1em; line-height: 1;">
+          <i class="bi bi-x-lg"></i>
+        </button>
+        <input type="hidden" name="role_ids[]" value="${role.value}">
+      `;
+      
+      container.appendChild(chip);
+    });
+  }
+
+  function renderSelectedProofs() {
+    const container = document.getElementById('selected-proofs');
+    const noProofsText = document.getElementById('no-proofs-text');
+    
+    if (selectedProofs.length === 0) {
+      noProofsText.style.display = 'flex';
+      container.querySelectorAll('.modern-chip').forEach(chip => chip.remove());
+      return;
+    }
+    
+    noProofsText.style.display = 'none';
+    
+    container.innerHTML = '';
+    container.appendChild(noProofsText);
+    
+    selectedProofs.forEach((proof, index) => {
+      const chip = document.createElement('div');
+      chip.className = 'modern-chip';
+      
+      const fileName = proof.name.length > 18 ? proof.name.substring(0, 15) + '...' : proof.name;
+      
+      chip.innerHTML = `
+        <i class="bi bi-file-earmark"></i>
+        <span title="${proof.name}">${fileName}</span>
+        <button type="button" class="btn p-0 text-white" onclick="removeProofAt(${index})" style="background: none; border: none; font-size: 1.1em; line-height: 1;">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      `;
+      
+      container.appendChild(chip);
+    });
+  }
+
+  // Auto-add role on selection
+  el.role?.addEventListener('change', function() {
+    if (!this.value) return;
+    
+    const roleValue = this.value;
+    const roleText = this.options[this.selectedIndex].text;
+    
+    // Check for duplicates
+    if (selectedRoles.some(role => role.value === roleValue)) {
+      showAlert('This role is already selected.', 'warning');
+      this.value = '';
+      return;
+    }
+    
+    selectedRoles.push({ value: roleValue, text: roleText });
+    renderSelectedRoles();
+    updateRoleVisibility();
+    
+    // Reset the select
+    this.value = '';
+  });
+
+  // Auto-add proof file on selection
+  const proofInput = document.querySelector('input[type="file"][name="proof"], input[type="file"]#id_proof');
+  proofInput?.addEventListener('change', function() {
+    if (!this.files.length) return;
+    
+    const file = this.files[0];
+    
+    // Check for duplicates by name and size
+    if (selectedProofs.some(proof => proof.name === file.name && proof.size === file.size)) {
+      showAlert('This file is already selected.', 'warning');
+      this.value = '';
+      return;
+    }
+    
+    // Create a new hidden input for this proof
+    const newInput = document.createElement('input');
+    newInput.type = 'hidden';
+    newInput.name = 'proof_files[]';
+    newInput.id = `proof_file_${proofCounter}`;
+    
+    // Store file data as base64
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      newInput.value = e.target.result;
+      
+      selectedProofs.push({ 
+        name: file.name, 
+        size: file.size, 
+        inputId: newInput.id,
+        counter: proofCounter
+      });
+      
+      renderSelectedProofs();
+    };
+    reader.readAsDataURL(file);
+    
+    // Add to form
+    el.formMain.appendChild(newInput);
+    
+    proofCounter++;
+    
+    // Reset the file input
+    this.value = '';
+  });
+
+  // Global remove functions
+  window.removeRoleAt = function(index) {
+    selectedRoles.splice(index, 1);
+    renderSelectedRoles();
+    updateRoleVisibility();
+  };
+
+  window.removeProofAt = function(index) {
+    const proof = selectedProofs[index];
+    if (proof && proof.inputId) {
+      const hiddenInput = document.getElementById(proof.inputId);
+      if (hiddenInput) {
+        hiddenInput.remove();
+      }
+    }
+    selectedProofs.splice(index, 1);
+    renderSelectedProofs();
+  };
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Dynamic Purok rows
@@ -511,9 +783,37 @@
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // Confirmation modal for Add button
+  // Validation and confirmation for Continue button
   // ─────────────────────────────────────────────────────────────────────────────
-  document.getElementById('addBtn')?.addEventListener('click', function() {
+  function showErrorModal(message) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.style.zIndex = '10000';
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+          <div class="modal-body text-center p-4">
+            <div class="mb-3">
+              <div class="d-inline-flex align-items-center justify-content-center" style="width: 64px; height: 64px; background: var(--bs-danger-text-emphasis); border-radius: 50%;">
+                <i class="bi bi-exclamation-triangle-fill text-white" style="font-size: 28px;"></i>
+              </div>
+            </div>
+            <h5 class="fw-semibold mb-2" style="color: #2d3748;">Validation Error</h5>
+            <p class="text-muted mb-4">${message}</p>
+            <div class="d-flex gap-2 justify-content-center">
+              <button type="button" class="btn btn-submit px-4 py-2" data-bs-dismiss="modal">OK</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    modal.addEventListener('hidden.bs.modal', () => modal.remove());
+  }
+
+  function showConfirmationModal() {
     const modal = document.createElement('div');
     modal.className = 'modal fade';
     modal.style.zIndex = '10000';
@@ -527,7 +827,7 @@
               </div>
             </div>
             <h5 class="fw-semibold mb-2" style="color: #2d3748;">Confirm Staff Addition</h5>
-            <p class="text-muted mb-4">Are you sure you want to add this resident for staff account creation?</p>
+            <p class="text-muted mb-4">Are you sure you want to add this resident as a staff member?</p>
             <div class="d-flex gap-2 justify-content-center">
               <button type="button" class="btn btn-reset px-3 py-2" data-bs-dismiss="modal">Cancel</button>
               <button type="button" class="btn btn-submit px-4 py-2" id="confirmAdd">Yes, Add Staff</button>
@@ -540,32 +840,91 @@
     const bsModal = new bootstrap.Modal(modal);
     modal.querySelector('#confirmAdd').onclick = function() {
       bsModal.hide();
-      const form = el.formMain;
-      const actionInput = document.createElement('input');
-      actionInput.type = 'hidden';
-      actionInput.name = 'action';
-      actionInput.value = 'add';
-      form.appendChild(actionInput);
-      form.submit();
+      el.formMain.submit();
     };
     bsModal.show();
     modal.addEventListener('hidden.bs.modal', () => modal.remove());
+  }
+
+  document.getElementById('continueBtn')?.addEventListener('click', function() {
+    // Validate before showing confirmation
+    if (!val(el.pid)) {
+      showErrorModal('Please select a resident first.');
+      return;
+    }
+    
+    if (selectedRoles.length === 0) {
+      showErrorModal('Please select at least one staff role.');
+      return;
+    }
+    
+    if (selectedProofs.length === 0) {
+      showErrorModal('Please attach at least one proof of employment.');
+      return;
+    }
+    
+    // Check BHW requirements
+    const hasBHW = selectedRoles.some(role => role.value === '9');
+    if (hasBHW) {
+      const extraPurokEls = Array.from(document.querySelectorAll('#purok-list select.extra-purok, #purok-list select[name="purok_sitio_ids[]"]'));
+      const allPurokVals = []
+        .concat(val(el.purokPrimary) ? [val(el.purokPrimary)] : [])
+        .concat(extraPurokEls.map(s => val(s)).filter(Boolean));
+      
+      if (allPurokVals.length === 0) {
+        showErrorModal('BHW must be assigned to at least one Purok/Sitio.');
+        return;
+      }
+    }
+    
+    // Check Lupon requirements
+    const hasLupon = selectedRoles.some(role => role.value === '8');
+    if (hasLupon) {
+      const dayEls = Array.from(document.querySelectorAll('select[name="day"], select[name="day[]"]'));
+      const startEls = Array.from(document.querySelectorAll('input[name="time_start"], input[name="time_start[]"]'));
+      const endEls = Array.from(document.querySelectorAll('input[name="time_end"], input[name="time_end[]"]'));
+      
+      const len = Math.max(dayEls.length, startEls.length, endEls.length);
+      const entries = [];
+      for (let i = 0; i < len; i++) {
+        const d = val(dayEls[i]);
+        const ts = val(startEls[i]);
+        const te = val(endEls[i]);
+        if (d || ts || te) {
+          if (!(d && ts && te)) {
+            showErrorModal('Please complete the schedule: day, time start, and time end are required.');
+            return;
+          }
+          entries.push({ d, ts, te });
+        }
+      }
+      
+      if (entries.length === 0) {
+        showErrorModal('Lupon Member must have at least one schedule.');
+        return;
+      }
+    }
+    
+    // All validations passed, show confirmation
+    showConfirmationModal();
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Client-side validation (inline, uniform flash style)
   // ─────────────────────────────────────────────────────────────────────────────
   el.formMain?.addEventListener('submit', (e) => {
-    const role = val(el.role);
+    // Check if we have selected roles
+    const hasSelectedRoles = selectedRoles.length > 0;
 
-    // Proof: either file or data-url/hidden text
+    // Proof: either file or data-url/hidden text or selected proofs
     const proofFile  = document.querySelector('input[type="file"][name="proof_file"], input[type="file"]#id_proof');
     const hasProofFile = !!proofFile?.files?.length;
     const proofDataEl  = document.querySelector('input[name="proof"], textarea[name="proof"], #id_proof');
     const hasProofData = val(proofDataEl);
+    const hasSelectedProofs = selectedProofs.length > 0;
 
-    const something = val(el.pid) || role ||
-      hasProofFile || hasProofData ||
+    const something = val(el.pid) || hasSelectedRoles ||
+      hasProofFile || hasProofData || hasSelectedProofs ||
       val(el.purokPrimary) || Array.from(document.querySelectorAll('#purok-list select.extra-purok')).some(s => val(s)) ||
       val(el.day) || val(el.tStart) || val(el.tEnd);
 
@@ -577,12 +936,13 @@
     if (!val(el.pid)) {
       e.preventDefault(); showAlert('Please select a resident first.'); return;
     }
-    if (!role) {
-      e.preventDefault(); showAlert('Please choose a staff role.'); return;
+    if (selectedRoles.length === 0) {
+      e.preventDefault(); showAlert('Please select at least one staff role.'); return;
     }
 
-    // ---------------- BHW (role 9) checks: at least one purok + no duplicates
-    if (role === '9') {
+    // ---------------- BHW checks: at least one purok + no duplicates
+    const hasBHW = selectedRoles.some(role => role.value === '9');
+    if (hasBHW) {
       // gather primary + extra puroks
       const extraPurokEls = Array.from(document.querySelectorAll('#purok-list select.extra-purok, #purok-list select[name="purok_sitio_ids[]"]'));
       const allPurokVals = []
@@ -598,8 +958,9 @@
       }
     }
 
-    // ---------------- Lupon (role 8) checks: at least one full schedule + 1 per day + start<end
-    if (role === '8') {
+    // ---------------- Lupon checks: at least one full schedule + 1 per day + start<end
+    const hasLupon = selectedRoles.some(role => role.value === '8');
+    if (hasLupon) {
       // include base row (no [] name) + dynamic rows (with [])
       const dayEls   = Array.from(document.querySelectorAll('select[name="day"], select[name="day[]"]'));
       const startEls = Array.from(document.querySelectorAll('input[name="time_start"], input[name="time_start[]"]'));
@@ -639,8 +1000,8 @@
     }
 
     // ---------------- Proof required
-    if (!(hasProofFile || hasProofData)) {
-      e.preventDefault(); showAlert('Please attach a proof of employment.'); return;
+    if (selectedProofs.length === 0 && !(hasProofFile || hasProofData)) {
+      e.preventDefault(); showAlert('Please attach at least one proof of employment.'); return;
     }
 
     // Happy path: let it submit; ensure server flashes are visible on load
@@ -708,6 +1069,11 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   }
+  
+  // Initialize the UI
+  renderSelectedRoles();
+  renderSelectedProofs();
+  updateRoleVisibility();
 })();
 </script>
 

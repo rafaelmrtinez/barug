@@ -482,6 +482,18 @@
   const statusEl   = document.getElementById('request_status_id');
   const submitBtn  = document.getElementById('submitBtn');
 
+  console.log('Elements found:', {
+    segApprove: !!segApprove,
+    segReject: !!segReject, 
+    statusEl: !!statusEl,
+    submitBtn: !!submitBtn
+  });
+  
+  if (!segApprove || !segReject || !statusEl || !submitBtn) {
+    console.error('Required elements not found');
+    return;
+  }
+
   function updateDecision(choice) {
     segApprove.classList.remove('active');
     segReject.classList.remove('active');
@@ -492,15 +504,18 @@
       segApprove.classList.add('active');
       segApprove.setAttribute('aria-pressed', 'true');
       statusEl.value = '3';
-      remarksBox.classList.add('d-none');
+      if (remarksBox) remarksBox.classList.add('d-none');
+      console.log('Set status to approve: 3');
     } else if (choice === 'reject') {
       segReject.classList.add('active');
       segReject.setAttribute('aria-pressed', 'true');
       statusEl.value = '4';
-      remarksBox.classList.remove('d-none');
+      if (remarksBox) remarksBox.classList.remove('d-none');
+      console.log('Set status to reject: 4');
     }
     
     submitBtn.disabled = false;
+    console.log('Status field value:', statusEl.value);
   }
 
   segApprove.addEventListener('click', () => updateDecision('approve'));
@@ -540,8 +555,20 @@
     document.body.appendChild(modal);
     const bsModal = new bootstrap.Modal(modal);
     modal.querySelector('#confirmSubmit').onclick = function() {
+      const currentStatus = statusEl.value;
+      console.log('About to submit with status:', currentStatus);
+      if (!currentStatus || (currentStatus !== '3' && currentStatus !== '4')) {
+        alert('Please select Approve or Reject before submitting.');
+        return;
+      }
       bsModal.hide();
-      document.getElementById('req-approve-form').submit();
+      const form = document.getElementById('req-approve-form');
+      const formData = new FormData(form);
+      console.log('Form data being submitted:');
+      for (let [key, value] of formData.entries()) {
+        console.log(key + ': ' + value);
+      }
+      form.submit();
     };
     bsModal.show();
     modal.addEventListener('hidden.bs.modal', () => modal.remove());

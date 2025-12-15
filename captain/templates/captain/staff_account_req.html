@@ -3,26 +3,264 @@
 {% load bootstrap_icons %}
 
 {% block css %}
+<link rel="stylesheet" href="{% static 'bootstrap-icons/bootstrap-icons.min.css' %}">
 <link rel="stylesheet" href="{% static 'css/form.css' %}">
 <link rel="stylesheet" href="{% static 'css/table.css' %}">
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
 <link rel="stylesheet" href="{% static 'css/paginator.css' %}">
 <link rel="stylesheet" href="{% static 'css/filters.css' %}">
 <style>
-  #filterForm input[type="date"] {
-    border: 2px solid black;
-    border-radius: 24px;
-    padding: 0.375rem 0.75rem;
-    font-size: 1rem;
-    line-height: 1.5;
-    background-color: #fff;
-    width: 100%;
+/* Modern UI Improvements */
+.btn-icon i,
+.btn-icon svg {
+  font-size: 1em !important;
+  width: 1em;
+  height: 1em;
+}
+.page-main {
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  min-height: 100vh;
+}
+.table {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border: none;
+}
+.table thead th {
+  background: var(--bs-danger-text-emphasis);
+  color: white;
+  font-weight: 600;
+  border: none;
+  padding: 1rem 0.75rem;
+  font-size: 0.875rem;
+  letter-spacing: 0.025em;
+}
+.table tbody tr {
+  border: none;
+  transition: all 0.2s ease;
+}
+.table tbody tr:hover {
+  background-color: #f8fafc;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+.table tbody td {
+  padding: 1rem 0.75rem;
+  vertical-align: middle;
+  border-color: #f1f5f9;
+}
+.btn-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bs-danger-text-emphasis);
+  border: none;
+  color: white;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+.btn-icon:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  color: white;
+  opacity: 0.9;
+}
+.badge {
+  padding: 0.6rem 1rem;
+  border-radius: 25px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+.badge::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transition: left 0.6s ease;
+}
+.badge:hover::before {
+  left: 100%;
+}
+.badge:hover {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+.bg-success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  border-color: #10b981;
+}
+.bg-success:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+}
+.bg-warning {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+  border-color: #f59e0b;
+  color: #1f2937 !important;
+}
+.bg-warning:hover {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
+  color: white !important;
+}
+.bg-secondary {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%) !important;
+  border-color: #6b7280;
+}
+.bg-secondary:hover {
+  background: linear-gradient(135deg, #4b5563 0%, #374151 100%) !important;
+}
+.bg-danger {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+  border-color: #ef4444;
+}
+.bg-danger:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+}
+.bg-info {
+  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%) !important;
+  border-color: #06b6d4;
+}
+.bg-info:hover {
+  background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%) !important;
+}
+.bg-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+  border-color: #3b82f6;
+}
+.bg-primary:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+}
+.toolbar {
+  background: white;
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+}
+.searchbox {
+  position: relative;
+}
+.searchbox input {
+  border-radius: 10px;
+  border: 2px solid #e2e8f0;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  transition: all 0.2s ease;
+}
+.searchbox input:focus {
+  border-color: var(--bs-danger-text-emphasis);
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+}
+.btn-brand-subtle {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  border: 2px solid #cbd5e1;
+  color: #475569;
+  border-radius: 10px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+.btn-brand-subtle:hover {
+  background: var(--bs-danger-text-emphasis);
+  border-color: var(--bs-danger-text-emphasis);
+  color: white;
+  transform: translateY(-1px);
+}
+.btn-outline-brand {
+  border: 2px solid var(--bs-danger-text-emphasis);
+  color: var(--bs-danger-text-emphasis);
+  border-radius: 10px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+.btn-outline-brand:hover {
+  background: var(--bs-danger-text-emphasis);
+  border-color: var(--bs-danger-text-emphasis);
+  color: white;
+  transform: translateY(-1px);
+}
+.filter-chip {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  border: 1px solid #cbd5e1;
+  border-radius: 20px;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  margin-right: 0.5rem;
+  margin-bottom: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  color: #475569;
+  transition: all 0.2s ease;
+}
+.filter-chip:hover {
+  background: var(--bs-danger-text-emphasis);
+  color: white;
+  transform: translateY(-1px);
+}
+.btn-brand {
+  background: var(--bs-danger-text-emphasis);
+  border: 2px solid var(--bs-danger-text-emphasis);
+  color: white;
+  border-radius: 10px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+.btn-brand:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: white;
+  transform: translateY(-1px);
+}
+#filterForm input[type="date"] {
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.75rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  background-color: #fff;
+  width: 100%;
+  transition: all 0.2s ease;
+}
+#filterForm input[type="date"]:focus {
+  border-color: var(--bs-danger-text-emphasis);
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+  outline: none;
+}
+/* Loading animation */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
   }
-  #filterForm input[type="date"]:focus {
-    border-color: var(--bs-danger-text-emphasis);
-    box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
-    outline: none;
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
+}
+.table tbody tr {
+  animation: fadeInUp 0.3s ease forwards;
+}
+.table tbody tr:nth-child(1) { animation-delay: 0.1s; }
+.table tbody tr:nth-child(2) { animation-delay: 0.2s; }
+.table tbody tr:nth-child(3) { animation-delay: 0.3s; }
+.table tbody tr:nth-child(4) { animation-delay: 0.4s; }
+.table tbody tr:nth-child(5) { animation-delay: 0.5s; }
 </style>
 {% endblock %}
 
@@ -52,6 +290,9 @@
                 <span class="badge rounded-pill text-bg-light ms-2">{{ active_filters|length }}</span>
               {% endif %}
           </button>
+          <a href="{% url 'captain:staff_requests_list' %}" class="btn btn-brand d-flex align-items-center me-2">
+            {% bs_icon 'list-ul' extra_classes='me-2' %} Request History
+          </a>
         </form>
 
         {# ─── Active filter chips ─── #}
@@ -89,14 +330,29 @@
                   <td>{{ row.role_name|default:""|title }}</td>
                   <td>{{ row.date_time_submitted_pretty }}</td>
                   <td>
-                    <span class="badge px-2 py-1 rounded-pill {% if row.status_id == 46 or row.status_name|upper == 'WAITING FOR ID VALIDATION' %}bg-info text-secondary{% elif row.status_id == 29 or row.status_name|upper == 'WAITING FOR BARANGAY CAPTAIN\'S APPROVAL' %}bg-primary{% elif row.status_id == 30 or row.status_name|upper == 'WAITING FOR ADMIN\'S APPROVAL' %}bg-info{% elif row.status_id == 3 or row.status_name|upper == 'APPROVED' %}bg-success{% elif row.status_id == 4 or row.status_name|upper == 'REJECTED' %}bg-danger{% else %}bg-warning text-dark{% endif %}" style="font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">{{ row.status_name|default_if_none:"PENDING" }}</span>
+                    <span class="badge {% if row.status_id == 46 or row.status_name|upper == 'WAITING FOR ID VALIDATION' %}bg-info{% elif row.status_id == 29 or row.status_name|upper == 'WAITING FOR BARANGAY CAPTAIN\'S APPROVAL' %}bg-primary{% elif row.status_id == 30 or row.status_name|upper == 'WAITING FOR ADMIN\'S APPROVAL' %}bg-info{% elif row.status_id == 3 or row.status_name|upper == 'APPROVED' %}bg-success{% elif row.status_id == 4 or row.status_name|upper == 'REJECTED' %}bg-danger{% else %}bg-warning{% endif %}">
+                      {% if row.status_id == 46 or row.status_name|upper == 'WAITING FOR ID VALIDATION' %}
+                        <i class="bi bi-shield-check"></i>
+                      {% elif row.status_id == 29 or row.status_name|upper == 'WAITING FOR BARANGAY CAPTAIN\'S APPROVAL' %}
+                        <i class="bi bi-person-check"></i>
+                      {% elif row.status_id == 30 or row.status_name|upper == 'WAITING FOR ADMIN\'S APPROVAL' %}
+                        <i class="bi bi-gear-fill"></i>
+                      {% elif row.status_id == 3 or row.status_name|upper == 'APPROVED' %}
+                        <i class="bi bi-check-circle-fill"></i>
+                      {% elif row.status_id == 4 or row.status_name|upper == 'REJECTED' %}
+                        <i class="bi bi-x-circle-fill"></i>
+                      {% else %}
+                        <i class="bi bi-clock-fill"></i>
+                      {% endif %}
+                      {{ row.status_name|default_if_none:"PENDING" }}
+                    </span>
                   </td>
                   <td>
                     <div class="d-flex gap-1">
-                      <a class="btn btn-icon btn-sm"
+                      <a class="btn btn-icon"
                          href="{% url 'captain:pending_staff_details' p_staff_acc_req_id=row.staff_acc_req_id %}"
                          title="Review request" aria-label="Review request">
-                        {% bs_icon 'eye' size='1em' %} <span class="ms-1 d-none d-sm-inline">Review</span>
+                        <i class="bi bi-eye-fill"></i>
                       </a>
                     </div>
                   </td>
