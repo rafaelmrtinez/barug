@@ -37,7 +37,7 @@ from .forms import ResidentProfileform, ChooseRole, StaffFilters, Schedule
 
 from common.flash import flash_success, flash_warning, flash_db_error, flash_system_error
 from common.email_validator import verify_email_deliverable_abstract
-from django.db import DatabaseError, OperationalError, IntegrityError
+from django.db import DatabaseError, OperationalError, IntegrityError, connection
 from common.db_errors import _pg_err_tuple
 
 # Pagination
@@ -400,6 +400,8 @@ def _upload_to_storage_retry(
 
 # === Non-resident key helper ===
 import re
+import secrets
+import string
 from datetime import datetime as _dt
 
 def _key_from_personal(personal: dict) -> str:
@@ -679,7 +681,7 @@ def staff_selection_resident(request: HttpRequest) -> HttpResponse:
             result = Secretary.insert_res_staff_account_request(
                 p_requested_by_id=staff_id,
                 p_person_id=int(pid),
-                p_role_id=role_id,
+                p_role_ids=[role_id] if role_id else None,
                 p_supporting_docs=([uploaded_proof_url] if uploaded_proof_url else None),
                 p_lupon_sched=(schedules if schedules else None),
                 p_bhw_purok_ids=(purok_ids if purok_ids else None),
@@ -1153,7 +1155,7 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
         req_id = Secretary.insert_nonres_staff_account_request(
             p_requested_by_id=staff_id,
             p_person_id=None,
-            p_role_id=role_id,
+            p_role_ids=[role_id] if role_id else None,
             p_supporting_docs=([proof_url] if proof_url else None),
             p_lupon_sched=schedules if schedules else None,
             p_bhw_purok_ids=sorted(set(purok_ids)) if purok_ids else None,
@@ -1659,7 +1661,7 @@ def pending_staff_dets(request, p_staff_acc_req_id: str):
 
 
 
-REQUEST_STATUS_APPROVED = 30
+REQUEST_STATUS_APPROVED = 3
 REQUEST_STATUS_REJECTED = 4
 
 @session_login_required
@@ -1698,18 +1700,24 @@ def process_staff_request(request: HttpRequest) -> HttpResponse:
 
     # Get decision status
     status_raw = request.POST.get("p_request_status_id")
+    logger.info("Captain process_staff_request - POST data: %s", dict(request.POST))
+    logger.info("Captain process_staff_request - status_raw: '%s'", status_raw)
+    
     if not status_raw:
-        flash_warning(request, "Missing decision status.")
+        flash_warning(request, "Missing decision status. Please select Approve or Reject.")
         return redirect(request.META.get("HTTP_REFERER") or "captain:staff_account_requests_list")
     
     try:
         status_id = int(status_raw)
     except (TypeError, ValueError):
-        flash_warning(request, "Invalid decision status.")
+        flash_warning(request, "Invalid decision format. Please select Approve or Reject.")
         return redirect(request.META.get("HTTP_REFERER") or "captain:staff_account_requests_list")
     
+    logger.info("Captain process_staff_request - status_id: %s, expected: 3 or 4", status_id)
+    
+    # Validate decision - only accept 3 (Approve) or 4 (Reject)
     if status_id not in (REQUEST_STATUS_APPROVED, REQUEST_STATUS_REJECTED):
-        flash_warning(request, "Invalid decision status.")
+        flash_warning(request, f"Invalid decision. Expected {REQUEST_STATUS_APPROVED} (Approve) or {REQUEST_STATUS_REJECTED} (Reject), got {status_id}.")
         return redirect(request.META.get("HTTP_REFERER") or "captain:staff_account_requests_list")
 
     remarks = (request.POST.get("remarks") or "").strip() or None
@@ -1723,14 +1731,14 @@ def process_staff_request(request: HttpRequest) -> HttpResponse:
             email_to = ""
 
     try:
-        result_text = Captain.process_staff_account_request(
+        result_text = Captain.process_staff_account_request_approval(
             p_staff_acc_req_id=staff_acc_req_id,
             p_approver_id=approver_id,
             p_request_status_id=status_id,
             p_remarks=remarks,
         )
 
-        if status_id == REQUEST_STATUS_REJECTED:
+        if status_id == 4:  # REJECTED
             # Send rejection email if email provided
             if email_to:
                 try:
@@ -1738,8 +1746,8 @@ def process_staff_request(request: HttpRequest) -> HttpResponse:
                     send_email.send_email(
                         subject="Staff Account Request Rejected",
                         to=[email_to],
-                        body_text=f"Good day!\n\nYour staff account creation request has been REJECTED.\n\nReason: {reason}\n\nPlease contact the authorized staff if you have any concern.\n\nBarangay Sto. Niño",
-                        body_html=f"<p>Good day!</p><p>Your staff account creation request has been <strong>REJECTED</strong>.</p><p><strong>Reason:</strong> {reason}</p><p>Please contact the authorized staff if you have any concern.</p><p>Barangay Sto. Niño</p>",
+                        body_text=f"Good day!\n\nYour staff account creation request has been REJECTED by the Barangay Captain.\n\nReason: {reason}\n\nPlease contact the authorized staff if you have any concern.\n\nBarangay Sto. Niño",
+                        body_html=f"<p>Good day!</p><p>Your staff account creation request has been <strong>REJECTED</strong> by the Barangay Captain.</p><p><strong>Reason:</strong> {reason}</p><p>Please contact the authorized staff if you have any concern.</p><p>Barangay Sto. Niño</p>",
                         from_name="Barangay Sto. Niño",
                         fail_silently=True,
                     )
@@ -1748,44 +1756,90 @@ def process_staff_request(request: HttpRequest) -> HttpResponse:
             
             flash_success(request, "Staff account request rejected.")
         
-        elif status_id == REQUEST_STATUS_APPROVED:
-            if result_text == "TRUE":
-                # Captain approval - forwarded to admin
-                if email_to:
-                    try:
-                        send_email.send_email(
-                            subject="Staff Account Request Update",
-                            to=[email_to],
-                            body_text="Good day!\n\nYour staff account request has been reviewed by the Barangay Captain.\n\nCurrent Status: WAITING FOR ADMIN'S APPROVAL\n\nYou will receive another update after the Admin's final decision.\n\nBarangay Sto. Niño",
-                            body_html="<p>Good day!</p><p>Your staff account request has been reviewed by the Barangay Captain.</p><p><strong>Current Status:</strong> WAITING FOR ADMIN'S APPROVAL</p><p>You will receive another update after the Admin's final decision.</p><p>Barangay Sto. Niño</p>",
-                            from_name="Barangay Sto. Niño",
-                            fail_silently=True,
-                        )
-                    except Exception as e:
-                        logger.warning("Failed to send approval email: %s", e)
-                
-                flash_success(request, "Request approved and forwarded to Admin for final processing.")
-            
-            elif result_text and result_text.strip():
-                # Final approval with staff code
+        elif status_id == 3:  # APPROVED
+            # Captain approval - final approval, create staff account and credentials
+            if result_text and result_text.strip() and result_text != "APPROVED":
                 staff_code = result_text.strip()
-                flash_success(request, f"Staff account approved. Staff Code: {staff_code}")
                 
-                if email_to:
-                    try:
-                        send_email.send_email(
-                            subject="Staff Account Request Approved",
-                            to=[email_to],
-                            body_text="Good day!\n\nYour staff account request has been APPROVED.\n\nYou will receive your login credentials in a separate email shortly.\n\nBarangay Sto. Niño",
-                            body_html="<p>Good day!</p><p>Your staff account request has been <strong>APPROVED</strong>.</p><p>You will receive your login credentials in a separate email shortly.</p><p>Barangay Sto. Niño</p>",
-                            from_name="Barangay Sto. Niño",
-                            fail_silently=True,
+                # Generate credentials
+                try:
+                    # Get staff details for credential generation
+                    with connection.cursor() as cursor:
+                        cursor.execute(
+                            """
+                            SELECT s.staff_id, p.first_name, p.middle_name, p.last_name, p.suffix, p.email
+                            FROM staff s
+                            JOIN person p ON p.person_id = s.person_id
+                            WHERE s.staff_code = %s
+                            """,
+                            [staff_code]
                         )
-                    except Exception as e:
-                        logger.warning("Failed to send final approval email: %s", e)
-            
+                        staff_row = cursor.fetchone()
+                    
+                    if staff_row:
+                        staff_id_for_creds, first_name, middle_name, last_name, suffix, person_email = staff_row
+                        
+                        # Generate username and password
+                        def _initials_from_name(first, middle, last, suffix):
+                            def fch(s): return s[0] if s and s.strip() else ""
+                            def clean_suffix(s): return re.sub(r"[^\w]+", "", s or "").strip()
+                            return "".join([fch(first), fch(middle), fch(last), clean_suffix(suffix)]).lower()
+                        
+                        def _rand_password(length=8):
+                            import string, secrets
+                            alphabet = string.ascii_letters + string.digits
+                            return "".join(secrets.choice(alphabet) for _ in range(length))
+                        
+                        initials = _initials_from_name(first_name, middle_name, last_name, suffix)
+                        username = f"brgySN.{initials}{staff_code}".lower()
+                        temp_password = _rand_password(8)
+                        
+                        # Use email from form or person record
+                        credential_email = email_to or (person_email or "").strip()
+                        
+                        # Validate email if provided
+                        if credential_email:
+                            is_valid, reason = verify_email_deliverable_abstract(credential_email)
+                            if not is_valid:
+                                logger.warning("Email validation failed for credentials: %s", reason)
+                                credential_email = None
+                        
+                        sent_flag = bool(credential_email)
+                        
+                        # Store credentials
+                        ok_upsert = Captain.upsert_staff_credentials_and_log(
+                            p_staff_id=staff_id_for_creds,
+                            p_username=username,
+                            p_password_plain=temp_password,
+                            p_sender_staff_id=approver_id,
+                            p_is_credentials_sent=sent_flag,
+                        )
+                        
+                        if ok_upsert and credential_email:
+                            # Send credentials email
+                            try:
+                                send_email.send_email(
+                                    subject="Barangay Sto. Niño Staff Account Approved - Login Credentials",
+                                    to=[credential_email],
+                                    body_text=f"Good day!\n\nYour staff account request has been APPROVED by the Barangay Captain.\n\nBelow are your login credentials:\n\nUsername: {username}\nTemporary Password: {temp_password}\n\nFor your security, please sign in as soon as possible and change your password immediately.\n\nThank you,\nBarangay Sto. Niño",
+                                    body_html=f"<p>Good day!</p><p>Your staff account request has been <strong>APPROVED</strong> by the Barangay Captain.</p><p>Below are your login credentials:</p><ul><li><strong>Username:</strong> {username}</li><li><strong>Temporary Password:</strong> {temp_password}</li></ul><p>For your security, please sign in as soon as possible and change your password immediately.</p><p>Thank you,<br>Barangay Sto. Niño</p>",
+                                    from_name="Barangay Sto. Niño",
+                                    fail_silently=True,
+                                )
+                                flash_success(request, f"Staff account approved and created. Credentials sent to the requested staff.")
+                            except Exception as e:
+                                logger.warning("Failed to send credentials email: %s", e)
+                                flash_success(request, f"Staff account approved and created. Staff Code: {staff_code}. Email sending failed.")
+                        else:
+                            flash_success(request, f"Staff account approved and created. Staff Code: {staff_code}")
+                    else:
+                        flash_warning(request, "Staff account approved but could not generate credentials.")
+                        
+                except Exception as e:
+                    logger.exception("Error generating credentials: %s", e)
+                    flash_success(request, f"Staff account approved and created. Staff Code: {staff_code}. Credential generation failed.")
             else:
-                flash_warning(request, "Request processed but no confirmation received. Please verify the status.")
+                flash_success(request, "Staff account request approved and staff account created.")
 
         logger.info(
             "process_staff_request completed: req_id=%s approver_id=%s status=%s result=%s",
@@ -1899,7 +1953,7 @@ def get_user_info(request):
 @role_required(CAPTAIN_ROLE)
 @nocache
 def staff_requests_list(request: HttpRequest) -> HttpResponse:
-    """View staff account requests submitted by this captain"""
+    """View all staff account requests"""
     from secretary.models import Secretary
     
     auth = request.session.get('auth', {})
@@ -1913,10 +1967,19 @@ def staff_requests_list(request: HttpRequest) -> HttpResponse:
     date_filter = request.GET.get('date_submitted', '').strip()
     
     try:
-        requests = Secretary.get_staff_account_req_list_by_requester(staff_id)
-        stats_data = Secretary.get_staff_request_statistics_by_requester(staff_id)
-        stats = stats_data[0] if stats_data else {
-            'total_requests': 0, 'pending_requests': 0, 'approved_requests': 0, 'rejected_requests': 0
+        # Get all staff account requests instead of just by requester
+        requests = Captain.list_requests() or []
+        # Calculate stats from all requests
+        total_requests = len(requests)
+        pending_requests = len([r for r in requests if r.get('status_id') in [29, 30, 46]])
+        approved_requests = len([r for r in requests if r.get('status_id') == 3])
+        rejected_requests = len([r for r in requests if r.get('status_id') == 4])
+        
+        stats = {
+            'total_requests': total_requests,
+            'pending_requests': pending_requests, 
+            'approved_requests': approved_requests,
+            'rejected_requests': rejected_requests
         }
     except Exception as e:
         logger.exception("Error loading requests")
@@ -1987,8 +2050,8 @@ def staff_requests_list(request: HttpRequest) -> HttpResponse:
         'user_fullname': user_fullname,
         'user_role': user_role,
         'user_role_template': user_role_template,
-        'page_path': f"{user_role} / My Requests",
-        'page_title': 'My Staff Requests',
+        'page_path': f"{user_role} / All Requests",
+        'page_title': 'All Staff Requests',
     })
 
 @session_login_required

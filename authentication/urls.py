@@ -12,6 +12,8 @@ urlpatterns = [
     path("new-password/", views.new_password, name="new_password"),
     path("email-sent/", views.email_sent, name="email_sent"),
     path("email-confirmed/", views.email_confirmed, name="email_confirmed"),
+    path("select-role/", views.select_role, name="select_role"),
+    path("switch-role/", views.switch_role, name="switch_role"),
 
     # New unauthorized endpoint
     path("unauthorized/", views.unauthorized, name="unauthorized"),

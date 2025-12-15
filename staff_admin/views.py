@@ -2169,6 +2169,10 @@ def _get_staff_by_code(staff_code: str) -> Optional[dict]:
 @nocache
 @require_http_methods(["POST"])
 def process_staff_request(request: HttpRequest) -> HttpResponse:
+    # Debug logging
+    logger.info("process_staff_request called with POST data: %s", dict(request.POST))
+    logger.info("p_request_status_id raw value: '%s'", request.POST.get("p_request_status_id"))
+    
     auth = request.session.get("auth") or {}
     approver_id = auth.get("staff_id")
     
@@ -2201,17 +2205,29 @@ def process_staff_request(request: HttpRequest) -> HttpResponse:
     # Get decision status
     status_raw = request.POST.get("p_request_status_id")
     if not status_raw:
-        flash_warning(request, "Missing decision status.")
+        flash_warning(request, "Missing decision status. Please select Approve or Reject.")
         return redirect(request.META.get("HTTP_REFERER") or "staff_admin:staff_account_requests_list")
     
     try:
         status_id = int(status_raw)
     except (TypeError, ValueError):
-        flash_warning(request, "Invalid decision status.")
+        flash_warning(request, "Invalid decision format. Please select Approve or Reject.")
         return redirect(request.META.get("HTTP_REFERER") or "staff_admin:staff_account_requests_list")
     
+    # Debug logging
+    logger.info("Received status_id: %s (type: %s)", status_id, type(status_id))
+    logger.info("Expected values: APPROVED=%s (type: %s), REJECTED=%s (type: %s)", 
+                REQUEST_STATUS_APPROVED, type(REQUEST_STATUS_APPROVED),
+                REQUEST_STATUS_REJECTED, type(REQUEST_STATUS_REJECTED))
+    logger.info("Comparison results: status_id == 3: %s, status_id == 4: %s", 
+                status_id == 3, status_id == 4)
+    logger.info("In tuple check: %s", status_id in (REQUEST_STATUS_APPROVED, REQUEST_STATUS_REJECTED))
+    
+    # Validate that the status is either approve (3) or reject (4)
     if status_id not in (REQUEST_STATUS_APPROVED, REQUEST_STATUS_REJECTED):
-        flash_warning(request, "Invalid decision status.")
+        logger.error("Status validation failed - status_id: %s, expected: %s or %s", 
+                    status_id, REQUEST_STATUS_APPROVED, REQUEST_STATUS_REJECTED)
+        flash_warning(request, f"Invalid decision. Expected Approve ({REQUEST_STATUS_APPROVED}) or Reject ({REQUEST_STATUS_REJECTED}), got {status_id}.")
         return redirect(request.META.get("HTTP_REFERER") or "staff_admin:staff_account_requests_list")
 
     remarks = (request.POST.get("remarks") or "").strip() or None

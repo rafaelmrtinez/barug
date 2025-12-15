@@ -301,14 +301,9 @@
             <div>
                 <h1 class="h2 mb-2 fw-bold text-dark d-flex align-items-center gap-3">
                     {% bs_icon 'clipboard-check-fill' color='var(--bs-danger-text-emphasis)' size='1.8em' %}
-                    My Staff Requests
+                    All Staff Requests
                 </h1>
-                <p class="text-muted mb-0">Manage and track your staff account requests</p>
-            </div>
-            <div>
-                <a href="{% url 'captain:staff_list' %}" class="btn btn-modern">
-                    {% bs_icon 'people-fill' %} Manage Staff Account
-                </a>
+                <p class="text-muted mb-0">View and manage all staff account requests</p>
             </div>
         </div>
     </div>
@@ -440,7 +435,7 @@
             <div class="d-flex align-items-center justify-content-between">
                 <h5 class="mb-0 fw-bold text-dark d-flex align-items-center gap-2">
                     {% bs_icon 'list-check' color='var(--bs-danger-text-emphasis)' %}
-                    My Requests
+                    All Requests
                     <span class="badge text-dark ms-2" style="background: var(--bs-danger-bg-subtle);">{% if page_obj %}{{ page_obj.paginator.count }}{% else %}{{ requests|length }}{% endif %}</span>
                 </h5>
                 {% if search_query or status_filter or role_filter or date_filter %}
@@ -527,7 +522,7 @@
                             {% bs_icon 'arrow-clockwise' %} Clear Filters
                         </a>
                     {% else %}
-                        <p class="text-muted">You haven't submitted any staff requests yet.</p>
+                        <p class="text-muted">No staff requests have been submitted yet.</p>
                     {% endif %}
                 </div>
             {% endif %}

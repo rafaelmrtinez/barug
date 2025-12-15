@@ -120,7 +120,7 @@ class Secretary(models.Model):
     def insert_res_staff_account_request(
         p_requested_by_id,
         p_person_id=None,
-        p_role_id=None,
+        p_role_ids=None,
         p_supporting_docs=None,
         p_lupon_sched=None,
         p_bhw_purok_ids=None,
@@ -139,8 +139,8 @@ class Secretary(models.Model):
                 docs_payload  = None if not p_supporting_docs else p_supporting_docs
 
                 logger.info(
-                    "DB ▶ insert_staff_account_request(by=%s, person=%s, role=%s, proof=%s, sched=%s, puroks=%s)",
-                    p_requested_by_id, p_person_id, p_role_id, docs_payload, sched_payload, purok_payload
+                    "DB ▶ insert_staff_account_request(by=%s, person=%s, role_ids=%s, proof=%s, sched=%s, puroks=%s)",
+                    p_requested_by_id, p_person_id, p_role_ids, docs_payload, sched_payload, purok_payload
                 )
 
                 if _HAS_PGJSON:
@@ -152,7 +152,7 @@ class Secretary(models.Model):
                         [
                             p_requested_by_id,
                             p_person_id,
-                            p_role_id,
+                            p_role_ids,
                             docs_payload,
                             PGJson(sched_payload) if sched_payload is not None else None,  # JSONB
                             purok_payload, 
@@ -172,7 +172,7 @@ class Secretary(models.Model):
                         [
                             p_requested_by_id,
                             p_person_id,
-                            p_role_id,
+                            p_role_ids,
                             docs_payload,
                             json.dumps(sched_payload) if sched_payload is not None else None,
                             purok_payload,
@@ -189,8 +189,8 @@ class Secretary(models.Model):
 
         except Exception:
             logger.exception(
-                "DB ✗ insert_staff_account_request failed (person=%s role=%s proof=%s sched=%s puroks=%s)",
-                p_person_id, p_role_id, _docs_for_log, _sched_for_log, _purok_for_log
+                "DB ✗ insert_staff_account_request failed (person=%s role_ids=%s proof=%s sched=%s puroks=%s)",
+                p_person_id, p_role_ids, _docs_for_log, _sched_for_log, _purok_for_log
             )
             raise
 
@@ -200,7 +200,7 @@ class Secretary(models.Model):
     def insert_nonres_staff_account_request(
         p_requested_by_id,
         p_person_id=None,
-        p_role_id=None,
+        p_role_ids=None,
         p_supporting_docs=None, 
         p_lupon_sched=None,
         p_bhw_purok_ids=None, 
@@ -246,8 +246,8 @@ class Secretary(models.Model):
                 docs_payload  = None if not p_supporting_docs else p_supporting_docs 
 
                 logger.info(
-                    "DB - insert_staff_account_request(by=%s, person=%s, role=%s, proof=%s, sched=%s, puroks=%s)",
-                    p_requested_by_id, p_person_id, p_role_id, docs_payload, sched_payload, purok_payload
+                    "DB - insert_staff_account_request(by=%s, person=%s, role_ids=%s, proof=%s, sched=%s, puroks=%s)",
+                    p_requested_by_id, p_person_id, p_role_ids, docs_payload, sched_payload, purok_payload
                 )
 
                 if _HAS_PGJSON:
@@ -269,7 +269,7 @@ class Secretary(models.Model):
                         [
                             p_requested_by_id,
                             p_person_id,
-                            p_role_id,
+                            p_role_ids,
                             docs_payload,
                             PGJson(sched_payload) if sched_payload is not None else None,
                             purok_payload,
@@ -336,7 +336,7 @@ class Secretary(models.Model):
                         [
                             p_requested_by_id,
                             p_person_id,
-                            p_role_id,
+                            p_role_ids,
                             docs_literal,
                             sched_text,
                             purok_literal,
@@ -380,8 +380,8 @@ class Secretary(models.Model):
 
         except Exception:
             logger.exception(
-                "DB x insert_staff_account_request failed (person=%s role=%s proof=%s sched=%s puroks=%s)",
-                p_person_id, p_role_id, _docs_for_log, _sched_for_log, _purok_for_log
+                "DB x insert_staff_account_request failed (person=%s role_ids=%s proof=%s sched=%s puroks=%s)",
+                p_person_id, p_role_ids, _docs_for_log, _sched_for_log, _purok_for_log
             )
             raise
 

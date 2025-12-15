@@ -18,16 +18,13 @@
                     <a class="nav-link" href="{% url 'clerk:business_list' %}">Business Records</a>
                 </li>
                 <li class="nav-item dropdown me-3">
-                    <a class="nav-link dropdown-toggle" href="#" id="staffManagementDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <a class="nav-link dropdown-toggle" href="#" id="staffDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                         Staff Directory
                     </a>
-                    <ul class="dropdown-menu" aria-labelledby="staffManagementDropdown">
-                        <li>
-                            <a class="dropdown-item d-flex justify-content-between align-items-center" href="{% url 'superadmin:staff_account_requests_list' %}">
-                                Staff Account Requests
-                            </a>
-                        </li>
-                        <li><a class="dropdown-item" href="{% url 'superadmin:staff_requests_list' %}">My Staff Requests</a></li>
+                    <ul class="dropdown-menu" aria-labelledby="staffDropdown">
+                        <li><a class="dropdown-item" href="{% url 'superadmin:staff_list' %}"><i class="bi bi-people me-2"></i>Staff List</a></li>
+                        <li><a class="dropdown-item" href="{% url 'superadmin:staff_requests_list' %}"><i class="bi bi-inbox me-2"></i>Account Requests</a></li>
+                        <li><a class="dropdown-item" href="{% url 'superadmin:staff_selection' %}"><i class="bi bi-person-plus me-2"></i>Create Staff Account</a></li>
                     </ul>
                 </li>
                 <li class="nav-item dropdown me-3">

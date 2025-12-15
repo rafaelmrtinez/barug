@@ -7,6 +7,69 @@
     <link rel="stylesheet" href="{% static 'css/button.css' %}">
     <link rel="stylesheet" href="{% static 'css/modal.css' %}">
     <link rel="stylesheet" href="{% static 'css/progress_bar.css' %}">
+    
+    <style>
+      .modern-card {
+        background: #ffffff;
+        border: 1px solid rgba(0,0,0,0.08);
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      }
+      
+      .chip-container {
+        background: rgba(255,255,255,0.7);
+        border: 2px dashed rgba(var(--bs-danger-text-emphasis-rgb), 0.3);
+        border-radius: 12px;
+        min-height: 60px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      
+      .chip-container:hover {
+        border-color: var(--bs-danger-text-emphasis);
+        background: rgba(var(--bs-danger-text-emphasis-rgb), 0.05);
+      }
+      
+      .modern-chip {
+        background: var(--bs-danger-text-emphasis);
+        color: white;
+        border: none;
+        border-radius: 20px;
+        padding: 8px 16px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        box-shadow: 0 2px 8px rgba(var(--bs-danger-text-emphasis-rgb), 0.3);
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      .modern-chip:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(var(--bs-danger-text-emphasis-rgb), 0.4);
+      }
+      
+      .section-label {
+        font-weight: 600;
+        color: #2d3748;
+        font-size: 0.9rem;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      .empty-state {
+        color: #64748b;
+        font-size: 0.85rem;
+        font-style: italic;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        min-height: 40px;
+      }
+    </style>
 {% endblock %}
 
 {% block content %}
@@ -65,10 +128,26 @@
                 </div>
             </div>
 
-            <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                    {{form.proof}}
-                    <label for="{{ form.proof.id_for_label }}">{{ form.proof.label }} *</label>
+            <!-- Multiple Proof of Employment -->
+            <div class="col-12">
+                <div class="modern-card p-4">
+                    <div class="section-label mb-3">
+                        <i class="bi bi-file-earmark-check" style="color: var(--bs-danger-text-emphasis); font-size: 1.1em;"></i>
+                        Selected Proof Documents
+                    </div>
+                    <div id="selected-proofs" class="chip-container d-flex flex-wrap gap-2 p-3 mb-3">
+                        <div class="empty-state" id="no-proofs-text">
+                            <i class="bi bi-cloud-upload" style="font-size: 1.2em;"></i>
+                            <span class="ms-2">No files selected</span>
+                        </div>
+                    </div>
+                    
+                    <label class="form-label small">Add Proof of Employment *</label>
+                    <div class="form-floating">
+                        <input type="file" class="form-control" id="proof-input" accept="image/*,.pdf" multiple>
+                        <label for="proof-input">Select proof files</label>
+                    </div>
+                    <div class="form-text">Select files to automatically add them as chips above.</div>
                 </div>
             </div>
 
@@ -89,6 +168,100 @@
   if (!form) return;
 
   const STORAGE_KEY = 'secretary_staff_nonres_docs_data';
+  
+  // Multiple proof of employment handling
+  const proofInput = document.getElementById('proof-input');
+  let selectedProofs = [];
+  let proofCounter = 0;
+
+  function renderSelectedProofs() {
+    const container = document.getElementById('selected-proofs');
+    const noProofsText = document.getElementById('no-proofs-text');
+    
+    if (selectedProofs.length === 0) {
+      noProofsText.style.display = 'flex';
+      container.querySelectorAll('.modern-chip').forEach(chip => chip.remove());
+      return;
+    }
+    
+    noProofsText.style.display = 'none';
+    
+    container.innerHTML = '';
+    container.appendChild(noProofsText);
+    
+    selectedProofs.forEach((proof, index) => {
+      const chip = document.createElement('div');
+      chip.className = 'modern-chip';
+      
+      const fileName = proof.name.length > 18 ? proof.name.substring(0, 15) + '...' : proof.name;
+      
+      chip.innerHTML = `
+        <i class="bi bi-file-earmark"></i>
+        <span title="${proof.name}">${fileName}</span>
+        <button type="button" class="btn p-0 text-white" onclick="removeProofAt(${index})" style="background: none; border: none; font-size: 1.1em; line-height: 1;">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      `;
+      
+      container.appendChild(chip);
+    });
+  }
+
+  // Global remove function
+  window.removeProofAt = function(index) {
+    const proof = selectedProofs[index];
+    if (proof && proof.inputId) {
+      const hiddenInput = document.getElementById(proof.inputId);
+      if (hiddenInput) {
+        hiddenInput.remove();
+      }
+    }
+    selectedProofs.splice(index, 1);
+    renderSelectedProofs();
+  };
+
+  // Auto-add proof file on selection
+  proofInput?.addEventListener('change', function() {
+    if (!this.files.length) return;
+    
+    Array.from(this.files).forEach(file => {
+      // Check for duplicates by name and size
+      if (selectedProofs.some(proof => proof.name === file.name && proof.size === file.size)) {
+        alert('File "' + file.name + '" is already selected.');
+        return;
+      }
+      
+      // Create a new hidden input for this proof
+      const newInput = document.createElement('input');
+      newInput.type = 'hidden';
+      newInput.name = 'proof_files[]';
+      newInput.id = `proof_file_${proofCounter}`;
+      
+      // Store file data as base64
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        newInput.value = e.target.result;
+        
+        selectedProofs.push({ 
+          name: file.name, 
+          size: file.size, 
+          inputId: newInput.id,
+          counter: proofCounter
+        });
+        
+        renderSelectedProofs();
+      };
+      reader.readAsDataURL(file);
+      
+      // Add to form
+      form.appendChild(newInput);
+      
+      proofCounter++;
+    });
+    
+    // Reset the file input
+    this.value = '';
+  });
 
   function saveFormData() {
     const formData = {};
@@ -138,14 +311,21 @@
     }
   }
 
+  form.addEventListener('submit', (e) => {
+    if (selectedProofs.length === 0) {
+      e.preventDefault();
+      alert('Please upload at least one proof document.');
+      return;
+    }
+    
+    sessionStorage.removeItem(STORAGE_KEY);
+  });
+
+  // Initialize UI
+  renderSelectedProofs();
+
   form.addEventListener('input', saveFormData);
   form.addEventListener('change', saveFormData);
-
-  form.addEventListener('submit', (e) => {
-    if (!e.defaultPrevented) {
-      sessionStorage.removeItem(STORAGE_KEY);
-    }
-  });
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', restoreFormData);
