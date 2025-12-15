@@ -35,7 +35,7 @@ urlpatterns = [
     path("staff/requests/<int:request_id>/", views.staff_request_detail, name="staff_request_detail"),
 
     # Residents
-    path("residents/", views.residents_list, name="residents_list"),
+    path("residents/", views.resident_list, name="residents_list"),
     path("residents/<int:person_id>/", views.resident_detail, name="resident_detail"),
 
     # Resident (legacy paths kept if still used elsewhere)

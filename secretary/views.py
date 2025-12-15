@@ -2127,31 +2127,36 @@ def process_staff_request(request: HttpRequest) -> HttpResponse:
 @role_required(SECRETARY_ROLE)
 @nocache
 @require_GET
-def residents_list(request: HttpRequest) -> HttpResponse:
-    """Minimal residents table: Name | Address | Actions"""
-    q = (request.GET.get("q") or "").strip()
-    page = int(request.GET.get("page") or 1)
-    page_size = 15
+@inject
+def resident_list(
+    request: HttpRequest,
+    resident_service: IResidentService = Provide[AppContainer.resident_service],
+):
+    user_role = _auth_role_name(request)
+    form = ResidentFilters()
+    
+    search = request.GET.get("search")
+    purok_sitio = request.GET.get("purok_sitio")
 
-    try:
-        rows, total = list_residents_minimal(search=q, page=page, page_size=page_size)
-    except Exception as e:
-        messages.error(request, f"Failed to load residents: {e}")
-        rows, total = [], 0
+    rows = resident_service.execute(
+        search=search,
+        purok=purok_sitio,
+    )
 
-    paginator = Paginator(range(total), page_size)  # fake range to drive page controls
-    page_obj = paginator.get_page(page)
+    paginator = Paginator(rows,10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+    
 
-    user_fullname, user_role, user_role_template = get_user_info(request)
-    return render(request, "secretary/residents_list.html", {
-        'user_fullname': user_fullname,
-        'user_role': user_role,
-        'page_path': f'{user_role} / Residents',
-        'page_title': 'Residents',
-        'user_role_template': user_role_template,
-        'rows': rows,
-        'q': q,
+    if (search or purok_sitio is not None) and not form.is_valid():
+        form = ResidentFilters()
+
+    return render(request, "resident/resident_list.html", {
+        'page_path': f'{user_role} / Resident List',
+        'page_title': 'Resident List',
         'page_obj': page_obj,
+        'form': form,
+        'search_url': 'secretary:ajax_resident_search',
     })
 
 
