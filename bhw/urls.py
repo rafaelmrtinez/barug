@@ -1,6 +1,6 @@
 # bhw/urls.py
 from django.urls import path
-from . import views
+from . import views, cb_views, api
 from common.api.household_history_pdf_api import HouseholdHistoryPDFAPI
 from common.api.family_history_pdf_api import FamilyHistoryPDFAPI
 from common.api.household_pdf_api import HouseholdPDFAPI
@@ -63,4 +63,22 @@ urlpatterns = [
     path("api/household/pdf/", HouseholdPDFAPI.as_view(), name="household_pdf_api"),
     path("api/family/pdf/", FamilyPDFAPI.as_view(), name="family_pdf_api"),
     path("api/residents/pdf/", ResidentsPDFAPI.as_view(), name="residents_pdf_api"),
+    
+    # RESIDENT PROFILING
+    path("profiling/personal-info/", views.profile_personal_info, name="profile_personal_info"),
+    path("profiling/link-parent/", views.profile_link_parent, name="profile_link_parent"),
+    path("profiling/link-children/", views.profile_link_children, name="profile_link_children"),
+    path("profiling/socioeconomic/", views.profile_socioeconomic, name="profile_socioeconomic"),
+    path("profiling/review/", views.profile_review, name="profile_review"),
+
+    # Class Based Views for Household Registration
+    path("household/register/", cb_views.HouseholdView.as_view(), name="household_register"),
+    
+    # API's 
+    path("api/update-household-information/", api.UpdateHouseholdInformationAPI.as_view(), name="update_household_information_api"),
+    path("api/update-household-head/", api.UpdateHouseholdHeadAPI.as_view(), name="update_household_head_api"),
+    path("api/update-family-head/", api.UpdateFamilyHeadAPI.as_view(), name="update_family_head_api"),
+    path("api/update-family-information/", api.UpdateFamilyInformationAPI.as_view(), name="update_family_information_api"),
+    path("api/quarterly-visit-completion/", api.MarkQuarterlyVisitAPI.as_view(), name="mark_quarterly_visit_api"),
 ]
+

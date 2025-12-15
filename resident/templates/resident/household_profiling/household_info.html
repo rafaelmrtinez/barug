@@ -4,15 +4,30 @@
 
 {% block css %}
     <link rel="stylesheet" href="{% static 'css/form.css' %}">
-    <link rel="stylesheet" href="{% static 'css/button.css' %}">
-    <link rel="stylesheet" href="{% static 'css/modal.css' %}">
-    <link rel="stylesheet" href="{% static 'css/progress_bar.css' %}">
-    <link rel="stylesheet" href="{% static 'css/map_registration.css' %}">
-    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"/>
+        <link rel="stylesheet" href="{% static 'css/button.css' %}">
+        <link rel="stylesheet" href="{% static 'css/modal.css' %}">
+        <link rel="stylesheet" href="{% static 'css/progress_bar.css' %}">
+        <link rel="stylesheet" href="{% static 'css/map_registration.css' %}">
+        <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"/>
 
-    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
-    <script src="{% static 'js/map_registration.js' %}"></script>
+    <style>
+        /* minimal styles for the household head search dropdown */
+        .search-container { position: relative; }
+        .hh-search-results {
+            position: absolute;
+            z-index: 1200;
+            left: 0;
+            right: 0;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            max-height: 220px;
+            overflow-y: auto;
+        }
+        .hh-search-item { padding: 8px 12px; cursor: pointer; }
+        .hh-search-item:hover { background: #f8fafc; }
+        .hh-search-empty { padding: 8px 12px; color: #6b7280; }
+    </style>
 {% endblock %}
 
 {% block content %}
@@ -54,15 +69,22 @@
             </div>
 
             <div class="col-lg-3 col-md-6 col-sm-12">
-                <div class="form-floating mb-3">
-                    {{form.household_head}}
-                    <label for="{{ form.household_head.id_for_label }}">{{ form.household_head.label }}</label>
-                </div>   
+                <div class="form-floating mb-3 search-container">
+                    <input type="text" id="household_head_search" class="form-control" placeholder="Search household head..." autocomplete="off">
+                    <label for="household_head_search">{{ form.household_head.label }}</label>
+                    <input type="hidden" id="{{ form.household_head.id_for_label }}" name="{{ form.household_head.name }}" value="{{ form.household_head.value }}">
+                    <div id="hhSearchResults" class="hh-search-results" style="display:none"></div>
+                </div>
             </div>
 
             <div class="col-lg-3 col-md-6 col-sm-12">
                 <div class="form-floating mb-3">
-                    {{form.house_type}}
+                    <select id="{{ form.house_type.id_for_label }}" name="{{ form.house_type.name }}" class="form-select">
+                        <option value="">Select house type</option>
+                        <option value="1" {% if form.house_type.value == "1" %}selected{% endif %}>CONCRETE</option>
+                        <option value="2" {% if form.house_type.value == "2" %}selected{% endif %}>SEMI-CONCRETE</option>
+                        <option value="3" {% if form.house_type.value == "3" %}selected{% endif %}>LIGHT MATERIAL</option>
+                    </select>
                     <label for="{{ form.house_type.id_for_label }}">{{ form.house_type.label }}</label>
                 </div>   
             </div>
@@ -73,7 +95,14 @@
 
             <div class="col-lg-3 col-md-6 col-sm-12">
                 <div class="form-floating mb-3">
-                    {{form.house_ownership}}
+                    <select id="{{ form.house_ownership.id_for_label }}" name="{{ form.house_ownership.name }}" class="form-select">
+                        <option value="">Select ownership type</option>
+                        <option value="1" {% if form.house_ownership.value == "1" %}selected{% endif %}>OWNED</option>
+                        <option value="2" {% if form.house_ownership.value == "2" %}selected{% endif %}>RENTED</option>
+                        <option value="3" {% if form.house_ownership.value == "3" %}selected{% endif %}>FAMILY-OWNED</option>
+                        <option value="4" {% if form.house_ownership.value == "4" %}selected{% endif %}>GOVERNMENT HOUSING</option>
+                        <option value="5" {% if form.house_ownership.value == "5" %}selected{% endif %}>INFORMAL SETTLER</option>
+                    </select>
                     <label for="{{ form.house_ownership.id_for_label }}">{{ form.house_ownership.label }}</label>
                 </div>
             </div>
@@ -81,7 +110,7 @@
         </div>
 
         <div class="modal fade" id="address_modal" tabindex="-1" aria-labelledby="home_address" aria-hidden="true">
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="home_address">Home Address</h5>
@@ -148,12 +177,147 @@
             </div>
         </div>
         
+        <input type="hidden" name="added_by_id" id="added_by_id" value="{{ request.user.id }}">
+        <input type="hidden" name="latitude" id="latitude" value=""> 
+        <input type="hidden" name="longitude" id="longitude" value=""> 
+
         <div class="mt-auto button-container">
-            <button class="btn btn-reset">Clear</button>
-            <a class="btn btn-submit" href="{% url 'resident:supporting_documents' %}">Continue</a>
+            <button class="btn btn-reset" type="button" id="clearHouseholdBtn">Clear</button>
+            <button class="btn btn-submit" type="button" id="submitHouseholdBtn">Continue</button>
         </div>
 
     </form>
 
 </div>
+{% block js %}
+<script defer src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script defer src="{% static 'js/map_registration.js' %}"></script>
+<script defer src="{% static 'js/household_head_search.js' %}"></script>
+<script>
+(() => {
+    document.addEventListener('DOMContentLoaded', function () {
+    const submitBtn = document.getElementById('submitHouseholdBtn');
+    const clearBtn = document.getElementById('clearHouseholdBtn');
+    const nextUrl = "{% url 'resident:family_info' household_id=0 %}";
+
+    function getField(name){
+        const elByName = document.querySelector('[name="' + name + '"]');
+        if (elByName) return elByName.value;
+        const elById = document.getElementById(name);
+        return elById ? elById.value : null;
+    }
+
+    function getCsrf(){
+        const tokenEl = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        return tokenEl ? tokenEl.value : '';
+    }
+
+    const formEl = document.querySelector('form');
+    if (formEl){
+        // Prevent native form submit (e.g. Enter key) — capture phase to stop early events
+        formEl.addEventListener('submit', function(e){ e.preventDefault(); }, true);
+        // As a defensive override for any inline handlers, ensure onsubmit returns false
+        formEl.onsubmit = function(){ return false; };
+    }
+
+    clearBtn && clearBtn.addEventListener('click', function(){
+        // Reset visible inputs in the form
+        const form = document.querySelector('form');
+        if (form) form.reset();
+    });
+    // prevent double-submit
+    let inFlight = false;
+
+    // lightweight dataset lock to avoid duplicate handlers (pointerdown+click) or duplicate listeners
+    if (submitBtn) submitBtn.dataset.locked = submitBtn.dataset.locked || '0';
+
+    submitBtn && submitBtn.addEventListener('click', async function(){
+        // If a previous submit locked this button, ignore
+        if (submitBtn.dataset.locked === '1') return;
+        if (inFlight) return;
+
+        // collect required fields (validation happens before setting the locked/inFlight state)
+        const payload = {
+            p_house_type_id: getField('{{ form.house_type.name }}') || getField('house_type_id') || null,
+            p_house_ownership_id: getField('{{ form.house_ownership.name }}') || getField('house_ownership_id') || null,
+            p_city: getField('{{ form.city.name }}') || getField('city'),
+            p_barangay: getField('{{ form.barangay.name }}') || getField('barangay'),
+            p_sitio_purok: getField('{{ form.purok_sitio.name }}') || getField('purok_sitio') || getField('sitio_purok'),
+            p_street: getField('{{ form.street.name }}') || getField('street'),
+            p_added_by_id: getField('added_by_id') || null,
+            p_household_num: getField('{{ form.household_num.name }}') || getField('household_num'),
+            p_house_num: getField('{{ form.house_num.name }}') || getField('house_num'),
+            p_household_head_id: getField('{{ form.household_head.name }}') || getField('household_head') || null,
+            p_latitude: getField('{{ form.latitude.name }}') || getField('latitude') || null,
+            p_longitude: getField('{{ form.longitude.name }}') || getField('longitude') || null,
+        };
+
+        // Basic validation
+        const required = ['p_house_type_id','p_house_ownership_id','p_city','p_barangay','p_household_num','p_house_num','p_household_head_id'];
+        for (const k of required){
+            if (!payload[k] || String(payload[k]).trim() === ''){
+                alert('Please fill all required fields before continuing. Missing: ' + k);
+                return;
+            }
+        }
+
+        // coerce numeric fields
+        payload.p_house_type_id = Number(payload.p_house_type_id) || null;
+        payload.p_house_ownership_id = Number(payload.p_house_ownership_id) || null;
+        payload.p_added_by_id = payload.p_added_by_id ? Number(payload.p_added_by_id) : null;
+        payload.p_household_head_id = payload.p_household_head_id ? Number(payload.p_household_head_id) : null;
+        payload.p_latitude = payload.p_latitude ? Number(payload.p_latitude) : null;
+        payload.p_longitude = payload.p_longitude ? Number(payload.p_longitude) : null;
+
+        // All validation passed — set locks so duplicate handlers/rapid events do not send twice
+        submitBtn.dataset.locked = '1';
+        inFlight = true;
+        submitBtn.disabled = true;
+
+        try{
+            console.debug('submit payload', payload);
+            const res = await fetch('/resident/api/household/create/', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrf(),
+                    'X-Client-Submit-Id': Math.random().toString(36).slice(2, 10)
+                },
+                body: JSON.stringify(payload),
+            });
+
+            if (res.status === 201){
+                // created -> proceed
+                const resJson = await res.json()
+                console.debug('household created', resJson);
+                window.location.href = nextUrl.replace('0', resJson.result);
+                return;
+            }
+
+            // try to parse body for error
+            let bodyText = '';
+            try{ bodyText = await res.text();
+                try{ const j = JSON.parse(bodyText); if (j && j.error) bodyText = j.error; }
+                catch(e){}
+            }catch(e){}
+
+            alert('Failed to create household: ' + (bodyText || res.statusText || 'Unknown error'));
+            // allow retry — reset locks
+            inFlight = false;
+            submitBtn.disabled = false;
+            submitBtn.dataset.locked = '0';
+        }catch(err){
+            console.error('create household error', err);
+            alert('An unexpected error occurred while creating household.');
+            inFlight = false;
+            submitBtn.disabled = false;
+            submitBtn.dataset.locked = '0';
+        }
+    });
+});
+})();
+</script>
+{% endblock  %}
 {% endblock %}

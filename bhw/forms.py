@@ -1,4 +1,5 @@
 from django import forms
+from datetime import datetime
 
 HOUSE_OWNERSHIP_CHOICES = [
     ("", "— All ownerships —"),
@@ -388,4 +389,30 @@ class FamilyHistoryFilters(forms.Form):
         label='Indigent Status',
         required=False,
     )
+
+# Resident Profiling Forms
+class ResidentPersonalInfoForm(forms.Form):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.data.get('mobile_num') and not self.initial.get('mobile_num'):
+            self.initial['mobile_num'] = '+63'
+    first_name = forms.CharField(max_length=100, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    middle_name = forms.CharField(max_length=100, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    last_name = forms.CharField(max_length=100, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    suffix = forms.ChoiceField(choices=[('', 'None'), ('JR', 'Jr.'), ('SR', 'Sr.'), ('III', 'III'), ('IV', 'IV'), ('V', 'V')], required=False, widget=forms.Select(attrs={'class': 'form-select'}))
+    sex = forms.ChoiceField(choices=[(1, 'Male'), (2, 'Female')], widget=forms.RadioSelect())
+    dob = forms.DateField(widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}))
+    civil_status = forms.ChoiceField(choices=[(1, 'Single'), (2, 'Married'), (3, 'Widowed'), (4, 'Separated'), (5, 'Divorced')], widget=forms.Select(attrs={'class': 'form-select'}))
+    nationality = forms.ChoiceField(choices=[(7, 'Filipino'), (1, 'American'), (2, 'Australian'), (3, 'Brazilian'), (4, 'British'), (5, 'Canadian'), (6, 'Chinese'), (8, 'French'), (9, 'German'), (10, 'Indian'), (11, 'Indonesian'), (12, 'Italian'), (13, 'Japanese'), (14, 'Korean'), (15, 'Malaysian'), (16, 'Russian'), (17, 'Saudi'), (18, 'Spanish'), (19, 'Thai'), (20, 'Vietnamese')], widget=forms.Select(attrs={'class': 'form-select'}))
+    religion = forms.ChoiceField(choices=[(12, 'Roman Catholic'), (8, 'Islam'), (2, 'Born Again'), (7, 'Iglesia Ni Cristo'), (1, 'Agnostic'), (3, 'Buddhist'), (4, 'Christian'), (5, 'Evangelical'), (6, 'Hindu'), (9, "Jehovah's Witness"), (10, 'Orthodox'), (11, 'Protestant'), (13, 'Seventh-Day Adventist'), (14, 'Others')], widget=forms.Select(attrs={'class': 'form-select'}))
+    mobile_num = forms.CharField(max_length=20, required=False, widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+63'}))
+    email = forms.EmailField(required=False, widget=forms.EmailInput(attrs={'class': 'form-control'}))
+
+class ResidentSocioeconomicForm(forms.Form):
+    educational_attainment = forms.ChoiceField(choices=[(1, 'No Formal Education'), (2, 'Kinder'), (3, 'Elementary Student'), (4, 'Elementary Undergrad'), (5, 'Elementary Graduate'), (6, 'High School Student'), (7, 'High School Undergrad'), (8, 'High School Graduate'), (9, 'Vocational Course'), (10, 'College Student'), (11, 'College Undergrad'), (12, 'College Graduate'), (13, 'Postgraduate')], required=False, widget=forms.Select(attrs={'class': 'form-select'}))
+    employment_status = forms.ChoiceField(choices=[(1, 'Employed'), (2, 'Unemployed'), (3, 'OFW'), (5, 'Retired'), (6, 'Self-Employed'), (7, 'Pensioner'), (8, 'Housewife'), (9, 'Freelancer'), (10, 'Disabled'), (11, 'Looking for Work'), (12, 'Part-Time'), (13, 'Full-Time'), (14, 'Underemployed')], widget=forms.Select(attrs={'class': 'form-select'}))
+    occupation = forms.CharField(max_length=100, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    monthly_income = forms.ChoiceField(choices=[(1, 'Below ₱5,000'), (2, '₱5,001 - ₱10,000'), (3, '₱10,001 - ₱15,000'), (4, '₱15,001 - ₱20,000'), (5, '₱20,001 - ₱30,000'), (6, '₱30,001 - ₱50,000'), (7, '₱50,001 - ₱75,000'), (8, '₱75,001 - ₱100,000'), (9, 'Above ₱100,000')], widget=forms.Select(attrs={'class': 'form-select'}))
+    residency_month = forms.ChoiceField(choices=[(str(i), datetime(2000, i, 1).strftime('%B')) for i in range(1, 13)], widget=forms.Select(attrs={'class': 'form-select'}))
+    residency_year = forms.ChoiceField(choices=[(str(y), str(y)) for y in range(datetime.now().year, datetime.now().year - 100, -1)], widget=forms.Select(attrs={'class': 'form-select'}))
 
