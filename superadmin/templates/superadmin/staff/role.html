@@ -9,6 +9,69 @@
   <link rel="stylesheet" href="{% static 'css/submission_dets.css' %}">
 
   <script src="{% static 'js/schedule.js' %}"></script>
+  
+  <style>
+    .modern-card {
+      background: #ffffff;
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+    
+    .chip-container {
+      background: rgba(255,255,255,0.7);
+      border: 2px dashed rgba(var(--bs-danger-text-emphasis-rgb), 0.3);
+      border-radius: 12px;
+      min-height: 60px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .chip-container:hover {
+      border-color: var(--bs-danger-text-emphasis);
+      background: rgba(var(--bs-danger-text-emphasis-rgb), 0.05);
+    }
+    
+    .modern-chip {
+      background: var(--bs-danger-text-emphasis);
+      color: white;
+      border: none;
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      box-shadow: 0 2px 8px rgba(var(--bs-danger-text-emphasis-rgb), 0.3);
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .modern-chip:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(var(--bs-danger-text-emphasis-rgb), 0.4);
+    }
+    
+    .section-label {
+      font-weight: 600;
+      color: #2d3748;
+      font-size: 0.9rem;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .empty-state {
+      color: #64748b;
+      font-size: 0.85rem;
+      font-style: italic;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      min-height: 40px;
+    }
+  </style>
 {% endblock %}
 
 {% block content %}
@@ -59,7 +122,17 @@
                     <div class="kv-item"><span class="kv-key">Middle Name</span><span class="kv-val">{{ personal.middle_name|default:""|title }}</span></div>
                     <div class="kv-item"><span class="kv-key">Suffix</span><span class="kv-val">{{ personal.suffix|default:""|upper }}</span></div>
                     <div class="kv-item"><span class="kv-key">Sex</span><span class="kv-val">{{ personal.sex_label|default:""|title }}</span></div>
-                    <div class="kv-item"><span class="kv-key">Date of Birth</span><span class="kv-val">{{ personal.birthdate_label|default:"" }}</span></div>
+                    <div class="kv-item"><span class="kv-key">Date of Birth</span>
+                      <span class="kv-val">
+                        {% if personal.birthdate_display %}
+                          {{ personal.birthdate_display }}
+                        {% elif personal.birthdate %}
+                          {{ personal.birthdate }}
+                        {% else %}
+                          —
+                        {% endif %}
+                      </span>
+                    </div>
                     <div class="kv-item"><span class="kv-key">Civil Status</span><span class="kv-val">{{ personal.civil_status_label|default:""|title }}</span></div>
                     <div class="kv-item"><span class="kv-key">Nationality</span><span class="kv-val">{{ personal.nationality_label|default:""|title }}</span></div>
                     <div class="kv-item"><span class="kv-key">Religion</span><span class="kv-val">{{ personal.religion_label|default:""|title }}</span></div>
@@ -125,18 +198,30 @@
                           <small class="text-muted d-block text-center mt-2">Selfie w/ ID</small>
                         </div>
 
-                        <div class="carousel-item">
-                          <div class="img-wrap">
-                            {% if docs.proof_preview %}
-                              <img src="{{ docs.proof_preview }}" class="doc-img" alt="Selfie with ID">
-                            {% elif docs.selfie_url %}
-                              <img src="{{ docs.proof_url }}" class="doc-img" alt="Selfie with ID">
-                            {% else %}
-                              <img src="{% static 'images/brgy-sto-nino.png' %}" class="doc-img" alt="Selfie with ID">
-                            {% endif %}
+                        {% if docs.proof_previews %}
+                          {% for proof_preview in docs.proof_previews %}
+                            <div class="carousel-item">
+                              <div class="img-wrap">
+                                <img src="{{ proof_preview }}" class="doc-img" alt="Proof of Employment {{ forloop.counter }}">
+                              </div>
+                              <small class="text-muted d-block text-center mt-2">Proof of Employment {{ forloop.counter }}</small>
+                            </div>
+                          {% endfor %}
+                        {% elif docs.proof_preview %}
+                          <div class="carousel-item">
+                            <div class="img-wrap">
+                              <img src="{{ docs.proof_preview }}" class="doc-img" alt="Proof of Employment">
+                            </div>
+                            <small class="text-muted d-block text-center mt-2">Proof of Employment</small>
                           </div>
-                          <small class="text-muted d-block text-center mt-2">Proof of Employment</small>
-                        </div>
+                        {% else %}
+                          <div class="carousel-item">
+                            <div class="img-wrap">
+                              <img src="{% static 'images/brgy-sto-nino.png' %}" class="doc-img" alt="Proof of Employment">
+                            </div>
+                            <small class="text-muted d-block text-center mt-2">Proof of Employment</small>
+                          </div>
+                        {% endif %}
                       </div>
 
                       <!-- Controls outside the image bounds -->
@@ -155,19 +240,53 @@
           </div>
         </div>
 
-        <!-- Staff Role (static-style input, like the search) -->
-        <div class="rounded-3 border bg-light p-3 mt-4">
-          <div class="row g-3 align-items-end">
-            <!-- Role -->
-            <div class="col-12 col-md-6">
-              <label class="form-label small">Select Staff Role</label>
+        <div class="modern-card p-4 mt-4">
+          <!-- Selected Items Display -->
+          <div class="row g-4 mb-4">
+            <div class="col-md-6">
+              <div class="section-label">
+                {% bs_icon 'person-badge' size='1.1em' color='var(--bs-danger-text-emphasis)' %}
+                Selected Roles
+              </div>
+              <div id="selected-roles" class="chip-container d-flex flex-wrap gap-2 p-3">
+                <div class="empty-state" id="no-roles-text">
+                  {% bs_icon 'plus-circle-dotted' size='1.2em' %}
+                  <span class="ms-2">No roles selected</span>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="section-label">
+                {% bs_icon 'file-earmark-check' size='1.1em' color='var(--bs-danger-text-emphasis)' %}
+                Proof Documents
+              </div>
+              <div id="selected-proofs" class="chip-container d-flex flex-wrap gap-2 p-3">
+                <div class="empty-state" id="no-proofs-text">
+                  {% bs_icon 'cloud-upload' size='1.2em' %}
+                  <span class="ms-2">No files selected</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add New Items -->
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small">Add Staff Role</label>
               <div class="form-floating">
                 {{ role_form.role }}
                 <label for="{{ role_form.role.id_for_label }}">{{ role_form.role.label }}</label>
               </div>
-              <div class="form-text">Choose the role to assign to this resident.</div>
+              <div class="form-text">Select a role to automatically add it as a chip above.</div>
             </div>
-
+            <div class="col-md-6">
+              <label class="form-label small">Add Proof of Employment</label>
+              <div class="form-floating">
+                <input type="file" class="form-control" id="proof-input" accept="image/*,.pdf" multiple>
+                <label for="proof-input">Select proof files</label>
+              </div>
+              <div class="form-text">Select files to automatically add them as chips above.</div>
+            </div>
           </div>
         </div>
 
@@ -330,9 +449,9 @@
   }
 
   function applyRoleVisibility() {
-    const v = roleSel ? String(roleSel.value) : '';
-    const isBHW   = v === '9'; // BHW
-    const isLupon = v === '8'; // Lupon
+    // Use selectedRoles array instead of collecting from DOM
+    const isBHW   = selectedRoles.some(role => role.value === '9'); // BHW
+    const isLupon = selectedRoles.some(role => role.value === '8'); // Lupon
 
     // Show/hide
     if (purokSection) purokSection.classList.toggle('d-none', !isBHW);
@@ -377,6 +496,164 @@
     row.querySelector('.remove-purok')?.addEventListener('click', () => row.remove());
     purokList.appendChild(row);
   }
+
+  // Multiple roles and proof management
+  let selectedRoles = [];
+  let selectedProofs = [];
+  let proofCounter = 0;
+
+  // Initialize role visibility and UI
+  applyRoleVisibility();
+  renderSelectedRoles();
+  renderSelectedProofs();
+
+  function renderSelectedRoles() {
+    const container = document.getElementById('selected-roles');
+    const noRolesText = document.getElementById('no-roles-text');
+    
+    if (selectedRoles.length === 0) {
+      noRolesText.style.display = 'flex';
+      container.querySelectorAll('.modern-chip').forEach(chip => chip.remove());
+      return;
+    }
+    
+    noRolesText.style.display = 'none';
+    
+    container.innerHTML = '';
+    container.appendChild(noRolesText);
+    
+    selectedRoles.forEach((role, index) => {
+      const chip = document.createElement('div');
+      chip.className = 'modern-chip';
+      chip.innerHTML = `
+        <span>${role.text}</span>
+        <button type="button" class="btn p-0 text-white" onclick="removeRoleAt(${index})" style="background: none; border: none; font-size: 1.1em; line-height: 1;">
+          <i class="bi bi-x-lg"></i>
+        </button>
+        <input type="hidden" name="role_ids[]" value="${role.value}">
+      `;
+      
+      container.appendChild(chip);
+    });
+  }
+
+  function renderSelectedProofs() {
+    const container = document.getElementById('selected-proofs');
+    const noProofsText = document.getElementById('no-proofs-text');
+    
+    if (selectedProofs.length === 0) {
+      noProofsText.style.display = 'flex';
+      container.querySelectorAll('.modern-chip').forEach(chip => chip.remove());
+      return;
+    }
+    
+    noProofsText.style.display = 'none';
+    
+    container.innerHTML = '';
+    container.appendChild(noProofsText);
+    
+    selectedProofs.forEach((proof, index) => {
+      const chip = document.createElement('div');
+      chip.className = 'modern-chip';
+      
+      const fileName = proof.name.length > 18 ? proof.name.substring(0, 15) + '...' : proof.name;
+      
+      chip.innerHTML = `
+        <i class="bi bi-file-earmark"></i>
+        <span title="${proof.name}">${fileName}</span>
+        <button type="button" class="btn p-0 text-white" onclick="removeProofAt(${index})" style="background: none; border: none; font-size: 1.1em; line-height: 1;">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      `;
+      
+      container.appendChild(chip);
+    });
+  }
+
+  // Global remove functions
+  window.removeRoleAt = function(index) {
+    selectedRoles.splice(index, 1);
+    renderSelectedRoles();
+    applyRoleVisibility();
+  };
+
+  window.removeProofAt = function(index) {
+    const proof = selectedProofs[index];
+    if (proof && proof.inputId) {
+      const hiddenInput = document.getElementById(proof.inputId);
+      if (hiddenInput) {
+        hiddenInput.remove();
+      }
+    }
+    selectedProofs.splice(index, 1);
+    renderSelectedProofs();
+  };
+
+  // Auto-add role on selection
+  roleSel?.addEventListener('change', function() {
+    if (!this.value) return;
+    
+    const roleValue = this.value;
+    const roleText = this.options[this.selectedIndex].text;
+    
+    // Check for duplicates
+    if (selectedRoles.some(role => role.value === roleValue)) {
+      showAlert('This role is already selected.', 'warning');
+      this.value = '';
+      return;
+    }
+    
+    selectedRoles.push({ value: roleValue, text: roleText });
+    renderSelectedRoles();
+    applyRoleVisibility();
+    
+    // Reset the select
+    this.value = '';
+  });
+
+  // Auto-add proof file on selection
+  const proofInput = document.getElementById('proof-input');
+  proofInput?.addEventListener('change', function() {
+    if (!this.files.length) return;
+    
+    Array.from(this.files).forEach(file => {
+      // Check for duplicates by name and size
+      if (selectedProofs.some(proof => proof.name === file.name && proof.size === file.size)) {
+        showAlert('File "' + file.name + '" is already selected.', 'warning');
+        return;
+      }
+      
+      // Create a new hidden input for this proof
+      const newInput = document.createElement('input');
+      newInput.type = 'hidden';
+      newInput.name = 'proof_files[]';
+      newInput.id = `proof_file_${proofCounter}`;
+      
+      // Store file data as base64
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        newInput.value = e.target.result;
+        
+        selectedProofs.push({ 
+          name: file.name, 
+          size: file.size, 
+          inputId: newInput.id,
+          counter: proofCounter
+        });
+        
+        renderSelectedProofs();
+      };
+      reader.readAsDataURL(file);
+      
+      // Add to form
+      form.appendChild(newInput);
+      
+      proofCounter++;
+    });
+    
+    // Reset the file input
+    this.value = '';
+  });
 
   // ── Validations
   function checkDuplicatePurok() {
@@ -466,8 +743,74 @@
     }
   });
 
+  // ── Validation function
+  function validateForm() {
+    let errorMessage = '';
+    
+    if (selectedRoles.length === 0) { 
+      errorMessage = 'Please choose at least one staff role.';
+    } else if (selectedProofs.length === 0) {
+      errorMessage = 'Please attach at least one proof of employment.';
+    } else {
+      // Apply one last time in case visibility changed and another script re-added required attrs
+      applyRoleVisibility();
+
+      if (selectedRoles.some(role => role.value === '9')) {
+        const v = checkDuplicatePurok();
+        if (!v.ok) { errorMessage = v.msg; }
+      }
+
+      if (!errorMessage && selectedRoles.some(role => role.value === '8')) {
+        const v = validateSchedules();
+        if (!v.ok) { errorMessage = v.msg; }
+      }
+    }
+
+    if (errorMessage) {
+      showErrorModal(errorMessage);
+      return false;
+    }
+
+    return true;
+  }
+
+  // ── Error modal function
+  function showErrorModal(message) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.style.zIndex = '10000';
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+          <div class="modal-body text-center p-4">
+            <div class="mb-3">
+              <div class="d-inline-flex align-items-center justify-content-center" style="width: 64px; height: 64px; background: linear-gradient(135deg, #dc3545, #b02a37); border-radius: 50%;">
+                <i class="bi bi-exclamation-triangle-fill text-white" style="font-size: 28px;"></i>
+              </div>
+            </div>
+            <h5 class="fw-semibold mb-2" style="color: #2d3748;">Validation Error</h5>
+            <p class="text-muted mb-4">${message}</p>
+            <div class="d-flex gap-2 justify-content-center">
+              <button type="button" class="btn btn-submit px-4 py-2" data-bs-dismiss="modal">OK</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+    modal.addEventListener('hidden.bs.modal', () => modal.remove());
+  }
+
   // ── Confirmation modal for Submit button
   document.getElementById('submitBtn')?.addEventListener('click', function() {
+    // Validate first, only show modal if validation passes
+    if (!validateForm()) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     const modal = document.createElement('div');
     modal.className = 'modal fade';
     modal.style.zIndex = '10000';
@@ -481,7 +824,7 @@
               </div>
             </div>
             <h5 class="fw-semibold mb-2" style="color: #2d3748;">Confirm Submission</h5>
-            <p class="text-muted mb-4">Are you sure you want to submit this staff account creation?</p>
+            <p class="text-muted mb-4">Are you sure you want to submit this staff account creation request?</p>
             <div class="d-flex gap-2 justify-content-center">
               <button type="button" class="btn btn-reset px-3 py-2" data-bs-dismiss="modal">Cancel</button>
               <button type="button" class="btn btn-submit px-4 py-2" id="confirmSubmit">Yes, Submit</button>
@@ -500,30 +843,12 @@
     modal.addEventListener('hidden.bs.modal', () => modal.remove());
   });
 
-  // ── Submit gate
+  // ── Submit gate (simplified since validation is done before modal)
   form?.addEventListener('submit', (e) => {
-    const role = val(roleSel);
-    if (!role) { e.preventDefault(); showAlert('Please choose a staff role.', 'warning'); return; }
-
-    // Apply one last time in case visibility changed and another script re-added required attrs
-    applyRoleVisibility();
-
-    if (role === '9') {
-      const v = checkDuplicatePurok();
-      if (!v.ok) { e.preventDefault(); showAlert(v.msg, v.type); return; }
-      // NOTE: no proof check here for BHW (per your earlier preference)
-    }
-
-    if (role === '8') {
-      const v = validateSchedules();
-      if (!v.ok) { e.preventDefault(); showAlert(v.msg, v.type); return; }
-    }
-
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, { passive:false });
 })();
 </script>
-
 
 <script>
 (function () {

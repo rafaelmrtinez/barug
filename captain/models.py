@@ -40,7 +40,7 @@ class Captain(models.Model):
         except Exception as e: raise e
 
     @staticmethod
-    def process_staff_account_request(
+    def process_staff_account_request_approval(
         p_staff_acc_req_id: int,
         p_approver_id: int,
         p_request_status_id: int,
@@ -61,7 +61,7 @@ class Captain(models.Model):
                 )
 
                 row = cursor.fetchone()
-                result_text = row[0] if row else None  # 'TRUE' (Captain) or staff_code (Admin)
+                result_text = row[0] if row else None  # 'REJECTED' or staff_code
 
                 logger.info(
                     "DB OK process_staff_account_request_approval(req_id=%s) result=%s",

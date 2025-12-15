@@ -37,17 +37,28 @@
       <span class="navbar-text d-none d-sm-inline"> - </span>
       <div class="user-type text-end">
         <span class="navbar-text">{{ user_role|title }}</span>
-        <!-- {% if lupon_sched %}
-          <br><small class="text-white-50">{% for sched in lupon_sched %}{% if sched.day == 0 %}Sun{% elif sched.day == 1 %}Mon{% elif sched.day == 2 %}Tue{% elif sched.day == 3 %}Wed{% elif sched.day == 4 %}Thu{% elif sched.day == 5 %}Fri{% elif sched.day == 6 %}Sat{% endif %} {{ sched.time_start|slice:":5" }}-{{ sched.time_end|slice:":5" }}{% if not forloop.last %}, {% endif %}{% endfor %}</small>
-        {% endif %} -->
       </div>
 
       <div class="d-flex align-items-center">
-        <form action="{% url 'authentication:logout' %}" method="post" class="m-0 p-0" id="logoutForm">
-          {% csrf_token %}
-          <button type="button" id="logout" name="logout" class="btn btn-logout" title="Logout" onclick="showLogoutConfirmation()">
+        <div class="dropdown">
+          <button class="btn btn-logout dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Account Menu">
             {% bs_icon 'arrow-bar-right' color='white' size='1.3em' %}
           </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            {% if user_roles|length > 1 %}
+              {% for role in user_roles %}
+                {% if role != selected_role %}
+                  <li><a class="dropdown-item" href="{% url 'authentication:switch_role' %}?role={{ role }}"><i class="bi bi-arrow-repeat me-2"></i>Switch to {{ role }}</a></li>
+                {% endif %}
+              {% endfor %}
+              <li><a class="dropdown-item" href="{% url 'authentication:switch_role' %}"><i class="bi bi-arrow-repeat me-2"></i>All Roles</a></li>
+              <li><hr class="dropdown-divider"></li>
+            {% endif %}
+            <li><a class="dropdown-item text-danger" href="#" onclick="showLogoutConfirmation()"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+          </ul>
+        </div>
+        <form action="{% url 'authentication:logout' %}" method="post" class="d-none" id="logoutForm">
+          {% csrf_token %}
         </form>
       </div>
     </div>
@@ -60,6 +71,11 @@
     .notif-title{ font-weight:600 }
     .notif-body{ color:#64748b }
     .notif-time{ font-size:12px; color:#94a3b8 }
+    /* White dropdown indicator */
+    .btn-logout.dropdown-toggle::after { border-top-color: white; }
+    /* Modern modal animations */
+    .modal.fade .modal-dialog { transform: scale(0.8); transition: transform 0.3s ease; }
+    .modal.show .modal-dialog { transform: scale(1); }
   </style>
 
   {# ───────────── Supabase + Notification Script ───────────── #}
@@ -164,20 +180,26 @@
   </script>
   {# ───────────── End Supabase + Notification Script ───────────── #}
 
-  {# ───────────── Logout Confirmation Modal ───────────── #}
+  {# ───────────── Modern Logout Confirmation Modal ───────────── #}
   <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title text-dark" id="logoutModalLabel">Confirm Logout</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <p class="text-dark">Do you really want to logout?</p>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="cancelBtn">Cancel</button>
-          <button type="button" class="btn btn-danger" onclick="confirmLogout()" id="logoutBtn">Logout</button>
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden;">
+        <div class="modal-body text-center p-4">
+          <div class="mb-4">
+            <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width: 80px; height: 80px; background-color: rgba(220, 53, 69, 0.1);">
+              <i class="bi bi-power" style="font-size: 2.5rem; color: var(--bs-danger-text-emphasis);"></i>
+            </div>
+            <h4 class="fw-bold text-dark mb-2">Sign Out</h4>
+            <p class="text-muted mb-0">Are you sure you want to sign out of your account?</p>
+          </div>
+          <div class="d-grid gap-2">
+            <button type="button" class="btn btn-lg" onclick="confirmLogout()" id="logoutBtn" style="border-radius: 12px; background: var(--bs-danger-text-emphasis); border-color: var(--bs-danger-text-emphasis); color: white;">
+              <i class="bi bi-box-arrow-right me-2"></i>Sign Out
+            </button>
+            <button type="button" class="btn btn-light btn-lg" data-bs-dismiss="modal" id="cancelBtn" style="border-radius: 12px;">
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
     </div>

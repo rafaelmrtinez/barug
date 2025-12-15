@@ -18,7 +18,7 @@ class Admin(models.Model):
     def create_staff_direct(
         p_requested_by_id: int,
         p_person_id: int,
-        p_role_id: int | None = None,
+        p_role_ids: list[int] | None = None,
         p_supporting_docs: list[str] | None = None,
         p_lupon_sched: list[dict] | None = None,
         p_bhw_purok_ids: list[int] | None = None,
@@ -26,6 +26,7 @@ class Admin(models.Model):
         _docs_for_log  = p_supporting_docs if p_supporting_docs else None
         _sched_for_log = p_lupon_sched if p_lupon_sched else None
         _purok_for_log = p_bhw_purok_ids if p_bhw_purok_ids else None
+        _roles_for_log = p_role_ids if p_role_ids else None
 
         try:
             with connection.cursor() as cursor:
@@ -38,7 +39,7 @@ class Admin(models.Model):
                         [
                             p_requested_by_id,
                             p_person_id,
-                            p_role_id,
+                            _roles_for_log,
                             _docs_for_log,
                             PGJson(_sched_for_log) if _sched_for_log is not None else None,
                             _purok_for_log,
@@ -58,7 +59,7 @@ class Admin(models.Model):
                         [
                             p_requested_by_id,
                             p_person_id,
-                            p_role_id,
+                            _roles_for_log,
                             _docs_for_log,
                             json.dumps(_sched_for_log) if _sched_for_log is not None else None,
                             _purok_for_log,
@@ -79,7 +80,7 @@ class Admin(models.Model):
     def update_staff_information(
         staff_id: int,
         updated_by_staff_id: int,
-        role_id: int,
+        role_ids: list[int],
         acc_status_id: int,
         username: str = None,
         password: str = None,
@@ -100,7 +101,7 @@ class Admin(models.Model):
             """, [
                 staff_id,
                 updated_by_staff_id,
-                role_id,
+                role_ids,
                 acc_status_id,
                 username,
                 password,
@@ -120,7 +121,7 @@ class Admin(models.Model):
     @staticmethod
     def insert_person_and_staff(
         p_added_by_id: int,
-        p_role_id: int,
+        p_role_ids: list[int] | None = None,
         p_supporting_docs: list[str] | None = None,
         p_first_name: str = None,
         p_last_name: str = None,
@@ -155,13 +156,12 @@ class Admin(models.Model):
                         );
                         """,
                         [
-                            p_added_by_id, p_role_id, p_supporting_docs,
+                            p_added_by_id, p_role_ids, p_supporting_docs,
                             p_first_name, p_last_name, p_birthdate, p_email, p_mobile_num,
                             p_sex_id, p_civil_status_id, p_nationality_id, p_religion_id,
                             p_city, p_barangay, p_sitio_purok, p_street,
                             p_valid_id_front, p_valid_id_back, p_valid_id_type_id, p_selfie_path,
-                            PGJson(p_lupon_sched) if p_lupon_sched else None,
-                            p_bhw_purok_ids, p_middle_name, p_suffix
+                            PGJson(p_lupon_sched) if p_lupon_sched else None, p_bhw_purok_ids, p_middle_name, p_suffix
                         ],
                     )
                 else:
@@ -173,13 +173,12 @@ class Admin(models.Model):
                         );
                         """,
                         [
-                            p_added_by_id, p_role_id, p_supporting_docs,
+                            p_added_by_id, p_role_ids, p_supporting_docs,
                             p_first_name, p_last_name, p_birthdate, p_email, p_mobile_num,
                             p_sex_id, p_civil_status_id, p_nationality_id, p_religion_id,
                             p_city, p_barangay, p_sitio_purok, p_street,
                             p_valid_id_front, p_valid_id_back, p_valid_id_type_id, p_selfie_path,
-                            json.dumps(p_lupon_sched) if p_lupon_sched else None,
-                            p_bhw_purok_ids, p_middle_name, p_suffix
+                            json.dumps(p_lupon_sched) if p_lupon_sched else None, p_bhw_purok_ids, p_middle_name, p_suffix
                         ],
                     )
 

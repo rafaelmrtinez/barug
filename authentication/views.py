@@ -31,6 +31,7 @@ def _role_home(role_name: str) -> str:
     """
     Map normalized (lowercased) role names to URL names.
     Accepts any case but immediately normalizes to lower().
+    For users with multiple roles, this determines the primary dashboard.
     """
     role = (role_name or "").strip().lower()
 
@@ -43,9 +44,9 @@ def _role_home(role_name: str) -> str:
     is_secy     = role in {"barangay secretary", "secretary"}
     is_nurse    = role in {"nurse", "barangay nurse"}
     is_super_admin = role in {"super admin", "superadmin", "super-admin"}
-    is_admin    = role in {"admin", "barangay admin"}  # << NEW
+    is_admin    = role in {"admin", "barangay admin"}
 
-    # NEW: Lupon roles
+    # Lupon roles
     is_lupon_member = role in {
         "barangay lupon member",
         "lupon member",
@@ -55,30 +56,29 @@ def _role_home(role_name: str) -> str:
     is_lupon_president = role in {
         "barangay lupon president",
         "lupon president",
-        "lupon chairman",      # common synonym
-        "pangkat chairman",    # when acting as chair of pangkat
+        "lupon chairman",
+        "pangkat chairman",
     }
 
-    if is_clerk:            return "clerk:dashboard"
+    # Priority order for multiple roles (highest priority first)
+    if is_super_admin:      return "superadmin:dashboard"
     if is_captain:          return "captain:dashboard"
-    if is_bhw:              return "bhw:dashboard"
-    if is_midwife:          return "midwife:dashboard"
+    if is_admin:            return "staff_admin:dashboard"
+    if is_clerk:            return "clerk:dashboard"
     if is_treas:            return "treasurer:queue"
     if is_secy:             return "secretary:dashboard"
+    if is_midwife:          return "midwife:dashboard"
+    if is_bhw:              return "bhw:dashboard"
     if is_nurse:            return "nurse:dashboard"
-    if is_admin:            return "staff_admin:dashboard"     # << NEW
-    if is_super_admin:      return "superadmin:dashboard"
-
-    # NEW: targets for Lupon roles (separate apps)
-    if is_lupon_member:     return "lupon_mem:dashboard"
     if is_lupon_president:  return "lupon_pres:dashboard"
+    if is_lupon_member:     return "lupon_mem:dashboard"
 
     logger.debug("Role not matched in _role_home; role=%s -> resident fallback", role)
     return "resident:dashboard"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Helpers / Decorators for auth & role checks
+# Helpers / Decorators for auth & role checks (now supports multiple roles)
 # ──────────────────────────────────────────────────────────────────────────────
 def staff_login_required(view_func):
     """Ensure session contains 'auth'. If missing, redirect to login."""
@@ -91,10 +91,38 @@ def staff_login_required(view_func):
     return _wrapped
 
 
+def session_login_required(view_func):
+    """Alias for staff_login_required for backward compatibility."""
+    return staff_login_required(view_func)
+
+
+def has_any_role(request, *role_names):
+    """
+    Check if the current user has any of the specified roles.
+    Returns True if user has at least one of the roles, False otherwise.
+    """
+    if not role_names:
+        return True
+    
+    user_roles = get_user_roles_from_session(request)
+    allowed_roles = {str(r).strip().lower() for r in role_names}
+    
+    return bool(allowed_roles.intersection(user_roles))
+
+
+def any_role_required(*role_names):
+    """
+    Decorator that allows access if user has ANY of the specified roles.
+    This is an alias for roles_required for clarity.
+    """
+    return roles_required(*role_names)
+
+
 def roles_required(*role_names):
     """
     Ensure the logged-in staff has one of the allowed roles.
     Role comparison is case-insensitive; both sides are normalized to lower().
+    Now supports multiple roles per user.
     If unauthorized, render the custom Unauthorized page (403).
     """
     allowed = {str(r).strip().lower() for r in role_names}
@@ -107,16 +135,29 @@ def roles_required(*role_names):
                 messages.error(request, "Please sign in to continue.", extra_tags="auth")
                 return redirect("authentication:login")
 
-            # Prefer normalized value; fall back to role_name if older sessions exist
-            role_now = (auth.get("role_lower") or auth.get("role_name") or "").strip().lower()
+            # Get user's roles - check both single role and multiple roles
+            user_roles = set()
+            
+            # Add primary role (for backward compatibility)
+            primary_role = (auth.get("role_lower") or auth.get("role_name") or "").strip().lower()
+            if primary_role:
+                user_roles.add(primary_role)
+            
+            # Add all roles from the list (new multi-role support)
+            role_names_list = auth.get("role_names_list", [])
+            for role in role_names_list:
+                user_roles.add(role.strip().lower())
+            
+            # Check if user has any of the required roles
+            has_required_role = bool(allowed.intersection(user_roles))
 
-            if allowed and role_now not in allowed:
+            if allowed and not has_required_role:
                 logger.warning(
-                    "UNAUTHORIZED | user=%s role=%s required_any=%s path=%s",
-                    auth.get("username"), role_now, allowed, request.path
+                    "UNAUTHORIZED | user=%s roles=%s required_any=%s path=%s",
+                    auth.get("username"), list(user_roles), allowed, request.path
                 )
                 try:
-                    home_url = reverse(_role_home(role_now))
+                    home_url = reverse(_role_home(primary_role))
                 except Exception:
                     home_url = reverse("authentication:login")
 
@@ -125,7 +166,7 @@ def roles_required(*role_names):
                     "unauthorized.html",
                     {
                         "requested_path": request.path,
-                        "role_name": role_now,  # already lowercased
+                        "role_name": primary_role,  # show primary role
                         "home_url": home_url,
                     },
                     status=403,
@@ -133,6 +174,42 @@ def roles_required(*role_names):
             return view_func(request, *args, **kwargs)
         return _wrapped
     return _decorator
+
+
+def get_user_roles_from_session(request):
+    """
+    Helper function to get all user roles from session.
+    Returns a set of normalized (lowercase) role names.
+    """
+    auth = request.session.get("auth")
+    if not auth:
+        return set()
+    
+    user_roles = set()
+    
+    # Add primary role (for backward compatibility)
+    primary_role = (auth.get("role_lower") or auth.get("role_name") or "").strip().lower()
+    if primary_role:
+        user_roles.add(primary_role)
+    
+    # Add all roles from the list (new multi-role support)
+    role_names_list = auth.get("role_names_list", [])
+    for role in role_names_list:
+        user_roles.add(role.strip().lower())
+    
+    return user_roles
+
+
+def get_primary_role_from_session(request):
+    """
+    Helper function to get the primary role from session.
+    Returns the primary role name (lowercase) or empty string.
+    """
+    auth = request.session.get("auth")
+    if not auth:
+        return ""
+    
+    return (auth.get("role_lower") or auth.get("role_name") or "").strip().lower()
 
 
 def debug_login_log(request):
@@ -217,7 +294,38 @@ def login(request):
 
         # 4) Success — unpack row (now includes login_log_id)
         staff_id, person_id, user_type, role_name_db, first_name, middle_name, last_name, account_status_name, login_log_id = row
-        role_lower = (role_name_db or "").strip().lower()
+        
+        # Handle multiple roles - role_name_db is now comma-separated
+        role_names_list = [r.strip() for r in (role_name_db or "").split(",") if r.strip()]
+        
+        # Check if user has multiple roles
+        if len(role_names_list) > 1:
+            # Store login data temporarily for role selection
+            request.session["role_selection_data"] = {
+                "staff_id": staff_id,
+                "person_id": person_id,
+                "user_type": user_type,
+                "role_names_list": role_names_list,
+                "role_name_db": role_name_db,
+                "first_name": first_name,
+                "middle_name": middle_name,
+                "last_name": last_name,
+                "account_status_name": account_status_name,
+                "login_log_id": login_log_id,
+                "username": username,
+                "ip": ip,
+                "created_at": timezone.now().isoformat(),
+            }
+            
+            # Clear rate-limit counter
+            cache.delete(rl_key)
+            
+            # Redirect to role selection
+            return redirect("authentication:select_role")
+        
+        # Single role - proceed normally
+        primary_role = role_names_list[0] if role_names_list else ""
+        role_lower = primary_role.lower()
         acc_status_upper = (account_status_name or "").strip().upper()
 
         # Check if account is PENDING - redirect to forgot password
@@ -251,7 +359,7 @@ def login(request):
             return redirect("authentication:new_password")
 
         logger.debug(
-            "LOGIN OK | user=%s staff_id=%s person_id=%s role=%s (normalized=%s) acc_status=%s",
+            "LOGIN OK | user=%s staff_id=%s person_id=%s roles=%s (primary=%s) acc_status=%s",
             username, staff_id, person_id, role_name_db, role_lower, account_status_name
         )
 
@@ -292,10 +400,11 @@ def login(request):
             "first_name": first_name,
             "last_name": last_name,
             "middle_name": middle_name,
-            # normalized & original
-            "role_name": role_lower,          # <<< lowercased for consistent checks
+            # normalized & original - now supporting multiple roles
+            "role_name": role_lower,          # <<< primary role lowercased for consistent checks
             "role_lower": role_lower,         # <<< redundant but explicit
-            "role_original": role_name_db,    # <<< optional, for display/logs if needed
+            "role_original": role_name_db,    # <<< comma-separated roles from DB
+            "role_names_list": role_names_list,  # <<< list of all roles
             "username": username,
             "display_name": "",
             "login_at": timezone.now().isoformat(),
@@ -863,8 +972,146 @@ def new_password(request):
 
 
 
+@csrf_protect
+def select_role(request):
+    """Role selection for users with multiple roles"""
+    role_data = request.session.get("role_selection_data")
+    if not role_data:
+        return redirect("authentication:login")
+    
+    # Check session expiration (5 minutes)
+    try:
+        from datetime import datetime
+        created_at = datetime.fromisoformat(role_data.get("created_at", ""))
+        if (timezone.now() - created_at).total_seconds() > 300:
+            request.session.pop("role_selection_data", None)
+            return redirect("authentication:login")
+    except (ValueError, TypeError):
+        request.session.pop("role_selection_data", None)
+        return redirect("authentication:login")
+    
+    if request.method == "POST":
+        selected_role = request.POST.get("selected_role")
+        if selected_role and selected_role in role_data["role_names_list"]:
+            # Complete login with selected role
+            _complete_login_with_role(request, role_data, selected_role)
+            
+            # Clear role selection data
+            request.session.pop("role_selection_data", None)
+            
+            # Redirect to selected role dashboard
+            dest = _role_home(selected_role.lower())
+            return redirect(dest)
+        else:
+            messages.error(request, "Invalid role selection.", extra_tags="auth")
+    
+    return render(request, "select_role.html", {
+        "role_names_list": role_data["role_names_list"],
+        "user_name": f"{role_data['first_name']} {role_data['last_name']}".strip(),
+    })
+
+
+def _complete_login_with_role(request, role_data, selected_role):
+    """Complete login process with selected role"""
+    role_lower = selected_role.lower()
+    
+    # Fetch assigned puroks for BHW
+    assigned_puroks = []
+    assigned_purok_names = []
+    if role_lower in {"barangay health worker", "bhw"}:
+        try:
+            from common.supabase_client import supabase
+            resp = supabase.table("staff_purok_assignment").select("purok_sitio_id, purok_sitio(purok_sitio_name)").eq("staff_id", role_data["staff_id"]).eq("is_active", True).execute()
+            for row in (resp.data or []):
+                assigned_puroks.append(row["purok_sitio_id"])
+                if row.get("purok_sitio") and row["purok_sitio"].get("purok_sitio_name"):
+                    assigned_purok_names.append(row["purok_sitio"]["purok_sitio_name"])
+        except Exception:
+            pass
+    
+    # Fetch lupon schedule for Barangay Lupon Member
+    lupon_sched = []
+    if role_lower == "barangay lupon member":
+        try:
+            from common.supabase_client import supabase
+            staff_sched = supabase.table("lupon_staff_sched").select("lupon_sched_id").eq("staff_id", role_data["staff_id"]).execute()
+            if staff_sched.data:
+                sched_ids = [s["lupon_sched_id"] for s in staff_sched.data]
+                lupon_sched = supabase.table("lupon_sched").select("*").in_("lupon_sched_id", sched_ids).execute().data or []
+        except Exception:
+            pass
+    
+    request.session.cycle_key()
+    request.session["auth"] = {
+        "staff_id": role_data["staff_id"],
+        "person_id": role_data["person_id"],
+        "user_type": role_data["user_type"],
+        "first_name": role_data["first_name"],
+        "last_name": role_data["last_name"],
+        "middle_name": role_data["middle_name"],
+        "role_name": role_lower,
+        "role_lower": role_lower,
+        "role_original": role_data["role_name_db"],
+        "role_names_list": role_data["role_names_list"],
+        "selected_role": selected_role,
+        "username": role_data["username"],
+        "display_name": "",
+        "login_at": timezone.now().isoformat(),
+        "login_log_id": role_data["login_log_id"],
+        "assigned_puroks": assigned_puroks,
+        "assigned_purok_names": assigned_purok_names,
+        "lupon_sched": lupon_sched,
+    }
+    request.session['last_activity'] = timezone.now().isoformat()
+    request.session.set_expiry(60 * 60 * 8)
+
+
 def email_sent(request):
     return render(request, "email_sent.html")
+
+
+@staff_login_required
+def switch_role(request):
+    """Allow users to switch between their available roles"""
+    auth = request.session.get("auth")
+    if not auth:
+        return redirect("authentication:login")
+    
+    role_names_list = auth.get("role_names_list", [])
+    if len(role_names_list) <= 1:
+        messages.info(request, "You only have one role assigned.")
+        return redirect(request.META.get("HTTP_REFERER", "/"))
+    
+    # Handle direct role switching via URL parameter
+    role_param = request.GET.get("role")
+    if role_param and role_param in role_names_list:
+        auth["role_name"] = role_param.lower()
+        auth["role_lower"] = role_param.lower()
+        auth["selected_role"] = role_param
+        request.session["auth"] = auth
+        
+        messages.success(request, f"Switched to {role_param} role.")
+        dest = _role_home(role_param.lower())
+        return redirect(dest)
+    
+    if request.method == "POST":
+        new_role = request.POST.get("new_role")
+        if new_role and new_role in role_names_list:
+            auth["role_name"] = new_role.lower()
+            auth["role_lower"] = new_role.lower()
+            auth["selected_role"] = new_role
+            request.session["auth"] = auth
+            
+            # messages.success(request, f"Switched to {new_role} role.")
+            dest = _role_home(new_role.lower())
+            return redirect(dest)
+        else:
+            messages.error(request, "Invalid role selection.")
+    
+    return render(request, "switch_role.html", {
+        "role_names_list": role_names_list,
+        "current_role": auth.get("selected_role", auth.get("role_name", "")),
+    })
 
 
 def email_confirmed(request):

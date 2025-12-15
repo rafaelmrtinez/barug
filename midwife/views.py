@@ -1958,25 +1958,36 @@ def staff_list(request):
     acc_id = int(acc_raw) if acc_raw.isdigit() else None
     purok_id = int(purok_raw) if purok_raw.isdigit() else None
 
+    # Map account status ID to string
+    status_map = {1: "Active", 4: "Pending", 3: "Deactivated", 2: "Inactive"}
+    target_status = status_map.get(acc_id) if acc_id else None
+
     try:
-        if acc_id is not None:
-            base_rows = Secretary.filter_staff_by_role_and_account(ROLE_BHW, acc_id) or []
-        else:
-            base_rows = Secretary.get_all_staff_info_summary() or []
+        base_rows = Secretary.get_all_staff_info_summary() or []
     except Exception as e:
         logger.exception("Failed to load staff summaries: %s", e)
         base_rows = []
 
     rows = _filter_bhw_rows(base_rows)
+    
+    # Apply account status filter
+    if target_status:
+        print(f"DEBUG: Filtering for target_status='{target_status}'")
+        before_count = len(rows)
+        rows = [r for r in rows if r.get('account_status') == target_status]
+        print(f"DEBUG: Before filter: {before_count}, After filter: {len(rows)}")
+        if not rows:
+            all_statuses = set(r.get('account_status') for r in _filter_bhw_rows(base_rows))
+            print(f"DEBUG: Available statuses in data: {all_statuses}")
 
-    # Filter by assigned purok using purok_sitio_ids
+    # Apply purok filter
     if purok_id is not None:
         filtered_rows = []
         for r in rows:
             purok_ids = r.get('purok_sitio_ids', [])
             if isinstance(purok_ids, list) and purok_id in purok_ids:
                 filtered_rows.append(r)
-            elif purok_ids == purok_id:  # Handle single ID case
+            elif purok_ids == purok_id:
                 filtered_rows.append(r)
         rows = filtered_rows
 
@@ -2065,25 +2076,30 @@ def staff_search_api(request):
     purok_id = int(purok_raw) if purok_raw.isdigit() else None
     acc_id = int(acc_raw) if acc_raw.isdigit() else None
 
+    # Map account status ID to string
+    status_map = {1: "Active", 2: "Pending", 3: "Deactivated", 4: "Inactive"}
+    target_status = status_map.get(acc_id) if acc_id else None
+
     try:
-        if acc_id is not None:
-            base_rows = Secretary.filter_staff_by_role_and_account(ROLE_BHW, acc_id) or []
-        else:
-            base_rows = Secretary.get_all_staff_info_summary() or []
+        base_rows = Secretary.get_all_staff_info_summary() or []
     except Exception as e:
         logger.exception("staff_search_api error: %s", e)
         return JsonResponse({"results": [], "error": "Search failed"}, status=500)
 
     rows = _filter_bhw_rows(base_rows)
+    
+    # Apply account status filter
+    if target_status:
+        rows = [r for r in rows if r.get('account_status') == target_status]
 
-    # Filter by assigned purok using purok_sitio_ids
+    # Apply purok filter
     if purok_id is not None:
         filtered_rows = []
         for r in rows:
             purok_ids = r.get('purok_sitio_ids', [])
             if isinstance(purok_ids, list) and purok_id in purok_ids:
                 filtered_rows.append(r)
-            elif purok_ids == purok_id:  # Handle single ID case
+            elif purok_ids == purok_id:
                 filtered_rows.append(r)
         rows = filtered_rows
 
@@ -2113,22 +2129,26 @@ def staff_filter_api(request):
     purok_id = int(purok_raw) if purok_raw.isdigit() else None
     acc_id  = int(acc_raw)  if acc_raw.isdigit()  else None
 
+    # Map account status ID to string
+    status_map = {1: "Active", 2: "Pending", 3: "Deactivated", 4: "Inactive"}
+    target_status = status_map.get(acc_id) if acc_id else None
+
     try:
-        if acc_id is not None:
-            base_rows = Secretary.filter_staff_by_role_and_account(ROLE_BHW, acc_id) or []
-        else:
-            base_rows = Secretary.get_all_staff_info_summary() or []
-        
+        base_rows = Secretary.get_all_staff_info_summary() or []
         rows = _filter_bhw_rows(base_rows)
         
-        # Filter by assigned purok using purok_sitio_ids
+        # Apply account status filter
+        if target_status:
+            rows = [r for r in rows if r.get('account_status') == target_status]
+        
+        # Apply purok filter
         if purok_id is not None:
             filtered_rows = []
             for r in rows:
                 purok_ids = r.get('purok_sitio_ids', [])
                 if isinstance(purok_ids, list) and purok_id in purok_ids:
                     filtered_rows.append(r)
-                elif purok_ids == purok_id:  # Handle single ID case
+                elif purok_ids == purok_id:
                     filtered_rows.append(r)
             rows = filtered_rows
         
