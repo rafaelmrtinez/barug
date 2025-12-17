@@ -1357,10 +1357,13 @@ def staff_selection_nonres_role_review(request: HttpRequest) -> HttpResponse:
     return redirect("secretary:staff_selection")
 
 
+
+
+
 @session_login_required
 @role_required(SECRETARY_ROLE)
 @nocache
-def staff_list(request):
+def staff_list(request: HttpRequest) -> HttpResponse:
     filters = request.session.get(STAFF_FILTER_SESSION_KEY, {}) or {}
     role_raw = (filters.get("role") or "").strip()
     acc_raw = (filters.get("account_stat") or "").strip()
@@ -1396,13 +1399,17 @@ def staff_list(request):
     if "q" in request.GET:
         search_term = (request.GET.get("q") or "").strip()
         updated = True
+    if "search" in request.GET:
+        search_term = (request.GET.get("search") or "").strip()
+        updated = True
 
-    if updated:
-        request.session[STAFF_FILTER_SESSION_KEY] = {
-            "role": role_raw,
-            "account_stat": acc_raw,
-            "q": search_term,
-        }
+    filters_state = {
+        "role": role_raw,
+        "account_stat": acc_raw,
+        "q": search_term,
+    }
+    if updated or STAFF_FILTER_SESSION_KEY not in request.session:
+        request.session[STAFF_FILTER_SESSION_KEY] = filters_state
         request.session.modified = True
 
     if should_redirect:
@@ -1416,10 +1423,13 @@ def staff_list(request):
         if role_id is not None or acc_id is not None:
             rows = Secretary.filter_staff_by_role_and_account(role_id, acc_id) or []
             if search_term:
-                s = search_term.lower()
-                rows = [r for r in rows if s in (r.get("full_name") or "").lower()]
+                term = search_term.lower()
+                rows = [r for r in rows if term in (r.get("full_name") or "").lower()]
         elif search_term:
-            rows = Secretary.search_staff_by_name(search_term) or []
+            # Get all staff first, then filter by search term to maintain role information
+            all_rows = Secretary.get_all_staff_info_summary() or []
+            term = search_term.lower()
+            rows = [r for r in all_rows if term in (r.get("full_name") or "").lower()]
         else:
             rows = Secretary.get_all_staff_info_summary() or []
     except Exception as e:
@@ -1430,12 +1440,12 @@ def staff_list(request):
         per_page = int(request.GET.get("per_page") or 10)
         if per_page <= 0:
             per_page = 10
-    except (TypeError, ValueError):
+    except ValueError:
         per_page = 10
 
     try:
         page_number = int(request.GET.get("page") or 1)
-    except (TypeError, ValueError):
+    except ValueError:
         page_number = 1
 
     form_initial = {
@@ -1473,12 +1483,7 @@ def staff_list(request):
     clear_filters_url = f"{request.path}?clear_filters=1"
 
     user_fullname, user_role, user_role_template = get_user_info(request)
-
-    current_filters = {
-        "role": role_raw,
-        "account_stat": acc_raw,
-        "q": search_term,
-    }
+    current_filters = filters_state
 
     return render(request, "staff/staff_list.html", {
         "user_fullname": user_fullname,

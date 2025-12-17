@@ -293,15 +293,60 @@ def _bytes_to_data_url(b: bytes, mime: str = "image/jpeg") -> str:
     return f"data:{mime};base64,{base64.b64encode(b).decode('ascii')}"
 
 
+def _process_staff_role_names(rows: List[Dict[str, Any]]) -> None:
+    """Process staff rows to ensure role_names is properly formatted as a list"""
+    for row in rows:
+        if isinstance(row, dict):
+            # Ensure role_names exists and is a list
+            if 'role_names' not in row:
+                # Check if role_name exists (singular)
+                if 'role_name' in row:
+                    role_name = row.get('role_name')
+                    row['role_names'] = [role_name] if role_name else []
+                else:
+                    row['role_names'] = []
+            elif not isinstance(row['role_names'], list):
+                # Convert non-list role_names to list
+                role_names = row.get('role_names')
+                if isinstance(role_names, str):
+                    # Split comma-separated string
+                    row['role_names'] = [name.strip() for name in role_names.split(',') if name.strip()]
+                elif role_names:
+                    row['role_names'] = [str(role_names)]
+                else:
+                    row['role_names'] = []
+            # Ensure empty lists are handled
+            elif not row['role_names']:
+                row['role_names'] = []
+
 def _only_lupon_members(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Filter helper to keep only Barangay Lupon members."""
+    """Filter helper to keep only Barangay Lupon members, excluding the President."""
     if not rows:
         return []
     target = []
     for row in rows:
         role_id = str(row.get("role_id") or "")
         role_name = (row.get("role_name") or "").strip().upper()
-        if role_id == str(ROLE_LUPON) or role_name == "BARANGAY LUPON MEMBER":
+        role_names = row.get("role_names") or []
+        
+        # Exclude Lupon President
+        is_president = (
+            "PRESIDENT" in role_name or
+            any("PRESIDENT" in str(rn).upper() for rn in role_names if rn)
+        )
+        
+        if is_president:
+            continue
+        
+        # Check multiple conditions for Lupon members
+        is_lupon = (
+            role_id == str(ROLE_LUPON) or 
+            role_name == "BARANGAY LUPON MEMBER" or
+            "LUPON" in role_name or
+            any("LUPON" in str(rn).upper() for rn in role_names if rn)
+        )
+        
+        if is_lupon:
             target.append(row)
     return target
 
@@ -309,6 +354,8 @@ def _only_lupon_members(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 def _load_lupon_summary() -> List[Dict[str, Any]]:
     try:
         all_rows = Secretary.get_all_staff_info_summary() or []
+        # Process role names to ensure proper formatting
+        _process_staff_role_names(all_rows)
     except Exception as exc:
         logger.exception("Failed to load staff summaries: %s", exc)
         return []
@@ -1268,6 +1315,18 @@ def members_list(request: HttpRequest) -> HttpResponse:
     account_label = _account_status_label_for(acc_raw)
 
     base_rows = _load_lupon_summary()
+    
+    # If no Lupon members found, show all staff for debugging
+    if not base_rows:
+        logger.warning("No Lupon members found, showing all staff for debugging")
+        try:
+            all_staff = Secretary.get_all_staff_info_summary() or []
+            _process_staff_role_names(all_staff)
+            base_rows = all_staff
+        except Exception as exc:
+            logger.exception("Failed to load all staff: %s", exc)
+            base_rows = []
+    
     rows = _filter_member_rows(
         base_rows,
         day_id=day_id,

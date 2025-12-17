@@ -221,6 +221,28 @@
   color: white;
   transform: translateY(-1px);
 }
+/* Role display styles */
+.role-badge {
+  background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+  border: 1px solid #81c784;
+  color: #2e7d32;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin: 0.125rem;
+  display: inline-block;
+  white-space: nowrap;
+}
+.role-container {
+  max-width: 200px;
+  line-height: 1.3;
+}
+.role-not-assigned {
+  color: #6c757d;
+  font-style: italic;
+  font-size: 0.875rem;
+}
 /* Loading animation */
 @keyframes fadeInUp {
   from {
@@ -303,7 +325,17 @@
               {% for r in page_obj.object_list %}
                 <tr class="table-row-height">
                   <td>{{ r.full_name }}</td>
-                  <td>{{ r.role_name|default:"—" }}</td>
+                  <td>
+                    <div class="role-container">
+                      {% if r.role_names and r.role_names.0 %}
+                        {% for role_name in r.role_names %}
+                          <span class="role-badge">{{ role_name }}</span>
+                        {% endfor %}
+                      {% else %}
+                        <span class="role-not-assigned">No Role Assigned</span>
+                      {% endif %}
+                    </div>
+                  </td>
                   <td>
                     {% with s=r.account_status|default:"" %}
                       <span class="badge

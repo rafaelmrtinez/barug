@@ -58,7 +58,19 @@
               <div class="mb-2">
                 <span class="text-muted fw-medium">{{ profile.staff_code|default:"No Code" }}</span>
               </div>
-              <p class="text-muted mb-0 fw-medium">{{ profile.role|default:"No Role Assigned" }}</p>
+              <div class="text-muted mb-0 fw-medium">
+                {% if profile.role %}
+                  {% if profile.role|length > 1 %}
+                    {% for role in profile.role %}
+                      <span class="badge me-1 mb-1" style="background: var(--bs-danger-text-emphasis); color: white; font-size: 0.75rem; font-weight: 500; padding: 0.4rem 0.8rem; border-radius: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">{{ role }}</span>
+                    {% endfor %}
+                  {% else %}
+                    {{ profile.role.0|default:"No Role Assigned" }}
+                  {% endif %}
+                {% else %}
+                  No Role Assigned
+                {% endif %}
+              </div>
             </div>
           </div>
         </div>
@@ -258,7 +270,7 @@
                 </div>
               </div>
               
-              {% if profile.role == 'Barangay Health Worker' %}
+              {% if 'Barangay Health Worker' in profile.role %}
                 <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
                   <div class="d-flex align-items-start">
                     <div class="me-2 mt-1">
@@ -288,7 +300,7 @@
                 </div>
               {% endif %}
               
-              {% if profile.role == 'Barangay Lupon Member' %}
+              {% if 'Barangay Lupon Member' in profile.role %}
                 <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
                   <div class="d-flex align-items-start">
                     <div class="me-2 mt-1">
@@ -355,18 +367,20 @@
               {% endif %}
               
               <div class="p-2 rounded-3" style="background: #f8f9fa;">
-                <div class="d-flex justify-content-between align-items-center">
-                  <div class="text-muted fw-medium" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Proof of Employment</div>
-                  {% if profile.proof_of_employment_path %}
-                    <div class="text-dark fw-bold" style="font-size: 0.9rem;">
-                      <a href="{{ profile.proof_of_employment_path }}" target="_blank" rel="noopener" class="text-decoration-none">Open</a>
-                    </div>
-                  {% else %}
-                    <div class="text-dark fw-bold" style="font-size: 0.9rem;">
-                      <span class="text-muted">Not Provided</span>
-                    </div>
-                  {% endif %}
-                </div>
+                <div class="text-muted fw-medium mb-2" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Proof of Employment</div>
+                {% if profile.proof_of_employment_paths %}
+                  <div class="d-flex flex-wrap gap-2">
+                    {% for proof_path in profile.proof_of_employment_paths %}
+                      <a href="{{ proof_path }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary text-decoration-none" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">Document {{ forloop.counter }}</a>
+                    {% endfor %}
+                  </div>
+                {% elif profile.proof_of_employment_path %}
+                  <div class="d-flex flex-wrap gap-2">
+                    <a href="{{ profile.proof_of_employment_path }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary text-decoration-none" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">Document 1</a>
+                  </div>
+                {% else %}
+                  <div class="text-muted fw-semibold" style="font-size: 0.9rem;">Not Provided</div>
+                {% endif %}
               </div>
             </div>
           </div>
@@ -489,19 +503,47 @@
             </div>
           </div>
           
+          <!-- Role Selection with Chips -->
+          <div class="mb-4">
+            <label class="form-label small fw-semibold">Staff Roles</label>
+            
+            <!-- Current Roles Display -->
+            <div id="selected-roles" class="d-flex flex-wrap gap-2 p-3 mb-3" style="background: rgba(255,255,255,0.7); border: 2px dashed rgba(var(--bs-danger-text-emphasis-rgb), 0.3); border-radius: 12px; min-height: 60px;">
+              {% if profile.role and profile.role|length > 0 %}
+                {% for role in profile.role %}
+                  <div class="role-chip d-flex align-items-center gap-1 px-2 py-1" style="background: var(--bs-danger-text-emphasis); color: white; border-radius: 16px; font-size: 0.75rem; font-weight: 500; box-shadow: 0 2px 8px rgba(var(--bs-danger-text-emphasis-rgb), 0.3);">
+                    <span>{{ role }}</span>
+                    <button type="button" class="btn p-0 text-white remove-role" data-role="{{ role }}" style="background: none; border: none; font-size: 0.9em; line-height: 1;">
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                    <input type="hidden" name="role_ids[]" value="{% for value, label in update_form.role.field.choices %}{% if label == role %}{{ value }}{% endif %}{% endfor %}">
+                  </div>
+                {% endfor %}
+              {% else %}
+                <div class="empty-state d-flex align-items-center justify-content-center text-muted" style="font-size: 0.85rem; font-style: italic; height: 100%; min-height: 40px;">
+                  <i class="bi bi-plus-circle-dotted me-2" style="font-size: 1.2em;"></i>
+                  <span>No roles assigned</span>
+                </div>
+              {% endif %}
+            </div>
+            
+            <!-- Add New Role -->
+            <div class="form-floating">
+              <select class="form-select" id="role-selector">
+                <option value="">— Select a Role to Add —</option>
+                {% for value, label in update_form.role.field.choices %}
+                  {% if value %}
+                    <option value="{{ value }}" data-label="{{ label }}">{{ label }}</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+              <label for="role-selector">Add Role</label>
+            </div>
+            <div class="form-text">Select roles and they will appear as chips above. You can remove roles by clicking the X.</div>
+          </div>
+          
           <div class="row">
             <div class="col-md-6">
-              <div class="form-floating mb-3">
-                <select class="form-select" name="role_id" id="{{ update_form.role.id_for_label }}" onchange="toggleRoleFields()" required>
-                  <option value="">— Select a Role —</option>
-                  {% for value, label in update_form.role.field.choices %}
-                    {% if value %}
-                      <option value="{{ value }}" {% if profile.role == label %}selected{% endif %}>{{ label }}</option>
-                    {% endif %}
-                  {% endfor %}
-                </select>
-                <label for="{{ update_form.role.id_for_label }}">{{ update_form.role.label }}</label>
-              </div>
               <div class="form-floating mb-3">
                 {{ update_form.username }}
                 <label for="{{ update_form.username.id_for_label }}">{{ update_form.username.label }}*</label>
@@ -563,7 +605,7 @@
           </div>
 
           <!-- Purok (BHW only) -->
-          <div class="form-group mb-3 {% if profile.role != 'Barangay Health Worker' %}d-none{% endif %}" id="purok-field">
+          <div class="form-group mb-3 {% if 'Barangay Health Worker' not in profile.role %}d-none{% endif %}" id="purok-field">
             <label class="form-label small">Assigned Purok/Sitio</label>
             <div id="purok-list">
               {% if purok_list and purok_list|length > 0 %}
@@ -612,7 +654,7 @@
           </div>
 
           <!-- Schedule (Lupon Member only) -->
-          <div class="form-group mb-3 {% if profile.role != 'Barangay Lupon Member' %}d-none{% endif %}" id="schedule-field">
+          <div class="form-group mb-3 {% if 'Barangay Lupon Member' not in profile.role %}d-none{% endif %}" id="schedule-field">
             <label class="form-label small">Assigned Schedule</label>
             <div id="schedule-list">
               {% if schedule_list and schedule_list|length > 0 %}
@@ -690,7 +732,7 @@
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn-reset" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-reset" data-bs-dismiss="modal" id="cancelBtn">Cancel</button>
           <button type="submit" class="btn btn-submit">Save Changes</button>
         </div>
       </form>
@@ -741,22 +783,29 @@
 
 <script>
 function toggleRoleFields() {
-  const roleSelect = document.getElementById('{{ update_form.role.id_for_label }}');
+  const selectedRoles = Array.from(document.querySelectorAll('input[name="role_ids[]"]')).map(input => {
+    const value = input.value;
+    const option = document.querySelector(`#role-selector option[value="${value}"]`);
+    return option ? option.dataset.label : '';
+  });
+  
   const purokField = document.getElementById('purok-field');
   const scheduleField = document.getElementById('schedule-field');
-  const selectedRole = roleSelect.options[roleSelect.selectedIndex]?.text || '';
-
-  purokField.classList.toggle('d-none', selectedRole !== 'Barangay Health Worker');
-  scheduleField.classList.toggle('d-none', selectedRole !== 'Barangay Lupon Member');
   
-  // Clear purok fields if role changed from BHW to something else
-  if (selectedRole !== 'Barangay Health Worker') {
+  const hasBHW = selectedRoles.includes('Barangay Health Worker');
+  const hasLupon = selectedRoles.includes('Barangay Lupon Member');
+  
+  purokField.classList.toggle('d-none', !hasBHW);
+  scheduleField.classList.toggle('d-none', !hasLupon);
+  
+  // Clear purok fields if no BHW role
+  if (!hasBHW) {
     const purokSelects = document.querySelectorAll('select[name="purok_ids[]"]');
     purokSelects.forEach(select => select.value = '');
   }
   
-  // Clear schedule fields if role changed from Lupon to something else
-  if (selectedRole !== 'Barangay Lupon Member') {
+  // Clear schedule fields if no Lupon role
+  if (!hasLupon) {
     const daySelects = document.querySelectorAll('select[name="schedule_day[]"]');
     const timeStarts = document.querySelectorAll('input[name="schedule_time_start[]"]');
     const timeEnds = document.querySelectorAll('input[name="schedule_time_end[]"]');
@@ -767,22 +816,83 @@ function toggleRoleFields() {
   }
 }
 
+// Role management functions
+function addRole() {
+  const selector = document.getElementById('role-selector');
+  const selectedValue = selector.value;
+  const selectedLabel = selector.options[selector.selectedIndex]?.dataset.label;
+  
+  if (!selectedValue || !selectedLabel) return;
+  
+  // Check if role already exists
+  const existingRoles = Array.from(document.querySelectorAll('input[name="role_ids[]"]')).map(input => input.value);
+  if (existingRoles.includes(selectedValue)) {
+    showErrorModal('This role is already assigned.');
+    selector.value = ''; // Reset selector
+    return;
+  }
+  
+  // Add role chip
+  const container = document.getElementById('selected-roles');
+  const emptyState = container.querySelector('.empty-state');
+  if (emptyState) emptyState.remove();
+  
+  const chip = document.createElement('div');
+  chip.className = 'role-chip d-flex align-items-center gap-1 px-2 py-1';
+  chip.style.cssText = 'background: var(--bs-danger-text-emphasis); color: white; border-radius: 16px; font-size: 0.75rem; font-weight: 500; box-shadow: 0 2px 8px rgba(var(--bs-danger-text-emphasis-rgb), 0.3);';
+  const chipIndex = container.querySelectorAll('.role-chip').length;
+  chip.innerHTML = `
+    <span>${selectedLabel}</span>
+    <button type="button" class="btn p-0 text-white" onclick="removeRoleAt(${chipIndex})" style="background: none; border: none; font-size: 0.9em; line-height: 1;">
+      <i class="bi bi-x-lg"></i>
+    </button>
+    <input type="hidden" name="role_ids[]" value="${selectedValue}">
+  `;
+  
+  container.appendChild(chip);
+  selector.value = '';
+  toggleRoleFields();
+}
+
+// Global remove functions
+window.removeRoleAt = function(index) {
+  const container = document.getElementById('selected-roles');
+  const chips = container.querySelectorAll('.role-chip');
+  if (chips[index]) {
+    chips[index].remove();
+    
+    // Show empty state if no roles left
+    if (!container.querySelector('.role-chip')) {
+      const emptyState = document.createElement('div');
+      emptyState.className = 'empty-state d-flex align-items-center justify-content-center text-muted';
+      emptyState.style.cssText = 'font-size: 0.85rem; font-style: italic; height: 100%; min-height: 40px;';
+      emptyState.innerHTML = '<i class="bi bi-plus-circle-dotted me-2" style="font-size: 1.2em;"></i><span>No roles assigned</span>';
+      container.appendChild(emptyState);
+    }
+    
+    toggleRoleFields();
+  }
+};
+
 (function() {
   // Store original HTML content
   let originalPurokHTML = '';
   let originalScheduleHTML = '';
   let originalAccountStatus = '';
+  let originalRolesHTML = '';
   
   // Store original values when update modal opens
   const updateModal = document.getElementById('updateModal');
   if (updateModal) {
     updateModal.addEventListener('show.bs.modal', function() {
-      // Store original HTML of purok and schedule lists
+      // Store original HTML of purok, schedule lists, and roles
       const purokList = document.getElementById('purok-list');
       const scheduleList = document.getElementById('schedule-list');
+      const rolesContainer = document.getElementById('selected-roles');
       
       if (purokList) originalPurokHTML = purokList.innerHTML;
       if (scheduleList) originalScheduleHTML = scheduleList.innerHTML;
+      if (rolesContainer) originalRolesHTML = rolesContainer.innerHTML;
       
       // Store original account status
       const accountStatusSelect = document.getElementById('{{ update_form.account_status.id_for_label }}');
@@ -824,23 +934,33 @@ function toggleRoleFields() {
       }
     });
     
-    // Restore original values when modal is hidden (after cancel)
-    updateModal.addEventListener('hidden.bs.modal', function() {
-      const form = this.querySelector('form');
-      
-      // Reset form
-      form.reset();
-      
-      // Restore original HTML structure
+    // Handle cancel/close modal
+    function restoreOriginalState() {
       const purokList = document.getElementById('purok-list');
       const scheduleList = document.getElementById('schedule-list');
+      const rolesContainer = document.getElementById('selected-roles');
       
       if (purokList && originalPurokHTML) purokList.innerHTML = originalPurokHTML;
       if (scheduleList && originalScheduleHTML) scheduleList.innerHTML = originalScheduleHTML;
+      if (rolesContainer && originalRolesHTML) rolesContainer.innerHTML = originalRolesHTML;
       
-      // Trigger role field toggle
+      const accountStatusSelect = document.getElementById('{{ update_form.account_status.id_for_label }}');
+      if (accountStatusSelect && originalAccountStatus) {
+        accountStatusSelect.value = originalAccountStatus;
+      }
+      
       setTimeout(() => toggleRoleFields(), 10);
+    }
+    
+    // Event delegation for cancel buttons
+    document.addEventListener('click', function(e) {
+      if (e.target.matches('#cancelBtn, [data-bs-dismiss="modal"]') && updateModal.contains(e.target)) {
+        restoreOriginalState();
+      }
     });
+    
+    // Also restore on modal hidden (for ESC key or backdrop click)
+    updateModal.addEventListener('hidden.bs.modal', restoreOriginalState);
   }
   
   // Password toggle
@@ -1051,13 +1171,41 @@ function toggleRoleFields() {
     return !hasDuplicate;
   }
 
-  // Add change event listeners for validation
+  // Add change event listeners for validation and auto-add role
   document.addEventListener('change', function(e) {
     if (e.target.name && (e.target.name === 'purok_ids[]')) {
       validatePurokSelections();
     }
     if (e.target.name && e.target.name === 'schedule_day[]') {
       validateScheduleSelections();
+    }
+    // Auto-add role when selected from dropdown
+    if (e.target && e.target.id === 'role-selector') {
+      if (e.target.value) {
+        addRole();
+      }
+    }
+  });
+
+  // Handle clicks on existing role chips (event delegation)
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('.remove-role')) {
+      const chip = e.target.closest('.role-chip');
+      if (chip) {
+        chip.remove();
+        
+        // Show empty state if no roles left
+        const container = document.getElementById('selected-roles');
+        if (!container.querySelector('.role-chip')) {
+          const emptyState = document.createElement('div');
+          emptyState.className = 'empty-state d-flex align-items-center justify-content-center text-muted';
+          emptyState.style.cssText = 'font-size: 0.85rem; font-style: italic; height: 100%; min-height: 40px;';
+          emptyState.innerHTML = '<i class="bi bi-plus-circle-dotted me-2" style="font-size: 1.2em;"></i><span>No roles assigned</span>';
+          container.appendChild(emptyState);
+        }
+        
+        toggleRoleFields();
+      }
     }
   });
 
@@ -1120,6 +1268,15 @@ function toggleRoleFields() {
       console.log('Staff form submission validation triggered');
       
       const staffReason = document.getElementById('staff_reason').value.trim();
+      
+      // Check if at least one role is selected
+      const selectedRoles = document.querySelectorAll('input[name="role_ids[]"]');
+      if (selectedRoles.length === 0) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        showErrorModal('Please select at least one role.');
+        return false;
+      }
       
       // Check if reason is provided
       if (!staffReason) {

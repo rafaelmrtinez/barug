@@ -227,6 +227,28 @@
   color: white;
   transform: translateY(-1px);
 }
+/* Role display styles */
+.role-badge {
+  background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+  border: 1px solid #81c784;
+  color: #2e7d32;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin: 0.125rem;
+  display: inline-block;
+  white-space: nowrap;
+}
+.role-container {
+  max-width: 200px;
+  line-height: 1.3;
+}
+.role-not-assigned {
+  color: #6c757d;
+  font-style: italic;
+  font-size: 0.875rem;
+}
 #filterForm input[type="date"] {
   border: 2px solid #e2e8f0;
   border-radius: 10px;
@@ -290,9 +312,9 @@
                 <span class="badge rounded-pill text-bg-light ms-2">{{ active_filters|length }}</span>
               {% endif %}
           </button>
-          <a href="{% url 'captain:staff_requests_list' %}" class="btn btn-brand d-flex align-items-center me-2">
+          <!-- <a href="{% url 'captain:staff_requests_list' %}" class="btn btn-brand d-flex align-items-center me-2">
             {% bs_icon 'list-ul' extra_classes='me-2' %} Request History
-          </a>
+          </a> -->
         </form>
 
         {# ─── Active filter chips ─── #}
@@ -327,7 +349,17 @@
               {% for row in page_obj.object_list %}
                 <tr class="table-row-height">
                   <td>{{ row.name|default:""|title }}</td>
-                  <td>{{ row.role_name|default:""|title }}</td>
+                  <td>
+                    <div class="role-container">
+                      {% if row.role_names and row.role_names.0 %}
+                        {% for role_name in row.role_names %}
+                          <span class="role-badge">{{ role_name }}</span>
+                        {% endfor %}
+                      {% else %}
+                        <span class="role-not-assigned">No Role Assigned</span>
+                      {% endif %}
+                    </div>
+                  </td>
                   <td>{{ row.date_time_submitted_pretty }}</td>
                   <td>
                     <span class="badge {% if row.status_id == 46 or row.status_name|upper == 'WAITING FOR ID VALIDATION' %}bg-info{% elif row.status_id == 29 or row.status_name|upper == 'WAITING FOR BARANGAY CAPTAIN\'S APPROVAL' %}bg-primary{% elif row.status_id == 30 or row.status_name|upper == 'WAITING FOR ADMIN\'S APPROVAL' %}bg-info{% elif row.status_id == 3 or row.status_name|upper == 'APPROVED' %}bg-success{% elif row.status_id == 4 or row.status_name|upper == 'REJECTED' %}bg-danger{% else %}bg-warning{% endif %}">

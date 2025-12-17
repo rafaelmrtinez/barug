@@ -56,7 +56,19 @@
               <div class="mb-2">
                 <span class="text-muted fw-medium">{{ profile.staff_code|default:"No Code" }}</span>
               </div>
-              <p class="text-muted mb-0 fw-medium">{{ profile.role|default:"No Role Assigned" }}</p>
+              <div class="text-muted mb-0 fw-medium">
+                {% if profile.role %}
+                  {% if profile.role|length > 1 %}
+                    {% for role in profile.role %}
+                      <span class="badge me-1 mb-1" style="background: var(--bs-danger-text-emphasis); color: white; font-size: 0.75rem; font-weight: 500; padding: 0.4rem 0.8rem; border-radius: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">{{ role }}</span>
+                    {% endfor %}
+                  {% else %}
+                    {{ profile.role.0|default:"No Role Assigned" }}
+                  {% endif %}
+                {% else %}
+                  No Role Assigned
+                {% endif %}
+              </div>
             </div>
           </div>
         </div>
@@ -230,7 +242,7 @@
                 </div>
               </div>
               
-              {% if profile.role == 'Barangay Health Worker' %}
+              {% if 'Barangay Health Worker' in profile.role %}
                 <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
                   <div class="d-flex align-items-start">
                     <div class="me-2 mt-1">
@@ -256,7 +268,7 @@
                 </div>
               {% endif %}
               
-              {% if profile.role == 'Barangay Lupon Member' %}
+              {% if 'Barangay Lupon Member' in profile.role %}
                 <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
                   <div class="d-flex align-items-start">
                     <div class="me-2 mt-1">
@@ -319,18 +331,20 @@
               {% endif %}
               
               <div class="p-2 rounded-3" style="background: #f8f9fa;">
-                <div class="d-flex justify-content-between align-items-center">
-                  <div class="text-muted fw-medium" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Proof of Employment</div>
-                  {% if profile.proof_of_employment_path %}
-                    <div class="text-dark fw-bold" style="font-size: 0.9rem;">
-                      <a href="{{ profile.proof_of_employment_path }}" target="_blank" rel="noopener" class="text-decoration-none">Open</a>
-                    </div>
-                  {% else %}
-                    <div class="text-dark fw-bold" style="font-size: 0.9rem;">
-                      <span class="text-muted">Not Provided</span>
-                    </div>
-                  {% endif %}
-                </div>
+                <div class="text-muted fw-medium mb-2" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Proof of Employment</div>
+                {% if profile.proof_of_employment_paths %}
+                  <div class="d-flex flex-wrap gap-2">
+                    {% for proof_path in profile.proof_of_employment_paths %}
+                      <a href="{{ proof_path }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary text-decoration-none" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">Document {{ forloop.counter }}</a>
+                    {% endfor %}
+                  </div>
+                {% elif profile.proof_of_employment_path %}
+                  <div class="d-flex flex-wrap gap-2">
+                    <a href="{{ profile.proof_of_employment_path }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary text-decoration-none" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">Document 1</a>
+                  </div>
+                {% else %}
+                  <div class="text-muted fw-semibold" style="font-size: 0.9rem;">Not Provided</div>
+                {% endif %}
               </div>
             </div>
           </div>
