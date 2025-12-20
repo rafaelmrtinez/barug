@@ -154,6 +154,17 @@
       display:grid;
       grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
       gap:1rem;
+      text-decoration:none;
+      color:inherit;
+      transition:all .2s ease;
+      cursor:pointer;
+    }
+
+    .member-item:hover{
+      background:#f8f9fa;
+      border-color:#6d2932;
+      box-shadow:0 2px 8px rgba(109,41,50,.15);
+      transform:translateX(4px);
     }
 
     .member-item:last-child{
@@ -370,7 +381,7 @@
             
             {% if family.members %}
               {% for member in family.members %}
-                <div class="member-item">
+                <a href="{% url 'bhw:resident_detail' member.person_id %}" class="member-item">
                   <div class="info-item">
                     <div class="info-label">Name</div>
                     <div class="info-value" style="font-size:.9375rem;">{{ member.full_name }}</div>
@@ -390,7 +401,7 @@
                     <div class="info-label">Sex</div>
                     <div class="info-value" style="font-size:.9375rem;">{{ member.sex|default:"—" }}</div>
                   </div>
-                </div>
+                </a>
               {% endfor %}
             {% else %}
               <div style="text-align:center; padding:2rem; color:#6c757d; font-style:italic;">
