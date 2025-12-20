@@ -76,7 +76,7 @@ class MaternalScheduleService(IMaternalScheduleService):
                     date_str = date.isoformat() if hasattr(date, 'isoformat') else str(date)
                     time_str = time.strftime('%I:%M %p') if hasattr(time, 'strftime') else str(time)
                     body = f'Prenatal visit scheduled on {date_str} at {time_str} — {purpose}'
-                    deep_link = "/(bhw)/(tabs)/postpartum"
+                    deep_link = "/(resident)/(tabs)/maternal_tracker"
                     logger.info("Sending prenatal schedule notification to target=%s title=%s", target, title)
                     try:
                         sent = notifier.notify_user(target=target, title=title, body=body, deep_link=deep_link)
@@ -131,7 +131,7 @@ class MaternalScheduleService(IMaternalScheduleService):
                     date_str = date.isoformat() if hasattr(date, 'isoformat') else str(date)
                     time_str = time.strftime('%I:%M %p') if hasattr(time, 'strftime') else str(time)
                     body = f'Postpartum visit scheduled on {date_str} at {time_str} — {visit}'
-                    deep_link = "/(bhw)/(tabs)/postpartum"
+                    deep_link = "/(resident)/(tabs)/maternal_tracker"
                     logger.info("Sending postpartum schedule notification to target=%s title=%s", target, title)
                     try:
                         sent = notifier.notify_user(target=target, title=title, body=body, deep_link=deep_link)

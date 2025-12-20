@@ -906,7 +906,7 @@ def resident_detail(
     user_role = request.session.get("authenticated_role_name", "")
     
     resident = resident_service.get_resident_detail(person_id)
-    
+    print(f"[resident_detail] resident: {resident}")
     if not resident:
         messages.error(request, "Resident not found.")
         return redirect("bhw:resident_list")
