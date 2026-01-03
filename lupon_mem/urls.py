@@ -9,6 +9,8 @@ from . import views_hearing_api
 from . import views_hearings
 from . import views_resident_records
 from .views_case_state import update_case_state
+from . import views_profiling
+from . import views_residents
 
 from lupon_mem.views_sql import (
     SubmissionViewSQL,
@@ -144,6 +146,15 @@ urlpatterns = [
     path("residents/", views_resident_records.resident_records_list, name="resident_records_list"),
     path("residents/<int:person_id>/", views_resident_records.resident_records_detail, name="resident_records_detail"),
     path("api/residents/search/", views_resident_records.resident_records_api, name="resident_records_api"),
+    
+    # resident list (all residents)
+    path("resident-list/", views_residents.resident_list, name="resident_list"),
+    path("resident-list/<int:person_id>/delete/", views_residents.resident_delete, name="resident_delete"),
+    
+    # resident profiling
+    path("profiling/personal-info/", views_profiling.profile_personal_info, name="profile_personal_info"),
+    path("profiling/socioeconomic/", views_profiling.profile_socioeconomic, name="profile_socioeconomic"),
+    path("profiling/review/", views_profiling.profile_review, name="profile_review"),
 
     # misc
     path("dashboard/", views.dashboard, name="dashboard"),
