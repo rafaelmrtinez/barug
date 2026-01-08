@@ -6,7 +6,9 @@ from django.views import View
 from src.app.services.household_update_service import HouseholdUpdateService
 from src.infra.database.connection_adapter import ConnectionAdapter
 from src.infra.repositories.commands.household_commands import HouseholdCommand
+from src.infra.repositories.commands.person_commands import PersonCommand
 from src.infra.exceptions.household_update_exception import HouseholdUpdateException
+from src.infra.exceptions.person_exceptions import PersonException
 
 import logging
 
@@ -181,7 +183,65 @@ class UpdateHouseholdHeadAPI(View):
         except Exception as exc:
             self._logger.error(f"Unhandled error in update_household_head: {exc}")
             return JsonResponse({"success": False, "error": "An unexpected error occurred."}, status=500)
+class ConfirmResidencyAPI(View):
+    """
+    API endpoint to confirm residency for a person.
+    Accepts POSTed JSON with required fields for residency confirmation.
+    """
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        ctx = ConnectionAdapter()
+        self._logger = logging.getLogger("ConfirmResidencyAPI")
+        self._cmd = PersonCommand(ctx)
+
+    def post(self, request: HttpRequest, *args, **kwargs) -> JsonResponse:
+        import json
+        from django.http import JsonResponse
+        try:
+            self._logger.info("POST /api/confirm-residency called")
+            # Parse JSON body
+            try:
+                payload = json.loads(request.body.decode('utf-8'))
+                self._logger.debug(f"Payload received: {payload}")
+            except Exception as e:
+                self._logger.error(f"Invalid JSON: {e}")
+                return JsonResponse({"success": False, "error": "Invalid JSON"}, status=400)
+
+            # Extract required fields
+            person_id = payload.get('person_id')
+            household_relationship_id = payload.get('household_relationship_id')
+            family_relationship_id = payload.get('family_relationship_id')
+            reason = payload.get('reason')
+            staff_id = request.session.get("auth").get("staff_id")
+
+            # Validate required fields
+            if not person_id:
+                return JsonResponse({"success": False, "error": "Missing required field: person_id"}, status=400)
+            if not household_relationship_id:
+                return JsonResponse({"success": False, "error": "Missing required field: household_relationship_id"}, status=400)
+            if not family_relationship_id:
+                return JsonResponse({"success": False, "error": "Missing required field: family_relationship_id"}, status=400)
+            if not reason or not reason.strip():
+                return JsonResponse({"success": False, "error": "Missing required field: reason"}, status=400)
+
+            # Call command
+            result = self._cmd.confirm_residency(
+                p_person_id=person_id,
+                p_performed_by=staff_id,
+                p_rel_to_hholdhead_id=household_relationship_id,
+                p_rel_to_family_head_id=family_relationship_id,
+                p_reason=reason
+            )
+            
+            self._logger.info(f"Residency confirmed successfully for person_id={person_id}")
+            return JsonResponse({"success": True, "result": result})
+        except PersonException as pe:
+            self._logger.warning(f"PersonException: {pe}")
+            return JsonResponse({"success": False, "error": pe.message}, status=400)
+        except Exception as exc:
+            self._logger.error(f"Unhandled error in confirm_residency: {exc}")
+            return JsonResponse({"success": False, "error": "An unexpected error occurred."}, status=500)
 class UpdateHouseholdInformationAPI(View):
     
     """
