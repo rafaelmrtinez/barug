@@ -145,7 +145,7 @@
             {% if user_role|lower != 'barangay treasurer' %}
               <th width="80">Has Case</th>
             {% endif %}
-            <th width="80">Action</th>
+            <th width="120">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -201,8 +201,11 @@
                     </a>
                   {% endif %}
                 {% else %}
-                  <a href="{% url 'lupon_mem:report_review' r.0 %}" class="btn btn-sm btn-outline-brand">
+                  <a href="{% url 'lupon_mem:report_review' r.0 %}" class="btn btn-sm btn-outline-brand" title="View Report">
                     {% bs_icon 'eye' %}
+                  </a>
+                  <a href="{% url 'lupon_mem:generate_blotter_pdf' r.0 %}" class="btn btn-sm btn-outline-danger" title="Download Blotter PDF" target="_blank">
+                    {% bs_icon 'file-pdf' %}
                   </a>
                 {% endif %}
               </td>

@@ -427,4 +427,5 @@ def compute_ui_flags(form_code: str) -> Dict[str,bool]:
         "kp24_ui_minimal": (u == "KP-24"),
         "kp25_ui_minimal": (u == "KP-25"),
         "kp26_ui_minimal": (u == "KP-26"),
+        "minutes_ui_minimal": (u == "MINUTES" or u == "MINUTES OF HEARING"),
     }

@@ -11,6 +11,7 @@ from . import views_resident_records
 from .views_case_state import update_case_state
 from . import views_profiling
 from . import views_residents
+from . import views_blotter_pdf
 
 from lupon_mem.views_sql import (
     SubmissionViewSQL,
@@ -106,6 +107,7 @@ urlpatterns = [
     path("reports/<int:report_id>/update-respondents/", views_reports.report_update_respondents, name="report_update_respondents"), # added to views_reports 
     path("reports/<int:report_id>/pay-open/", views_reports.report_pay_and_open_case, name="report_pay_and_open_case"), # added to views_reports
     path("reports/<int:report_id>/payment-details/", views_reports.report_payment_details, name="report_payment_details"), # added to views_reports
+    path("reports/<int:report_id>/blotter-pdf/", views_blotter_pdf.generate_blotter_pdf, name="generate_blotter_pdf"),
     path("store-session-values/", views_reports.store_session_values, name="store_session_values"),
     
     # blotter reports

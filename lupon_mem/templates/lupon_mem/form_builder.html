@@ -271,6 +271,13 @@
       </div>
       {% endif %}
 
+      {% if minutes_ui_minimal %}
+      <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-file-text" style="font-size:1.1rem;"></i><strong>MINUTES OF HEARING</strong></div>
+        <div class="mt-1" style="opacity:.95">Document the hearing proceedings. Only fill in the <strong>What</strong> field to describe what happened during the hearing. All other case information is automatically populated and cannot be modified.</div>
+      </div>
+      {% endif %}
+
       {# NEW: KP-9-P2 helper banner (Officer’s Return) #}
       {% if header.0 == 'KP-9-P2' %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
@@ -431,7 +438,8 @@
                   {% if kp21_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
                   {% if kp22_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
                   {% if kp23_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
-                  {% if kp24_ui_minimal and code != 'case_num' and code != 'purpose' and code != 'motion_date' and code != 'motion_time' %} kp-offscreen{% endif %}">
+                  {% if kp24_ui_minimal and code != 'case_num' and code != 'purpose' and code != 'motion_date' and code != 'motion_time' %} kp-offscreen{% endif %}
+                  {% if minutes_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_num' and code != 'purpose' and code != 'date_filed' and code != 'time_filed' and code != 'what' %} kp-offscreen{% endif %}">
               {% else %}
                 <div class="col-12 col-md-6
                   {% if header.0 == 'KP-9-P2' and 'respondent_names' in code %} kp-offscreen{% endif %}
@@ -463,7 +471,8 @@
                   {% if kp21_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
                   {% if kp22_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
                   {% if kp23_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
-                  {% if kp24_ui_minimal and code != 'case_num' and code != 'purpose' and code != 'motion_date' and code != 'motion_time' %} kp-offscreen{% endif %}">
+                  {% if kp24_ui_minimal and code != 'case_num' and code != 'purpose' and code != 'motion_date' and code != 'motion_time' %} kp-offscreen{% endif %}
+                  {% if minutes_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_num' and code != 'purpose' and code != 'date_filed' and code != 'time_filed' and code != 'what' %} kp-offscreen{% endif %}">
               {% endif %}
                 <div class="kp-field" data-code="{{ code }}">
                   <label class="form-label
@@ -486,6 +495,8 @@
                         {% if code == 'appearance_date' or code == 'appearance_time' %} label-req {% endif %}
                       {% elif kp24_ui_minimal %}
                         {% if code == 'motion_date' or code == 'motion_time' %} label-req {% endif %}
+                      {% elif minutes_ui_minimal %}
+                        {% if code == 'what' %} label-req {% endif %}
                       {% else %}
                         label-req
                       {% endif %}
@@ -505,6 +516,7 @@
                            {% if kp22_ui_minimal %}readonly{% endif %}
                            {% if kp23_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'case_num' or code == 'purpose' %}readonly{% endif %}
                            {% if kp24_ui_minimal and code == 'case_num' or code == 'purpose' %}readonly{% endif %}
+                           {% if minutes_ui_minimal and code != 'what' %}readonly{% endif %}
                            {% if is_required %}required{% endif %}>
                   {% elif type_name == "EMAIL" %}
                     <input id="f_{{ field_id }}" type="email" class="form-control"
@@ -556,6 +568,7 @@
                               {% if kp22_ui_minimal %}readonly{% endif %}
                               {% if kp23_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'case_num' or code == 'purpose' %}readonly{% endif %}
                               {% if kp24_ui_minimal and code == 'case_num' or code == 'purpose' %}readonly{% endif %}
+                              {% if minutes_ui_minimal and code != 'what' %}readonly{% endif %}
                               {% if is_required %}required{% endif %}>{{ value|default:'' }}</textarea>
                   {% else %}
                     <input id="f_{{ field_id }}" type="text" class="form-control"
@@ -687,7 +700,8 @@
     "kp22_ui_minimal": {{ kp22_ui_minimal|yesno:"true,false" }},
     "kp23_ui_minimal": {{ kp23_ui_minimal|yesno:"true,false" }},
     "kp24_ui_minimal": {{ kp24_ui_minimal|yesno:"true,false" }},
-    "kp20a_ui_minimal": {{ kp20a_ui_minimal|yesno:"true,false" }}
+    "kp20a_ui_minimal": {{ kp20a_ui_minimal|yesno:"true,false" }},
+    "minutes_ui_minimal": {{ minutes_ui_minimal|yesno:"true,false" }}
   },
   "urls": {
     "save_answers": "{% url 'lupon_mem:save_answers' %}",
