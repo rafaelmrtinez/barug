@@ -19,6 +19,7 @@ from lupon_mem.views_sql import (
     SubmissionUpdateSQL,
 )
 from lupon_mem.views_mobile import residents_search
+from lupon_mem.views_delete_submission import delete_submission
 
 app_name = "lupon_mem"
 
@@ -27,6 +28,7 @@ urlpatterns = [
     path("submissions/<int:pk>/",      SubmissionViewSQL.as_view(),   name="kp_submission_view"),
     path("submissions/<int:pk>/edit/", SubmissionEditSQL.as_view(),   name="kp_submission_edit"),
     path("submissions/<int:pk>/save/", SubmissionUpdateSQL.as_view(), name="kp_submission_update"),
+    path("submissions/<int:submission_id>/delete/", delete_submission, name="kp_submission_delete"),
 
     # cases
     path("cases/", views_cases.case_list, name="case_list"),
