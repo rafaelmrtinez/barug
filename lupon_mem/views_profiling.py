@@ -20,7 +20,7 @@ def _auth_role_name(request: HttpRequest) -> str:
 def profile_personal_info(request: HttpRequest) -> HttpResponse:
     user_role = _auth_role_name(request)
     if request.method == 'POST':
-        form = ResidentPersonalInfoForm(request.POST)
+        form = ResidentPersonalInfoForm(request.POST, request.FILES)
         if form.is_valid():
             data = form.cleaned_data.copy()
             if 'dob' in data and data['dob']:
@@ -28,6 +28,14 @@ def profile_personal_info(request: HttpRequest) -> HttpResponse:
             if data.get('mobile_num') and data['mobile_num'].strip() in ('', '+63'):
                 data['mobile_num'] = None
             data['is_resident'] = request.POST.get('is_resident', '1') == '1'
+            
+            # Handle image upload
+            if 'person_img' in request.FILES:
+                import base64
+                img_file = request.FILES['person_img']
+                img_data = base64.b64encode(img_file.read()).decode('utf-8')
+                data['person_img'] = f"data:{img_file.content_type};base64,{img_data}"
+            
             request.session['profile_data'] = data
             return redirect('lupon_mem:profile_review')
     else:
@@ -78,6 +86,7 @@ def profile_review(request: HttpRequest) -> HttpResponse:
                 'p_education_id': None,
                 'p_employment_status_id': None,
                 'p_residential_status_id': 2 if profile_data.get('is_resident', True) else 6,
+                'p_person_img': profile_data.get('person_img') or None,
             }
             logger.info(f'[LUPON_MEM PROFILING] Submitting resident profile: {profile_data.get("first_name")} {profile_data.get("last_name")}')
             result = supabase.rpc('profile_resident_lupon', payload).execute()

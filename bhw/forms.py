@@ -396,6 +396,7 @@ class ResidentPersonalInfoForm(forms.Form):
         super().__init__(*args, **kwargs)
         if not self.data.get('mobile_num') and not self.initial.get('mobile_num'):
             self.initial['mobile_num'] = '+63'
+    person_img = forms.ImageField(required=False, widget=forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}))
     first_name = forms.CharField(max_length=100, widget=forms.TextInput(attrs={'class': 'form-control'}))
     middle_name = forms.CharField(max_length=100, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
     last_name = forms.CharField(max_length=100, widget=forms.TextInput(attrs={'class': 'form-control'}))

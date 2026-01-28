@@ -49,6 +49,7 @@
         <table class="table align-middle">
           <thead>
             <tr>
+              <th style="width:60px;">Photo</th>
               <th>Resident Code</th>
               <th>Full Name</th>
               <th>Address</th>
@@ -60,6 +61,13 @@
           <tbody>
             {% for r in page_obj.object_list %}
               <tr>
+                <td>
+                  {% if r.person_img %}
+                    <img src="{{ r.person_img }}" alt="{{ r.first_name }}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid #7C2D3E;">
+                  {% else %}
+                    <div style="width:40px;height:40px;border-radius:50%;background:#f3eaeb;display:flex;align-items:center;justify-content:center;border:2px solid #7C2D3E;color:#7C2D3E;font-weight:700;font-size:14px;">{{ r.first_name.0 }}{{ r.last_name.0 }}</div>
+                  {% endif %}
+                </td>
                 <td><span class="id-pill">{{ r.person_code|default:"—" }}</span></td>
                 <td>{{ r.first_name }} {{ r.middle_name|default:"" }} {{ r.last_name }} {{ r.suffix|default:"" }}</td>
                 <td>{{ r.address|default:"—" }}</td>
@@ -73,7 +81,7 @@
                 </td>
               </tr>
             {% empty %}
-              <tr><td colspan="6" class="text-center py-3 text-muted">No residents found.</td></tr>
+              <tr><td colspan="7" class="text-center py-3 text-muted">No residents found.</td></tr>
             {% endfor %}
           </tbody>
         </table>

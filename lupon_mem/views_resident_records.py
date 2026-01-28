@@ -6,6 +6,8 @@ from django.core.paginator import Paginator
 from django.contrib import messages
 from authentication.guards import session_login_required, role_required
 from authentication.utils import nocache
+import time
+import uuid
 
 LUPON_ROLES = {"BARANGAY LUPON MEMBER", "BARANGAY LUPON PRESIDENT"}
 
@@ -155,7 +157,8 @@ def resident_records_detail(request: HttpRequest, person_id: int):
         cur.execute("""
             SELECT person_id, first_name, last_name, middle_name, suffix,
                    TRIM(COALESCE(first_name, '') || ' ' || COALESCE(middle_name, '') || ' ' || 
-                        COALESCE(last_name, '') || ' ' || COALESCE(suffix, '')) AS full_name
+                        COALESCE(last_name, '') || ' ' || COALESCE(suffix, '')) AS full_name,
+                   mobile_num, email, person_img
             FROM person 
             WHERE person_id = %s
         """, [person_id])
@@ -180,6 +183,9 @@ def resident_records_detail(request: HttpRequest, person_id: int):
             'middle_name': person_row[3] or '',
             'suffix': person_row[4] or '',
             'full_name': person_row[5],
+            'mobile_num': person_row[6] or '',
+            'email': person_row[7] or '',
+            'person_img': person_row[8] or '',
         }
         
         # Get blotter report history using the database function
@@ -268,3 +274,38 @@ def resident_records_api(request: HttpRequest):
             })
     
     return JsonResponse({'results': results})
+
+
+@session_login_required
+@role_required(*LUPON_ROLES, "barangay treasurer")
+def update_resident_photo(request: HttpRequest, person_id: int):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid method'})
+    
+    photo = request.FILES.get('photo')
+    if not photo:
+        return JsonResponse({'success': False, 'error': 'No photo provided'})
+    
+    try:
+        from common.supabase_client import supabase
+        from .db import update_person_photo
+        
+        with connection.cursor() as cur:
+            cur.execute("SELECT supabase_uid FROM person WHERE person_id = %s", [person_id])
+            row = cur.fetchone()
+            if not row:
+                return JsonResponse({'success': False, 'error': 'Person not found'})
+            
+            supabase_uid = row[0] or str(uuid.uuid4())
+            
+            file_ext = photo.name.split('.')[-1]
+            file_name = f"person/{supabase_uid}/{int(time.time() * 1000)}.{file_ext}"
+            
+            supabase.storage.from_('staff-profile-picture').upload(file_name, photo.read(), {'content-type': photo.content_type})
+            photo_url = supabase.storage.from_('staff-profile-picture').get_public_url(file_name)
+            
+            update_person_photo(person_id, photo_url, supabase_uid)
+        
+        return JsonResponse({'success': True, 'photo_url': photo_url})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})

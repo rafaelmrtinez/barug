@@ -149,6 +149,7 @@ urlpatterns = [
     # resident records
     path("residents/", views_resident_records.resident_records_list, name="resident_records_list"),
     path("residents/<int:person_id>/", views_resident_records.resident_records_detail, name="resident_records_detail"),
+    path("residents/<int:person_id>/update-photo/", views_resident_records.update_resident_photo, name="update_resident_photo"),
     path("api/residents/search/", views_resident_records.resident_records_api, name="resident_records_api"),
     
     # resident list (all residents)

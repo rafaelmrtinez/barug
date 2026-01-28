@@ -19,21 +19,31 @@ def resident_list(request: HttpRequest) -> HttpResponse:
     purok = request.GET.get("purok", "").strip()
     
     try:
-        resp = supabase.rpc("get_all_residents_full_details", {}).execute()
-        rows = resp.data or []
+        from django.db import connection
+        with connection.cursor() as cur:
+            cur.execute("""
+                SELECT p.person_id, p.person_code, p.first_name, p.middle_name, p.last_name, 
+                       p.suffix, p.birthdate, p.age, p.mobile_num, p.email, p.person_img
+                FROM person p
+                WHERE p.person_status_id = 1
+                ORDER BY p.last_name, p.first_name
+            """)
+            rows = [{
+                'person_id': r[0], 'person_code': r[1], 'first_name': r[2], 'middle_name': r[3],
+                'last_name': r[4], 'suffix': r[5], 'birthdate': r[6], 'age': r[7],
+                'mobile_num': r[8], 'email': r[9], 'person_img': r[10], 'address': ''
+            } for r in cur.fetchall()]
+        
+        print(f"Found {len(rows)} residents with person_status_id=1")
         
         if q:
             rows = [r for r in rows if q.lower() in (r.get('first_name') or '').lower() or 
                     q.lower() in (r.get('last_name') or '').lower() or 
                     q.lower() in (r.get('person_code') or '').lower()]
-        
-        if purok:
-            rows = [r for r in rows if purok.lower() in (r.get('purok_sitio_name') or '').lower()]
-        
-        for r in rows:
-            addr_parts = [r.get('street_name'), r.get('purok_sitio_name'), r.get('barangay_name'), r.get('city_name')]
-            r['address'] = ', '.join([p for p in addr_parts if p])
-    except Exception:
+    except Exception as e:
+        print(f"Error fetching residents: {e}")
+        import traceback
+        traceback.print_exc()
         rows = []
     
     page_obj = Paginator(rows, 10).get_page(request.GET.get("page"))
