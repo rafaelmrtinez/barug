@@ -25,6 +25,8 @@ def profile_personal_info(request: HttpRequest) -> HttpResponse:
             data = form.cleaned_data.copy()
             if 'dob' in data and data['dob']:
                 data['dob'] = str(data['dob'])
+            else:
+                data['dob'] = None
             if data.get('mobile_num') and data['mobile_num'].strip() in ('', '+63'):
                 data['mobile_num'] = None
             data['is_resident'] = request.POST.get('is_resident', '1') == '1'
@@ -76,7 +78,7 @@ def profile_review(request: HttpRequest) -> HttpResponse:
                 'p_middle_name': profile_data.get('middle_name') or None,
                 'p_last_name': profile_data.get('last_name'),
                 'p_suffix': profile_data.get('suffix') or None,
-                'p_birthdate': str(profile_data.get('dob')),
+                'p_birthdate': profile_data.get('dob') or '1900-01-01',
                 'p_sex_id': int(profile_data.get('sex', 1)),
                 'p_civil_status_id': int(profile_data.get('civil_status', 1)),
                 'p_nationality_id': int(profile_data.get('nationality', 1)),

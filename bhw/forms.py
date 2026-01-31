@@ -402,7 +402,7 @@ class ResidentPersonalInfoForm(forms.Form):
     last_name = forms.CharField(max_length=100, widget=forms.TextInput(attrs={'class': 'form-control'}))
     suffix = forms.ChoiceField(choices=[('', 'None'), ('JR', 'Jr.'), ('SR', 'Sr.'), ('III', 'III'), ('IV', 'IV'), ('V', 'V')], required=False, widget=forms.Select(attrs={'class': 'form-select'}))
     sex = forms.ChoiceField(choices=[(1, 'Male'), (2, 'Female')], widget=forms.RadioSelect())
-    dob = forms.DateField(widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}))
+    dob = forms.DateField(required=False, widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}))
     civil_status = forms.ChoiceField(choices=[(1, 'Single'), (2, 'Married'), (3, 'Widowed'), (4, 'Separated'), (5, 'Divorced')], widget=forms.Select(attrs={'class': 'form-select'}))
     nationality = forms.ChoiceField(choices=[(7, 'Filipino'), (1, 'American'), (2, 'Australian'), (3, 'Brazilian'), (4, 'British'), (5, 'Canadian'), (6, 'Chinese'), (8, 'French'), (9, 'German'), (10, 'Indian'), (11, 'Indonesian'), (12, 'Italian'), (13, 'Japanese'), (14, 'Korean'), (15, 'Malaysian'), (16, 'Russian'), (17, 'Saudi'), (18, 'Spanish'), (19, 'Thai'), (20, 'Vietnamese')], widget=forms.Select(attrs={'class': 'form-select'}))
     religion = forms.ChoiceField(choices=[(12, 'Roman Catholic'), (8, 'Islam'), (2, 'Born Again'), (7, 'Iglesia Ni Cristo'), (1, 'Agnostic'), (3, 'Buddhist'), (4, 'Christian'), (5, 'Evangelical'), (6, 'Hindu'), (9, "Jehovah's Witness"), (10, 'Orthodox'), (11, 'Protestant'), (13, 'Seventh-Day Adventist'), (14, 'Others')], widget=forms.Select(attrs={'class': 'form-select'}))
