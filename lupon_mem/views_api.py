@@ -704,7 +704,7 @@ def resident_lookup(request: HttpRequest):
 def resident_quick_search(request: HttpRequest):
     """
     GET /lupon_mem/resident/quick-search/?q=term
-    Returns top residents for the autocomplete (id, name, purok, address).
+    Returns top residents and non-residents for the autocomplete (id, name, purok, address, status).
     """
     q = (request.GET.get("q") or "").strip()
     if len(q) < 2:
@@ -716,26 +716,36 @@ def resident_quick_search(request: HttpRequest):
             """
             SELECT
               p.person_id AS id,
-              trim(coalesce(p.first_name,'') || ' ' ||
-                   coalesce(p.middle_name,'') || ' ' ||
-                   coalesce(p.last_name,'')  || ' ' ||
-                   coalesce(p.suffix,''))    AS name,
+              TRIM(CONCAT_WS(' ', 
+                  p.first_name, 
+                  NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), 
+                  p.last_name, 
+                  NULLIF(p.suffix, '')
+              )) AS name,
               coalesce(ps.purok_sitio_name,'') AS purok,
               trim(concat_ws(', ',
                     NULLIF(a.street,''),
                     NULLIF(ps.purok_sitio_name,''),
                     NULLIF(a.barangay,''),
                     NULLIF(a.city,'')
-              )) AS address
+              )) AS address,
+              CASE 
+                  WHEN rs.residential_status_name = 'RESIDENT' THEN 'Resident'
+                  ELSE 'Non-Resident'
+              END AS status
             FROM person p
             LEFT JOIN addresss a   ON a.address_id = p.address_id
             LEFT JOIN purok_sitio ps ON ps.purok_sitio_id = a.purok_sitio_id
-            WHERE
-                 p.first_name ILIKE %s
-              OR p.last_name  ILIKE %s
-              OR (p.first_name || ' ' || coalesce(p.middle_name,'') || ' ' || p.last_name) ILIKE %s
-              OR a.street ILIKE %s
-            ORDER BY name
+            LEFT JOIN residential_status rs ON rs.residential_status_id = p.residential_status_id
+            WHERE (
+                   p.first_name ILIKE %s
+                OR p.last_name  ILIKE %s
+                OR (p.first_name || ' ' || coalesce(p.middle_name,'') || ' ' || p.last_name) ILIKE %s
+                OR a.street ILIKE %s
+              )
+            ORDER BY 
+                CASE WHEN rs.residential_status_name = 'RESIDENT' THEN 0 ELSE 1 END,
+                name
             LIMIT 20
             """,
             [like, like, like, like],
@@ -743,7 +753,13 @@ def resident_quick_search(request: HttpRequest):
         rows = cur.fetchall()
 
     results = [
-        {"id": r[0], "name": (r[1] or "").strip(), "purok": (r[2] or "").strip(), "address": (r[3] or "").strip()}
+        {
+            "id": r[0], 
+            "name": (r[1] or "").strip(), 
+            "purok": (r[2] or "").strip(), 
+            "address": (r[3] or "").strip(),
+            "status": (r[4] or "").strip()
+        }
         for r in rows
     ]
     return JsonResponse({"ok": True, "results": results})
@@ -795,14 +811,46 @@ def person_suggest(request: HttpRequest):
     if len(q) < 2:
         return JsonResponse({"results": []})
 
+    like = f"%{q}%"
     with connection.cursor() as cur:
+        # Include both residents and non-residents in search
         cur.execute(
-            "SELECT person_id, person_name FROM search_person_by_code_or_name_not_deceased(%s) LIMIT 20",
-            [q]
+            """
+            SELECT 
+                p.person_id,
+                TRIM(CONCAT_WS(' ', 
+                    p.first_name, 
+                    NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), 
+                    p.last_name, 
+                    NULLIF(p.suffix, '')
+                )) AS person_name,
+                CASE 
+                    WHEN rs.residential_status_name = 'RESIDENT' THEN 'Resident'
+                    ELSE 'Non-Resident'
+                END AS status
+            FROM person p
+            LEFT JOIN residential_status rs ON rs.residential_status_id = p.residential_status_id
+            WHERE (
+                   p.first_name ILIKE %s
+                OR p.last_name ILIKE %s
+                OR CONCAT(p.first_name, ' ', p.last_name) ILIKE %s
+                OR CONCAT(p.last_name, ', ', p.first_name) ILIKE %s
+              )
+            ORDER BY 
+                CASE WHEN rs.residential_status_name = 'RESIDENT' THEN 0 ELSE 1 END,
+                p.last_name, p.first_name
+            LIMIT 20
+            """,
+            [like, like, like, like]
         )
         rows = cur.fetchall()
 
-    return JsonResponse({"results": [{"id": r[0], "name": (r[1] or "").strip()} for r in rows]})
+    return JsonResponse({"results": [
+        {
+            "id": r[0], 
+            "name": f"{(r[1] or '').strip()} ({r[2]})"
+        } for r in rows
+    ]})
 
 
 

@@ -331,6 +331,17 @@ LOGGING = {
     },
 
     "loggers": {
+        # Suppress httpx/httpcore debug logs
+        "httpx": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "httpcore": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
         # our views module (adjust if your file path differs)
         "authentication.views": {
             "handlers": ["console", "console_prod"],
