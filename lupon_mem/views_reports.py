@@ -964,6 +964,94 @@ def report_update_respondents(request: HttpRequest, report_id: int):
     return redirect("lupon_mem:report_review", report_id=report_id)
 
 
+@session_login_required
+@role_required(*LUPON_ROLES, "barangay treasurer")
+@require_POST
+def report_mark_paid(request: HttpRequest, report_id: int):
+    staff_id = (request.session.get("auth") or {}).get("staff_id")
+    if not staff_id:
+        return HttpResponseBadRequest("Missing staff id.")
+
+    paid_by_person_id = _toi(request.POST.get("paid_by_person_id"))
+    if not paid_by_person_id:
+        messages.error(request, "Please select who paid.")
+        return redirect("lupon_mem:report_review", report_id=report_id)
+
+    try:
+        with connection.cursor() as cur:
+            # Get report details for case creation
+            cur.execute(
+                "SELECT temp_complaint_title_id, temp_case_nature_id FROM blotter_report WHERE blotter_report_id = %s",
+                [report_id]
+            )
+            temp_row = cur.fetchone()
+            complaint_title_id = temp_row[0] if temp_row else None
+            case_nature_id = temp_row[1] if temp_row else None
+            
+            # Get case name from parties
+            cur.execute(
+                "SELECT p.last_name FROM complainant_report cr JOIN person p ON p.person_id = cr.person_id WHERE cr.blotter_report_id = %s LIMIT 1",
+                [report_id]
+            )
+            c_row = cur.fetchone()
+            c_last = c_row[0] if c_row else "Complainant"
+            
+            cur.execute(
+                "SELECT p.last_name FROM respondent_report rr JOIN person p ON p.person_id = rr.person_id WHERE rr.blotter_report_id = %s LIMIT 1",
+                [report_id]
+            )
+            r_row = cur.fetchone()
+            r_last = r_row[0] if r_row else "Respondent"
+            
+            case_name = f"{c_last} vs {r_last}"
+            
+            # Get settlement status ID for ONGOING
+            cur.execute("SELECT settlement_status_id FROM settlement_status WHERE UPPER(settlement_status_name) = 'ONGOING' LIMIT 1")
+            ss_row = cur.fetchone()
+            settlement_status_id = ss_row[0] if ss_row else 1
+            
+            # Create case using confirm_report_and_open_case
+            cur.execute(
+                "SELECT confirm_report_and_open_case(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                [
+                    report_id,
+                    case_name,
+                    complaint_title_id,
+                    case_nature_id,
+                    settlement_status_id,
+                    staff_id,
+                    True,  # with_payment
+                    None,  # payment_receipt
+                    150.00,  # payment_amount
+                    "PAID",  # payment_status
+                    paid_by_person_id,
+                    "ESCALATED TO CASE",
+                    "Report marked as paid and escalated to case"
+                ]
+            )
+            case_id = cur.fetchone()[0]
+            
+            cur.execute(
+                "SELECT TRIM(CONCAT_WS(' ', first_name, last_name)) FROM person WHERE person_id = %s",
+                [paid_by_person_id]
+            )
+            payer_name = cur.fetchone()[0] if cur.rowcount else None
+            
+            blotter_log_event(
+                action="CREATE",
+                table_affected="blotter_case",
+                record_affected_id=case_id,
+                details=f"Case created from report #{report_id}, marked as PAID (paid by: {payer_name or 'Unknown'})",
+                performer_staff_id=staff_id
+            )
+        
+        messages.success(request, f"Report marked as paid and case #{case_id} created.")
+        return redirect("lupon_mem:case_detail", case_id=case_id)
+    except Exception as e:
+        messages.error(request, f"Failed: {e}")
+        return redirect("lupon_mem:report_review", report_id=report_id)
+
+
 # APPROVE (Lupon -> set UNPAID via DB func)
 # ------------------------------
 @session_login_required

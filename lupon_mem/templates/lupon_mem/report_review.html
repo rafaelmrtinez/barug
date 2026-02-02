@@ -226,6 +226,29 @@
         </a>
       </div>
     </div>
+    
+    {% if report.4|upper == 'UNPAID' %}
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <h5 class="mb-3">{% bs_icon 'cash-coin' %} Record Payment</h5>
+        <form method="post" action="{% url 'lupon_mem:report_mark_paid' report.0 %}" id="paymentForm">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label">Paid by <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="paidBySearch" placeholder="Start typing name…" autocomplete="off">
+            <input type="hidden" name="paid_by_person_id" id="paidByPersonId">
+            <div id="payerDropdown" class="list-group mt-1" style="position:absolute; z-index:1000; max-height:200px; overflow-y:auto; display:none;"></div>
+            <div id="payerDisplay" class="form-control bg-body-tertiary mt-2" style="min-height:38px; display:flex; align-items:center;">
+              <span class="text-muted">No payer selected</span>
+            </div>
+          </div>
+          <button type="button" class="btn btn-brand" id="submitPaymentBtn" disabled>
+            {% bs_icon 'check2-circle' %} Mark as Paid
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
   {% else %}
     {% if user_role|upper in LUPON_ROLES_LIST %}
       {% if has_respondent %}
@@ -539,6 +562,64 @@
   // Approve / Decline submit
   const approveBtn = document.getElementById('approveConfirmBtn');
   const declineBtn = document.getElementById('declineConfirmBtn');
+
+  // Payment typeahead
+  const paidBySearch = document.getElementById('paidBySearch');
+  if (paidBySearch) {
+    const payerDropdown = document.getElementById('payerDropdown');
+    const payerDisplay = document.getElementById('payerDisplay');
+    const paidByPersonId = document.getElementById('paidByPersonId');
+    const submitPaymentBtn = document.getElementById('submitPaymentBtn');
+    let debounceTimer;
+
+    paidBySearch.addEventListener('input', function() {
+      clearTimeout(debounceTimer);
+      const query = this.value.trim();
+      if (query.length < 2) {
+        payerDropdown.style.display = 'none';
+        return;
+      }
+      debounceTimer = setTimeout(() => {
+        fetch(`/lupon_mem/person_suggest/?q=${encodeURIComponent(query)}`)
+          .then(r => r.json())
+          .then(data => {
+            payerDropdown.innerHTML = '';
+            if (data.results && data.results.length > 0) {
+              data.results.forEach(person => {
+                const item = document.createElement('a');
+                item.href = '#';
+                item.className = 'list-group-item list-group-item-action';
+                item.innerHTML = `<span>${person.name || '(no name)'}</span> <span class="badge text-bg-light border">ID ${person.id}</span>`;
+                item.onclick = (e) => {
+                  e.preventDefault();
+                  paidByPersonId.value = person.id;
+                  paidBySearch.value = person.name;
+                  payerDisplay.innerHTML = `<span class="badge bg-success">${person.name} (ID: ${person.id})</span>`;
+                  payerDropdown.style.display = 'none';
+                  submitPaymentBtn.disabled = false;
+                };
+                payerDropdown.appendChild(item);
+              });
+              payerDropdown.style.display = 'block';
+            } else {
+              payerDropdown.style.display = 'none';
+            }
+          });
+      }, 300);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!paidBySearch.contains(e.target) && !payerDropdown.contains(e.target)) {
+        payerDropdown.style.display = 'none';
+      }
+    });
+
+    submitPaymentBtn.addEventListener('click', function() {
+      if (paidByPersonId.value) {
+        document.getElementById('paymentForm').submit();
+      }
+    });
+  }
 
   if (approveBtn){
     approveBtn.addEventListener('click', function(e){
