@@ -143,6 +143,7 @@
           <th>Nature of Case</th>
           <th>Complaint Title</th>
           <th>Date Filed</th>
+          <th>Processed On</th>
           <th>Case Status</th>
           <th>Settlement Status</th>
           <th width="100">Action</th>
@@ -152,7 +153,7 @@
         {% for row in rows %}
         <tr>
           <td>
-            <span class="case-num">#{{ row.1 }}</span>
+            <span class="case-num">{{ row.1 }}</span>
           </td>
           <td class="fw-semibold">{{ row.2 }}</td>
           <td>
@@ -168,6 +169,12 @@
             {% else %}
               <span class="text-muted">—</span>
             {% endif %}
+          </td>
+          <td>
+            <div class="dt-display">
+              <div class="date">{{ row.9 }}</div>
+              <div><i class="bi bi-clock me-1"></i>{{ row.10 }}</div>
+            </div>
           </td>
           <td>
             <div class="dt-display">
@@ -213,7 +220,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="8" class="text-center py-4 text-muted">
+          <td colspan="9" class="text-center py-4 text-muted">
             {% if q %}No cases found matching "{{ q }}"{% else %}No cases found{% endif %}
           </td>
         </tr>

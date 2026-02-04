@@ -164,7 +164,7 @@
                 <!-- <h6 class="mb-3"><i class="bi bi-funnel"></i> Filters & Controls</h6> -->
                 <form method="get" id="filterForm">
                     <div class="row">
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label class="form-label">Data Source</label>
                             <select id="dataSource" class="form-select" onchange="updateMapData()">
                                 <option value="all">All Data</option>
@@ -173,7 +173,7 @@
                                 <option value="both_separate">Show Both (Separate Colors)</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label class="form-label">Time Period</label>
                             <select name="time_filter" class="form-select" onchange="toggleCustomDates(this.value); if(this.value !== 'custom') this.form.submit();">
                                 <option value="1_month" {% if time_filter == '1_month' %}selected{% endif %}>Last Month</option>
@@ -184,32 +184,21 @@
                                 <option value="custom" {% if time_filter == 'custom' %}selected{% endif %}>Custom Range</option>
                             </select>
                         </div>
-                        <div class="col-md-6" id="customDateRange" style="{% if time_filter != 'custom' %}display: none;{% endif %}">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <label class="form-label">Start Date</label>
-                                    <input type="date" name="start_date" class="form-control" value="{{ start_date }}">
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">End Date</label>
-                                    <input type="date" name="end_date" class="form-control" value="{{ end_date }}">
-                                </div>
-                            </div>
-                            <div class="mt-2">
-                                <button type="submit" class="btn btn-primary btn-sm">Apply Date Range</button>
-                            </div>
-                        </div>
                         <div class="col-md-2">
                             <label class="form-label">Case Nature</label>
                             <select id="caseNature" class="form-select" onchange="updateMapData()">
                                 <option value="all">All Natures</option>
-                                <option value="THEFT">THEFT</option>
-                                <option value="ESTAFA">ESTAFA</option>
-                                <option value="SLIGHT PHYSICAL INJURY">SLIGHT PHYSICAL INJURY</option>
-                                <option value="ORAL DEFAMATION">ORAL DEFAMATION</option>
-                                <option value="MALICIOUS MISCHIEF">MALICIOUS MISCHIEF</option>
-                                <option value="TRESPASS TO DWELLING">TRESPASS TO DWELLING</option>
-                                <option value="ILLEGAL TRESPASS">ILLEGAL TRESPASS</option>
+                                {% for nature in case_natures %}
+                                <option value="{{ nature }}">{{ nature }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Case Type</label>
+                            <select id="caseType" class="form-select" onchange="updateMapData()">
+                                <option value="all">All Types</option>
+                                <option value="CIVIL CASE">Civil Case</option>
+                                <option value="CRIMINAL CASE">Criminal Case</option>
                             </select>
                         </div>
                         <div class="col-md-2">
@@ -230,6 +219,19 @@
                                 <option value="light-v10">Light</option>
                                 <option value="dark-v10">Dark</option>
                             </select>
+                        </div>
+                    </div>
+                    <div class="row mt-2" id="customDateRange" style="{% if time_filter != 'custom' %}display: none;{% endif %}">
+                        <div class="col-md-3">
+                            <label class="form-label">Start Date</label>
+                            <input type="date" name="start_date" class="form-control" value="{{ start_date }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">End Date</label>
+                            <input type="date" name="end_date" class="form-control" value="{{ end_date }}">
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary btn-sm">Apply Date Range</button>
                         </div>
                     </div>
                 </form>
@@ -354,39 +356,8 @@
                 <div class="card-header">
                     <h6 class="mb-0"><i class="bi bi-info-circle"></i> Case Nature</h6>
                 </div>
-                <div class="card-body">
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #dc3545;"></div>
-                        <span>THEFT</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #fd7e14;"></div>
-                        <span>ESTAFA</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #28a745;"></div>
-                        <span>SLIGHT PHYSICAL INJURY</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #6f42c1;"></div>
-                        <span>ORAL DEFAMATION</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #20c997;"></div>
-                        <span>MALICIOUS MISCHIEF</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #ffc107;"></div>
-                        <span>TRESPASS TO DWELLING</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #e83e8c;"></div>
-                        <span>ILLEGAL TRESPASS</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #6c757d;"></div>
-                        <span>Blotter Report</span>
-                    </div>
+                <div class="card-body" id="legendContainer">
+                    <!-- Legend items will be dynamically generated by JavaScript -->
                 </div>
             </div>
 
@@ -455,6 +426,63 @@ let incidentData = barangayCasesData;
 const incidentStats = {{ incident_stats|safe }};
 const streetStats = {{ street_stats|safe }};
 
+// Color mapping for case natures
+const caseNatureColors = {
+    'THEFT': '#dc3545',
+    'ESTAFA': '#fd7e14',
+    'SLIGHT PHYSICAL INJURY': '#28a745',
+    'ORAL DEFAMATION': '#6f42c1',
+    'MALICIOUS MISCHIEF': '#20c997',
+    'TRESPASS TO DWELLING': '#ffc107',
+    'ILLEGAL TRESPASS': '#e83e8c',
+    'PUBLIC DISTURBANCE': '#17a2b8',
+    'COLLECTION OF SUM OF MONEY': '#6610f2',
+    'BREACH OF CONTRACT': '#e83e8c',
+    'UNLAWFUL DETAINER / EVICTION': '#fd7e14',
+    'THREAT': '#dc3545',
+    'ACT OF LASCIVIOUSNESS': '#6f42c1'
+};
+
+// Function to get color for a case nature
+function getCaseNatureColor(caseNature) {
+    if (!caseNature) return '#6c757d'; // Default gray for unknown
+    const upperNature = caseNature.toUpperCase();
+    return caseNatureColors[upperNature] || '#6c757d';
+}
+
+// Generate legend dynamically
+function generateLegend() {
+    const legendContainer = document.getElementById('legendContainer');
+    if (!legendContainer) return;
+    
+    // Get unique case natures from the data
+    const uniqueNatures = [...new Set(allIncidentData
+        .filter(item => item.case_nature)
+        .map(item => item.case_nature.toUpperCase()))]
+        .sort();
+    
+    let legendHTML = '';
+    uniqueNatures.forEach(nature => {
+        const color = getCaseNatureColor(nature);
+        legendHTML += `
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: ${color};"></div>
+                <span>${nature}</span>
+            </div>
+        `;
+    });
+    
+    // Add Blotter Report legend
+    legendHTML += `
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #6c757d;"></div>
+            <span>Blotter Report</span>
+        </div>
+    `;
+    
+    legendContainer.innerHTML = legendHTML;
+}
+
 // State variables
 let isHeatmapVisible = false;
 let isStreetViewVisible = false;
@@ -475,10 +503,61 @@ map.addControl(new mapboxgl.NavigationControl(), 'bottom-left');
 
 // Map load event
 map.on('load', function() {
+    generateLegend(); // Generate legend from data
+    addBarangayBoundary(); // Add barangay boundary polygon
     initializeMap();
     updateStatistics();
     initializeCharts();
 });
+
+// Add Barangay Sto. Niño boundary polygon
+function addBarangayBoundary() {
+    // Barangay Sto. Niño boundary coordinates (approximate)
+    const barangayBoundary = {
+        type: 'Feature',
+        geometry: {
+            type: 'Polygon',
+            coordinates: [[
+                [123.8980, 10.3000],
+                [123.9080, 10.3000],
+                [123.9080, 10.2900],
+                [123.8980, 10.2900],
+                [123.8980, 10.3000]
+            ]]
+        },
+        properties: {
+            name: 'Barangay Señor Santo Niño'
+        }
+    };
+    
+    map.addSource('barangay-boundary', {
+        type: 'geojson',
+        data: barangayBoundary
+    });
+    
+    // Add fill layer
+    map.addLayer({
+        id: 'barangay-fill',
+        type: 'fill',
+        source: 'barangay-boundary',
+        paint: {
+            'fill-color': '#7B1E22',
+            'fill-opacity': 0.1
+        }
+    });
+    
+    // Add outline layer
+    map.addLayer({
+        id: 'barangay-outline',
+        type: 'line',
+        source: 'barangay-boundary',
+        paint: {
+            'line-color': '#7B1E22',
+            'line-width': 3,
+            'line-dasharray': [2, 2]
+        }
+    });
+}
 
 function initializeMap() {
     // Filter incidents with valid coordinates
@@ -561,16 +640,27 @@ function initializeMap() {
                 10, 25
             ],
             'circle-color': [
-                'match',
-                ['get', 'primary_case_nature'],
-                'THEFT', '#dc3545',
-                'ESTAFA', '#fd7e14',
-                'SLIGHT PHYSICAL INJURY', '#28a745',
-                'ORAL DEFAMATION', '#6f42c1',
-                'MALICIOUS MISCHIEF', '#20c997',
-                'TRESPASS TO DWELLING', '#ffc107',
-                'ILLEGAL TRESPASS', '#e83e8c',
-                '#6c757d' // default for Blotter Reports
+                'case',
+                ['has', 'primary_case_nature'],
+                [
+                    'match',
+                    ['get', 'primary_case_nature'],
+                    'THEFT', '#dc3545',
+                    'ESTAFA', '#fd7e14',
+                    'SLIGHT PHYSICAL INJURY', '#28a745',
+                    'ORAL DEFAMATION', '#6f42c1',
+                    'MALICIOUS MISCHIEF', '#20c997',
+                    'TRESPASS TO DWELLING', '#ffc107',
+                    'ILLEGAL TRESPASS', '#e83e8c',
+                    'PUBLIC DISTURBANCE', '#17a2b8',
+                    'COLLECTION OF SUM OF MONEY', '#6610f2',
+                    'BREACH OF CONTRACT', '#e83e8c',
+                    'UNLAWFUL DETAINER / EVICTION', '#fd7e14',
+                    'THREAT', '#dc3545',
+                    'ACT OF LASCIVIOUSNESS', '#6f42c1',
+                    '#6c757d' // default for unknown or Blotter Reports
+                ],
+                '#6c757d' // default when no case_nature
             ],
             'circle-stroke-color': '#fff',
             'circle-stroke-width': 2,
@@ -934,7 +1024,10 @@ document.getElementById('mapStyle').addEventListener('change', function() {
     map.setStyle('mapbox://styles/mapbox/' + this.value);
     map.once('styledata', function() {
         // Re-add data sources and layers after style change
-        setTimeout(initializeMap, 500);
+        setTimeout(function() {
+            addBarangayBoundary();
+            initializeMap();
+        }, 500);
     });
 });
 
@@ -958,6 +1051,7 @@ document.getElementById('resetView').addEventListener('click', () => {
 function updateMapData() {
     const dataSource = document.getElementById('dataSource').value;
     const caseNature = document.getElementById('caseNature').value;
+    const caseType = document.getElementById('caseType').value;
     
     let filteredData = allIncidentData;
     
@@ -983,15 +1077,20 @@ function updateMapData() {
         );
     }
     
+    // Filter by case type (civil/criminal)
+    if (caseType !== 'all') {
+        filteredData = filteredData.filter(item => 
+            item.type && item.type.toUpperCase() === caseType.toUpperCase()
+        );
+    }
+    
     incidentData = filteredData;
     
     // Clear existing map layers
     if (map.getSource('incidents')) {
-        map.removeLayer('incident-points');
-        if (map.getLayer('incident-count')) {
-            map.removeLayer('incident-count');
-        }
-        map.removeLayer('incident-heatmap');
+        if (map.getLayer('incident-points')) map.removeLayer('incident-points');
+        if (map.getLayer('incident-count')) map.removeLayer('incident-count');
+        if (map.getLayer('incident-heatmap')) map.removeLayer('incident-heatmap');
         map.removeSource('incidents');
     }
     

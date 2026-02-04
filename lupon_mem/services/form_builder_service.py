@@ -75,7 +75,8 @@ def fetch_case_core(cur, case_id: int):
             bc.date_filed,
             ct.complaint_title_name,
             cn.case_name,
-            bc.blotter_report_id
+            bc.blotter_report_id,
+            bc.time_filed
         FROM blotter_case bc
         LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
         LEFT JOIN case_nature   cn   ON cn.case_nature_id   = bc.case_nature_id
@@ -84,7 +85,7 @@ def fetch_case_core(cur, case_id: int):
         [case_id],
     )
     row = cur.fetchone()
-    return row if row else (None,)*9
+    return row if row else (None,)*10
 
 def resolve_incident_address(cur, blotter_report_id: Optional[int]) -> Optional[str]:
     if not blotter_report_id:
@@ -214,6 +215,7 @@ def build_prefills(
     incident_time,
     incident_loc: Optional[str],
     date_filed,
+    time_filed,
     complaint_title_name: Optional[str],
     case_nature_name: Optional[str],
     punong_barangay: str,
@@ -248,6 +250,44 @@ def build_prefills(
 
     for_value = _fmt_purpose(complaint_title_name, case_nature_name)
 
+    # Create concatenated date & time filed string like "Jan 13, 2025 @02:35 PM"
+    date_time_filed_str = ""
+    if date_filed and time_filed:
+        try:
+            # Parse date
+            if isinstance(date_filed, str):
+                for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"):
+                    try:
+                        date_obj = _dt_cls.strptime(date_filed, fmt).date()
+                        break
+                    except Exception:
+                        pass
+            else:
+                date_obj = date_filed
+            
+            # Parse time
+            if isinstance(time_filed, str):
+                try:
+                    time_obj = _dt_cls.strptime(time_filed, "%H:%M:%S").time()
+                except Exception:
+                    try:
+                        time_obj = _dt_cls.strptime(time_filed, "%H:%M").time()
+                    except Exception:
+                        time_obj = time_filed
+            else:
+                time_obj = time_filed
+            
+            # Format as "Jan 13, 2025 @02:35 PM"
+            date_str = date_obj.strftime("%b %d, %Y")
+            time_str = time_obj.strftime("%I:%M %p")
+            date_time_filed_str = f"{date_str} @{time_str}"
+        except Exception:
+            pass
+
+    # Extract day from dates for forms that need it
+    date_created_day = str(src_date.day).zfill(2) if src_date else ""
+    date_notified_day = str(today.day).zfill(2)
+    
     prefill_by_label: Dict[str, Any] = {
         "complainant(s)": parties_complainant,
         "complainants": parties_complainant,
@@ -285,6 +325,9 @@ def build_prefills(
         "current year": curr_year,
         "date signed": date_created_iso,
         "recipient": first_respondent,
+        "processed on (date)": curr_date_iso,
+        "date & time filed": date_time_filed_str,
+        "date and time filed": date_time_filed_str,
     }
 
     prefill_by_code: Dict[str, Any] = {
@@ -298,8 +341,9 @@ def build_prefills(
         "incident_date": _iso_date(incident_date) or "",
         "incident_time": _hm(incident_time) or "",
         "incident_location": (incident_loc or ""),
-        "date_created": date_created_iso,
+        "date_created": date_created_day,  # Use day only for date_created
         "month_created": month_created,
+        "year_created": str(src_date.year),
         "year_received": year_received,
         "month_received": month_received,
         "complainants_2": parties_complainant,
@@ -314,6 +358,7 @@ def build_prefills(
         "curr_month": curr_month,
         "curr_year":  curr_year,
         "brgy_capt": punong_barangay,
+        "processed_on_date": curr_date_iso,
         # KP-12
         "complainants_one": parties_complainant,
         "repondents_one":   parties_respondent,
@@ -323,10 +368,13 @@ def build_prefills(
         "current_date":  curr_date_iso,
         "current_month": curr_month,
         "current_year":  curr_year,
+
         "notified_date":  curr_date_iso,
         "notified_month": curr_month,
         "notified_year":  curr_year,
         "brgy_captain": punong_barangay,
+        "date_time_filed": date_time_filed_str,
+        "date_and_time_filed": date_time_filed_str,
     }
 
     return (prefill_by_label, prefill_by_code,
@@ -354,6 +402,8 @@ def apply_answers_and_prefills(
     
     def _ans_or_prefill(field_id, label, code):
         v = answers.get(str(field_id))
+        
+        # If there's a saved answer, always use it
         if v not in (None, "", "null"):
             return v
         
@@ -370,6 +420,16 @@ def apply_answers_and_prefills(
                 return handler_values.get("case_num", "")
             elif code_lower == "purpose":
                 return handler_values.get("purpose", "")
+        
+        # Don't prefill date_created or processed_on_date if submission already exists AND no saved answer
+        # This prevents overwriting user input when they reload the form
+        if submission_id:
+            code_lower = (code or "").strip().lower()
+            label_lower = (label or "").strip().lower()
+            if code_lower in ("date_created", "processed_on_date") or label_lower in ("date created", "processed on (date)"):
+                # No saved answer and submission exists = user hasn't filled it yet or cleared it
+                # Don't prefill to avoid overwriting
+                return None
         
         key = (label or "").strip().lower()
         if key in prefill_by_label:
@@ -406,26 +466,27 @@ def slice_until_code(fields_with_values, stop_code: str):
 def compute_ui_flags(form_code: str) -> Dict[str,bool]:
     u = str(form_code).strip().upper()
     return {
+        "kp7_ui_minimal":  (u == "KP-7"),
         "kp9_ui_minimal":  (u == "KP-9"),
         "kp8_ui_minimal":  (u == "KP-8"),
-        "kp10_ui_minimal": (u == "KP-10"),
-        "kp11_ui_minimal": (u == "KP-11"),
-        "kp12_ui_minimal": (u == "KP-12"),
-        "kp13_ui_minimal": (u == "KP-13"),
-        "kp14_ui_minimal": (u == "KP-14"),
-        "kp15_ui_minimal": (u == "KP-15"),
-        "kp16_ui_minimal": (u == "KP-16"),
-        "kp17_ui_minimal": (u == "KP-17"),
-        "kp18_ui_minimal": (u == "KP-18"),
-        "kp19_ui_minimal": (u == "KP-19"),
-        "kp20_ui_minimal": (u == "KP-20"),
-        "kp20a_ui_minimal": (u == "KP-20A"),
-        "kp20b_ui_minimal": (u == "KP-20B"),
-        "kp21_ui_minimal": (u == "KP-21"),
-        "kp22_ui_minimal": (u == "KP-22"),
-        "kp23_ui_minimal": (u == "KP-23"),
-        "kp24_ui_minimal": (u == "KP-24"),
-        "kp25_ui_minimal": (u == "KP-25"),
-        "kp26_ui_minimal": (u == "KP-26"),
-        "minutes_ui_minimal": (u == "MINUTES" or u == "MINUTES OF HEARING"),
+        "kp10_ui_minimal": False,  # Temporarily disabled
+        "kp11_ui_minimal": False,  # Temporarily disabled
+        "kp12_ui_minimal": False,  # Temporarily disabled
+        "kp13_ui_minimal": False,  # Temporarily disabled
+        "kp14_ui_minimal": False,  # Temporarily disabled
+        "kp15_ui_minimal": False,  # Temporarily disabled
+        "kp16_ui_minimal": False,  # Temporarily disabled
+        "kp17_ui_minimal": False,  # Temporarily disabled
+        "kp18_ui_minimal": False,  # Temporarily disabled
+        "kp19_ui_minimal": False,  # Temporarily disabled
+        "kp20_ui_minimal": False,  # Temporarily disabled
+        "kp20a_ui_minimal": False,  # Temporarily disabled
+        "kp20b_ui_minimal": False,  # Temporarily disabled
+        "kp21_ui_minimal": False,  # Temporarily disabled
+        "kp22_ui_minimal": False,  # Temporarily disabled
+        "kp23_ui_minimal": False,  # Temporarily disabled
+        "kp24_ui_minimal": False,  # Temporarily disabled
+        "kp25_ui_minimal": False,  # Temporarily disabled
+        "kp26_ui_minimal": False,  # Temporarily disabled
+        "minutes_ui_minimal": False,  # Temporarily disabled
     }

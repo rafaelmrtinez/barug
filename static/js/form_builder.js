@@ -871,43 +871,7 @@ function bindCloseOnEscape(input, closeFn){
   });
 })();
 
-/* ===== KP-9: All fields filled, ready to submit ===== */
-(function initKP9(){
-  if (!isKP9()) return;
-  
-  // Hide all form fields since everything is pre-filled
-  const allFields = document.querySelectorAll('.kp-field');
-  allFields.forEach(field => {
-    field.classList.add('kp-offscreen');
-  });
-  
-  // Show a message that everything is ready
-  const cardBody = document.querySelector('.card-body');
-  if (cardBody) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = 'mb-3 p-3 rounded-3';
-    messageDiv.style.background = '#680404ff';
-    messageDiv.style.color = '#fff';
-    messageDiv.innerHTML = `
-      <div class="d-flex align-items-center gap-2">
-        <i class="bi bi-check-circle" style="font-size:1.1rem;"></i>
-        <strong>All fields are already filled out</strong>
-      </div>
-      <div class="mt-1" style="opacity:.95">
-        For <strong>KP Form No. 9</strong>, all required information has been automatically populated. 
-        Click <strong>Submit &amp; Generate PDF</strong> to generate the summons for the respondent.
-      </div>
-    `;
-    
-    // Insert after any existing helper banners
-    const existingBanners = cardBody.querySelectorAll('.mb-3.p-3.rounded-3');
-    if (existingBanners.length > 0) {
-      existingBanners[existingBanners.length - 1].after(messageDiv);
-    } else {
-      cardBody.insertBefore(messageDiv, cardBody.firstChild);
-    }
-  }
-})();
+/* ===== KP-9: Disabled completely ===== */
 
 /* ===== KP-9-P2: respondents-only binding + narrative/visibility ===== */
 /* ===== KP-9-P2: respondents-only binding + narrative/visibility + single-line fill ===== */

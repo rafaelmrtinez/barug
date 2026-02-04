@@ -240,21 +240,23 @@ def case_list(request: HttpRequest):
                 bc.blotter_case_id,                    -- 0
                 bc.blotter_case_num,                   -- 1
                 bc.blotter_case_name,                  -- 2
-                TO_CHAR(bc.date_time_added AT TIME ZONE 'Asia/Manila', 'Mon DD, YYYY') AS date_filed_fmt,   -- 3
-                TO_CHAR(bc.date_time_added AT TIME ZONE 'Asia/Manila', 'HH12:MI AM')   AS time_filed_fmt,   -- 4
+                TO_CHAR(bc.date_time_added AT TIME ZONE 'Asia/Manila', 'Mon DD, YYYY') AS processed_on_date,   -- 3
+                TO_CHAR(bc.date_time_added AT TIME ZONE 'Asia/Manila', 'HH12:MI AM')   AS processed_on_time,   -- 4
                 COALESCE(cs.case_state_name, 'PENDING')        AS case_state,         -- 5
                 COALESCE(ss.settlement_status_name, 'Pending') AS settlement_status,  -- 6
                 COALESCE(ct.complaint_title_name, '')          AS complaint_title,    -- 7
                 COALESCE(cn.case_name, '')                     AS case_nature,        -- 8
+                TO_CHAR(bc.date_filed, 'Mon DD, YYYY')         AS date_filed,         -- 9
+                TO_CHAR(bc.time_filed, 'HH12:MI AM')           AS time_filed,         -- 10
 
                 -- ===== fn_case_hearing_window extras (may be NULL if no KP-8 yet) =====
-                hw.window_end_date_text,      -- 9  e.g., "November 12, 2025"
-                hw.window_end_time_text,      -- 10  e.g., "10:09 pm"
-                hw.days_left,                 -- 11
-                hw.can_set_mediation,         -- 12
-                hw.can_set_conciliation,      -- 13
-                COALESCE(hw.mediation_hearings_set,  0) AS mediation_hearings_set,   -- 14
-                COALESCE(hw.mediation_hearings_held, 0) AS mediation_hearings_held   -- 15
+                hw.window_end_date_text,      -- 11  e.g., "November 12, 2025"
+                hw.window_end_time_text,      -- 12  e.g., "10:09 pm"
+                hw.days_left,                 -- 13
+                hw.can_set_mediation,         -- 14
+                hw.can_set_conciliation,      -- 15
+                COALESCE(hw.mediation_hearings_set,  0) AS mediation_hearings_set,   -- 16
+                COALESCE(hw.mediation_hearings_held, 0) AS mediation_hearings_held   -- 17
             FROM blotter_case bc
             LEFT JOIN case_state       cs ON cs.case_state_id = bc.case_state_id
             LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id

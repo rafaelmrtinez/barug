@@ -230,10 +230,25 @@
     {% if report.4|upper == 'UNPAID' %}
     <div class="card shadow-sm mb-3">
       <div class="card-body">
-        <h5 class="mb-3">{% bs_icon 'cash-coin' %} Record Payment</h5>
+        <h5 class="mb-3">{% bs_icon 'cash-coin' %} Record Payment & Escalate to Case</h5>
         <form method="post" action="{% url 'lupon_mem:report_mark_paid' report.0 %}" id="paymentForm">
           {% csrf_token %}
-          <div class="mb-3">
+          <div class="row g-3">
+            <div class="col-md-12">
+              <label class="form-label">Case Number <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" name="blotter_case_num" id="caseNum" placeholder="BC #YYYY-MM-XXX" pattern="BC #\d{4}-\d{2}-\d{3}" title="Format: BC #YYYY-MM-XXX (e.g., BC #2024-01-001)" required>
+              <small class="text-muted">Format: BC #YYYY-MM-XXX (e.g., BC #2024-01-001)</small>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Date Filed <span class="text-danger">*</span></label>
+              <input type="date" class="form-control" name="date_filed" id="dateFiled" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Time Filed <span class="text-danger">*</span></label>
+              <input type="time" class="form-control" name="time_filed" id="timeFiled" required>
+            </div>
+          </div>
+          <div class="mb-3 mt-3">
             <label class="form-label">Paid by <span class="text-danger">*</span></label>
             <input type="text" class="form-control" id="paidBySearch" placeholder="Start typing name…" autocomplete="off">
             <input type="hidden" name="paid_by_person_id" id="paidByPersonId">
@@ -242,8 +257,8 @@
               <span class="text-muted">No payer selected</span>
             </div>
           </div>
-          <button type="button" class="btn btn-brand" id="submitPaymentBtn" disabled>
-            {% bs_icon 'check2-circle' %} Mark as Paid
+          <button type="button" class="btn btn-brand" id="submitPaymentBtn" disabled data-bs-toggle="modal" data-bs-target="#confirmPaymentModal">
+            {% bs_icon 'check2-circle' %} Mark as Paid & Escalate
           </button>
         </form>
       </div>
@@ -384,6 +399,31 @@
       </div>
       <div class="modal-footer border-0">
         <button type="button" class="btn btn-brand" data-bs-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Payment Modal -->
+<div class="modal fade" id="confirmPaymentModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false" style="margin-top: 200px;">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">{% bs_icon 'cash-coin' extra_classes='text-success me-2' %} Confirm Payment & Escalation</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">Are you sure you want to <strong>mark this report as paid</strong> and <strong>escalate it to a case</strong>?</p>
+        <div class="alert alert-info mb-0">
+          <strong>Case Number:</strong> <span id="confirmCaseNum"></span><br>
+          <strong>Date Filed:</strong> <span id="confirmDateFiled"></span><br>
+          <strong>Time Filed:</strong> <span id="confirmTimeFiled"></span><br>
+          <strong>Paid By:</strong> <span id="confirmPaidBy"></span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-brand" data-bs-dismiss="modal">{% bs_icon 'x' extra_classes='me-1' %} Cancel</button>
+        <button type="button" class="btn btn-brand" id="confirmPaymentBtn">{% bs_icon 'check2' extra_classes='me-1' %} Yes, Confirm</button>
       </div>
     </div>
   </div>
@@ -596,7 +636,7 @@
                   paidBySearch.value = person.name;
                   payerDisplay.innerHTML = `<span class="badge bg-success">${person.name} (ID: ${person.id})</span>`;
                   payerDropdown.style.display = 'none';
-                  submitPaymentBtn.disabled = false;
+                  validatePaymentForm();
                 };
                 payerDropdown.appendChild(item);
               });
@@ -614,11 +654,43 @@
       }
     });
 
-    submitPaymentBtn.addEventListener('click', function() {
-      if (paidByPersonId.value) {
-        document.getElementById('paymentForm').submit();
+    // Validate form and enable/disable button
+    function validatePaymentForm() {
+      const caseNum = document.getElementById('caseNum').value.trim();
+      const dateFiled = document.getElementById('dateFiled').value;
+      const timeFiled = document.getElementById('timeFiled').value;
+      const payerId = paidByPersonId.value;
+      const pattern = /^BC #\d{4}-\d{2}-\d{3}$/;
+      
+      if (caseNum && pattern.test(caseNum) && dateFiled && timeFiled && payerId) {
+        submitPaymentBtn.disabled = false;
+      } else {
+        submitPaymentBtn.disabled = true;
       }
-    });
+    }
+    
+    document.getElementById('caseNum').addEventListener('input', validatePaymentForm);
+    document.getElementById('dateFiled').addEventListener('change', validatePaymentForm);
+    document.getElementById('timeFiled').addEventListener('change', validatePaymentForm);
+    
+    // Update confirmation modal when shown
+    const confirmModal = document.getElementById('confirmPaymentModal');
+    if (confirmModal) {
+      confirmModal.addEventListener('show.bs.modal', function() {
+        document.getElementById('confirmCaseNum').textContent = document.getElementById('caseNum').value;
+        document.getElementById('confirmDateFiled').textContent = document.getElementById('dateFiled').value;
+        document.getElementById('confirmTimeFiled').textContent = document.getElementById('timeFiled').value;
+        document.getElementById('confirmPaidBy').textContent = paidBySearch.value;
+      });
+    }
+    
+    // Handle confirm button
+    const confirmPaymentBtn = document.getElementById('confirmPaymentBtn');
+    if (confirmPaymentBtn) {
+      confirmPaymentBtn.addEventListener('click', function() {
+        document.getElementById('paymentForm').submit();
+      });
+    }
   }
 
   if (approveBtn){
@@ -675,6 +747,25 @@
         // If AJAX fails, just navigate anyway
         window.location.href = payOpenBtn.href;
       });
+    });
+  }
+  
+  // Auto-format case number input
+  const caseNumInput = document.getElementById('caseNum');
+  if (caseNumInput) {
+    caseNumInput.addEventListener('input', function(e) {
+      let val = e.target.value.replace(/[^0-9]/g, '');
+      if (val.length > 0) {
+        let formatted = 'BC #';
+        if (val.length <= 4) {
+          formatted += val;
+        } else if (val.length <= 6) {
+          formatted += val.substring(0, 4) + '-' + val.substring(4);
+        } else {
+          formatted += val.substring(0, 4) + '-' + val.substring(4, 6) + '-' + val.substring(6, 9);
+        }
+        e.target.value = formatted;
+      }
     });
   }
 })();

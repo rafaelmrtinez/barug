@@ -18,10 +18,12 @@ _KP7_FIELDS = [
     "complainants", "respondents", "case_num", "purpose",
     "complaint_details", "solutions_seeked",
     "date_created", "month_created", "year_received",
-    "case_time_filed",                 # ← ensure present
+    "case_time_filed",
+    "kp7_date_time_filed",
     "complainants_2",
     "date_received", "month_received", "year_received_2",
     "punong_barangay",
+    "processed_on_date",
 ]
 
 _KP7_SOURCES = {
@@ -31,15 +33,17 @@ _KP7_SOURCES = {
     "purpose":           {"for", "for_section", "purpose", "complaint_title", "case_nature"},
     "complaint_details": {"complaint", "complaint_details"},
     "solutions_seeked":  {"solutions_seeked"},
-    "date_created":      {"date_created", "date_signed"},
+    "date_created":      {"date_created", "date_signed", "date created"},
     "month_created":     {"month_created"},
     "year_received":     {"year_received", "year_created"},
     "case_time_filed":   {"case_time_filed", "time_filed"},
+    "kp7_date_time_filed": {"date & time filed", "date and time filed", "date_time_filed"},
     "complainants_2":    {"complainants_2", "complainants"},
     "date_received":     {"date_received"},
     "month_received":    {"month_received"},
     "year_received_2":   {"year_received_2", "year_received"},
     "punong_barangay":   {"punong_barangay", "brgy_capt", "brgy_captain", "chairman"},
+    "processed_on_date": {"processed_on_date", "processed on (date)", "processed_on"},
 }
 
 
@@ -78,6 +82,8 @@ class KP7Handler:
                     by_label[label.strip().lower()] = val
                 if field_code:
                     by_code[field_code.strip().lower()] = val
+        
+        logger.info("[KP7] All answers from DB: %s", {k: v for k, v in by_label.items() if 'date' in k or 'processed' in k})
 
         def _find_any(keys: Set[str]) -> str:
             for k in keys:
@@ -91,6 +97,10 @@ class KP7Handler:
         out: Dict[str, str] = {}
         for target, sources in _KP7_SOURCES.items():
             out[target] = _find_any(sources)
+
+        # Remove "CIVIL CASE - " prefix from purpose if present
+        if out.get("purpose") and out["purpose"].startswith("CIVIL CASE - "):
+            out["purpose"] = out["purpose"][13:]
 
         # ---------------------------------------------------
         # Propagate duplicates
@@ -134,44 +144,67 @@ class KP7Handler:
                 return (f"{int(v):02d}", "", "")
             return ("", v, "")
 
-        # made / received date derivation
-        dd1, mo1, yr1 = _parts_from_value(out.get("date_created"))
-        dd2, mo2, yr2 = _parts_from_value(out.get("month_created"))
-        dd3, mo3, yr3 = _parts_from_value(out.get("year_received"))
-        made_day = dd1 or dd2 or dd3
-        made_month = mo1 or mo2 or mo3
-        made_year = yr1 or yr2 or yr3
-
-        rd1, rm1, ry1 = _parts_from_value(out.get("date_received"))
-        rd2, rm2, ry2 = _parts_from_value(out.get("month_received"))
-        rd3, rm3, ry3 = _parts_from_value(out.get("year_received_2"))
-        recv_day = rd1 or rd2 or rd3
-        recv_month = rm1 or rm2 or rm3
-        recv_year = ry1 or ry2 or ry3
-
-        made_any = any([made_day, made_month, made_year])
-        recv_any = any([recv_day, recv_month, recv_year])
-
-        if made_any and not recv_any:
-            recv_day, recv_month, recv_year = made_day, made_month, made_year
-        elif recv_any and not made_any:
-            made_day, made_month, made_year = recv_day, recv_month, recv_year
-        elif not made_any and not recv_any:
+        # Parse Date Created and Processed On Date separately
+        date_created_val = out.get("date_created") or ""
+        logger.info("[KP7] Raw date_created input: '%s'", date_created_val)
+        cd, cm, cy = _parts_from_value(date_created_val)
+        logger.info("[KP7] Parsed date_created -> day='%s', month='%s', year='%s'", cd, cm, cy)
+        
+        processed_on_val = out.get("processed_on_date") or ""
+        logger.info("[KP7] Raw processed_on_date input: '%s'", processed_on_val)
+        pd, pm, py = _parts_from_value(processed_on_val)
+        logger.info("[KP7] Parsed processed_on -> day='%s', month='%s', year='%s'", pd, pm, py)
+        
+        # Date Created fills: date_created, month_created, year_received
+        # Use date_created if available, otherwise use today
+        if cd and cm and cy:
+            made_day, made_month, made_year = cd, cm, cy
+        else:
             made_day, made_month, made_year = t_day, t_month, t_year
+        
+        # Processed On Date fills: date_received, month_received, year_received_2
+        # Use processed_on_date if available, otherwise use today (NOT date_created)
+        if pd and pm and py:
+            recv_day, recv_month, recv_year = pd, pm, py
+        else:
             recv_day, recv_month, recv_year = t_day, t_month, t_year
 
-        out["date_created"] = made_month or t_month
-        out["month_created"] = made_day or t_day
-        out["year_received"] = made_year or t_year
-        out["date_received"] = recv_month or out["date_created"]
-        out["month_received"] = recv_day or out["month_created"]
-        out["year_received_2"] = recv_year or out["year_received"]
+        # Fill PDF-specific fields with parsed parts
+        out["date_created"] = made_month  # PDF field: month name
+        out["month_created"] = made_day    # PDF field: day number
+        out["year_received"] = made_year   # PDF field: year
+        out["date_received"] = recv_month  # PDF field: month name
+        out["month_received"] = recv_day   # PDF field: day number
+        out["year_received_2"] = recv_year # PDF field: year
+        
+        logger.info("[KP7] Final values -> date_created='%s', month_created='%s', year_received='%s'", 
+                    made_month, made_day, made_year)
+        logger.info("[KP7] Final values -> date_received='%s', month_received='%s', year_received_2='%s'", 
+                    recv_month, recv_day, recv_year)
 
         # ---------------------------------------------------
         # Auto-fill current time
         # ---------------------------------------------------
         if not out.get("case_time_filed"):
             out["case_time_filed"] = t_time
+
+        # ---------------------------------------------------
+        # Auto-fill Date & Time Filed from case date_filed and time_filed
+        # ---------------------------------------------------
+        if not out.get("kp7_date_time_filed"):
+            with FS.connection.cursor() as cur2:
+                cur2.execute("""
+                    SELECT bc.date_filed, bc.time_filed
+                      FROM blotter_case bc
+                      JOIN blotter_kp_submission s ON s.blotter_case_id = bc.blotter_case_id
+                     WHERE s.submission_id = %s
+                """, [submission_id])
+                row = cur2.fetchone()
+                if row and row[0] and row[1]:
+                    date_filed, time_filed = row[0], row[1]
+                    dt_filed = datetime.combine(date_filed, time_filed)
+                    out["kp7_date_time_filed"] = dt_filed.strftime("%B %d, %Y %I:%M %p")
+                    logger.info("[KP7] Auto-filled kp7_date_time_filed=%s", out["kp7_date_time_filed"])
 
         # ---------------------------------------------------
         # Default Punong Barangay
@@ -289,7 +322,18 @@ class KP7Handler:
         # ---------------------------------------------------
         # Save all computed answers into DB
         # ---------------------------------------------------
-        FS.save_answers(submission_id, out)
+        # Don't save date_created if it's just a month name - preserve original date
+        save_out = out.copy()
+        if date_created_val and len(date_created_val) >= 8:
+            save_out["date_created"] = date_created_val  # Preserve original date
+            logger.info("[KP7] Preserving date_created='%s' (original input)", date_created_val)
+        else:
+            save_out["date_created"] = made_month  # Use month if no date
+            logger.info("[KP7] Using month for date_created='%s'", made_month)
+        
+        logger.info("[KP7] Saving to DB: date_created='%s', processed_on_date='%s'", 
+                    save_out.get("date_created"), save_out.get("processed_on_date"))
+        FS.save_answers(submission_id, save_out)
         logger.info("[KP7] Auto-filled & saved case_time_filed=%s (submission=%s)", out.get("case_time_filed"), submission_id)
 
         # ---------------------------------------------------

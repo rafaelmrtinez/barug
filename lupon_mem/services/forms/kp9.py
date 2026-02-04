@@ -22,6 +22,7 @@ _KP9_FIELDS = [
     "respondent_names_one","respondent_names_two","respondent_names_three",
     "proxy_name_one","served_to_2","proxy_name_two","offcr_name",
     "served_to_3","date_signed_one","date_signed_two","served_to_4",
+    "recipient_address","date_time_field",
 ]
 
 # Accept both label text and field_code from the builder
@@ -59,6 +60,8 @@ _KP9_SOURCES: Dict[str, Set[str]] = {
     "date_signed_one": {"date_signed_one"},
     "date_signed_two": {"date_signed_two"},
     "served_to_4": {"served_to_4"},
+    "recipient_address": {"recipient_address", "address", "respondent_address"},
+    "date_time_field": {"date_time_field", "datetime", "date_time", "kp7_date_time_filed"},
 }
 
 _DEFAULT_PUNONG_BARANGAY = "Lourdes Ramirez"
@@ -187,15 +190,18 @@ class KP9Handler:
           mon_key -> 'October'
           yr_key  -> '2025'
         Leaves existing month/year if already present.
+        Only processes if the day_key contains a full date format.
         """
         raw = (out.get(day_key) or "").strip()
-        dt = KP9Handler._try_parse_date(raw)
-        if dt:
-            out[day_key] = str(dt.day)
-            if not (out.get(mon_key) or "").strip():
-                out[mon_key] = dt.strftime("%B")
-            if not (out.get(yr_key) or "").strip():
-                out[yr_key] = str(dt.year)
+        # Only try to parse if it looks like a full date (contains - or /)
+        if raw and ("-" in raw or "/" in raw):
+            dt = KP9Handler._try_parse_date(raw)
+            if dt:
+                out[day_key] = str(dt.day)
+                if not (out.get(mon_key) or "").strip():
+                    out[mon_key] = dt.strftime("%B")
+                if not (out.get(yr_key) or "").strip():
+                    out[yr_key] = str(dt.year)
 
     @staticmethod
     def _log_fill_map(out: Dict[str, str]) -> None:
@@ -324,11 +330,17 @@ class KP9Handler:
             self._ensure(out, "respondent_names_three", resp_val)
             self._ensure(out, "recipient", resp_val.split(",")[0].strip())
 
-        # Today's stamps if missing (overwrite when blank)
-        today = _date.today()
-        self._ensure(out, "curr_date",  today.isoformat())
-        self._ensure(out, "curr_month", today.strftime("%B"))
-        self._ensure(out, "curr_year",  str(today.year))
+        # Only use today's date as fallback if no user input provided
+        # Do NOT overwrite user input with current date
+        if not out.get("curr_date"):
+            today = _date.today()
+            out["curr_date"] = str(today.day)
+        if not out.get("curr_month"):
+            today = _date.today()
+            out["curr_month"] = today.strftime("%B")
+        if not out.get("curr_year"):
+            today = _date.today()
+            out["curr_year"] = str(today.year)
 
         # PB name
         pb_from_inputs = ""
@@ -340,8 +352,25 @@ class KP9Handler:
         pb_name = pb_from_inputs or FormUtil.get_captain_name(_DEFAULT_PUNONG_BARANGAY)
         self._ensure(out, "brgy_capt", pb_name)
 
-        # Map purpose → PDF typo field "purapose"
-        self._ensure(out, "purapose", out.get("purpose", ""))
+        # Map purpose → PDF typo field "purapose" (remove "CIVIL CASE - " prefix)
+        purpose_val = out.get("purpose", "")
+        if purpose_val.startswith("CIVIL CASE - "):
+            purpose_val = purpose_val[13:]  # Remove "CIVIL CASE - " prefix
+        self._ensure(out, "purapose", purpose_val)
+
+        # --- Auto-fill date_time_field from case date_filed and time_filed (like KP7)
+        if not out.get("date_time_field") and case_id:
+            with connection.cursor() as cur:
+                cur.execute(
+                    "SELECT date_filed, time_filed FROM blotter_case WHERE blotter_case_id=%s",
+                    [case_id]
+                )
+                row = cur.fetchone()
+                if row and row[0] and row[1]:
+                    from datetime import datetime
+                    date_filed, time_filed = row[0], row[1]
+                    dt_filed = datetime.combine(date_filed, time_filed)
+                    out["date_time_field"] = dt_filed.strftime("%B %d, %Y %I:%M %p")
 
         # Officer's return ← served triplet if blank
         self._ensure(out, "date_offcret",  out.get("offcret_serve_date", ""))
