@@ -1031,6 +1031,26 @@ def report_mark_paid(request: HttpRequest, report_id: int):
             )
             case_id = cur.fetchone()[0]
             
+            # Ensure payment status is set to PAID
+            cur.execute(
+                "UPDATE blotter_report SET payment_status_id = (SELECT payment_status_id FROM payment_status WHERE payment_status_name = 'PAID') WHERE blotter_report_id = %s",
+                [report_id]
+            )
+            
+            # Ensure report status is ESCALATED TO CASE
+            cur.execute(
+                """UPDATE blotter_report 
+                   SET current_status_id = (SELECT report_status_id FROM report_status WHERE report_status_name = 'ESCALATED TO CASE')
+                   WHERE blotter_report_id = %s""",
+                [report_id]
+            )
+            
+            # Set case state to OPEN
+            cur.execute(
+                "UPDATE blotter_case SET case_state_id = 1 WHERE blotter_case_id = %s",
+                [case_id]
+            )
+            
             cur.execute(
                 "SELECT TRIM(CONCAT_WS(' ', first_name, last_name)) FROM person WHERE person_id = %s",
                 [paid_by_person_id]
@@ -1464,17 +1484,26 @@ def report_pay_and_open_case(request: HttpRequest, report_id: int):
         )
         case_id = cur.fetchone()[0]
         
-        # FIX: Manually update payment status since the function doesn't do it
+        # Ensure payment status is set and case is escalated
         if with_payment and payment_status:
             cur.execute(
                 "UPDATE blotter_report SET payment_status_id = (SELECT payment_status_id FROM payment_status WHERE payment_status_name = %s) WHERE blotter_report_id = %s",
                 [payment_status, report_id]
             )
-            # Also set case state to OPEN
-            cur.execute(
-                "UPDATE blotter_case SET case_state_id = 1 WHERE blotter_case_id = %s",
-                [case_id]
-            )
+        
+        # Set case state to OPEN (case_state_id = 1)
+        cur.execute(
+            "UPDATE blotter_case SET case_state_id = 1 WHERE blotter_case_id = %s",
+            [case_id]
+        )
+        
+        # Ensure report status is ESCALATED TO CASE
+        cur.execute(
+            """UPDATE blotter_report 
+               SET current_status_id = (SELECT report_status_id FROM report_status WHERE report_status_name = 'ESCALATED TO CASE')
+               WHERE blotter_report_id = %s""",
+            [report_id]
+        )
             
         # Log the payment and case creation
         blotter_log_event(

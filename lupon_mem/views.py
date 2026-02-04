@@ -1385,8 +1385,7 @@ def form_builder(request, case_id: int, form_id: int = None, submission_id: int 
 
     # Optional stop-at
     stop_code = request.GET.get("show_until")
-    if not stop_code and str(fid) == "7":
-        stop_code = "solutions_seeked"
+    # Removed automatic stop for form 7 - show all fields
     if stop_code:
         fields_with_values = slice_until_code(fields_with_values, stop_code)
 
