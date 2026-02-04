@@ -204,8 +204,8 @@ def _hm(t):
     except Exception: return None
 
 def _fmt_purpose(ct_name: Optional[str], cn_name: Optional[str]) -> str:
-    a = (ct_name or "").strip(); b = (cn_name or "").strip()
-    return f"{a} - {b}" if a and b else (a or b or "")
+    b = (cn_name or "").strip()
+    return b or ""
 
 def build_prefills(
     *,
@@ -421,12 +421,11 @@ def apply_answers_and_prefills(
             elif code_lower == "purpose":
                 return handler_values.get("purpose", "")
         
-        # Don't prefill date_created or processed_on_date if submission already exists AND no saved answer
-        # This prevents overwriting user input when they reload the form
+        # Don't prefill date_entered, month_entered, year_entered, date_signed, time_signed, when - these should come from user input
         if submission_id:
             code_lower = (code or "").strip().lower()
             label_lower = (label or "").strip().lower()
-            if code_lower in ("date_created", "processed_on_date") or label_lower in ("date created", "processed on (date)"):
+            if code_lower in ("date_created", "processed_on_date", "date_entered", "month_entered", "year_entered", "date_signed", "time_signed", "when") or label_lower in ("date created", "processed on (date)", "date signed", "time signed", "when"):
                 # No saved answer and submission exists = user hasn't filled it yet or cleared it
                 # Don't prefill to avoid overwriting
                 return None
@@ -475,7 +474,7 @@ def compute_ui_flags(form_code: str) -> Dict[str,bool]:
         "kp13_ui_minimal": False,  # Temporarily disabled
         "kp14_ui_minimal": False,  # Temporarily disabled
         "kp15_ui_minimal": False,  # Temporarily disabled
-        "kp16_ui_minimal": False,  # Temporarily disabled
+        "kp16_ui_minimal": (u == "KP-16"),
         "kp17_ui_minimal": False,  # Temporarily disabled
         "kp18_ui_minimal": False,  # Temporarily disabled
         "kp19_ui_minimal": False,  # Temporarily disabled
@@ -488,5 +487,5 @@ def compute_ui_flags(form_code: str) -> Dict[str,bool]:
         "kp24_ui_minimal": False,  # Temporarily disabled
         "kp25_ui_minimal": False,  # Temporarily disabled
         "kp26_ui_minimal": False,  # Temporarily disabled
-        "minutes_ui_minimal": False,  # Temporarily disabled
+        "minutes_ui_minimal": (u == "MINUTES"),
     }

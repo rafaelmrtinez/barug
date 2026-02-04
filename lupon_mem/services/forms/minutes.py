@@ -180,19 +180,66 @@ class MinutesHandler:
         else:
             out["who"] = ""
 
-        # WHEN: "Month DD, YYYY" using current PH date
-        today = _now_ph().date()
-        out["when"] = f"{today.strftime('%B')} {today.day:02d}, {today.year}"
+        # WHEN: Use from form if provided, otherwise use current PH date
+        when_str = _find_any({"when", "hearing_date", "date_of_hearing"})
+        if when_str:
+            out["when"] = when_str
+        else:
+            today = _now_ph().date()
+            out["when"] = f"{today.strftime('%B')} {today.day:02d}, {today.year}"
 
         # WHERE: fixed text
         out["where"] = "Barangay Senor Santo Nino Barangay Hall"
 
-        # ----------------- Current date/time for signatures --------
-        now = _now_ph()
-        out["date_signed"] = f"{now.day:02d}"       # day like "24"
-        out["month_signed"] = now.strftime("%B")     # month like "October"
-        out["year_signed"]  = str(now.year)         # year like "2025"
-        out["time_signed"]  = _fmt_12h_dt(now)      # "6:49 pm"
+        # ----------------- Date/time for signatures: use date_signed and time_signed from form if provided --------
+        # Check if date_signed was provided in the form
+        date_signed_str = _find_any({"date_signed", "date signed", "signature_date"})
+        
+        if date_signed_str:
+            # Try to parse the date_signed field
+            try:
+                # Try ISO format first
+                signed_date = _dt.strptime(date_signed_str.strip(), "%Y-%m-%d").date()
+            except:
+                try:
+                    # Try other common formats
+                    for fmt in ("%m/%d/%Y", "%d/%m/%Y", "%B %d, %Y", "%b %d, %Y"):
+                        try:
+                            signed_date = _dt.strptime(date_signed_str.strip(), fmt).date()
+                            break
+                        except:
+                            continue
+                    else:
+                        signed_date = _now_ph().date()
+                except:
+                    signed_date = _now_ph().date()
+        else:
+            signed_date = _now_ph().date()
+        
+        # Check if time_signed was provided in the form
+        time_signed_str = _find_any({"time_signed", "time signed", "signature_time"})
+        
+        if time_signed_str:
+            # Try to parse the time_signed field
+            try:
+                # Try various time formats
+                for fmt in ("%H:%M", "%H:%M:%S", "%I:%M %p", "%I:%M%p"):
+                    try:
+                        signed_time = _dt.strptime(time_signed_str.strip(), fmt).time()
+                        break
+                    except:
+                        continue
+                else:
+                    signed_time = _now_ph().time()
+            except:
+                signed_time = _now_ph().time()
+        else:
+            signed_time = _now_ph().time()
+        
+        out["date_signed"] = f"{signed_date.day:02d}"       # day like "24"
+        out["month_signed"] = signed_date.strftime("%B")     # month like "October"
+        out["year_signed"]  = str(signed_date.year)         # year like "2025"
+        out["time_signed"]  = _fmt_12h_time(signed_time)    # "6:49 pm"
 
         # ----------------- TIME FILED: match KP-16 (case time) ----
         # 1) Prefer case number lookup
