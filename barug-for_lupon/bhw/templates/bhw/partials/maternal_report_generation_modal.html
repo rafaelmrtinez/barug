@@ -1,0 +1,292 @@
+{% load bootstrap_icons %}
+
+<!-- Maternal Report Generation Modal -->
+<div class="modal fade mt-5" id="maternalReportGenerationModal" tabindex="-1" aria-labelledby="maternalReportGenerationModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background: linear-gradient(135deg, #fbf7f4, #fff); border-bottom: 1px solid #ece7e1;">
+        <h5 class="modal-title fw-bold" id="maternalReportGenerationModalLabel">
+          {% bs_icon 'file-earmark-bar-graph' size='1.2em' %}
+          <span class="ms-2">Generate Maternal Health Report</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <form id="maternalReportForm" method="get" action="{% url 'maternal:mhr_report_api' %}" target="_blank">
+          <!-- Report Type Selection -->
+          <div class="mb-4">
+            <label class="form-label fw-bold">Select Report Type</label>
+            <select class="form-select form-select-lg" id="maternalReportType" name="report_type" required>
+              <option value="">-- Choose a report --</option>
+              <option value="2">Monthly Visit Compliance</option>
+              <option value="3">Monthly Risk Indicator Summary</option>
+              <option value="4">Monthly Immunization & Supplement Adherence</option>
+              <option value="5">Trimester Health Outcome Trajectory</option>
+              <option value="6">Trimester Complication & Referral Analytics</option>
+              <option value="7">Trimester Service Utilization</option>
+              <option value="8">Annual Maternal Outcome Consolidated</option>
+              <option value="9">Annual Coverage Scorecard</option>
+              <option value="10">Annual Trend Analysis</option>
+              <option value="11">All-in-One Analytics Report</option>
+            </select>
+            <div class="form-text">
+              Select the type of analytics report you want to generate
+            </div>
+          </div>
+
+          <!-- Year Input (for all reports) -->
+          <div class="mb-4" id="maternalYearSection">
+            <label for="maternalYear" class="form-label fw-bold">Year</label>
+            <input type="number" class="form-control" id="maternalYear" name="year" 
+                   min="2020" max="2030" placeholder="e.g., 2024" required>
+            <div class="form-text">Enter the year for the report</div>
+          </div>
+
+          <!-- Month Input (for monthly reports) -->
+          <div class="mb-4 d-none" id="maternalMonthSection">
+            <label for="maternalMonth" class="form-label fw-bold">Month</label>
+            <select class="form-select" id="maternalMonth" name="month">
+              <option value="">-- Select month --</option>
+              <option value="1">January</option>
+              <option value="2">February</option>
+              <option value="3">March</option>
+              <option value="4">April</option>
+              <option value="5">May</option>
+              <option value="6">June</option>
+              <option value="7">July</option>
+              <option value="8">August</option>
+              <option value="9">September</option>
+              <option value="10">October</option>
+              <option value="11">November</option>
+              <option value="12">December</option>
+            </select>
+            <div class="form-text">Select the month for monthly reports</div>
+          </div>
+
+          <!-- Trimester Input (for trimester reports) -->
+          <div class="mb-4 d-none" id="maternalTrimesterSection">
+            <label for="maternalTrimester" class="form-label fw-bold">Trimester</label>
+            <select class="form-select" id="maternalTrimester" name="trimester">
+              <option value="">-- Select trimester --</option>
+              <option value="1">First Trimester</option>
+              <option value="2">Second Trimester</option>
+              <option value="3">Third Trimester</option>
+            </select>
+            <div class="form-text">Select the trimester for trimester reports</div>
+          </div>
+
+          <!-- Report Description -->
+          <div class="alert alert-light border" id="maternalReportDescription" style="display: none;">
+            <h6 class="fw-bold mb-2">Report Details:</h6>
+            <p class="mb-0 small" id="maternalReportDescText"></p>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer" style="background-color: #faf9f7; border-top: 1px solid #ece7e1;">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          {% bs_icon 'x-circle' %}
+          <span class="ms-1">Cancel</span>
+        </button>
+        <button type="submit" form="maternalReportForm" class="btn" style="background: #6d2932; color: #fff;">
+          {% bs_icon 'file-earmark-pdf' %}
+          <span class="ms-1">Generate PDF Report</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const reportType = document.getElementById('maternalReportType');
+  const monthSection = document.getElementById('maternalMonthSection');
+  const trimesterSection = document.getElementById('maternalTrimesterSection');
+  const yearSection = document.getElementById('maternalYearSection');
+  const monthInput = document.getElementById('maternalMonth');
+  const trimesterInput = document.getElementById('maternalTrimester');
+  const yearInput = document.getElementById('maternalYear');
+  const reportDescription = document.getElementById('maternalReportDescription');
+  const reportDescText = document.getElementById('maternalReportDescText');
+
+  const reportDescriptions = {
+    '2': {
+      desc: 'Monthly report showing ANC visit compliance rates, missed visits, schedule adherence, and purok-level performance metrics. Requires year and month.',
+      requiresMonth: true,
+      requiresTrimester: false
+    },
+    '3': {
+      desc: 'Monthly summary of risk indicators including high-risk pregnancies, BMI classifications, anemia cases, and referral tracking. Requires year and month.',
+      requiresMonth: true,
+      requiresTrimester: false
+    },
+    '4': {
+      desc: 'Monthly report analyzing TT immunization coverage, micronutrient supplementation adherence, and compliance by trimester stage. Requires year and month.',
+      requiresMonth: true,
+      requiresTrimester: false
+    },
+    '5': {
+      desc: 'Trimester-based analysis of health outcome trajectories, tracking weight gain patterns, blood pressure trends, and outcome changes across pregnancy stages. Requires year and trimester.',
+      requiresMonth: false,
+      requiresTrimester: true
+    },
+    '6': {
+      desc: 'Trimester-level analytics on complications, emergency referrals, hospital admissions, and resolution outcomes by trimester. Requires year and trimester.',
+      requiresMonth: false,
+      requiresTrimester: true
+    },
+    '7': {
+      desc: 'Trimester service utilization report covering visit frequency, service types accessed, lab test completion, and facility utilization patterns. Requires year and trimester.',
+      requiresMonth: false,
+      requiresTrimester: true
+    },
+    '8': {
+      desc: 'Annual consolidated report summarizing pregnancy outcomes, delivery statistics, complication rates, and year-over-year comparisons. Requires year only.',
+      requiresMonth: false,
+      requiresTrimester: false
+    },
+    '9': {
+      desc: 'Annual scorecard measuring coverage indicators including first visit timing, four-visit completion, facility delivery rates, and program targets. Requires year only.',
+      requiresMonth: false,
+      requiresTrimester: false
+    },
+    '10': {
+      desc: 'Annual trend analysis showing multi-year patterns in maternal health indicators, seasonal variations, and program performance evolution. Requires year only.',
+      requiresMonth: false,
+      requiresTrimester: false
+    },
+    '11': {
+      desc: 'Consolidated all-in-one analytics report combining monthly visit compliance, risk indicators, and immunization data for comprehensive analysis. Requires year and month.',
+      requiresMonth: true,
+      requiresTrimester: false,
+      monthOptional: false
+    }
+  };
+
+  reportType.addEventListener('change', function() {
+    const selected = this.value;
+    
+    if (selected && reportDescriptions[selected]) {
+      const config = reportDescriptions[selected];
+      
+      // Show/hide month section
+      if (config.requiresMonth) {
+        monthSection.classList.remove('d-none');
+        monthInput.required = true;
+      } else {
+        monthSection.classList.add('d-none');
+        monthInput.required = false;
+        monthInput.value = '';
+      }
+      
+      // Show/hide trimester section
+      if (config.requiresTrimester) {
+        trimesterSection.classList.remove('d-none');
+        trimesterInput.required = true;
+      } else {
+        trimesterSection.classList.add('d-none');
+        trimesterInput.required = false;
+        trimesterInput.value = '';
+      }
+      
+      // Show description
+      reportDescText.textContent = config.desc;
+      reportDescription.style.display = 'block';
+      
+      // Set current year as default
+      if (!yearInput.value) {
+        yearInput.value = new Date().getFullYear();
+      }
+    } else {
+      monthSection.classList.add('d-none');
+      trimesterSection.classList.add('d-none');
+      monthInput.required = false;
+      trimesterInput.required = false;
+      reportDescription.style.display = 'none';
+    }
+  });
+
+  // Reset form when modal is closed
+  document.getElementById('maternalReportGenerationModal').addEventListener('hidden.bs.modal', function() {
+    document.getElementById('maternalReportForm').reset();
+    monthSection.classList.add('d-none');
+    trimesterSection.classList.add('d-none');
+    reportDescription.style.display = 'none';
+    monthInput.required = false;
+    trimesterInput.required = false;
+  });
+
+  // Form validation before submit
+  document.getElementById('maternalReportForm').addEventListener('submit', function(e) {
+    const selectedType = reportType.value;
+    const yearValue = yearInput.value;
+    const monthValue = monthInput.value;
+    const trimesterValue = trimesterInput.value;
+
+    if (!selectedType) {
+      e.preventDefault();
+      alert('Please select a report type');
+      return;
+    }
+
+    if (!yearValue) {
+      e.preventDefault();
+      alert('Please enter a year');
+      return;
+    }
+
+    const config = reportDescriptions[selectedType];
+    if (config && config.requiresMonth && !monthValue) {
+      e.preventDefault();
+      alert('Please select a month for this report type');
+      return;
+    }
+
+    if (config && config.requiresTrimester && !trimesterValue) {
+      e.preventDefault();
+      alert('Please select a trimester for this report type');
+      return;
+    }
+
+    // Show loading indicator
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generating...';
+    
+    // Re-enable button after 3 seconds (PDF will open in new tab)
+    setTimeout(function() {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalText;
+    }, 3000);
+  });
+})();
+</script>
+
+<style>
+#maternalReportGenerationModal .modal-content {
+  border-radius: 16px;
+  border: 1px solid #ece7e1;
+}
+
+#maternalReportGenerationModal .form-select,
+#maternalReportGenerationModal .form-control {
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
+}
+
+#maternalReportGenerationModal .form-select:focus,
+#maternalReportGenerationModal .form-control:focus {
+  border-color: #6d2932;
+  box-shadow: 0 0 0 0.2rem rgba(109, 41, 50, 0.15);
+}
+
+#maternalReportGenerationModal .alert-light {
+  background-color: #fbf7f4;
+  border-color: #e8d8c4;
+  border-radius: 12px;
+}
+
+#maternalReportGenerationModal .btn {
+  border-radius: 12px;
+}
+</style>

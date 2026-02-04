@@ -1,0 +1,86 @@
+{%  extends 'base.html' %}
+
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+    <link rel="stylesheet" href="{% static 'css/table.css' %}">
+    <link rel="stylesheet" href="{% static 'css/button.css' %}">
+    <link rel="stylesheet" href="{% static 'css/modal.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3" style="margin-top: 40px;">
+
+    <div class="row">
+
+        <div class="col-lg-12">
+
+            <div>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Resident ID</th>
+                            <th scope="col">Full Name</th>
+                            <th scope="col">Mobile Number</th>
+                            <th scope="col">Email Address</th>
+                            <th scope="col">Registration Method</th>
+                            <th scope="col">Registration Date</th>
+                            <th scope="col">Account Status</th>
+                            <th scope="col">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="table-row-height">
+                            <td>000000</td>
+                            <td>Bellosillo, Raphael H.</td>
+                            <td>000000</td>
+                            <td>000000</td>
+                            <td>Walk-in</td>
+                            <td>000000</td>
+                            <td>000000</td>
+                            <td>
+                                <div>
+                                    <button type="button" class="btn btn-icon" data-bs-toggle="modal" data-bs-target="#generate_pass">
+                                        {% bs_icon 'pass-fill' size='1em' %}
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="9" class="text-center text-muted">No resident records found.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="modal fade" id="generate_pass" tabindex="-1" aria-labelledby="generate_pass" aria-hidden="true">
+                <div class="modal-dialog modal-md">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="home_address">Generate Temporary Password</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Are you sure you want to generate a new temporary password for <br>
+                                <strong>Bellosillo, Raphael H.</strong>
+                            </p>
+                        </div>
+
+                        <div class="modal-footer">
+                            {% csrf_token %}
+                            <form method="post">
+                                <button class="btn btn-reset">Cancel</button>
+                                <a class="btn btn-submit" href="{% url 'authentication:temporary_pass' %}">Generate</a>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}

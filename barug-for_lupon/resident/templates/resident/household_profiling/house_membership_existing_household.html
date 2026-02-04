@@ -1,0 +1,339 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block css %}
+    <link rel="stylesheet" href="{% static 'css/form.css' %}">
+    <link rel="stylesheet" href="{% static 'css/button.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3 d-flex flex-column flex-grow-1" style="margin-top: 40px;">
+    <h3 class="mb-3">Add Household Members</h3>
+    <form id="addMemberForm" class="mb-4">
+        <input type="hidden" id="family_id" name="family_id" value="{{ family_id }}">
+        <div class="row mb-2">
+            <div class="col-lg-5 col-md-12 col-sm-12 mb-3">
+                <div class="form-floating mb-3 position-relative" style="width:100%;">
+                    <input type="text" class="form-control" id="person_search" name="person_search" placeholder="Search Person" autocomplete="off" style="width:100%;">
+                    <label for="person_search">Search Person</label>
+                    <input type="hidden" id="person_id" name="person_id">
+                    <div id="person_search_results" class="list-group position-absolute" style="top:100%; left:0; width:100%; z-index:10;"></div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    <select id="rel_to_hhold_head_id" name="rel_to_hhold_head_id" class="form-select" required>
+                        <option value="">Relationship to Household Head</option>
+                        <option value="1">HOUSEHOLD HEAD</option>
+                        <option value="2">FAMILY HEAD</option>
+                        <option value="3">SPOUSE</option>
+                        <option value="4">MOTHER</option>
+                        <option value="5">FATHER</option>
+                        <option value="6">GUARDIAN</option>
+                        <option value="7">CHILD</option>
+                        <option value="8">SON</option>
+                        <option value="9">DAUGHTER</option>
+                        <option value="10">SIBLING</option>
+                        <option value="11">GRANDCHILD</option>
+                        <option value="12">GRANDPARENT</option>
+                        <option value="13">NEPHEW</option>
+                        <option value="14">NIECE</option>
+                        <option value="15">UNCLE</option>
+                        <option value="16">AUNT</option>
+                        <option value="17">COUSIN</option>
+                        <option value="18">IN-LAW (E.G., BROTHER-IN-LAW, SISTER-IN-LAW, PARENT-IN-LAW)</option>
+                        <option value="19">BOARDER</option>
+                        <option value="20">RENTER</option>
+                        <option value="21">DOMESTIC HELPER</option>
+                        <option value="22">OTHER RELATIVE</option>
+                        <option value="23">NON-RELATIVE</option>
+                    </select>
+                    <label for="rel_to_hhold_head_id">Relationship to Household Head</label>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    <select id="rel_to_family_head_id" name="rel_to_family_head_id" class="form-select" required>
+                        <option value="">Relationship to Family Head</option>
+                        <option value="2">FAMILY HEAD</option>
+                        <option value="3">SPOUSE</option>
+                        <option value="4">MOTHER</option>
+                        <option value="5">FATHER</option>
+                        <option value="6">GUARDIAN</option>
+                        <option value="7">CHILD</option>
+                        <option value="8">SON</option>
+                        <option value="9">DAUGHTER</option>
+                        <option value="10">SIBLING</option>
+                        <option value="11">GRANDCHILD</option>
+                        <option value="12">GRANDPARENT</option>
+                        <option value="13">NEPHEW</option>
+                        <option value="14">NIECE</option>
+                        <option value="15">UNCLE</option>
+                        <option value="16">AUNT</option>
+                        <option value="17">COUSIN</option>
+                        <option value="18">IN-LAW (E.G., BROTHER-IN-LAW, SISTER-IN-LAW, PARENT-IN-LAW)</option>
+                        <option value="19">BOARDER</option>
+                        <option value="20">RENTER</option>
+                        <option value="21">DOMESTIC HELPER</option>
+                        <option value="22">OTHER RELATIVE</option>
+                        <option value="23">NON-RELATIVE</option>
+                    </select>
+                    <label for="rel_to_family_head_id">Relationship to Family Head</label>
+                </div>
+            </div>
+        </div>
+        <div class="d-flex justify-content-end">
+            <button type="button" class="btn btn-primary" id="addMemberBtn">Add Member</button>
+        </div>
+    </form>
+    <h5>Members to be Added</h5>
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped table-hover align-middle" id="membersPreviewTable" style="background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <thead class="table-dark">
+                <tr>
+                    <th class="text-center">Name</th>
+                    <th class="text-center">Relationship to Household Head</th>
+                    <th class="text-center">Relationship to Family Head</th>
+                    <th class="text-center">Action</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+    <div class="d-flex justify-content-end mt-3">
+        <button type="button" class="btn btn-success" id="submitMembersBtn">Submit Members</button>
+    </div>
+</div>
+
+{% block js %}
+<script>
+(function() {
+    const members = [];
+    document.addEventListener('DOMContentLoaded', function () {
+        // Person search logic
+        const searchInput = document.getElementById('person_search');
+        const resultsContainer = document.getElementById('person_search_results');
+        const hiddenIdInput = document.getElementById('person_id');
+        let debounceTimeout = null;
+        let personSelected = false;
+
+        searchInput.addEventListener('input', function () {
+            const query = searchInput.value.trim();
+            resultsContainer.innerHTML = '';
+            if (!personSelected) {
+                hiddenIdInput.value = '';
+            }
+            personSelected = false;
+            if (debounceTimeout) clearTimeout(debounceTimeout);
+            if (query.length < 2) return;
+            debounceTimeout = setTimeout(() => {
+                fetch(`/resident/api/search/?q=${encodeURIComponent(query)}&limit=10`)
+                    .then(response => response.json())
+                    .then(data => {
+                        resultsContainer.innerHTML = '';
+                        if (Array.isArray(data) && data.length > 0) {
+                            data.forEach(person => {
+                                const item = document.createElement('button');
+                                item.type = 'button';
+                                item.className = 'list-group-item list-group-item-action';
+                                const name = `${person.first_name} ${person.last_name}`;
+                                const code = person.person_code ? ` [${person.person_code}]` : '';
+                                const address = person.full_address ? `${person.full_address}` : '';
+                                item.innerHTML = `<strong>${name}</strong>${code}<br><small>${address}</small>`;
+                                item.addEventListener('click', function () {
+                                    searchInput.value = name;
+                                    hiddenIdInput.value = person.person_id;
+                                    personSelected = true;
+                                    resultsContainer.innerHTML = '';
+                                });
+                                resultsContainer.appendChild(item);
+                            });
+                        } else {
+                            const noResult = document.createElement('div');
+                            noResult.className = 'list-group-item';
+                            noResult.textContent = 'No results found.';
+                            resultsContainer.appendChild(noResult);
+                        }
+                    })
+                    .catch(() => {
+                        resultsContainer.innerHTML = '<div class="list-group-item">Error searching.</div>';
+                    });
+            }, 300);
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!resultsContainer.contains(e.target) && e.target !== searchInput) {
+                resultsContainer.innerHTML = '';
+            }
+        });
+
+        // Add member logic
+        const addMemberBtn = document.getElementById('addMemberBtn');
+        let addMemberLocked = false;
+        if (!addMemberBtn.hasAttribute('data-listener-bound')) {
+            addMemberBtn.setAttribute('data-listener-bound', 'true');
+            addMemberBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                if (addMemberLocked) return;
+                addMemberLocked = true;
+                addMemberBtn.disabled = true;
+                const personId = hiddenIdInput.value;
+                const personName = searchInput.value.trim();
+                const relToHholdHeadSelect = document.getElementById('rel_to_hhold_head_id');
+                const relToFamilyHeadSelect = document.getElementById('rel_to_family_head_id');
+                const relToHholdHead = relToHholdHeadSelect.selectedOptions[0].text;
+                const relToHholdHeadId = relToHholdHeadSelect.value;
+                const relToFamilyHead = relToFamilyHeadSelect.selectedOptions[0].text;
+                const relToFamilyHeadId = relToFamilyHeadSelect.value;
+
+                if (!personId || !personName || !relToHholdHeadId || !relToFamilyHeadId) {
+                    alert('Please select a person from the search results and both relationships.');
+                    addMemberBtn.disabled = false;
+                    addMemberLocked = false;
+                    return;
+                }
+                if (members.some(m => m.personId === personId)) {
+                    alert('This person is already added.');
+                    addMemberBtn.disabled = false;
+                    addMemberLocked = false;
+                    return;
+                }
+                members.push({
+                    personId,
+                    personName,
+                    relToHholdHead,
+                    relToHholdHeadId,
+                    relToFamilyHead,
+                    relToFamilyHeadId
+                });
+                renderMembersTable();
+                searchInput.value = '';
+                hiddenIdInput.value = '';
+                relToHholdHeadSelect.value = '';
+                relToFamilyHeadSelect.value = '';
+                addMemberBtn.disabled = false;
+                addMemberLocked = false;
+            });
+        }
+
+        function renderMembersTable() {
+            const tbody = document.querySelector('#membersPreviewTable tbody');
+            tbody.innerHTML = '';
+            members.forEach((m, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="text-center align-middle">${m.personName}</td>
+                    <td class="text-center align-middle">${m.relToHholdHead}</td>
+                    <td class="text-center align-middle">${m.relToFamilyHead}</td>
+                    <td class="text-center align-middle"><button type="button" class="btn btn-danger btn-sm" data-idx="${idx}">Remove</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+            tbody.querySelectorAll('button[data-idx]').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const idx = parseInt(btn.getAttribute('data-idx'));
+                    members.splice(idx, 1);
+                    renderMembersTable();
+                });
+            });
+        }
+
+        // Helper to get CSRF token from cookie
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    // Does this cookie string begin with the name we want?
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // API call to register household members (with CSRF token)
+        async function registerHouseholdMembers(familyId) {
+            const membersPayload = members.map(m => ({
+                p_family_id: familyId,
+                p_existing_person_id: m.personId,
+                p_relationship_to_hholdhead_id: m.relToHholdHeadId,
+                p_relationship_to_family_head_id: m.relToFamilyHeadId,
+                person_name: m.personName
+            }));
+            const payload = {
+                members: membersPayload
+            };
+            const csrftoken = getCookie('csrftoken');
+            try {
+                const response = await fetch('/resident/api/register/household_members/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': csrftoken
+                    },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    alert('Failed to register members: ' + errorText);
+                    return null;
+                }
+                const data = await response.json();
+                // Check for non-critical errors in results
+                if (data && Array.isArray(data.results)) {
+                    const errorMessages = data.results
+                        .filter(r => r && typeof r === 'object' && r.error)
+                        .map(r => r.error);
+                    if (errorMessages.length > 0) {
+                        alert('Some members were not added or have issues:\n' + errorMessages.join('\n'));
+                        members.length = 0;
+                        renderMembersTable();
+                    } else {
+                        // Success: clear table, hidden data, and redirect
+                        alert('Members registered successfully!');
+                        members.length = 0;
+                        renderMembersTable();
+                    }
+                } else {
+                    // Success: clear table, hidden data, and redirect
+                    alert('Members registered successfully!');
+                    members.length = 0;
+                    renderMembersTable();
+                }
+                return data;
+            } catch (err) {
+                alert('Error registering members: ' + err);
+                return null;
+            }
+        }
+
+        // Submit button logic
+        const submitBtn = document.getElementById('submitMembersBtn');
+        if (submitBtn) {
+            submitBtn.addEventListener('click', async function () {
+                if (members.length === 0) {
+                    alert('No members to submit.');
+                    return;
+                }
+                const familyIdInput = document.getElementById('family_id');
+                const familyId = familyIdInput ? familyIdInput.value : null;
+                if (!familyId) {
+                    alert('Family ID is missing.');
+                    return;
+                }
+                submitBtn.disabled = true;
+                await registerHouseholdMembers(familyId);
+                submitBtn.disabled = false;
+            });
+        }
+    });
+})();
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,360 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<style>
+  :root{
+    --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932;
+    --brand-600:#7a323b; --brand-100:#f3eaeb; --brand-050:#fbf6f6;
+    --ring: rgba(109,41,50,.18);
+    --gold:#D4AF37;
+  }
+
+  /* ---------- Hero / Header ---------- */
+  .hero{
+    position:sticky; top:0; z-index:5;
+    background:linear-gradient(180deg, var(--brand-700) 0%, var(--brand-800) 100%);
+    border-bottom:1px solid rgba(255,255,255,.12);
+  }
+  .hero-inner{
+    display:flex; align-items:center; justify-content:space-between; gap:.75rem;
+    padding:.85rem 1rem;
+  }
+  .hero-left{ display:flex; align-items:center; gap:.75rem; color:#fff; }
+  .hero-title{ display:flex; align-items:center; gap:.5rem; margin:0; font-weight:800; letter-spacing:.2px; }
+  .hero-title .bi{ opacity:.9; }
+  .stat-pill{
+    display:inline-flex; align-items:center; gap:.45rem;
+    background:rgba(255,255,255,.08); color:#fff; border:1px solid rgba(255,255,255,.22);
+    padding:.35rem .75rem; border-radius:999px; font-weight:700; font-size:.9rem;
+  }
+  .stat-dot{ width:.55rem; height:.55rem; border-radius:50%; background:var(--gold); box-shadow:0 0 0 2px rgba(212,175,55,.25) inset; }
+
+  .btn-hero{
+    background:#fff; color:var(--brand-700); border:1px solid #fff; border-radius:999px; font-weight:800;
+    padding:.5rem 1rem; box-shadow:0 6px 18px rgba(0,0,0,.12);
+  }
+  .btn-hero:hover{ background:#f9f6f4; color:var(--brand-800); border-color:#fff; }
+
+  /* ---------- Secondary toolbar ---------- */
+  .toolbar{ background:#fff; border:1px solid var(--bs-border-color); border-radius:12px; padding:.6rem; margin:.75rem 0; }
+  .toolbar-grid{ display:grid; gap:.5rem; grid-template-columns:1fr; }
+  @media (min-width: 992px){ .toolbar-grid{ grid-template-columns:1fr auto; align-items:center; } }
+
+  .searchbox{ position:relative; width:100%; }
+  .searchbox .bi{ position:absolute; left:.7rem; top:50%; transform:translateY(-50%); color:var(--brand-700); opacity:.7; }
+  .searchbox input{ padding-left:2.2rem !important; }
+
+  .form-control,.form-select{ border-radius:12px; }
+  .form-control:focus,.form-select:focus{ border-color:var(--brand-700); box-shadow:0 0 0 .2rem var(--ring); }
+
+  /* ---------- Table & Cards ---------- */
+  .table-wrap{ background:#fff; border:1px solid var(--bs-border-color); border-radius:12px; overflow:hidden; }
+  .table{ margin:0; }
+  .table thead th{
+    position:sticky; top:0; z-index:1; background:#fff; border-bottom:1px solid #eadfda;
+    font-size:.8rem; letter-spacing:.02em; white-space:nowrap;
+  }
+  .table tbody td{ vertical-align:middle; }
+  .table-hover>tbody>tr:hover{ background-color:#fff9f8; }
+
+  .resident-card{ border:1px solid var(--bs-border-color,#e5e7eb); border-radius:12px; padding:1rem; background:#fff; }
+  .resident-card + .resident-card{ margin-top:.6rem; }
+  .rc-row{ display:flex; align-items:center; gap:.5rem; }
+  .rc-meta{ color:#6c757d; font-size:.9rem; }
+
+  .pill{ border-radius:999px; padding:.28rem .6rem; font-weight:800; font-size:.75rem; line-height:1; display:inline-flex; align-items:center; gap:.35rem; border:1px solid transparent; }
+  .pill-complainant{ background:#e7f6ec; color:#0f5132; border-color:#c7ebd3; }
+  .pill-respondent{ background:#fff7e6; color:#8a6d1d; border-color:#ffe0a6; }
+  .pill-both{ background:#e8f4ff; color:#0b4c77; border-color:#cde6fb; }
+  .pill-light{ background:#f2f2f2; color:#666; border-color:#e7e7e7; }
+
+  .actions{ display:flex; gap:.35rem; justify-content:flex-end; align-items:center; flex-wrap:wrap; }
+  .btn-chip{ border-radius:999px; padding:.35rem .75rem; font-weight:800; border:1px solid var(--brand-700); color:var(--brand-700); background:#fff; }
+  .btn-chip:hover{ background:var(--brand-700); color:#fff; }
+
+  .involvement-summary{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: .5rem;
+    margin-top: .5rem;
+  }
+  .involvement-item{
+    text-align: center;
+    padding: .5rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+  }
+  .involvement-count{
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--brand-700);
+  }
+  .involvement-label{
+    font-size: .75rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+
+  /* ---------- Pager ---------- */
+  .pager-wrap{ display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-top:.75rem; flex-wrap:wrap; }
+  .pagination .page-link{ color:var(--brand-700); border-color:rgba(109,41,50,.25); }
+  .pagination .page-link:hover{ background:var(--brand-050); border-color:var(--brand-700); color:var(--brand-800); }
+  .pagination .page-item.active .page-link{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
+  .pagination .page-item.disabled .page-link{ color:#999; background:#faf7f7; border-color:rgba(109,41,50,.15); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0" style="margin-top: 40px;">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-inner container-fluid">
+      <div class="hero-left">
+        <h5 class="hero-title m-0">
+          {% bs_icon 'people' extra_classes='me-1' %}
+          Resident Records
+        </h5>
+        {% if residents %}
+          <span class="stat-pill" title="Total residents with blotter involvement">
+            <span class="stat-dot"></span>
+            <span>{{ page_obj.paginator.count }}</span> residents
+          </span>
+        {% endif %}
+      </div>
+      <div class="hero-right">
+        <a href="{% url 'lupon_mem:report_list' %}" class="btn btn-hero d-none d-md-inline-flex">
+          {% bs_icon 'file-earmark-text' extra_classes='me-2' %} View Reports
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="container-fluid pt-2">
+    <!-- SEARCH -->
+    <form method="get" class="toolbar">
+      <div class="toolbar-grid">
+        <div class="searchbox">
+          {% bs_icon 'search' %}
+          <input type="text" class="form-control" name="q" value="{{ search_query }}" 
+                 placeholder="Search by name (first, last, or full name)...">
+        </div>
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-hero d-flex align-items-center justify-content-center">
+            {% bs_icon 'search' extra_classes='me-2' %} Search
+          </button>
+          <a href="{% url 'lupon_mem:resident_records_list' %}" class="btn btn-outline-light d-flex align-items-center justify-content-center" style="border-color:var(--brand-700); color:var(--brand-700);">
+            {% bs_icon 'arrow-counterclockwise' extra_classes='me-2' %} Clear
+          </a>
+        </div>
+      </div>
+    </form>
+
+    {% if search_query and not residents %}
+      <div class="alert alert-info">
+        <div class="d-flex align-items-center">
+          {% bs_icon 'info-circle' extra_classes='me-2' %}
+          <div>
+            <strong>No residents found</strong><br>
+            <small>Try searching with a different name or check the spelling.</small>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- DESKTOP TABLE -->
+    <div class="table-wrap d-none d-lg-block">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th class="text-center">Reports as Complainant</th>
+              <th class="text-center">Reports as Respondent</th>
+              <th class="text-center">Cases as Complainant</th>
+              <th class="text-center">Cases as Respondent</th>
+              <th class="text-center">Latest Activity</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for resident in residents %}
+              <tr>
+                <td>
+                  <div class="fw-semibold">{{ resident.1 }}</div>
+                  <small class="text-muted">ID: {{ resident.0 }}</small>
+                </td>
+                <td class="text-center">
+                  {% if resident.6 > 0 %}
+                    <span class="pill pill-complainant">{{ resident.6 }}</span>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+                <td class="text-center">
+                  {% if resident.7 > 0 %}
+                    <span class="pill pill-respondent">{{ resident.7 }}</span>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+                <td class="text-center">
+                  {% if resident.8 > 0 %}
+                    <span class="pill pill-complainant">{{ resident.8 }}</span>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+                <td class="text-center">
+                  {% if resident.9 > 0 %}
+                    <span class="pill pill-respondent">{{ resident.9 }}</span>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+                <td class="text-center">
+                  {% if resident.10 %}
+                    <small class="text-muted">{{ resident.10|date:"M d, Y" }}</small>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="actions">
+                    <a class="btn btn-chip btn-sm" href="{% url 'lupon_mem:resident_records_detail' resident.0 %}">
+                      {% bs_icon 'eye' %} View Records
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="7" class="text-center text-muted py-4">
+                {% if search_query %}
+                  No residents found matching "{{ search_query }}".
+                {% else %}
+                  No residents with blotter involvement found.
+                {% endif %}
+              </td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- MOBILE CARDS -->
+    <div class="d-lg-none">
+      {% for resident in residents %}
+        <div class="resident-card">
+          <div class="d-flex justify-content-between align-items-start">
+            <div class="flex-grow-1">
+              <div class="fw-semibold">{{ resident.1 }}</div>
+              <div class="rc-meta">ID: {{ resident.0 }}</div>
+              
+              <div class="involvement-summary">
+                <div class="involvement-item">
+                  <div class="involvement-count">{{ resident.6 }}</div>
+                  <div class="involvement-label">Reports (C)</div>
+                </div>
+                <div class="involvement-item">
+                  <div class="involvement-count">{{ resident.7 }}</div>
+                  <div class="involvement-label">Reports (R)</div>
+                </div>
+                <div class="involvement-item">
+                  <div class="involvement-count">{{ resident.8 }}</div>
+                  <div class="involvement-label">Cases (C)</div>
+                </div>
+                <div class="involvement-item">
+                  <div class="involvement-count">{{ resident.9 }}</div>
+                  <div class="involvement-label">Cases (R)</div>
+                </div>
+              </div>
+              
+              {% if resident.10 %}
+                <div class="rc-meta mt-2">
+                  <small>Latest: {{ resident.10|date:"M d, Y" }}</small>
+                </div>
+              {% endif %}
+            </div>
+            <div class="ms-3">
+              <a class="btn btn-chip btn-sm" href="{% url 'lupon_mem:resident_records_detail' resident.0 %}">
+                {% bs_icon 'eye' %} View
+              </a>
+            </div>
+          </div>
+        </div>
+      {% empty %}
+        <div class="text-center text-muted py-4">
+          {% if search_query %}
+            No residents found matching "{{ search_query }}".
+          {% else %}
+            No residents with blotter involvement found.
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.paginator.num_pages > 1 %}
+      <div class="pager-wrap">
+        <div class="text-muted">
+          Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }} residents
+        </div>
+        <nav>
+          <ul class="pagination pagination-sm mb-0">
+            {% if page_obj.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?{% if search_query %}q={{ search_query }}&{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">Previous</span>
+              </li>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+              {% if page_obj.number == num %}
+                <li class="page-item active">
+                  <span class="page-link">{{ num }}</span>
+                </li>
+              {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <li class="page-item">
+                  <a class="page-link" href="?{% if search_query %}q={{ search_query }}&{% endif %}page={{ num }}">{{ num }}</a>
+                </li>
+              {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?{% if search_query %}q={{ search_query }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">Next</span>
+              </li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+  // Auto-submit search form on Enter
+  document.querySelector('input[name="q"]').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      this.form.submit();
+    }
+  });
+</script>
+{% endblock %}

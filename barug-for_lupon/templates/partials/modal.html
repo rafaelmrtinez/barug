@@ -1,0 +1,46 @@
+{# templates/partials/modal.html #}
+{# You can reuse this partial for any modal_id. Styles below target #barugModal specifically. #}
+<div class="modal fade barug-modal {{ size|default:'' }}"
+     id="{{ modal_id }}"
+     tabindex="-1"
+     aria-labelledby="{{ modal_id }}-label"
+     aria-hidden="true"
+     data-bs-backdrop="static"
+     data-bs-keyboard="false">
+  <div class="modal-dialog {{ size|default:'' }}">
+    <div class="modal-content">
+      <div class="modal-header text-center position-relative">
+        <h5 class="modal-title fw-bold w-100" id="{{ modal_id }}-label">{{ title|default:"" }}</h5>
+        {% if show_close != "false" %}
+          <button type="button" class="btn-close position-absolute end-0 top-0 mt-2 me-2"
+                  data-bs-dismiss="modal" aria-label="Close"></button>
+        {% endif %}
+      </div>
+
+      <div class="modal-body" id="{{ modal_id }}-body">
+        {% if body_html %}{{ body_html|safe }}{% else %}
+          <p class="mb-0 text-muted">Content goes here…</p>
+        {% endif %}
+      </div>
+
+      <div class="modal-footer justify-content-center gap-3">
+        {% if secondary_label %}
+          <button type="button"
+                  class="barug-btn"
+                  data-role="secondary"
+                  data-bs-dismiss="modal">
+            {{ secondary_label }}
+          </button>
+        {% endif %}
+
+        {% if primary_label %}
+          <button type="button"
+                  class="barug-btn"
+                  data-role="primary">
+            {{ primary_label }}
+          </button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>

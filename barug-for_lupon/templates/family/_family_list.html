@@ -1,0 +1,32 @@
+{# _family_list.html #}
+{% for r in rows %}
+<tr>
+  <td>
+    <span class="id-pill">{{ r.family_num }}</span>
+  </td>
+  <td>{{ r.family_head_name }}</td>
+  <td>{{ r.household_num }}</td>
+  <td><span class="cat-badge">{{ r.household_type }}</span></td>
+  <td><span class="cat-badge">{{ r.nhts_status }}</span></td>
+  <td><span class="cat-badge">{{ r.indigent_status }}</span></td>
+  <td class="text-end">
+    {% if request.resolver_match.namespace == 'captain' %}
+      <a class="btn btn-outline-brand btn-sm" href="{% url 'captain:family_detail' family_id=r.family_id %}">
+          View
+      </a>
+    {% elif request.resolver_match.namespace == 'bhw' %}
+      <a class="btn btn-outline-brand btn-sm" href="{% url 'bhw:family_detail' family_id=r.family_id %}">
+          View
+      </a>
+    {% else %}
+      <a class="btn btn-outline-brand btn-sm" href="{% url 'secretary:family_detail' family_id=r.family_id %}">
+          View
+      </a>
+    {% endif %}
+  </td>
+</tr>
+{% empty %}
+<tr>
+  <td colspan="8" class="text-center py-3 text-muted">No families found.</td>
+</tr>
+{% endfor %}

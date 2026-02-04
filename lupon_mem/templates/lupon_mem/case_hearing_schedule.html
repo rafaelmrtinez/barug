@@ -306,11 +306,54 @@
       letter-spacing:.03em;
     }
 
-    /* Print */
+    /* Print Styles */
     @media print{
-      .btn, .alert, .badge{ display:none!important; }
-      .wrap, .cell{ box-shadow:none!important; background:#fff; }
+      .btn, .alert, .badge, .no-print{ display:none!important; }
+      .wrap, .cell{ box-shadow:none!important; background:#fff; border:1px solid #ddd; }
       body{ background:#fff; }
+      .print-only{ display:block!important; }
+      .documentation-grid{
+        display:grid!important;
+        grid-template-columns:repeat(2,1fr)!important;
+        gap:15px!important;
+        page-break-inside:avoid;
+      }
+      .documentation-item{
+        border:1px solid #ddd;
+        padding:10px;
+        border-radius:8px;
+        page-break-inside:avoid;
+        margin-bottom:15px;
+      }
+      .documentation-item img{
+        width:100%!important;
+        height:auto!important;
+        max-height:300px!important;
+        object-fit:contain!important;
+      }
+      .documentation-caption{
+        font-size:12px;
+        color:#666;
+        margin-top:8px;
+        text-align:center;
+      }
+      .print-header{
+        text-align:center;
+        margin-bottom:20px;
+        border-bottom:2px solid #6d2932;
+        padding-bottom:10px;
+      }
+      .print-case-info{
+        margin-bottom:20px;
+        padding:10px;
+        border:1px solid #ddd;
+        border-radius:5px;
+      }
+    }
+    
+    /* Print-only elements */
+    .print-only{
+      display:none;
     }
   </style>
 
@@ -552,10 +595,41 @@
   <div class="wrap wrap--quiet mb-3">
     <div class="section-h">
       <h6 class="title">Documentation Photos</h6>
-      {% if hearing_held %}<span class="badge text-bg-success">HELD</span>{% endif %}
+      <div class="d-flex gap-2">
+        {% if hearing_held %}<span class="badge text-bg-success">HELD</span>{% endif %}
+        <button class="btn btn-outline-brand btn-sm no-print" onclick="printDocumentation()" title="Print Documentation">
+          <i class="bi bi-printer me-1"></i> Print
+        </button>
+        <a href="{% url 'lupon_mem:hearing_documentation_pdf' case_id %}" class="btn btn-outline-brand btn-sm no-print" title="Download as PDF">
+          <i class="bi bi-download me-1"></i> Download PDF
+        </a>
+      </div>
     </div>
     <div class="section-b">
-      <div class="grid">
+      <!-- Print Header (only visible when printing) -->
+      <div class="print-only print-header">
+        <h2 style="color:#6d2932;margin:0;">BARANGAY LUPON HEARING DOCUMENTATION</h2>
+        <div class="print-case-info mt-3">
+          <div class="row">
+            <div class="col-6">
+              <strong>Case ID:</strong> {{ case_id }}<br>
+              <strong>Hearing Type:</strong> {% if hearing_source == "KP-8" %}Mediation Hearing{% elif hearing_source == "KP-12" %}Conciliation Hearing{% else %}Hearing{% endif %}
+            </div>
+            <div class="col-6">
+              <strong>Date:</strong> {{ hearing_date|default:"—" }}<br>
+              <strong>Time:</strong> {{ hearing_time|default:"—" }}<br>
+              <strong>Status:</strong> {% if hearing_held %}HELD{% else %}NOT HELD{% endif %}
+            </div>
+          </div>
+          <div class="mt-2">
+            <strong>Complainant(s):</strong> {{ complainants|join:", "|default:"—" }}<br>
+            <strong>Respondent(s):</strong> {{ respondents|join:", "|default:"—" }}
+          </div>
+        </div>
+      </div>
+      
+      <!-- Screen View -->
+      <div class="grid no-print">
         {% for p in mediation_photos %}
           <div class="tile position-relative">
             <a href="{{ p.display_url }}" target="_blank" rel="noopener" class="text-decoration-none">
@@ -570,6 +644,18 @@
               <i class="bi bi-trash"></i>
             </button>
             <div class="small soft mt-1 caption">{{ p.caption|default:" " }}</div>
+          </div>
+        {% endfor %}
+      </div>
+      
+      <!-- Print View -->
+      <div class="documentation-grid print-only">
+        {% for p in mediation_photos %}
+          <div class="documentation-item">
+            <img src="{{ p.display_url }}" alt="Documentation Photo {{ forloop.counter }}">
+            <div class="documentation-caption">
+              Photo {{ forloop.counter }}{% if p.caption and p.caption != " " %}: {{ p.caption }}{% endif %}
+            </div>
           </div>
         {% endfor %}
       </div>
@@ -874,6 +960,17 @@
     modal.addEventListener('hidden.bs.modal', () => modal.remove());
     bsModal.show();
   }
+  
+  // Print Documentation Function
+  window.printDocumentation = function() {
+    // Show loading message
+    showAlertModal('Preparing Print', 'Preparing documentation for printing. Please wait...');
+    
+    // Wait a moment for images to load, then print
+    setTimeout(() => {
+      window.print();
+    }, 1000);
+  };
 
   // If already held → concise summary chips
   const outcomeHost = document.getElementById('hearingOutcome');

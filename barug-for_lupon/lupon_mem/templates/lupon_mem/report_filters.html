@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Report Filters</h3>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="complaint_title_id">Complaint Title (Optional)</label>
+                                    <select class="form-control" id="complaint_title_id" name="complaint_title_id">
+                                        <option value="">All Complaint Types</option>
+                                        {% for ct_id, ct_name in complaint_titles %}
+                                            <option value="{{ ct_id }}">{{ ct_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="case_nature_id">Case Nature (Optional)</label>
+                                    <select class="form-control" id="case_nature_id" name="case_nature_id">
+                                        <option value="">All Case Natures</option>
+                                        {% for cn_id, cn_name in case_natures %}
+                                            <option value="{{ cn_id }}">{{ cn_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="date_from">Date From (Optional)</label>
+                                    <input type="date" class="form-control" id="date_from" name="date_from">
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="date_to">Date To (Optional)</label>
+                                    <input type="date" class="form-control" id="date_to" name="date_to">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-file-pdf"></i> Generate Report
+                            </button>
+                            <a href="{% url 'lupon_mem:blotter_reports_menu' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Back
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -4247,6 +4247,227 @@ def generate_settlement_summary(request, case_id: int):
 
 from django.db import connection
 
+@session_login_required
+@role_required(*LUPON_ROLES, "barangay treasurer")
+def hearing_documentation_pdf(request, case_id: int):
+    """
+    Generate a PDF document containing all hearing documentation photos
+    with case information and organized layout.
+    """
+    from django.http import HttpResponse
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.units import inch
+    from reportlab.lib.utils import ImageReader
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    from reportlab.lib import colors
+    from io import BytesIO
+    import requests
+    from PIL import Image as PILImage
+    
+    # Get case information
+    with connection.cursor() as cur:
+        cur.execute("""
+            SELECT bc.blotter_case_num, bc.blotter_case_name, bc.incident_desc,
+                   bc.date_filed, bc.time_filed,
+                   COALESCE(ct.complaint_title_name, '') AS complaint_title,
+                   COALESCE(cn.case_name, '') AS case_nature
+            FROM blotter_case bc
+            LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
+            LEFT JOIN case_nature cn ON cn.case_nature_id = bc.case_nature_id
+            WHERE bc.blotter_case_id = %s
+        """, [case_id])
+        case_info = cur.fetchone()
+        if not case_info:
+            return HttpResponse("Case not found", status=404)
+        
+        case_num, case_name, incident_desc, date_filed, time_filed, complaint_title, case_nature = case_info
+        
+        # Get parties
+        cur.execute("""
+            SELECT TRIM(COALESCE(p.first_name,'')||' '||COALESCE(p.last_name,'')) 
+            FROM complainant_case cc JOIN person p ON p.person_id=cc.person_id
+            WHERE cc.blotter_case_id=%s ORDER BY 1
+        """, [case_id])
+        complainants = [r[0] for r in cur.fetchall()]
+        
+        cur.execute("""
+            SELECT TRIM(COALESCE(p.first_name,'')||' '||COALESCE(p.last_name,'')) 
+            FROM respondent_case rc JOIN person p ON p.person_id=rc.person_id
+            WHERE rc.blotter_case_id=%s ORDER BY 1
+        """, [case_id])
+        respondents = [r[0] for r in cur.fetchall()]
+    
+    # Get hearing information
+    hearing_info = {}
+    with connection.cursor() as cur:
+        cur.execute("SELECT * FROM fn_case_mediation_hearings(%s)", [case_id])
+        cols = [c[0] for c in cur.description] if cur.description else []
+        hearing_rows = [dict(zip(cols, r)) for r in cur.fetchall()] if cols else []
+        
+        if hearing_rows:
+            latest_hearing = hearing_rows[-1]  # Get the latest hearing
+            hearing_info = {
+                'source': latest_hearing.get('source', ''),
+                'hearing_date': latest_hearing.get('hearing_date'),
+                'hearing_time': latest_hearing.get('hearing_time'),
+                'hearing_held': bool(latest_hearing.get('hearing_held')),
+                'held_at': latest_hearing.get('held_at')
+            }
+    
+    # Get documentation photos
+    mediation_photos = _list_mediation_photos(case_id, None)
+    
+    if not mediation_photos:
+        return HttpResponse("No documentation photos found", status=404)
+    
+    # Create PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+    
+    # Container for the 'Flowable' objects
+    elements = []
+    
+    # Define styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        spaceAfter=30,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor('#6d2932')
+    )
+    
+    header_style = ParagraphStyle(
+        'CustomHeader',
+        parent=styles['Heading2'],
+        fontSize=14,
+        spaceAfter=12,
+        textColor=colors.HexColor('#6d2932')
+    )
+    
+    normal_style = ParagraphStyle(
+        'CustomNormal',
+        parent=styles['Normal'],
+        fontSize=10,
+        spaceAfter=6
+    )
+    
+    # Title
+    title = Paragraph("BARANGAY LUPON HEARING DOCUMENTATION", title_style)
+    elements.append(title)
+    elements.append(Spacer(1, 12))
+    
+    # Case Information Table
+    case_data = [
+        ['Case ID:', case_num or 'N/A'],
+        ['Case Name:', case_name or 'N/A'],
+        ['Complaint Type:', complaint_title or 'N/A'],
+        ['Case Nature:', case_nature or 'N/A'],
+        ['Date Filed:', date_filed.strftime('%B %d, %Y') if date_filed else 'N/A'],
+        ['Time Filed:', time_filed.strftime('%I:%M %p') if time_filed else 'N/A'],
+        ['Complainant(s):', ', '.join(complainants) if complainants else 'N/A'],
+        ['Respondent(s):', ', '.join(respondents) if respondents else 'N/A']
+    ]
+    
+    if hearing_info:
+        hearing_type = 'Mediation Hearing' if hearing_info.get('source') == 'KP-8' else 'Conciliation Hearing' if hearing_info.get('source') == 'KP-12' else 'Hearing'
+        case_data.extend([
+            ['Hearing Type:', hearing_type],
+            ['Hearing Date:', hearing_info.get('hearing_date').strftime('%B %d, %Y') if hearing_info.get('hearing_date') else 'N/A'],
+            ['Hearing Time:', hearing_info.get('hearing_time').strftime('%I:%M %p') if hearing_info.get('hearing_time') else 'N/A'],
+            ['Status:', 'HELD' if hearing_info.get('hearing_held') else 'NOT HELD']
+        ])
+    
+    case_table = Table(case_data, colWidths=[2*inch, 4*inch])
+    case_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f3f4f6')),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#6d2932')),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6)
+    ]))
+    
+    elements.append(case_table)
+    elements.append(Spacer(1, 20))
+    
+    # Documentation Photos Header
+    photos_header = Paragraph("Documentation Photos", header_style)
+    elements.append(photos_header)
+    elements.append(Spacer(1, 12))
+    
+    # Add photos
+    for i, photo in enumerate(mediation_photos, 1):
+        try:
+            # Download image from URL
+            response = requests.get(photo['display_url'], timeout=10)
+            if response.status_code == 200:
+                img_data = BytesIO(response.content)
+                
+                # Open with PIL to get dimensions and ensure it's valid
+                pil_img = PILImage.open(img_data)
+                img_width, img_height = pil_img.size
+                
+                # Calculate scaling to fit within page width (max 6 inches)
+                max_width = 6 * inch
+                max_height = 4 * inch
+                
+                scale_w = max_width / img_width
+                scale_h = max_height / img_height
+                scale = min(scale_w, scale_h, 1.0)  # Don't upscale
+                
+                final_width = img_width * scale
+                final_height = img_height * scale
+                
+                # Reset BytesIO position
+                img_data.seek(0)
+                
+                # Create ReportLab Image
+                img = Image(img_data, width=final_width, height=final_height)
+                
+                # Photo caption
+                caption_text = f"Photo {i}"
+                if photo.get('caption') and photo['caption'].strip() and photo['caption'] != ' ':
+                    caption_text += f": {photo['caption']}"
+                
+                caption = Paragraph(caption_text, normal_style)
+                
+                elements.append(img)
+                elements.append(Spacer(1, 6))
+                elements.append(caption)
+                elements.append(Spacer(1, 20))
+                
+        except Exception as e:
+            # If image fails to load, add a placeholder
+            error_text = f"Photo {i}: Unable to load image ({str(e)[:50]}...)"
+            error_para = Paragraph(error_text, normal_style)
+            elements.append(error_para)
+            elements.append(Spacer(1, 12))
+    
+    # Build PDF
+    doc.build(elements)
+    
+    # Get the value of the BytesIO buffer and write it to the response
+    pdf = buffer.getvalue()
+    buffer.close()
+    
+    response = HttpResponse(pdf, content_type='application/pdf')
+    filename = f"hearing_documentation_case_{case_num or case_id}_{datetime.now().strftime('%Y%m%d')}.pdf"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    return response
+
+
 def _maybe_upsert_hearing_attendance(case_id: int, source_code: str, notice_sid: int,
                                      compl_attended: bool, resp_attended: bool,
                                      settlement: str | None, remarks: str | None) -> None:

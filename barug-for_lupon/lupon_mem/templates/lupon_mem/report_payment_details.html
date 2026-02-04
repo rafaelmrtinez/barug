@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+
+{% block css %}
+<style>
+body{ background:var(--bs-body-bg); font-family:var(--bs-font-sans-serif); }
+.d-flex{ display:flex; }
+.justify-content-between{ justify-content:space-between; }
+.align-items-center{ align-items:center; }
+.flex-wrap{ flex-wrap:wrap; }
+.text-center{ text-align:center; }
+.mb-4{ margin-bottom:1.5rem; }
+.btn{ display:inline-block; padding:.5rem 1rem; text-decoration:none; border:none; cursor:pointer; }
+.page-wrap{ max-width:1200px; margin:0 auto; padding:1.25rem; }
+
+.hero{ border-radius:16px; background:var(--bs-danger-text-emphasis); 
+       color:var(--bs-white); padding:1.5rem; margin-bottom:1.5rem; box-shadow:0 4px 16px rgba(0,0,0,.1); }
+.hero .title{ font-weight:800; letter-spacing:.3px; margin:0; }
+.hero .subtitle{ opacity:.9; margin-top:.5rem; }
+
+.card{ border:var(--bs-border-width) solid var(--bs-border-color); border-radius:var(--bs-border-radius-lg); background:var(--bs-body-bg);
+       box-shadow:var(--bs-box-shadow); margin-bottom:1.5rem; }
+.card-header{ background:var(--bs-light); 
+              border-bottom:var(--bs-border-width) solid var(--bs-border-color); border-radius:var(--bs-border-radius-lg) var(--bs-border-radius-lg) 0 0!important; 
+              padding:1.25rem 1.5rem; }
+.card-header h5{ margin:0; font-weight:var(--bs-font-weight-bold); color:var(--bs-danger-text-emphasis); display:flex; align-items:center; gap:.5rem; }
+.card-body{ padding:1.5rem; }
+
+.info-grid{ display:grid; grid-template-columns:1fr 1fr; gap:2rem; }
+@media (max-width: 768px){ .info-grid{ grid-template-columns:1fr; gap:1.5rem; } }
+
+.info-item{ margin-bottom:1.5rem; }
+.info-label{ font-weight:var(--bs-font-weight-bold); color:var(--bs-emphasis-color); font-size:.9rem; margin-bottom:.4rem; 
+             text-transform:uppercase; letter-spacing:.5px; }
+.info-value{ color:var(--bs-secondary-color); font-size:1.1rem; font-weight:var(--bs-font-weight-medium); }
+.info-value.highlight{ color:var(--bs-emphasis-color); font-weight:var(--bs-font-weight-semibold); }
+.info-value.amount{ color:var(--bs-success); font-weight:var(--bs-font-weight-bold); font-size:1.3rem; }
+
+.status-badge{ display:inline-flex; align-items:center; gap:.4rem; padding:.5rem .8rem; 
+               border-radius:var(--bs-border-radius-pill); font-weight:var(--bs-font-weight-bold); font-size:.85rem; }
+.status-paid{ background:var(--bs-success-bg-subtle); color:var(--bs-success-text-emphasis); border:var(--bs-border-width) solid var(--bs-success-border-subtle); }
+.status-case{ background:var(--bs-info-bg-subtle); color:var(--bs-info-text-emphasis); border:var(--bs-border-width) solid var(--bs-info-border-subtle); }
+
+.receipt-box{ background:var(--bs-secondary-bg); 
+              border:2px dashed var(--bs-danger-text-emphasis); border-radius:var(--bs-border-radius); padding:1rem; 
+              text-align:center; font-family:var(--bs-font-monospace); font-weight:var(--bs-font-weight-semibold); color:var(--bs-danger-text-emphasis); }
+
+.btn-back{ background:rgba(255,255,255,.9); border:var(--bs-border-width) solid rgba(255,255,255,.3); 
+           color:var(--bs-white); border-radius:var(--bs-border-radius); font-weight:var(--bs-font-weight-semibold); text-decoration:none; }
+.btn-back:hover{ background:var(--bs-white); color:var(--bs-danger-text-emphasis); text-decoration:none; }
+
+.divider{ height:1px; background:var(--bs-border-color); margin:1.5rem 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <!-- Header -->
+  <div class="hero">
+    <div class="d-flex justify-content-between align-items-center flex-wrap">
+      <div>
+        <h2 class="title">🧾 Payment Receipt</h2>
+        <div class="subtitle">Blotter Report #{{ report.0 }} • {{ report.1 }}</div>
+      </div>
+      <a href="/lupon_mem/reports/" class="btn btn-back">
+        ← Back to Reports
+      </a>
+    </div>
+  </div>
+
+  <!-- Payment Summary Card -->
+  <div class="card">
+    <div class="card-header">
+      <h5>💳 Payment Summary</h5>
+    </div>
+    <div class="card-body">
+      <div class="text-center mb-4">
+        <div class="receipt-box">
+          {{ payment.receipt_num|default:"No Receipt Number" }}
+        </div>
+      </div>
+      
+      <div class="info-grid">
+        <div>
+          <div class="info-item">
+            <div class="info-label">💰 Amount Paid</div>
+            <div class="info-value amount">₱{{ payment.amount|floatformat:2|default:"0.00" }}</div>
+          </div>
+          
+          <div class="info-item">
+            <div class="info-label">✅ Payment Status</div>
+            <div class="info-value">
+              <span class="status-badge status-paid">
+                ✓ {{ payment.payment_status_name|default:"PAID" }}
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <div>
+          <div class="info-item">
+            <div class="info-label">📅 Payment Date & Time</div>
+            <div class="info-value highlight">{{ payment.date_of_payment_pretty|default:"—" }}</div>
+            <div class="info-value">{{ payment.time_of_payment_pretty|default:"—" }}</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="divider"></div>
+      
+      <div class="info-grid">
+        <div>
+          <div class="info-item">
+            <div class="info-label">👤 Paid By</div>
+            <div class="info-value highlight">{{ payment.paid_by_name|default:"—" }}</div>
+          </div>
+        </div>
+        
+        <div>
+          <div class="info-item">
+            <div class="info-label">👨‍💼 Received By</div>
+            <div class="info-value highlight">{{ payment.payee_name|default:"—" }}</div>
+            <div class="info-value">Staff Code: {{ payment.payee_staff_code|default:"—" }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Report & Case Information -->
+  <div class="card">
+    <div class="card-header">
+      <h5>📄 Report & Case Details</h5>
+    </div>
+    <div class="card-body">
+      <div class="info-grid">
+        <div>
+          <div class="info-item">
+            <div class="info-label"># Report ID</div>
+            <div class="info-value highlight">#{{ report.0 }}</div>
+          </div>
+          
+          <div class="info-item">
+            <div class="info-label">📝 Subject</div>
+            <div class="info-value highlight">{{ report.1 }}</div>
+          </div>
+        </div>
+        
+        <div>
+          <div class="info-item">
+            <div class="info-label">📆 Date Reported</div>
+            <div class="info-value highlight">{{ report.2 }}</div>
+          </div>
+          
+          <div class="info-item">
+            <div class="info-label">📁 Case Status</div>
+            <div class="info-value">
+              {% if payment.blotter_case_id %}
+                <span class="status-badge status-case">
+                  ✓ Case #{{ payment.blotter_case_id }}
+                </span>
+              {% else %}
+                <span class="status-badge status-case">
+                  ✓ Case Created
+                </span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

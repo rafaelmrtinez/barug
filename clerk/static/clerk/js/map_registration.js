@@ -200,7 +200,8 @@ document.addEventListener("DOMContentLoaded", function () {
           if (item.id.includes('address')) street = item.text;
         });
 
-        barangay = 'Sto. Niño';
+        barangay = 'SEÑOR SANTO NIÑO';
+        city = city || 'Cebu City';
 
         const hit = whichPurok(purokFc, lng, lat);
         if (hit?.name) purok = hit.name;
@@ -229,27 +230,33 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function attemptUpdate(coords) {
-    if (typeof turf === 'undefined') {
-      console.warn('Turf is required for boundary checks.');
-      return;
-    }
-    const point = turf.point([coords.lng, coords.lat]);
-    const inside = turf.booleanPointInPolygon(point, stoNinoBoundary);
+    // Always allow selection anywhere - no boundary check
+    marker.setLngLat([coords.lng, coords.lat]);
+    currentLngLat = coords;
+    setLatLngFields(coords);
 
-    if (inside) {
-      marker.setLngLat([coords.lng, coords.lat]);
-      currentLngLat = coords;
-      setLatLngFields(coords);
-
-      const hit = whichPurok(purokFc, coords.lng, coords.lat);
-      setPurokInput(hit);
-
-      getAddressFromCoordinates(coords.lng, coords.lat);
+    // Find nearest purok regardless of location
+    const hit = whichPurok(purokFc, coords.lng, coords.lat);
+    if (!hit && purokFc) {
+      // If not in any purok, find nearest one
+      const point = turf.point([coords.lng, coords.lat]);
+      let nearestPurok = null;
+      let minDistance = Infinity;
+      
+      purokFc.features.forEach(f => {
+        const center = turf.centroid(f);
+        const distance = turf.distance(point, center, {units: 'kilometers'});
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearestPurok = f.properties;
+        }
+      });
+      
+      setPurokInput(nearestPurok);
     } else {
-      new mapboxgl.Popup()
-        .setLngLat([coords.lng, coords.lat])
-        .setHTML(`<strong>Invalid:</strong><br>Select only within Sto. Niño boundary.`)
-        .addTo(map);
+      setPurokInput(hit);
     }
+
+    getAddressFromCoordinates(coords.lng, coords.lat);
   }
 });

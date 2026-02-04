@@ -1,0 +1,329 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+<style>
+:root{--brand-700:#6d2932;--brand-800:#561c24;--brand-100:#f3eaeb;--brand-050:#fbf6f6;}
+.btn-brand{color:#fff;background:var(--brand-700);border-color:var(--brand-700);}
+.btn-brand:hover{background:var(--brand-800);border-color:var(--brand-800);color:#fff;}
+.btn-outline-brand{color:var(--brand-700);border-color:var(--brand-700);background:#fff;}
+.btn-outline-brand:hover{background:var(--brand-700);color:#fff;}
+.btn-brand-subtle{background:var(--brand-100);color:var(--brand-700);border-color:var(--brand-100);}
+.btn-brand-subtle:hover{background:var(--brand-050);color:var(--brand-700);}
+.form-control:focus,.form-select:focus{border-color:var(--brand-700);box-shadow:0 0 0 .25rem rgba(109,41,50,.25);}
+.hero{background:linear-gradient(180deg,var(--brand-050),#fff 70%);border:1px solid #dee2e6;border-radius:16px;padding:18px 16px;}
+.hero .case-no{font-size:.85rem;color:#6c757d;font-weight:700;letter-spacing:.02em}
+.hero .title{margin:2px 0 0;font-weight:800;color:#0f172a}
+.pill{display:inline-flex;align-items:center;gap:.45rem;padding:.35rem .7rem;border-radius:999px;font-weight:800;font-size:.75rem;border:1px solid transparent;white-space:nowrap;}
+.pill-status{background:#fff;color:var(--brand-700);border-color:#eadfcd;box-shadow:0 1px 0 #f0e7d5}
+.toolbar{background:#fff;border:1px solid #dee2e6;border-radius:1rem;padding:.75rem;gap:.5rem;}
+.search-box{position:relative;flex:1;min-width:280px;}
+.search-box .bi{position:absolute;left:.8rem;top:50%;transform:translateY(-50%);color:var(--brand-700);opacity:.6;}
+.search-box input{padding-left:2.5rem!important;}
+.table thead th{border-bottom:2px solid #dee2e6;font-weight:600;color:#495057;font-size:.85rem;white-space:nowrap;}
+.table tbody tr:hover{background:#f8f9fa;}
+.code-chip{display:inline-flex;align-items:center;gap:.35rem;font-family:ui-monospace,Consolas,monospace;font-size:.78rem;padding:.22rem .46rem;border-radius:.5rem;background:#f7f5f2;border:1px solid #eee}
+.pill-submitted{background:#eaf7ee;color:#0f5132;border:1px solid #bfe6cc}
+.pill-pending{background:#eef2f7;color:#0f172a;border:1px solid #d5dce7}
+.status-pill{display:inline-flex;align-items:center;gap:.25rem;font-size:.75rem;font-weight:600;padding:.25rem .5rem;border-radius:999px;border:1px solid;}
+.status-open{background:#e7f3ff;color:#0066cc;border-color:#b3d9ff;}
+.status-closed{background:#f1f3f4;color:#5f6368;border-color:#dadce0;}
+.status-settled{background:#e8f5e8;color:#137333;border-color:#c8e6c9;}
+.status-pending{background:#fef7e0;color:#b06000;border-color:#f9c74f;}
+.status-unsettled{background:#fce8e6;color:#d93025;border-color:#f28b82;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="margin-top: 60px;">
+
+  {% if messages %}
+    <div class="mt-2">
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }} mb-2" role="alert">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <!-- Hero Header -->
+  <section class="hero mb-3">
+    <div class="d-flex align-items-start justify-content-between gap-2 flex-wrap">
+      <div>
+        <div class="case-no">Case No. {{ case.1 }}</div>
+        <h3 class="title">{{ case.2 }}</h3>
+
+        <div class="d-flex align-items-center gap-2 mt-2">
+          <span class="pill pill-status" title="Settlement Status">
+            <i class="bi bi-hand-thumbs-up"></i> {{ case.7|default:"—" }}
+          </span>
+
+          {% with st=case_state_name|default:"—"|lower %}
+            <span class="pill"
+                  title="Case State"
+                  style="{% if st == 'open' %}background:#eef7ff;color:#0b5cab;border:1px solid #cfe4ff;{% elif st == 'pending' %}background:#fffaf2;color:#995a00;border:1px solid #f2ddbd;{% elif st == 'closed' %}background:#f5f7f9;color:#334155;border:1px solid #e5e7eb;{% else %}background:#f6f7f9;color:#4b5563;border:1px solid #e5e7eb;{% endif %}">
+              {% if st == 'open' %}<i class="bi bi-unlock"></i> OPEN
+              {% elif st == 'pending' %}<i class="bi bi-hourglass-split"></i> PENDING
+              {% elif st == 'closed' %}<i class="bi bi-lock"></i> CLOSED
+              {% else %}{{ case_state_name|default:"—" }}{% endif %}
+            </span>
+          {% endwith %}
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-brand" href="{% url 'lupon_mem:case_timeline' case_id %}">
+          <i class="bi bi-clock-history me-1"></i> Timeline
+        </a>
+        <a class="btn btn-brand" href="{% url 'lupon_mem:case_hearing_list' case_id %}">
+          <i class="bi bi-calendar-week me-1"></i> Hearings
+        </a>
+        <a class="btn btn-outline-brand" href="{% url 'lupon_mem:summon_attendance' case_id %}">
+          <i class="bi bi-envelope me-1"></i> Summons / Attendance
+        </a>
+
+        <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#updateSettlementModal">
+          <i class="bi bi-hand-thumbs-up me-1"></i> Update Settlement
+        </button>
+
+        {% if case_state_name|lower == "closed" %}
+          <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#reopenCaseModal">
+            <i class="bi bi-arrow-counterclockwise me-1"></i> Reopen
+          </button>
+        {% else %}
+          <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#closeCaseModal">
+            <i class="bi bi-lock me-1"></i> Close Case
+          </button>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <!-- Process Guide -->
+  <div class="alert alert-info mb-3">
+    <i class="bi bi-info-circle me-2"></i>
+    <strong>Process:</strong> After attaching KP-8 and KP-9 forms, go to <strong>Hearings</strong> to record attendance and settlement status.
+  </div>
+
+  <!-- Attached Forms -->
+  <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+    <h6 class="text-uppercase text-muted fw-bold mb-0 d-flex align-items-center">
+      <i class="bi bi-files me-1"></i> Attached KP Forms
+    </h6>
+    <div class="text-muted small d-none d-md-block">
+      {% if forms %}{{ forms|length }} form{{ forms|length|pluralize }}{% else %}0 forms{% endif %}
+    </div>
+  </div>
+
+  <div class="toolbar d-flex align-items-center flex-wrap mb-2">
+    <div class="search-box">
+      <i class="bi bi-search"></i>
+      <input id="formsSearch" type="search" class="form-control" placeholder="Search form name or code…">
+    </div>
+
+    <div class="ms-auto d-flex align-items-center gap-2">
+        <a class="btn btn-outline-brand" href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
+          <i class="bi bi-plus-circle me-1"></i> Add Form
+        </a>
+
+      {% with status_txt=case.7|default:''|upper %}
+        {% if has_med_summary or status_txt == 'SETTLED' %}
+          {% if has_med_summary %}
+            <a class="btn btn-outline-brand" href="{% url 'lupon_mem:submission_pdf' med_summary_sid %}">
+              <i class="bi bi-file-earmark-text me-1"></i> View Summary
+            </a>
+          {% else %}
+            <a class="btn btn-outline-brand" href="{% url 'lupon_mem:generate_settlement_summary' case_id %}">
+              <i class="bi bi-file-earmark-plus me-1"></i> Create Summary
+            </a>
+          {% endif %}
+        {% endif %}
+      {% endwith %}
+    </div>
+  </div>
+
+  <!-- Forms Table -->
+  <div class="table-responsive">
+    <table class="table align-middle" id="formsTable">
+      <thead>
+        <tr>
+          <th style="width:120px;"><i class="bi bi-hash me-1"></i> Code</th>
+          <th><i class="bi bi-file-earmark-text me-1"></i> Form</th>
+          <th style="width:260px;"><i class="bi bi-check2-circle me-1"></i> Status</th>
+          <th style="width:230px;"><i class="bi bi-clock me-1"></i> Submitted</th>
+          <th class="text-end" style="width:90px;"><i class="bi bi-file-earmark-pdf me-1"></i> PDF</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for f in forms %}
+        <tr>
+          <td class="text-nowrap">
+            <span class="code-chip"><i class="bi bi-file-earmark-text"></i> {{ f.1 }}</span>
+          </td>
+          <td class="fw-semibold">
+            {{ f.2 }}
+            {% if f.7 %}
+              <span class="badge rounded-pill bg-light text-dark border ms-2">
+                {{ f.7 }}
+              </span>
+            {% endif %}
+            {% if f.5 %}
+              <span class="badge rounded-pill bg-light text-dark border ms-2" title="Who repudiated the settlement">
+                Repudiated by: {{ f.5 }}{% if f.6 %} — {{ f.6 }}{% endif %}
+              </span>
+            {% endif %}
+          </td>
+          <td>
+            {% if f.3 and f.3|upper == 'SUBMITTED' %}
+              <span class="pill-submitted pill"><i class="bi bi-check-circle me-1"></i> SUBMITTED</span>
+            {% else %}
+              <span class="pill-pending pill"><i class="bi bi-hourglass-split me-1"></i> {{ f.3|upper|default:"PENDING" }}</span>
+            {% endif %}
+          </td>
+          <td class="text-muted">{{ f.4 }}</td>
+          <td class="text-end">
+            <a class="btn btn-outline-brand btn-sm" href="{% url 'lupon_mem:submission_pdf' f.0 %}">
+              <i class="bi bi-file-earmark-pdf"></i>
+            </a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="5" class="text-center text-muted py-4">
+            <i class="bi bi-inboxes me-2"></i> No forms attached.
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="d-md-none mt-3 text-center">
+      <a class="btn btn-outline-brand btn-lg rounded-pill"
+         href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
+        <i class="bi bi-plus-circle me-1"></i> Add Form
+      </a>
+  </div>
+
+</div>
+
+<!-- Update Settlement Modal -->
+<div class="modal fade" id="updateSettlementModal" tabindex="-1" aria-labelledby="updateSettlementLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="updateSettlementLabel">
+          <i class="bi bi-hand-thumbs-up me-2"></i> Update Settlement Status
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{% url 'lupon_mem:case_settlement_update' case_id %}">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Settlement Status</label>
+            <select class="form-select" name="settlement_status" required>
+              <option value="">Choose status...</option>
+              {% for choice in settlement_choices %}
+                <option value="{{ choice }}" {% if case.7 == choice %}selected{% endif %}>{{ choice }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Remarks (Optional)</label>
+            <textarea class="form-control" name="remarks" rows="3" placeholder="Additional notes..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-brand-subtle" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-brand">
+            <i class="bi bi-check2 me-1"></i> Update Status
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Close Case Modal -->
+<div class="modal fade" id="closeCaseModal" tabindex="-1" aria-labelledby="closeCaseLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="closeCaseLabel">
+          <i class="bi bi-lock me-2"></i> Close Case
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{% url 'lupon_mem:case_close' case_id %}">
+        {% csrf_token %}
+        <div class="modal-body">
+          <p class="mb-3">Are you sure you want to close this case?</p>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Closing Note (Optional)</label>
+            <textarea class="form-control" name="close_note" rows="3" placeholder="Reason for closing..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-brand-subtle" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-brand">
+            <i class="bi bi-lock me-1"></i> Close Case
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Reopen Case Modal -->
+<div class="modal fade" id="reopenCaseModal" tabindex="-1" aria-labelledby="reopenCaseLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="reopenCaseLabel">
+          <i class="bi bi-arrow-counterclockwise me-2"></i> Reopen Case
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{% url 'lupon_mem:case_reopen' case_id %}">
+        {% csrf_token %}
+        <div class="modal-body">
+          <p class="mb-3">Are you sure you want to reopen this case?</p>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Reason for Reopening</label>
+            <textarea class="form-control" name="reopen_reason" rows="3" placeholder="Why is this case being reopened?" required></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-brand-subtle" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-brand">
+            <i class="bi bi-arrow-counterclockwise me-1"></i> Reopen Case
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+// Simple form search
+(function(){
+  const q = document.getElementById('formsSearch');
+  const table = document.getElementById('formsTable');
+  if(q && table){
+    const rows = Array.from(table.querySelectorAll('tbody tr'));
+    function applyFilter(){
+      const needle = q.value.trim().toLowerCase();
+      rows.forEach(tr=>{
+        const text = tr.innerText.toLowerCase();
+        tr.style.display = needle && !text.includes(needle) ? 'none' : '';
+      });
+    }
+    q.addEventListener('input', applyFilter);
+  }
+})();
+</script>
+{% endblock %}

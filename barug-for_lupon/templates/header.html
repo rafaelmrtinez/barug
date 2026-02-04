@@ -1,0 +1,225 @@
+{% load static %}
+{% load bootstrap_icons %}
+
+{# ====== BEGIN: Header with Notifications ====== #}
+<header class="text-white">
+
+  <div class="d-flex flex-wrap justify-content-between align-items-center">
+    <div class="mt-2">
+      <img src="{% static 'images/brgy-sto-nino.png' %}" alt="Barangay Sto. Niño" class="img-fluid pe-2" style="max-height:40px;
+      padding-left: 5;">
+      <span class="navbar-brand"><b>BARANGAY SEÑOR SANTO NIÑO</b></span>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+      <div class="d-flex align-items-center">
+
+        {# ───────────── Notifications (bell + badge + dropdown) ───────────── #}
+        <div id="notifRoot" class="position-relative me-2">
+
+        </div>
+        {# ──────────────────────────────────────────────────────────────────── #}
+
+        <a href="{% url 'authentication:account_settings' %}" class="btn p-0" aria-label="Open account settings">
+          {% if header_profile.staff_img %}
+            <img src="{{ header_profile.staff_img }}" alt="Profile" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover; border: 2px solid white;">
+          {% else %}
+            <div class="d-flex align-items-center justify-content-center text-white rounded-circle" style="width: 28px; height: 28px; background: var(--bs-danger-text-emphasis); font-size: 14px; font-weight: 600; border: 2px solid white;">
+              {{ header_profile.first_name|first|upper|default:"U" }}{{ header_profile.last_name|first|upper|default:"" }}
+            </div>
+          {% endif %}
+        </a>
+      </div>
+
+      <div class="user text-end">
+        <span class="navbar-text">{{ user_fullname }}</span>
+      </div>
+      <span class="navbar-text d-none d-sm-inline"> - </span>
+      <div class="user-type text-end">
+        <span class="navbar-text">{{ user_role|title }}</span>
+      </div>
+
+      <div class="d-flex align-items-center">
+        <div class="dropdown">
+          <button class="btn btn-logout dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Account Menu">
+            {% bs_icon 'arrow-bar-right' color='white' size='1.3em' %}
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            {% if user_roles|length > 1 %}
+              {% for role in user_roles %}
+                {% if role != selected_role %}
+                  <li><a class="dropdown-item" href="{% url 'authentication:switch_role' %}?role={{ role }}"><i class="bi bi-arrow-repeat me-2"></i>Switch to {{ role }}</a></li>
+                {% endif %}
+              {% endfor %}
+              <li><a class="dropdown-item" href="{% url 'authentication:switch_role' %}"><i class="bi bi-arrow-repeat me-2"></i>All Roles</a></li>
+              <li><hr class="dropdown-divider"></li>
+            {% endif %}
+            <li><a class="dropdown-item text-danger" href="#" onclick="showLogoutConfirmation()"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+          </ul>
+        </div>
+        <form action="{% url 'authentication:logout' %}" method="post" class="d-none" id="logoutForm">
+          {% csrf_token %}
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    /* Notification dropdown item look */
+    .notif-item{ padding:12px 14px; border-bottom:1px solid #f1f5f9; display:block; color:#111; text-decoration:none }
+    .notif-item:last-child{ border-bottom:0 }
+    .notif-title{ font-weight:600 }
+    .notif-body{ color:#64748b }
+    .notif-time{ font-size:12px; color:#94a3b8 }
+    /* White dropdown indicator */
+    .btn-logout.dropdown-toggle::after { border-top-color: white; }
+    /* Modern modal animations */
+    .modal.fade .modal-dialog { transform: scale(0.8); transition: transform 0.3s ease; }
+    .modal.show .modal-dialog { transform: scale(1); }
+  </style>
+
+  {# ───────────── Supabase + Notification Script ───────────── #}
+  {# If not already loaded in base.html, include Supabase JS and init here #}
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script>
+    // supply these from Django settings/context (safe public anon key)
+    window.SUPABASE_URL = "{{ SUPABASE_URL }}";
+    window.SUPABASE_ANON_KEY = "{{ SUPABASE_ANON_KEY }}";
+    window.supabase = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+
+    // Who is logged in? (set these from your view context)
+    // PERSON (resident) -> user_type_id=1 + person_id; STAFF -> user_type_id=2 + staff_id
+    window.CURRENT_USER_TYPE_ID = {{ user_type_id|default:1 }};     // 1 or 2
+    window.CURRENT_PERSON_ID    = {{ person_id|default:"null" }};   // integer or null
+    window.CURRENT_STAFF_ID     = {{ staff_id|default:"null" }};    // integer or null
+  </script>
+
+  <script type="module">
+    const bell   = document.getElementById('notifBell');
+    const badge  = document.getElementById('notifBadge');
+    const menu   = document.getElementById('notifMenu');
+    const listEl = document.getElementById('notifList');
+    const clearBtn = document.getElementById('notifClearAll');
+
+    const userTypeId = Number(window.CURRENT_USER_TYPE_ID);
+    const personId   = window.CURRENT_PERSON_ID ?? null;
+    const staffId    = window.CURRENT_STAFF_ID ?? null;
+
+    let open = false;
+    bell?.addEventListener('click', () => { open = !open; menu.style.display = open ? 'block' : 'none'; });
+    document.addEventListener('click', (e)=>{
+      const root = document.getElementById('notifRoot');
+      if (root && !root.contains(e.target)) { open=false; menu.style.display='none'; }
+    });
+
+    function matchesMe(n){
+      if (Number(n.user_type_id) !== userTypeId) return false;
+      if (userTypeId === 1) return Number(n.person_id||0) === Number(personId||0);
+      if (userTypeId === 2) return Number(n.staff_id||0)  === Number(staffId||0);
+      return false;
+    }
+    function timeago(iso){
+      const t=new Date(iso); const s=Math.floor((Date.now()-t)/1000);
+      if (s<60) return `${s}s ago`; const m=Math.floor(s/60);
+      if (m<60) return `${m}m ago`; const h=Math.floor(m/60);
+      if (h<24) return `${h}h ago`; const d=Math.floor(h/24); return `${d}d ago`;
+    }
+    function render(items){
+      const unread = items.filter(n=>!n.is_read).length;
+      badge.textContent = unread;
+      badge.style.display = unread ? 'inline-flex' : 'none';
+      listEl.innerHTML = items.slice(0,8).map(n=>`
+        <a href="${n.deep_link || '#'}" class="notif-item" data-id="${n.notification_id}">
+          <div class="notif-title">${n.title || ''}</div>
+          <div class="notif-body">${n.body || ''}</div>
+          <div class="notif-time">${timeago(n.created_at)}</div>
+        </a>
+      `).join('') || `<div class="p-3 text-secondary small">No notifications</div>`;
+    }
+
+    async function loadInitial(){
+      const params = new URLSearchParams({
+        user_type_id: String(userTypeId),
+        person_id: personId ?? '',
+        staff_id: staffId ?? '',
+      });
+      const res  = await fetch(`/api/notifications/list?${params.toString()}`);
+      const json = await res.json().catch(()=>({data:[]}));
+      const items = (json.data || []).filter(matchesMe);
+      render(items);
+    }
+
+    clearBtn?.addEventListener('click', async ()=>{
+      await fetch('/api/notifications/clear', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ user_type_id:userTypeId, person_id:personId, staff_id:staffId })
+      });
+      loadInitial();
+    });
+
+    // Realtime subscription — requires Realtime enabled on the 'notification' table
+    const channel = window.supabase.channel('notif-header')
+      .on('postgres_changes', { event:'INSERT', schema:'public', table:'notification' }, (payload) => {
+        const n = payload.new;
+        if (!matchesMe(n)) return;
+        // Build a new list: new item + existing (up to 7 more)
+        const currentEls = Array.from(listEl.querySelectorAll('.notif-item'));
+        const current = currentEls.slice(0,7).map(el => ({
+          notification_id: Number(el.getAttribute('data-id')),
+          title: el.querySelector('.notif-title')?.textContent,
+          body:  el.querySelector('.notif-body')?.textContent,
+          created_at: new Date().toISOString(),
+          is_read: false
+        }));
+        render([n, ...current]);
+      })
+      .subscribe();
+
+    loadInitial();
+  </script>
+  {# ───────────── End Supabase + Notification Script ───────────── #}
+
+  {# ───────────── Modern Logout Confirmation Modal ───────────── #}
+  <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content border-0 shadow-lg" style="border-radius: 20px; overflow: hidden;">
+        <div class="modal-body text-center p-4">
+          <div class="mb-4">
+            <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width: 80px; height: 80px; background-color: rgba(220, 53, 69, 0.1);">
+              <i class="bi bi-power" style="font-size: 2.5rem; color: var(--bs-danger-text-emphasis);"></i>
+            </div>
+            <h4 class="fw-bold text-dark mb-2">Sign Out</h4>
+            <p class="text-muted mb-0">Are you sure you want to sign out of your account?</p>
+          </div>
+          <div class="d-grid gap-2">
+            <button type="button" class="btn btn-lg" onclick="confirmLogout()" id="logoutBtn" style="border-radius: 12px; background: var(--bs-danger-text-emphasis); border-color: var(--bs-danger-text-emphasis); color: white;">
+              <i class="bi bi-box-arrow-right me-2"></i>Sign Out
+            </button>
+            <button type="button" class="btn btn-light btn-lg" data-bs-dismiss="modal" id="cancelBtn" style="border-radius: 12px;">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showLogoutConfirmation() {
+      const logoutModal = new bootstrap.Modal(document.getElementById('logoutModal'));
+      logoutModal.show();
+    }
+
+    function confirmLogout() {
+      const logoutBtn = document.getElementById('logoutBtn');
+      const cancelBtn = document.getElementById('cancelBtn');
+      logoutBtn.disabled = true;
+      cancelBtn.disabled = true;
+      document.getElementById('logoutForm').submit();
+    }
+  </script>
+  {# ───────────── End Logout Confirmation Modal ───────────── #}
+
+</header>
+{# ====== END: Header with Notifications ====== #}

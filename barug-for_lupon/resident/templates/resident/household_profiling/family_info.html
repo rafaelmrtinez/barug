@@ -1,0 +1,222 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block css %}
+    <link rel="stylesheet" href="{% static 'css/form.css' %}">
+    <link rel="stylesheet" href="{% static 'css/button.css' %}">
+    <link rel="stylesheet" href="{% static 'css/progress_bar.css' %}">
+{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid pt-3 d-flex flex-column flex-grow-1" style="margin-top: 40px;">
+    <div class="step-progress mb-2">
+        <div class="step completed">
+            <div class="circle">1</div>
+            <div class="label">Household Information</div>
+        </div>
+        <div class="step active">
+            <div class="circle">2</div>
+            <div class="label">Family Information</div>
+        </div>
+        <div class="step">
+            <div class="circle">3</div>
+            <div class="label">Household Members</div>
+        </div>
+    </div>
+
+    <form method="post" id="familyCreationForm" class="d-flex flex-column flex-grow-1">
+        {% csrf_token %}
+
+        <input type="hidden" id="household_num" name="household_num" value="{{ household_id }}">
+
+        <h5 class="mb-3">Family Head & Type</h5>
+        <div class="row mb-2">
+            <div class="col-lg-6 col-md-12 col-sm-12 mb-3">
+                <div class="form-floating mb-3 position-relative" style="width:100%;">
+                    <input type="text" class="form-control" id="person_search" name="person_search" placeholder="Search Family Head" autocomplete="off" style="width:100%;">
+                    <label for="person_search">Search Family Head</label>
+                    <input type="hidden" id="family_head_id" name="family_head_id">
+                    <div id="person_search_results" class="list-group position-absolute" style="top:100%; left:0; width:100%; z-index:10;"></div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    <select id="household_type_id" name="household_type_id" class="form-select" required>
+                        <option value="">Select Household Type</option>
+                        <option value="1">NUCLEAR FAMILY</option>
+                        <option value="2">EXTENDED FAMILY</option>
+                        <option value="3">BOARDING HOUSE</option>
+                        <option value="4">SHARED APARTMET</option>
+                        <option value="5">SOLO HOUSEHOLD</option>
+                        <option value="6">GOVERNMENT HOUSING</option>
+                        <option value="7">INFORMAL SETTLER</option>
+                    </select>
+                    <label for="household_type_id">Household Type</label>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    <select id="rel_to_hhold_head_id" name="rel_to_hhold_head_id" class="form-select" required>
+                        <option value="">Select Relationship to Household Head</option>
+                        <option value="1">HOUSEHOLD HEAD</option>
+                        <option value="2">FAMILY HEAD</option>
+                        <option value="3">SPOUSE</option>
+                        <option value="4">MOTHER</option>
+                        <option value="5">FATHER</option>
+                        <option value="6">GUARDIAN</option>
+                        <option value="7">CHILD</option>
+                        <option value="8">SON</option>
+                        <option value="9">DAUGHTER</option>
+                        <option value="10">SIBLING</option>
+                        <option value="11">GRANDCHILD</option>
+                        <option value="12">GRANDPARENT</option>
+                        <option value="13">NEPHEW</option>
+                        <option value="14">NIECE</option>
+                        <option value="15">UNCLE</option>
+                        <option value="16">AUNT</option>
+                        <option value="17">COUSIN</option>
+                        <option value="18">IN-LAW (E.G., BROTHER-IN-LAW, SISTER-IN-LAW, PARENT-IN-LAW)</option>
+                        <option value="19">BOARDER</option>
+                        <option value="20">RENTER</option>
+                        <option value="21">DOMESTIC HELPER</option>
+                        <option value="22">OTHER RELATIVE</option>
+                        <option value="23">NON-RELATIVE</option>
+                    </select>
+                    <label for="rel_to_hhold_head_id">Relationship to Household Head</label>
+                </div>
+            </div>
+        </div>
+
+        <h5 class="mb-3">Family Details</h5>
+        <div class="row mb-2">
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    {{form.family_num}}
+                    <label for="{{ form.family_num.id_for_label }}">{{ form.family_num.label }}</label>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    <input type="number" class="form-control" id="ufc_num" name="ufc_num" placeholder="Enter UFC" min="0" required>
+                    <label for="ufc_num">Unique Family Code (UFC)</label>
+                </div>
+            </div>
+        </div>
+
+        <h5 class="mb-3">Status & Income</h5>
+        <div class="row mb-2">
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    <select id="nhts_status" name="nhts_status" class="form-select">
+                        <option value="">Select NHTS status</option>
+                        <option value="1" {% if form.nhts_status.value == "1" %}selected{% endif %}>NHTS</option>
+                        <option value="2" {% if form.nhts_status.value == "2" %}selected{% endif %}>NON-NHTS</option>
+                    </select>
+                    <label for="nhts_status">{{ form.nhts_status.label }}</label>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6 col-sm-12">
+                <div class="form-floating mb-3">
+                    <select id="indigent_status" name="indigent_status" class="form-select">
+                        <option value="">Select Indigent status</option>
+                        <option value="1" {% if form.indigent_status.value == "1" %}selected{% endif %}>INDIGENT</option>
+                        <option value="2" {% if form.indigent_status.value == "2" %}selected{% endif %}>NON-INDIGENT</option>
+                    </select>
+                    <label for="indigent_status">{{ form.indigent_status.label }}</label>
+                </div>
+            </div>
+            <div class="col-lg-6 col-md-12 col-sm-12 d-flex">
+                <div class="form-floating mb-3 flex-grow-1 me-2">
+                    <input type="text" class="form-control" id="source_of_income" name="source_of_income" placeholder="Enter Source of Income" required>
+                    <label for="source_of_income">Source of Income</label>
+                </div>
+                <div class="form-floating mb-3 flex-grow-1">
+                    <select id="monthly_income" name="monthly_income" class="form-select">
+                        <option value="">Select Family Monthly Income</option>
+                        <option value="1" {% if form.monthly_income.value == "1" %}selected{% endif %}>Below ₱5,000</option>
+                        <option value="2" {% if form.monthly_income.value == "2" %}selected{% endif %}>₱5,001 - ₱10,000</option>
+                        <option value="3" {% if form.monthly_income.value == "3" %}selected{% endif %}>₱10,001 - ₱15,000</option>
+                        <option value="4" {% if form.monthly_income.value == "4" %}selected{% endif %}>₱15,001 - ₱20,000</option>
+                        <option value="5" {% if form.monthly_income.value == "5" %}selected{% endif %}>₱20,001 - ₱30,000</option>
+                        <option value="6" {% if form.monthly_income.value == "6" %}selected{% endif %}>₱30,001 - ₱50,000</option>
+                        <option value="7" {% if form.monthly_income.value == "7" %}selected{% endif %}>₱50,001 - ₱75,000</option>
+                        <option value="8" {% if form.monthly_income.value == "8" %}selected{% endif %}>₱75,001 - ₱100,000</option>
+                        <option value="9" {% if form.monthly_income.value == "9" %}selected{% endif %}>Above ₱100,000</option>
+                    </select>
+                    <label for="monthly_income">Family Monthly Income</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-auto button-container">
+            <button type="reset" class="btn btn-reset">Clear</button>
+            <button type="submit" class="btn btn-submit">Continue</button>
+        </div>
+    </form>
+</div>
+
+{% block js %}
+    <script defer src="{% static 'resident/js/family_head_search.js' %}"></script>
+    <script>
+    (() => {
+        document.addEventListener('DOMContentLoaded', function () {
+            const form = document.getElementById('familyCreationForm');
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn.disabled) return; // Prevent double submit
+                submitBtn.disabled = true;
+                const household_id = document.getElementById('household_num')?.value || '';
+                const data = {
+                    household_num: document.getElementById('household_num')?.value || document.getElementById('p_household_num')?.value || '',
+                    family_num: document.getElementById('family_num')?.value || document.getElementById('p_family_num')?.value || '',
+                    ufc_num: document.getElementById('ufc_num')?.value || document.getElementById('p_ufc_num')?.value || '',
+                    source_of_income: document.getElementById('source_of_income')?.value || document.getElementById('p_source_of_income')?.value || '',
+                    family_mnthly_icnome_id: parseInt(document.getElementById('monthly_income')?.value || document.getElementById('p_family_mnthly_icnome_id')?.value || '0'),
+                    nhts_status_id: parseInt(document.getElementById('nhts_status')?.value || document.getElementById('p_nhts_status_id')?.value || '0'),
+                    indigent_status_id: parseInt(document.getElementById('indigent_status')?.value || document.getElementById('p_indigent_status_id')?.value || '0'),
+                    household_type_id: parseInt(document.getElementById('household_type_id')?.value || document.getElementById('p_household_type_id')?.value || '0'),
+                    family_head_id: parseInt(document.getElementById('family_head_id')?.value || document.getElementById('p_family_head_id')?.value || '0'),
+                    rel_to_hhold_head_id: parseInt(document.getElementById('rel_to_hhold_head_id')?.value || document.getElementById('p_rel_to_hhold_head_id')?.value || '0'),
+                    house_num: document.getElementById('house_num')?.value || document.getElementById('p_house_num')?.value || '',
+                };
+                fetch('/resident/api/register/family_unit/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    body: JSON.stringify(data)
+                })
+                .then(response => response.json().then(json => ({status: response.status, json})))
+                .then(({status, json}) => {
+                    if (status === 201 && json.result) {
+                        // Redirect to house membership page for the new family unit
+                        const familyId = json.result.family_id || json.result.id || json.result; // support various backend return formats
+                        if (familyId) {
+                            window.location.href = `/resident/house/membership/${familyId}/`;
+                        } else {
+                            alert('Family unit created, but could not determine family ID for redirect.');
+                        }
+                    } else if (json.error) {
+                        console.log('error', json);
+                        alert(json.error);
+                        submitBtn.disabled = false;
+                    } else {
+                        alert('An unexpected error occurred.');
+                        submitBtn.disabled = false;
+                    }
+                })
+                .catch(() => {
+                    alert('Failed to register family unit.');
+                    submitBtn.disabled = false;
+                });
+            });
+    });
+    })();
+    </script>
+{% endblock %}
+
+{% endblock %}

@@ -1,0 +1,47 @@
+<nav class="navbar navbar-expand-lg pt-0 pb-3">
+    <div>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarText" aria-controls="navbarText" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarText">
+            <ul class="navbar-nav me-auto mb-lg-0">
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'bhw:dashboard' %}">Dashboard</a>
+                </li>
+                
+                <!-- Health Records -->
+                <li class="nav-item dropdown me-3">
+                    <a class="nav-link dropdown-toggle" href="#" id="healthRecordsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        Health Records
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="resident_dropdown">
+                        <li><a class="dropdown-item" href="{% url 'maternal:maternal_records' %}">Maternal Health Record</a></li>
+                        <li><a class="dropdown-item" href="{% url 'child_health:child_record_list' %}">Child Health Record</a></li>
+                    </ul>
+                </li>
+
+                <!-- Records -->
+                <li class="nav-item dropdown me-3">
+                    <a class="nav-link dropdown-toggle" href="#" id="recordsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        Records
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="recordsDropdown">
+                        <li><h6 class="dropdown-header">Household</h6></li>
+                        <li><a class="dropdown-item" href="{% url 'bhw:household_list' %}"><i class="bi bi-house-door me-2"></i>Household Records</a></li>
+                        <li><a class="dropdown-item" href="{% url 'bhw:household_map' %}"><i class="bi bi-geo-alt me-2"></i>Household Map View</a></li>
+                        <li><a class="dropdown-item" href="{% url 'bhw:household_history_list' %}"><i class="bi bi-clock-history me-2"></i>Household History</a></li>
+                        <li><a class="dropdown-item" href="{% url 'resident:household_info' %}"><i class="bi bi-archive me-2"></i>Register Household</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><h6 class="dropdown-header">Family</h6></li>
+                        <li><a class="dropdown-item" href="{% url 'bhw:family_list' %}"><i class="bi bi-people me-2"></i>Family Records</a></li>
+                        <li><a class="dropdown-item" href="{% url 'bhw:family_history_list' %}"><i class="bi bi-clock-history me-2"></i>Family History</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><h6 class="dropdown-header">Residents</h6></li>
+                        <li><a class="dropdown-item" href="{% url 'bhw:resident_list' %}"><i class="bi bi-person me-2"></i>Resident Records</a></li>
+                        <li><a class="dropdown-item" href="{% url 'bhw:profile_personal_info' %}"><i class="bi bi-person-plus me-2"></i>Profile Resident</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>

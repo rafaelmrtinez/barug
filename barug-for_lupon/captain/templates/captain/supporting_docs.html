@@ -1,0 +1,478 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block css %}
+    <link rel="stylesheet" href="{% static 'css/form.css' %}">
+    <link rel="stylesheet" href="{% static 'css/button.css' %}">
+    <link rel="stylesheet" href="{% static 'css/modal.css' %}">
+    <link rel="stylesheet" href="{% static 'css/progress_bar.css' %}">
+    
+    <style>
+      .docs-container {
+        background: #f8fafc;
+        min-height: calc(100vh - 100px);
+        padding: 6.25rem 0 2rem 0;
+      }
+      
+      .docs-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        overflow: hidden;
+      }
+      
+      .docs-header {
+        background: var(--bs-danger-text-emphasis);
+        color: white;
+        padding: 1.5rem;
+        text-align: center;
+      }
+      
+      .docs-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin: 0;
+        position: relative;
+        z-index: 1;
+      }
+      
+      .docs-subtitle {
+        font-size: 1rem;
+        opacity: 0.9;
+        margin: 0.5rem 0 0 0;
+        position: relative;
+        z-index: 1;
+      }
+      
+      .docs-body {
+        padding: 2.5rem;
+      }
+      
+      .upload-section {
+        background: #f8fafc;
+        border: 2px dashed #cbd5e1;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+      
+      .section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      
+      .section-icon {
+        width: 24px;
+        height: 24px;
+        background: var(--bs-danger-text-emphasis);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.8rem;
+      }
+      
+      .form-floating {
+        position: relative;
+      }
+      
+      .form-floating .form-control,
+      .form-floating .form-select {
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1rem 0.75rem 0.25rem 0.75rem;
+        height: auto;
+        min-height: 58px;
+        background: #ffffff;
+        transition: all 0.3s ease;
+      }
+      
+      .form-floating .form-control:focus,
+      .form-floating .form-select:focus {
+        border-color: var(--bs-danger-text-emphasis);
+        box-shadow: 0 0 0 2px rgba(var(--bs-danger-text-emphasis-rgb), 0.1);
+      }
+      
+      .form-floating label {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #64748b;
+        padding: 0.25rem 0.75rem;
+      }
+      
+      .file-input-wrapper {
+        position: relative;
+        overflow: hidden;
+        display: inline-block;
+        width: 100%;
+      }
+      
+      .file-input-wrapper input[type=file] {
+        position: absolute;
+        left: -9999px;
+      }
+      
+      .file-input-label {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 1rem;
+        border: 2px dashed #cbd5e1;
+        border-radius: 12px;
+        background: #ffffff;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        min-height: 58px;
+        font-size: 0.9rem;
+        color: #64748b;
+      }
+      
+      .file-preview {
+        margin-top: 0.5rem;
+        font-size: 0.8rem;
+        color: #059669;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+      }
+      
+      .grid-layout {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+      }
+      
+      .action-buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 2rem;
+        border-top: 1px solid #e2e8f0;
+      }
+      
+      .btn-modern {
+        padding: 0.75rem 2rem;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        border: 2px solid transparent;
+      }
+      
+      .btn-primary-modern {
+        background: var(--bs-danger-text-emphasis);
+        color: white;
+        border-color: var(--bs-danger-text-emphasis);
+      }
+      
+      .btn-secondary-modern {
+        background: #f8fafc;
+        color: #475569;
+        border-color: #cbd5e1;
+      }
+      
+      .progress-indicator {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #64748b;
+        font-size: 0.85rem;
+      }
+      
+      @media (max-width: 768px) {
+        .docs-container {
+          padding: 1rem 0;
+        }
+        
+        .docs-body {
+          padding: 1.5rem;
+        }
+        
+        .grid-layout {
+          grid-template-columns: 1fr;
+          gap: 1rem;
+        }
+        
+        .action-buttons {
+          flex-direction: column-reverse;
+          gap: 0.75rem;
+        }
+        
+        .btn-modern {
+          width: 100%;
+          justify-content: center;
+        }
+      }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="docs-container">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-12 col-xl-10">
+                <div class="docs-card">
+                    <div class="docs-header">
+                        <h1 class="docs-title">
+                            📄 Valid ID Verification
+                        </h1>
+                        <p class="docs-subtitle">Upload your valid identification documents</p>
+                    </div>
+                    
+                    <div class="docs-body">
+                        <form method="post" action="{% url 'captain:staff_selection_non-resident_docs' %}" enctype="multipart/form-data" id="docs-form">
+                            {% csrf_token %}
+                            
+                            <!-- ID Type Selection -->
+                            <div class="upload-section">
+                                <div class="section-title">
+                                    <div class="section-icon">📋</div>
+                                    Identification Type
+                                </div>
+                                <div class="form-floating">
+                                    {{ form.type_of_id }}
+                                    <label for="{{ form.type_of_id.id_for_label }}">{{ form.type_of_id.label }} *</label>
+                                </div>
+                            </div>
+                            
+                            <!-- Document Uploads -->
+                            <div class="upload-section">
+                                <div class="section-title">
+                                    <div class="section-icon">📤</div>
+                                    Document Uploads
+                                </div>
+                                
+                                <div class="grid-layout">
+                                    <!-- Front ID -->
+                                    <div class="upload-item">
+                                        <label class="form-label fw-semibold text-dark mb-2">
+                                            💳 {{ form.front_id.label }} *
+                                        </label>
+                                        <div class="file-input-wrapper">
+                                            {{ form.front_id }}
+                                            <label for="{{ form.front_id.id_for_label }}" class="file-input-label">
+                                                ⬆️ Choose front ID image
+                                            </label>
+                                        </div>
+                                        <div class="file-preview" id="front-id-preview"></div>
+                                    </div>
+                                    
+                                    <!-- Back ID -->
+                                    <div class="upload-item">
+                                        <label class="form-label fw-semibold text-dark mb-2">
+                                            🔄 {{ form.back_id.label }} *
+                                        </label>
+                                        <div class="file-input-wrapper">
+                                            {{ form.back_id }}
+                                            <label for="{{ form.back_id.id_for_label }}" class="file-input-label">
+                                                ⬆️ Choose back ID image
+                                            </label>
+                                        </div>
+                                        <div class="file-preview" id="back-id-preview"></div>
+                                    </div>
+                                    
+                                    <!-- Profile Image -->
+                                    <div class="upload-item">
+                                        <label class="form-label fw-semibold text-dark mb-2">
+                                            👤 {{ form.res_img.label }} *
+                                        </label>
+                                        <div class="file-input-wrapper">
+                                            {{ form.res_img }}
+                                            <label for="{{ form.res_img.id_for_label }}" class="file-input-label">
+                                                ⬆️ Choose profile photo
+                                            </label>
+                                        </div>
+                                        <div class="file-preview" id="res-img-preview"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Action Buttons -->
+                            <div class="action-buttons">
+                                <div class="progress-indicator">
+                                    ℹ️ ID Verification
+                                </div>
+                                <div class="d-flex gap-3">
+                                    <a href="{% url 'captain:staff_selection_non-resident' %}" class="btn btn-modern btn-secondary-modern">
+                                        ← Back
+                                    </a>
+                                    <button type="submit" class="btn btn-modern btn-primary-modern">
+                                        Continue →
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(() => {
+  const form = document.getElementById('docs-form');
+  if (!form) return;
+
+  const STORAGE_KEY = 'captain_staff_nonres_docs_data';
+  
+  // File preview functionality
+  function setupFilePreview(inputId, previewId) {
+    const input = document.getElementById(inputId);
+    const preview = document.getElementById(previewId);
+    const label = input?.nextElementSibling;
+    
+    if (!input || !preview) return;
+    
+    input.addEventListener('change', function() {
+      const file = this.files[0];
+      if (file) {
+        preview.innerHTML = `
+          ✅ <span>${file.name} (${(file.size / 1024).toFixed(1)} KB)</span>
+        `;
+        if (label) {
+          label.style.borderColor = '#059669';
+          label.style.background = 'rgba(5, 150, 105, 0.05)';
+          label.style.color = '#059669';
+        }
+      } else {
+        preview.innerHTML = '';
+        if (label) {
+          label.style.borderColor = '#cbd5e1';
+          label.style.background = '#ffffff';
+          label.style.color = '#64748b';
+        }
+      }
+    });
+  }
+  
+  // Setup file previews
+  setupFilePreview('{{ form.front_id.id_for_label }}', 'front-id-preview');
+  setupFilePreview('{{ form.back_id.id_for_label }}', 'back-id-preview');
+  setupFilePreview('{{ form.res_img.id_for_label }}', 'res-img-preview');
+
+  function saveFormData() {
+    const formData = {};
+    const formElements = form.querySelectorAll('input, select');
+    
+    formElements.forEach(el => {
+      if (el.name === 'csrfmiddlewaretoken') return;
+      if (el.type === 'file') {
+        if (el.files && el.files.length > 0) {
+          formData[el.name + '_has_file'] = true;
+        }
+      } else {
+        formData[el.name] = el.value;
+      }
+    });
+    
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
+  }
+
+  function restoreFormData() {
+    try {
+      const savedData = sessionStorage.getItem(STORAGE_KEY);
+      if (!savedData) return;
+      
+      const formData = JSON.parse(savedData);
+      const formElements = form.querySelectorAll('input, select');
+      let restoredCount = 0;
+      
+      formElements.forEach(el => {
+        if (el.name === 'csrfmiddlewaretoken') return;
+        if (el.type === 'file') return;
+        if (!formData.hasOwnProperty(el.name)) return;
+        
+        const savedValue = formData[el.name];
+        if (savedValue) {
+          el.value = savedValue;
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          restoredCount++;
+        }
+      });
+      
+      if (restoredCount > 0) {
+        console.log(`Docs form data restored: ${restoredCount} fields`);
+      }
+    } catch (e) {
+      console.warn('Failed to restore docs form data:', e);
+    }
+  }
+
+  // Form validation
+  form.addEventListener('submit', function(e) {
+    const requiredFiles = ['{{ form.front_id.id_for_label }}', '{{ form.back_id.id_for_label }}', '{{ form.res_img.id_for_label }}'];
+    const typeSelect = document.getElementById('{{ form.type_of_id.id_for_label }}');
+    
+    let hasErrors = false;
+    
+    // Check ID type selection
+    if (!typeSelect.value) {
+      hasErrors = true;
+      typeSelect.style.borderColor = '#dc2626';
+    }
+    
+    // Check required files
+    requiredFiles.forEach(fileId => {
+      const fileInput = document.getElementById(fileId);
+      if (fileInput && (!fileInput.files || fileInput.files.length === 0)) {
+        hasErrors = true;
+        const label = fileInput.nextElementSibling;
+        if (label) {
+          label.style.borderColor = '#dc2626';
+          label.style.background = 'rgba(220, 38, 38, 0.05)';
+        }
+      }
+    });
+    
+    if (hasErrors) {
+      e.preventDefault();
+      // Scroll to top to show errors
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      // Show error message
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'alert alert-danger alert-dismissible fade show';
+      errorDiv.innerHTML = `
+        ⚠️ Please fill in all required fields and upload all required documents.
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      `;
+      
+      const docsBody = document.querySelector('.docs-body');
+      docsBody.insertBefore(errorDiv, docsBody.firstChild);
+      
+      // Auto-remove error after 5 seconds
+      setTimeout(() => {
+        if (errorDiv.parentNode) {
+          errorDiv.remove();
+        }
+      }, 5000);
+      
+      return false;
+    }
+    
+    sessionStorage.removeItem(STORAGE_KEY);
+  });
+
+  form.addEventListener('input', saveFormData);
+  form.addEventListener('change', saveFormData);
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', restoreFormData);
+  } else {
+    setTimeout(restoreFormData, 100);
+  }
+})();
+</script>
+
+{% endblock %}

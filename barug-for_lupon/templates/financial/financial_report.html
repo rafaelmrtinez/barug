@@ -1,0 +1,318 @@
+{# treasurer/financial_report.html (filters updated for ORFilters: search, pay_meth) #}
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+{% load choiceextras %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<link rel="stylesheet" href="{% static 'css/filters.css' %}">
+
+<style>
+  .btn-outline-brand{ color:#6d2932; border-color:#6d2932; background:#fff; }
+  .btn-outline-brand:hover{ background:#6d2932; color:#fff; }
+
+  .table thead th{
+    font-size:.80rem;
+    text-transform:capitalize;   /* keep headers uppercase */
+    letter-spacing:.02em;
+    vertical-align:middle;
+    white-space:nowrap;
+    text-align:left;
+  }
+
+  .table .business-id{
+    width:1%;
+    white-space:nowrap;
+  }
+
+  /* Pill-styled, monospace, tabular digits for perfect alignment */
+  .id-pill{
+    display:inline-block;
+    padding:.22rem .55rem;
+    border-radius:999px;
+    background:#f8f1f2;                      /* soft brand-tinted bg */
+    border:1px solid rgba(109,41,50,.18);    /* matches your cat-badge border tone */
+    color:#6d2932;
+    font-weight:700;
+    font-size:.78rem;
+    line-height:1;
+    font-variant-numeric: tabular-nums;      /* aligned digits */
+    letter-spacing:.03em;
+  }
+
+  .table tbody td{
+    font-size:.80rem;           /* slightly smaller body text */
+    vertical-align:middle;
+    text-align:left;
+    font-weight:600;            /* normalize weight */
+  }
+
+  .filter-chip {
+    display:inline-flex;
+    align-items:center;
+    gap:.5rem;
+    padding:.28rem .6rem;
+    border-radius:999px;
+    background:#fff;
+    border:1px solid rgba(0,0,0,.06);
+    color:#333;
+    font-weight:600;
+    text-decoration:none;
+  }
+  .filter-chip .x { margin-left:.25rem; opacity:.7; }
+</style>
+
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap" style="margin-top: 40px;">
+  <div class="container-fluid pt-3 page-main">
+    <div class="row">
+      {# ─── Toolbar: search + filters button + add ─── #}
+      <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+        {% csrf_token %}
+        <div class="searchbox">
+          {% bs_icon 'search' extra_classes='bi' %}
+          {{ form.search }}
+        </div>
+
+        {# preserve selected payment method when searching #}
+        <input type="hidden" name="pay_meth" value="{{ request.GET.pay_meth|default:'' }}">
+        <input type="hidden" name="month" value="{{ request.GET.month|default:'' }}">
+        <input type="hidden" name="year" value="{{ request.GET.year|default:'' }}">
+        <input type="hidden" name="date_from" value="{{ request.GET.date_from|default:'' }}">
+        <input type="hidden" name="date_to" value="{{ request.GET.date_to|default:'' }}">
+
+        {# Filters button with badge count #}
+        {% with pm=request.GET.pay_meth|yesno:"1,0" m=request.GET.month|yesno:"1,0" y=request.GET.year|yesno:"1,0" df=request.GET.date_from|yesno:"1,0" dt=request.GET.date_to|yesno:"1,0" %}
+          {% with fc=0|add:pm|add:m|add:y|add:df|add:dt %}
+            <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
+                    type="button"
+                    data-bs-toggle="offcanvas"
+                    data-bs-target="#filterPanel"
+                    aria-controls="filterPanel">
+              {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+              {% if fc %}
+                <span class="badge rounded-pill text-bg-light ms-2">{{ fc }}</span>
+              {% endif %}
+            </button>
+          {% endwith %}
+        {% endwith %}
+        <button class="btn btn-brand-subtle d-flex align-items-center btn-generate-financial-pdf" type="button">
+          {% bs_icon 'file-text' extra_classes='me-2' %} Generate PDF
+        </button>
+      </form>
+
+      {# ─── Active filter chips (show selected labels) ─── #}
+      <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
+        {% if request.GET.pay_meth or request.GET.month or request.GET.year or request.GET.date_from or request.GET.date_to %}
+          <span class="text-muted me-1">Active:</span>
+
+          {# Payment Method chip #}
+          {% if request.GET.pay_meth %}
+            {% with label=form.pay_meth|choice_label:request.GET.pay_meth %}
+              <a class="filter-chip"
+                 href="?search={{ request.GET.search|urlencode }}&month={{ request.GET.month|urlencode }}&year={{ request.GET.year|urlencode }}&date_from={{ request.GET.date_from|urlencode }}&date_to={{ request.GET.date_to|urlencode }}">
+                {{ label }}
+                <span class="x" aria-hidden="true">×</span>
+              </a>
+            {% endwith %}
+          {% endif %}
+
+          {# Month chip #}
+          {% if request.GET.month %}
+            {% with label=form.month|choice_label:request.GET.month %}
+              <a class="filter-chip"
+                 href="?search={{ request.GET.search|urlencode }}&pay_meth={{ request.GET.pay_meth|urlencode }}&year={{ request.GET.year|urlencode }}&date_from={{ request.GET.date_from|urlencode }}&date_to={{ request.GET.date_to|urlencode }}">
+                Month: {{ label }}
+                <span class="x" aria-hidden="true">×</span>
+              </a>
+            {% endwith %}
+          {% endif %}
+
+          {# Year chip #}
+          {% if request.GET.year %}
+            <a class="filter-chip"
+               href="?search={{ request.GET.search|urlencode }}&pay_meth={{ request.GET.pay_meth|urlencode }}&month={{ request.GET.month|urlencode }}&date_from={{ request.GET.date_from|urlencode }}&date_to={{ request.GET.date_to|urlencode }}">
+              Year: {{ request.GET.year }}
+              <span class="x" aria-hidden="true">×</span>
+            </a>
+          {% endif %}
+
+          {# Date From chip #}
+          {% if request.GET.date_from %}
+            <a class="filter-chip"
+               href="?search={{ request.GET.search|urlencode }}&pay_meth={{ request.GET.pay_meth|urlencode }}&month={{ request.GET.month|urlencode }}&year={{ request.GET.year|urlencode }}&date_to={{ request.GET.date_to|urlencode }}">
+              From: {{ request.GET.date_from }}
+              <span class="x" aria-hidden="true">×</span>
+            </a>
+          {% endif %}
+
+          {# Date To chip #}
+          {% if request.GET.date_to %}
+            <a class="filter-chip"
+               href="?search={{ request.GET.search|urlencode }}&pay_meth={{ request.GET.pay_meth|urlencode }}&month={{ request.GET.month|urlencode }}&year={{ request.GET.year|urlencode }}&date_from={{ request.GET.date_from|urlencode }}">
+              To: {{ request.GET.date_to }}
+              <span class="x" aria-hidden="true">×</span>
+            </a>
+          {% endif %}
+
+          <a class="btn btn-sm btn-outline-brand ms-1" href="?search={{ request.GET.search|urlencode }}">
+            {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
+          </a>
+        {% else %}
+          <span class="text-muted small">No active filters.</span>
+        {% endif %}
+      </div>
+
+
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th scope="col">OR</th>
+              <th scope="col">Payment Method</th>
+              <th scope="col">Amount</th>
+              <th scope="col">Purpose</th>
+              <th scope="col">Issued By</th>
+              <th scope="col">Issued At</th>
+            </tr>
+          </thead>
+          <tbody id="results-body">
+            {% include "financial/_financial_report_rows.html" with rows=page_obj.object_list %}
+          </tbody>
+          <tfoot>
+            <tr style="border-top: 2px solid #6d2932;">
+              <td colspan="2" class="text-end fw-bold" style="font-size: 0.9rem;">Total:</td>
+              <td class="fw-bold" style="font-size: 0.9rem; color: #6d2932;">₱{{ total_amount|floatformat:2 }}</td>
+              <td colspan="3"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div class="page-pagination">
+      {% include 'paginator.html' %}
+    </div>
+  {% endif %}
+
+  {# ─── Offcanvas Filters ─── #}
+  <div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
+       aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150px;">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+
+    <div class="offcanvas-body">
+      <form method="get" id="filterForm">
+        <div class="mb-3">
+          <label class="form-label">Payment Method</label>
+          {{ form.pay_meth }}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Month</label>
+          {{ form.month }}
+          <small class="form-text text-muted">Select month (works best with year)</small>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Year</label>
+          {{ form.year }}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Date Range</label>
+          <div class="row">
+            <div class="col-6">
+              {{ form.date_from }}
+              <small class="form-text text-muted">From</small>
+            </div>
+            <div class="col-6">
+              {{ form.date_to }}
+              <small class="form-text text-muted">To</small>
+            </div>
+          </div>
+        </div>
+
+        {# keep search term when applying filters #}
+        <input type="hidden" name="search" value="{{ request.GET.search|default:'' }}"/>
+
+        <!-- Footer pinned to bottom, right-aligned -->
+        <div class="offcanvas-footer">
+          <div class="actions">
+            <a class="btn btn-outline-brand" href="?search={{ request.GET.search|urlencode }}">Clear</a>
+            <button type="submit" class="btn btn-brand">Apply Filters</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  // elements
+  const input = document.getElementById('search');   // default Django id for form field "search"
+  const tbody = document.getElementById('results-body');
+  const endpoint = "{% url search_url %}";
+
+  // read current filter values from the page (keep your hidden inputs)
+  function currentParams() {
+    const params = new URLSearchParams();
+    params.set('q', (input?.value || '').trim());
+    params.set('tpl', 'rows');  
+    const payMeth = document.querySelector('input[name="pay_meth"]')?.value || '';
+    if (payMeth) params.set('pay_meth', payMeth);
+    const month = document.querySelector('input[name="month"]')?.value || '';
+    if (month) params.set('month', month);
+    const year = document.querySelector('input[name="year"]')?.value || '';
+    if (year) params.set('year', year);
+    const dateFrom = document.querySelector('input[name="date_from"]')?.value || '';
+    if (dateFrom) params.set('date_from', dateFrom);
+    const dateTo = document.querySelector('input[name="date_to"]')?.value || '';
+    if (dateTo) params.set('date_to', dateTo);
+    return params.toString();
+  }
+
+  // simple debounce
+  let t = null;
+  function debounce(fn, delay) {
+    return function (...args) {
+      clearTimeout(t);
+      t = setTimeout(() => fn.apply(this, args), delay);
+    }
+  }
+
+  async function fetchRows() {
+    try {
+      const url = endpoint + "?" + currentParams();
+      const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+      if (!res.ok) throw new Error("Network error");
+      const html = await res.text();
+      tbody.innerHTML = html;
+    } catch (err) {
+      // optional: show a small error row
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3">Failed to load results</td></tr>`;
+      console.error(err);
+    }
+  }
+
+  if (input && tbody) {
+    // live as the user types (300ms feels good)
+    input.addEventListener('input', debounce(fetchRows, 300));
+  }
+})();
+</script>
+
+<script src="{% static 'js/generate_financial_pdf.js' %}"></script>
+
+{% endblock %}

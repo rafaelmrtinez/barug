@@ -1,0 +1,730 @@
+{% load static %} 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>New Report</title>
+
+  <!-- Bootstrap & Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- Map -->
+  <link rel="stylesheet" href="{% static 'css/map_registration.css' %}">
+  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"/>
+
+  <style>
+    :root{
+      --brand:#7B1E22; --brand-700:#6a1a1e; --accent:#D4AF37;
+      --ink:#212529; --muted:#6c757d; --card:#ffffff; --bg:#faf9f8; --ring:rgba(123,30,34,.25);
+      --dropdown-bg:#ffffff; --dropdown-border:#c7c7c7; --dropdown-hover:#f3efe9; --dropdown-active:#eadfcd;
+      --dropdown-shadow: 0 10px 24px rgba(0,0,0,.12), 0 2px 6px rgba(0,0,0,.06);
+    }
+    html,body{ background: var(--bg); }
+    .page-wrap{ max-width:1120px; margin:0 auto; padding:1.25rem; }
+    .hero{ border-radius:16px; background:#fff; border:1px solid rgba(0,0,0,.06); padding:1rem 1.25rem; }
+    .hero .title{ font-weight:700; letter-spacing:.2px; margin:0; }
+    .hero .eyebrow{ text-transform:uppercase; font-size:.75rem; color:var(--muted); letter-spacing:.18rem; }
+
+    .card{ border:1px solid rgba(0,0,0,.06); border-radius:16px; background:var(--card);
+      box-shadow:0 2px 8px rgba(0,0,0,.03), 0 1px 0 rgba(212,175,55,.12) inset; }
+    .card .card-header{ background:#fff; border-bottom:1px solid rgba(0,0,0,.06); border-radius:16px 16px 0 0!important; padding:.9rem 1rem; }
+    .card .card-body{ padding:1.1rem; }
+
+    .form-label{ font-weight:600; color:var(--ink); }
+    .form-control,.input-group-text{ border-radius:.65rem; border-color:rgba(0,0,0,.12); }
+    .form-control:focus{ border-color:var(--brand); box-shadow:0 0 0 .2rem var(--ring); }
+
+    .btn-brand{ --bs-btn-bg:var(--brand); --bs-btn-border-color:var(--brand);
+      --bs-btn-hover-bg:var(--brand-700); --bs-btn-hover-border-color:var(--brand-700);
+      --bs-btn-focus-shadow-rgb:123,30,34; --bs-btn-active-bg:var(--brand-700); --bs-btn-active-border-color:var(--brand-700); color:#fff; }
+    .btn-outline-brand{ --bs-btn-color:var(--brand); --bs-btn-border-color:var(--brand);
+      --bs-btn-hover-bg:var(--brand); --bs-btn-hover-border-color:var(--brand);
+      --bs-btn-active-bg:var(--brand); --bs-btn-active-border-color:var(--brand); color:var(--brand); background:#fff; }
+    .btn-link-compact{ border-radius:12px; border:1px solid rgba(0,0,0,.08); padding:.45rem .7rem; color:var(--ink); background:#fff; }
+    .btn-link-compact:hover{ border-color:var(--brand); color:var(--brand); }
+    .btn i{ vertical-align:-1px; }
+
+    .chip{ display:inline-flex; align-items:center; gap:.35rem; padding:.25rem .5rem; border-radius:999px;
+           border:1px solid var(--bs-border-color); background:#fff; margin:.15rem .25rem 0 0; font-size:.875rem; }
+    .chip .rm{ border:none; background:transparent; padding:0; line-height:1; cursor:pointer; }
+
+    .results-viewport{ max-height:320px; overflow:auto; }
+    .result-item{ cursor:pointer; }
+    .result-item:hover{ background:var(--dropdown-hover); }
+
+    .hint{ color:var(--muted); font-size:.9rem; }
+
+    .map-container { position: relative; height: 360px; border-radius: 12px; overflow: hidden; }
+    #map { position: absolute; inset: 0; }
+    .map-style {
+      position: absolute; left: 10px; bottom: 10px; z-index: 2;
+      background: #fff; border-radius: 8px; padding: 6px 8px; box-shadow: 0 2px 8px rgba(0,0,0,.1);
+    }
+    .addr-preview { font-size: .9rem; color:#495057; background:#f8f9fa; padding:.5rem .75rem; border-radius:8px; }
+    .brgy-logo{ width:56px; height:56px; object-fit:contain; border-radius:50%; border:2px solid #ffd100; box-shadow:0 2px 4px rgba(0,0,0,.06); }
+    @media (min-width:992px){ .brgy-logo{ width:64px; height:64px; } }
+  </style>
+</head>
+
+<body>
+<div class="page-wrap">
+
+  <!-- Header -->
+  <div class="hero mb-3 d-flex align-items-center justify-content-between">
+    <div class="d-flex align-items-center gap-3">
+      <img src="{% static 'images/brgy-sto-nino.png' %}" alt="Barangay Sto. Niño" class="brgy-logo">
+      <div>
+        <div class="eyebrow" style="color:#FC9700; letter-spacing:.32em;">BARANGAY SEÑOR SANTO NIÑO</div>
+        <h4 class="title" style="color:#7B1E22;">BLOTTER CASE REPORT</h4>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <a href="{% url 'lupon_mem:report_list' %}" class="btn btn-link-compact">
+        <i class="bi bi-arrow-left me-1"></i> Back to Reports
+      </a>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1055;"></div>
+
+  <!-- Form Card -->
+  <div class="card">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-journal-plus text-warning"></i>
+        <strong>Fill out incident details</strong>
+      </div>
+      <div class="small hint">Fields with important parties can be searched from the registry.</div>
+    </div>
+
+    <div class="card-body">
+      <form method="post" class="needs-validation" novalidate>
+        {% csrf_token %}
+
+        <!-- Hidden fields needed by the view for map-created addresses -->
+        <input type="hidden" name="map_street"    id="map_street">
+        <input type="hidden" name="map_purok"     id="map_purok">
+        <input type="hidden" name="map_barangay"  id="map_barangay">
+        <input type="hidden" name="map_city"      id="map_city">
+
+        <!-- Incident -->
+        <div class="row g-3 mb-2">
+          <div class="col-md-6">
+            <label class="form-label">Incident Subject</label>
+            <input class="form-control" name="incident_subject" required>
+            <div class="invalid-feedback">Required.</div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Date</label>
+            <input type="date" class="form-control" name="incident_date" required>
+            <div class="invalid-feedback">Required.</div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Time</label>
+            <input type="time" class="form-control" name="incident_time" required>
+            <div class="invalid-feedback">Required.</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Narrative</label>
+            <textarea class="form-control" name="incident_desc" rows="4" required></textarea>
+            <div class="invalid-feedback">Required.</div>
+          </div>
+        </div>
+
+        <!-- Address + Parties -->
+        <div class="row g-3">
+          <div class="col-md-4">
+            <!-- Hidden Incident Address ID field -->
+            <input type="hidden" name="incident_address_id">
+            
+            <label class="form-label d-flex justify-content-between align-items-center">
+              <span>Incident Location</span>
+              <button class="btn btn-sm btn-outline-brand" type="button" data-bs-toggle="modal" data-bs-target="#address_modal">
+                <i class="bi bi-geo-alt me-1"></i> Pick on Map
+              </button>
+            </label>
+            <input id="incident_address" name="incident_address" class="form-control" placeholder="No address chosen" readonly required>
+            <div class="invalid-feedback">Please select an incident location using the map.</div>
+            <input type="hidden" id="incident_lat" name="incident_lat">
+            <input type="hidden" id="incident_lng" name="incident_lng">
+          </div>
+
+          <!-- Complainant -->
+          <div class="col-md-4">
+            <label class="form-label d-flex justify-content-between align-items-center">
+              <span>Complainant</span>
+              <button class="btn btn-sm btn-outline-brand" type="button"
+                      data-bs-toggle="modal" data-bs-target="#personModal"
+                      data-mode="complainant">
+                <i class="bi bi-person-plus me-1"></i> Choose
+              </button>
+            </label>
+            <div id="complainantDisplay" class="form-control bg-body-tertiary" style="min-height:38px; display:flex; align-items:center;">
+              <span class="text-muted">No complainant selected</span>
+            </div>
+            <input type="hidden" name="complainant_id" id="complainantId" required>
+            <div class="invalid-feedback">Please select a complainant.</div>
+          </div>
+
+          <!-- Respondent -->
+          <div class="col-md-4">
+            <label class="form-label d-flex justify-content-between align-items-center">
+              <span>Respondent</span>
+              <button class="btn btn-sm btn-outline-brand" type="button"
+                      data-bs-toggle="modal" data-bs-target="#personModal"
+                      data-mode="respondent">
+                <i class="bi bi-person-plus me-1"></i> Choose
+              </button>
+            </label>
+            <div id="respondentDisplay" class="form-control bg-body-tertiary" style="min-height:38px; display:flex; align-items:center;">
+              <span class="text-muted">No respondent selected</span>
+            </div>
+            <input type="hidden" name="respondent_ids" id="respondentId">
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-end mt-4">
+          <button class="btn btn-brand">
+            <i class="bi bi-save me-2"></i> Save Report
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Person Picker Modal -->
+<div class="modal fade" id="personModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="personModalTitle">Find a person</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="input-group mb-3">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input id="personSearch" type="search" class="form-control" placeholder="Type at least 2 letters…">
+        </div>
+
+        <div id="results" class="results-viewport list-group border">
+          <div class="list-group-item text-muted">Start typing to search…</div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline-brand" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Address Modal (map left, fields right) -->
+<div class="modal fade" id="address_modal" tabindex="-1" aria-labelledby="home_address" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="home_address">Incident Location</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col">
+            <div class="map-container">
+              <div id="map"></div>
+              <div class="map-style">
+                <select id="style-selector" class="form-select form-select-sm">
+                  <option value="mapbox/streets-v11">Streets</option>
+                  <option value="mapbox/satellite-streets-v11">Satellite Streets</option>
+                  <option value="mapbox/light-v11">Light</option>
+                  <option value="mapbox/dark-v11">Dark</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="col">
+            <div class="form-floating mb-3">
+              <input id="street" type="text" class="form-control" placeholder="Street">
+              <label for="street">Street</label>
+            </div>
+            <div class="form-floating mb-3">
+              <input id="purok_sitio" type="text" class="form-control" placeholder="Purok / Sitio">
+              <label for="purok_sitio">Purok / Sitio</label>
+            </div>
+            <div class="form-floating mb-3">
+              <input id="barangay" type="text" class="form-control" placeholder="Barangay" value="SEÑOR SANTO NIÑO">
+              <label for="barangay">Barangay</label>
+            </div>
+            <div class="form-floating mb-3">
+              <input id="city" type="text" class="form-control" placeholder="City">
+              <label for="city">City</label>
+            </div>
+          </div>
+        </div>
+
+        <input type="hidden" id="b_address">
+        <div class="addr-preview mt-2" id="addrPreview">Move the pin to update the address…</div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline-brand" type="button" id="btnClearPin">Clear</button>
+        <button class="btn btn-brand" type="button" onclick="useIncidentAddress()" data-bs-dismiss="modal">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Mapbox + Turf -->
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+
+<!-- Person search (same behavior as old.html) -->
+<script>
+(function(){
+  let mode = 'complainant';
+  const complainantIdInput = document.getElementById('complainantId');
+  const complainantDisplay = document.getElementById('complainantDisplay');
+  const respondentIdInput = document.getElementById('respondentId');
+  const respondentDisplay = document.getElementById('respondentDisplay');
+
+  const personModal = document.getElementById('personModal');
+  personModal.addEventListener('show.bs.modal', function (evt){
+    const btn = evt.relatedTarget;
+    mode = btn?.getAttribute('data-mode') || 'complainant';
+    document.getElementById('personModalTitle').textContent =
+      (mode === 'complainant') ? 'Choose Complainant' : 'Add Respondent';
+    document.getElementById('personSearch').value = '';
+    setResultsMessage('Start typing to search…', true);
+    cancelPending();
+  });
+
+  const searchBox = document.getElementById('personSearch');
+  let debounceTimer=null;
+  let pendingController=null;
+
+  function cancelPending(){
+    if (pendingController){ try{ pendingController.abort(); }catch(e){} }
+    pendingController = null;
+  }
+
+  searchBox.addEventListener('input', function(){
+    if (debounceTimer) clearTimeout(debounceTimer);
+    const q = this.value.trim();
+    debounceTimer = setTimeout(()=> doSearch(q), 220);
+  });
+
+  async function doSearch(q){
+    if (q.length < 2){ setResultsMessage('Type at least 2 letters…', true); return; }
+    setResultsMessage('Searching…', true);
+
+    cancelPending();
+    pendingController = new AbortController();
+
+    try{
+      const url = `{% url 'lupon_mem:person_suggest' %}?q=` + encodeURIComponent(q);
+      const res = await fetch(url, {
+        headers:{ 'Accept':'application/json', 'X-Requested-With':'XMLHttpRequest' },
+        credentials:'same-origin',
+        signal: pendingController.signal
+      });
+
+      if (!res.ok){
+        const txt = await res.text();
+        console.error('person_suggest failed:', res.status, txt);
+        setResultsMessage(`Search failed (${res.status}).`, false);
+        return;
+      }
+
+      const data = await res.json().catch(e=>{
+        console.error('JSON parse error', e);
+        setResultsMessage('Invalid response.', false);
+        return null;
+      });
+      if (!data) return;
+
+      const arr = Array.isArray(data.results) ? data.results : [];
+      if (!arr.length){ setResultsMessage('No matches', true); return; }
+
+      const results = document.getElementById('results');
+      results.innerHTML = '';
+      const frag = document.createDocumentFragment();
+      arr.forEach(item=>{
+        const btn = document.createElement('button');
+        btn.type='button';
+        btn.className='list-group-item list-group-item-action d-flex justify-content-between align-items-center result-item';
+        btn.innerHTML = `<span>${escapeHtml(item.name || '(no name)')}</span>
+                         <span class="badge text-bg-light border">ID ${item.id}</span>`;
+        btn.addEventListener('click', ()=> choosePerson(item.id, item.name));
+        frag.appendChild(btn);
+      });
+      results.appendChild(frag);
+
+    }catch(e){
+      if (e.name === 'AbortError') return;
+      console.error(e);
+      setResultsMessage('Search error — see console.', false);
+    }
+  }
+
+  function setResultsMessage(msg, muted){
+    const results = document.getElementById('results');
+    results.innerHTML = `<div class="list-group-item ${muted?'text-muted':''}">${escapeHtml(msg)}</div>`;
+  }
+
+  function choosePerson(id, name){
+    // Check if trying to select the same person for both roles
+    if (mode === 'complainant' && respondentIdInput.value === id) {
+      showToast('This person is already selected as the respondent. Please choose a different person.');
+      return;
+    }
+    if (mode === 'respondent' && complainantIdInput.value === id) {
+      showToast('This person is already selected as the complainant. Please choose a different person.');
+      return;
+    }
+
+    if (mode === 'complainant'){
+      complainantIdInput.value = id;
+      complainantDisplay.innerHTML =
+        `<span class="chip">
+           ${escapeHtml(name)} <small class="text-muted">(#${id})</small>
+           <button type="button" class="rm" title="Remove" aria-label="Remove">
+             <i class="bi bi-x-lg"></i>
+           </button>
+         </span>`;
+      complainantDisplay.querySelector('.rm').addEventListener('click', ()=>{
+        complainantIdInput.value = '';
+        complainantDisplay.innerHTML = `<span class="text-muted">No complainant selected</span>`;
+      });
+      bootstrap.Modal.getInstance(personModal).hide();
+    }else{
+      respondentIdInput.value = id;
+      respondentDisplay.innerHTML =
+        `<span class="chip">
+           ${escapeHtml(name)} <small class="text-muted">(#${id})</small>
+           <button type="button" class="rm" title="Remove" aria-label="Remove">
+             <i class="bi bi-x-lg"></i>
+           </button>
+         </span>`;
+      respondentDisplay.querySelector('.rm').addEventListener('click', ()=>{
+        respondentIdInput.value = '';
+        respondentDisplay.innerHTML = `<span class="text-muted">No respondent selected</span>`;
+      });
+      bootstrap.Modal.getInstance(personModal).hide();
+    }
+  }
+
+
+
+  function escapeHtml(s){
+    return String(s ?? '')
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;')
+      .replaceAll("'","&#39;");
+  }
+})();
+</script>
+
+<!-- Map picker (shows warning when outside barangay) -->
+<script>
+(function(){
+  const MAPBOX_TOKEN = 'pk.eyJ1IjoicmFwaGJlbGwiLCJhIjoiY21jNHN6ODhtMDRteDJpcHdocXJpaTFpaiJ9.tkV7UFKy4yBlAtkZNYOS4A';
+  mapboxgl.accessToken = MAPBOX_TOKEN;
+
+  const DEFAULT_CENTER = [123.9028, 10.2951]; // [lng, lat]
+  const DEFAULT_ZOOM = 18;
+
+  const STO_NINO_POLY = {
+    type:"Feature",
+    geometry:{ type:"Polygon", coordinates:[[ 
+      [123.90212,10.29731],[123.90201,10.29786],[123.90058,10.29764],[123.89806,10.29617],[123.89771,10.29501],
+      [123.89805,10.29378],[123.89904,10.29427],[123.89994,10.29420],[123.89934,10.29213],[123.89938,10.29193],
+      [123.90009,10.29210],[123.90065,10.28980],[123.90212,10.29069],[123.90181,10.29169],[123.90195,10.29180],
+      [123.90196,10.29194],[123.90334,10.29488],[123.90359,10.29580],[123.90382,10.29723],[123.90379,10.29753],
+      [123.90213,10.29724],[123.90212,10.29731]
+    ]]}
+  };
+
+  const PUROKS = [
+    { code:"S01", name:"KANIPAAN", coords:[
+      [123.89850,10.29760],[123.90005,10.29785],[123.90150,10.29695],
+      [123.90135,10.29610],[123.90005,10.29555],[123.89900,10.29605],
+      [123.89870,10.29700],[123.89850,10.29760]
+    ]},
+    { code:"S02", name:"PAMPANGO", coords:[
+      [123.90160,10.29460],[123.90360,10.29475],[123.90350,10.29330],
+      [123.90250,10.29260],[123.90120,10.29285],[123.90100,10.29380],
+      [123.90160,10.29460]
+    ]},
+    { code:"S03", name:"LUTAW-LUTAW", coords:[
+      [123.89990,10.29485],[123.90140,10.29455],[123.90120,10.29355],
+      [123.90000,10.29280],[123.89905,10.29355],[123.89900,10.29430],
+      [123.89990,10.29485]
+    ]},
+    { code:"S04", name:"MAUCO", coords:[
+      [123.90200,10.29650],[123.90345,10.29605],[123.90370,10.29495],
+      [123.90225,10.29460],[123.90155,10.29525],[123.90200,10.29650]
+    ]}
+  ];
+
+  const streetEl = document.getElementById('street');
+  const purokEl  = document.getElementById('purok_sitio');
+  const brgyEl   = document.getElementById('barangay');
+  const cityEl   = document.getElementById('city');
+  const fullEl   = document.getElementById('b_address');
+  const preview  = document.getElementById('addrPreview');
+  const styleSel = document.getElementById('style-selector');
+  const latEl    = document.getElementById('incident_lat');
+  const lngEl    = document.getElementById('incident_lng');
+  const addrOut  = document.getElementById('incident_address');
+
+  // NEW: hidden inputs that must mirror map fields (for the view)
+  const mapStreetEl   = document.getElementById('map_street');
+  const mapPurokEl    = document.getElementById('map_purok');
+  const mapBrgyEl     = document.getElementById('map_barangay');
+  const mapCityEl     = document.getElementById('map_city');
+
+  let map, marker;
+  const modalEl = document.getElementById('address_modal');
+  modalEl.addEventListener('shown.bs.modal', initMap, { once:true });
+
+  function initMap(){
+    map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/' + styleSel.value,
+      center: DEFAULT_CENTER,
+      zoom: DEFAULT_ZOOM
+    });
+
+    marker = new mapboxgl.Marker({ color:'#B22222', draggable:true })
+      .setLngLat(DEFAULT_CENTER)
+      .addTo(map);
+
+    map.on('load', () => {
+      addLayers();
+      updateAddressFor(marker.getLngLat());
+      setTimeout(()=>map.resize(), 120);
+    });
+
+    marker.on('dragend', () => updateAddressFor(marker.getLngLat()));
+    map.on('click', (e) => { marker.setLngLat(e.lngLat); updateAddressFor(e.lngLat); });
+
+    styleSel.addEventListener('change', () => {
+      map.setStyle('mapbox://styles/' + styleSel.value);
+      map.once('styledata', () => { addLayers(); marker.addTo(map); });
+    });
+  }
+
+  function addLayers(){
+    if (!map.getSource('brgy-src')){
+      map.addSource('brgy-src', { type:'geojson', data: STO_NINO_POLY });
+    }
+    if (!map.getLayer('brgy-outline')){
+      map.addLayer({ id:'brgy-outline', type:'line', source:'brgy-src',
+        paint:{ 'line-color':'#111', 'line-width':2 }});
+    }
+    if (!map.getLayer('brgy-fill')){
+      map.addLayer({ id:'brgy-fill', type:'fill', source:'brgy-src',
+        paint:{ 'fill-color':'#111', 'fill-opacity': 0 } }); /* invisible */
+    }
+
+    PUROKS.forEach((p,i)=>{
+      const id = `purok-${i}`;
+      const poly = turf.polygon([closeRing(p.coords)]);
+      if (!map.getSource(id)) map.addSource(id,{ type:'geojson', data:poly });
+      if (!map.getLayer(`${id}-line`)){
+        map.addLayer({ id:`${id}-line`, type:'line', source:id,
+          paint:{ 'line-color':'rgba(0,0,0,0)', 'line-opacity': 0, 'line-width': 0 }});
+      }
+    });
+  }
+
+  function closeRing(coords){
+    const ring = coords.slice();
+    const a = ring[0], b = ring[ring.length-1];
+    if (a[0]!==b[0] || a[1]!==b[1]) ring.push(a);
+    return ring;
+  }
+
+  function setPreviewOutside(isOutside){
+    preview.classList.toggle('text-danger', !!isOutside);
+    preview.classList.toggle('fw-semibold', !!isOutside);
+  }
+
+  // NEW: keep hidden inputs in sync with current map fields
+  function syncHidden(){
+    if (mapStreetEl) mapStreetEl.value = (streetEl.value || '').trim();
+    if (mapPurokEl)  mapPurokEl.value  = (purokEl.value  || '').trim();
+    if (mapBrgyEl)   mapBrgyEl.value   = (brgyEl.value   || '').trim();
+    if (mapCityEl)   mapCityEl.value   = (cityEl.value   || '').trim();
+  }
+
+  async function updateAddressFor(lngLat){
+    const lng = Number(lngLat.lng), lat = Number(lngLat.lat);
+    if (lngEl) lngEl.value = lng.toFixed(6);
+    if (latEl) latEl.value = lat.toFixed(6);
+
+    const inside = turf.booleanPointInPolygon(turf.point([lng,lat]), STO_NINO_POLY);
+
+    preview.textContent = 'Resolving address…';
+    setPreviewOutside(false);
+
+    let purokCode='', purokName='';
+    if (inside){
+      const matches = PUROKS.filter(p =>
+        turf.booleanPointInPolygon(turf.point([lng,lat]), turf.polygon([closeRing(p.coords)]))
+      );
+      if (matches.length===1){
+        purokCode = matches[0].code; purokName = matches[0].name;
+      } else if (matches.length>1){
+        let best = matches[0], bestA = turf.area(turf.polygon([closeRing(matches[0].coords)]));
+        for (let i=1;i<matches.length;i++){
+          const A = turf.area(turf.polygon([closeRing(matches[i].coords)]));
+          if (A<bestA){ best=matches[i]; bestA=A; }
+        }
+        purokCode = best.code; purokName = best.name;
+      }
+    }
+
+    try{
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxgl.accessToken}&limit=1`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const feat = data.features?.[0];
+      const ctx = feat?.context || [];
+      let street = feat?.text || '', city = '';
+      ctx.forEach(item=>{
+        if (item.id.includes('address')) street = item.text;
+        if (item.id.includes('place'))   city = item.text;
+      });
+
+      streetEl.value = street || '';
+      cityEl.value   = city || '';
+
+      if (inside){
+        purokEl.value  = purokName ? `${purokName}${purokCode ? ' ('+purokCode+')' : ''}` : '';
+        brgyEl.value   = brgyEl.value || 'SEÑOR SANTO NIÑO';
+        fillCombinedAddress();
+        syncHidden(); // keep hidden inputs updated
+        preview.textContent = fullEl.value || `Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`;
+      }else{
+        purokEl.value = '';
+        brgyEl.value  = '';
+        fullEl.value  = '';
+        if (addrOut) addrOut.value = '';
+        syncHidden(); // will clear hidden as well
+        setPreviewOutside(true);
+        preview.textContent = 'Outside the barangay range. Move the pin inside Barangay SEÑOR SANTO NIÑO.';
+      }
+    } catch(e){
+      if (inside){
+        purokEl.value  = purokName ? `${purokName}${purokCode ? ' ('+purokCode+')' : ''}` : '';
+        brgyEl.value   = brgyEl.value || 'SEÑOR SANTO NIÑO';
+        fillCombinedAddress();
+        syncHidden();
+        preview.textContent = fullEl.value || `Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`;
+      }else{
+        purokEl.value = '';
+        brgyEl.value  = '';
+        fullEl.value  = '';
+        if (addrOut) addrOut.value = '';
+        syncHidden();
+        setPreviewOutside(true);
+        preview.textContent = 'Outside the barangay range. Move the pin inside Barangay SEÑOR SANTO NIÑO.';
+      }
+    }
+  }
+
+  function fillCombinedAddress(){
+    const parts = [streetEl.value.trim(), purokEl.value.trim(), (brgyEl.value||'SEÑOR SANTO NIÑO').trim(), cityEl.value.trim()].filter(Boolean);
+    fullEl.value = parts.join(', ');
+  }
+
+  document.getElementById('btnClearPin').addEventListener('click', () => {
+    streetEl.value = '';
+    purokEl.value  = '';
+    brgyEl.value   = 'SEÑOR SANTO NIÑO';
+    cityEl.value   = '';
+    if (addrOut) addrOut.value = '';
+    if (latEl) latEl.value = '';
+    if (lngEl) lngEl.value = '';
+    fillCombinedAddress();
+    syncHidden();
+    if (marker){ marker.setLngLat(DEFAULT_CENTER); updateAddressFor({lng:DEFAULT_CENTER[0], lat:DEFAULT_CENTER[1]}); }
+  });
+
+  // Save button: copy composed address to the read-only display in the main form
+  window.useIncidentAddress = function(){
+    if (fullEl.value && addrOut) addrOut.value = fullEl.value;
+    syncHidden(); // ensure latest values are posted
+  };
+
+  // Make showToast available globally for person selection validation
+  window.showToast = function(message, type = 'danger') {
+    const toastContainer = document.querySelector('.toast-container');
+    const toastId = 'toast-' + Date.now();
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center text-bg-${type} border-0`;
+    toast.setAttribute('role', 'alert');
+    toast.id = toastId;
+    toast.innerHTML = `
+      <div class="d-flex">
+        <div class="toast-body">${message}</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>`;
+    toastContainer.appendChild(toast);
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+    toast.addEventListener('hidden.bs.toast', () => toast.remove());
+  };
+
+  // Form validation and submission
+  const form = document.querySelector('form');
+  form.addEventListener('submit', function(event) {
+    event.preventDefault();
+    
+    // Validate required fields
+    const subject = document.querySelector('[name="incident_subject"]').value.trim();
+    const date = document.querySelector('[name="incident_date"]').value.trim();
+    const time = document.querySelector('[name="incident_time"]').value.trim();
+    const desc = document.querySelector('[name="incident_desc"]').value.trim();
+    const address = document.querySelector('[name="incident_address"]').value.trim();
+    const complainant = document.querySelector('[name="complainant_id"]').value.trim();
+    const respondent = document.querySelector('[name="respondent_ids"]').value.trim();
+    
+    if (!subject) { showToast('Incident subject is required'); return; }
+    if (!date) { showToast('Incident date is required'); return; }
+    if (!time) { showToast('Incident time is required'); return; }
+    if (!desc) { showToast('Incident description is required'); return; }
+    if (!address) { showToast('Incident location is required. Please select a location using the map'); return; }
+    if (!complainant) { showToast('Complainant is required'); return; }
+    
+    // Check if complainant and respondent are the same person
+    if (complainant && respondent && complainant === respondent) {
+      showToast('Complainant and respondent cannot be the same person');
+      return;
+    }
+    
+    // Confirmation with respondent reminder
+    let confirmMsg = 'Are you sure you want to save this blotter report?';
+    if (!respondent) {
+      confirmMsg += '\n\nNote: No respondent has been added to this report.';
+    }
+    
+    if (confirm(confirmMsg)) {
+      this.submit();
+    }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{% load choiceextras %}
+{% for r in rows %}
+<tr>
+  <td>
+    <span class="id-pill">{{ r.person_code|default_if_none:"" }}</span>
+  </td>
+  <td>{{ r.full_name|default_if_none:"" }}</td>
+  <td>{{ r.address|default_if_none:"" }}</td>
+  <td>{{ r.mob_num|format_mobile|default_if_none:"" }}</td>
+  <td>{{ r.email|default_if_none:"" }}</td>
+  <td class="text-end">
+    {% if request.resolver_match.namespace == 'captain' %}
+      <a class="btn btn-outline-brand btn-sm" href="{% url 'captain:resident_detail' r.person_id %}">
+        View
+      </a>
+    {% elif request.resolver_match.namespace == 'bhw' %}
+      <a class="btn btn-outline-brand btn-sm" href="{% url 'bhw:resident_detail' r.person_id %}">
+        View
+      </a>
+    {% else %}
+      <a class="btn btn-outline-brand btn-sm" href="{% url 'secretary:resident_detail' r.person_id %}">
+        View
+      </a>
+    {% endif %}
+  </td>
+</tr>
+{% empty %}
+<tr>
+  <td colspan="9" class="text-center py-3 text-muted">No households found.</td>
+</tr>
+{% endfor %}

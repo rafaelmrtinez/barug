@@ -1,0 +1,6 @@
+The arbitration choice is missing from the live flow. 
+
+In the kp9_mediation step, the choices array needs to include:
+{ label: "Both attended → NOT SETTLED → Agree to Arbitration", next: "kp14_arbitration_agree" }
+
+This should be added alongside the existing "Both attended → NOT SETTLED → Constitute Pangkat" option to give parties the choice between Pangkat conciliation or arbitration when mediation fails.

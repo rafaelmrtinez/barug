@@ -1,0 +1,51 @@
+"""
+URL configuration for barug project.
+
+The `urlpatterns` list routes URLs to views. For more information please see:
+    https://docs.djangoproject.com/en/5.2/topics/http/urls/
+Examples:
+Function views
+    1. Add an import:  from my_app import views
+    2. Add a URL to urlpatterns:  path('', views.home, name='home')
+Class-based views
+    1. Add an import:  from other_app.views import Home
+    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
+Including another URLconf
+    1. Import the include() function: from django.urls import include, path
+    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
+"""
+
+from django.contrib import admin
+from django.urls import path, include
+from authentication import views as auth_view
+from django.conf import settings
+from django.conf.urls.static import static
+from process_scheduled_deliveries_endpoint import process_scheduled_deliveries
+
+urlpatterns = [
+    path("", auth_view.login, name="login"),
+    path("admin/", include("staff_admin.urls", namespace="staff_admin")),
+    path("superadmin/", include("superadmin.urls", namespace="superadmin")),
+    path("authentication/", include("authentication.urls", namespace="authentication")),
+    path("bhw/", include("bhw.urls", namespace="bhw")),
+    path("midwife/", include("midwife.urls", namespace="midwife")),
+    path("captain/", include("captain.urls", namespace="captain")),
+    path("clerk/", include("clerk.urls", namespace="clerk")),
+    path("lupon_mem/", include("lupon_mem.urls", namespace="lupon_mem")),
+    path("lupon_pres/", include("lupon_pres.urls", namespace="lupon_pres")),
+    path("person/", include("resident.urls", namespace="resident21")),
+    path("secretary/", include("secretary.urls", namespace="secretary")),
+    path("treasurer/", include("treasurer.urls", namespace="treasurer")),
+    path("resident/", include("resident.urls", namespace="resident")),
+    path("metrics/", include("metrics.urls", namespace="metrics")),
+    path("payments/", include("payments.urls", namespace="payments")),
+    path("notifications/", include("notifications.urls", namespace="notifications")),
+    path("maternal/", include("maternal.urls", namespace="maternal")),
+    path("child-health/", include("child_health.urls", namespace="child_health")),
+    path("docs/", include("doc_ingest.urls", namespace="doc_ingest")),
+    path("e/", include("event_logs.urls", namespace="event_logs")),
+    path('process-scheduled-deliveries/', process_scheduled_deliveries, name='process_scheduled_deliveries'),
+]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

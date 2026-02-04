@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<style>
+  :root{
+    --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932; --brand-600:#7a323b;
+    --brand-100:#f3eaeb; --brand-050:#fbf6f6;
+  }
+  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
+  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
+  .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); background:#fff; }
+  .btn-outline-brand:hover{ background:var(--brand-700); color:#fff; }
+
+  .toolbar{ background:#fff; border:1px solid var(--bs-border-color,#dee2e6);
+            border-radius:1rem; padding:.75rem; gap:.5rem; }
+  .searchbox{ position:relative; flex:1; min-width:240px; }
+  .searchbox .bi{ position:absolute; left:.8rem; top:50%; transform:translateY(-50%); opacity:.6; color:var(--brand-700); }
+  .searchbox input{ padding-left:2.35rem !important; }
+
+  .table thead th{ border-bottom-width:2px; white-space:nowrap; }
+  .group-row td{ background:var(--brand-050); border-top:2px solid rgba(109,41,50,.15); font-weight:600; color:#3b3032; }
+  .reqcode{ font-family: ui-monospace,monospace; font-size:.86rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3" style="margin-top: 40px;">
+
+  <!-- Toolbar -->
+  <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get" id="toolbarForm">
+    <div class="searchbox">
+      {% bs_icon 'search' extra_classes='bi' %}
+      <input type="text" class="form-control" id="search" name="q" placeholder="Search code / OR / year / business id" value="{{ q }}" />
+    </div>
+    <input type="hidden" name="per_page" value="{{ per_page }}">
+    <!-- <button type="submit" class="btn btn-brand d-flex align-items-center">
+      {% bs_icon 'search' extra_classes='me-2' %} Search
+    </button> -->
+  </form>
+
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th style="width:1%">Code</th>
+          <th style="width:1%">Business</th>
+          <th>Period</th>
+          <th class="text-end">Base</th>
+          <th class="text-end">Surcharge</th>
+          <th class="text-end">Total</th>
+          <th>OR #</th>
+          <th>Paid On</th>
+          <th>Status</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if rows %}
+          {% for r in rows %}
+            {% if r.is_group_header %}
+              <tr class="group-row">
+                <td colspan="9" class="text-center">
+                  <span>Business <span class="badge bg-light text-dark border">{{ r.business_id|stringformat:"06d" }}</span></span>
+                  <span class="text-muted small ms-2">Created @ {{ r.created_at_sec }}</span>
+                </td>
+                <td class="text-end">
+                  <a class="btn btn-sm btn-outline-brand" href="{% url 'treasurer:closure_group' r.business_id %}">{% bs_icon 'eye' extra_classes='me-1' %} View</a>
+                </td>
+              </tr>
+            {% else %}
+              <tr>
+                <td class="reqcode">{{ r.request_code }}</td>
+                <td>{{ r.business_id }}</td>
+                <td>{{ r.period_label }}</td>
+                <td class="text-end">{% if r.base_fee_quote_f is not None %}₱{{ r.base_fee_quote_f|floatformat:2 }}{% else %}—{% endif %}</td>
+                <td class="text-end">{% if r.surcharge_quote_f is not None %}₱{{ r.surcharge_quote_f|floatformat:2 }}{% else %}—{% endif %}</td>
+                <td class="text-end">{% if r.total_quote_f is not None %}₱{{ r.total_quote_f|floatformat:2 }}{% else %}—{% endif %}</td>
+                <td>{{ r.or_number|default:"—" }}</td>
+                <td>{{ r.paid_on_disp|default:"—" }}</td>
+                <td><span class="{{ r.status_ui.cls }}">{{ r.status_ui.label }}</span></td>
+                <td class="text-end">
+                  {% if r.closure_payment_request_id %}
+                    <a class="btn btn-sm btn-outline-brand" href="{% url 'treasurer:closure_detail' r.closure_payment_request_id %}">
+                      {% bs_icon 'eye' extra_classes='me-1' %} View
+                    </a>
+                  {% else %}
+                    <span class="text-muted small">No item</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endif %}
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="10" class="text-center">No matching items.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if is_paginated %}
+  <div class="d-flex justify-content-end">
+    <ul class="pagination pagination-sm">
+      {% for num in page_numbers %}
+        {% if num %}
+          <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+            <a class="page-link" href="?q={{ q|urlencode }}&per_page={{ per_page }}&page={{ num }}">{{ num }}</a>
+          </li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link">…</span></li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

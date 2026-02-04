@@ -446,11 +446,7 @@
   const STO_NINO_POLY = {
     type:"Feature",
     geometry:{ type:"Polygon", coordinates:[[ 
-      [123.90212,10.29731],[123.90201,10.29786],[123.90058,10.29764],[123.89806,10.29617],[123.89771,10.29501],
-      [123.89805,10.29378],[123.89904,10.29427],[123.89994,10.29420],[123.89934,10.29213],[123.89938,10.29193],
-      [123.90009,10.29210],[123.90065,10.28980],[123.90212,10.29069],[123.90181,10.29169],[123.90195,10.29180],
-      [123.90196,10.29194],[123.90334,10.29488],[123.90359,10.29580],[123.90382,10.29723],[123.90379,10.29753],
-      [123.90213,10.29724],[123.90212,10.29731]
+      [123.88800,10.27800],[123.91500,10.27800],[123.91500,10.31200],[123.88800,10.31200],[123.88800,10.27800]
     ]]}
   };
 
@@ -471,8 +467,7 @@
       [123.89990,10.29485]
     ]},
     { code:"S04", name:"MAUCO", coords:[
-      [123.90200,10.29650],[123.90345,10.29605],[123.90370,10.29495],
-      [123.90225,10.29460],[123.90155,10.29525],[123.90200,10.29650]
+      [123.88800,10.28000],[123.91000,10.28000],[123.91000,10.31000],[123.88800,10.31000],[123.88800,10.28000]
     ]}
   ];
 
@@ -573,26 +568,31 @@
     if (lngEl) lngEl.value = lng.toFixed(6);
     if (latEl) latEl.value = lat.toFixed(6);
 
-    const inside = turf.booleanPointInPolygon(turf.point([lng,lat]), STO_NINO_POLY);
+    // Always treat as inside barangay - no polygon check needed
+    const inside = true;
 
     preview.textContent = 'Resolving address…';
     setPreviewOutside(false);
 
-    let purokCode='', purokName='';
-    if (inside){
-      const matches = PUROKS.filter(p =>
-        turf.booleanPointInPolygon(turf.point([lng,lat]), turf.polygon([closeRing(p.coords)]))
-      );
-      if (matches.length===1){
-        purokCode = matches[0].code; purokName = matches[0].name;
-      } else if (matches.length>1){
-        let best = matches[0], bestA = turf.area(turf.polygon([closeRing(matches[0].coords)]));
-        for (let i=1;i<matches.length;i++){
-          const A = turf.area(turf.polygon([closeRing(matches[i].coords)]));
-          if (A<bestA){ best=matches[i]; bestA=A; }
-        }
-        purokCode = best.code; purokName = best.name;
+    // Find nearest purok/sitio
+    let nearestPurok = null;
+    let minDistance = Infinity;
+    
+    PUROKS.forEach(p => {
+      const purokPoly = turf.polygon([closeRing(p.coords)]);
+      const purokCenter = turf.centroid(purokPoly);
+      const distance = turf.distance(turf.point([lng, lat]), purokCenter, {units: 'kilometers'});
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestPurok = p;
       }
+    });
+    
+    let purokCode = '', purokName = '';
+    if (nearestPurok) {
+      purokCode = nearestPurok.code;
+      purokName = nearestPurok.name;
     }
 
     try{
@@ -608,39 +608,19 @@
       });
 
       streetEl.value = street || '';
-      cityEl.value   = city || '';
-
-      if (inside){
-        purokEl.value  = purokName ? `${purokName}${purokCode ? ' ('+purokCode+')' : ''}` : '';
-        brgyEl.value   = brgyEl.value || 'SEÑOR SANTO NIÑO';
-        fillCombinedAddress();
-        syncHidden(); // keep hidden inputs updated
-        preview.textContent = fullEl.value || `Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`;
-      }else{
-        purokEl.value = '';
-        brgyEl.value  = '';
-        fullEl.value  = '';
-        if (addrOut) addrOut.value = '';
-        syncHidden(); // will clear hidden as well
-        setPreviewOutside(true);
-        preview.textContent = 'Outside the barangay range. Move the pin inside Barangay SEÑOR SANTO NIÑO.';
-      }
+      cityEl.value = 'Cebu City';
+      purokEl.value = purokName ? `${purokName}${purokCode ? ' ('+purokCode+')' : ''}` : '';
+      brgyEl.value = 'SEÑOR SANTO NIÑO';
+      fillCombinedAddress();
+      syncHidden();
+      preview.textContent = fullEl.value || `Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`;
     } catch(e){
-      if (inside){
-        purokEl.value  = purokName ? `${purokName}${purokCode ? ' ('+purokCode+')' : ''}` : '';
-        brgyEl.value   = brgyEl.value || 'SEÑOR SANTO NIÑO';
-        fillCombinedAddress();
-        syncHidden();
-        preview.textContent = fullEl.value || `Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`;
-      }else{
-        purokEl.value = '';
-        brgyEl.value  = '';
-        fullEl.value  = '';
-        if (addrOut) addrOut.value = '';
-        syncHidden();
-        setPreviewOutside(true);
-        preview.textContent = 'Outside the barangay range. Move the pin inside Barangay SEÑOR SANTO NIÑO.';
-      }
+      purokEl.value = purokName ? `${purokName}${purokCode ? ' ('+purokCode+')' : ''}` : '';
+      brgyEl.value = 'SEÑOR SANTO NIÑO';
+      cityEl.value = 'Cebu City';
+      fillCombinedAddress();
+      syncHidden();
+      preview.textContent = fullEl.value || `Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`;
     }
   }
 
@@ -652,8 +632,8 @@
   document.getElementById('btnClearPin').addEventListener('click', () => {
     streetEl.value = '';
     purokEl.value  = '';
-    brgyEl.value   = 'SEÑOR SANTO NIÑO';
-    cityEl.value   = '';
+    brgyEl.value   = 'SEÑOR SANTO NIÑO'; // Always default to barangay
+    cityEl.value   = 'Cebu City'; // Always default to Cebu City
     if (addrOut) addrOut.value = '';
     if (latEl) latEl.value = '';
     if (lngEl) lngEl.value = '';
@@ -664,6 +644,7 @@
 
   // Save button: copy composed address to the read-only display in the main form
   window.useIncidentAddress = function(){
+    // Always allow saving the address, even if outside barangay
     if (fullEl.value && addrOut) addrOut.value = fullEl.value;
     syncHidden(); // ensure latest values are posted
   };

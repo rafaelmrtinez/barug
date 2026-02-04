@@ -1,0 +1,223 @@
+{% load static %}
+{% load django_bootstrap5 %}
+{% bootstrap_css %}
+{% bootstrap_javascript %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+
+    <link rel="stylesheet" href="{% static 'css/static_style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/form.css' %}">
+    <link rel="stylesheet" href="{% static 'css/button.css' %}">
+
+    <link rel="icon" type="image/x-icon" href="{% static 'images/brgy-sto-nino.png' %}">
+    <title>Login</title>
+
+    <style>
+        :root {
+            --brgy-maroon: #561c24;
+            --brgy-maroon-600: #6d2932;
+            --brgy-cream: #e8d8c4;
+            --error-soft: #fde8e8;
+            --error-border: #f4b4b4;
+        }
+        .alert-soft.alert-danger { background: #ffe0e0; border-color: #ffb3b3; color: #7f1d1d; }
+        .alert-soft.alert-error  { background: #fff1f1; border-color: #ff9e9e; color: #9a1c1c; }
+
+        .box-area { max-width: 720px; width: 100%; }
+
+        .error-banner {
+            background: var(--error-soft);
+            border: 1px solid var(--error-border);
+            border-left: 6px solid #dc3545;
+            color: #7a1f1f;
+            border-radius: 12px;
+            padding: .85rem 1rem;
+            display: flex;
+            align-items: flex-start;
+            gap: .75rem;
+        }
+        .error-banner .emoji { font-size: 1.2rem; line-height: 1; margin-top: .1rem; }
+        .error-list { margin: 0; padding-left: 1.15rem; }
+        .error-list li { margin: .15rem 0; }
+
+        .alert-soft { border-radius: 12px; border-width: 1px; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
+        .alert-soft.alert-success { background: #ecfdf3; border-color: #b7f0d0; color: #166534; }
+        .alert-soft.alert-info    { background: #eef6ff; border-color: #cde3ff; color: #1e40af; }
+        .alert-soft.alert-warning { background: #fff7ed; border-color: #ffe3c5; color: #92400e; }
+        .alert-soft.alert-danger  { background: #fde8e8; border-color: #fecaca; color: #7f1d1d; }
+
+        .toggle-password { background: none; border: none; cursor: pointer; color: var(--brgy-maroon-600); font-weight: 600; }
+        .toggle-password:focus { outline: none; }
+
+        .form-floating input[type="password"],
+        .form-floating input[type="text"] { padding-right: 4.5rem; }
+
+        .form-control.is-invalid { border-color: #dc3545 !important; box-shadow: 0 0 0 .2rem rgba(220,53,69,.08); }
+        .invalid-feedback { display: block; }
+
+        .btn-submit {
+            background: var(--brgy-maroon);
+            color: #fff; border: none; border-radius: 14px;
+            padding: .85rem 1rem; font-weight: 700; transition: .15s ease-in-out;
+        }
+        .btn-submit:hover { background: var(--brgy-maroon-600); }
+        .btn-submit:disabled { opacity: .8; }
+
+        .forgot-pass { color: #111; font-weight: 600; text-decoration: none; }
+        .forgot-pass:hover { text-decoration: underline; }
+    </style>
+</head>
+
+
+<body>
+<div class="container d-flex justify-content-center align-items-center min-vh-100">
+    <div class="row border rounded-5 p-3 bg-white shadow box-area">
+        <div class="col-md-12 right-box">
+            <div class="row align-items-center">
+
+                <!-- Header -->
+                <div class="header-text mb-4 text-start mt-3 d-flex align-items-center justify-content-between">
+                    <div>
+                        <div>
+                            <img src="{% static 'images/login-logo.png' %}" alt="Logo" class="img-fluid" style="max-height:80px;">
+                        </div>
+                        <h6 class="mt-2">Log in to access barangay services.</h6>
+                    </div>
+                    <div>
+                        <img src="{% static 'images/brgy-sto-nino.png' %}" alt="Logo" class="img-fluid" style="max-height:100px;">
+                    </div>
+                </div>
+
+                <!-- Django messages: show ONLY messages tagged "auth" -->
+                {% if messages %}
+                <div class="mb-3">
+                    {% for message in messages %}
+                        {% if 'auth' in message.tags %}
+                            <div class="alert alert-{{ message.level_tag|default:'info' }} alert-soft alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Error banner (non-field + field summary) -->
+                {% if form.non_field_errors %}
+                <div class="mb-3 error-banner">
+                    <div class="emoji">⚠️</div>
+                    <div>
+                        {% for err in form.non_field_errors %}
+                            <div>{{ err }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Login form -->
+                <form method="post" id="login-form" novalidate>
+                    {% csrf_token %}
+
+                    <!-- Username / Email -->
+                    <div class="form-floating mb-3 position-relative">
+                        {% with f=form.email_username %}
+                        <input type="text" name="{{ f.html_name }}" id="{{ f.id_for_label }}"
+                               value="{{ f.value|default_if_none:'' }}"
+                               class="form-control{% if f.errors %} is-invalid{% endif %}"
+                               placeholder="{{ f.label }}" autocomplete="username" />
+                        <label for="{{ f.id_for_label }}">{{ f.label }}</label>
+
+                        {% if f.errors %}
+                        <div class="invalid-feedback">
+                            {% for err in f.errors %}<div>{{ err }}</div>{% endfor %}
+                        </div>
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+
+                    <!-- Password -->
+                    <div class="form-floating mb-3 position-relative">
+                        {% with f=form.password %}
+                        <input type="password" name="{{ f.html_name }}" id="{{ f.id_for_label }}"
+                               class="form-control{% if f.errors %} is-invalid{% endif %}"
+                               placeholder="{{ f.label }}" autocomplete="current-password" />
+                        <label for="{{ f.id_for_label }}">{{ f.label }}</label>
+
+                        <!-- Show/Hide password -->
+                        <button type="button" class="toggle-password position-absolute top-50 end-0 translate-middle-y me-3 p-0"
+                                data-target="{{ f.id_for_label }}">
+                            <small>Show</small>
+                        </button>
+
+                        {% if f.errors %}
+                        <div class="invalid-feedback">
+                            {% for err in f.errors %}<div>{{ err }}</div>{% endfor %}
+                        </div>
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+
+                    <!-- Forgot password -->
+                    <div class="mb-3 text-end">
+                        <a href="{% url 'authentication:forgot_password' %}" class="forgot-pass">Forgot Password?</a>
+                    </div>
+
+                    <!-- Submit -->
+                    <div class="input-group mb-3">
+                        <button type="submit" id="submit" name="submit" class="btn btn-submit btn-lg w-100 fs-6">
+                            Login
+                        </button>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Minimal JS just for toggling password + preventing double submit -->
+<script>
+(function () {
+    // Prevent browser back button from showing login page after successful login
+    if (window.history && window.history.pushState) {
+        window.history.pushState(null, null, window.location.href);
+        window.addEventListener('popstate', function() {
+            window.history.pushState(null, null, window.location.href);
+        });
+    }
+    
+    // toggle password show/hide
+    document.querySelectorAll('.toggle-password').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const targetId = btn.getAttribute('data-target');
+            const input = document.getElementById(targetId);
+            if (!input) return;
+            const showing = input.getAttribute('type') === 'text';
+            input.setAttribute('type', showing ? 'password' : 'text');
+            btn.querySelector('small').textContent = showing ? 'Show' : 'Hide';
+        });
+    });
+
+    // prevent double submit
+    const form = document.getElementById('login-form');
+    const submitBtn = document.getElementById('submit');
+    if (form && submitBtn) {
+        form.addEventListener('submit', function () {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Signing in…';
+        });
+    }
+})();
+</script>
+</body>
+
+{% include 'partials/modal_messages.html' %}
+</html>

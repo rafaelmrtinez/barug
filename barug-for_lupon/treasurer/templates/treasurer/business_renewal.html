@@ -1,0 +1,422 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<style>
+  :root{
+    --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932; --brand-600:#7a323b;
+    --brand-100:#f3eaeb; --brand-050:#fbf6f6;
+  }
+  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
+  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
+  .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); background:#fff; }
+  .btn-outline-brand:hover{ background:var(--brand-700); color:#fff; }
+  .btn-brand-subtle{ background:var(--brand-100); color:var(--brand-700); border-color:var(--brand-100); }
+  .btn-brand-subtle:hover{ background:var(--brand-050); color:var(--brand-700); }
+
+  .form-control:focus, .form-select:focus, .form-check-input:focus{
+    border-color:var(--brand-700);
+    box-shadow:0 0 0 .25rem rgba(109,41,50,.25);
+    outline:none;
+  }
+
+  .toolbar{ background:#fff; border:1px solid var(--bs-border-color,#dee2e6);
+            border-radius:1rem; padding:.75rem; gap:.5rem; }
+  .searchbox{ position:relative; flex:1; min-width:240px; }
+  .searchbox .bi{ position:absolute; left:.8rem; top:50%; transform:translateY(-50%); opacity:.6; color:var(--brand-700); }
+  .searchbox input{ padding-left:2.35rem !important; }
+
+  .filters-bar{ gap:.5rem; }
+  .filter-chip{
+    display:inline-flex; align-items:center; gap:.4rem; padding:.3rem .65rem;
+    border-radius:999px; font-size:.8rem; text-decoration:none;
+    border:1px solid rgba(109,41,50,.18); background:var(--brand-050); color:var(--brand-700);
+  }
+  .filter-chip:hover{ background:var(--brand-100); }
+  .filter-chip .x{ display:inline-grid; place-items:center; width:1rem; height:1rem; border-radius:50%;
+                   background:#fff; border:1px solid rgba(109,41,50,.22); line-height:1; font-weight:700; color:var(--brand-700); }
+
+  .code-badge{
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size:.875rem; padding:.25rem .45rem; border-radius:.5rem;
+    background:#f5f2ee; border:1px solid rgba(0,0,0,.06); color:var(--brand-800);
+  }
+
+  .table thead th{ border-bottom-width:2px; white-space:nowrap; }
+  .table tbody tr:hover{ background:#fcfcfd; }
+  .table td, .table th{ vertical-align:middle; white-space:normal; word-break:break-word; }
+
+  /* group header row */
+  .group-row td{
+    background:var(--brand-050);
+    border-top:2px solid rgba(109,41,50,.15);
+    font-weight:600;
+    color:#3b3032;
+  }
+
+  .page-pagination .pagination .page-item.active .page-link{
+    background: var(--brand-700);
+    border-color: var(--brand-700);
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 0 0 3px rgba(109,41,50,.20);
+  }
+
+  /* Request code pill */
+  .reqcode{
+    display:inline-flex;align-items:center;gap:.45rem;padding:.22rem .55rem;
+    border-radius:.5rem;border:1px solid #e5e7eb;background:#fff;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;
+    font-size:.86rem;white-space:nowrap;line-height:1;
+  }
+  .reqcode .prefix{
+    padding:.12rem .4rem;border-radius:.35rem;font-weight:700;
+    font-size:.72rem;letter-spacing:.03em;background:var(--brand-700);color:#fff;
+  }
+  .reqcode .num{letter-spacing:.02em;color:#1f2937;}
+
+  /* keep the first column from squishing */
+  .table th:first-child,.table td:first-child{white-space:nowrap;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap" style="margin-top: 40px;">
+  <div class="container-fluid pt-3 page-main">
+    <div class="row">
+      <div>
+
+        <!-- Toolbar -->
+        <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get" id="toolbarForm">
+          <div class="searchbox">
+            {% bs_icon 'search' extra_classes='bi' %}
+            <input type="text" class="form-control" id="search" name="q" placeholder="Search request code / OR / year / business id" value="{{ q }}" />
+          </div>
+
+          <input type="hidden" name="per_page" value="{{ per_page }}">
+
+          <button type="submit" class="btn btn-brand d-flex align-items-center">
+            {% bs_icon 'search' extra_classes='me-2' %} Search
+          </button>
+
+          <button class="btn btn-brand-subtle d-flex align-items-center ms-auto" type="button"
+                  data-bs-toggle="offcanvas" data-bs-target="#filterPanel" aria-controls="filterPanel">
+            {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+            <span class="badge rounded-pill text-bg-light ms-2" id="activeFiltersBadge" style="display:none;">0</span>
+          </button>
+        </form>
+
+        <!-- Active filters -->
+        <div class="filters-bar d-flex flex-wrap align-items-center mb-3" id="activeChips">
+          <span class="text-muted small">No active filters.</span>
+        </div>
+
+        <!-- Table -->
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead>
+              <tr>
+                <th style="width:1%">Request Code</th>
+                <th style="width:1%">Business ID</th>
+                <th>Period</th>
+                <th class="text-end">Base</th>
+                <th class="text-end">Surcharge</th>
+                <th class="text-end">Total</th>
+                <th>OR #</th>
+                <th>Paid On</th>
+                <th>Status</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if rows %}
+                {% for r in rows %}
+                  {% if r.is_group_header %}
+                    <tr class="group-row">
+                      <td colspan="9" class="text-center">
+                        <span class="me-2">Business <span class="code-badge">{{ r.business_id|stringformat:"06d" }}</span></span>
+                        <span class="text-muted small">Created @ {{ r.created_at_sec|default:"" }}</span>
+                      </td>
+                      <td class="text-end">
+                        {# SAFE header button: use header_request_id if present #}
+                        {% if r.header_request_id %}
+                          <a class="btn btn-sm btn-outline-brand"
+                             href="{% url 'treasurer:business_renewal_group' r.business_id %}">
+                            {% bs_icon 'eye' extra_classes='me-1' %} View
+                          </a>
+                        {% else %}
+                          <span class="text-muted small">No item to view</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% else %}
+                    <tr>
+                      <td title="{{ r.request_code }}">
+                        {% with rc=r.request_code %}
+                          {% if rc|slice:":4" == "RNR-" %}
+                            {% with num=rc|slice:"4:" %}
+                              <span class="reqcode"><span class="prefix">RNR</span><span class="num">{{ num }}</span></span>
+                            {% endwith %}
+                          {% else %}
+                            <span class="reqcode"><span class="num">{{ rc }}</span></span>
+                          {% endif %}
+                        {% endwith %}
+                      </td>
+                      <td>{{ r.business_id }}</td>
+                      <td>{{ r.period_label }}</td>
+                      <td class="text-end">{% if r.base_fee_quote_f is not None %}₱{{ r.base_fee_quote_f|floatformat:2 }}{% else %}—{% endif %}</td>
+                      <td class="text-end">{% if r.surcharge_quote_f is not None %}₱{{ r.surcharge_quote_f|floatformat:2 }}{% else %}—{% endif %}</td>
+                      <td class="text-end">{% if r.total_quote_f is not None %}₱{{ r.total_quote_f|floatformat:2 }}{% else %}—{% endif %}</td>
+                      <td>{{ r.or_number|default:"—" }}</td>
+                      <td>{{ r.paid_on_disp|default:"—" }}</td>
+                      <td><span class="{{ r.status_ui.cls }}">{{ r.status_ui.label }}</span></td>
+                      <td class="text-end">
+                        {% if r.renewal_request_id %}
+                          <a class="btn btn-sm btn-outline-brand"
+                             href="{% url 'treasurer:business_renewal_detail' r.renewal_request_id %}">
+                            {% bs_icon 'eye' extra_classes='me-1' %} View
+                          </a>
+                        {% else %}
+                          <span class="text-muted small">No item</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endif %}
+                {% endfor %}
+              {% else %}
+                <tr><td colspan="10" class="text-center">No matching renewals.</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  {% if is_paginated %}
+  <div class="page-pagination d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2 px-3">
+    <div class="small text-muted">
+      Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ paginator.count }}
+    </div>
+
+    <nav aria-label="Renewals pagination">
+      <ul class="pagination pagination-sm mb-0">
+        {% if page_obj.has_previous %}
+          <li class="page-item"><a class="page-link"
+             href="?q={{ q|urlencode }}{% for t in period_types %}&period_type={{ t }}{% endfor %}{% for f in paid_filters %}&paid={{ f }}{% endfor %}{% if year %}&year={{ year }}{% endif %}&per_page={{ per_page }}&page=1"
+             aria-label="First">«</a></li>
+          <li class="page-item"><a class="page-link"
+             href="?q={{ q|urlencode }}{% for t in period_types %}&period_type={{ t }}{% endfor %}{% for f in paid_filters %}&paid={{ f }}{% endfor %}{% if year %}&year={{ year }}{% endif %}&per_page={{ per_page }}&page={{ page_obj.previous_page_number }}"
+             aria-label="Previous">‹</a></li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link">«</span></li>
+          <li class="page-item disabled"><span class="page-link">‹</span></li>
+        {% endif %}
+
+        {% for num in page_numbers %}
+          {% if num %}
+            <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+              <a class="page-link"
+                 href="?q={{ q|urlencode }}{% for t in period_types %}&period_type={{ t }}{% endfor %}{% for f in paid_filters %}&paid={{ f }}{% endfor %}{% if year %}&year={{ year }}{% endif %}&per_page={{ per_page }}&page={{ num }}">{{ num }}</a>
+            </li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+          {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+          <li class="page-item"><a class="page-link"
+             href="?q={{ q|urlencode }}{% for t in period_types %}&period_type={{ t }}{% endfor %}{% for f in paid_filters %}&paid={{ f }}{% endfor %}{% if year %}&year={{ year }}{% endif %}&per_page={{ per_page }}&page={{ page_obj.next_page_number }}"
+             aria-label="Next">›</a></li>
+          <li class="page-item"><a class="page-link"
+             href="?q={{ q|urlencode }}{% for t in period_types %}&period_type={{ t }}{% endfor %}{% for f in paid_filters %}&paid={{ f }}{% endfor %}{% if year %}&year={{ year }}{% endif %}&per_page={{ per_page }}&page={{ paginator.num_pages }}"
+             aria-label="Last">»</a></li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link">›</span></li>
+          <li class="page-item disabled"><span class="page-link">»</span></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Offcanvas Filters -->
+<div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
+     aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 100px;">
+  <div class="offcanvas-header" style="margin-top: 50px;">
+    <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+
+  <div class="offcanvas-body">
+    <form method="get" id="filterForm">
+      <input type="hidden" name="q" value="{{ q }}">
+      <input type="hidden" name="per_page" value="{{ per_page }}">
+
+      <div class="mb-4">
+        <div class="form-label fw-semibold d-flex justify-content-between align-items-center">
+          <span>Period Type</span>
+          <div class="small">
+            <a href="#" id="selectAllPeriod" class="me-2">Select all</a>
+            <a href="#" id="clearAllPeriod">None</a>
+          </div>
+        </div>
+        <div class="row row-cols-1">
+          {% for p in period_type_all %}
+            <div class="col mb-2">
+              <div class="form-check">
+                <input class="form-check-input period-box" type="checkbox" name="period_type" value="{{ p }}" id="pt-{{ p|slugify }}" {% if p in period_types %}checked{% endif %}>
+                <label class="form-check-label" for="pt-{{ p|slugify }}">{{ p|title }}</label>
+              </div>
+            </div>
+          {% empty %}
+            <div class="small text-muted">No period types.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <div class="form-label fw-semibold d-flex justify-content-between align-items-center">
+          <span>Year</span>
+        </div>
+        <select class="form-select" name="year">
+          <option value="">(any)</option>
+          {% for y in year_all %}
+            <option value="{{ y }}" {% if year and year|add:0 == y %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="mb-4">
+        <div class="form-label fw-semibold d-flex justify-content-between align-items-center">
+          <span>Paid</span>
+        </div>
+        <div class="row row-cols-1">
+          <div class="col mb-2">
+            <div class="form-check">
+              <input class="form-check-input paid-box" type="checkbox" name="paid" value="paid" id="pd-paid" {% if 'paid' in paid_filters %}checked{% endif %}>
+              <label class="form-check-label" for="pd-paid">Paid</label>
+            </div>
+          </div>
+          <div class="col mb-2">
+            <div class="form-check">
+              <input class="form-check-input paid-box" type="checkbox" name="paid" value="unpaid" id="pd-unpaid" {% if 'unpaid' in paid_filters %}checked{% endif %}>
+              <label class="form-check-label" for="pd-unpaid">Unpaid</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="offcanvas-footer">
+        <div class="d-flex gap-2">
+          <button class="btn btn-brand" type="submit">
+            {% bs_icon 'check2' extra_classes='me-1' %} Apply
+          </button>
+          <a class="btn btn-outline-brand" href="?q={{ q|urlencode }}&per_page={{ per_page }}">
+            {% bs_icon 'x-circle' extra_classes='me-1' %} Clear
+          </a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+  function getQS(){ return new URLSearchParams(window.location.search); }
+  function arrParam(name){
+    const qs=getQS(); const vals=qs.getAll(name);
+    if (vals.length===1 && vals[0].includes(',')) return vals[0].split(',').map(s=>s.trim()).filter(Boolean);
+    return vals;
+  }
+  function buildUrlWithout(name, dropVal){
+    const qs=getQS();
+    const kept = arrParam(name).filter(v=>v!==dropVal);
+    qs.delete(name);
+    kept.forEach(v=>qs.append(name, v));
+    const base=window.location.pathname; const q=qs.toString(); return q? base+'?'+q : base;
+  }
+
+  (function initFilters(){
+    const picked = {
+      period_type: new Set(arrParam('period_type')),
+      paid: new Set(arrParam('paid')),
+      year: (getQS().get('year') || '').trim()
+    };
+
+    const chips=document.getElementById('activeChips'); chips.innerHTML='';
+    let count=0;
+
+    picked.period_type.forEach(val=>{
+      count++;
+      const a=document.createElement('a'); a.className='filter-chip'; a.href=buildUrlWithout('period_type', val);
+      a.innerHTML=val.replaceAll('_',' ').toLowerCase().replace(/(^|\\s)\\S/g,t=>t.toUpperCase())+' <span class="x">×</span>';
+      chips.appendChild(a);
+    });
+
+    picked.paid.forEach(val=>{
+      count++;
+      const a=document.createElement('a'); a.className='filter-chip'; a.href=buildUrlWithout('paid', val);
+      a.innerHTML=val.replaceAll('_',' ').toLowerCase().replace(/(^|\\s)\\S/g,t=>t.toUpperCase())+' <span class="x">×</span>';
+      chips.appendChild(a);
+    });
+
+    if (picked.year){
+      count++;
+      const qs=getQS(); qs.delete('year');
+      const base=window.location.pathname; const url = (qs.toString()? base+'?'+qs.toString():base);
+      const a=document.createElement('a'); a.className='filter-chip'; a.href=url;
+      a.innerHTML='Year '+picked.year+' <span class="x">×</span>';
+      chips.appendChild(a);
+    }
+
+    if (!count){
+      chips.innerHTML='<span class="text-muted small">No active filters.</span>';
+    }
+
+    const badge=document.getElementById('activeFiltersBadge');
+    if (badge){ if(count){ badge.style.display='inline-block'; badge.textContent=count; } else { badge.style.display='none'; } }
+
+    const selAll=document.getElementById('selectAllPeriod');
+    const clrAll=document.getElementById('clearAllPeriod');
+    const boxes=()=>Array.from(document.querySelectorAll('.period-box'));
+    if(selAll) selAll.addEventListener('click',e=>{ e.preventDefault(); boxes().forEach(b=>b.checked=true); });
+    if(clrAll) clrAll.addEventListener('click',e=>{ e.preventDefault(); boxes().forEach(b=>b.checked=false); });
+  })();
+
+  (function(){
+    const form=document.getElementById('toolbarForm');
+    if(!form) return;
+    form.addEventListener('submit',()=>{
+      form.querySelectorAll('input[type="hidden"][name="period_type"]').forEach(n=>n.remove());
+      arrParam('period_type').forEach(v=>{
+        const i=document.createElement('input'); i.type='hidden'; i.name='period_type'; i.value=v; form.appendChild(i);
+      });
+      form.querySelectorAll('input[type="hidden"][name="paid"]').forEach(n=>n.remove());
+      arrParam('paid').forEach(v=>{
+        const i=document.createElement('input'); i.type='hidden'; i.name='paid'; i.value=v; form.appendChild(i);
+      });
+      form.querySelectorAll('input[type="hidden"][name="year"]').forEach(n=>n.remove());
+      const y=(getQS().get('year')||'').trim();
+      if(y){
+        const i=document.createElement('input'); i.type='hidden'; i.name='year'; i.value=y; form.appendChild(i);
+      }
+    });
+  })();
+
+  (function () {
+    const oc=document.getElementById('filterPanel');
+    if (!oc) return;
+    oc.addEventListener('show.bs.offcanvas',()=>{ document.querySelectorAll('.offcanvas-backdrop').forEach(b=>b.remove()); });
+    oc.addEventListener('hidden.bs.offcanvas',()=>{ document.body.classList.remove('offcanvas-open'); document.querySelectorAll('.offcanvas-backdrop').forEach(b=>b.remove()); });
+  })();
+</script>
+{% endblock %}

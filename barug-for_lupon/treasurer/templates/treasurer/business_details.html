@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block content %}
+<style>
+  :root { --brand:#7a1212; --brand-700:#4a0a0a; --accent:#f2c94c; --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --card:#fff; --wash:#fafafa; }
+  .hero{ background:radial-gradient(120% 140% at 0% 0%,var(--brand) 0%,var(--brand-700) 70%); color:#fff; border-radius:16px; padding:18px 20px; box-shadow:0 12px 28px rgba(0,0,0,.15); }
+  .chip{ border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.08); color:#f3f4f6; border-radius:999px; padding:6px 12px; font-size:.82rem; font-weight:700; }
+  .card-soft{ border:0; border-radius:14px; box-shadow:0 10px 24px rgba(16,24,40,.06); background:#fff; }
+  .section-title{ font-weight:800; color:var(--ink); display:flex; align-items:center; gap:.5rem; margin-bottom:.5rem; }
+  .dot{ width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px rgba(242,201,76,.25); }
+  .kv{ list-style:none; padding:0; margin:0; }
+  .kv li{ display:flex; gap:12px; padding:10px 0; border-bottom:1px dashed var(--line); }
+  .kv li:last-child{ border-bottom:0; }
+  .label{ color:var(--muted); min-width:180px; }
+  .value{ font-weight:700; color:var(--ink); }
+  .pill{ display:inline-block; padding:.25rem .6rem; border-radius:999px; border:1px solid var(--line); background:#fff; font-size:.8rem; }
+  .pill.ok{ background:#e8f7ef; color:#0a7a3d; border-color:#cdebd9; }
+  .pill.no{ background:#fff1f1; color:#7a0a0a; border-color:#f3d1d1; }
+  .sticky-aside{ position:sticky; top:84px; }
+  .btn-brand{ background:var(--brand); color:#fff; border:0; }
+  .btn-brand:hover{ background:#5a1919; color:#fff; }
+  .status-chip{ border-radius:999px; padding:4px 10px; font-size:.8rem; background:#fff1; }
+  .table tbody tr:hover{ background:#fff8eb; }
+  .or-highlight{ border:2px solid var(--accent); background:linear-gradient(180deg,#fffdf6,#fff); border-radius:12px; padding:10px 12px; }
+  .or-badge{ background:var(--accent); color:#000; font-weight:800; border-radius:6px; padding:2px 6px; }
+
+  /* CTC cosmetic */
+  .ctc-hero{background:linear-gradient(140deg,#FFF7D6 0%, #FFE7A6 40%, #FFD985 100%); color:#5a3e00; border-radius:16px; padding:18px 20px; box-shadow:0 12px 28px rgba(0,0,0,.08);}
+  .ctc-chip{ border-radius:999px; padding:6px 12px; font-weight:800; background:#0000000d; border:1px solid #0000001a; color:#5a3e00; }
+</style>
+
+<div class="container py-3">
+
+  {% if ctc_mode %}
+  <!-- =================== CTC VARIANT =================== -->
+  <div class="ctc-hero mb-3 d-flex align-items-center gap-3">
+    <div class="me-auto">
+      <div class="fw-bold">CTC — {{ biz.business_name|default:"—" }}</div>
+      <!-- <div class="small">
+        Business ID: {{ biz.business_id|default:"—" }} • Request ID: {{ doc_request_id|default:"—" }} • Code: {{ header.request_code|default:"—" }}
+      </div> -->
+      <div class="small">
+        {{ header.request_code|default:"—" }}
+      </div>
+    </div>
+    <span class="ctc-chip">CERTIFIED TRUE COPY</span>
+  </div>
+
+  <div class="row g-3">
+    <!-- LEFT -->
+    <div class="col-lg-8">
+
+      <!-- Reference clearance being re-printed -->
+      <div class="card card-soft mb-3" style="border:1px dashed #EAB308; background:#FFFBEB">
+        <div class="card-body">
+          <div class="section-title"><span class="dot"></span> Reference Clearance (to re-print)</div>
+
+          {% if ctc_ref_request_id %}
+            <div class="mb-2 small text-muted">Original Doc Request ID: <span class="fw-bold">{{ ctc_ref_request_id }}</span></div>
+          {% endif %}
+
+          {% if ctc_ref_header %}
+            <ul class="kv">
+              <li><span class="label">Original Request Code</span><span class="value">{{ ctc_ref_header.request_code|default:"—" }}</span></li>
+              <!-- <li><span class="label">Original Status</span><span class="value">{{ ctc_ref_header.status|default:"—" }}</span></li> -->
+              <li><span class="label">Requested By</span><span class="value">{{ ctc_ref_header.requester_full_name|default:"—" }}</span></li>
+            </ul>
+
+            {% if ctc_ref_lines %}
+              <hr>  
+              <div class="small text-muted mb-2">Original Line Items</div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Document</th><th>Category</th><th class="text-end">Qty</th>
+                      <th class="text-end">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for l in ctc_ref_lines %}
+                      <tr>
+                        <td>{{ l.document_type_name|default:"—" }}</td>
+                        <td>{{ l.purpose_code|default:"—" }}</td>
+                        <td class="text-end">{{ l.quantity }}</td>
+                        <!-- <td class="text-end">₱{{ l.base_amount|default:0|floatformat:2 }}</td>
+                        <td class="text-end">₱{{ l.waived_amount|default:0|floatformat:2 }}</td> -->
+                        <td class="text-end">₱{{ l.line_total|default:0|floatformat:2 }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% endif %}
+          {% else %}
+            <div class="text-muted">No reference details found in this CTC line.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Business Snapshot -->
+      <div class="card card-soft mb-3">
+        <div class="card-body">
+          <div class="section-title"><span class="dot"></span> Business Snapshot</div>
+          <ul class="kv">
+            <li><span class="label">Business Name</span><span class="value">{{ biz.business_name|default:"—" }}</span></li>
+            <li><span class="label">Address</span><span class="value">{{ biz.business_address|default:"—" }}</span></li>
+            <li><span class="label">Owner</span><span class="value">{{ biz.owner_full_name|default:"—" }} (ID: {{ biz.owner_person_id|default:"—" }})</span></li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+    <!-- Compliance (short) - HIDDEN
+      <div class="card card-soft mb-3">
+        <div class="card-body">
+          <div class="section-title"><span class="dot"></span> Compliance</div>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="label">Has Business Clearance</span>
+            {% if biz.has_business_clearance %}<span class="pill ok">Yes</span>{% else %}<span class="pill no">No</span>{% endif %}
+          </div>
+        </div>
+      </div>
+     -->
+
+    <!-- RIGHT: PAYMENT (unchanged) -->
+    <div class="col-lg-4">
+      <div class="card card-soft sticky-aside">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="section-title mb-0"><span class="dot"></span> Take Payment</div>
+            <span class="status-chip {{ status_ui.cls }}">{{ status_ui.label }}</span>
+          </div>
+
+          <div class="small text-muted mb-1">Official Receipt Number:</div>
+          {% if payments.latest_or_number %}
+            <div class="mb-3 or-highlight">
+              <div class="d-flex align-items-center justify-content-between">
+                <div class="fw-semibold"><span class="or-badge me-2">OR</span> {{ payments.latest_or_number }}</div>
+                <i class="bi bi-check-circle-fill text-success"></i>
+              </div>
+              <div class="small text-muted">{{ payments.latest_or_time|date:"M d, Y, P" }}</div>
+            </div>
+          {% else %}
+            <div class="mb-3 text-muted">None yet</div>
+          {% endif %}
+
+          {% if status_ui.label == "PAID" or status_ui.label == "For Printing" and payments.latest_or_number or status_ui.label == "Released" %}
+            <div class="alert alert-success mb-0">Payment complete. Request may be printed.</div>
+          {% else %}
+            <form method="post" action="{% url 'treasurer:business_pay_and_print' biz.business_id doc_request_id %}" onsubmit="return confirm('Are you sure you want to process this payment and move to printing?');">
+              {% csrf_token %}
+              <div class="mb-2">
+                <label class="form-label">Payment Method</label>
+                <select class="form-select" name="payment_method_id" required>
+                  <option value="">Select…</option>
+                  {% for m in methods %}
+                    <option value="{{ m.payment_method_id }}" {% if m.method_name == 'CASH' %}selected{% endif %}>{{ m.method_name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Amount Paid (₱)</label>
+                <input class="form-control" name="amount_paid" type="number" step="0.01" min="0"
+                       value="{{ header.amount_due|default:0 }}">
+                <div class="form-text">Amount due: ₱{{ header.amount_due|default:0|floatformat:2 }}</div>
+              </div>
+              <button class="btn btn-brand w-100">
+                {% bs_icon 'credit-card' extra_classes='me-1' %} Pay, Set Clearance &amp; Move to Printing
+              </button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% else %}
+  <!-- =================== BUSINESS CLEARANCE (unchanged) =================== -->
+  <div class="hero mb-3 d-flex align-items-center gap-3">
+    <div class="me-auto">
+      <div class="fw-bold">{{ biz.business_name|default:"—" }}</div>
+      <!-- <div class="text-white-50 small">
+        Business ID: {{ biz.business_id|default:"—" }} • Request ID: {{ doc_request_id|default:"—" }} Code: {{ header.request_code }}
+        Requested Document: {{ document_type_name }}
+      </div> -->
+      <div class="text-white-50 small">
+        {{ header.request_code }}
+      </div>
+    </div>
+    <span class="chip">{% if biz.has_business_clearance %}HAS CLEARANCE{% else %}NO CLEARANCE{% endif %}</span>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <!-- Identity -->
+      <div class="card card-soft mb-3">
+        <div class="card-body">
+          <div class="section-title"><span class="dot"></span> Identity</div>
+          <ul class="kv">
+            <li><span class="label">Requested Document</span><span class="value">{{ document_type_name }}</span></li>
+            <li><span class="label">Business Name</span><span class="value">{{ biz.business_name|default:"—" }}</span></li>
+            <li><span class="label">Business Nature</span><span class="value">{{ biz.business_nature|default:"—" }}</span></li>
+            <li><span class="label">Business Category</span><span class="value">{{ biz.business_category|default:"—" }}</span></li>
+            <li><span class="label">Ownership Type</span><span class="value">{{ biz.ownership_type|default:"—" }}</span></li>
+            <li><span class="label">Address</span><span class="value">{{ biz.business_address|default:"—" }}</span></li>
+            <li><span class="label">Location Description</span><span class="value">{{ biz.description|default:"—" }}</span></li>
+            <li><span class="label">Date Established</span><span class="value">{{ biz.date_established|default:"—" }}</span></li>
+            <li><span class="label">DTI/SEC Reg. No.</span><span class="value">{{ biz.dti_reg_num|default:"—" }}</span></li>
+            <li><span class="label">Owner</span>
+                <span class="value">{{ biz.owner_full_name|default:"—" }} (ID: {{ biz.owner_person_id|default:"—" }})</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Operations -->
+      <div class="card card-soft mb-3">
+        <div class="card-body">
+          <div class="section-title"><span class="dot"></span> Operations</div>
+          <ul class="kv">
+            <li><span class="label">Operating Days</span><span class="value">{{ biz.operating_days|default:"—" }}</span></li>
+            <li><span class="label">Operating Hours</span><span class="value">{{ biz.operating_hours|default:"—" }}</span></li>
+            <li><span class="label">Employees</span><span class="value">{{ biz.num_of_employees|default:"—" }}</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Financials -->
+      <div class="card card-soft mb-3">
+        <div class="card-body">
+          <div class="section-title"><span class="dot"></span> Financials</div>
+          <ul class="kv">
+            <li><span class="label">Capital Invested</span><span class="value">{{ biz.capital_invested|default:"—" }}</span></li>
+            <li><span class="label">Previous Yr. Gross Sales</span><span class="value">{{ biz.prev_year_gross_sales|default:"—" }}</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Compliance -->
+      <div class="card card-soft mb-3" style="display:none;">
+        <div class="card-body">
+          <div class="section-title"><span class="dot"></span> Compliance</div>
+
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="label">Has Business Clearance</span>
+            {% if biz.has_business_clearance %}
+              <span class="pill ok">Yes</span>
+            {% else %}
+              <span class="pill no">No</span>
+            {% endif %}
+          </div>
+
+          <div class="row g-2 mb-2">
+            <div class="col-md-6">
+              <div class="small text-muted">Current-Year Status</div>
+              <div class="fw-semibold">{% if year_status %}{{ year_status.status }}{% else %}—{% endif %}</div>
+              {% if year_status and year_status.last_changed_at %}
+                <div class="text-muted small">{{ year_status.last_changed_at|date:"M d, Y, P" }}</div>
+              {% endif %}
+            </div>
+            <div class="col-md-6">
+              <div class="small text-muted">Last Cleared Year</div>
+              <div class="fw-semibold">{{ last_cleared_year|default:"—" }}</div>
+            </div>
+          </div>
+
+          {% if clearances %}
+            <hr>
+            <div class="small text-muted mb-2">Released Clearances</div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead class="table-light">
+                  <tr><th>Request Code</th><th>Issued On</th><th class="text-end">Year</th></tr>
+                </thead>
+                <tbody>
+                  {% for c in clearances %}
+                    <tr>
+                      <td><span class="pill">{{ c.request_code }}</span></td>
+                      <td>{{ c.issued_on}}</td>
+                      <td class="text-end">{{ c.year }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: PAYMENT (unchanged) -->
+    <div class="col-lg-4">
+      <div class="card card-soft sticky-aside">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="section-title mb-0"><span class="dot"></span> Take Payment</div>
+            <span class="status-chip {{ status_ui.cls }}">{{ status_ui.label }}</span>
+          </div>
+
+          <div class="small text-muted mb-1">Official Receipt Number:</div>
+          {% if payments.latest_or_number %}
+            <div class="mb-3 or-highlight">
+              <div class="d-flex align-items-center justify-content-between">
+                <div class="fw-semibold"><span class="or-badge me-2">OR</span> {{ payments.latest_or_number }}</div>
+                <i class="bi bi-check-circle-fill text-success"></i>
+              </div>
+              <div class="small text-muted">{{ payments.latest_or_time|date:"M d, Y, P" }}</div>
+            </div>
+          {% else %}
+            <div class="mb-3 text-muted">None yet</div>
+          {% endif %}
+
+          {% if status_ui.label == "PAID" or status_ui.label == "For Printing" and payments.latest_or_number or status_ui.label == "Released" %}
+            <div class="alert alert-success mb-0">Payment complete. Request may be printed.</div>
+          {% else %}
+            <form method="post" action="{% url 'treasurer:business_pay_and_print' biz.business_id doc_request_id %}">
+              {% csrf_token %}
+              <div class="mb-2">
+                <label class="form-label">Payment Method</label>
+                <select class="form-select" name="payment_method_id" required>
+                  <option value="">Select…</option>
+                  {% for m in methods %}
+                    <option value="{{ m.payment_method_id }}" {% if m.method_name == 'CASH' %}selected{% endif %}>{{ m.method_name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Amount Paid (₱)</label>
+                <input class="form-control" name="amount_paid" type="number" step="0.01" min="0"
+                       value="{{ header.amount_due|default:0 }}">
+                <div class="form-text">Amount due: ₱{{ header.amount_due|default:0|floatformat:2 }}</div>
+              </div>
+              <button class="btn btn-brand w-100">
+                {% bs_icon 'credit-card' extra_classes='me-1' %} Pay, Set Clearance &amp; Move to Printing
+              </button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

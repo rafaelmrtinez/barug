@@ -1,0 +1,313 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<style>
+  :root{
+    --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932; --brand-600:#7a323b;
+    --brand-100:#f3eaeb; --brand-050:#fbf6f6;
+  }
+  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
+  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
+  .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); background:#fff; }
+  .btn-outline-brand:hover{ background:var(--brand-700); color:#fff; }
+  .btn-brand-subtle{ background:var(--brand-100); color:var(--brand-700); border-color:var(--brand-100); }
+  .btn-brand-subtle:hover{ background:var(--brand-050); color:var(--brand-700); }
+
+  .form-control:focus, .form-select:focus, .form-check-input:focus{
+    border-color:var(--brand-700);
+    box-shadow:0 0 0 .25rem rgba(109,41,50,.25);
+    outline:none;
+  }
+  .form-check-input:checked{ background-color:var(--brand-700); border-color:var(--brand-700); }
+
+  .toolbar{ background:#fff; border:1px solid var(--bs-border-color,#dee2e6);
+            border-radius:1rem; padding:.75rem; gap:.5rem; }
+  .searchbox{ position:relative; flex:1; }
+  .searchbox .bi{ position:absolute; left:.8rem; top:50%; transform:translateY(-50%); opacity:.6; color:var(--brand-700); }
+  .searchbox input{ padding-left:2.35rem !important; }
+
+  .filters-bar{ gap:.5rem; }
+  .filter-chip{
+    display:inline-flex; align-items:center; gap:.4rem; padding:.3rem .65rem;
+    border-radius:999px; font-size:.8rem; text-decoration:none;
+    border:1px solid rgba(109,41,50,.18); background:var(--brand-050); color:var(--brand-700);
+  }
+  .filter-chip:hover{ background:var(--brand-100); }
+  .filter-chip .x{ display:inline-grid; place-items:center; width:1rem; height:1rem; border-radius:50%;
+                   background:#fff; border:1px solid rgba(109,41,50,.22); line-height:1; font-weight:700; color:var(--brand-700); }
+
+  .table thead th{ border-bottom-width:2px; }
+  .table tbody tr:hover{ background:#fcfcfd; }
+
+  .mini-badge{ display:inline-block; padding:.28rem .6rem; border-radius:.5rem;
+               background:#fff; border:1px solid rgba(0,0,0,.08); font-size:.78rem; }
+  .code-badge{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+               font-size:.875rem; padding:.25rem .45rem; border-radius:.5rem;
+               background:#f5f2ee; border:1px solid rgba(0,0,0,.06); color:var(--brand-800); }
+
+  /* action cluster */
+  .row-actions{ display:flex; flex-wrap:wrap; gap:.35rem; justify-content:flex-end; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+  <div class="container-fluid pt-3 page-main">
+    <div class="row">
+      <div>
+
+        <!-- Toolbar -->
+        <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get" id="toolbarForm">
+          <div class="searchbox">
+            {% bs_icon 'search' extra_classes='bi' %}
+            <input type="text" class="form-control" id="search" name="q" placeholder="Search requests" value="{{ q }}" />
+          </div>
+
+          <!-- hidden status chips will be injected by JS on submit -->
+          <button type="submit" class="btn btn-brand d-flex align-items-center">
+            {% bs_icon 'search' extra_classes='me-2' %} Search
+          </button>
+
+          <button class="btn btn-brand-subtle d-flex align-items-center ms-auto" type="button"
+                  data-bs-toggle="offcanvas" data-bs-target="#filterPanel" aria-controls="filterPanel">
+            {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+            <span class="badge rounded-pill text-bg-light ms-2" id="activeFiltersBadge" style="display:none;">0</span>
+          </button>
+        </form>
+
+        <!-- Active filters (chips) — built by JS -->
+        <div class="filters-bar d-flex flex-wrap align-items-center mb-3" id="activeChips">
+          <span class="text-muted small">No active filters.</span>
+        </div>
+
+        <!-- Table (ONLY Business Clearance & CTC) -->
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Request Code</th>
+              <th scope="col">Date Requested</th>
+              <th scope="col">Requester</th>
+              <th scope="col">Requested For</th>
+              <th scope="col">Documents</th>
+              <th scope="col">Purpose(s)</th>
+              <th scope="col">Status</th>
+              <th scope="col" class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% with items=page_obj.object_list|default:rows %}
+            {% if items %}
+              {% for r in items %}
+                <tr class="table-row-height">
+                  <td><span class="code-badge">{{ r.request_code }}</span></td>
+                  <td><span class="small text-muted">{{ r.created_fmt|default:"—" }}</span></td>
+                  <td>{{ r.requester_display|default:r.requested_by|default:"—" }}</td>
+                  <td>{{ r.on_behalf_of|default:"SELF" }}</td>
+
+                  <!-- r.doc_types already trimmed in view -->
+                  <td>
+                    {% if r.doc_types %}
+                      {% for d in r.doc_types %}
+                        <span class="mini-badge">{{ d }}</span>
+                      {% endfor %}
+                    {% else %} — {% endif %}
+                  </td>
+
+                  <td>
+                    {% if r.purposes_display %}
+                      {% for p in r.purposes_display %}
+                        <span class="mini-badge">{{ p }}</span>
+                      {% endfor %}
+                    {% else %} — {% endif %}
+                  </td>
+                  <!-- <td><span class="{{ r.status_ui.cls }}">{{ r.status_ui.label }} {{ r.business_id }}</span></td> -->
+                  <td><span class="{{ r.status_ui.cls }}">{{ r.status_ui.label }}</span></td>
+                <td class="text-end">
+                  <div class="row-actions">
+                    {% if r.business_id %}
+                      <a class="btn btn-outline-brand btn-sm"
+                        href="{% url 'treasurer:business_detail' r.business_id r.doc_request_id %}">
+                        {% bs_icon 'person-lines-fill' extra_classes='me-1' %} View
+                      </a>
+                    {% else %}
+                      <a class="btn btn-outline-brand btn-sm"
+                        href="{% url 'treasurer:detail' r.doc_request_id %}">
+                        {% bs_icon 'person-lines-fill' extra_classes='me-1' %} View
+                      </a>
+                    {% endif %}
+                  </div>
+                </td>
+
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr><td colspan="8" class="text-center">No matching requests.</td></tr>
+            {% endif %}
+          {% endwith %}
+          </tbody>
+        </table>
+
+      </div>
+    </div>
+  </div>
+
+  {% if page_obj and page_obj.has_other_pages %}
+    <div class="page-pagination">
+      {% include 'paginator.html' with page_obj=page_obj %}
+    </div>
+  {% endif %}
+</div>
+
+<!-- Offcanvas Filters (Status only, hardcoded) -->
+<div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
+     aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 100px;">
+  <div class="offcanvas-header" style="margin-top: 50px;">
+    <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+
+  <div class="offcanvas-body">
+    <form method="get" id="filterForm">
+      <input type="hidden" name="q" value="{{ q }}">
+
+      <div class="mb-4">
+        <div class="form-label fw-semibold d-flex justify-content-between align-items-center">
+          <span>Statuses</span>
+          <div class="small">
+            <a href="#" id="selectAllStatuses" class="me-2">Select all</a>
+            <a href="#" id="clearAllStatuses">None</a>
+          </div>
+        </div>
+        <div class="row row-cols-1">
+          <div class="col mb-2">
+            <div class="form-check">
+              <input class="form-check-input status-box" type="checkbox" name="status" value="FOR_TREASURER_REVIEW" id="st-FOR_TREASURER_REVIEW">
+              <label class="form-check-label" for="st-FOR_TREASURER_REVIEW">For Treasurer Review</label>
+            </div>
+          </div>
+          <div class="col mb-2">
+            <div class="form-check">
+              <input class="form-check-input status-box" type="checkbox" name="status" value="PAID" id="st-PAID">
+              <label class="form-check-label" for="st-PAID">Paid</label>
+            </div>
+          </div>
+          <div class="col mb-2">
+            <div class="form-check">
+              <input class="form-check-input status-box" type="checkbox" name="status" value="FOR_PRINTING" id="st-FOR_PRINTING">
+              <label class="form-check-label" for="st-FOR_PRINTING">For Printing</label>
+            </div>
+          </div>
+          <div class="col mb-2">
+            <div class="form-check">
+              <input class="form-check-input status-box" type="checkbox" name="status" value="READY_FOR_PICKUP" id="st-READY_FOR_PICKUP">
+              <label class="form-check-label" for="st-READY_FOR_PICKUP">Ready for Pickup</label>
+            </div>
+          </div>
+          <div class="col mb-2">
+            <div class="form-check">
+              <input class="form-check-input status-box" type="checkbox" name="status" value="RELEASED" id="st-RELEASED">
+              <label class="form-check-label" for="st-RELEASED">Released</label>
+            </div>
+          </div>
+          <div class="col mb-2">
+            <div class="form-check">
+              <input class="form-check-input status-box" type="checkbox" name="status" value="DECLINED" id="st-DECLINED">
+              <label class="form-check-label" for="st-DECLINED">Declined</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="offcanvas-footer">
+        <div class="d-flex gap-2">
+          <button class="btn btn-brand" type="submit">
+            {% bs_icon 'check2' extra_classes='me-1' %} Apply
+          </button>
+          <a class="btn btn-outline-brand" href="?q={{ q|urlencode }}">
+            {% bs_icon 'x-circle' extra_classes='me-1' %} Clear
+          </a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+  // Query helpers
+  function getQS(){ return new URLSearchParams(window.location.search); }
+  function getStatuses(){
+    const qs=getQS(); const vals=qs.getAll('status');
+    if (vals.length===1 && vals[0].includes(',')) return vals[0].split(',').map(s=>s.trim()).filter(Boolean);
+    return vals;
+  }
+  function buildUrlWithoutStatus(drop){
+    const qs=getQS(); qs.delete('status');
+    const kept=getStatuses().filter(s=>s!==drop); kept.forEach(s=>qs.append('status',s));
+    const base=window.location.pathname; const q=qs.toString(); return q? base+'?'+q : base;
+  }
+
+  (function initFilters(){
+    const picked=new Set(getStatuses());
+
+    // Pre-check offcanvas boxes
+    document.querySelectorAll('.status-box').forEach(cb=>{ if(picked.has(cb.value)) cb.checked=true; });
+
+    // Active chips
+    const chips=document.getElementById('activeChips'); chips.innerHTML='';
+    if(picked.size){
+      const label=document.createElement('span'); label.className='text-muted me-1'; label.textContent='Active:'; chips.appendChild(label);
+      picked.forEach(s=>{
+        const a=document.createElement('a'); a.className='filter-chip'; a.href=buildUrlWithoutStatus(s); a.title='Remove '+s;
+        a.innerHTML=s.replaceAll('_',' ').toLowerCase().replace(/(^|\\s)\\S/g,t=>t.toUpperCase())+' <span class="x" aria-hidden="true">×</span>';
+        chips.appendChild(a);
+      });
+      const clear=document.createElement('a'); clear.className='btn btn-sm btn-outline-brand ms-1';
+      const qs=new URLSearchParams(window.location.search); qs.delete('status');
+      clear.href=(function(){ const base=window.location.pathname; const query=qs.toString(); return query? base+'?'+query : base; })();
+      clear.innerHTML=`{% bs_icon 'x-circle' extra_classes='me-1' %} Clear all`;
+      chips.appendChild(clear);
+    }else{
+      chips.innerHTML='<span class="text-muted small">No active filters.</span>';
+    }
+
+    // Badge count
+    const badge=document.getElementById('activeFiltersBadge');
+    if(badge){ const n=picked.size; if(n){ badge.style.display='inline-block'; badge.textContent=n; } else { badge.style.display='none'; } }
+
+    // Select all / none in offcanvas
+    const selAllS=document.getElementById('selectAllStatuses');
+    const clrAllS=document.getElementById('clearAllStatuses');
+    const boxes=()=>Array.from(document.querySelectorAll('.status-box'));
+    if(selAllS) selAllS.addEventListener('click',e=>{ e.preventDefault(); boxes().forEach(b=>b.checked=true); });
+    if(clrAllS) clrAllS.addEventListener('click',e=>{ e.preventDefault(); boxes().forEach(b=>b.checked=false); });
+  })();
+
+  // Persist current statuses when pressing the Search button
+  (function(){
+    const form=document.getElementById('toolbarForm');
+    if(!form) return;
+    form.addEventListener('submit',()=>{
+      form.querySelectorAll('input[type="hidden"][name="status"]').forEach(n=>n.remove());
+      getStatuses().forEach(s=>{
+        const i=document.createElement('input'); i.type='hidden'; i.name='status'; i.value=s; form.appendChild(i);
+      });
+    });
+  })();
+
+  // Offcanvas backdrop safety
+  (function () {
+    const oc=document.getElementById('filterPanel');
+    if (!oc) return;
+    oc.addEventListener('show.bs.offcanvas',()=>{ document.querySelectorAll('.offcanvas-backdrop').forEach(b=>b.remove()); });
+    oc.addEventListener('hidden.bs.offcanvas',()=>{ document.body.classList.remove('offcanvas-open'); document.querySelectorAll('.offcanvas-backdrop').forEach(b=>b.remove()); });
+  })();
+</script>
+{% endblock %}

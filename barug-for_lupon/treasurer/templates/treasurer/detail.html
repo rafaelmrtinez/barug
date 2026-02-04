@@ -1,0 +1,676 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+  :root{--brand-900:#3a1217;--brand-800:#561c24;--brand-700:#6d2932;--brand-600:#7a323b;--accent:#f2c94c;
+        --ink:#0f172a;--muted:#64748b;--line:#e5e7eb;--card:#ffffff;--wash:#fbf6f6;--ring:rgba(109,41,50,.18)}
+  body{background:linear-gradient(160deg,var(--wash),#fff 30%)}
+  .hero{background:radial-gradient(120% 140% at 0% 0%,var(--brand-700) 0%,var(--brand-900) 70%);
+        color:#fff;border-radius:18px;padding:18px 20px;box-shadow:0 14px 32px rgba(58,18,23,.25), inset 0 0 0 1px rgba(255,255,255,.06)}
+  .hero .brand-icon{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.08);box-shadow:0 0 0 3px rgba(122,18,18,.15);position:relative;flex:0 0 56px}
+  .hero .brand-icon::after{content:"";position:absolute;inset:8px;border-radius:50%;background:rgba(242,201,76,.18)}
+  .hero .brand-icon i{position:relative;z-index:1;transform:translateY(2px)}
+  .hero .chip{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.10);color:#fff;border-radius:999px;padding:6px 12px;font-size:.82rem;text-transform:uppercase;letter-spacing:.08em;font-weight:800}
+  .card-soft{border:1px solid #f1e8ea;background:#fff;border-radius:16px;box-shadow:0 12px 28px rgba(16,24,40,.06)}
+  .section-title{font-weight:800;color:var(--ink);display:flex;align-items:center;gap:.6rem}
+  .section-title .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(242,201,76,.25)}
+  .kv{list-style:none;padding:0;margin:0}
+  .kv li{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px dashed var(--line)}
+  .kv li:last-child{border-bottom:0}
+  .kv .label{color:var(--muted);min-width:140px}
+  .kv .value{font-weight:700;color:var(--ink)}
+  .table thead th{white-space:nowrap}
+  .table tbody tr:hover{background:#fff8eb}
+  .amount-row{display:flex;justify-content:space-between;align-items:center;margin-top:.25rem;padding-top:.75rem;border-top:1px solid var(--line)}
+  .small-muted{color:var(--muted)}
+  .media-grid{display:flex;flex-wrap:wrap;gap:14px}
+  .media-thumb{width:180px;height:240px;object-fit:cover;border-radius:12px;border:1px solid var(--line);background:#fff;cursor:zoom-in;transition:transform .15s, box-shadow .15s}
+  .media-thumb:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(0,0,0,.12)}
+  .pdf-pill{width:180px;height:240px;border-radius:12px;border:1px dashed var(--line);background:#fff7e6;color:var(--brand-800);font-weight:800;display:flex;align-items:center;justify-content:center;text-decoration:none}
+  .sticky-aside{position:sticky;top:78px}
+  .status-chip{border-radius:999px;padding:4px 10px;font-size:.8rem;background:#fff1;border:1px solid rgba(255,255,255,.25)}
+  .or-highlight{border:2px solid var(--accent);background:linear-gradient(180deg,#fffdf6,#fff);border-radius:12px;padding:10px 12px}
+  .or-highlight .or-badge{background:var(--accent);color:#000;font-weight:800;border-radius:6px;padding:2px 6px}
+  .timeline{position:relative;margin-left:6px;padding-left:64px;--line-x:30px;--dot-size:32px}
+  .timeline:before{content:"";position:absolute;left:var(--line-x);top:0;bottom:0;width:3px;background:linear-gradient(180deg,#e9eef5,#e2e8f0);border-radius:3px}
+  .tl-item{position:relative;margin-bottom:14px;border-radius:14px;padding:12px 14px;background:#fff;border:1px solid #eef2f7;box-shadow:0 6px 16px rgba(16,24,40,.04)}
+  .tl-item:last-child{margin-bottom:0}
+  .tl-dot{position:absolute;left:-50px;top:20px;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:#fff;border:3px solid #fff;box-shadow:0 2px 8px rgba(2,6,23,.15)}
+  .tl-dot.primary{background:#6366f1}.tl-dot.info{background:#0ea5e9}.tl-dot.success{background:#10b981}.tl-dot.warn{background:#f59e0b}.tl-dot.muted{background:#94a3b8}
+  .tl-head{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+  .tl-title{font-weight:800;color:#0f172a;letter-spacing:.02em}
+  .tl-when{margin-left:auto;color:#64748b;font-size:.82rem;white-space:nowrap}
+  .pill{border-radius:999px;padding:.15rem .55rem;font-size:.72rem;border:1px solid transparent}
+  .pill.gray{background:#f1f5f9;color:#334155;border-color:#e2e8f0}
+  .pill.blue{background:#eef2ff;color:#3730a3;border-color:#c7d2fe}
+  .pill.amber{background:#fff7ed;color:#9a3412;border-color:#fed7aa}
+  .pill.green{background:#ecfdf5;color:#065f46;border-color:#a7f3d0}
+  .tl-meta{color:#475569;font-size:.86rem;margin-top:2px}
+  .tl-body{color:#334155;font-size:.9rem;margin-top:6px}
+  .container-fluid.page{padding-left:clamp(16px,4vw,40px);padding-right:clamp(16px,4vw,40px);max-width:1700px}
+  .row-tight{row-gap:1rem}
+  @media (min-width:1400px){.col-xxl-9{flex:0 0 auto;width:75%}.col-xxl-3{flex:0 0 auto;width:25%}}
+</style>
+
+<div class="container-fluid page py-3">
+  <!-- Hero -->
+  <div class="hero mb-3 d-flex align-items-center gap-3">
+    <div class="brand-icon"><i class="bi bi-cash-coin fs-4" aria-hidden="true"></i></div>
+    <div class="me-auto">
+      <div class="fw-bold fs-5">{{ header.request_code }}</div>
+      <div class="text-white-50 small">{{ header.created_fmt }}</div>
+    </div>
+    <span class="chip">{{ status_ui.label }}</span>
+  </div>
+
+  <div class="row row-tight">
+    <!-- LEFT -->
+    <div class="col-12 col-lg-8 col-xxl-9">
+      <!-- Items -->
+      <div class="card card-soft mb-3">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="section-title mb-0"><span class="dot"></span> Items</div>
+            <span class="badge rounded-pill text-bg-warning border border-warning-subtle">
+              {{ lines|length }} item{{ lines|length|pluralize }}
+            </span>
+          </div>
+
+          {% if lines %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th style="min-width:260px">Document</th>
+                  <th>Purpose</th>
+                  <th class="text-center">Qty</th>
+                  <th class="text-end">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for l in lines %}
+                <tr>
+                  <td class="fw-semibold">{{ l.document_type_name|default:"—" }}</td>
+                  <td>
+                    {% if l.purpose_display %}{{ l.purpose_display }}
+                    {% elif l.purpose_label %}{{ l.purpose_label }}
+                    {% else %}&mdash;{% endif %}
+                  </td>
+                  <td class="text-center">{{ l.quantity }}</td>
+                  <td class="text-end fw-bold">
+                    ₱{{ l.line_total|floatformat:2 }}
+                    {% if l.is_exempt %}
+                      <span class="badge text-bg-success ms-2">Exempt</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% if l.reason_chips or l.is_exempt %}
+                <tr class="table-borderless">
+                  <td colspan="4">
+                    <div class="d-flex flex-wrap gap-2">
+                      {% for tag in l.reason_chips %}
+                        <span class="badge rounded-pill bg-success-subtle text-success-emphasis">{{ tag }}</span>
+                      {% endfor %}
+                      {% if l.is_exempt %}
+                        <span class="badge rounded-pill bg-success-subtle text-success-emphasis">Full waiver applied</span>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+            <div class="text-muted">No items.</div>
+          {% endif %}
+
+          <!-- Amount Due -->
+          <div class="amount-row">
+            <div class="small-muted">Amount Due</div>
+            {% if header.amount_due|floatformat:2 == "0.00" %}
+              <div class="fs-5 fw-bold text-success">WAIVED</div>
+            {% elif payments.latest_or_number or is_paid_no_or %}
+              <div class="text-end">
+                <div class="fs-5 fw-bold text-success">PAID</div>
+                {% if paid_method_label %}
+                  <div class="small-muted">Paid via {{ paid_method_label }}</div>
+                {% endif %}
+              </div>
+            {% else %}
+              <div id="amount-due-section">
+                <div class="fs-5 fw-bold text-danger">₱{{ header.amount_due|floatformat:2 }}</div>
+              </div>
+              <div id="paid-section" style="display:none;">
+                <div class="fs-5 fw-bold text-success">PAID</div>
+                <!-- <div class="small-muted">Payment confirmed by system</div> -->
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Resident / On-behalf -->
+      <div class="card card-soft mb-3">
+        <div class="card-body">
+          <div class="section-title mb-2"><span class="dot"></span> Resident</div>
+
+          {% if not header.on_behalf_full_name and not header.on_behalf_of_person_id and not header.on_behalf_id %}
+            <div class="alert alert-primary d-flex align-items-center gap-2 mb-3">
+              <i class="bi bi-person-check-fill"></i>
+              <div><strong>Requested for self.</strong></div>
+            </div>
+          {% endif %}
+
+          <div class="row g-4">
+            <div class="col-12 {% if header.on_behalf_full_name or header.on_behalf_of_person_id or header.on_behalf_id %}col-md-6{% else %}col-md-12{% endif %}">
+              <div class="small-muted mb-2">Requested by</div>
+              <ul class="kv">
+                <li><span class="label">Name</span>
+                    <span class="value">{% firstof header.requester_full_name header.requested_by "—" %}</span></li>
+                {% if header.address or header.barangay or header.city or header.province %}
+                <li>
+                  <span class="label">Address</span>
+                  <span class="text-end" style="max-width:60%">
+                    {% if header.address %}{{ header.address }}{% else %}
+                      {{ header.barangay|default_if_none:"" }}{% if header.barangay %}, {% endif %}
+                      {{ header.city|default_if_none:"" }}{% if header.city %}, {% endif %}
+                      {{ header.province|default_if_none:"" }}
+                    {% endif %}
+                  </span>
+                </li>
+                {% endif %}
+              </ul>
+            </div>
+
+            {% if header.on_behalf_full_name or header.on_behalf_of_person_id or header.on_behalf_id %}
+              <div class="col-12 col-md-6">
+                <div class="small-muted mb-2">Requested For</div>
+                <ul class="kv">
+                  <li><span class="label">Name</span>
+                      <span class="value">{% firstof header.on_behalf_full_name header.on_behalf_of "—" %}</span></li>
+                  <li><span class="label">Resident ID</span>
+                      <span class="value">{% firstof header.on_behalf_of_person_id header.on_behalf_id "—" %}</span></li>
+                  {% if header.on_behalf_address %}
+                    <li><span class="label">Address</span><span class="text-end" style="max-width:60%">{{ header.on_behalf_address }}</span></li>
+                  {% endif %}
+                </ul>
+              </div>
+            {% else %}
+              <!-- <div class="col-12 col-md-6 d-flex align-items-start">
+                <div>
+                  <div class="small-muted mb-2">Requested For</div>
+                  <span class="badge rounded-pill bg-success-subtle text-success-emphasis">
+                    {% comment %}<i class="bi bi-person-check-fill me-1"></i> Self{% endcomment %}
+                  </span>
+                  <div class="text-muted small mt-1">Same as “Requested by”.</div>
+                </div>
+              </div> -->
+            {% endif %}
+          </div>
+
+          {% if auth_links %}
+            <hr class="my-3">
+            <div class="section-title mb-2"><span class="dot"></span> Authorization Letter</div>
+            <div class="media-grid">
+              {% for a in auth_links %}
+                {% if a.is_pdf %}
+                  <a class="pdf-pill" href="{{ a.url }}" target="_blank" rel="noopener" title="Open {{ a.name }}">
+                    PDF<br>{{ a.name }}
+                  </a>
+                {% else %}
+                  <img src="{{ a.url }}" alt="{{ a.name }}" class="media-thumb"
+                       data-bs-toggle="modal" data-bs-target="#authLightbox" data-src="{{ a.url }}">
+                {% endif %}
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          {% if header.purpose_notes %}
+            <hr class="my-3">
+            <div class="small-muted mb-1">Notes to Treasurer/Clerk</div>
+            <div class="fw-semibold">{{ header.purpose_notes }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Timeline -->
+      <div class="card card-soft mb-3">
+        <div class="card-body">
+          <div class="section-title mb-2"><span class="dot"></span> Timeline</div>
+          {% if timeline %}
+            <div class="timeline">
+              {% for e in timeline %}
+                {% with act=e.action|default:''|upper %}
+                <div class="tl-item">
+                  <div class="tl-dot
+                      {% if act == 'REQUEST_CREATED' or act == 'LINE_ADDED' %} primary
+                      {% elif act == 'PAYMENT_INITIATED' %} info
+                      {% elif act == 'PAYMENT_ACCEPTED' or act == 'OR_ISSUED' %} success
+                      {% elif act == 'STATUS_CHANGED' %} warn
+                      {% else %} muted {% endif %}">
+                    {% if act == 'REQUEST_CREATED' %}<i class="bi bi-file-earmark-plus"></i>
+                    {% elif act == 'LINE_ADDED' %}<i class="bi bi-plus-lg"></i>
+                    {% elif act == 'PAYMENT_INITIATED' %}<i class="bi bi-credit-card"></i>
+                    {% elif act == 'PAYMENT_ACCEPTED' %}<i class="bi bi-cash-coin"></i>
+                    {% elif act == 'OR_ISSUED' %}<i class="bi bi-receipt"></i>
+                    {% elif act == 'STATUS_CHANGED' %}<i class="bi bi-arrow-left-right"></i>
+                    {% else %}<i class="bi bi-clock-history"></i>{% endif %}
+                  </div>
+
+                  <div class="tl-head">
+                    <div class="tl-title">{{ e.action|default:"—" }}</div>
+                    <div class="tl-when">{{ e.occur_fmt }}</div>
+                  </div>
+
+                  {% if act == 'STATUS_CHANGED' %}
+                    <div class="d-flex align-items-center gap-1 mt-1">
+                      {% if e.from_status %}<span class="pill blue">{{ e.from_status }}</span>{% endif %}
+                      <i class="bi bi-arrow-right-short text-muted"></i>
+                      {% if e.to_status %}<span class="pill amber">{{ e.to_status }}</span>{% endif %}
+                    </div>
+                  {% endif %}
+
+                  <div class="tl-meta">{{ e.display_actor }}</div>
+                  {% if e.reason %}<div class="tl-body">Reason: {{ e.reason }}</div>{% endif %}
+                </div>
+                {% endwith %}
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="text-muted">No timeline yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Payment -->
+    <div class="col-12 col-lg-4 col-xxl-3">
+      <div class="card card-soft sticky-aside">
+        <div class="card-body">
+
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="section-title mb-0"><span class="dot"></span> Take Payment</div>
+            <span class="status-chip {{ status_ui.cls }}">{{ status_ui.label }}</span>
+          </div>
+
+          <div class="small-muted mb-1">Official Receipt Number:</div>
+          {% if payments.latest_or_number %}
+            <div class="mb-3 or-highlight">
+              <div class="d-flex align-items-center justify-content-between">
+                <div class="fw-semibold"><span class="or-badge me-2">OR</span> {{ payments.latest_or_number }}</div>
+                <i class="bi bi-check-circle-fill text-success"></i>
+              </div>
+              <div class="small text-muted">{{ payments.latest_or_time|date:"M d, Y, P" }}</div>
+            </div>
+          {% elif header.status|upper == "REFUNDED" %}
+            <div class="mb-3 alert alert-info border-0" style="background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%); border-left: 4px solid #2196f3 !important;">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-arrow-counterclockwise text-primary"></i>
+                <strong>Payment Refunded</strong>
+              </div>
+              <div class="small text-muted mt-1">This request has been successfully refunded.</div>
+            </div>
+          {% else %}
+            <div class="mb-3 text-muted">None yet</div>
+          {% endif %}
+
+          {% comment %}
+          <!-- DEBUG: Visibility inspector -->
+          <div class="alert alert-secondary small" style="border-style:dashed">
+            <div class="fw-bold mb-1">DEBUG — Button visibility</div>
+            <ul class="mb-0 ps-3">
+              <li>has_or:
+                {% if payments.latest_or_number %}yes{% endif %}
+                {% if not payments.latest_or_number %}no{% endif %}
+              </li>
+              <li>is_zero:
+                {% if header.amount_due|floatformat:2 == "0.00" %}yes{% endif %}
+                {% if header.amount_due|floatformat:2 != "0.00" %}no{% endif %}
+              </li>
+              <li>is_walkin (staff-added):
+                {% if header.requested_by_staff_id or header.request_added_by_id or header.added_by_id or header.request_added_by or header.added_by %}yes{% endif %}
+                {% if not header.requested_by_staff_id and not header.request_added_by_id and not header.added_by_id and not header.request_added_by and not header.added_by %}no{% endif %}
+              </li>
+              <li>status_upper: {{ header.status|upper }}</li>
+              <li>will_show_confirm_online:
+                {% if not payments.latest_or_number and header.amount_due|floatformat:2 != "0.00" and not header.requested_by_staff_id and not header.request_added_by_id and not header.added_by_id and not header.request_added_by and not header.added_by %}
+                  {% if header.status|upper == "PAID" or header.status|upper == "FOR CLERK REVIEW" or header.status|upper == "FOR_TREASURER_REVIEW" %}yes{% endif %}
+                {% endif %}
+                {% if payments.latest_or_number %}no{% endif %}
+                {% if header.amount_due|floatformat:2 == "0.00" %}no{% endif %}
+              </li>
+              <li>will_show_waived:
+                {% if not payments.latest_or_number and header.amount_due|floatformat:2 == "0.00" %}yes{% endif %}
+              </li>
+              <li>will_show_accept_walkin:
+                {% if not payments.latest_or_number and header.amount_due|floatformat:2 != "0.00" %}
+                  {% if header.requested_by_staff_id or header.request_added_by_id or header.added_by_id or header.request_added_by or header.added_by %}yes{% endif %}
+                {% endif %}
+              </li>
+            </ul>
+          </div>
+          <!-- /DEBUG -->
+          {% endcomment %}
+
+          {# Hide all payment forms if status is REFUNDED #}
+          {% if header.status|upper != "REFUNDED" %}
+          
+          {# ONLINE: Confirm & Post OR — only when STATUS_CHANGED to PAID by SYSTEM exists #}
+          {% if header.amount_due|floatformat:2 != "0.00" and not header.requested_by_staff_id and not header.request_added_by_id and not header.added_by_id and not header.request_added_by and not header.added_by %}
+            {% if header.status|upper == "PAID" or header.status|upper == "FOR_TREASURER_REVIEW" %}
+              <div class="mb-4" id="confirm-or-section" style="display:none;">
+                <div class="alert alert-info mb-3 border-0" style="background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%); border-left: 4px solid #2196f3 !important;">
+                  <div class="d-flex align-items-center gap-2 mb-1">
+                    <i class="bi bi-check-circle-fill text-primary"></i>
+                    <strong>Confirm &amp; Post OR</strong>
+                  </div>
+                  <div class="small text-muted">Use for online payments when payment is confirmed by system.</div>
+                  {% if paid_method_label %}<div class="small text-primary mt-1"><i class="bi bi-credit-card me-1"></i>Detected method: {{ paid_method_label }}</div>{% endif %}
+                </div>
+                <form method="post" action="{% url 'treasurer:confirm_post_or' header.doc_request_id %}">
+                  {% csrf_token %}
+                  <div class="mb-2">
+                    <label class="form-label">OR Payment Method</label>
+
+                    <!-- Always submit 2 -->
+                    <input type="hidden" name="payment_method_id" value="2">
+
+                    <!-- Read-only display (not editable) -->
+                    <div class="form-control-plaintext py-2 px-3 bg-light rounded border">
+                      {% for m in methods %}
+                        {% if m.payment_method_id == 2 %}
+                          {{ m.method_name|default:"PAYMENT METHOD #2" }}
+                        {% endif %}
+                      {% endfor %}
+                    </div>
+
+                    <div class="form-text">Amount: ₱{{ header.amount_due|floatformat:2 }}</div>
+                  </div>
+
+                  <!-- <div class="mb-3">
+                    <label class="form-label">OR Number (optional)</label>
+                    <input class="form-control" name="or_number" placeholder="Leave blank to auto-generate">
+                  </div> -->
+
+                  <button type="button" class="btn btn-primary w-100 py-2"
+                          style="background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%); border: none; font-weight: 600; box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);"
+                          onclick="showConfirmModal(this, 'Confirm & Post OR', 'This will confirm the online payment and generate an Official Receipt. Do you want to proceed?')">
+                    <i class="bi bi-receipt me-2"></i>Confirm &amp; Post OR → Move to Printing
+                  </button>
+                </form>
+
+              </div>
+            {% endif %}
+          {% endif %}
+
+          {# WAIVED: Issue Waived OR — only when ₱0.00 and no OR #}
+          {% if not payments.latest_or_number and header.amount_due|floatformat:2 == "0.00" %}
+            <hr class="my-3">
+            <div class="mb-4">
+              <div class="alert alert-success mb-3 border-0" style="background: linear-gradient(135deg, #e8f5e8 0%, #f1f8e9 100%); border-left: 4px solid #4caf50 !important;">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <i class="bi bi-gift-fill text-success"></i>
+                  <strong>Issue Waived OR</strong>
+                </div>
+                <div class="small text-muted">Use when fee is fully waived (₱0.00).</div>
+              </div>
+              {% if waived_method_id %}
+                <form method="post" action="{% url 'treasurer:take_payment' header.doc_request_id %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="payment_method_id" value="{{ waived_method_id }}">
+                  <input type="hidden" name="amount_paid" value="0">
+                  <button type="button" class="btn btn-success w-100 py-2" style="background: linear-gradient(135deg, #388e3c 0%, #66bb6a 100%); border: none; font-weight: 600; box-shadow: 0 4px 12px rgba(56, 142, 60, 0.3);" onclick="showConfirmModal(this, 'Issue Waived OR', 'This will issue a waived Official Receipt for ₱0.00. Do you want to proceed?')">
+                    <i class="bi bi-gift me-2"></i>Issue Waived OR (₱0.00)
+                  </button>
+                </form>
+              {% else %}
+                <div class="alert alert-warning">
+                  Payment method <strong>WAIVED</strong> not found. Add it in the database.
+                </div>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          {# WALK-IN: Accept Payment & Post OR — staff added, not ₱0.00, no OR #}
+          {% if not payments.latest_or_number and header.amount_due|floatformat:2 != "0.00" %}
+            {% if header.requested_by_staff_id or header.request_added_by_id or header.added_by_id or header.request_added_by or header.added_by %}
+              <hr class="my-3">
+              <div>
+                <div class="alert alert-warning mb-3 border-0" style="background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%); border-left: 4px solid #ff9800 !important;">
+                  <div class="d-flex align-items-center gap-2 mb-1">
+                    <i class="bi bi-cash-coin text-warning"></i>
+                    <strong>Accept Payment &amp; Post OR</strong>
+                  </div>
+                  <div class="small text-muted">Use for cash/in-person payments.</div>
+                </div>
+                <form method="post" action="{% url 'treasurer:take_payment' header.doc_request_id %}">
+                  {% csrf_token %}
+                  {% for m in methods %}
+                    {% if m.method_name|upper == 'CASH' %}
+                      <input type="hidden" name="payment_method_id" value="{{ m.payment_method_id }}">
+                    {% endif %}
+                  {% endfor %}
+                  <div class="mb-2">
+                    <label class="form-label">Payment Method</label>
+                    <input class="form-control" value="CASH" readonly style="background-color: #f8f9fa;">
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Amount Paid (₱)</label>
+                    <input class="form-control" name="amount_paid" type="number" step="0.01" value="{{ header.amount_due|floatformat:2 }}" readonly style="background-color: #f8f9fa;">
+                    <div class="form-text">Amount due: ₱{{ header.amount_due|floatformat:2 }}</div>
+                  </div>
+                  <button type="button" class="btn w-100 py-2" style="background: #dc3545; color: #fff; border: none; font-weight: 600; box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);" onclick="showConfirmModal(this, 'Accept Cash Payment', 'This will accept a cash payment of ₱{{ header.amount_due|floatformat:2 }} and generate an Official Receipt. Do you want to proceed?')">
+                    <i class="bi bi-cash-coin me-2"></i>Accept Payment &amp; Post OR
+                  </button>
+                </form>
+              </div>
+            {% endif %}
+          {% endif %}
+
+          {# FALLBACK: show Accept Payment if not online-eligible and not walk-in #}
+          {% if not payments.latest_or_number and header.amount_due|floatformat:2 != "0.00" and not header.requested_by_staff_id and not header.request_added_by_id and not header.added_by_id and not header.request_added_by and not header.added_by %}
+            <div id="fallback-section">
+              <hr class="my-3">
+              <div>
+                <!-- <div class="alert alert-secondary mb-3 border-0" style="background: linear-gradient(135deg, #f5f5f5 0%, #eeeeee 100%);">
+                  <div class="d-flex align-items-center gap-2 mb-1">
+                    <i class="bi bi-exclamation-triangle text-secondary"></i>
+                    <strong>Manual Payment Entry</strong>
+                  </div>
+                  <div class="small text-muted">Use when payment needs manual processing.</div>
+                </div> -->
+                <form method="post" action="{% url 'treasurer:take_payment' header.doc_request_id %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="payment_method_id" value="1">
+                  <div class="mb-2">
+                    <label class="form-label">Payment Method</label>
+                    <select class="form-select" disabled style="background-color: #f8f9fa;">
+                      {% for m in methods %}
+                        <option value="{{ m.payment_method_id }}" 
+                          {% if m.payment_method_id == 1 %}selected{% endif %}>
+                          {{ m.method_name }}
+                        </option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Amount Paid (₱)</label>
+                    <input class="form-control" name="amount_paid" type="number" step="0.01" value="{{ header.amount_due|floatformat:2 }}" readonly style="background-color: #f8f9fa;">
+                    <div class="form-text">Amount due: ₱{{ header.amount_due|floatformat:2 }}</div>
+                  </div>
+                  <button type="button" class="btn w-100 py-2" style="background: #4f0202; color: #fff; border: none; font-weight: 600; box-shadow: 0 4px 12px rgba(97, 97, 97, 0.3);" onclick="showConfirmModal(this, 'Manual Payment Entry', 'This will manually process a payment of ₱{{ header.amount_due|floatformat:2 }} and generate an Official Receipt. Do you want to proceed?')">
+                    <i class="bi bi-credit-card me-2"></i>Accept Payment &amp; Post OR
+                  </button>
+                </form>
+              </div>
+            </div>
+          {% endif %}
+
+          {% if latest_pending_refund %}
+            <hr class="my-3">
+            <div class="alert alert-warning">
+              <div class="fw-bold">Refund Pending</div>
+              <div class="small">
+                Ticket #{{ latest_pending_refund.payment_refund_id }} •
+                Amount: ₱{{ latest_pending_refund.refund_amount|floatformat:2 }} •
+                Status: {{ latest_pending_refund.status }}
+                {% if latest_pending_refund.reason %}
+                  <br>Reason: {{ latest_pending_refund.reason }}
+                {% endif %}
+              </div>
+            </div>
+
+            <form method="post" action="{% url 'treasurer:treasurer_complete_refund' header.doc_request_id %}" class="mb-2">
+              {% csrf_token %}
+              <input type="hidden" name="refund_id" value="{{ latest_pending_refund.payment_refund_id }}">
+              <button type="button" class="btn btn-outline-danger w-100" onclick="showConfirmModal(this, 'Mark Refund Completed', 'Are you sure you want to mark this refund as completed? This action will finalize the refund for Ticket #{{ latest_pending_refund.payment_refund_id }} (₱{{ latest_pending_refund.refund_amount|floatformat:2 }}). Do you want to proceed?')">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>
+                Mark Refund Completed
+              </button>
+            </form>
+
+          {% elif has_pending_refund %}
+            <hr class="my-3">
+            <div class="alert alert-warning mb-2">
+              One or more refund tickets are pending. Select a ticket to complete below.
+            </div>
+            {% for r in refunds_pending %}
+              <form method="post" action="{% url 'treasurer:treasurer_complete_refund' header.doc_request_id %}" class="border rounded p-2 mb-2">
+                {% csrf_token %}
+                <input type="hidden" name="refund_id" value="{{ r.payment_refund_id }}">
+                <div class="small mb-2">
+                  Ticket #{{ r.payment_refund_id }} • Amount: ₱{{ r.refund_amount|floatformat:2 }} • Status: {{ r.status }}
+                </div>
+                <button type="button" class="btn btn-outline-danger w-100 mt-2" onclick="showConfirmModal(this, 'Mark Refund Completed', 'Are you sure you want to mark this refund as completed? This action will finalize the refund for Ticket #{{ r.payment_refund_id }} (₱{{ r.refund_amount|floatformat:2 }}). Do you want to proceed?')">Mark Refund Completed</button>
+              </form>
+            {% endfor %}
+
+          {% elif last_completed_refund %}
+            <hr class="my-3">
+            <div class="alert alert-success mb-0">
+              <div class="fw-bold">Refund Completed</div>
+              <div class="small">
+                Ticket #{{ last_completed_refund.payment_refund_id }} • ₱{{ last_completed_refund.refund_amount|floatformat:2 }}
+                {% if last_completed_refund.refund_receipt_no %}• Receipt: {{ last_completed_refund.refund_receipt_no }}{% endif %}
+                {% if last_completed_refund.provider_refund_id %}• Gateway: {{ last_completed_refund.provider_refund_id }}{% endif %}
+              </div>
+            </div>
+          {% endif %}
+          
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox for images -->
+<div class="modal fade" id="authLightbox" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content bg-dark text-white">
+      <div class="modal-body p-0">
+        <img id="authLightboxImg" src="" class="w-100" alt="Authorization letter">
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius: 16px; border: none; box-shadow: 0 20px 40px rgba(58, 18, 23, 0.15);">
+      <div class="modal-header" style="background: var(--brand-800); color: white; border-radius: 16px 16px 0 0; border: none; padding: 20px 24px;">
+        <div class="d-flex align-items-center gap-3">
+          <div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center;">
+            <i class="bi bi-exclamation-triangle" style="font-size: 18px;"></i>
+          </div>
+          <h5 class="modal-title mb-0" id="confirmModalTitle" style="font-weight: 700;">Confirm Action</h5>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" style="padding: 24px;">
+        <p id="confirmModalMessage" style="margin: 0; font-size: 16px; line-height: 1.5; color: var(--ink);">Are you sure you want to proceed with this action?</p>
+      </div>
+      <div class="modal-footer" style="border: none; padding: 0 24px 24px; gap: 12px;">
+        <button type="button" class="btn" data-bs-dismiss="modal" style="background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; font-weight: 600; padding: 10px 20px; border-radius: 8px;">Cancel</button>
+        <button type="button" class="btn" id="confirmModalProceed" style="background: var(--brand-800); color: white; border: none; font-weight: 600; padding: 10px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(86, 28, 36, 0.3);">Proceed</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Lightbox
+  document.addEventListener('click', function(e){
+    const t = e.target;
+    if (t.matches('.media-thumb')){
+      const src = t.getAttribute('data-src') || t.getAttribute('src');
+      const img = document.getElementById('authLightboxImg');
+      if (img && src) img.src = src;
+    }
+  });
+
+  // Check timeline for STATUS_CHANGED to PAID by SYSTEM
+  document.addEventListener('DOMContentLoaded', function(){
+    const timelineItems = document.querySelectorAll('.tl-item');
+    let hasSystemPaidChange = false;
+    
+    timelineItems.forEach(item => {
+      const title = item.querySelector('.tl-title')?.textContent?.trim();
+      const actor = item.querySelector('.tl-meta')?.textContent?.trim();
+      const pills = item.querySelectorAll('.pill.amber');
+      
+      if (title === 'STATUS_CHANGED' && actor === 'SYSTEM') {
+        pills.forEach(pill => {
+          if (pill.textContent?.trim() === 'PAID') {
+            hasSystemPaidChange = true;
+          }
+        });
+      }
+    });
+    
+    // Show/hide buttons based on timeline check
+    const confirmSection = document.getElementById('confirm-or-section');
+    const fallbackSection = document.getElementById('fallback-section');
+    const amountDueSection = document.getElementById('amount-due-section');
+    const paidSection = document.getElementById('paid-section');
+    
+    if (hasSystemPaidChange) {
+      if (confirmSection) confirmSection.style.display = 'block';
+      if (fallbackSection) fallbackSection.style.display = 'none';
+      if (amountDueSection) amountDueSection.style.display = 'none';
+      if (paidSection) paidSection.style.display = 'block';
+    } else {
+      if (confirmSection) confirmSection.style.display = 'none';
+      if (fallbackSection) fallbackSection.style.display = 'block';
+      if (amountDueSection) amountDueSection.style.display = 'block';
+      if (paidSection) paidSection.style.display = 'none';
+    }
+  });
+
+  // Confirmation modal functions
+  let currentForm = null;
+  
+  function showConfirmModal(button, title, message) {
+    currentForm = button.closest('form');
+    document.getElementById('confirmModalTitle').textContent = title;
+    document.getElementById('confirmModalMessage').textContent = message;
+    
+    const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    modal.show();
+  }
+  
+  document.getElementById('confirmModalProceed').addEventListener('click', function() {
+    if (currentForm) {
+      currentForm.submit();
+    }
+    bootstrap.Modal.getInstance(document.getElementById('confirmModal')).hide();
+  });
+</script>
+
+{% endblock %}

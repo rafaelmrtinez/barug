@@ -22,7 +22,16 @@ PAYMONGO_WEBHOOK_SECRET= os.getenv("PAYMONGO_WEBHOOK_SECRET")
 STAFF_SYSTEM_ID        =13
 
 DEBUG = True
-ALLOWED_HOSTS = ["*", "localhost", "127.0.0.1", ".ngrok-free.app"]
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "192.168.8.1",
+    "192.168.8.252",   # your steady IP (example)
+    "192.168.1.252",
+    ".ngrok-free.app",
+    "*",
+]
+
 CSRF_TRUSTED_ORIGINS = ["https://*.ngrok-free.app"]
 
 ANDROID_PACKAGE = "host.exp.exponent"

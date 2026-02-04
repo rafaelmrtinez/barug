@@ -1,0 +1,104 @@
+<style>
+.nav-link:hover {
+    color: #ffd000 !important;
+}
+.nav-link.active {
+    color: #ff8c00 !important;
+}
+.dropdown-item:hover {
+    color: #ff8c00 !important;
+}
+.count-badge {
+    display: inline-block;
+    min-width: 20px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: middle;
+    background-color: #dc3545;
+    border-radius: 10px;
+    margin-left: 6px;
+}
+</style>
+<nav class="navbar navbar-expand-lg pt-0 pb-3">
+    <div>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarText" aria-controls="navbarText" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarText">
+            <ul class="navbar-nav me-auto mb-lg-0">
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'treasurer:dashboard' %}">Dashboard</a>
+                </li>
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="">Document Requests</a>
+                </li>
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'clerk:identity_verification' %}">Identity Verification</a>
+                </li>
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'clerk:business_list' %}">Business Records</a>
+                </li>
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="">Activity Log</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>  
+<nav class="navbar navbar-expand-lg pt-0 pb-3">
+    <div>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarText" aria-controls="navbarText" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarText">
+            <ul class="navbar-nav me-auto mb-lg-0">
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'treasurer:dashboard' %}">Dashboard</a>
+                </li>
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'treasurer:fees_index' %}">Fee Catalog</a>
+                </li>
+
+                
+                <!-- <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'treasurer:fees' %}">XX Management</a>
+                </li>
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'clerk:identity_verification' %}"> XX Identity Verification</a>
+                </li> -->
+                <li class="nav-item dropdown me-3">
+                    <a class="nav-link dropdown-toggle" href="#" id="resident_dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        Document Requests
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="resident_dropdown">
+                        <li><a class="dropdown-item" href="{% url 'treasurer:business_queue' %}">Business{% if business_count %}<span class="count-badge">{{ business_count }}</span>{% endif %}</a></li>
+                        <li><a class="dropdown-item" href="{% url 'treasurer:queue' %}">Resident (Requests){% if resident_count %}<span class="count-badge">{{ resident_count }}</span>{% endif %}</a></li>
+                        <li><a class="dropdown-item" href="{% url 'treasurer:closure_list' %}">Business Closure</a></li>
+                        <li><a class="dropdown-item" href="{% url 'treasurer:payment_refunds' %}">Payment Refunds{% if refund_count %}<span class="count-badge">{{ refund_count }}</span>{% endif %}</a></li>
+                        <li><a class="dropdown-item" href="{% url 'treasurer:people_requests' %}">History</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'treasurer:financial_report' %}">Financial Report</a>
+                </li>
+                <li class="nav-item me-3">
+                    <a class="nav-link" href="{% url 'lupon_mem:report_list' %}">Lupon Case Filing{% if lupon_unpaid_count %}<span class="count-badge">{{ lupon_unpaid_count }}</span>{% endif %}</a>
+                </li>
+                <!-- <li class="nav-item dropdown me-3">
+                    <a class="nav-link dropdown-toggle" href="#" id="lupon_dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        Lupon Records
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="lupon_dropdown">
+                        <li><a class="dropdown-item" href="{% url 'lupon_mem:report_list' %}">Blotter Reports</a></li>
+                        <li><a class="dropdown-item" href="{% url 'lupon_mem:case_list' %}">Barangay Cases</a></li>
+                        <li><a class="dropdown-item" href="{% url 'lupon_mem:resident_records_list' %}">Resident Records</a></li>
+                    </ul>
+                </li> -->
+        </div>
+    </div>
+</nav>

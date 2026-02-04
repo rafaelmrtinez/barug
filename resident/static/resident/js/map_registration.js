@@ -246,41 +246,44 @@
     }
 
     function attemptUpdate(coords) {
-      const point = turf.point([coords.lng, coords.lat]);
-      const inside = turf.booleanPointInPolygon(point, stoNinoBoundary);
-
-      if (inside) {
-        marker.setLngLat([coords.lng, coords.lat]);
-        currentLngLat = coords;
-        // Persist coordinates immediately so form payloads pick them up without requiring modal Save
-        try {
-          const latEl = document.getElementById('latitude') || document.getElementById('id_latitude');
-          const lngEl = document.getElementById('longitude') || document.getElementById('id_longitude');
-          if (latEl) latEl.value = String(coords.lat);
-          if (lngEl) lngEl.value = String(coords.lng);
-        } catch (err) {
-          console.warn('Could not persist lat/lng inputs from attemptUpdate', err);
-        }
-        // detect Purok by checking polygon features first
-        try {
-          const hit = purokGeojson.features.find(f => turf.booleanPointInPolygon(point, f));
-          const purokInput = document.getElementById('purok_sitio');
-          if (hit && purokInput) {
-            purokInput.value = hit.properties.name || hit.properties.code || '';
-          }
-        } catch (err) {
-          console.warn('Purok detection error', err);
-        }
-
-        // then call reverse geocode to fill street/city etc.
-        getAddressFromCoordinates(coords.lng, coords.lat);
-      } else {
-        new mapboxgl.Popup()
-          .setLngLat([coords.lng, coords.lat])
-          .setHTML(`<strong>Invalid:</strong><br>Select only within Sto. Niño boundary.`)
-          .addTo(map);
-        console.warn('Clicked outside Sto. Niño:', coords);
+      // Always allow selection anywhere - no boundary check
+      marker.setLngLat([coords.lng, coords.lat]);
+      currentLngLat = coords;
+      // Persist coordinates immediately so form payloads pick them up without requiring modal Save
+      try {
+        const latEl = document.getElementById('latitude') || document.getElementById('id_latitude');
+        const lngEl = document.getElementById('longitude') || document.getElementById('id_longitude');
+        if (latEl) latEl.value = String(coords.lat);
+        if (lngEl) lngEl.value = String(coords.lng);
+      } catch (err) {
+        console.warn('Could not persist lat/lng inputs from attemptUpdate', err);
       }
+      
+      // Find nearest purok regardless of location
+      try {
+        const point = turf.point([coords.lng, coords.lat]);
+        let nearestPurok = null;
+        let minDistance = Infinity;
+        
+        purokGeojson.features.forEach(f => {
+          const center = turf.centroid(f);
+          const distance = turf.distance(point, center, {units: 'kilometers'});
+          if (distance < minDistance) {
+            minDistance = distance;
+            nearestPurok = f;
+          }
+        });
+        
+        const purokInput = document.getElementById('purok_sitio');
+        if (nearestPurok && purokInput) {
+          purokInput.value = nearestPurok.properties.name || nearestPurok.properties.code || '';
+        }
+      } catch (err) {
+        console.warn('Purok detection error', err);
+      }
+
+      // Always call reverse geocode to fill street/city etc.
+      getAddressFromCoordinates(coords.lng, coords.lat);
     }
 
   });

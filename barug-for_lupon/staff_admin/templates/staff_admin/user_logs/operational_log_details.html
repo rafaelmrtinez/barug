@@ -1,0 +1,254 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<style>
+.detail-card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border-radius: 0.75rem;
+}
+.detail-header {
+    background: linear-gradient(135deg, var(--bs-danger-text-emphasis), #dc3545);
+    color: white;
+    border-radius: 0.75rem 0.75rem 0 0;
+    padding: 1.5rem;
+}
+.info-row {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f8f9fa;
+}
+.info-row:last-child {
+    border-bottom: none;
+}
+.info-label {
+    font-weight: 600;
+    color: #495057;
+    min-width: 140px;
+}
+.change-card {
+    background: #f8f9fa;
+    border-left: 4px solid var(--bs-danger-text-emphasis);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    background-color: #d4edda;
+    color: #155724;
+}
+.user-type-staff {
+    padding: 0.25rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    background-color: #fff3cd;
+    color: #856404;
+}
+.user-type-person {
+    padding: 0.25rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    background-color: #ffeaa7;
+    color: #6c5ce7;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3" style="margin-top: 40px;">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
+                        {% bs_icon 'file-text-fill' color='var(--bs-danger-text-emphasis)' size='1.5em' %} 
+                        Operational Log Details
+                    </h2>
+                    <p class="text-muted mb-0">Detailed information about system operation</p>
+                </div>
+                <a href="{% url 'staff_admin:operational_logs' %}" class="btn btn-outline-secondary d-flex align-items-center gap-2">
+                    {% bs_icon 'arrow-left' %} Back to Logs
+                </a>
+            </div>
+
+            {% if log_detail %}
+            <!-- Main Details Card -->
+            <div class="detail-card card mb-4">
+                <div class="detail-header">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <h4 class="mb-1">Log Entry #{{ log_detail.common_log_id }}</h4>
+                            <p class="mb-0 opacity-75">{{ log_detail.action|title }} operation on {{ log_detail.table_affected|title }}</p>
+                        </div>
+
+                    </div>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-4">
+                        <!-- Left Column -->
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-3 d-flex align-items-center gap-2">
+                                {% bs_icon 'person-fill' %} Performer Information
+                            </h6>
+                            <div class="info-row d-flex">
+                                <span class="info-label">Performer:</span>
+                                <span class="fw-medium">{{ log_detail.performer_name|default:"System"|title }}</span>
+                            </div>
+                            <div class="info-row d-flex">
+                                <span class="info-label">User Type:</span>
+                                <span class="{% if log_detail.user_type_name|lower == 'staff' %}user-type-staff{% elif log_detail.user_type_name|lower == 'person' %}user-type-person{% else %}status-badge{% endif %}">{{ log_detail.user_type_name|default:"—"|title }}</span>
+                            </div>
+                            <div class="info-row d-flex">
+                                <span class="info-label">Performer Code:</span>
+                                <span class="fw-medium"> 
+                                    {% if log_detail.user_type_name|lower == 'staff' and log_detail.performer_staff_code %}
+                                        {{ log_detail.performer_staff_code }}
+                                    {% elif log_detail.user_type_name|lower == 'person' and log_detail.performer_person_code %}
+                                        {{ log_detail.performer_person_code }}
+                                    {% elif log_detail.user_type_name|lower == 'system' %}
+                                        —
+                                    {% else %}
+                                        {{ log_detail.performer_id|default:"—" }}
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="info-row d-flex">
+                                <span class="info-label">Subsystem:</span>
+                                <span class="fw-medium">{{ log_detail.subsystem_name|default:"—"|title }}</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Right Column -->
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-3 d-flex align-items-center gap-2">
+                                {% bs_icon 'clock-fill' %} Operation Details
+                            </h6>
+                            <div class="info-row d-flex">
+                                <span class="info-label">Action:</span>
+                                <span class="status-badge">{{ log_detail.action|default:"—"|title }}</span>
+                            </div>
+                            <div class="info-row d-flex">
+                                <span class="info-label">Timestamp:</span>
+                                <span class="fw-medium">
+                                    {% if log_detail.date_time %}
+                                        {{ log_detail.date_time|date:"F d, Y g:i A" }}
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <!-- <div class="info-row d-flex">
+                                <span class="info-label">Target Table:</span>
+                                <code class="bg-light px-2 py-1 rounded">{{ log_detail.table_affected|default:"—"|title }}</code>
+                            </div> -->
+                            <!-- <div class="info-row d-flex">
+                                <span class="info-label">Record ID:</span>
+                                <span class="text-muted">{{ log_detail.record_affected_id|default:"—" }}</span>
+                            </div> -->
+                            <div class="info-row d-flex">
+                                <span class="info-label">Data Changed:</span>
+                                <span class="fw-medium">{{ log_detail.field_changed|default:"—"|title }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Details & Reason Card -->
+            {% if log_detail.details or log_detail.reason %}
+            <div class="detail-card card mb-4">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0 d-flex align-items-center gap-2">
+                        {% bs_icon 'info-circle-fill' %} Additional Information
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% if log_detail.details %}
+                    <div class="mb-3">
+                        <h6 class="text-muted mb-2">Details:</h6>
+                        <div class="bg-light p-3 rounded">
+                            {{ log_detail.details }}{% if not log_detail.details|last == '.' %}.{% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if log_detail.reason %}
+                    <div>
+                        <h6 class="text-muted mb-2">Reason:</h6>
+                        <div class="bg-light p-3 rounded">
+                            {{ log_detail.reason|lower|capfirst }}{% if not log_detail.reason|last == '.' %}.{% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Changes Card -->
+            {% if log_detail.old_value or log_detail.new_value %}
+            <div class="detail-card card mb-4">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0 d-flex align-items-center gap-2">
+                        {% bs_icon 'arrow-left-right' %} Value Changes
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        {% if log_detail.old_value %}
+                        <div class="col-md-6">
+                            <div class="change-card" style="border-left-color: #dc3545;">
+                                <h6 class="text-danger mb-2 d-flex align-items-center gap-2">
+                                    {% bs_icon 'dash-circle' %} Old Value
+                                </h6>
+                                <div class="bg-white p-3 rounded border">
+                                    <pre class="mb-0 text-wrap">{{ log_detail.old_value }}</pre>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if log_detail.new_value %}
+                        <div class="col-md-6">
+                            <div class="change-card" style="border-left-color: #28a745;">
+                                <h6 class="text-success mb-2 d-flex align-items-center gap-2">
+                                    {% bs_icon 'plus-circle' %} New Value
+                                </h6>
+                                <div class="bg-white p-3 rounded border">
+                                    <pre class="mb-0 text-wrap">{{ log_detail.new_value }}</pre>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% else %}
+            <!-- No Data Found -->
+            <div class="text-center py-5">
+                <div class="mb-3">
+                    {% bs_icon 'exclamation-triangle' size='3em' color='#6c757d' %}
+                </div>
+                <h5 class="text-muted">Log Entry Not Found</h5>
+                <p class="text-muted">The requested operational log entry could not be found.</p>
+                <a href="{% url 'staff_admin:operational_logs' %}" class="btn btn-primary">
+                    Return to Operational Logs
+                </a>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}
