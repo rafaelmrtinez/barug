@@ -754,17 +754,22 @@
   const caseNumInput = document.getElementById('caseNum');
   if (caseNumInput) {
     caseNumInput.addEventListener('input', function(e) {
-      let val = e.target.value.replace(/[^0-9]/g, '');
-      if (val.length > 0) {
+      let val = e.target.value;
+      // Remove everything except digits and the prefix
+      let digitsOnly = val.replace(/[^0-9]/g, '');
+      
+      if (digitsOnly.length > 0) {
         let formatted = 'BC #';
-        if (val.length <= 4) {
-          formatted += val;
-        } else if (val.length <= 6) {
-          formatted += val.substring(0, 4) + '-' + val.substring(4);
+        if (digitsOnly.length <= 4) {
+          formatted += digitsOnly;
+        } else if (digitsOnly.length <= 6) {
+          formatted += digitsOnly.substring(0, 4) + '-' + digitsOnly.substring(4);
         } else {
-          formatted += val.substring(0, 4) + '-' + val.substring(4, 6) + '-' + val.substring(6, 9);
+          formatted += digitsOnly.substring(0, 4) + '-' + digitsOnly.substring(4, 6) + '-' + digitsOnly.substring(6, 9);
         }
         e.target.value = formatted;
+      } else if (val.length === 0) {
+        e.target.value = '';
       }
     });
   }
