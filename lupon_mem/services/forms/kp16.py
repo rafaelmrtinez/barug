@@ -53,6 +53,7 @@ _KP16_SOURCES: Dict[str, Set[str]] = {
     # Filing date/time (from answers if provided)
     "date_filed": {"date_filed", "filed_date", "date_of_filing", "date created", "date_created", "date_today"},
     "time_filed": {"time_filed", "filed_time", "time_of_filing", "time_created"},
+    "kp7_date_time_filed": {"date & time filed case", "date and time filed case", "kp7_date_time_filed", "date_time_filed"},
 
     # Settlement text
     "settlement_statement": {
@@ -283,41 +284,62 @@ class KP16Handler:
         except Exception as _e:
             logger.warning("KP16 raw DB print failed: %s", _e)
 
-        # ---- Date Filed (Month DD, YYYY) ----
-        date_answer = (out.get("date_filed") or "").strip()
-        date_obj: Optional[_date] = self._try_parse_date(date_answer)
-
-        if not date_obj and date_answer.isdigit():
-            day_num = int(date_answer)
-            m_name = (out.get("month_entered") or "").strip()
-            y_txt  = (out.get("year_entered")  or "").strip()
-            m_num = self._month_name_to_number(m_name)
-            if m_num and y_txt.isdigit():
-                try:
-                    date_obj = _date(int(y_txt), m_num, day_num)
-                except Exception:
-                    date_obj = None
-
-        if not date_obj and isinstance(case_date_by_num, _date):
-            date_obj = case_date_by_num
-        if not date_obj and isinstance(case_date_by_sub, _date):
-            date_obj = case_date_by_sub
+        # ---- Date Filed and Time Filed from kp7_date_time_filed ----
+        # Try to get from kp7_date_time_filed first (e.g., "January 13, 2025 02:35 PM")
+        kp7_datetime_str = _find_any({"date & time filed case", "date and time filed case", "kp7_date_time_filed", "date_time_filed"})
+        date_obj: Optional[_date] = None
+        time_obj: Optional[_time] = None
+        
+        if kp7_datetime_str:
+            # Parse the combined datetime string
+            try:
+                # Try format: "January 13, 2025 02:35 PM"
+                dt = _dt.strptime(kp7_datetime_str.strip(), "%B %d, %Y %I:%M %p")
+                date_obj = dt.date()
+                time_obj = dt.time()
+                logger.info("[KP16] Parsed kp7_date_time_filed: date=%s time=%s", date_obj, time_obj)
+            except Exception as e:
+                logger.warning("[KP16] Failed to parse kp7_date_time_filed '%s': %s", kp7_datetime_str, e)
+        
+        # Fallback to separate date_filed field if kp7_date_time_filed not available
         if not date_obj:
-            d_txt = (out.get("date_entered") or "").strip()
-            m_txt = (out.get("month_entered") or "").strip()
-            y_txt = (out.get("year_entered") or "").strip()
-            m_num = self._month_name_to_number(m_txt)
-            if d_txt.isdigit() and m_num and y_txt.isdigit():
-                try:
-                    date_obj = _date(int(y_txt), m_num, int(d_txt))
-                except Exception:
-                    date_obj = None
-        if not date_obj:
-            date_obj = _dt.now(ZoneInfo("Asia/Manila")).date()
+            date_answer = (out.get("date_filed") or "").strip()
+            date_obj = self._try_parse_date(date_answer)
+
+            if not date_obj and date_answer.isdigit():
+                day_num = int(date_answer)
+                m_name = (out.get("month_entered") or "").strip()
+                y_txt  = (out.get("year_entered")  or "").strip()
+                m_num = self._month_name_to_number(m_name)
+                if m_num and y_txt.isdigit():
+                    try:
+                        date_obj = _date(int(y_txt), m_num, day_num)
+                    except Exception:
+                        date_obj = None
+
+            if not date_obj and isinstance(case_date_by_num, _date):
+                date_obj = case_date_by_num
+            if not date_obj and isinstance(case_date_by_sub, _date):
+                date_obj = case_date_by_sub
+            if not date_obj:
+                d_txt = (out.get("date_entered") or "").strip()
+                m_txt = (out.get("month_entered") or "").strip()
+                y_txt = (out.get("year_entered") or "").strip()
+                m_num = self._month_name_to_number(m_txt)
+                if d_txt.isdigit() and m_num and y_txt.isdigit():
+                    try:
+                        date_obj = _date(int(y_txt), m_num, int(d_txt))
+                    except Exception:
+                        date_obj = None
+            if not date_obj:
+                date_obj = _dt.now(ZoneInfo("Asia/Manila")).date()
 
         out["date_filed"] = self._fmt_full_date(date_obj)
-
-        out["time_filed"] = self._fmt_time_12h(get_case_time_filed_from_kp7(submission_id))
+        
+        # Use time from kp7_date_time_filed if available, otherwise fallback to KP7 case_time_filed
+        if not time_obj:
+            time_obj = get_case_time_filed_from_kp7(submission_id)
+        out["time_filed"] = self._fmt_time_12h(time_obj)
 
         # ---- entered date trio: extract from processed_on_date if available ----
         now_ph = _dt.now(ZoneInfo("Asia/Manila"))
