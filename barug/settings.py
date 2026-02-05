@@ -28,6 +28,7 @@ ALLOWED_HOSTS = [
     "192.168.8.1",
     "192.168.8.252",   # your steady IP (example)
     "192.168.1.252",
+    "192.168.8.105",
     ".ngrok-free.app",
     "*",
 ]
