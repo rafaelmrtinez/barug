@@ -973,8 +973,16 @@ def report_mark_paid(request: HttpRequest, report_id: int):
         return HttpResponseBadRequest("Missing staff id.")
 
     paid_by_person_id = _toi(request.POST.get("paid_by_person_id"))
+    date_filed = _to_none_if_blank(request.POST.get("date_filed"))
+    time_filed = _to_none_if_blank(request.POST.get("time_filed"))
+    blotter_case_num = _to_none_if_blank(request.POST.get("blotter_case_num"))
+    
     if not paid_by_person_id:
         messages.error(request, "Please select who paid.")
+        return redirect("lupon_mem:report_review", report_id=report_id)
+    
+    if not date_filed or not time_filed:
+        messages.error(request, "Please provide date and time filed.")
         return redirect("lupon_mem:report_review", report_id=report_id)
 
     try:
@@ -1010,9 +1018,9 @@ def report_mark_paid(request: HttpRequest, report_id: int):
             ss_row = cur.fetchone()
             settlement_status_id = ss_row[0] if ss_row else 1
             
-            # Create case using confirm_report_and_open_case
+            # Create case using confirm_report_and_open_case with date/time
             cur.execute(
-                "SELECT confirm_report_and_open_case(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                "SELECT confirm_report_and_open_case(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                 [
                     report_id,
                     case_name,
@@ -1026,7 +1034,10 @@ def report_mark_paid(request: HttpRequest, report_id: int):
                     "PAID",  # payment_status
                     paid_by_person_id,
                     "ESCALATED TO CASE",
-                    "Report marked as paid and escalated to case"
+                    "Report marked as paid and escalated to case",
+                    date_filed,
+                    time_filed,
+                    blotter_case_num
                 ]
             )
             case_id = cur.fetchone()[0]
@@ -1051,6 +1062,13 @@ def report_mark_paid(request: HttpRequest, report_id: int):
                 [case_id]
             )
             
+            # Get case number and payer name for display
+            cur.execute(
+                "SELECT blotter_case_num FROM blotter_case WHERE blotter_case_id = %s",
+                [case_id]
+            )
+            case_num = cur.fetchone()[0] if cur.rowcount else None
+            
             cur.execute(
                 "SELECT TRIM(CONCAT_WS(' ', first_name, last_name)) FROM person WHERE person_id = %s",
                 [paid_by_person_id]
@@ -1065,7 +1083,7 @@ def report_mark_paid(request: HttpRequest, report_id: int):
                 performer_staff_id=staff_id
             )
         
-        messages.success(request, f"Report marked as paid and case #{case_id} created.")
+        messages.success(request, f"Report marked as paid and case {case_num or f'#{case_id}'} created (Filed: {date_filed} {time_filed}).")
         return redirect("lupon_mem:case_detail", case_id=case_id)
     except Exception as e:
         messages.error(request, f"Failed: {e}")
@@ -1432,6 +1450,8 @@ def report_pay_and_open_case(request: HttpRequest, report_id: int):
     complaint_title_id   = _toi(request.POST.get("complaint_title_id"))
     case_nature_id       = _toi(request.POST.get("case_nature_id"))
     settlement_status_id = _toi(request.POST.get("settlement_status_id"))
+    date_filed           = (request.POST.get("date_filed") or "").strip() or None
+    time_filed           = (request.POST.get("time_filed") or "").strip() or None
 
     # payment toggle + details
     with_payment      = (request.POST.get("with_payment") == "on")
@@ -1471,6 +1491,10 @@ def report_pay_and_open_case(request: HttpRequest, report_id: int):
         # status after
         "ESCALATED TO CASE",
         "Report converted to case",
+        
+        # date/time filed
+        date_filed,
+        time_filed,
     ]
     print("[DEBUG][PAY-OPEN][POST] SQL → confirm_report_and_open_case(...) args:", args)
     with connection.cursor() as cur:
@@ -1478,7 +1502,7 @@ def report_pay_and_open_case(request: HttpRequest, report_id: int):
             """SELECT confirm_report_and_open_case(
                 %s,%s,%s,%s,%s,%s,
                 %s,%s,%s,%s,%s,
-                %s,%s
+                %s,%s,%s,%s
             )""",
             args,
         )

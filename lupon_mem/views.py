@@ -1340,8 +1340,7 @@ def form_builder(request, case_id: int, form_id: int = None, submission_id: int 
 
         # Case core
         (case_num, incident_desc, incident_date, incident_time,
-         incident_loc_raw, date_filed,
-         complaint_title_name, case_nature_name, blotter_report_id) = fetch_case_core(cur, case_id)
+         incident_loc_raw, date_filed, complaint_title_name, case_nature_name, blotter_report_id, time_filed) = fetch_case_core(cur, case_id)
 
         # Incident location (fallback to report address)
         incident_addr_text = resolve_incident_address(cur, blotter_report_id)
@@ -1366,6 +1365,7 @@ def form_builder(request, case_id: int, form_id: int = None, submission_id: int 
             incident_time=incident_time,
             incident_loc=incident_loc,
             date_filed=date_filed,
+            time_filed=time_filed,
             complaint_title_name=complaint_title_name,
             case_nature_name=case_nature_name,
             punong_barangay=punong_barangay,
@@ -1394,7 +1394,7 @@ def form_builder(request, case_id: int, form_id: int = None, submission_id: int 
 
     # KP-9 minimal filter (exactly same as before)
     if flags["kp9_ui_minimal"]:
-        allowed_codes = {"summon_date", "summon_time"}
+        allowed_codes = {"curr_date", "recipient_address"}
         fields_with_values = [item for item in fields_with_values if ((item[6] or "").strip().lower() in allowed_codes)]
         page2_index = None
 
@@ -2153,6 +2153,17 @@ def incident_heatmap(request: HttpRequest):
             ORDER BY ct.complaint_title_name
         """)
         case_types = [row[0] for row in cur.fetchall()]
+        
+        # ---------- 5) Case nature options (for filter dropdown) ----------
+        cur.execute("""
+            SELECT DISTINCT cn.case_name
+            FROM case_nature cn
+            JOIN blotter_case bc ON bc.case_nature_id = cn.case_nature_id
+            WHERE bc.date_filed >= CURRENT_DATE - INTERVAL '2 years'
+              AND cn.case_name IS NOT NULL
+            ORDER BY cn.case_name
+        """)
+        case_natures = [row[0] for row in cur.fetchall()]
 
     # -------- Format payloads for the template --------
     import json
@@ -2247,6 +2258,7 @@ def incident_heatmap(request: HttpRequest):
         "blotter_reports_count": blotter_reports_count,
         "blotter_cases_count": blotter_cases_count,
         "case_types": case_types,
+        "case_natures": case_natures,  # Add case natures for dropdown
         "time_filter": time_filter,
         "case_type_filter": case_type_filter,
         "settlement_filter": settlement_filter,

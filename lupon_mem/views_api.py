@@ -254,7 +254,7 @@ def submit_form(request: HttpRequest):
                     values_map = {
                         "processed_by_staff_id": str(staff_id),
                         "processed_by_staff_name": full_name,
-                        "processed_by_staff": full_name,  # alias support
+                        "processed_by_staff": full_name,
                         "processed_by_staff_position": role_name,
                         "processed_on_date": now.date().isoformat(),
                         "processed_on_time": now.strftime("%I:%M %p").lstrip("0").lower(),
@@ -266,10 +266,20 @@ def submit_form(request: HttpRequest):
                     )
                     code_to_id = {fc: fid for fc, fid in cur.fetchall()}
 
+                    # Check existing answers to avoid overwriting user input
+                    cur.execute(
+                        "SELECT field_id FROM blotter_kp_answer WHERE submission_id = %s AND field_id = ANY(%s)",
+                        [submission_id, list(code_to_id.values())]
+                    )
+                    existing_field_ids = {row[0] for row in cur.fetchall()}
+
                     import json as _json
                     for code, val in values_map.items():
                         fid = code_to_id.get(code)
                         if not fid:
+                            continue
+                        # Skip processed_on_date if user already provided it
+                        if code == "processed_on_date" and fid in existing_field_ids:
                             continue
                         cur.execute(
                             """

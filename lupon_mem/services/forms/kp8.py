@@ -35,12 +35,12 @@ _KP8_SOURCES: Dict[str, Set[str]] = {
     "appearance_month":  {"appearance_month", "hearing_month", "hearing month"},
     "appearance_year":   {"appearance_year", "hearing_year", "hearing year"},
     # "appearance_time":   {"appearance_time", "hearing_time", "hearing time"},
-    "date_created":      {"date_created"},   # will be normalized to DAY
-    "month_created":     {"month_created"},  # will be normalized to MONTH NAME
-    "year_created":      {"year_created"},   # normalized to YEAR
-    "date_notified":     {"date_notified"},  # will be overridden to TODAY (Month)
-    "month_notified":    {"month_notified"}, # overridden to TODAY (Day)
-    "year_notified":     {"year_notified"},  # overridden to TODAY (Year)
+    "date_created":      {"date_created", "date created", "created_date"},   # Use date_created from form
+    "month_created":     {"month_created", "date_created", "date created", "created_date"},  # Use date_created from form
+    "year_created":      {"year_created", "date_created", "date created", "created_date"},   # Use date_created from form
+    "date_notified":     {"date_notified", "processed_on_date", "processed on date", "processed_date", "date_processed"},  # Use processed_on_date from form
+    "month_notified":    {"month_notified", "processed_on_date", "processed on date", "processed_date", "date_processed"}, # Use processed_on_date from form
+    "year_notified":     {"year_notified", "processed_on_date", "processed on date", "processed_date", "date_processed"},  # Use processed_on_date from form
     "brgy_capt":         {"brgy_capt", "brgy_captain", "chairman", "punong barangay", "punong_barangay"},
 }
 
@@ -300,10 +300,19 @@ class KP8Handler:
             out["recipient"] = respondents_val.split(",")[0].strip()
 
         # --- CURRENT date for “Notified this … day of …, …”
-        today = _date.today()
-        out["date_notified"]  = f"{today.day:02d}"   # Day (number with leading zero)
-        out["month_notified"]  = today.strftime("%B")   # Month name
-        out["year_notified"]  = str(today.year)        # Year
+        # --- Use processed_on_date for "Notified this … day of …, …" instead of current date
+        processed_date = None
+        processed_date_raw = _find_any({"processed_on_date", "processed on date", "processed_date", "date_processed"})
+        if processed_date_raw:
+            processed_date = self._try_parse_date(processed_date_raw)
+        
+        # Fallback to current date if no processed_on_date is provided
+        if not processed_date:
+            processed_date = _date.today()
+            
+        out["date_notified"]  = f"{processed_date.day:02d}"   # Day (number with leading zero)
+        out["month_notified"]  = processed_date.strftime("%B")   # Month name
+        out["year_notified"]  = str(processed_date.year)        # Year
 
         # --- “This __ day of ____, ____” (we fill DAY → MONTH → YEAR)
         # Prefer any provided date parts; else fall back to Date Filed (case) → today.
@@ -352,11 +361,19 @@ class KP8Handler:
             else:
                 made_day, made_month, made_year = f"{today.day:02d}", today.strftime("%B"), str(today.year)
 
-        # Assign in natural order for the PDF wording:
-        now = _dt.now()
-        out["date_created"]  = f"{now.day:02d}"      # DAY (01..31)
-        out["month_created"] = now.strftime("%B")    # MONTH NAME (e.g., October)
-        out["year_created"]  = str(now.year)         # YEAR (e.g., 2025)
+        # --- Use date_created from form for "This __ day of ____, ____" instead of current date
+        created_date = None
+        created_date_raw = _find_any({"date_created", "date created", "created_date"})
+        if created_date_raw:
+            created_date = self._try_parse_date(created_date_raw)
+        
+        # Fallback to filed_date or current date if no date_created is provided
+        if not created_date:
+            created_date = filed_date or _date.today()
+            
+        out["date_created"]  = f"{created_date.day:02d}"      # DAY (01..31)
+        out["month_created"] = created_date.strftime("%B")    # MONTH NAME (e.g., October)
+        out["year_created"]  = str(created_date.year)         # YEAR (e.g., 2025)
 
         # Also allow normalizing if user pasted an ISO date into appearance_date
         # self._normalize_triplet(out, "appearance_date", "appearance_month", "appearance_year")

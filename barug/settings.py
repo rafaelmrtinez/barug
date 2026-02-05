@@ -351,6 +351,28 @@ LOGGING = {
             "level": "WARNING",
             "propagate": False,
         },
+        # Suppress urllib3 debug logs
+        "urllib3": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        # Suppress hpack debug logs
+        "hpack": {
+            "handlers": [],
+            "level": "CRITICAL",
+            "propagate": False,
+        },
+        "hpack.hpack": {
+            "handlers": [],
+            "level": "CRITICAL",
+            "propagate": False,
+        },
+        "charset_normalizer": {
+            "handlers": [],
+            "level": "CRITICAL",
+            "propagate": False,
+        },
         # our views module (adjust if your file path differs)
         "authentication.views": {
             "handlers": ["console", "console_prod"],

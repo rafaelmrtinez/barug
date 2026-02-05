@@ -64,6 +64,9 @@ _KP16_SOURCES: Dict[str, Set[str]] = {
     "date_entered":  {"date_entered", "current_date", "this_date", "date_today", "date_created"},
     "month_entered": {"month_entered", "current_month", "month_today", "month_created"},
     "year_entered":  {"year_entered", "current_year", "year_today", "year_created"},
+    
+    # Processed date (source for date_entered/month_entered/year_entered)
+    "processed_on_date": {"processed_on_date", "processed on (date)", "date_processed"},
 
     # Chairman (the PDF field key is “chairman”; we will fill Lupon/Pangkat Chair)
     "chairman": {"pangkat chairman", "lupon chair", "lupon chairman","punong barangay", "brgy_capt"},
@@ -316,22 +319,29 @@ class KP16Handler:
 
         out["time_filed"] = self._fmt_time_12h(get_case_time_filed_from_kp7(submission_id))
 
-        # ---- entered date trio defaults = TODAY (PH) ----
+        # ---- entered date trio: extract from processed_on_date if available ----
         now_ph = _dt.now(ZoneInfo("Asia/Manila"))
         today = now_ph.date()
+        
+        # Check if processed_on_date exists in answers
+        processed_date_str = _find_any({"processed_on_date", "processed on (date)", "date_processed"})
+        processed_date_obj = self._try_parse_date(processed_date_str) if processed_date_str else None
+        
+        # Use processed_on_date if available, otherwise use today
+        source_date = processed_date_obj if processed_date_obj else today
 
         if not (out.get("date_entered") or "").strip():
-            out["date_entered"] = str(today.day)
+            out["date_entered"] = str(source_date.day)
         else:
             maybe = self._try_parse_date(out["date_entered"])
             if maybe:
                 out["date_entered"] = str(maybe.day)
 
         if not (out.get("month_entered") or "").strip():
-            out["month_entered"] = today.strftime("%B")
+            out["month_entered"] = source_date.strftime("%B")
 
         if not (out.get("year_entered") or "").strip():
-            out["year_entered"] = str(today.year)
+            out["year_entered"] = str(source_date.year)
 
         # ---- Chairman → Barangay Captain ----
         if not (out.get("chairman") or "").strip():

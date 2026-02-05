@@ -191,6 +191,16 @@
 
             <!-- PAID BY — ONLY EDITABLE PART -->
             <div class="mt-2">
+              <div class="label">Date Filed <span class="text-danger">*</span></div>
+              <input type="date" class="form-control" name="date_filed" id="date_filed" required>
+            </div>
+            
+            <div class="mt-2">
+              <div class="label">Time Filed <span class="text-danger">*</span></div>
+              <input type="time" class="form-control" name="time_filed" id="time_filed" required>
+            </div>
+            
+            <div class="mt-2">
               <div class="label">Paid by <span class="text-danger">*</span></div>
               <input type="text" class="form-control" id="paid_by_search" placeholder="Start typing name…" disabled>
               <input type="hidden" name="paid_by_person_id" id="paid_by_person_id" value="">
@@ -421,8 +431,11 @@
   // ==========================
 
   function updateCreateButton(){
-    // Payment is now required, so both payment checkbox and payer must be filled
-    const isValid = withPay.checked && paidById.value.trim() !== '';
+    // Payment is now required, so payment checkbox, payer, date, and time must be filled
+    const dateFiled = $('#date_filed');
+    const timeFiled = $('#time_filed');
+    const isValid = withPay.checked && paidById.value.trim() !== '' && 
+                    dateFiled.value.trim() !== '' && timeFiled.value.trim() !== '';
     createBtn.disabled = !isValid;
   }
 
@@ -509,6 +522,12 @@
   // init
   setPaymentEnabled(true); // Start with payment enabled since it's required
   updateCreateButton();
+  
+  // Add event listeners for date/time fields
+  const dateFiled = $('#date_filed');
+  const timeFiled = $('#time_filed');
+  if (dateFiled) dateFiled.addEventListener('change', updateCreateButton);
+  if (timeFiled) timeFiled.addEventListener('change', updateCreateButton);
 })();
 </script>
 {% endblock %}
