@@ -284,24 +284,19 @@ class KP16Handler:
         except Exception as _e:
             logger.warning("KP16 raw DB print failed: %s", _e)
 
-        # ---- Date Filed and Time Filed from kp7_date_time_filed ----
-        # Try to get from kp7_date_time_filed first (e.g., "January 13, 2025 02:35 PM")
-        kp7_datetime_str = _find_any({"date & time filed case", "date and time filed case", "kp7_date_time_filed", "date_time_filed"})
+        # ---- Date Filed and Time Filed from blotter_case ----
         date_obj: Optional[_date] = None
         time_obj: Optional[_time] = None
         
-        if kp7_datetime_str:
-            # Parse the combined datetime string
-            try:
-                # Try format: "January 13, 2025 02:35 PM"
-                dt = _dt.strptime(kp7_datetime_str.strip(), "%B %d, %Y %I:%M %p")
-                date_obj = dt.date()
-                time_obj = dt.time()
-                logger.info("[KP16] Parsed kp7_date_time_filed: date=%s time=%s", date_obj, time_obj)
-            except Exception as e:
-                logger.warning("[KP16] Failed to parse kp7_date_time_filed '%s': %s", kp7_datetime_str, e)
+        # Get date_filed and time_filed directly from blotter_case table
+        if isinstance(case_date_by_sub, _date):
+            date_obj = case_date_by_sub
+        if isinstance(case_time_by_sub, _time):
+            time_obj = case_time_by_sub
         
-        # Fallback to separate date_filed field if kp7_date_time_filed not available
+        logger.info("[KP16] Using blotter_case date_filed=%s time_filed=%s", date_obj, time_obj)
+        
+        # Fallback logic if blotter_case doesn't have the values
         if not date_obj:
             date_answer = (out.get("date_filed") or "").strip()
             date_obj = self._try_parse_date(date_answer)
@@ -336,9 +331,9 @@ class KP16Handler:
 
         out["date_filed"] = self._fmt_full_date(date_obj)
         
-        # Use time from kp7_date_time_filed if available, otherwise fallback to KP7 case_time_filed
+        # Use time from blotter_case
         if not time_obj:
-            time_obj = get_case_time_filed_from_kp7(submission_id)
+            time_obj = case_time_by_num if case_time_by_num else None
         out["time_filed"] = self._fmt_time_12h(time_obj)
 
         # ---- entered date trio: extract from processed_on_date if available ----

@@ -332,15 +332,8 @@ class KP9Handler:
 
         # Only use today's date as fallback if no user input provided
         # Do NOT overwrite user input with current date
-        if not out.get("curr_date"):
-            today = _date.today()
-            out["curr_date"] = str(today.day)
-        if not out.get("curr_month"):
-            today = _date.today()
-            out["curr_month"] = today.strftime("%B")
-        if not out.get("curr_year"):
-            today = _date.today()
-            out["curr_year"] = str(today.year)
+        # Leave blank if no input - don't default to today
+        pass  # Remove auto-fill of current date
 
         # PB name
         pb_from_inputs = ""
@@ -352,11 +345,14 @@ class KP9Handler:
         pb_name = pb_from_inputs or FormUtil.get_captain_name(_DEFAULT_PUNONG_BARANGAY)
         self._ensure(out, "brgy_capt", pb_name)
 
-        # Map purpose → PDF typo field "purapose" (remove "CIVIL CASE - " prefix)
+        # Map purpose → PDF field "purpose" (remove case type prefixes)
         purpose_val = out.get("purpose", "")
         if purpose_val.startswith("CIVIL CASE - "):
-            purpose_val = purpose_val[13:]  # Remove "CIVIL CASE - " prefix
-        self._ensure(out, "purapose", purpose_val)
+            purpose_val = purpose_val[13:]
+        elif purpose_val.startswith("CRIMINAL CASE - "):
+            purpose_val = purpose_val[16:]
+        out["purpose"] = purpose_val
+        self._ensure(out, "purapose", purpose_val)  # Keep for backward compatibility
 
         # --- Auto-fill date_time_field from case date_filed and time_filed (like KP7)
         if not out.get("date_time_field") and case_id:

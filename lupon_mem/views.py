@@ -1372,6 +1372,7 @@ def form_builder(request, case_id: int, form_id: int = None, submission_id: int 
             parties_complainant=parties_complainant,
             parties_respondent=parties_respondent,
             first_respondent=first_respondent,
+            form_code=form_code,
         )
 
         # Apply values

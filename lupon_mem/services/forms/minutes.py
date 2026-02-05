@@ -241,7 +241,7 @@ class MinutesHandler:
         out["year_signed"]  = str(signed_date.year)         # year like "2025"
         out["time_signed"]  = _fmt_12h_time(signed_time)    # "6:49 pm"
 
-        # ----------------- TIME FILED: match KP-16 (case time) ----
+        # ----------------- DATE & TIME FILED: from blotter_case ----
         # 1) Prefer case number lookup
         case_num_ans = (out.get("brgy_case_num") or "").strip()
         case_date_by_num, case_time_by_num = _load_case_datetime_by_case_num(case_num_ans) if case_num_ans else (None, None)
@@ -251,8 +251,15 @@ class MinutesHandler:
         if not case_num_ans and case_num_from_sub:
             out["brgy_case_num"] = str(case_num_from_sub or "")
 
-        # 3) Choose time_filed in priority: by case_num → by submission → answer → current time
-        out["time_filed"] = self._fmt_time_12h(get_case_time_filed_from_kp7(submission_id))
+        # 3) Use date_filed and time_filed from blotter_case
+        date_obj = case_date_by_sub if isinstance(case_date_by_sub, _date) else None
+        time_obj = case_time_by_sub if isinstance(case_time_by_sub, _time) else None
+        
+        if not time_obj:
+            time_obj = case_time_by_num if case_time_by_num else None
+        
+        out["date_filed"] = date_obj.strftime("%Y-%m-%d") if date_obj else ""
+        out["time_filed"] = self._fmt_time_12h(time_obj)
 
         # ----------------- Officials -------------------------------
         out["brgy_sec"] = get_secretary_name(default=out.get("brgy_sec", "") or "")

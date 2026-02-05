@@ -222,6 +222,7 @@ def build_prefills(
     parties_complainant: str,
     parties_respondent: str,
     first_respondent: str,
+    form_code: Optional[str] = None,
 ) -> Tuple[Dict[str,Any], Dict[str,Any], str, str, str, str, str, str]:
     # date sources
     src_date = date_filed or incident_date or _date_cls.today()
@@ -354,9 +355,9 @@ def build_prefills(
         "respondent_names_one": parties_respondent,
         "respondent_names_two": parties_respondent,
         "respondent_names_three": parties_respondent,
-        "curr_date":  curr_date_iso,
-        "curr_month": curr_month,
-        "curr_year":  curr_year,
+        "curr_date":  "" if form_code and form_code.upper() == "KP-9" else curr_date_iso,
+        "curr_month": "" if form_code and form_code.upper() == "KP-9" else curr_month,
+        "curr_year":  "" if form_code and form_code.upper() == "KP-9" else curr_year,
         "brgy_capt": punong_barangay,
         "processed_on_date": curr_date_iso,
         # KP-12
@@ -421,13 +422,16 @@ def apply_answers_and_prefills(
             elif code_lower == "purpose":
                 return handler_values.get("purpose", "")
         
-        # Don't prefill date_entered, month_entered, year_entered, date_signed, time_signed, when - these should come from user input
+        # Don't prefill date fields for KP-9 to avoid confusion
         if submission_id:
             code_lower = (code or "").strip().lower()
             label_lower = (label or "").strip().lower()
+            # For KP-9, don't prefill curr_date, curr_month, curr_year, date_created, etc.
+            if form_code and form_code.upper() == "KP-9":
+                if code_lower in ("curr_date", "curr_month", "curr_year", "current_date", "current_month", "current_year", "date_created", "processed_on_date", "date_entered", "month_entered", "year_entered", "date_signed", "time_signed", "when"):
+                    return None
+            # For other forms, don't prefill date_entered, month_entered, year_entered, date_signed, time_signed, when
             if code_lower in ("date_created", "processed_on_date", "date_entered", "month_entered", "year_entered", "date_signed", "time_signed", "when") or label_lower in ("date created", "processed on (date)", "date signed", "time signed", "when"):
-                # No saved answer and submission exists = user hasn't filled it yet or cleared it
-                # Don't prefill to avoid overwriting
                 return None
         
         key = (label or "").strip().lower()

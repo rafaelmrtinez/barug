@@ -28,7 +28,23 @@ def normalize(val):
         return ", ".join(str(x) for x in val.values())
     if isinstance(val, list):
         return ", ".join(str(x) for x in val)
-    return str(val)
+    
+    # Convert 24hr time to 12hr format with AM/PM
+    s = str(val)
+    if ':' in s and len(s) <= 8:  # Likely a time string
+        try:
+            # Try parsing as time
+            from datetime import datetime
+            for fmt in ['%H:%M:%S', '%H:%M']:
+                try:
+                    t = datetime.strptime(s.strip(), fmt)
+                    return t.strftime('%I:%M %p').lstrip('0')  # Remove leading zero from hour
+                except:
+                    continue
+        except:
+            pass
+    
+    return s
 
 def to_int(x, default=None):
     try:

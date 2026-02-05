@@ -45,7 +45,7 @@ def _today(fmt="%B %d, %Y") -> str:
 
 def _format_dt(date_iso: Optional[str], time_hm: Optional[str]) -> str:
     """
-    Best-effort "Month DD, YYYY HH:MM" from pieces like '2025-10-16' + '14:30'
+    Best-effort "Month DD, YYYY HH:MM AM/PM" from pieces like '2025-10-16' + '14:30'
     Falls back to whatever non-empty value we have.
     """
     if date_iso and len(date_iso) >= 8:
@@ -54,7 +54,7 @@ def _format_dt(date_iso: Optional[str], time_hm: Optional[str]) -> str:
             if time_hm:
                 try:
                     t = _dt.strptime(time_hm, "%H:%M").time()
-                    return f"{d.strftime('%B %d, %Y')} {t.strftime('%H:%M')}"
+                    return f"{d.strftime('%B %d, %Y')} {t.strftime('%I:%M %p').lstrip('0')}"
                 except Exception:
                     return f"{d.strftime('%B %d, %Y')} {time_hm}"
             return d.strftime("%B %d, %Y")
@@ -141,11 +141,11 @@ class Med1SettledHandler:
         return out
 
     # ---------------- KP-8 / KP-12 schedules (date/time) in chronological order ----------
-    def _notice_schedule_triplet(self, case_id: int) -> List[Tuple[str, str]]:
+    def _notice_schedule_triplet(self, case_id: int) -> List[Tuple[str, str, str, str]]:
         """
-        Returns up to 3 (date_iso, time_hm) for KP-8/KP-12 in chronological (old->new) order.
+        Returns up to 3 (notice_date, notice_time, hearing_date, hearing_time) for KP-8/KP-12.
         """
-        pairs: List[Tuple[str, str, _dt, int]] = []  # (date_iso, time_hm, submitted_at, sid)
+        pairs: List[Tuple[str, str, str, str, _dt, int]] = []
         with connection.cursor() as cur:
             cur.execute("""
                 WITH forms AS (
@@ -162,46 +162,59 @@ class Med1SettledHandler:
 
         for sid, fid, sub_at in rows:
             bycode = self._answers_by_code(fid, sid)
-            date_iso = _first_nonblank(bycode.get("hearing_date"), bycode.get("appearance_date"))
-            time_hm  = _first_nonblank(bycode.get("hearing_time"), bycode.get("appearance_time"))
-            if date_iso or time_hm:
-                pairs.append((date_iso, time_hm, sub_at or _dt.now(), sid))
+            notice_d = _first_nonblank(bycode.get("processed_on_date"), bycode.get("appearance_date"))
+            notice_t = _first_nonblank(bycode.get("hearing_time"), bycode.get("appearance_time"))
+            hearing_d = _first_nonblank(bycode.get("hearing_date"), bycode.get("appearance_date"))
+            hearing_t = _first_nonblank(bycode.get("hearing_time"), bycode.get("appearance_time"))
+            if notice_d or notice_t or hearing_d or hearing_t:
+                pairs.append((notice_d, notice_t, hearing_d, hearing_t, sub_at or _dt.now(), sid))
 
-        # old->new
-        pairs.sort(key=lambda r: (r[2], r[3]))
-        out = [(d, t) for (d, t, _, __) in pairs[:3]]
-        # DEBUG
+        pairs.sort(key=lambda r: (r[4], r[5]))
+        out = [(nd, nt, hd, ht) for (nd, nt, hd, ht, _, __) in pairs[:3]]
         print("[MED1-SETTLED][NOTICES] triplet raw =", json.dumps(out))
         return out
 
     # ---------------- KP-9 summons up to 3 (date/time + officer return) -----------------
     def _summons_triplet(self, case_id: int):
         """
-        Returns up to 3 summons entries:
-          [
-            {"dt": "...", "offret": "..."},
-            ...
-          ]
-        Inferred from KP-9 answers. Tries common field codes; falls back to any date/time-looking fields.
+        Returns up to 3 summons entries with officer return dates.
+        Matches KP-9 summons with their corresponding officer return from any submission.
         """
         results = []
+        
+        # Get all submissions for this case to find officer return dates
+        with connection.cursor() as cur:
+            cur.execute("""
+                SELECT a.submission_id, LOWER(f.field_code) AS code_lc,
+                       TRIM(BOTH '"' FROM a.value_json::text) AS value_txt
+                FROM blotter_kp_submission s
+                JOIN blotter_kp_answer a ON a.submission_id = s.submission_id
+                JOIN kp_field f ON f.field_id = a.field_id
+                WHERE s.blotter_case_id = %s AND LOWER(f.field_code) = 'date_offcret'
+            """, [case_id])
+            offret_data = {row[0]: row[2] for row in cur.fetchall()}
+        
+        print(f"[MED1-SETTLED][OFFRET-DEBUG] Found officer returns: {offret_data}")
+        
         kp9s = self._submissions_for_code(case_id, "KP-9")
-        # reverse to old->new so we match notice order visually
-        kp9s = list(reversed(kp9s))
-        for fid, sid in kp9s:
+        kp9_2s = self._submissions_for_code(case_id, "KP-9-2")
+        all_summons = kp9s + kp9_2s
+        all_summons = list(reversed(all_summons))
+        
+        for fid, sid in all_summons:
             bycode = self._answers_by_code(fid, sid)
-            # likely codes
-            d = _first_nonblank(bycode.get("summon_date"), bycode.get("appearance_date"), bycode.get("date"))
-            t = _first_nonblank(bycode.get("summon_time"), bycode.get("appearance_time"), bycode.get("time"))
+            d = _first_nonblank(bycode.get("curr_date"), bycode.get("processed_on_date"), bycode.get("summon_date"), bycode.get("appearance_date"), bycode.get("date"))
+            t = _first_nonblank(bycode.get("processed_on_time"), bycode.get("summon_time"), bycode.get("appearance_time"), bycode.get("time"))
             dt_text = _format_dt(d, t)
 
-            # officer return fields (guesses)
-            off = _first_nonblank(
-                bycode.get("officer_return"), bycode.get("officer_return_dt"), bycode.get("officer_return_date"),
-                bycode.get("officer_return_datetime"), bycode.get("officer_return_time")
-            )
+            # Check if this submission or next submission has officer return
+            off_d = bycode.get("date_offcret", "")
+            if not off_d and (sid + 1) in offret_data:
+                off_d = offret_data[sid + 1]
+            off_t = bycode.get("time_offcret", "")
+            off_text = _format_dt(off_d, off_t)
 
-            results.append({"dt": dt_text, "offret": off})
+            results.append({"dt": dt_text, "offret": off_text})
             if len(results) >= 3:
                 break
 
@@ -347,9 +360,9 @@ class Med1SettledHandler:
 
         # Notices (KP-8/12) → first/second/third_notice_dt
         notices = self._notice_schedule_triplet(case_id)
-        first_notice  = _format_dt(*notices[0]) if len(notices) >= 1 else ""
-        second_notice = _format_dt(*notices[1]) if len(notices) >= 2 else ""
-        third_notice  = _format_dt(*notices[2]) if len(notices) >= 3 else ""
+        first_notice  = _format_dt(notices[0][0], notices[0][1]) if len(notices) >= 1 else ""
+        second_notice = _format_dt(notices[1][0], notices[1][1]) if len(notices) >= 2 else ""
+        third_notice  = _format_dt(notices[2][0], notices[2][1]) if len(notices) >= 3 else ""
 
         # Summons (KP-9) up to 3 + officer returns
         summons = self._summons_triplet(case_id)
@@ -358,8 +371,8 @@ class Med1SettledHandler:
         # KP-16 main + date
         main_text, settlement_dt = self._kp16_main_and_date(case_id)
 
-        # 1st confrontation date/time = first KP-8/12 schedule
-        first_conf_dt = first_notice
+        # 1st confrontation date/time = first KP-8/12 hearing_date
+        first_conf_dt = _format_dt(notices[0][2], notices[0][3]) if len(notices) >= 1 else ""
 
         # Compose output defaults
         out = {
@@ -394,7 +407,7 @@ class Med1SettledHandler:
             "dt_exec": "",
             "dt_court_report": "",
             "dt_report_dilg": "",
-            "monitoring_date": _today(),
+            "monitoring_date": "",
         }
 
         # DUMMY mode: fill all with field names to confirm bindings
