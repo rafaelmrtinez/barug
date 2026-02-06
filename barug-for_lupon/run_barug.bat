@@ -1,22 +1,61 @@
 @echo off
 title BaRUG Django Server
 
-:: Go to project root (where manage.py is)
-cd /d "C:\Users\panch\OneDrive\BaRUG v3 Jan 31\barug-for_lupon_updated\barug-for_lupon"
+REM ==============================
+REM CONFIG: PROJECT ROOT
+REM ==============================
+REM This MUST be the folder where:
+REM - manage.py exists
+REM - you run git pull
+REM - venv folder exists
 
-:: Activate virtual environment
+set PROJECT_ROOT=C:\Users\panch\OneDrive\BaRUG v3 Jan 31\barug-for_lupon_updated
+
+REM ==============================
+REM GO TO PROJECT ROOT
+REM ==============================
+cd /d "%PROJECT_ROOT%"
+
+echo.
+echo ==============================
+echo Running Django from:
+echo %CD%
+echo ==============================
+echo.
+
+REM ==============================
+REM ACTIVATE VIRTUAL ENV
+REM ==============================
 call venv\Scripts\activate.bat
 
-:: Get active IPv4 using PowerShell
+REM ==============================
+REM SHOW CURRENT GIT COMMIT
+REM ==============================
+echo Current Git Commit:
+git rev-parse --short HEAD
+echo.
+
+REM ==============================
+REM GET ACTIVE IPV4 ADDRESS
+REM ==============================
 for /f %%i in ('powershell -Command "(Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.PrefixOrigin -eq 'Dhcp' -and $_.IPAddress -notlike '169.*'}).IPAddress"') do set MYIP=%%i
 
-:: Run Django server in a new window USING THE VENV
-start "BaRUG Django" cmd /k python manage.py runserver 0.0.0.0:8005
+echo Using IP: %MYIP%
+echo.
 
-:: Wait a bit to let Django start
+REM ==============================
+REM START DJANGO SERVER (NEW WINDOW)
+REM ==============================
+start "BaRUG Django Server" cmd /k python manage.py runserver 0.0.0.0:8005
+
+REM ==============================
+REM WAIT FOR SERVER
+REM ==============================
 timeout /t 3 /nobreak >nul
 
-:: Open browser to current IP
+REM ==============================
+REM OPEN BROWSER
+REM ==============================
 start "" http://%MYIP%:8005/
 
 pause

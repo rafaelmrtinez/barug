@@ -240,7 +240,7 @@ def report_list(request: HttpRequest):
     f_blotter = (request.GET.get("blotter_status") or "").strip()
     f_date_from = (request.GET.get("date_from") or "").strip()
     f_date_to = (request.GET.get("date_to") or "").strip()
-    f_sort = (request.GET.get("sort") or "oldest").strip()
+    f_sort = (request.GET.get("sort") or "newest").strip()
 
     auth = request.session.get("auth") or {}
     user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
@@ -256,7 +256,7 @@ def report_list(request: HttpRequest):
         cur.execute("SELECT blotter_report_id, date_time_reported, incident_subject, payment_status_id FROM blotter_report ORDER BY blotter_report_id DESC")
         raw_reports = cur.fetchall()
         
-        cur.execute("SELECT * FROM get_all_report_details()")
+        cur.execute("SELECT * FROM get_all_report_details() ORDER BY blotter_report_id DESC")
         columns = [col[0] for col in cur.description]
         all_reports = cur.fetchall()
         
@@ -313,9 +313,9 @@ def report_list(request: HttpRequest):
             elif f_blotter == 'REVIEWED':
                 filtered_reports = [r for r in filtered_reports if r[4] == 'REVIEWED']
         
-        # Apply sorting
-        if f_sort == "newest":
-            filtered_reports.reverse()
+        # Apply sorting (default is newest first - DESC order)
+        if f_sort == "oldest":
+            filtered_reports.reverse()  # Reverse to get oldest first (ASC)
         
         # Limit to 200 results
         rows = filtered_reports[:200]

@@ -78,8 +78,8 @@ _REGISTRY = {
     "LUPON-BLOTTER": LuponBlotterHandler(),
     "MED-ATT-2025":  MedAttendance2025Handler(),
     "MINUTES":       MinutesHandler(),
-    "MON-COMPL":     MonitoringComplainantHandler(),
-    "MON-RESP":      MonitoringRespondentHandler(),
+    # "MON-COMPL":     MonitoringComplainantHandler(),  # Disabled - use generic handler to preserve UI data
+    # "MON-RESP":      MonitoringRespondentHandler(),   # Disabled - use generic handler to preserve UI data
     "MED1-SETTLED":  Med1SettledHandler(),
     "MED2-FTA-SET":  Med2FtaSettledHandler(),
     "MED2-SETTLED":  Med2SettledHandler(),

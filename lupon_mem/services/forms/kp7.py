@@ -39,9 +39,9 @@ _KP7_SOURCES = {
     "case_time_filed":   {"case_time_filed", "time_filed"},
     "kp7_date_time_filed": {"date & time filed", "date and time filed", "date_time_filed"},
     "complainants_2":    {"complainants_2", "complainants"},
-    "date_received":     {"date_received"},
-    "month_received":    {"month_received"},
-    "year_received_2":   {"year_received_2", "year_received"},
+    "date_received":     {"date_received", "date received & filed", "date_received_filed", "notified_date"},
+    "month_received":    {"month_received", "date received & filed", "date_received_filed", "notified_month"},
+    "year_received_2":   {"year_received_2", "year_received", "date received & filed", "date_received_filed", "notified_year"},
     "punong_barangay":   {"punong_barangay", "brgy_capt", "brgy_captain", "chairman"},
     "processed_on_date": {"processed_on_date", "processed on (date)", "processed_on"},
 }

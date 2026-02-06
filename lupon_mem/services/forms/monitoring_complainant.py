@@ -46,4 +46,5 @@ class MonitoringComplainantHandler:
         for k,v in list(out.items()):
             if isinstance(v,str): out[k]=FS.sanitize_text(v)
         for k in _FIELDS: out.setdefault(k,"")
+        if not out.get("brgy_sec"): out["brgy_sec"]="JUDE FRENCILLO"
         self._log(out); return out

@@ -38,9 +38,9 @@ _KP8_SOURCES: Dict[str, Set[str]] = {
     "date_created":      {"date_created", "date created", "created_date"},   # Use date_created from form
     "month_created":     {"month_created", "date_created", "date created", "created_date"},  # Use date_created from form
     "year_created":      {"year_created", "date_created", "date created", "created_date"},   # Use date_created from form
-    "date_notified":     {"date_notified", "processed_on_date", "processed on date", "processed_date", "date_processed"},  # Use processed_on_date from form
-    "month_notified":    {"month_notified", "processed_on_date", "processed on date", "processed_date", "date_processed"}, # Use processed_on_date from form
-    "year_notified":     {"year_notified", "processed_on_date", "processed on date", "processed_date", "date_processed"},  # Use processed_on_date from form
+    "date_notified":     {"date_notified", "notified_date", "processed_on_date", "processed on date", "processed_date", "date_processed"},  # Use processed_on_date from form
+    "month_notified":    {"month_notified", "notified_month", "processed_on_date", "processed on date", "processed_date", "date_processed"}, # Use processed_on_date from form
+    "year_notified":     {"year_notified", "notified_year", "processed_on_date", "processed on date", "processed_date", "date_processed"},  # Use processed_on_date from form
     "brgy_capt":         {"brgy_capt", "brgy_captain", "chairman", "punong barangay", "punong_barangay"},
 }
 

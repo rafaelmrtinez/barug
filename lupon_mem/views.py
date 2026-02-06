@@ -1757,7 +1757,9 @@ def add_form_choose_static(request, case_id: int):
         ('KP-10', 'NOTICE FOR CONSTITUTION OF PANGKAT'),
         ('KP-11', 'NOTICE TO CHOSEN PANGKAT MEMBER'),
         ('KP-13', 'SUBPOENA LETTER'),
-        ('MINUTES', 'MINUTES OF HEARING')
+        ('MINUTES', 'MINUTES OF HEARING'),
+        ('MON-COMPL', 'MONITORING (COMPLAINANT)'),
+        ('MON-RESP', 'MONITORING (RESPONDENT)')
     ]
     
     # ---- pagination ----

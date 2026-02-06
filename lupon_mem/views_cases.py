@@ -267,7 +267,7 @@ def case_list(request: HttpRequest):
             LEFT JOIN LATERAL fn_case_hearing_window(bc.blotter_case_id) hw ON TRUE
 
             {where_sql}
-            ORDER BY bc.blotter_case_id DESC
+            ORDER BY bc.blotter_case_num DESC
             LIMIT %s OFFSET %s
         """
         cur.execute(data_sql, params + [per_page, offset])

@@ -404,7 +404,8 @@ def apply_answers_and_prefills(
     def _ans_or_prefill(field_id, label, code):
         v = answers.get(str(field_id))
         
-        # If there's a saved answer, always use it
+        # PRIORITY 1: UI/Frontend data (saved answers) - NEVER override user input
+        # If there's a saved answer from the UI, ALWAYS use it - this is the most important data
         if v not in (None, "", "null"):
             return v
         

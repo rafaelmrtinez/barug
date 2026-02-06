@@ -97,6 +97,7 @@
     .redirect-spinner{ color:#7B1E22!important; width:3rem; height:3rem; }
     .redirect-title{ color:#7B1E22; font-weight:700; }
     .redirect-text{ color:#FC9700; }
+    [data-code="brgy_sec"],[data-code="processed_by"],[data-code="processed_on_time"],[data-code="recipient_addr"],[data-code="punong_barangay"],[data-code="brgy_capt"],[data-code="processed_by_staff"],[data-code="processed_by_staff_id"],[data-code="brgy_captain"],[data-code="barangay_captain"]{display:none!important;}
   </style>
 </head>
 
@@ -448,7 +449,7 @@
                   {% if kp23_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
                   {% if kp24_ui_minimal and code != 'case_num' and code != 'purpose' and code != 'motion_date' and code != 'motion_time' %} kp-offscreen{% endif %}
                   {% if minutes_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_num' and code != 'purpose' and code != 'when' and code != 'what' and code != 'date_signed' and code != 'time_signed' %} kp-offscreen{% endif %}
-                  {% if kp7_ui_minimal and field_id != 1 and field_id != 2 and field_id != 222 and field_id != 169 and field_id != 3 and field_id != 280 and field_id != 42 and field_id != 1129 %} kp-offscreen{% endif %}">
+                  {% if kp7_ui_minimal and field_id != 1 and field_id != 2 and field_id != 222 and field_id != 169 and field_id != 3 and field_id != 280 and field_id != 42 and field_id != 1129 and field_id != 1121 %} kp-offscreen{% endif %}">
               {% else %}
                 <div class="col-12 col-md-6
                   {% if header.0 == 'KP-9-P2' and 'respondent_names' in code %} kp-offscreen{% endif %}
@@ -485,7 +486,7 @@
                   {% if kp23_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
                   {% if kp24_ui_minimal and code != 'case_num' and code != 'purpose' and code != 'motion_date' and code != 'motion_time' %} kp-offscreen{% endif %}
                   {% if minutes_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_num' and code != 'purpose' and code != 'when' and code != 'what' and code != 'date_signed' and code != 'time_signed' %} kp-offscreen{% endif %}
-                  {% if kp7_ui_minimal and field_id != 1 and field_id != 2 and field_id != 222 and field_id != 169 and field_id != 3 and field_id != 280 and field_id != 42 and field_id != 1129 %} kp-offscreen{% endif %}">
+                  {% if kp7_ui_minimal and field_id != 1 and field_id != 2 and field_id != 222 and field_id != 169 and field_id != 3 and field_id != 280 and field_id != 42 and field_id != 1129 and field_id != 1121 %} kp-offscreen{% endif %}">
               {% endif %}
                 <div class="kp-field" data-code="{{ code }}">
                   <label class="form-label
