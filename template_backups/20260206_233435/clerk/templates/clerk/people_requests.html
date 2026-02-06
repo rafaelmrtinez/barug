@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<style>
+  :root{
+    --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932; --brand-600:#7a323b;
+    --brand-100:#f3eaeb; --brand-050:#fbf6f6;
+  }
+  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
+  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
+  .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); background:#fff; }
+  .btn-outline-brand:hover{ background:var(--brand-700); color:#fff; }
+  .badge.bg-brand{ background-color:var(--brand-700) !important; }
+  .form-control:focus{ border-color:var(--brand-700); box-shadow:0 0 0 .25rem rgba(109,41,50,.25); outline:none; }
+  .toolbar{ background:#fff; border:1px solid var(--bs-border-color,#dee2e6); border-radius:1rem; padding:.75rem; gap:.5rem; }
+  .searchbox{ position:relative; flex:1; }
+  .searchbox .bi{ position:absolute; left:.8rem; top:50%; transform:translateY(-50%); opacity:.6; color:var(--brand-700); }
+  .searchbox input{ padding-left:2.35rem !important; }
+  .table thead th{ border-bottom-width:2px; }
+  .table tbody tr:hover{ background:#fcfcfd; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3">
+  <h3>People Document Requests</h3>
+  
+  <form method="get" class="toolbar d-flex align-items-center flex-wrap mb-3">
+    <div class="searchbox">
+      {% bs_icon 'search' extra_classes='bi' %}
+      <input type="text" class="form-control" name="q" placeholder="Search by name or ID" value="{{ q }}">
+    </div>
+    <button type="submit" class="btn btn-brand d-flex align-items-center">
+      {% bs_icon 'search' extra_classes='me-2' %} Search
+    </button>
+  </form>
+
+  <table class="table table-hover">
+    <thead>
+      <tr>
+        <th>Person ID</th>
+        <th>Full Name</th>
+        <th>Total Requests</th>
+        <th>Last Request</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in page_obj %}
+        <tr>
+          <td>{{ p.person_id }}</td>
+          <td>{{ p.person_name }}</td>
+          <td><span class="badge bg-brand">{{ p.request_count }}</span></td>
+          <td>{{ p.last_request_at|default:"—" }}</td>
+          <td>
+            <a href="{% url 'clerk:person_request_history' p.person_id %}" class="btn btn-sm btn-outline-brand">
+              {% bs_icon 'list' %} View History
+            </a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="text-center">No people found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if paginator.num_pages > 1 %}
+    {% include 'paginator.html' with page_obj=page_obj %}
+  {% endif %}
+</div>
+{% endblock %}

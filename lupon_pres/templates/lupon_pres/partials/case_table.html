@@ -1,4 +1,4 @@
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 <style>
   /* pills reused */
@@ -50,13 +50,13 @@
         <td>
           {% with r.6|default:"—" as s %}
             {% if s|lower == "settled" %}
-              <span class="pill settled">{% bs_icon 'check-circle' %} {{ s }}</span>
+              <span class="pill settled">{% bs_icon_cached 'check-circle' %} {{ s }}</span>
             {% elif s|lower == "pending" or s|lower == "to be scheduled" or s|lower == "for hearing" %}
-              <span class="pill pending">{% bs_icon 'hourglass-split' %} {{ s }}</span>
+              <span class="pill pending">{% bs_icon_cached 'hourglass-split' %} {{ s }}</span>
             {% elif s|lower == "unsettled" or s|lower == "failed" or s|lower == "terminated" %}
-              <span class="pill unsettled">{% bs_icon 'x-circle' %} {{ s }}</span>
+              <span class="pill unsettled">{% bs_icon_cached 'x-circle' %} {{ s }}</span>
             {% elif s == "—" %}
-              <span class="pill na">{% bs_icon 'dash-circle' %} —</span>
+              <span class="pill na">{% bs_icon_cached 'dash-circle' %} —</span>
             {% else %}
               <span class="pill na">{{ s }}</span>
             {% endif %}
@@ -64,7 +64,7 @@
         </td>
         <td class="text-end">
           <a class="btn btn-outline-brand btn-sm" href="{% url 'lupon_mem:case_detail' r.0 %}">
-            {% bs_icon 'box-arrow-in-right' extra_classes='me-1' %} Open
+            {% bs_icon_cached 'box-arrow-in-right' extra_classes='me-1' %} Open
           </a>
         </td>
       </tr>

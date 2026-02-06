@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
   <link rel="stylesheet" href="{% static 'css/button.css' %}">
@@ -227,10 +227,10 @@
 
                       <!-- Controls outside the image bounds -->
                       <button class="carousel-control-prev doc-control" type="button" data-bs-target="#staffDocCarousel" data-bs-slide="prev" aria-label="Previous">
-                        <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
+                        <span class="control-icon" aria-hidden="true">{% bs_icon_cached 'chevron-left' size='2em' %}</span>
                       </button>
                       <button class="carousel-control-next doc-control" type="button" data-bs-target="#staffDocCarousel" data-bs-slide="next" aria-label="Next">
-                        <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
+                        <span class="control-icon" aria-hidden="true">{% bs_icon_cached 'chevron-right' size='2em' %}</span>
                       </button>
                     </div>
                   </div>
@@ -246,24 +246,24 @@
           <div class="row g-4 mb-4">
             <div class="col-md-6">
               <div class="section-label">
-                {% bs_icon 'person-badge' size='1.1em' color='var(--bs-danger-text-emphasis)' %}
+                {% bs_icon_cached 'person-badge' size='1.1em' color='var(--bs-danger-text-emphasis)' %}
                 Selected Roles
               </div>
               <div id="selected-roles" class="chip-container d-flex flex-wrap gap-2 p-3">
                 <div class="empty-state" id="no-roles-text">
-                  {% bs_icon 'plus-circle-dotted' size='1.2em' %}
+                  {% bs_icon_cached 'plus-circle-dotted' size='1.2em' %}
                   <span class="ms-2">No roles selected</span>
                 </div>
               </div>
             </div>
             <div class="col-md-6">
               <div class="section-label">
-                {% bs_icon 'file-earmark-check' size='1.1em' color='var(--bs-danger-text-emphasis)' %}
+                {% bs_icon_cached 'file-earmark-check' size='1.1em' color='var(--bs-danger-text-emphasis)' %}
                 Proof Documents
               </div>
               <div id="selected-proofs" class="chip-container d-flex flex-wrap gap-2 p-3">
                 <div class="empty-state" id="no-proofs-text">
-                  {% bs_icon 'cloud-upload' size='1.2em' %}
+                  {% bs_icon_cached 'cloud-upload' size='1.2em' %}
                   <span class="ms-2">No files selected</span>
                 </div>
               </div>

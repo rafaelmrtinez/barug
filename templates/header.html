@@ -1,5 +1,5 @@
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {# ====== BEGIN: Header with Notifications ====== #}
 <header class="text-white">
@@ -42,7 +42,7 @@
       <div class="d-flex align-items-center">
         <div class="dropdown">
           <button class="btn btn-logout dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Account Menu">
-            {% bs_icon 'arrow-bar-right' color='white' size='1.3em' %}
+            {% bs_icon_cached 'arrow-bar-right' color='white' size='1.3em' %}
           </button>
           <ul class="dropdown-menu dropdown-menu-end">
             {% if user_roles|length > 1 %}

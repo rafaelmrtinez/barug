@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="margin-top: 40px;">
+  <div class="card shadow-sm border-0 rounded-3">
+    <div class="card-body">
+
+      <!-- Title and Download -->
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0">Barangay Clearance</h5>
+        <!-- Show only when status is ready -->
+        <a href="#" class="btn btn-submit btn-sm">
+          {% bs_icon 'download' size='1em' %} Download
+        </a>
+      </div>
+
+      <p class="text-muted small mb-1">Request #: REQ-BCLR-20250602-001</p>
+      <p class="text-muted small mb-1">Processing Fee: ₱100.00</p>
+
+      <!-- Status moved here -->
+      <div class="mb-3">
+        <span class="badge rounded-pill" style="background-color: var(--bs-danger-text-emphasis);">
+          For Payment
+        </span>
+      </div>
+
+      <!-- Date Requested -->
+      <div class="mb-3">
+        <p class="text-muted small mb-1">Date &amp; Time Requested</p>
+        <p class="fw-bold mb-0">June 15, 2023 • 10:30 AM</p>
+      </div>
+
+      <!-- Details -->
+      <h6 class="fw-semibold mb-2">Details</h6>
+      <div class="bg-light rounded-3 p-3 mb-3">
+        <p class="mb-2">
+          <span class="text-muted small">Full Name</span><br>
+          <strong>JUAN DELA CRUZ</strong>
+        </p>
+        <p class="mb-2">
+          <span class="text-muted small">Age</span><br>
+          <strong>22</strong>
+        </p>
+        <p class="mb-2">
+          <span class="text-muted small">Civil Status</span><br>
+          <strong>SINGLE</strong>
+        </p>
+        <p class="mb-2">
+          <span class="text-muted small">Home Address</span><br>
+          <strong>PUROK 2, STO. NIÑO</strong>
+        </p>
+        <p class="mb-0">
+          <span class="text-muted small">Purpose</span><br>
+          <strong>JOB REQUIREMENT</strong>
+        </p>
+      </div>
+
+      <!-- Expected Pickup Date -->
+      <div class="mb-3">
+        <p class="text-muted small mb-1">Expected Pickup Date</p>
+        <p class="fw-bold mb-0">June 18, 2023</p>
+      </div>
+
+      <!-- Action Button -->
+      <div class="text-end">
+        <a href="#" class="btn btn-submit">
+          Approve
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

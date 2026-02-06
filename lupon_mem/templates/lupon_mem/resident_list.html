@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'css/table.css' %}">
@@ -25,12 +25,12 @@
     <div class="row">
       <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
         <div class="searchbox">
-          {% bs_icon 'search' extra_classes='bi' %}
+          {% bs_icon_cached 'search' extra_classes='bi' %}
           <input type="text" class="form-control" name="q" placeholder="Search residents by name or code" value="{{ q }}">
         </div>
         <input type="hidden" name="purok" value="{{ purok }}">
         <button class="btn btn-brand-subtle d-flex align-items-center ms-auto" type="button" data-bs-toggle="offcanvas" data-bs-target="#filterPanel">
-          {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+          {% bs_icon_cached 'sliders' extra_classes='me-2' %} Filters
           {% if purok %}<span class="badge rounded-pill text-bg-light ms-2">1</span>{% endif %}
         </button>
       </form>
@@ -39,7 +39,7 @@
         {% if purok %}
           <span class="text-muted me-1">Active:</span>
           <a class="filter-chip" href="?q={{ q|urlencode }}">{{ purok|title }} <span class="x">×</span></a>
-          <a class="btn btn-sm btn-outline-brand ms-1" href="?q={{ q|urlencode }}">{% bs_icon 'x-circle' extra_classes='me-1' %} Clear all</a>
+          <a class="btn btn-sm btn-outline-brand ms-1" href="?q={{ q|urlencode }}">{% bs_icon_cached 'x-circle' extra_classes='me-1' %} Clear all</a>
         {% else %}
           <span class="text-muted small">No active filters.</span>
         {% endif %}
@@ -76,7 +76,7 @@
                 <td class="text-end">
                   <a class="btn btn-outline-brand btn-sm" href="{% url 'lupon_mem:resident_records_detail' r.person_id %}">View</a>
                   <button type="button" class="btn btn-outline-brand btn-sm" onclick="confirmDelete({{ r.person_id }}, '{{ r.first_name }} {{ r.last_name }}')" title="Remove Person">
-                    {% bs_icon 'person-x' %}
+                    {% bs_icon_cached 'person-x' %}
                   </button>
                 </td>
               </tr>

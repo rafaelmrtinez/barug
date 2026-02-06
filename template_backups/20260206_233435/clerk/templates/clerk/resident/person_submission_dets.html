@@ -1,0 +1,217 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/submission_dets.css' %}">
+<style>
+  .modal-content { border:0; border-radius:1rem; box-shadow:0 12px 30px rgba(0,0,0,.12);}
+  .modal-header { border-bottom:0; background:#f7f7f9; border-top-left-radius:1rem; border-top-right-radius:1rem;}
+  .modal-footer { border-top:0; background:#fafafa; border-bottom-left-radius:1rem; border-bottom-right-radius:1rem;}
+  .modal-title { display:flex; align-items:center; gap:.5rem; font-weight:700;}
+  .leadish { font-size:.975rem; line-height:1.45rem; margin-bottom:.75rem;}
+  .pill-note { display:inline-flex; align-items:center; gap:.5rem; font-size:.85rem; padding:.35rem .6rem; border-radius:999px; background:#f1f5f9; color:#334155;}
+  .btn-soft-danger { background:#fee2e2; color:#991b1b; border:1px solid #fecaca;}
+  .btn-soft-danger:hover { background:#fecaca; color:#7f1d1d;}
+  .btn-soft-secondary { background:#e5e7eb; color:#374151; border:1px solid #d1d5db;}
+  .btn-soft-secondary:hover { background:#d1d5db; color:#111827;}
+  .btn-success { padding-left:1.1rem; padding-right:1.1rem;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container pt-5 px-0" style="margin-top:40px; margin-bottom:20px;">
+  <div class="row justify-content-center">
+    <div class="col-12">
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
+        <h4>
+          <strong>
+            {{ person.first_name }} {% if person.middle_name %}{{ person.middle_name }}{% endif %} {{ person.last_name }}{% if person.suffix %} {{ person.suffix }}{% endif %}
+          </strong>
+        </h4>
+        <div class="meta d-flex gap-4">
+          <div>
+            <div class="section-title mb-1">Date Submitted</div>
+            <div>{% bs_icon 'calendar-event-fill' size='1em' %} <b>{{ person.submitted_fmt }}</b></div>
+          </div>
+          <div>
+            <div class="section-title mb-1">Status</div>
+            <div><b>{{ person.latest_status }}</b></div>
+          </div>
+          {% if person.remarks %}
+          <div>
+            <div class="section-title mb-1">Remarks</div>
+            <div><b>{{ person.remarks }}</b></div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row g-4">
+        <!-- Personal Information -->
+        <div class="col-md-6">
+          <div class="section-title mb-2">Personal Information</div>
+          <div class="kv">
+            <div class="kv-item"><span class="kv-key">Last Name</span><span class="kv-val">{{ person.last_name }}</span></div>
+            <div class="kv-item"><span class="kv-key">First Name</span><span class="kv-val">{{ person.first_name }}</span></div>
+            <div class="kv-item"><span class="kv-key">Middle Name</span><span class="kv-val">{{ person.middle_name }}</span></div>
+            <div class="kv-item"><span class="kv-key">Suffix</span><span class="kv-val">{{ person.suffix }}</span></div>
+            <div class="kv-item"><span class="kv-key">Sex</span><span class="kv-val">{{ person.sex }}</span></div>
+            <div class="kv-item"><span class="kv-key">Date of Birth</span><span class="kv-val">{{ person.birthdate }}</span></div>
+            <div class="kv-item"><span class="kv-key">Civil Status</span><span class="kv-val">{{ person.civil_status }}</span></div>
+            <div class="kv-item"><span class="kv-key">Nationality</span><span class="kv-val">{{ person.nationality }}</span></div>
+            <div class="kv-item"><span class="kv-key">Religion</span><span class="kv-val">{{ person.religion }}</span></div>
+            <div class="kv-item">
+              <span class="kv-key">Home Address</span>
+              <span class="kv-val">{{ person.full_address|default:"—" }}</span>
+            </div>
+
+            <div class="kv-item"><span class="kv-key">Email Address</span><span class="kv-val">{{ person.email }}</span></div>
+            <div class="kv-item"><span class="kv-key">Mobile Number</span><span class="kv-val">{{ person.mobile_num }}</span></div>
+          </div>
+        </div>
+
+        <!-- Socioeconomic Information -->
+        <div class="col-md-6">
+          <div class="section-title mb-2">Socioeconomic Information</div>
+          <div class="kv">
+            <div class="kv-item"><span class="kv-key">Educational Attainment</span><span class="kv-val">{{ person.educational_attainment }}</span></div>
+            <div class="kv-item"><span class="kv-key">Employment Status</span><span class="kv-val">{{ person.employment_status }}</span></div>
+            <div class="kv-item"><span class="kv-key">Occupation</span><span class="kv-val">{{ person.occupation }}</span></div>
+            <div class="kv-item"><span class="kv-key">Monthly Personal Income</span><span class="kv-val">{{ person.monthly_personal_income }}</span></div>
+            <div class="kv-item">
+              <span class="kv-key">Government Program(s)</span>
+              <span class="kv-val">
+                {% if person.government_programs %}
+                  {% for gp in person.government_programs %}
+                    <span class="badge rounded-pill text-bg-secondary">{{ gp }}</span>
+                  {% endfor %}
+                {% else %}
+                  —
+                {% endif %}
+              </span>
+            </div>
+          </div>
+
+          <div class="kv">
+            <div class="kv-item"><span class="kv-key">Valid IDs</span></div>
+            <div class="doc-carousel carousel slide" id="docCarousel" data-bs-ride="false" aria-label="Supporting documents">
+              <div class="carousel-inner">
+                {% for f in person.valid_id_files %}
+                <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                  <div class="img-wrap">
+                    <img src="{{ f }}" class="doc-img" alt="ID Image">
+                  </div>
+                  <small class="text-muted d-block text-center mt-2">Valid ID {{ forloop.counter }}</small>
+                </div>
+                {% endfor %}
+                {% if person.selfie_file %}
+                <div class="carousel-item">
+                  <div class="img-wrap">
+                    <img src="{{ person.selfie_file }}" class="doc-img" alt="Selfie with ID">
+                  </div>
+                  <small class="text-muted d-block text-center mt-2">Selfie w/ ID</small>
+                </div>
+                {% endif %}
+              </div>
+
+              <!-- Controls -->
+              <button class="carousel-control-prev doc-control" type="button" data-bs-target="#docCarousel"
+                data-bs-slide="prev" aria-label="Previous">
+                <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
+              </button>
+              <button class="carousel-control-next doc-control" type="button" data-bs-target="#docCarousel"
+                data-bs-slide="next" aria-label="Next">
+                <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      
+      {% if person.latest_status == 'Pending' %}
+      <div class="mt-auto button-container justify-content-end mb-2">
+        <!-- Decline triggers remarks modal -->
+        <button type="button" class="btn btn-reset" data-bs-toggle="modal" data-bs-target="#decisionModal">Decline</button>
+        <!-- Approve triggers confirmation modal -->
+        <button type="button" class="btn btn-submit" data-bs-toggle="modal" data-bs-target="#approveModal">Approve</button>
+      </div>
+      {% endif %}
+
+      <!-- Decline / Reject Modal -->
+      <div class="modal fade" id="decisionModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false" style="margin-top: 40;">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">{% bs_icon 'chat-left-text' size='1.1em' %} Add Remarks</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="{% url 'clerk:decision_request' req_id=person.person_id %}">
+              {% csrf_token %}
+              <div class="modal-body">
+                <p class="leadish">Please provide a short explanation for this decision. These remarks may be visible to the resident.</p>
+                <div class="mb-3">
+                  <label for="remarks" class="form-label">Remarks <span class="text-danger">*</span></label>
+                  <textarea id="remarks" name="remarks" class="form-control" rows="4" required
+                            placeholder="Example: ID image is blurry / name mismatch / missing page, etc."></textarea>
+                </div>
+                <!-- <span class="pill-note">
+                  {% bs_icon 'info-circle' size='1em' %} Choose <b>Reject</b> if validation fails; choose <b>Decline</b> for non-compliance or incomplete docs.
+                </span> -->
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-soft-secondary" data-bs-dismiss="modal">Cancel</button>
+                <!-- <button type="submit" name="action" value="decline" class="btn btn-outline-secondary">
+                  {% bs_icon 'dash-circle' size='1em' %} Mark as Declined
+                </button> -->
+                <button type="submit" name="action" value="reject" class="btn btn-soft-danger">
+                  {% bs_icon 'x-octagon' size='1em' %} Mark as Rejected
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Approve Confirmation Modal -->
+      <div class="modal fade" id="approveModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">{% bs_icon 'patch-check-fill' size='1.1em' %} Confirm Approval</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <p class="leadish">Are you sure you want to <strong>Approve</strong> this request?</p>
+              <ul class="mb-0">
+                <li>You confirm the identity matches the submitted documents.</li>
+                <li>You verified the images are clear and authentic.</li>
+                <li>You authorize this account to be marked as <b>Verified</b> in the system.</li>
+              </ul>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-soft-secondary" data-bs-dismiss="modal">Cancel</button>
+              <form method="post" action="{% url 'clerk:approve_request' req_id=person.person_id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-success">
+                  {% bs_icon 'check2-circle' size='1em' %} Yes, Approve
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+    </div>
+  </div>
+</div>
+{% endblock %}

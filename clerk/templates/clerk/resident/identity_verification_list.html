@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'css/form.css' %}">
@@ -60,7 +60,7 @@
       <!-- Toolbar: search like the “nice” bar -->
       <form method="get" class="toolbar d-flex align-items-center flex-wrap mb-1">
         <div class="searchbox">
-          {% bs_icon 'search' extra_classes='bi' %}
+          {% bs_icon_cached 'search' extra_classes='bi' %}
           {# Use your bound form field so validation & value persist #}
           {{ form.search }}
           <label for="{{ form.search.id_for_label }}" class="visually-hidden">
@@ -69,12 +69,12 @@
         </div>
 
         <button class="btn btn-brand d-flex align-items-center" type="submit">
-          {% bs_icon 'search' extra_classes='me-2' %} Search
+          {% bs_icon_cached 'search' extra_classes='me-2' %} Search
         </button>
 
         {% if request.GET %}
           <a class="btn btn-outline-brand ms-2" href="{% url 'clerk:identity_verification' %}">
-            {% bs_icon 'x-circle' extra_classes='me-1' %} Reset
+            {% bs_icon_cached 'x-circle' extra_classes='me-1' %} Reset
           </a>
         {% endif %}
       </form>
@@ -85,7 +85,7 @@
           <div class="card-body">
             <div class="d-flex align-items-center justify-content-between mb-3">
               <h5 class="card-title d-flex align-items-center gap-2 mb-0">
-                {% bs_icon 'person-badge' size='1.1em' %} Identification Requests
+                {% bs_icon_cached 'person-badge' size='1.1em' %} Identification Requests
               </h5>
             </div>
 
@@ -116,12 +116,12 @@
                               <a class="btn btn-outline-brand btn-sm"
                                  title="View submission"
                                  href="{% url 'clerk:person_details' r.requester_person_id %}">
-                                {% bs_icon 'person-lines-fill' extra_classes='me-1' %} Open
+                                {% bs_icon_cached 'person-lines-fill' extra_classes='me-1' %} Open
                               </a>
                             {% else %}
                               <button class="btn btn-outline-brand btn-sm" disabled
                                       title="No person id available">
-                                {% bs_icon 'person-lines-fill' extra_classes='me-1' %} Open
+                                {% bs_icon_cached 'person-lines-fill' extra_classes='me-1' %} Open
                               </button>
                             {% endif %}
                           </div>

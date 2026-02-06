@@ -1,0 +1,345 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+<style>
+  .info-card {
+    background: #f8f9fa;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .info-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+  }
+
+  .info-value {
+    font-size: 1rem;
+    color: #1f2937;
+  }
+
+  .content-box {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    line-height: 1.6;
+  }
+
+  .audience-item {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .channel-badge {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    margin: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .status-pill {
+    display: inline-block;
+    padding: 0.35rem 0.85rem;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    background: #f3f4f6;
+    color: #6b7280;
+    border: 1px solid #e5e7eb;
+  }
+
+  .status-pill-warning {
+    background: #fef3c7;
+    color: #92400e;
+    border-color: #fde68a;
+  }
+
+  .status-pill-success {
+    background: #d1fae5;
+    color: #065f46;
+    border-color: #a7f3d0;
+  }
+
+  .status-pill-danger {
+    background: #fee2e2;
+    color: #991b1b;
+    border-color: #fecaca;
+  }
+
+  .status-pill-secondary {
+    background: #e5e7eb;
+    color: #374151;
+    border-color: #d1d5db;
+  }
+
+  .audiences-scroll-container {
+    max-height: 250px;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .audiences-scroll-container::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .audiences-scroll-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+  }
+
+  .audiences-scroll-container::-webkit-scrollbar-thumb {
+    background: #6d2932;
+    border-radius: 10px;
+  }
+
+  .audiences-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: #5a2129;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap" style="margin-top: 40px;">
+  <div class="container-fluid pt-3 page-main">
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+              <i class="bi bi-megaphone me-2"></i>
+              {{ announcement.announcement_title }}
+            </h5>
+          </div>
+
+          <div class="card-body">
+            <div class="row">
+              <!-- Main Content -->
+              <div class="col-md-8">
+                <div class="mb-4">
+                  <div class="info-label">
+                    <i class="bi bi-file-text me-1"></i>
+                    Announcement Content
+                  </div>
+                  <div class="content-box">
+                    {{ announcement.announcement_body|linebreaks }}
+                  </div>
+                </div>
+
+                <div class="row">
+                  <div class="col-md-4 mb-3">
+                    <div class="info-card">
+                      <div class="info-label">
+                        <i class="bi bi-calendar-event me-1"></i>
+                        Created
+                      </div>
+                      <div class="info-value">
+                        {{ announcement.announcement_created_at|date:"M d, Y" }}
+                        <br>
+                        <small class="text-muted">{{ announcement.announcement_created_at|time:"g:i A" }}</small>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="col-md-4 mb-3">
+                    <div class="info-card">
+                      <div class="info-label">
+                        <i class="bi bi-send me-1"></i>
+                        Publish Date
+                      </div>
+                      <div class="info-value">
+                        {% if announcement.announcement_published_at %}
+                          {{ announcement.announcement_published_at|date:"M d, Y" }}
+                          <br>
+                          <small class="text-muted">{{ announcement.announcement_published_at|time:"g:i A" }}</small>
+                        {% else %}
+                          <span class="text-muted">Not scheduled</span>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="col-md-4 mb-3">
+                    <div class="info-card">
+                      <div class="info-label">
+                        <i class="bi bi-calendar-x me-1"></i>
+                        Expire Date
+                      </div>
+                      <div class="info-value">
+                        {% if announcement.announcement_expire_at %}
+                          {{ announcement.announcement_expire_at|date:"M d, Y" }}
+                          <br>
+                          <small class="text-muted">{{ announcement.announcement_expire_at|time:"g:i A" }}</small>
+                        {% else %}
+                          <span class="text-muted">No expiry</span>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Sidebar -->
+              <div class="col-md-4">
+                <!-- Status -->
+                <div class="mb-4">
+                  <div class="info-label">
+                    <i class="bi bi-flag me-1"></i>
+                    Status
+                  </div>
+                  <div>
+                    {% if announcement.announcement_status_id == 1 %}
+                      <span class="status-pill">
+                        <i class="bi bi-file-earmark me-1"></i>
+                        {{ announcement.announcement_status_name|default:"Draft" }}
+                      </span>
+                    {% elif announcement.announcement_status_id == 2 %}
+                      <span class="status-pill status-pill-warning">
+                        <i class="bi bi-clock-history me-1"></i>
+                        {{ announcement.announcement_status_name|default:"Scheduled" }}
+                      </span>
+                    {% elif announcement.announcement_status_id == 3 %}
+                      <span class="status-pill status-pill-success">
+                        <i class="bi bi-check-circle me-1"></i>
+                        {{ announcement.announcement_status_name|default:"Published" }}
+                      </span>
+                    {% elif announcement.announcement_status_id == 4 %}
+                      <span class="status-pill status-pill-danger">
+                        <i class="bi bi-x-circle me-1"></i>
+                        {{ announcement.announcement_status_name|default:"Cancelled" }}
+                      </span>
+                    {% elif announcement.announcement_status_id == 5 %}
+                      <span class="status-pill status-pill-secondary">
+                        <i class="bi bi-calendar-x me-1"></i>
+                        {{ announcement.announcement_status_name|default:"Expired" }}
+                      </span>
+                    {% else %}
+                      <span class="status-pill">{{ announcement.announcement_status_name }}</span>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <!-- Audiences -->
+                <div class="mb-4">
+                  <div class="info-label">
+                    <i class="bi bi-people me-1"></i>
+                    Target Audiences
+                  </div>
+                  <div class="audiences-scroll-container">
+                    {% if audiences %}
+                      {% for audience in audiences %}
+                        <div class="audience-item">
+                          <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                              <strong>{{ audience.audience_scope_name }}</strong>
+                              {% if audience.role_name %}
+                                <br><small class="text-primary"><i class="bi bi-briefcase me-1"></i>{{ audience.role_name }}</small>
+                              {% endif %}
+                              {% if audience.purok_sitio_name %}
+                                <br><small class="text-success"><i class="bi bi-geo-alt me-1"></i>{{ audience.purok_sitio_name }}</small>
+                              {% endif %}
+                              <br>
+                              <small class="text-muted">
+                                <i class="bi bi-person-check me-1"></i>
+                                {{ audience.inserted_persons }} person{{ audience.inserted_persons|pluralize }}
+                              </small>
+                            </div>
+                            <span class="badge bg-primary rounded-pill">{{ audience.inserted_persons }}</span>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    {% else %}
+                      <p class="text-muted small">No audiences defined</p>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <!-- Channels -->
+                <div class="mb-4">
+                  <div class="info-label">
+                    <i class="bi bi-broadcast me-1"></i>
+                    Distribution Channels
+                  </div>
+                  <div id="channels-container">
+                    <p class="text-muted small">Loading channels...</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-footer">
+            <small class="text-muted">
+              Created on {{ announcement.announcement_created_at|date:"F d, Y" }} at {{ announcement.announcement_created_at|time:"g:i A" }}
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const announcementId = {{ announcement.announcement_id }};
+  const channelsContainer = document.getElementById('channels-container');
+
+  async function loadChannels() {
+    try {
+      const response = await fetch(`/secretary/api/announcement_channels/${announcementId}/`, {
+        credentials: 'same-origin'
+      });
+
+      if (!response.ok) throw new Error('Failed to load channels');
+
+      const data = await response.json();
+      const channels = data.channels || [];
+
+      if (channels.length === 0) {
+        channelsContainer.innerHTML = '<p class="text-muted small">No channels configured</p>';
+      } else {
+        let html = '<div>';
+        channels.forEach(channel => {
+          html += `<span class="channel-badge">
+                     <i class="bi bi-megaphone-fill me-1"></i>
+                     ${escapeHtml(channel.channel_type_name)}
+                   </span>`;
+        });
+        html += '</div>';
+        channelsContainer.innerHTML = html;
+      }
+    } catch (error) {
+      console.error('Error loading channels:', error);
+      channelsContainer.innerHTML = '<p class="text-muted small">Failed to load channels</p>';
+    }
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  document.addEventListener('DOMContentLoaded', loadChannels);
+})();
+</script>
+
+{% endblock %}

@@ -1,7 +1,7 @@
 {# templates/lupon_mem/hearing_list.html #}
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'css/table.css' %}">
@@ -148,7 +148,7 @@
   <!-- Header -->
   <div class="d-flex justify-content-between align-items-center page-head mb-3">
     <h4>
-      {% bs_icon 'calendar-week' %} Hearing Schedules
+      {% bs_icon_cached 'calendar-week' %} Hearing Schedules
     </h4>
     {% if items %}
       <span class="badge soft-badge">{{ items|length }} total</span>
@@ -159,7 +159,7 @@
   <div class="today-card card mb-3">
     <div class="card-header">
       <div class="fw-semibold">
-        {% bs_icon 'clock-history' %} Today’s Schedule
+        {% bs_icon_cached 'clock-history' %} Today’s Schedule
         <span class="today-date" id="todayDateLabel"></span>
       </div>
       <span class="badge today-badge" id="todayCount">0</span>
@@ -182,16 +182,16 @@
   <div class="filterbar">
     <span class="text-muted small me-1">Filter:</span>
     <button type="button" class="filter-pill active" data-filter="all">
-      {% bs_icon 'funnel' extra_classes='me-1' %} All
+      {% bs_icon_cached 'funnel' extra_classes='me-1' %} All
     </button>
     <button type="button" class="filter-pill" data-filter="upcoming">
-      {% bs_icon 'hourglass-split' extra_classes='me-1' %} To be held
+      {% bs_icon_cached 'hourglass-split' extra_classes='me-1' %} To be held
     </button>
     <button type="button" class="filter-pill" data-filter="held">
-      {% bs_icon 'check-circle' extra_classes='me-1' %} Held
+      {% bs_icon_cached 'check-circle' extra_classes='me-1' %} Held
     </button>
     <button type="button" class="filter-pill" data-filter="missed">
-      {% bs_icon 'x-circle' extra_classes='me-1' %} Not held
+      {% bs_icon_cached 'x-circle' extra_classes='me-1' %} Not held
     </button>
   </div>
 
@@ -227,9 +227,9 @@
           </td>
           <td class="text-nowrap">
             {% if it.hearing_held %}
-              <span class="status-pill status-held js-status-pill">{% bs_icon 'check-circle' extra_classes='me-1' %} Held</span>
+              <span class="status-pill status-held js-status-pill">{% bs_icon_cached 'check-circle' extra_classes='me-1' %} Held</span>
             {% else %}
-              <span class="status-pill status-upcoming js-status-pill">{% bs_icon 'hourglass-split' extra_classes='me-1' %} To be held</span>
+              <span class="status-pill status-upcoming js-status-pill">{% bs_icon_cached 'hourglass-split' extra_classes='me-1' %} To be held</span>
             {% endif %}
           </td>
           <td class="text-nowrap">
@@ -242,7 +242,7 @@
           </td>
           <td class="text-end">
             <a class="btn btn-outline-brand btn-sm view-link" href="{% url 'lupon_mem:case_hearing_schedule' it.case_id %}?sid={{ it.submission_id }}">
-              {% bs_icon 'eye' extra_classes='me-1' %} View
+              {% bs_icon_cached 'eye' extra_classes='me-1' %} View
             </a>
           </td>
         </tr>
@@ -262,9 +262,9 @@
           <div class="hc-row">
             <span class="case-chip">{{ it.case_num }}</span>
             {% if it.hearing_held %}
-              <span class="status-pill status-held js-status-pill">{% bs_icon 'check-circle' %} Held</span>
+              <span class="status-pill status-held js-status-pill">{% bs_icon_cached 'check-circle' %} Held</span>
             {% else %}
-              <span class="status-pill status-upcoming js-status-pill">{% bs_icon 'hourglass-split' %} To be held</span>
+              <span class="status-pill status-upcoming js-status-pill">{% bs_icon_cached 'hourglass-split' %} To be held</span>
             {% endif %}
           </div>
           <div class="fw-semibold mt-2 text-truncate">
@@ -273,7 +273,7 @@
           {% if it.case_title %}<div class="hc-meta text-truncate case-title">{{ it.case_title }}</div>{% endif %}
         </div>
         <a class="btn btn-outline-brand btn-sm view-link" href="{% url 'lupon_mem:case_hearing_schedule' it.case_id %}?sid={{ it.submission_id }}">
-          {% bs_icon 'eye' extra_classes='me-1' %} View
+          {% bs_icon_cached 'eye' extra_classes='me-1' %} View
         </a>
       </div>
       <div class="hc-divider"></div>
@@ -426,13 +426,13 @@
         if(!pill) return;
         if(status === 'held'){
           pill.classList.remove('status-upcoming','status-missed'); pill.classList.add('status-held');
-          pill.innerHTML = `{% bs_icon 'check-circle' extra_classes='me-1' %} Held`;
+          pill.innerHTML = `{% bs_icon_cached 'check-circle' extra_classes='me-1' %} Held`;
         }else if(status === 'missed'){
           pill.classList.remove('status-upcoming','status-held'); pill.classList.add('status-missed');
-          pill.innerHTML = `{% bs_icon 'x-circle' extra_classes='me-1' %} Not held`;
+          pill.innerHTML = `{% bs_icon_cached 'x-circle' extra_classes='me-1' %} Not held`;
         }else{
           pill.classList.remove('status-held','status-missed'); pill.classList.add('status-upcoming');
-          pill.innerHTML = `{% bs_icon 'hourglass-split' extra_classes='me-1' %} To be held`;
+          pill.innerHTML = `{% bs_icon_cached 'hourglass-split' extra_classes='me-1' %} To be held`;
         }
       });
     }
@@ -500,9 +500,9 @@
       function pillFor(kind){
         const span=document.createElement('span');
         span.className='status-pill ' + (kind==='held' ? 'status-held' : kind==='missed' ? 'status-missed' : 'status-upcoming');
-        if(kind==='held'){ span.innerHTML=`{% bs_icon 'check-circle' extra_classes='me-1' %} Held`; }
-        else if(kind==='missed'){ span.innerHTML=`{% bs_icon 'x-circle' extra_classes='me-1' %} Not held`; }
-        else{ span.innerHTML=`{% bs_icon 'hourglass-split' extra_classes='me-1' %} To be held`; }
+        if(kind==='held'){ span.innerHTML=`{% bs_icon_cached 'check-circle' extra_classes='me-1' %} Held`; }
+        else if(kind==='missed'){ span.innerHTML=`{% bs_icon_cached 'x-circle' extra_classes='me-1' %} Not held`; }
+        else{ span.innerHTML=`{% bs_icon_cached 'hourglass-split' extra_classes='me-1' %} To be held`; }
         return span;
       }
 

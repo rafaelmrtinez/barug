@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'css/form.css' %}">
@@ -66,10 +66,10 @@
       <h4 class="mb-0">Barangay Senior Santo Niño — Blotter Cases</h4>
       <div class="d-flex gap-2">
         <a href="{% url 'lupon_mem:report_list' %}" class="btn btn-outline-brand d-flex align-items-center">
-          {% bs_icon 'file-earmark-text' extra_classes='me-2' %} Reports
+          {% bs_icon_cached 'file-earmark-text' extra_classes='me-2' %} Reports
         </a>
         <a href="{% url 'lupon_mem:case_new' %}" class="btn btn-brand d-flex align-items-center">
-          {% bs_icon 'plus' extra_classes='me-2' %} New Case
+          {% bs_icon_cached 'plus' extra_classes='me-2' %} New Case
         </a>
       </div>
     </div>
@@ -77,7 +77,7 @@
     <!-- Toolbar -->
     <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
       <div class="searchbox">
-        {% bs_icon 'search' extra_classes='bi' %}
+        {% bs_icon_cached 'search' extra_classes='bi' %}
         <input type="text" class="form-control" id="search" name="q"
                placeholder="Search case no. or case name" value="{{ q }}" />
       </div>
@@ -90,12 +90,12 @@
       <input type="hidden" name="per_page" value="{{ per_page|default:'10' }}">
 
       <button type="submit" class="btn btn-brand d-flex align-items-center">
-        {% bs_icon 'search' extra_classes='me-2' %} Search
+        {% bs_icon_cached 'search' extra_classes='me-2' %} Search
       </button>
 
       <button class="btn btn-brand-subtle d-flex align-items-center ms-auto" type="button"
               data-bs-toggle="offcanvas" data-bs-target="#filterPanel" aria-controls="filterPanel">
-        {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+        {% bs_icon_cached 'sliders' extra_classes='me-2' %} Filters
         {% if state or settlement or filed_from or filed_to %}
           <span class="badge rounded-pill text-bg-light ms-2">●</span>
         {% endif %}
@@ -131,7 +131,7 @@
         {% endif %}
 
         <a class="btn btn-sm btn-outline-brand ms-1" href="?q={{ q|urlencode }}&per_page={{ per_page }}">
-          {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
+          {% bs_icon_cached 'x-circle' extra_classes='me-1' %} Clear all
         </a>
       {% else %}
         <span class="text-muted small">No active filters.</span>
@@ -166,18 +166,18 @@
             <td>
               <span class="dt-chip">
                 <span class="date">{{ r.3 }}</span>
-                <span class="time">{% bs_icon 'clock' extra_classes='me-1' %} {{ r.4 }}</span>
+                <span class="time">{% bs_icon_cached 'clock' extra_classes='me-1' %} {{ r.4 }}</span>
               </span>
             </td>
 
             <td>
               {% with r.5|default:"—" as st %}
                 {% if st|lower == "open" %}
-                  <span class="pill state-open">{% bs_icon 'unlock' %} OPEN</span>
+                  <span class="pill state-open">{% bs_icon_cached 'unlock' %} OPEN</span>
                 {% elif st|lower == "pending" %}
-                  <span class="pill state-pending">{% bs_icon 'hourglass-split' %} PENDING</span>
+                  <span class="pill state-pending">{% bs_icon_cached 'hourglass-split' %} PENDING</span>
                 {% elif st|lower == "closed" %}
-                  <span class="pill state-closed">{% bs_icon 'lock' %} CLOSED</span>
+                  <span class="pill state-closed">{% bs_icon_cached 'lock' %} CLOSED</span>
                 {% else %}
                   <span class="pill state-closed">{{ st }}</span>
                 {% endif %}
@@ -187,13 +187,13 @@
             <td>
               {% with r.6|default:"—" as s %}
                 {% if s|lower == "settled" %}
-                  <span class="pill settled">{% bs_icon 'check-circle' %} {{ s }}</span>
+                  <span class="pill settled">{% bs_icon_cached 'check-circle' %} {{ s }}</span>
                 {% elif s|lower == "pending" or s|lower == "to be scheduled" or s|lower == "for hearing" %}
-                  <span class="pill pending">{% bs_icon 'hourglass-split' %} {{ s }}</span>
+                  <span class="pill pending">{% bs_icon_cached 'hourglass-split' %} {{ s }}</span>
                 {% elif s|lower == "unsettled" or s|lower == "failed" or s|lower == "terminated" %}
-                  <span class="pill unsettled">{% bs_icon 'x-circle' %} {{ s }}</span>
+                  <span class="pill unsettled">{% bs_icon_cached 'x-circle' %} {{ s }}</span>
                 {% elif s == "—" %}
-                  <span class="pill na">{% bs_icon 'dash-circle' %} —</span>
+                  <span class="pill na">{% bs_icon_cached 'dash-circle' %} —</span>
                 {% else %}
                   <span class="pill na">{{ s }}</span>
                 {% endif %}
@@ -202,7 +202,7 @@
 
             <td class="text-end">
               <a class="btn btn-outline-brand btn-sm" href="{% url 'lupon_mem:case_detail' r.0 %}">
-                {% bs_icon 'box-arrow-in-right' extra_classes='me-1' %} Open
+                {% bs_icon_cached 'box-arrow-in-right' extra_classes='me-1' %} Open
               </a>
             </td>
           </tr>
@@ -303,10 +303,10 @@
       <div class="offcanvas-footer">
         <div class="d-flex gap-2">
           <button class="btn btn-brand" type="submit">
-            {% bs_icon 'check2' extra_classes='me-1' %} Apply
+            {% bs_icon_cached 'check2' extra_classes='me-1' %} Apply
           </button>
           <a class="btn btn-outline-brand" href="?q={{ q|urlencode }}&per_page={{ per_page }}">
-            {% bs_icon 'x-circle' extra_classes='me-1' %} Clear
+            {% bs_icon_cached 'x-circle' extra_classes='me-1' %} Clear
           </a>
         </div>
       </div>

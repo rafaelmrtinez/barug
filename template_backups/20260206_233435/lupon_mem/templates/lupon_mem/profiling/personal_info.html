@@ -1,0 +1,230 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/progress_bar.css' %}">
+<style>
+* { box-sizing: border-box; }
+body { background: #f5f5f5; }
+.profile-wrapper { min-height: 100vh; background: #f5f5f5; }
+.profile-header {
+    background: linear-gradient(135deg, #7C2D3E 0%, #5A1F2E 100%);
+    color: white; padding: 1.25rem 2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.profile-header h2 { margin: 0; font-weight: 700; font-size: 1.4rem; }
+.profile-header p { margin: 0.35rem 0 0 0; opacity: 0.9; font-size: 0.9rem; }
+.form-container { max-width: 1400px; margin: 0 auto; padding: 1.5rem 2rem; }
+.progress-wrapper { background: white; padding: 1.25rem; border-radius: 8px; margin-bottom: 1.25rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.section-card { background: white; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.25rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e8e8e8; }
+.section-title { color: #7C2D3E; font-weight: 700; font-size: 1rem; margin-bottom: 1.25rem; padding-bottom: 0.65rem; border-bottom: 2px solid #7C2D3E; display: flex; align-items: center; gap: 0.5rem; }
+.section-title i { font-size: 1.1rem; }
+.toggle-group { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.75rem; }
+.toggle-option input { display: none; }
+.toggle-option label { display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.85rem; border: 2px solid #ddd; border-radius: 6px; cursor: pointer; transition: all 0.3s ease; font-weight: 600; font-size: 0.9rem; background: #fafafa; }
+.toggle-option label i { font-size: 1.1rem; }
+.toggle-option input:checked + label { background: #7C2D3E; color: white; border-color: #7C2D3E; box-shadow: 0 4px 12px rgba(124, 45, 62, 0.3); transform: translateY(-2px); }
+.toggle-option label:hover { border-color: #7C2D3E; background: #fff; }
+.toggle-option input:checked + label:hover { background: #6A2535; }
+.form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+.form-group { position: relative; }
+.form-group label { display: block; font-weight: 600; color: #333; margin-bottom: 0.4rem; font-size: 0.85rem; }
+.form-group label .required { color: #dc3545; margin-left: 2px; }
+.form-control, .form-select { width: 100%; padding: 0.65rem 0.85rem; border: 2px solid #ddd; border-radius: 6px; font-size: 0.9rem; transition: all 0.3s ease; background: white; }
+.form-control:focus, .form-select:focus { outline: none; border-color: #7C2D3E; box-shadow: 0 0 0 3px rgba(124, 45, 62, 0.1); }
+.sex-group { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.4rem; }
+.sex-option input { display: none; }
+.sex-option label { display: block; padding: 0.65rem; border: 2px solid #ddd; border-radius: 6px; text-align: center; cursor: pointer; transition: all 0.3s ease; font-weight: 600; background: #fafafa; font-size: 0.85rem; }
+.sex-option input:checked + label { background: #7C2D3E; color: white; border-color: #7C2D3E; }
+.sex-option label:hover { border-color: #7C2D3E; }
+.action-buttons { display: flex; gap: 0.75rem; justify-content: flex-end; padding-top: 1.25rem; margin-top: 1.25rem; border-top: 2px solid #e8e8e8; }
+.btn { padding: 0.7rem 1.75rem; border: none; border-radius: 6px; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 0.4rem; }
+.btn-secondary { background: #6c757d; color: white; }
+.btn-secondary:hover { background: #5a6268; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+.btn-primary { background: #7C2D3E; color: white; }
+.btn-primary:hover { background: #5A1F2E; transform: translateY(-2px); box-shadow: 0 6px 16px rgba(124, 45, 62, 0.4); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="profile-wrapper">
+    <div class="profile-header" style="margin-top: 40px;">
+        <h2><i class="bi bi-person-plus-fill"></i> Profile Person</h2>
+        <p>Add a new person to the barangay records system</p>
+    </div>
+
+    <div class="form-container">
+        <div class="progress-wrapper">
+            <div class="step-progress">
+                <div class="step active"><div class="circle">1</div><div class="label">Personal Information</div></div>
+                <div class="step"><div class="circle">2</div><div class="label">Review & Submit</div></div>
+            </div>
+        </div>
+
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <div class="section-card">
+                <div class="section-title">
+                    <i class="bi bi-camera-fill"></i>
+                    Profile Photo
+                </div>
+                <div class="form-group">
+                    <label>Upload Photo (Optional)</label>
+                    {{ form.person_img }}
+                    <small class="text-muted d-block mt-1">Accepted formats: JPG, PNG, GIF (Max 5MB)</small>
+                </div>
+                <div id="imagePreview" style="margin-top:1rem;display:none;">
+                    <img id="previewImg" src="" alt="Preview" style="max-width:150px;max-height:150px;border-radius:8px;border:2px solid #7C2D3E;">
+                </div>
+            </div>
+            
+            <div class="section-card">
+                <div class="section-title">
+                    <i class="bi bi-house-door-fill"></i>
+                    Residency Status
+                </div>
+                <div class="toggle-group">
+                    <div class="toggle-option">
+                        <input type="radio" name="is_resident" id="resident_yes" value="1" checked>
+                        <label for="resident_yes">
+                            <i class="bi bi-house-check-fill"></i>
+                            <span>Resident</span>
+                        </label>
+                    </div>
+                    <div class="toggle-option">
+                        <input type="radio" name="is_resident" id="resident_no" value="0">
+                        <label for="resident_no">
+                            <i class="bi bi-person-fill"></i>
+                            <span>Non-Resident</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <div class="section-title">
+                    <i class="bi bi-person-vcard-fill"></i>
+                    Basic Information
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>First Name <span class="required">*</span></label>
+                        {{ form.first_name }}
+                    </div>
+                    <div class="form-group">
+                        <label>Middle Name</label>
+                        {{ form.middle_name }}
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name <span class="required">*</span></label>
+                        {{ form.last_name }}
+                    </div>
+                    <div class="form-group">
+                        <label>Suffix</label>
+                        {{ form.suffix }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <div class="section-title">
+                    <i class="bi bi-info-circle-fill"></i>
+                    Personal Details
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Sex <span class="required">*</span></label>
+                        <div class="sex-group">
+                            {% for radio in form.sex %}
+                            <div class="sex-option">
+                                {{ radio.tag }}
+                                <label for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Date of Birth</label>
+                        {{ form.dob }}
+                    </div>
+                    <div class="form-group">
+                        <label>Civil Status <span class="required">*</span></label>
+                        {{ form.civil_status }}
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nationality <span class="required">*</span></label>
+                        {{ form.nationality }}
+                    </div>
+                    <div class="form-group">
+                        <label>Religion <span class="required">*</span></label>
+                        {{ form.religion }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <div class="section-title">
+                    <i class="bi bi-telephone-fill"></i>
+                    Contact Information
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Mobile Number</label>
+                        {{ form.mobile_num }}
+                    </div>
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        {{ form.email }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button type="reset" class="btn btn-secondary">
+                    <i class="bi bi-arrow-counterclockwise"></i> Clear Form
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    Continue <i class="bi bi-arrow-right"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+const mobileInput = document.querySelector('input[name="mobile_num"]');
+if (mobileInput) {
+    mobileInput.addEventListener('input', function(e) {
+        let val = e.target.value;
+        if (!val.startsWith('+63')) {
+            e.target.value = '+63';
+        } else if (val.length > 13) {
+            e.target.value = val.slice(0, 13);
+        }
+    });
+    mobileInput.addEventListener('keydown', function(e) {
+        if ((e.key === 'Backspace' || e.key === 'Delete') && e.target.selectionStart <= 3) {
+            e.preventDefault();
+        }
+    });
+}
+</script>
+<script>
+// Image preview
+const imgInput = document.querySelector('input[name="person_img"]');
+if (imgInput) {
+    imgInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('previewImg').src = e.target.result;
+                document.getElementById('imagePreview').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+}
+</script>
+{% endblock %}

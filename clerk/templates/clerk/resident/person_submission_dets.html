@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
@@ -33,7 +33,7 @@
         <div class="meta d-flex gap-4">
           <div>
             <div class="section-title mb-1">Date Submitted</div>
-            <div>{% bs_icon 'calendar-event-fill' size='1em' %} <b>{{ person.submitted_fmt }}</b></div>
+            <div>{% bs_icon_cached 'calendar-event-fill' size='1em' %} <b>{{ person.submitted_fmt }}</b></div>
           </div>
           <div>
             <div class="section-title mb-1">Status</div>
@@ -121,11 +121,11 @@
               <!-- Controls -->
               <button class="carousel-control-prev doc-control" type="button" data-bs-target="#docCarousel"
                 data-bs-slide="prev" aria-label="Previous">
-                <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
+                <span class="control-icon" aria-hidden="true">{% bs_icon_cached 'chevron-left' size='2em' %}</span>
               </button>
               <button class="carousel-control-next doc-control" type="button" data-bs-target="#docCarousel"
                 data-bs-slide="next" aria-label="Next">
-                <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
+                <span class="control-icon" aria-hidden="true">{% bs_icon_cached 'chevron-right' size='2em' %}</span>
               </button>
             </div>
           </div>
@@ -151,7 +151,7 @@
         <div class="modal-dialog modal-dialog-centered modal-lg">
           <div class="modal-content">
             <div class="modal-header">
-              <h5 class="modal-title">{% bs_icon 'chat-left-text' size='1.1em' %} Add Remarks</h5>
+              <h5 class="modal-title">{% bs_icon_cached 'chat-left-text' size='1.1em' %} Add Remarks</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="post" action="{% url 'clerk:decision_request' req_id=person.person_id %}">
@@ -164,16 +164,16 @@
                             placeholder="Example: ID image is blurry / name mismatch / missing page, etc."></textarea>
                 </div>
                 <!-- <span class="pill-note">
-                  {% bs_icon 'info-circle' size='1em' %} Choose <b>Reject</b> if validation fails; choose <b>Decline</b> for non-compliance or incomplete docs.
+                  {% bs_icon_cached 'info-circle' size='1em' %} Choose <b>Reject</b> if validation fails; choose <b>Decline</b> for non-compliance or incomplete docs.
                 </span> -->
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-soft-secondary" data-bs-dismiss="modal">Cancel</button>
                 <!-- <button type="submit" name="action" value="decline" class="btn btn-outline-secondary">
-                  {% bs_icon 'dash-circle' size='1em' %} Mark as Declined
+                  {% bs_icon_cached 'dash-circle' size='1em' %} Mark as Declined
                 </button> -->
                 <button type="submit" name="action" value="reject" class="btn btn-soft-danger">
-                  {% bs_icon 'x-octagon' size='1em' %} Mark as Rejected
+                  {% bs_icon_cached 'x-octagon' size='1em' %} Mark as Rejected
                 </button>
               </div>
             </form>
@@ -186,7 +186,7 @@
         <div class="modal-dialog modal-dialog-centered modal-lg">
           <div class="modal-content">
             <div class="modal-header">
-              <h5 class="modal-title">{% bs_icon 'patch-check-fill' size='1.1em' %} Confirm Approval</h5>
+              <h5 class="modal-title">{% bs_icon_cached 'patch-check-fill' size='1.1em' %} Confirm Approval</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -202,7 +202,7 @@
               <form method="post" action="{% url 'clerk:approve_request' req_id=person.person_id %}">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-success">
-                  {% bs_icon 'check2-circle' size='1em' %} Yes, Approve
+                  {% bs_icon_cached 'check2-circle' size='1em' %} Yes, Approve
                 </button>
               </form>
             </div>

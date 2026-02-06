@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
   <link rel="stylesheet" href="{% static 'css/button.css' %}">
@@ -180,7 +180,7 @@
       {% endif %}
     </div>
     <div class="family-head">
-      {% bs_icon 'person-fill' %} {{ family.family_head_name }}
+      {% bs_icon_cached 'person-fill' %} {{ family.family_head_name }}
     </div>
   </div>
 
@@ -188,7 +188,7 @@
   <div class="section-block">
     <div class="section-header">
       <div class="section-icon">
-        {% bs_icon 'people-fill' %}
+        {% bs_icon_cached 'people-fill' %}
       </div>
       <h2 class="section-title">Family Information</h2>
     </div>
@@ -263,7 +263,7 @@
   <div class="section-block">
     <div class="section-header">
       <div class="section-icon">
-        {% bs_icon 'calendar-check' %}
+        {% bs_icon_cached 'calendar-check' %}
       </div>
       <h2 class="section-title">Record Information</h2>
     </div>

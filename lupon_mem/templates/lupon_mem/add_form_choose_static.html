@@ -49,23 +49,23 @@
   <div class="d-flex justify-content-between align-items-center mb-3" style="margin-top: 40;">
     <h4 class="mb-0">Attach a KP Form</h4>
     <a href="{% url 'lupon_mem:case_detail' case_id %}" class="btn btn-outline-brand d-flex align-items-center">
-      {% bs_icon 'arrow-left' extra_classes='me-2' %} Back to Case
+      {% bs_icon_cached 'arrow-left' extra_classes='me-2' %} Back to Case
     </a>
   </div>
 
   {% if gate_msg %}
     <div class="alert alert-info d-flex align-items-center mb-3" role="alert">
-      {% bs_icon 'info-circle' extra_classes='me-2' %} {{ gate_msg }}
+      {% bs_icon_cached 'info-circle' extra_classes='me-2' %} {{ gate_msg }}
     </div>
   {% endif %}
 
   <form class="toolbar d-flex align-items-center flex-wrap mb-3" onsubmit="return false;">
     <div class="searchbox">
-      {% bs_icon 'search' extra_classes='bi' %}
+      {% bs_icon_cached 'search' extra_classes='bi' %}
       <input id="formSearch" type="text" class="form-control" placeholder="Search by code or form name…">
     </div>
     <button type="button" class="btn btn-outline-brand d-flex align-items-center" onclick="clearSearch()">
-      {% bs_icon 'x-circle' extra_classes='me-2' %} Clear
+      {% bs_icon_cached 'x-circle' extra_classes='me-2' %} Clear
     </button>
   </form>
 
@@ -73,41 +73,41 @@
     {% for code, name in forms %}
       <div class="form-card" data-code="{{ code|upper }}" data-name="{{ name|upper }}">
         <div class="form-meta">
-          <span class="form-code">{% bs_icon 'file-earmark-text' %} {{ code }}</span>
+          <span class="form-code">{% bs_icon_cached 'file-earmark-text' %} {{ code }}</span>
           <div class="form-name" title="{{ name }}">{{ name }}</div>
 
           {# Contextual reasons, purely visual #}
           {% if code|upper == 'MED-ATT-2025' %}
-            <span class="badge rounded-pill hint-badge kp9 ms-1">{% bs_icon 'envelope' %} Med Attendance</span>
+            <span class="badge rounded-pill hint-badge kp9 ms-1">{% bs_icon_cached 'envelope' %} Med Attendance</span>
           {% endif %}
           {% if code|upper == 'KP-9' %}
-            <span class="badge rounded-pill hint-badge kp9 ms-1">{% bs_icon 'envelope' %} New Summons</span>
+            <span class="badge rounded-pill hint-badge kp9 ms-1">{% bs_icon_cached 'envelope' %} New Summons</span>
           {% elif code|upper == 'KP-18' %}
-            <span class="badge rounded-pill hint-badge kp18 ms-1">{% bs_icon 'person-exclamation' %} No-show (Complainant)</span>
+            <span class="badge rounded-pill hint-badge kp18 ms-1">{% bs_icon_cached 'person-exclamation' %} No-show (Complainant)</span>
           {% elif code|upper == 'KP-19' %}
-            <span class="badge rounded-pill hint-badge kp19 ms-1">{% bs_icon 'person-exclamation' %} No-show (Respondent)</span>
+            <span class="badge rounded-pill hint-badge kp19 ms-1">{% bs_icon_cached 'person-exclamation' %} No-show (Respondent)</span>
           {% elif code|upper == 'KP-20' %}
-            <span class="badge rounded-pill hint-badge kp20 ms-1">{% bs_icon 'exclamation-triangle' %} Repudiation → CFA</span>
+            <span class="badge rounded-pill hint-badge kp20 ms-1">{% bs_icon_cached 'exclamation-triangle' %} Repudiation → CFA</span>
           {% elif code|upper == 'KP-20A' %}
-            <span class="badge rounded-pill hint-badge kp20a ms-1">{% bs_icon 'check2-circle' %} No Settlement → CFA</span>
+            <span class="badge rounded-pill hint-badge kp20a ms-1">{% bs_icon_cached 'check2-circle' %} No Settlement → CFA</span>
           {% elif code|upper == 'KP-20B' %}
-            <span class="badge rounded-pill hint-badge kp20b ms-1">{% bs_icon 'person-x' %} Repeated No-Show → CFA</span>
+            <span class="badge rounded-pill hint-badge kp20b ms-1">{% bs_icon_cached 'person-x' %} Repeated No-Show → CFA</span>
           {% elif code|upper == 'KP-21' %}
-            <span class="badge rounded-pill hint-badge kp21 ms-1">{% bs_icon 'ban' %} Bar Action (Compl.)</span>
+            <span class="badge rounded-pill hint-badge kp21 ms-1">{% bs_icon_cached 'ban' %} Bar Action (Compl.)</span>
           {% elif code|upper == 'KP-22' %}
-            <span class="badge rounded-pill hint-badge kp22 ms-1">{% bs_icon 'ban' %} Bar Counterclaim (Resp.)</span>
+            <span class="badge rounded-pill hint-badge kp22 ms-1">{% bs_icon_cached 'ban' %} Bar Counterclaim (Resp.)</span>
           {% elif code|upper == 'KP-23' %}
-            <span class="badge rounded-pill hint-badge kp23 ms-1">{% bs_icon 'gavel' %} Execution (Non-Compliance)</span>
+            <span class="badge rounded-pill hint-badge kp23 ms-1">{% bs_icon_cached 'gavel' %} Execution (Non-Compliance)</span>
           {% elif code|upper == 'KP-24' %}
-            <span class="badge rounded-pill hint-badge kp24 ms-1">{% bs_icon 'calendar-event' %} Hearing on Execution</span>
+            <span class="badge rounded-pill hint-badge kp24 ms-1">{% bs_icon_cached 'calendar-event' %} Hearing on Execution</span>
           {% elif code|upper == 'KP-25' %}
-            <span class="badge rounded-pill hint-badge kp25 ms-1">{% bs_icon 'bell' %} Notice of Execution</span>
+            <span class="badge rounded-pill hint-badge kp25 ms-1">{% bs_icon_cached 'bell' %} Notice of Execution</span>
           {% endif %}
         </div>
         <div class="form-action">
           <a class="btn btn-brand btn-sm d-flex align-items-center use-form"
              href="{% url 'lupon_mem:form_builder_by_code' case_id code %}">
-            {% bs_icon 'plus' extra_classes='me-2' %} Use this form
+            {% bs_icon_cached 'plus' extra_classes='me-2' %} Use this form
           </a>
         </div>
       </div>

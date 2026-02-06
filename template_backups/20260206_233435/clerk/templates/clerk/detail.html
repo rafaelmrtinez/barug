@@ -1,0 +1,703 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+  :root{
+    --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932; --brand-600:#7a323b;
+    --accent:#f2c94c; --ink:#0f172a; --muted:#64748b; --line:#e5e7eb; --card:#ffffff; --wash:#fbf6f6;
+  }
+
+  body{ background:linear-gradient(160deg, var(--wash), #fff 30%) }
+
+  /* Page container (same feel as Treasurer) */
+  .container-fluid.page{
+    padding-left: clamp(16px, 4vw, 40px);
+    padding-right: clamp(16px, 4vw, 40px);
+    max-width: 1700px;
+  }
+  .row-tight{ row-gap: 1rem; }
+
+  /* Hero */
+  .hero{
+    background: radial-gradient(120% 140% at 0% 0%, var(--brand-700) 0%, var(--brand-900) 70%);
+    color:#fff; border-radius:18px; padding:18px 20px;
+    box-shadow:0 14px 32px rgba(58,18,23,.25), inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+  .hero .brand-icon{
+    width:56px; height:56px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(255,255,255,.08); box-shadow:0 0 0 3px rgba(122,18,18,.15);
+    position:relative; flex:0 0 56px;
+  }
+  .hero .brand-icon::after{ content:""; position:absolute; inset:8px; border-radius:50%; background:rgba(242,201,76,.18) }
+  .hero .brand-icon i{ position:relative; z-index:1; transform: translateY(2px) }
+  .hero .chip{
+    border:1px solid rgba(255,255,255,.22); background:rgba(255,255,255,.10); color:#fff;
+    border-radius:999px; padding:6px 12px; font-size:.82rem; text-transform:uppercase; letter-spacing:.08em; font-weight:800
+  }
+
+  /* Cards / sections */
+  .card-soft{ border:1px solid #f1e8ea; background:#fff; border-radius:16px; box-shadow:0 12px 28px rgba(16,24,40,.06) }
+  .section-title{ font-weight:800; color:var(--ink); display:flex; align-items:center; gap:.6rem }
+  .section-title .dot{ width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px rgba(242,201,76,.25) }
+  .small-muted{ color:var(--muted) }
+
+  .kv{ list-style:none; padding:0; margin:0 }
+  .kv li{ display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px dashed var(--line) }
+  .kv li:last-child{ border-bottom:0 }
+  .kv .label{ color:var(--muted); min-width:140px }
+  .kv .value{ font-weight:700; color:var(--ink) }
+
+  .table thead th{ white-space:nowrap }
+  .table tbody tr:hover{ background:#fff8eb }
+
+  .amount-row{ display:flex; justify-content:space-between; align-items:center; margin-top:.25rem; padding-top:.75rem; border-top:1px solid var(--line) }
+
+  /* Media */
+  .media-grid{ display:flex; flex-wrap:wrap; gap:14px }
+  .media-thumb{ width:180px; height:240px; object-fit:cover; border-radius:12px; border:1px solid var(--line); background:#fff; cursor:zoom-in; transition:transform .15s, box-shadow .15s }
+  .media-thumb:hover{ transform:translateY(-2px); box-shadow:0 8px 18px rgba(0,0,0,.12) }
+  .pdf-pill{ width:180px; height:240px; border-radius:12px; border:1px dashed var(--line); background:#fff7e6; color:var(--brand-800); font-weight:800; display:flex; align-items:center; justify-content:center; text-decoration:none }
+
+  .sticky-aside{ position:sticky; top:78px }
+  .status-chip{ border-radius:999px; padding:4px 10px; font-size:.8rem; background:#fff1; border:1px solid rgba(255,255,255,.25) }
+  .or-badge{ background:#fff3cd; color:#7a5a00; border:1px solid #ffe69c; border-radius:10px; padding:6px 10px; font-weight:700 }
+
+  /* Timeline */
+  .timeline{ position:relative; margin-left:6px; padding-left:64px; --line-x:30px; --dot-size:32px }
+  .timeline:before{ content:""; position:absolute; left:var(--line-x); top:0; bottom:0; width:3px; background:linear-gradient(180deg,#e9eef5,#e2e8f0); border-radius:3px }
+  .tl-item{ position:relative; margin-bottom:14px; border-radius:14px; padding:12px 14px; background:#fff; border:1px solid #eef2f7; box-shadow:0 6px 16px rgba(16,24,40,.04) }
+  .tl-item:last-child{ margin-bottom:0 }
+  .tl-dot{ position:absolute; left:-50px; top:20px; width:var(--dot-size); height:var(--dot-size); border-radius:50%; display:grid; place-items:center; color:#fff; border:3px solid #fff; box-shadow:0 2px 8px rgba(2,6,23,.15) }
+  .tl-dot.primary{background:#6366f1}.tl-dot.info{background:#0ea5e9}.tl-dot.success{background:#10b981}.tl-dot.warn{background:#f59e0b}.tl-dot.muted{background:#94a3b8}
+  .tl-head{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap }
+  .tl-title{ font-weight:800; color:#0f172a; letter-spacing:.02em }
+  .tl-when{ margin-left:auto; color:#64748b; font-size:.82rem; white-space:nowrap }
+  .pill{ border-radius:999px; padding:.15rem .55rem; font-size:.72rem; border:1px solid transparent }
+  .pill.gray{background:#f1f5f9;color:#334155;border-color:#e2e8f0}
+  .pill.blue{background:#eef2ff;color:#3730a3;border-color:#c7d2fe}
+  .pill.amber{background:#fff7ed;color:#9a3412;border-color:#fed7aa}
+  .pill.green{background:#ecfdf5;color:#065f46;border-color:#a7f3d0}
+  .tl-meta{ color:#475569; font-size:.86rem; margin-top:2px }
+  .tl-body{ color:#334155; font-size:.9rem; margin-top:6px }
+  .help-text{ font-size:.85rem; color:#64748b }
+</style>
+
+<div class="container-fluid page py-3">
+
+  {% with status=header.status|upper %}
+  <!-- Hero -->
+  <div class="hero mb-3 d-flex align-items-center gap-3">
+    <div class="brand-icon"><i class="bi bi-printer fs-4" aria-hidden="true"></i></div>
+    <div class="me-auto">
+      <div class="fw-bold fs-5">{{ header.request_code }}</div>
+      <div class="text-white-50 small">{{ header.created_fmt }}</div>
+      {% if is_business_clearance and business_name %}
+        <div class="mt-2 d-flex align-items-center gap-2 flex-wrap">
+          <span class="badge" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); padding: 6px 12px;">
+            <i class="bi bi-building me-1"></i> {{ business_name|title }}
+          </span>
+          {% if business_id_display %}
+            <span class="badge" style="background: rgba(242,201,76,0.3); border: 1px solid rgba(242,201,76,0.5); padding: 6px 12px;">
+              <i class="bi bi-hash me-1"></i> {{ business_id_display }}
+            </span>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+    <div class="d-flex flex-column align-items-end gap-2">
+      <span class="chip">{{ status_ui.label }}</span>
+      <!-- {% if status != "RELEASED" and header.or_number %}
+        <span class="or-badge">OR: {{ header.or_number }}</span>
+      {% endif %} -->
+    </div>
+  </div>
+
+  <div class="row row-tight">
+    <!-- LEFT -->
+    <div class="col-12 col-lg-8 col-xxl-9">
+
+      <!-- Items -->
+      <div class="card card-soft mb-3">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="section-title mb-0"><span class="dot"></span> Items</div>
+            <span class="badge rounded-pill text-bg-warning border border-warning-subtle">
+              {{ lines|length }} item{{ lines|length|pluralize }}
+            </span>
+          </div>
+
+          {% if lines %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th style="min-width:260px">Document</th>
+                  <th>Purpose</th>
+                  <th class="text-center">Qty</th>
+                  <th class="text-end">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for l in lines %}
+                <tr>
+                  <td class="fw-semibold">{{ l.document_type_name|default:"—" }}</td>
+                  <td>
+                    {% if l.purpose_display %}{{ l.purpose_display }}
+                    {% elif l.purpose_label %}{{ l.purpose_label }}
+                    {% else %}&mdash;{% endif %}
+                    {% if is_business_renewal %}
+                      <div class="small text-muted mt-1">
+                        <i class="bi bi-calendar-check"></i> {{ renewal_totals.years_count }} year{{ renewal_totals.years_count|pluralize }} 
+                        ({{ renewal_totals.period_type }} up to {{ renewal_totals.period_year }})
+                      </div>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">{{ l.quantity }}</td>
+                  <td class="text-end fw-bold">
+                    {% if is_business_renewal %}
+                      ₱{{ renewal_totals.total_amount|floatformat:2 }}
+                      <div class="small text-muted">{{ renewal_totals.years_count }} year{{ renewal_totals.years_count|pluralize }}</div>
+                    {% else %}
+                      ₱{{ l.line_total|floatformat:2 }}
+                      {% if l.is_exempt %}
+                        <span class="badge text-bg-success ms-2">Exempt</span>
+                      {% endif %}
+                    {% endif %}
+                  </td>
+                </tr>
+                {% if l.reason_chips or l.is_exempt %}
+                <tr class="table-borderless">
+                  <td colspan="4">
+                    <div class="d-flex flex-wrap gap-2">
+                      {% for tag in l.reason_chips %}
+                        <span class="badge rounded-pill bg-success-subtle text-success-emphasis">{{ tag }}</span>
+                      {% endfor %}
+                      {% if l.is_exempt %}
+                        <span class="badge rounded-pill bg-success-subtle text-success-emphasis">Full waiver applied</span>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+            <div class="text-muted">No items.</div>
+          {% endif %}
+
+          <!-- Amount Due (uses was_marked_paid) -->
+          <div class="amount-row">
+            <div class="small-muted">Amount Due</div>
+            {% with amount_due=header.amount_due|default:0 %}
+              {% if amount_due == 0 %}
+                <div class="fs-5 fw-bold text-success">WAIVED</div>
+              {% elif was_marked_paid %}
+                {% if header.or_number %}
+                  <div class="fs-6 fw-bold text-success">
+                    PAID <span class="small text-muted">({{ header.or_number }})</span>
+                  </div>
+                {% else %}
+                  <div class="fs-6 fw-bold text-success">PAID — awaiting OR number</div>
+                {% endif %}
+              {% else %}
+                <div class="fs-6 fw-bold text-warning">For Treasurer Payment</div>
+              {% endif %}
+            {% endwith %}
+          </div>
+
+        </div>
+      </div>
+
+      {% if is_business_renewal and renewal_breakdown %}
+      <!-- Business Renewal Breakdown -->
+      <div class="card card-soft mb-3">
+        <div class="card-body">
+          <div class="section-title mb-3">
+            <span class="dot"></span> Business Renewal Breakdown
+            <span class="badge rounded-pill text-bg-info ms-2">
+              {{ renewal_totals.years_count }} year{{ renewal_totals.years_count|pluralize }}
+            </span>
+          </div>
+
+          <div class="alert alert-info border-0 mb-3" style="background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);">
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-info-circle-fill text-primary"></i>
+              <div class="small">
+                <strong>Multi-Year Renewal:</strong> This request covers {{ renewal_totals.years_count }} unpaid year(s) 
+                up to {{ renewal_totals.period_type }} {{ renewal_totals.period_year }}.
+              </div>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Year</th>
+                  <th>Type</th>
+                  <th class="text-end">Base Fee</th>
+                  <th class="text-end">Surcharge</th>
+                  <th class="text-end">Total</th>
+                  <th class="text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in renewal_breakdown %}
+                <tr>
+                  <td class="fw-semibold">{{ item.year }}</td>
+                  <td>
+                    <span class="badge {% if item.kind == 'CURRENT' %}bg-success-subtle text-success{% else %}bg-warning-subtle text-warning{% endif %}">
+                      {{ item.kind }}
+                    </span>
+                  </td>
+                  <td class="text-end">₱{{ item.base_fee|floatformat:2 }}</td>
+                  <td class="text-end">
+                    {% if item.surcharge > 0 %}
+                      <span class="text-danger">₱{{ item.surcharge|floatformat:2 }}</span>
+                      {% if item.days_late %}
+                        <small class="text-muted d-block">{{ item.days_late }} day{{ item.days_late|pluralize }} late</small>
+                      {% endif %}
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end fw-bold">₱{{ item.total|floatformat:2 }}</td>
+                  <td class="text-center">
+                    <span class="badge bg-warning-subtle text-warning">Unpaid</span>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot class="table-light">
+                <tr>
+                  <td colspan="2" class="fw-bold">TOTAL ({{ renewal_totals.years_count }} year{{ renewal_totals.years_count|pluralize }})</td>
+                  <td class="text-end fw-bold">₱{{ renewal_totals.total_base_fee|floatformat:2 }}</td>
+                  <td class="text-end fw-bold text-danger">₱{{ renewal_totals.total_surcharge|floatformat:2 }}</td>
+                  <td class="text-end fw-bold fs-5 text-primary">₱{{ renewal_totals.total_amount|floatformat:2 }}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div class="alert alert-warning border-0 mt-3 mb-0" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
+            <div class="d-flex align-items-start gap-2">
+              <i class="bi bi-exclamation-triangle-fill text-warning mt-1"></i>
+              <div class="small">
+                <strong>Payment Note:</strong> The treasurer will process a single payment for all {{ renewal_totals.years_count }} year(s) 
+                totaling <strong>₱{{ renewal_totals.total_amount|floatformat:2 }}</strong>. All renewal requests will be marked as paid together.
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Resident / On-behalf + Authorization Letter -->
+      <div class="card card-soft mb-3">
+        <div class="card-body">
+          <div class="section-title mb-2"><span class="dot"></span> Resident</div>
+
+          <div class="row g-4">
+            <!-- Requested by -->
+            <div class="col-12 {% if header.on_behalf_full_name or header.on_behalf_of_person_id or header.on_behalf_id %}col-md-6{% else %}col-md-12{% endif %}">
+              <div class="small-muted mb-2">Requested by</div>
+              <ul class="kv">
+                <li><span class="label">Name</span>
+                    <span class="value">{% firstof header.requester_full_name header.requested_by "—" %}</span></li>
+                <li><span class="label">Resident ID</span>
+                    <span class="value">{% firstof header.requested_by_person_id header.requested_by_id "—" %}</span></li>
+                {% if header.address or header.barangay or header.city or header.province %}
+                <li>
+                  <span class="label">Address</span>
+                  <span class="text-end" style="max-width:60%">
+                    {% if header.address %}{{ header.address }}{% else %}
+                      {{ header.barangay|default_if_none:"" }}{% if header.barangay %}, {% endif %}
+                      {{ header.city|default_if_none:"" }}{% if header.city %}, {% endif %}
+                      {{ header.province|default_if_none:"" }}
+                    {% endif %}
+                  </span>
+                </li>
+                {% endif %}
+              </ul>
+            </div>
+
+            <!-- Requested for -->
+            {% if header.on_behalf_full_name or header.on_behalf_of_person_id or header.on_behalf_id %}
+            <div class="col-12 col-md-6">
+              <div class="small-muted mb-2">Requested For</div>
+              <ul class="kv">
+                <li><span class="label">Name</span>
+                    <span class="value">{% firstof header.on_behalf_full_name header.on_behalf_of header.subject_full_name "—" %}</span></li>
+                <li><span class="label">Resident ID</span>
+                    <span class="value">{% firstof header.on_behalf_of_person_id header.on_behalf_id "—" %}</span></li>
+                {% if header.on_behalf_address or header.subject_address %}
+                  <li><span class="label">Address</span>
+                    <span class="text-end" style="max-width:60%">
+                      {% firstof header.on_behalf_address header.subject_address %}
+                    </span>
+                  </li>
+                {% endif %}
+              </ul>
+            </div>
+            {% endif %}
+          </div>
+
+          {% if auth_links %}
+            <hr class="my-3">
+            <div class="section-title mb-2"><span class="dot"></span> Authorization Letter</div>
+            <div class="media-grid">
+              {% for a in auth_links %}
+                {% if a.is_pdf %}
+                  <a class="pdf-pill" href="{{ a.url }}" target="_blank" rel="noopener" title="Open {{ a.name }}">
+                    PDF<br>{{ a.name }}
+                  </a>
+                {% else %}
+                  <img src="{{ a.url }}" alt="{{ a.name }}" class="media-thumb"
+                       data-bs-toggle="modal" data-bs-target="#authLightbox" data-src="{{ a.url }}">
+                {% endif %}
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          {% if header.purpose_notes %}
+            <hr class="my-3">
+            <div class="small-muted mb-1">Notes</div>
+            <div class="fw-semibold">{{ header.purpose_notes }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Timeline -->
+      <div class="card card-soft mb-3">
+        <div class="card-body">
+          <div class="section-title mb-2"><span class="dot"></span> Timeline</div>
+          {% if timeline %}
+            <div class="timeline">
+              {% for e in timeline %}
+                {% with act=e.action|default:''|upper %}
+                <div class="tl-item">
+                  <div class="tl-dot
+                      {% if act == 'REQUEST_CREATED' or act == 'LINE_ADDED' %} primary
+                      {% elif act == 'PAYMENT_INITIATED' %} info
+                      {% elif act == 'PAYMENT_ACCEPTED' %} success
+                      {% elif act == 'STATUS_CHANGED' %} warn
+                      {% else %} muted {% endif %}">
+                    {% if act == 'REQUEST_CREATED' %}<i class="bi bi-file-earmark-plus"></i>
+                    {% elif act == 'LINE_ADDED' %}<i class="bi bi-plus-lg"></i>
+                    {% elif act == 'PAYMENT_INITIATED' %}<i class="bi bi-credit-card"></i>
+                    {% elif act == 'PAYMENT_ACCEPTED' %}<i class="bi bi-cash-coin"></i>
+                    {% elif act == 'STATUS_CHANGED' %}<i class="bi bi-arrow-left-right"></i>
+                    {% else %}<i class="bi bi-clock-history"></i>{% endif %}
+                  </div>
+
+                  <div class="tl-head">
+                    <div class="tl-title">{{ e.action|default:"—" }}</div>
+
+                    {% if act == 'STATUS_CHANGED' %}
+                      {% if e.from_status %}
+                        <span class="pill blue">{{ e.from_status }}</span>
+                        <i class="bi bi-arrow-right-short text-muted"></i>
+                      {% endif %}
+                      {% if e.to_status %}
+                        <span class="pill amber">{{ e.to_status }}</span>
+                      {% endif %}
+                    {% endif %}
+
+                    {% if act == 'PAYMENT_ACCEPTED' %}
+                      {% if e.or_number %}
+                        <span class="pill blue">OR: {{ e.or_number }}</span>
+                      {% endif %}
+                      {% if e.details.amount_paid %}
+                        <span class="pill green">₱{{ e.details.amount_paid|floatformat:2 }}</span>
+                      {% endif %}
+                      {% if e.details.payment_method %}
+                        <span class="pill gray">{{ e.details.payment_method }}</span>
+                      {% endif %}
+                    {% endif %}
+                    <div class="tl-when">{{ e.occur_fmt }}</div>
+                  </div>
+
+                  <div class="tl-meta">{{ e.display_actor }}</div>
+
+                  {% if e.reason %}
+                    <div class="tl-body">Reason: {{ e.reason }}</div>
+                  {% endif %}
+                </div>
+                {% endwith %}
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="text-muted">No events yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Clerk Actions -->
+    <div class="col-12 col-lg-4 col-xxl-3">
+      <div class="card card-soft sticky-aside">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="section-title mb-0"><span class="dot"></span> Actions</div>
+            <span class="status-chip {{ status_ui.cls }}">{{ status_ui.label }}</span>
+          </div>
+
+          {% with amount_due=header.amount_due|default:0 %}
+            <!-- Quick status chips -->
+            <div class="d-flex gap-2 mb-3">
+              <!-- {% if status == 'FOR_TREASURER_REVIEW' %}
+                <span class="badge rounded-pill text-bg-warning">
+                  <i class="bi bi-hourglass-split me-1"></i> For Treasurer Review
+                </span>
+              {% elif amount_due == 0 %}
+                <span class="badge rounded-pill text-bg-success">
+                  <i class="bi bi-patch-check-fill me-1"></i> Waived
+                </span>
+              {% elif was_marked_paid or header.or_number %}
+                <span class="badge rounded-pill text-bg-success">
+                  <i class="bi bi-cash-coin me-1"></i> Paid
+                </span>
+              {% else %}
+                <span class="badge rounded-pill text-bg-warning">
+                  <i class="bi bi-exclamation-triangle-fill me-1"></i> Unpaid
+                </span>
+              {% endif %} -->
+            </div>
+
+            {% if status == 'FOR CLERK REVIEW' or status == 'FOR_CLERK_REVIEW' %}
+              {% if amount_due == 0 or was_marked_paid %}
+                <div class="d-grid gap-2 mb-2">
+                  <form method="post" action="{% url 'clerk:confirm_forward_treasurer' header.doc_request_id %}"
+                        onsubmit="return confirm('Confirm and forward this request to the Treasurer?');">
+                    {% csrf_token %}
+                    <button class="btn btn-warning w-100" style="color:#fff;">
+                      <i class="bi bi-send-check me-1"></i> Confirm &amp; Forward to Treasurer
+                    </button>
+                  </form>
+                </div>
+              {% else %}
+                <div class="alert alert-warning py-2 mb-3">
+                  <div class="d-flex justify-content-between">
+                    <span><strong>Unpaid.</strong></span>
+                    <span>Amount Due: ₱{{ amount_due|floatformat:2 }}</span>
+                  </div>
+                  <div class="help-text">Forward to the Treasurer for payment collection.</div>
+                </div>
+                <div class="d-grid gap-2 mb-2">
+                  <form method="post" action="{% url 'clerk:confirm_forward_treasurer' header.doc_request_id %}"
+                        onsubmit="return confirm('Confirm and forward this request to the Treasurer?');">
+                    {% csrf_token %}
+                    <button class="btn btn-warning w-100" style="color:#fff;">
+                      <i class="bi bi-send-check me-1"></i> Confirm &amp; Forward to Treasurer
+                    </button>
+                  </form>
+                </div>
+              {% endif %}
+              <hr class="my-3">
+            {% endif %}
+          {% endwith %}
+
+          <!-- Print / Ready / Release -->
+          {% if status == 'FOR_PRINTING' %}
+            <form method="post" action="{% url 'clerk:mark_ready_for_pickup' header.doc_request_id %}" class="mb-2">
+              {% csrf_token %}
+              <button type="button" class="btn btn-primary w-100 mb-2"
+                      data-bs-toggle="modal" data-bs-target="#confirmPrintModal">
+                <i class="bi bi-printer me-1"></i> Download &amp; Print
+              </button>
+              <button class="btn btn-outline-primary w-100">
+                <i class="bi bi-check2-square me-1"></i> Mark Ready for Pickup
+              </button>
+            </form>
+          {% elif status == 'READY_FOR_PICKUP' %}
+            <form method="post" action="{% url 'clerk:mark_released' header.doc_request_id %}" class="mb-2"
+                  onsubmit="return confirm('Mark this request as RELEASED?');">
+              {% csrf_token %}
+              <button class="btn btn-success w-100"><i class="bi bi-box-arrow-up-right me-1"></i> Mark Released</button>
+            </form>
+          {% endif %}
+
+          {% if status == 'FOR_TREASURER_REVIEW' %}
+            <hr class="my-3">
+            <div class="alert alert-info py-2 mb-0">
+              <i class="bi bi-info-circle me-1"></i>
+              <strong>This request is already for treasurer payment.</strong>
+            </div>
+          {% elif status == 'DECLINED' %}
+            <hr class="my-3">
+            <div class="alert alert-danger py-2 mb-0">
+              <div class="fw-bold"><i class="bi bi-x-circle me-1"></i> Declined</div>
+              {% for e in timeline reversed %}
+                {% if e.action|upper == 'STATUS_CHANGED' and e.to_status|upper == 'DECLINED' %}
+                  {% if e.display_actor %}
+                    <div class="mt-2 small"><strong>Declined By:</strong> {{ e.display_actor }}</div>
+                  {% endif %}
+                  {% if e.reason %}
+                    <div class="small"><strong>Reason:</strong> {{ e.reason }}</div>
+                  {% endif %}
+                  {% comment %}Found the decline event, stop checking{% endcomment %}
+                  {% if forloop.first %}{% endif %}
+                {% endif %}
+              {% endfor %}
+            </div>
+          {% elif status != 'FOR_PRINTING' and status != 'READY_FOR_PICKUP' and status != 'RELEASED' %}
+            <hr class="my-3">
+
+            <!-- Decline -->
+            <form method="post" action="{% url 'clerk:decline' header.doc_request_id %}"
+                  onsubmit="return confirm('Decline this request? If payment was collected, a refund ticket will be created.');">
+              {% csrf_token %}
+              <div class="mb-2">
+                <label class="form-label">Decline Reason</label>
+                <input class="form-control" name="reason" placeholder="Optional reason">
+                <div class="form-text">If any payment was collected, this will also create a refund ticket.</div>
+              </div>
+              <button class="btn btn-outline-danger w-100"><i class="bi bi-x-circle me-1"></i> Decline</button>
+            </form>
+          {% endif %}
+
+          {% if header.or_number %}
+            <div class="alert alert-warning mt-3 mb-0">
+              <div class="fw-bold">Official Receipt</div>
+              <div>{{ header.or_number }}</div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endwith %}
+</div>
+
+<!-- Confirm & Download Modal -->
+<div class="modal fade" id="confirmPrintModal" tabindex="-1" aria-labelledby="confirmPrintLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#fff7e6;">
+        <h5 class="modal-title" id="confirmPrintLabel">Confirm &amp; Download</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="mb-3">
+          <div class="small-muted">Request Code</div>
+          <div class="fw-bold">{{ header.request_code }}</div>
+        </div>
+
+        <div class="mb-3">
+          <div class="small-muted">Subject</div>
+          <div class="fw-semibold">{% firstof header.on_behalf_full_name header.subject_full_name "—" %}</div>
+        </div>
+
+        <div class="mb-3">
+          <div class="small-muted">Items</div>
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead class="table-light">
+                <tr><th>Document</th><th>Purpose</th><th class="text-center">Qty</th><th class="text-end">Total</th></tr>
+              </thead>
+              <tbody>
+                {% for l in lines %}
+                <tr>
+                  <td>{{ l.document_type_name|default:"—" }}</td>
+                  <td>
+                    {% if l.purpose_display %}{{ l.purpose_display }}
+                    {% elif l.purpose_label %}{{ l.purpose_label }}
+                    {% else %}&mdash;{% endif %}
+                  </td>
+                  <td class="text-center">{{ l.quantity }}</td>
+                  <td class="text-end fw-bold">
+                    {% if is_business_renewal %}
+                      ₱{{ renewal_totals.total_amount|floatformat:2 }}
+                    {% else %}
+                      ₱{{ l.line_total|floatformat:2 }}
+                      {% if l.is_exempt %}
+                        <span class="badge text-bg-success ms-2">Exempt</span>
+                      {% endif %}
+                    {% endif %}
+                  </td>
+                </tr>
+                {% if l.reason_chips or l.is_exempt %}
+                <tr class="table-borderless">
+                  <td colspan="4">
+                    <div class="d-flex flex-wrap gap-2">
+                      {% for tag in l.reason_chips %}
+                        <span class="badge rounded-pill bg-success-subtle text-success-emphasis">{{ tag }}</span>
+                      {% endfor %}
+                      {% if l.is_exempt %}
+                        <span class="badge rounded-pill bg-success-subtle text-success-emphasis">Full waiver applied</span>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+              </tbody>
+
+              <tfoot>
+                <tr>
+                  <td colspan="3" class="text-end fw-semibold">Grand Total</td>
+                  <td class="text-end fw-bold">₱{{ header.amount_due|floatformat:2 }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div class="small text-muted">
+            <!-- HEADER BUSINESS ID {{ header.business_id }} • REQ {{ header.request_code }}<br> -->
+            Proceeding will download the filled PDF(s). <strong>This action does not change request status.</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form method="post" action="{% url 'clerk:mark_printing' header.doc_request_id %}">
+          {% csrf_token %}
+          <input type="hidden" name="download" value="1">
+          <input type="hidden" name="business_id" value="{{ header.business_id }}">
+          <button class="btn btn-primary"><i class="bi bi-download me-1"></i> Proceed &amp; Download</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox for authorization images -->
+<div class="modal fade" id="authLightbox" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content bg-dark text-white">
+      <div class="modal-body p-0">
+        <img id="authLightboxImg" src="" class="w-100" alt="Authorization letter">
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Tooltips
+  document.addEventListener('DOMContentLoaded', function () {
+    try {
+      var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+      tooltipTriggerList.forEach(function (el) { if (window.bootstrap) new bootstrap.Tooltip(el); });
+    } catch (e) { console.warn('Tooltip init failed:', e); }
+  });
+
+  // Lightbox behavior for authorization images
+  document.addEventListener('click', function(e){
+    const t = e.target;
+    if (t.matches('.media-thumb')){
+      const src = t.getAttribute('data-src') || t.getAttribute('src');
+      const img = document.getElementById('authLightboxImg');
+      if (img) img.src = src;
+    }
+  });
+</script>
+{% endblock %}

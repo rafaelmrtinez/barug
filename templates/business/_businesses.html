@@ -29,7 +29,7 @@
         <div class="card-actions">
         <button type="button" class="btn btn-outline-brand js-locate"
             data-bid="{{ r.business_id }}"{% if r.lat and r.lng %} data-lat="{{ r.lat }}" data-lng="{{ r.lng }}"{% endif %}>
-            {% load bootstrap_icons %}{% bs_icon 'geo-alt' %} Locate on map
+            {% load cached_icons %}{% bs_icon_cached 'geo-alt' %} Locate on map
         </button>
         </div>
     </div>

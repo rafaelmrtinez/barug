@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'css/table.css' %}">
@@ -163,7 +163,7 @@
         <ol class="breadcrumb mb-2">
           <li class="breadcrumb-item">
             <a href="{% url 'lupon_mem:resident_records_list' %}">
-              {% bs_icon 'people' %} Resident Records
+              {% bs_icon_cached 'people' %} Resident Records
             </a>
           </li>
           <li class="breadcrumb-item active" aria-current="page">
@@ -181,15 +181,15 @@
               <div id="personPhoto" style="width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;border:3px solid rgba(255,255,255,.3);color:#fff;font-weight:700;font-size:24px;">{{ person.first_name.0 }}{{ person.last_name.0 }}</div>
             {% endif %}
             <div style="position:absolute;bottom:0;right:0;background:var(--brand-700);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;">
-              <span class="text-white" style="font-size:10px;">{% bs_icon 'eye' %}</span>
+              <span class="text-white" style="font-size:10px;">{% bs_icon_cached 'eye' %}</span>
             </div>
           </div>
           <input type="file" id="photoUpload" accept="image/*" style="display:none;" onchange="uploadPhoto(this)">
           <div>
             <h4 class="hero-title mb-1">{{ person.full_name }}</h4>
             <div class="hero-subtitle">
-              {% if person.mobile_num %}{% bs_icon 'phone' %} {{ person.mobile_num }}{% endif %}
-              {% if person.email %}{% if person.mobile_num %} • {% endif %}{% bs_icon 'envelope' %} {{ person.email }}{% endif %}
+              {% if person.mobile_num %}{% bs_icon_cached 'phone' %} {{ person.mobile_num }}{% endif %}
+              {% if person.email %}{% if person.mobile_num %} • {% endif %}{% bs_icon_cached 'envelope' %} {{ person.email }}{% endif %}
             </div>
           </div>
         </div>
@@ -203,7 +203,7 @@
     <div class="container-fluid pt-4">
       <div class="alert alert-danger">
         <div class="d-flex align-items-center">
-          {% bs_icon 'exclamation-triangle' extra_classes='me-2' %}
+          {% bs_icon_cached 'exclamation-triangle' extra_classes='me-2' %}
           <div>
             <strong>Person not found</strong><br>
             <small>The requested person could not be found in the system.</small>
@@ -211,7 +211,7 @@
         </div>
       </div>
       <a href="{% url 'lupon_mem:resident_records_list' %}" class="btn btn-chip">
-        {% bs_icon 'arrow-left' %} Back to Resident Records
+        {% bs_icon_cached 'arrow-left' %} Back to Resident Records
       </a>
     </div>
   {% else %}
@@ -241,7 +241,7 @@
     <!-- BLOTTER REPORT HISTORY -->
     <div class="content-card">
       <div class="card-header">
-        {% bs_icon 'file-earmark-text' %}
+        {% bs_icon_cached 'file-earmark-text' %}
         Blotter Report History
         {% if report_history %}
           <span class="badge bg-secondary ms-auto">{{ report_history|length }}</span>
@@ -271,11 +271,11 @@
                     </td>
                     <td>
                       {% if report.role_in_report == 'COMPLAINANT' %}
-                        <span class="pill pill-complainant">{% bs_icon 'person-check' %} Complainant</span>
+                        <span class="pill pill-complainant">{% bs_icon_cached 'person-check' %} Complainant</span>
                       {% elif report.role_in_report == 'RESPONDENT' %}
-                        <span class="pill pill-respondent">{% bs_icon 'person-x' %} Respondent</span>
+                        <span class="pill pill-respondent">{% bs_icon_cached 'person-x' %} Respondent</span>
                       {% elif report.role_in_report == 'REPORTER' %}
-                        <span class="pill pill-reporter">{% bs_icon 'person-plus' %} Reporter</span>
+                        <span class="pill pill-reporter">{% bs_icon_cached 'person-plus' %} Reporter</span>
                       {% else %}
                         <span class="pill pill-light">{{ report.role_in_report|default:"Unknown" }}</span>
                       {% endif %}
@@ -340,7 +340,7 @@
           </div>
         {% else %}
           <div class="empty-state">
-            {% bs_icon 'file-earmark-text' %}
+            {% bs_icon_cached 'file-earmark-text' %}
             <h6>No Report History</h6>
             <p class="mb-0">This person has no blotter report involvement on record.</p>
           </div>
@@ -351,7 +351,7 @@
     <!-- CASE HISTORY -->
     <div class="content-card">
       <div class="card-header">
-        {% bs_icon 'briefcase' %}
+        {% bs_icon_cached 'briefcase' %}
         Case History
         {% if case_history %}
           <span class="badge bg-secondary ms-auto">{{ case_history|length }}</span>
@@ -384,9 +384,9 @@
                     </td>
                     <td>
                       {% if case.role_in_case == 'COMPLAINANT' %}
-                        <span class="pill pill-complainant">{% bs_icon 'person-check' %} Complainant</span>
+                        <span class="pill pill-complainant">{% bs_icon_cached 'person-check' %} Complainant</span>
                       {% elif case.role_in_case == 'RESPONDENT' %}
-                        <span class="pill pill-respondent">{% bs_icon 'person-x' %} Respondent</span>
+                        <span class="pill pill-respondent">{% bs_icon_cached 'person-x' %} Respondent</span>
                       {% else %}
                         <span class="pill pill-light">{{ case.role_in_case|default:"Unknown" }}</span>
                       {% endif %}
@@ -442,7 +442,7 @@
                     </td>
                     <td>
                       <a href="{% url 'lupon_mem:case_detail' case.blotter_case_id %}" class="btn-chip btn-sm">
-                        {% bs_icon 'eye' %} View Case
+                        {% bs_icon_cached 'eye' %} View Case
                       </a>
                     </td>
                   </tr>
@@ -452,7 +452,7 @@
           </div>
         {% else %}
           <div class="empty-state">
-            {% bs_icon 'briefcase' %}
+            {% bs_icon_cached 'briefcase' %}
             <h6>No Case History</h6>
             <p class="mb-0">This person has no case involvement on record.</p>
           </div>
@@ -463,11 +463,11 @@
     <!-- ACTIONS -->
     <div class="d-flex gap-2 mb-4">
       <a href="{% url 'lupon_mem:resident_records_list' %}" class="btn btn-chip">
-        {% bs_icon 'arrow-left' %} Back to Resident Records
+        {% bs_icon_cached 'arrow-left' %} Back to Resident Records
       </a>
       {% if report_history or case_history %}
         <!-- <button class="btn btn-chip" onclick="window.print()">
-          {% bs_icon 'printer' %} Print Records
+          {% bs_icon_cached 'printer' %} Print Records
         </button> -->
       {% endif %}
     </div>
@@ -496,7 +496,7 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
         <button type="button" class="btn" style="background:var(--brand-700);color:#fff;" onclick="document.getElementById('photoUpload').click();">
-          {% bs_icon 'camera' %} Update Photo
+          {% bs_icon_cached 'camera' %} Update Photo
         </button>
       </div>
     </div>

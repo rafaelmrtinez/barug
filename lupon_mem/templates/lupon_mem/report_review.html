@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static bootstrap_icons %}
+{% load static cached_icons %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'css/form.css' %}">
@@ -69,7 +69,7 @@
     </div>
     <div class="d-flex align-items-center gap-2">
       <a href="{% url 'lupon_mem:report_list' %}" class="btn btn-link-compact">
-        {% bs_icon 'arrow-left' extra_classes='me-1' %} Back to Reports
+        {% bs_icon_cached 'arrow-left' extra_classes='me-1' %} Back to Reports
       </a>
     </div>
   </div>
@@ -85,19 +85,19 @@
 
           <!-- Date Filed -->
           <div class="mt-2">
-            <span class="text-muted me-1">{% bs_icon 'calendar-event' %}</span>
+            <span class="text-muted me-1">{% bs_icon_cached 'calendar-event' %}</span>
             <span><strong>Date Filed:</strong> {{ report.3 }}</span>
           </div>
 
           <!-- Incident Date -->
           <div class="mt-2">
-            <span class="text-muted me-1">{% bs_icon 'calendar3' %}</span>
+            <span class="text-muted me-1">{% bs_icon_cached 'calendar3' %}</span>
             <span><strong>Incident Date:</strong> {{ incident_date }}</span>
           </div>
 
           <!-- Incident address -->
           <div class="mt-2">
-            <span class="text-muted me-1">{% bs_icon 'geo-alt' %}</span>
+            <span class="text-muted me-1">{% bs_icon_cached 'geo-alt' %}</span>
             <span><strong>Incident Address:</strong> {{ report.5 }}</span>
           </div>
         </div>
@@ -106,13 +106,13 @@
         <div class="mt-2 mt-md-0">
           {% with status=report.4|upper %}
             {% if status == 'PAID' %}
-              <span class="pill pill-paid">{% bs_icon 'check-circle' %} PAID</span>
+              <span class="pill pill-paid">{% bs_icon_cached 'check-circle' %} PAID</span>
             {% elif status == 'UNPAID' %}
-              <span class="pill pill-unpaid">{% bs_icon 'cash-coin' %} UNPAID</span>
+              <span class="pill pill-unpaid">{% bs_icon_cached 'cash-coin' %} UNPAID</span>
             {% elif status == 'DECLINED' %}
-              <span class="pill pill-declined">{% bs_icon 'x-octagon' %} DECLINED</span>
+              <span class="pill pill-declined">{% bs_icon_cached 'x-octagon' %} DECLINED</span>
             {% elif status == 'PARTIALLY PAID' %}
-              <span class="pill pill-partial">{% bs_icon 'pie-chart' %} PARTIALLY PAID</span>
+              <span class="pill pill-partial">{% bs_icon_cached 'pie-chart' %} PARTIALLY PAID</span>
             {% else %}
               <span class="badge text-bg-light text-muted px-3 py-2">—</span>
             {% endif %}
@@ -122,7 +122,7 @@
 
       <!-- Subject Details -->
       <div class="mt-2">
-        <span class="text-muted me-1">{% bs_icon 'card-text' %}</span>
+        <span class="text-muted me-1">{% bs_icon_cached 'card-text' %}</span>
         <span><strong>Subject Details:</strong> {{ report.2 }}</span>
       </div>
     </div>
@@ -132,12 +132,12 @@
   <div class="card shadow-sm mb-3">
     <div class="card-body">
       <div class="d-flex align-items-center gap-2 mb-2">
-        {% bs_icon 'people' %} <strong>Parties</strong>
+        {% bs_icon_cached 'people' %} <strong>Parties</strong>
       </div>
 
       <div class="row g-2">
         <div class="col-md-6">
-          <div class="mb-1 small text-muted">{% bs_icon 'person' %} Complainant(s)</div>
+          <div class="mb-1 small text-muted">{% bs_icon_cached 'person' %} Complainant(s)</div>
           <div id="complainantList">
             {% for p in parties %}{% if p.2|upper == 'COMPLAINANT' %}
               <span class="party-chip" data-role="{{ p.2 }}" data-name="{{ p.1|escape }}">#{{ p.0 }} {{ p.1 }}</span>
@@ -145,7 +145,7 @@
           </div>
         </div>
         <div class="col-md-6">
-          <div class="mb-1 small text-muted">{% bs_icon 'people' %} Respondent(s)</div>
+          <div class="mb-1 small text-muted">{% bs_icon_cached 'people' %} Respondent(s)</div>
           <div id="respondentList">
             {% for p in parties %}{% if p.2|upper == 'RESPONDENT' %}
               <span class="party-chip" data-role="{{ p.2 }}" data-name="{{ p.1|escape }}">#{{ p.0 }} {{ p.1 }}</span>
@@ -208,7 +208,7 @@
     <div class="card shadow-sm mb-3">
       <div class="card-body d-flex flex-wrap align-items-center justify-content-between">
         <div>
-          <span class="pill pill-reviewed">{% bs_icon 'check2' %} REVIEWED</span>
+          <span class="pill pill-reviewed">{% bs_icon_cached 'check2' %} REVIEWED</span>
           {% if review_action %}
             <span class="ms-2 badge rounded-pill bg-light text-dark">{{ review_action }}</span>
           {% endif %}
@@ -222,7 +222,7 @@
           {% endif %}
         </div>
         <a class="btn btn-outline-brand" href="{% url 'lupon_mem:report_list' %}">
-          {% bs_icon 'arrow-left' extra_classes='me-1' %} Back to Reports
+          {% bs_icon_cached 'arrow-left' extra_classes='me-1' %} Back to Reports
         </a>
       </div>
     </div>
@@ -230,7 +230,7 @@
     {% if report.4|upper == 'UNPAID' %}
     <div class="card shadow-sm mb-3">
       <div class="card-body">
-        <h5 class="mb-3">{% bs_icon 'cash-coin' %} Record Payment & Escalate to Case</h5>
+        <h5 class="mb-3">{% bs_icon_cached 'cash-coin' %} Record Payment & Escalate to Case</h5>
         <form method="post" action="{% url 'lupon_mem:report_mark_paid' report.0 %}" id="paymentForm">
           {% csrf_token %}
           <div class="row g-3">
@@ -258,7 +258,7 @@
             </div>
           </div>
           <button type="button" class="btn btn-brand" id="submitPaymentBtn" disabled data-bs-toggle="modal" data-bs-target="#confirmPaymentModal">
-            {% bs_icon 'check2-circle' %} Mark as Paid & Escalate
+            {% bs_icon_cached 'check2-circle' %} Mark as Paid & Escalate
           </button>
         </form>
       </div>
@@ -270,10 +270,10 @@
       <div class="card shadow-sm mb-3">
         <div class="card-body d-flex flex-wrap gap-2">
           <button type="button" class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#approveModal">
-            {% bs_icon 'check2' extra_classes='me-2' %} Convert to Case
+            {% bs_icon_cached 'check2' extra_classes='me-2' %} Convert to Case
           </button>
           <button type="button" class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#declineModal">
-            {% bs_icon 'x-circle' extra_classes='me-2' %} Decline
+            {% bs_icon_cached 'x-circle' extra_classes='me-2' %} Decline
           </button>
         </div>
       </div>
@@ -281,7 +281,7 @@
       <div class="card shadow-sm mb-3">
         <div class="card-body">
           <div class="alert alert-warning mb-3" role="alert">
-            {% bs_icon 'exclamation-triangle' extra_classes='me-2' %}
+            {% bs_icon_cached 'exclamation-triangle' extra_classes='me-2' %}
             <strong>No Respondent:</strong> A respondent must be added before this report can be converted to a case.
           </div>
           
@@ -305,7 +305,7 @@
             </div>
             
             <button type="button" class="btn btn-brand" id="updateRespondentsBtn" disabled data-bs-toggle="modal" data-bs-target="#confirmUpdateModal">
-              {% bs_icon 'check2' extra_classes='me-1' %} Update Respondent
+              {% bs_icon_cached 'check2' extra_classes='me-1' %} Update Respondent
             </button>
           </form>
         </div>
@@ -319,7 +319,7 @@
       <div class="card-body d-flex justify-content-between align-items-center">
         <div class="hint"><i>Payment required to open a case.</i></div>
         <a class="btn btn-brand" href="{% url 'lupon_mem:report_pay_and_open_case' report.0 %}" id="payOpenBtn">
-          {% bs_icon 'wallet2' extra_classes='me-2' %} Pay & Open Case
+          {% bs_icon_cached 'wallet2' extra_classes='me-2' %} Pay & Open Case
         </a>
       </div>
     </div>
@@ -344,7 +344,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">{% bs_icon 'check2-circle' extra_classes='text-success me-2' %} Convert to Case</h5>
+        <h5 class="modal-title">{% bs_icon_cached 'check2-circle' extra_classes='text-success me-2' %} Convert to Case</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -355,8 +355,8 @@
         </ul>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline-brand" data-bs-dismiss="modal">{% bs_icon 'x' extra_classes='me-1' %} Cancel</button>
-        <button type="button" class="btn btn-brand" id="approveConfirmBtn">{% bs_icon 'check2' extra_classes='me-1' %} Yes, Convert to Case</button>
+        <button type="button" class="btn btn-outline-brand" data-bs-dismiss="modal">{% bs_icon_cached 'x' extra_classes='me-1' %} Cancel</button>
+        <button type="button" class="btn btn-brand" id="approveConfirmBtn">{% bs_icon_cached 'check2' extra_classes='me-1' %} Yes, Convert to Case</button>
       </div>
     </div>
   </div>
@@ -409,7 +409,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">{% bs_icon 'cash-coin' extra_classes='text-success me-2' %} Confirm Payment & Escalation</h5>
+        <h5 class="modal-title">{% bs_icon_cached 'cash-coin' extra_classes='text-success me-2' %} Confirm Payment & Escalation</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -422,8 +422,8 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline-brand" data-bs-dismiss="modal">{% bs_icon 'x' extra_classes='me-1' %} Cancel</button>
-        <button type="button" class="btn btn-brand" id="confirmPaymentBtn">{% bs_icon 'check2' extra_classes='me-1' %} Yes, Confirm</button>
+        <button type="button" class="btn btn-outline-brand" data-bs-dismiss="modal">{% bs_icon_cached 'x' extra_classes='me-1' %} Cancel</button>
+        <button type="button" class="btn btn-brand" id="confirmPaymentBtn">{% bs_icon_cached 'check2' extra_classes='me-1' %} Yes, Confirm</button>
       </div>
     </div>
   </div>
@@ -434,7 +434,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">{% bs_icon 'x-octagon' extra_classes='text-danger me-2' %} Decline Report</h5>
+        <h5 class="modal-title">{% bs_icon_cached 'x-octagon' extra_classes='text-danger me-2' %} Decline Report</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -443,8 +443,8 @@
         <textarea id="declineReason" class="form-control" rows="3" placeholder="State a short reason…"></textarea>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline-brand" data-bs-dismiss="modal">{% bs_icon 'x' extra_classes='me-1' %} Cancel</button>
-        <button type="button" class="btn btn-brand" id="declineConfirmBtn">{% bs_icon 'send' extra_classes='me-1' %} Submit Decline</button>
+        <button type="button" class="btn btn-outline-brand" data-bs-dismiss="modal">{% bs_icon_cached 'x' extra_classes='me-1' %} Cancel</button>
+        <button type="button" class="btn btn-brand" id="declineConfirmBtn">{% bs_icon_cached 'send' extra_classes='me-1' %} Submit Decline</button>
       </div>
     </div>
   </div>

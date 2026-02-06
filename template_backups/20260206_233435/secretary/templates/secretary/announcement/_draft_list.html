@@ -1,0 +1,61 @@
+{% for r in rows %}
+<tr class="table-row-height">
+  <td>
+    <div class="fw-semibold">{{ r.announcement_title|truncatechars:50 }}</div>
+    <div class="text-muted small">{{ r.announcement_body|truncatechars:80 }}</div>
+  </td>
+  <td>
+    {% if r.announcement_published_at %}
+      <div class="small">{{ r.announcement_published_at|date:"M d, Y" }}</div>
+      <div class="text-muted small">{{ r.announcement_published_at|time:"g:i A" }}</div>
+    {% else %}
+      <span class="text-muted">Not scheduled</span>
+    {% endif %}
+  </td>
+  <td>
+    {% if r.announcement_expire_at %}
+      <div class="small">{{ r.announcement_expire_at|date:"M d, Y" }}</div>
+      <div class="text-muted small">{{ r.announcement_expire_at|time:"g:i A" }}</div>
+    {% else %}
+      <span class="text-muted">No expiry</span>
+    {% endif %}
+  </td>
+  <td>
+    <div class="small">{{ r.announcement_created_at|date:"M d, Y" }}</div>
+    <div class="text-muted small">{{ r.announcement_created_at|time:"g:i A" }}</div>
+  </td>
+  <td>
+    <span class="status-pill">
+      <i class="bi bi-file-earmark me-1"></i>
+      {{ r.announcement_status_name|default:"Draft" }}
+    </span>
+  </td>
+  <td>
+    <div class="btn-group btn-group-sm" role="group">
+      <a href="{% url 'secretary:announcement_draft_view' r.announcement_id %}" 
+         class="btn btn-outline-secondary" 
+         title="View Details"
+         data-bs-toggle="tooltip">
+        <i class="bi bi-eye"></i>
+      </a>
+      <a href="{% url 'secretary:announcement_draft_edit' r.announcement_id %}" 
+         class="btn btn-outline-primary" 
+         title="Edit Draft"
+         data-bs-toggle="tooltip">
+        <i class="bi bi-pencil"></i>
+      </a>
+      <button type="button" 
+              class="btn btn-outline-danger" 
+              title="Delete Draft"
+              data-bs-toggle="tooltip"
+              onclick="confirmDelete({{ r.announcement_id }})">
+        <i class="bi bi-trash"></i>
+      </button>
+    </div>
+  </td>
+</tr>
+{% empty %}
+<tr>
+  <td colspan="6" class="text-center py-4 text-muted">No announcements found.</td>
+</tr>
+{% endfor %}
