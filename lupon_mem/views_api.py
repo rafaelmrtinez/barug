@@ -622,12 +622,7 @@ def staff_suggest(request: HttpRequest):
         cur.execute(
             """
             SELECT s.staff_id,
-                   trim(
-                       coalesce(p.first_name,'') || ' ' ||
-                       coalesce(p.middle_name,'') || ' ' ||
-                       coalesce(p.last_name,'') || ' ' ||
-                       coalesce(p.suffix,'')
-                   ) AS name
+                   TRIM(CONCAT_WS(' ', p.first_name, p.last_name, NULLIF(p.suffix, ''))) AS name
             FROM staff s
             JOIN person p ON p.person_id = s.person_id
             JOIN rolee  r ON r.role_id = s.role_id
@@ -659,12 +654,7 @@ def staff_suggest_all(request: HttpRequest):
         cur.execute(
             """
             SELECT s.staff_id,
-                   trim(
-                       coalesce(p.first_name,'') || ' ' ||
-                       coalesce(p.middle_name,'') || ' ' ||
-                       coalesce(p.last_name,'') || ' ' ||
-                       coalesce(p.suffix,'')
-                   ) AS name
+                   TRIM(CONCAT_WS(' ', p.first_name, p.last_name, NULLIF(p.suffix, ''))) AS name
             FROM staff s
             JOIN person p ON p.person_id = s.person_id
             JOIN rolee  r ON r.role_id = s.role_id
@@ -823,21 +813,16 @@ def person_suggest(request: HttpRequest):
 
     like = f"%{q}%"
     with connection.cursor() as cur:
-        # Include both residents and non-residents in search
         cur.execute(
             """
             SELECT 
                 p.person_id,
-                TRIM(CONCAT_WS(' ', 
-                    p.first_name, 
-                    NULLIF(SUBSTRING(COALESCE(p.middle_name, '') FROM 1 FOR 1) || '.', '.'), 
-                    p.last_name, 
-                    NULLIF(p.suffix, '')
-                )) AS person_name,
+                TRIM(CONCAT_WS(' ', p.first_name, p.last_name, NULLIF(p.suffix, ''))) AS person_name,
                 CASE 
                     WHEN rs.residential_status_name = 'RESIDENT' THEN 'Resident'
                     ELSE 'Non-Resident'
-                END AS status
+                END AS status,
+                p.mobile_num
             FROM person p
             LEFT JOIN residential_status rs ON rs.residential_status_id = p.residential_status_id
             WHERE (
@@ -858,7 +843,9 @@ def person_suggest(request: HttpRequest):
     return JsonResponse({"results": [
         {
             "id": r[0], 
-            "name": f"{(r[1] or '').strip()} ({r[2]})"
+            "name": (r[1] or '').strip(),
+            "resident_type": r[2],
+            "contact_number": r[3] or ''
         } for r in rows
     ]})
 

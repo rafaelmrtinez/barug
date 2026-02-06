@@ -97,7 +97,7 @@
     .redirect-spinner{ color:#7B1E22!important; width:3rem; height:3rem; }
     .redirect-title{ color:#7B1E22; font-weight:700; }
     .redirect-text{ color:#FC9700; }
-    [data-code="brgy_sec"],[data-code="processed_by"],[data-code="processed_on_time"],[data-code="recipient_addr"],[data-code="punong_barangay"],[data-code="brgy_capt"],[data-code="processed_by_staff"],[data-code="processed_by_staff_id"],[data-code="brgy_captain"],[data-code="barangay_captain"]{display:none!important;}
+    [data-code="brgy_sec"],[data-code="processed_by"],[data-code="processed_on_time"],[data-code="recipient_addr"],[data-code="punong_barangay"],[data-code="brgy_capt"],[data-code="processed_by_staff"],[data-code="processed_by_staff_id"],[data-code="brgy_captain"],[data-code="barangay_captain"],[data-code="processed_on_date"],[data-code="brgy_chairman"],[data-code="respondents_2"]{display:none!important;}
   </style>
 </head>
 
@@ -312,6 +312,9 @@
             <button type="button" class="btn btn-sm btn-outline-brand d-flex align-items-center" id="btnAddStaff">
               <i class="bi bi-person-plus me-2"></i> Add staff
             </button>
+            <button type="button" class="btn btn-sm btn-outline-success d-flex align-items-center" id="btnAddResident">
+              <i class="bi bi-person-plus me-2"></i> Add resident
+            </button>
             <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearStaff" title="Clear picks">Clear</button>
           </div>
         </div>
@@ -409,6 +412,26 @@
             </div>
           </div>
         </div>
+      </div>
+      {% endif %}
+
+      <!-- Add Person Button for MED-ATT-2025 -->
+      {% if header.0 == 'MED-ATT-2025' %}
+      <div class="mb-3" style="display:none;">
+        <div class="d-flex align-items-start justify-content-between">
+          <div>
+            <div class="fw-semibold d-flex align-items-center"><i class="bi bi-people me-2 text-warning"></i>Person attendees</div>
+            <div id="addedPersonsList" class="mt-2"></div>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-outline-brand d-flex align-items-center" id="btnAddPerson">
+              <i class="bi bi-person-plus me-2"></i> Add person
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearPerson" title="Clear picks">Clear</button>
+          </div>
+        </div>
+        <input type="hidden" id="med_att_person_json" name="med_att_person_json" value="[]">
+        <div class="form-text mt-1">Picks auto-fill Attendee/Position/Contact fields (1..N). You can still edit them after.</div>
       </div>
       {% endif %}
 
@@ -681,6 +704,25 @@
   </div>
 </div>
 
+<!-- Resident picker modal -->
+<div class="modal" tabindex="-1" id="residentPicker" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Add resident attendee</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group mb-2">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input type="text" class="form-control" id="residentSearch" placeholder="Search resident by name…">
+        </div>
+        <div id="residentResults" class="list-group"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Redirect loading overlay -->
 <div id="redirectOverlay" class="redirect-overlay">
   <div class="redirect-message">
@@ -740,3 +782,6 @@
 <script src="{% static 'js/form_builder.js' %}"></script>
 </body>
 </html>
+
+<!-- Person picker modal -->`n<div class="modal" tabindex="-1" id="personPicker" aria-hidden="true">`n  <div class="modal-dialog modal-dialog-scrollable">`n    <div class="modal-content">`n      <div class="modal-header">`n        <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Add person attendee</h5>`n        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>`n      </div>`n      <div class="modal-body">`n        <div class="input-group mb-2">`n          <span class="input-group-text"><i class="bi bi-search"></i></span>`n          <input type="text" class="form-control" id="personSearch" placeholder="Search person by name�">`n        </div>`n        <div id="personResults" class="list-group"></div>`n      </div>`n    </div>`n  </div>`n</div>`n`n<script>`n// Person picker functionality`n(function(){`n  let addedPersons=[];`n  let personCounter=1;`n  const personModal = document.getElementById('personPicker');`n  const btnAddPerson = document.getElementById('btnAddPerson');`n  const btnClearPerson = document.getElementById('btnClearPerson');`n  const personSearch = document.getElementById('personSearch');`n  const personResults = document.getElementById('personResults');`n  `n  if(btnAddPerson){`n    btnAddPerson.addEventListener('click',function(){`n      new bootstrap.Modal(personModal).show();`n    });`n  }`n  `n  if(btnClearPerson){`n    btnClearPerson.addEventListener('click',function(){`n      addedPersons=[];`n      personCounter=1;`n      const l=document.getElementById('addedPersonsList');`n      if(l)l.innerHTML='';`n      document.querySelectorAll('[data-field-code^="person_"],[data-field-code^="pos_"],[data-field-code^="contact_"],[data-field-code="position_one"]').forEach(f=>{`n        f.value='';`n        f.dispatchEvent(new Event('change',{bubbles:true}));`n      });`n    });`n  }`n  `n  if(personSearch){`n    personSearch.addEventListener('input',function(e){`n      const q=e.target.value.trim();`n      if(q.length<2){personResults.innerHTML='';return;}`n      fetch(`/lupon_mem/person_suggest/?q=${encodeURIComponent(q)}`).then(r=>r.json()).then(data=>{`n        personResults.innerHTML='';`n        if(data.results&&data.results.length>0){`n          data.results.forEach(p=>{`n            const item=document.createElement('a');`n            item.href='#';`n            item.className='list-group-item list-group-item-action';`n            item.innerHTML=`${p.name} <span class="badge bg-secondary">${p.resident_type||'Resident'}</span>`;`n            item.onclick=(ev)=>{`n              ev.preventDefault();`n              addPersonToForm(p);`n              bootstrap.Modal.getInstance(personModal).hide();`n              personSearch.value='';`n              personResults.innerHTML='';`n            };`n            personResults.appendChild(item);`n          });`n        }else{personResults.innerHTML='<div class="p-2 text-muted">No results</div>';}`n      });`n    });`n  }`n  `n  function addPersonToForm(p){`n    if(personCounter>10){alert('Max 10 persons');return;}`n    addedPersons.push(p);`n    const w=['','one','two','three','four','five','six','seven','eight','nine','ten'][personCounter];`n    const pf=document.querySelector(`input[data-field-code="person_${w}"]`);`n    const posf=document.querySelector(`input[data-field-code="${personCounter===1?'position_one':'pos_'+w}"]`);`n    const cf=document.querySelector(`input[data-field-code="contact_${w}"]`);`n    if(pf)pf.value=p.name;`n    if(posf)posf.value=p.resident_type||'Resident';`n    if(cf)cf.value=p.contact_number||'';`n    if(pf)pf.dispatchEvent(new Event('change',{bubbles:true}));`n    if(posf)posf.dispatchEvent(new Event('change',{bubbles:true}));`n    if(cf)cf.dispatchEvent(new Event('change',{bubbles:true}));`n    personCounter++;`n    const l=document.getElementById('addedPersonsList');`n    if(l)l.innerHTML='<small class="text-muted">Added:</small><br>'+addedPersons.map((p,i)=>`<span class="badge bg-success me-1">${i+1}. ${p.name}</span>`).join('');`n  }`n})();`n</script>
+

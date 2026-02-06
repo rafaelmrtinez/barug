@@ -173,25 +173,28 @@
       </nav> -->
       
       {% if person %}
-        <div class="d-flex align-items-center gap-3">
-          <div style="position:relative;cursor:pointer;" onclick="showPhotoModal()">
-            {% if person.person_img %}
-              <img id="personPhoto" src="{{ person.person_img }}" alt="{{ person.full_name }}" style="width:60px;height:60px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,.3);">
-            {% else %}
-              <div id="personPhoto" style="width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;border:3px solid rgba(255,255,255,.3);color:#fff;font-weight:700;font-size:24px;">{{ person.first_name.0 }}{{ person.last_name.0 }}</div>
-            {% endif %}
-            <div style="position:absolute;bottom:0;right:0;background:var(--brand-700);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;">
-              <span class="text-white" style="font-size:10px;">{% bs_icon_cached 'eye' %}</span>
+        <div class="d-flex align-items-center justify-content-between">
+          <div class="d-flex align-items-center gap-3">
+            <div style="position:relative;cursor:pointer;" onclick="showPhotoModal()">
+              {% if person.person_img %}
+                <img id="personPhoto" src="{{ person.person_img }}" alt="{{ person.full_name }}" style="width:60px;height:60px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,.3);">
+              {% else %}
+                <div id="personPhoto" style="width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;border:3px solid rgba(255,255,255,.3);color:#fff;font-weight:700;font-size:24px;">{{ person.first_name.0 }}{{ person.last_name.0 }}</div>
+              {% endif %}
+              <div style="position:absolute;bottom:0;right:0;background:var(--brand-700);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;">
+                <span class="text-white" style="font-size:10px;">{% bs_icon_cached 'eye' %}</span>
+              </div>
+            </div>
+            <input type="file" id="photoUpload" accept="image/*" style="display:none;" onchange="uploadPhoto(this)">
+            <div>
+              <h4 class="hero-title mb-1">{{ person.full_name }}</h4>
+              <div class="hero-subtitle">
+                {% if person.mobile_num %}{% bs_icon_cached 'phone' %} {{ person.mobile_num }}{% endif %}
+                {% if person.email %}{% if person.mobile_num %} • {% endif %}{% bs_icon_cached 'envelope' %} {{ person.email }}{% endif %}
+              </div>
             </div>
           </div>
-          <input type="file" id="photoUpload" accept="image/*" style="display:none;" onchange="uploadPhoto(this)">
-          <div>
-            <h4 class="hero-title mb-1">{{ person.full_name }}</h4>
-            <div class="hero-subtitle">
-              {% if person.mobile_num %}{% bs_icon_cached 'phone' %} {{ person.mobile_num }}{% endif %}
-              {% if person.email %}{% if person.mobile_num %} • {% endif %}{% bs_icon_cached 'envelope' %} {{ person.email }}{% endif %}
-            </div>
-          </div>
+          <button class="btn btn-light" onclick="showEditModal()">{% bs_icon_cached 'pencil' %} Edit Details</button>
         </div>
       {% else %}
         <h4 class="hero-title">Person Not Found</h4>
@@ -502,6 +505,51 @@
     </div>
   </div>
 </div>
+
+<!-- Edit Details Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog" style="margin-top:100px;">
+    <div class="modal-content">
+      <form method="POST" onsubmit="return confirmSave();">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title">Edit Person Details</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">First Name</label>
+            <input type="text" class="form-control" name="first_name" value="{{ person.first_name }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Middle Name</label>
+            <input type="text" class="form-control" name="middle_name" value="{{ person.middle_name }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Last Name</label>
+            <input type="text" class="form-control" name="last_name" value="{{ person.last_name }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Suffix</label>
+            <input type="text" class="form-control" name="suffix" value="{{ person.suffix }}" placeholder="Jr., Sr., III, etc.">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Contact Number</label>
+            <input type="text" class="form-control" name="mobile_num" value="{{ person.mobile_num }}" placeholder="09XXXXXXXXX">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-control" name="email" value="{{ person.email }}" placeholder="email@example.com">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn" style="background:var(--brand-700);color:#fff;">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block js %}
@@ -509,6 +557,15 @@
 function showPhotoModal() {
   const modal = new bootstrap.Modal(document.getElementById('photoModal'));
   modal.show();
+}
+
+function showEditModal() {
+  const modal = new bootstrap.Modal(document.getElementById('editModal'));
+  modal.show();
+}
+
+function confirmSave() {
+  return confirm('Are you sure you want to save these changes?');
 }
 
 function uploadPhoto(input) {

@@ -721,6 +721,7 @@ function bindCloseOnEscape(input, closeFn){
 /* MED ATT: picks -> autofill (unchanged) */
 (function(){
   const btnAdd   = document.getElementById("btnAddStaff");
+  const btnAddResident = document.getElementById("btnAddResident");
   const btnClear = document.getElementById("btnClearStaff");
   const chipsBox = document.getElementById("attChips");
   const hidden   = document.getElementById("med_att_staff_json");
@@ -729,6 +730,11 @@ function bindCloseOnEscape(input, closeFn){
   const modal     = modalEl ? new bootstrap.Modal(modalEl) : null;
   const searchBox = document.getElementById("staffSearch");
   const results   = document.getElementById("staffResults");
+
+  const resModalEl   = document.getElementById("residentPicker");
+  const resModal     = resModalEl ? new bootstrap.Modal(resModalEl) : null;
+  const resSearchBox = document.getElementById("residentSearch");
+  const resResults   = document.getElementById("residentResults");
 
   if(!btnAdd || !chipsBox) return;
 
@@ -806,6 +812,13 @@ function bindCloseOnEscape(input, closeFn){
     modal.show();
     setTimeout(()=>searchBox.focus(), 80);
   });
+  if (btnAddResident) btnAddResident.addEventListener("click", ()=>{
+    if(!resModal) return;
+    resResults.innerHTML = "";
+    resSearchBox.value = "";
+    resModal.show();
+    setTimeout(()=>resSearchBox.focus(), 80);
+  });
   if (btnClear) btnClear.addEventListener("click", ()=>{ picks=[]; persist(); renderChips(); pushToForm(); });
 
   let t=null;
@@ -868,6 +881,51 @@ function bindCloseOnEscape(input, closeFn){
     picks.push(row);
     persist(); renderChips(); pushToForm();
     if (modal) modal.hide();
+  });
+
+  let rt=null;
+  if (resSearchBox){
+    resSearchBox.addEventListener("input", ()=>{
+      const q = resSearchBox.value.trim();
+      if (rt) clearTimeout(rt);
+      if (q.length < 2){ resResults.innerHTML=""; return; }
+      rt = setTimeout(async ()=>{
+        resResults.innerHTML = '<div class="list-group-item text-muted">Searching…</div>';
+        try{
+          const r = await fetch(safeUrl('person_suggest') + "?q=" + encodeURIComponent(q), {headers:{'X-Requested-With':'fetch'}});
+          const j = await r.json();
+          const rows = j.results || [];
+          resResults.innerHTML = rows.length ? rows.map(x=>{
+            const pid = x.person_id ?? x.id ?? "";
+            const payload = btoa(unescape(encodeURIComponent(JSON.stringify(x))));
+            return `<button type="button" class="list-group-item list-group-item-action" data-pid="${String(pid)}" data-json="${payload}">${escapeHtml(x.name || "")} <span class="badge bg-secondary">${escapeHtml(x.resident_type||'Resident')}</span></button>`;
+          }).join("") : '<div class="list-group-item text-muted">No matches</div>';
+        }catch(_){
+          resResults.innerHTML = '<div class="list-group-item text-danger">Search failed</div>';
+        }
+      }, 200);
+    });
+  }
+
+  resResults?.addEventListener("click", async (e)=>{
+    const btn = e.target.closest("button.list-group-item"); if (!btn) return;
+    let base = {};
+    try { base = JSON.parse(decodeURIComponent(escape(atob(btn.getAttribute("data-json") || "e30=")))); } catch(_){}
+
+    const row = {
+      person_id: base.person_id || base.id || null,
+      name: (base.name || "").trim(),
+      role: (base.resident_type || "Resident").trim(),
+      mobile: (base.contact_number || base.mobile || base.phone || "").trim()
+    };
+
+    if (picks.some(p => p.name === row.name)){
+      if (resModal) resModal.hide();
+      return;
+    }
+    picks.push(row);
+    persist(); renderChips(); pushToForm();
+    if (resModal) resModal.hide();
   });
 })();
 

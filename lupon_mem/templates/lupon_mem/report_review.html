@@ -275,6 +275,9 @@
           <button type="button" class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#declineModal">
             {% bs_icon_cached 'x-circle' extra_classes='me-2' %} Decline
           </button>
+          <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+            {% bs_icon_cached 'trash' extra_classes='me-2' %} Delete Report
+          </button>
         </div>
       </div>
       {% else %}
@@ -445,6 +448,29 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-brand" data-bs-dismiss="modal">{% bs_icon_cached 'x' extra_classes='me-1' %} Cancel</button>
         <button type="button" class="btn btn-brand" id="declineConfirmBtn">{% bs_icon_cached 'send' extra_classes='me-1' %} Submit Decline</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">{% bs_icon_cached 'exclamation-triangle' extra_classes='text-danger me-2' %} Delete Report</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">Are you sure you want to <strong>delete</strong> this blotter report?</p>
+        <p class="text-danger"><strong>Warning:</strong> This action cannot be undone. All data associated with this report will be permanently deleted.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{% bs_icon_cached 'x' extra_classes='me-1' %} Cancel</button>
+        <form method="post" action="{% url 'lupon_mem:report_delete' report.0 %}" style="display:inline;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger">{% bs_icon_cached 'trash' extra_classes='me-1' %} Delete Report</button>
+        </form>
       </div>
     </div>
   </div>

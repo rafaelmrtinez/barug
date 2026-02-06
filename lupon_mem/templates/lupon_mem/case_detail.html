@@ -176,7 +176,7 @@
     </div>
 
     <div class="ms-auto d-flex align-items-center gap-2">
-      {% if case_state_name|lower != 'closed' and case_state_name|lower != 'dismissed' and request.session.auth.role_name|lower != 'barangay secretary' %}
+      {% if request.session.auth.role_name|lower != 'barangay secretary' %}
       <a class="btn btn-outline-brand" href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
         {% bs_icon_cached 'plus-circle' extra_classes='me-1' %} Add Form
       </a>
@@ -329,13 +329,11 @@
     </div>
   </div> -->
 
-  {% if case_state_name|lower != 'closed' and case_state_name|lower != 'dismissed' %}
   <div class="sticky-add d-md-none mt-3">
     <a class="btn btn-outline-brand btn-lg rounded-pill" href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
       {% bs_icon_cached 'plus-circle' extra_classes='me-1' %} Add Form
     </a>
   </div>
-  {% endif %}
 
 </div>
 
