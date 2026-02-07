@@ -298,13 +298,7 @@ class KP7Handler:
                         if addr_row and addr_row[0]:
                             where_text = addr_row[0]
 
-        parts = []
-        parts.append(f"WHAT: {raw_what}" if raw_what else "WHAT:")
-        if when_text:
-            parts.append(f"WHEN: {when_text}")
-        parts.append(f"WHERE: {where_text}" if where_text else "WHERE:")
-
-        new_details = "\n".join(parts).strip()
+        new_details = raw_what.strip()
 
         # Only write back if different to avoid churn on repeated runs
         if FS.sanitize_text(out.get("complaint_details", "")) != new_details:

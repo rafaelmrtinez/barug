@@ -349,6 +349,26 @@ class Med1SettledHandler:
 
     # ---------------- public API ----------------------------------------------------------
     def build_name_value_map(self, form_id: int, submission_id: int) -> dict:
+        # Load existing user answers first
+        answers_by_id = FS.load_answers(submission_id)
+        
+        # Fetch field codes for this form
+        with connection.cursor() as cur:
+            cur.execute("""
+                SELECT f.field_id, LOWER(f.field_code)
+                FROM kp_form_field kff
+                JOIN kp_field f ON f.field_id = kff.field_id
+                WHERE kff.form_id=%s
+            """, [form_id])
+            field_map = {row[1]: str(row[0]) for row in cur.fetchall() if row[1]}
+        
+        # Build user_inputs dict from existing answers
+        user_inputs = {}
+        for code, field_id in field_map.items():
+            val = answers_by_id.get(field_id)
+            if val not in (None, "", "null"):
+                user_inputs[code] = FS.sanitize_text(str(val))
+        
         # Determine the related case
         case_id = self._case_id_for_submission(submission_id)
         if not case_id:
@@ -374,40 +394,40 @@ class Med1SettledHandler:
         # 1st confrontation date/time = first KP-8/12 hearing_date
         first_conf_dt = _format_dt(notices[0][2], notices[0][3]) if len(notices) >= 1 else ""
 
-        # Compose output defaults
+        # Compose output defaults (use user inputs if available, otherwise auto-fill)
         out = {
             # case
-            "case_num": header["case_num"],
-            "dt_filed": header["dt_filed"],
-            "complaint_title": header["complaint_title"],
-            "case_nature": header["case_nature"],
-            "complainant_name": header["complainant_name"],
-            "respondent_name": header["respondent_name"],
+            "case_num": user_inputs.get("case_num") or header["case_num"],
+            "dt_filed": user_inputs.get("dt_filed") or header["dt_filed"],
+            "complaint_title": user_inputs.get("complaint_title") or header["complaint_title"],
+            "case_nature": user_inputs.get("case_nature") or header["case_nature"],
+            "complainant_name": user_inputs.get("complainant_name") or header["complainant_name"],
+            "respondent_name": user_inputs.get("respondent_name") or header["respondent_name"],
 
             # notices
-            "first_notice_dt": first_notice,
-            "second_notice_dt": second_notice,
-            "third_notice_dt": third_notice,
+            "first_notice_dt": user_inputs.get("first_notice_dt") or first_notice,
+            "second_notice_dt": user_inputs.get("second_notice_dt") or second_notice,
+            "third_notice_dt": user_inputs.get("third_notice_dt") or third_notice,
 
             # summons
-            "first_summon_dt":  first_sum.get("dt",""),
-            "officer_return_dt": first_sum.get("offret",""),
-            "second_summon_dt": second_sum.get("dt",""),
-            "officer_return_dt2": second_sum.get("offret",""),
-            "third_summon_dt":  third_sum.get("dt",""),
-            "third_offret_dt":  third_sum.get("offret",""),
+            "first_summon_dt": user_inputs.get("first_summon_dt") or first_sum.get("dt",""),
+            "officer_return_dt": user_inputs.get("officer_return_dt") or first_sum.get("offret",""),
+            "second_summon_dt": user_inputs.get("second_summon_dt") or second_sum.get("dt",""),
+            "officer_return_dt2": user_inputs.get("officer_return_dt2") or second_sum.get("offret",""),
+            "third_summon_dt": user_inputs.get("third_summon_dt") or third_sum.get("dt",""),
+            "third_offret_dt": user_inputs.get("third_offret_dt") or third_sum.get("offret",""),
 
             # action taken
-            "first_conf_dt": first_conf_dt,
-            "settlement_dt": settlement_dt,
+            "first_conf_dt": user_inputs.get("first_conf_dt") or first_conf_dt,
+            "settlement_dt": user_inputs.get("settlement_dt") or settlement_dt,
 
             # main point + misc
-            "Text Box 1": main_text,
-            "monitoring_remarks": "",
-            "dt_exec": "",
-            "dt_court_report": "",
-            "dt_report_dilg": "",
-            "monitoring_date": "",
+            "Text Box 1": user_inputs.get("text box 1") or main_text,
+            "monitoring_remarks": user_inputs.get("monitoring_remarks") or "",
+            "dt_exec": user_inputs.get("dt_exec") or "",
+            "dt_court_report": user_inputs.get("dt_court_report") or "",
+            "dt_report_dilg": user_inputs.get("dt_report_dilg") or "",
+            "monitoring_date": user_inputs.get("monitoring_date") or "",
         }
 
         # DUMMY mode: fill all with field names to confirm bindings
