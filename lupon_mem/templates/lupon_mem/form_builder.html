@@ -97,7 +97,7 @@
     .redirect-spinner{ color:#7B1E22!important; width:3rem; height:3rem; }
     .redirect-title{ color:#7B1E22; font-weight:700; }
     .redirect-text{ color:#FC9700; }
-    [data-code="brgy_sec"],[data-code="processed_by"],[data-code="processed_on_time"],[data-code="recipient_addr"],[data-code="punong_barangay"],[data-code="brgy_capt"],[data-code="processed_by_staff"],[data-code="processed_by_staff_id"],[data-code="brgy_captain"],[data-code="barangay_captain"],[data-code="processed_on_date"],[data-code="brgy_chairman"],[data-code="respondents_2"]{display:none!important;}
+    [data-code="brgy_sec"],[data-code="processed_by"],[data-code="processed_on_time"],[data-code="recipient_addr"],[data-code="punong_barangay"],[data-code="brgy_capt"],[data-code="processed_by_staff"],[data-code="processed_by_staff_id"],[data-code="brgy_captain"],[data-code="barangay_captain"],[data-code="brgy_chairman"],[data-code="respondents_2"]{display:none!important;}
   </style>
 </head>
 
@@ -144,8 +144,8 @@
 
       {% if kp8_ui_minimal %}
       <div class="mb-3 p-3 rounded-3" style="background:#8a262a;color:#fff;">
-        <div class="d-flex align-items-center gap-2"><i class="bi bi-calendar2-event" style="font-size:1.1rem;"></i><strong>Please set the Hearing Date and the Hearing Time</strong></div>
-        <div class="mt-1" style="opacity:.95">For <strong>KP Form No. 8</strong>, you are required to set the <strong>Hearing Date</strong> and <strong>Hearing Time</strong>.</div>
+        <div class="d-flex align-items-center gap-2"><i class="bi bi-calendar2-event" style="font-size:1.1rem;"></i><strong>Please set the Hearing Date, Hearing Time, and Notified this</strong></div>
+        <div class="mt-1" style="opacity:.95">For <strong>KP Form No. 8</strong>, you are required to set the <strong>Hearing Date</strong>, <strong>Hearing Time</strong>, and <strong>Notified this</strong> date.</div>
       </div>
       {% endif %}
 
@@ -453,7 +453,7 @@
                   {% if header.0 == 'KP-9-P2' and 'officer_return_narrative' in code %} kp-offscreen{% endif %}
                   {% if header.0 == 'KP-9-P2' and 'narrative' in code %} kp-offscreen{% endif %}
                   {% if header.0 == 'KP-9-P2' and 'Officer' in label and 'Return' in label and 'Narrative' in label %} kp-offscreen{% endif %}
-                  {% if kp8_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'hearing_date' and code != 'hearing_time' and code != 'date_created' and code != 'processed_on_date' %} kp-offscreen{% endif %}
+                  {% if kp8_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'hearing_date' and code != 'hearing_time' and code != 'date_created' and code != 'processed_on_date' and code != 'notified_date' %} kp-offscreen{% endif %}
                   {% if kp9_ui_minimal and code != 'curr_date' and code != 'recipient_address' %} kp-offscreen{% endif %}
                   {% if kp10_ui_minimal and code != 'appearance_date' and code != 'appearance_time' and code != 'addr_to' %} kp-offscreen{% endif %}
                   {% if kp11_ui_minimal and code != 'pangkat_member_name' %} kp-offscreen{% endif %}
@@ -490,7 +490,7 @@
                   {% if header.0 == 'KP-9-P2' and 'Processed' in label %} kp-offscreen{% endif %}
                   {% if header.0 == 'KP-9-P2' and 'Date' in label and 'Time' in label %} kp-offscreen{% endif %}
                   {% if header.0 == 'KP-9-P2' and 'Recipient Address' in label %} kp-offscreen{% endif %}
-                  {% if kp8_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'hearing_date' and code != 'hearing_time' and code != 'date_created' and code != 'processed_on_date' %} kp-offscreen{% endif %}
+                  {% if kp8_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'hearing_date' and code != 'hearing_time' and code != 'date_created' and code != 'processed_on_date' and code != 'notified_date' %} kp-offscreen{% endif %}
                   {% if kp9_ui_minimal and code != 'curr_date' and code != 'recipient_address' %} kp-offscreen{% endif %}
                   {% if kp10_ui_minimal and code != 'appearance_date' and code != 'appearance_time' and code != 'addr_to' %} kp-offscreen{% endif %}
                   {% if kp11_ui_minimal and code != 'pangkat_member_name' %} kp-offscreen{% endif %}

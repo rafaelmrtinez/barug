@@ -73,8 +73,8 @@ def _role_home(role_name: str) -> str:
     if is_lupon_president:  return "lupon_pres:dashboard"
     if is_lupon_member:     return "lupon_mem:dashboard"
 
-    logger.debug("Role not matched in _role_home; role=%s -> resident fallback", role)
-    return "resident:dashboard"
+    logger.debug("Role not matched in _role_home; role=%s -> lupon_mem fallback", role)
+    return "lupon_mem:dashboard"  # Default to lupon member instead of resident
 
 
 # ──────────────────────────────────────────────────────────────────────────────
