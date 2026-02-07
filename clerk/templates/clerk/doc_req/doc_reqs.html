@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'css/form.css' %}">
@@ -50,7 +50,7 @@
         <!-- Button outside form -->
         <div class="col-12 col-md-3 d-grid d-md-flex">
         <a class="btn btn-submit" href="#">
-        {% bs_icon 'person-walking' %} Walk-in Document Request
+        {% bs_icon_cached 'person-walking' %} Walk-in Document Request
         </a>
         </div>
         </div>
@@ -80,7 +80,7 @@
               <td>2025-09-18 10:30 AM</td>
               <td class="text-end">
                 <a class="btn btn-icon" href="{% url 'treasurer:doc_dets' doc_id=130023 %}">
-                  {% bs_icon 'file-earmark-text-fill' size='1em' %}
+                  {% bs_icon_cached 'file-earmark-text-fill' size='1em' %}
                 </a>
               </td>
             </tr>
@@ -94,7 +94,7 @@
               <td>2025-09-18 11:05 AM</td>
               <td class="text-end">
                 <a class="btn btn-icon" href="{% url 'treasurer:doc_dets' doc_id=130024 %}">
-                  {% bs_icon 'file-earmark-text-fill' size='1em' %}
+                  {% bs_icon_cached 'file-earmark-text-fill' size='1em' %}
                 </a>
               </td>
             </tr>

@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'css/form.css' %}">
@@ -37,7 +37,7 @@
         <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
           {% csrf_token %}
           <div class="searchbox">
-            {% bs_icon 'search' extra_classes='bi' %}
+            {% bs_icon_cached 'search' extra_classes='bi' %}
             {{form.search}}
           </div>
 
@@ -47,7 +47,7 @@
 
           <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
               type="button" data-bs-toggle="offcanvas" data-bs-target="#filterPanel" aria-controls="filterPanel">
-              {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+              {% bs_icon_cached 'sliders' extra_classes='me-2' %} Filters
               {% if active_filters %}
                 <span class="badge rounded-pill text-bg-light ms-2">{{ active_filters|length }}</span>
               {% endif %}
@@ -96,7 +96,7 @@
                       <a class="btn btn-icon btn-sm"
                          href="{% url 'secretary:pending_staff_details' p_staff_acc_req_id=row.staff_acc_req_id %}"
                          title="Review request" aria-label="Review request">
-                        {% bs_icon 'eye' size='1em' %} <span class="ms-1 d-none d-sm-inline">Review</span>
+                        {% bs_icon_cached 'eye' size='1em' %} <span class="ms-1 d-none d-sm-inline">Review</span>
                       </a>
                     </div>
                   </td>

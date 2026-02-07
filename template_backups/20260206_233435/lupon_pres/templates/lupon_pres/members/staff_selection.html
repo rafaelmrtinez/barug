@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+    <link rel="stylesheet" href="{% static 'css/button.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="min-vh-100 w-100 bg-white text-dark" style="margin-top:40px;">
+  <div class="sticky-top border-bottom bg-white">
+    <div class="container px-3 py-3">
+      <h3 class="fw-semibold">Account Management — Staff Accounts</h3>
+      <p class="mt-1 small text-muted">
+        Link a staff account to an existing resident, or register a non-resident and assign staff privileges.
+      </p>
+    </div>
+  </div>
+
+  <div class="container px-3 py-4">
+    <section class="rounded-3 border bg-white p-4 shadow-sm">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <h2 class="fs-5 fw-semibold mb-0">Staff Onboarding</h2>
+      </div>
+      <p class="small text-muted mb-4">Select how you want to create or link the staff account.</p>
+
+      <div class="rounded-3 border bg-light p-3 mb-3">
+        <div class="small fw-medium mb-2">Is the staff member a resident of the barangay?</div>
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <p class="small text-muted mb-0">
+            Choose <span class="fw-semibold text-dark">Resident</span> and search by Resident ID or name.  
+            Choose <span class="fw-semibold text-dark">Non-resident</span> and add details manually.
+          </p>
+          <div class="d-flex gap-2">
+            <a type="button" class="btn btn-submit btn-sm" href="{% url 'lupon_pres:staff_selection_resident' %}">Resident</a>
+            <a type="reset" class="btn btn-reset btn-sm" href="{% url 'lupon_pres:staff_selection_non-resident' %}">Non-Resident</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+{% include 'partials/modal_messages.html' %}
+{% endblock %}

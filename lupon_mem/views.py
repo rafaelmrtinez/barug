@@ -1759,7 +1759,13 @@ def add_form_choose_static(request, case_id: int):
         ('KP-13', 'SUBPOENA LETTER'),
         ('MINUTES', 'MINUTES OF HEARING'),
         ('MON-COMPL', 'MONITORING (COMPLAINANT)'),
-        ('MON-RESP', 'MONITORING (RESPONDENT)')
+        ('MON-RESP', 'MONITORING (RESPONDENT)'),
+        ('MED-ATT-2025', 'MEDIATION ATTENDANCE'),
+        ('MED1-SETTLED', '1ST MEDIATION SETTLED SUMMARY'),
+        ('MED2-FTA-SET', '2ND MEDIATION FTA SETTLED'),
+        ('MED2-SETTLED', '2ND MEDIATION SETTLED SUMMARY'),
+        ('MED3-FOLDER', '3RD MEDIATION CASE FOLDER'),
+        ('MED3-SETTLED', '3RD MEDIATION SETTLED SUMMARY')
     ]
     
     # ---- pagination ----

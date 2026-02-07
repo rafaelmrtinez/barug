@@ -1,7 +1,7 @@
 {# cancelled_list.html #}
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 {% load choiceextras %}
 
 {% block css %}
@@ -79,7 +79,7 @@
       <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
         {% csrf_token %}
         <div class="searchbox">
-          {% bs_icon 'search' extra_classes='bi' %}
+          {% bs_icon_cached 'search' extra_classes='bi' %}
           {{ form.search }}
         </div>
       </form>

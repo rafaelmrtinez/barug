@@ -1,6 +1,6 @@
 {%extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
   <link rel="stylesheet" href="{% static 'css/button.css' %}">
@@ -177,7 +177,7 @@
   <div class="page-header">
     <div class="family-number">Family {{ family.family_num }}</div>
     <div class="family-head">
-      {% bs_icon 'person-fill' %} {{ family.family_head_name }}
+      {% bs_icon_cached 'person-fill' %} {{ family.family_head_name }}
     </div>
   </div>
 
@@ -185,7 +185,7 @@
   <div class="section-block">
     <div class="section-header">
       <div class="section-icon">
-        {% bs_icon 'people-fill' %}
+        {% bs_icon_cached 'people-fill' %}
       </div>
       <h2 class="section-title">Family Information</h2>
     </div>
@@ -254,7 +254,7 @@
   <div class="section-block">
     <div class="section-header">
       <div class="section-icon">
-        {% bs_icon 'person-lines-fill' %}
+        {% bs_icon_cached 'person-lines-fill' %}
       </div>
       <h2 class="section-title">Family Members ({{ family.members|length }})</h2>
     </div>
@@ -291,7 +291,7 @@
     {% else %}
       <div class="no-members">
         <div>
-          <i>{% bs_icon 'inbox' %}</i>
+          <i>{% bs_icon_cached 'inbox' %}</i>
         </div>
         <div style="font-size:1.125rem; font-weight:600;">No Members Found</div>
         <div style="font-size:.9375rem;">This family has no member records.</div>

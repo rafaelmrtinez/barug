@@ -1,4 +1,4 @@
-{% load bootstrap_icons %}
+{% load cached_icons %}
 {% if messages %}
 
 <style>
@@ -30,7 +30,7 @@
       {% if tag == "success" %}
         {% with cls="success" icon="check-circle-fill" %}
           <div class="alert alert-{{ cls }} alert-dismissible fade show shadow-sm" role="alert">
-            <span class="flash-icon">{% bs_icon icon size='1.1em' %}</span>
+            <span class="flash-icon">{% bs_icon_cached icon size='1.1em' %}</span>
             <span class="flash-text">{{ message }}</span>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
           </div>
@@ -38,7 +38,7 @@
       {% elif tag == "warning" %}
         {% with cls="warning" icon="exclamation-circle-fill" %}
           <div class="alert alert-{{ cls }} alert-dismissible fade show shadow-sm" role="alert">
-            <span class="flash-icon">{% bs_icon icon size='1.1em' %}</span>
+            <span class="flash-icon">{% bs_icon_cached icon size='1.1em' %}</span>
             <span class="flash-text">{{ message }}</span>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
           </div>
@@ -46,7 +46,7 @@
       {% elif tag == "error" %}
         {% with cls="danger" icon="exclamation-triangle-fill" %}
           <div class="alert alert-{{ cls }} alert-dismissible fade show shadow-sm" role="alert">
-            <span class="flash-icon">{% bs_icon icon size='1.1em' %}</span>
+            <span class="flash-icon">{% bs_icon_cached icon size='1.1em' %}</span>
             <span class="flash-text">{{ message }}</span>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
           </div>
@@ -54,7 +54,7 @@
       {% else %}
         {% with cls="info" icon="info-circle-fill" %}
           <div class="alert alert-{{ cls }} alert-dismissible fade show shadow-sm" role="alert">
-            <span class="flash-icon">{% bs_icon icon size='1.1em' %}</span>
+            <span class="flash-icon">{% bs_icon_cached icon size='1.1em' %}</span>
             <span class="flash-text">{{ message }}</span>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
           </div>

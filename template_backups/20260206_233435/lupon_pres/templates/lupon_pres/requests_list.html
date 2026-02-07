@@ -1,0 +1,588 @@
+{% extends "base.html" %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/filters.css' %}">
+<style>
+  #filterForm input[type="date"] {
+    border: 2px solid black;
+    border-radius: 24px;
+    padding: 0.375rem 0.75rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    background-color: #fff;
+    width: 100%;
+  }
+  #filterForm input[type="date"]:focus {
+    border-color: var(--bs-danger-text-emphasis);
+    box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+    outline: none;
+  }
+</style>
+<style>
+:root {
+    --primary-color: var(--bs-danger-text-emphasis);
+    --primary-light: color-mix(in srgb, var(--bs-danger-text-emphasis) 10%, white);
+    --primary-dark: color-mix(in srgb, var(--bs-danger-text-emphasis) 80%, black);
+    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --hover-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --border-radius: 12px;
+    --transition: all 0.3s ease;
+}
+
+.modern-container {
+    background: #f8f9fa;
+    min-height: 100vh;
+    padding: 2rem 0;
+}
+
+.stats-card {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%) !important;
+    border: none !important;
+    border-radius: var(--border-radius) !important;
+    box-shadow: var(--card-shadow) !important;
+    transition: var(--transition) !important;
+    overflow: hidden;
+    position: relative;
+}
+
+.stats-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 100%);
+    pointer-events: none;
+}
+
+.stats-card:hover {
+    transform: translateY(-4px) !important;
+    box-shadow: var(--hover-shadow) !important;
+}
+
+.stats-card * {
+    color: white !important;
+    position: relative;
+    z-index: 1;
+}
+
+.stats-icon {
+    font-size: 2.5rem !important;
+    opacity: 0.9;
+    transition: var(--transition);
+}
+
+.stats-card:hover .stats-icon {
+    transform: scale(1.05);
+    opacity: 1;
+}
+
+.modern-card {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    transition: var(--transition);
+    overflow: hidden;
+}
+
+.modern-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--hover-shadow);
+    border-color: var(--primary-light);
+}
+
+.request-card {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    transition: var(--transition);
+    overflow: hidden;
+    position: relative;
+}
+
+.request-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--primary-color);
+}
+
+.request-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--hover-shadow);
+    border-color: var(--primary-light);
+}
+
+.status-badge {
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: none;
+}
+
+.badge-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.badge-approved {
+    background: #d1e7dd;
+    color: #0f5132;
+}
+
+.badge-rejected {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.progress-modern {
+    height: 8px;
+    border-radius: 8px;
+    background: #e9ecef;
+    overflow: hidden;
+}
+
+.progress-modern .progress-bar {
+    border-radius: 8px;
+    background: var(--primary-color);
+    transition: width 0.6s ease;
+}
+
+.modern-header {
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    border: 1px solid #e9ecef;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.modern-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--primary-color);
+}
+
+.btn-modern {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: var(--transition);
+}
+
+.btn-modern:hover {
+    background: var(--primary-dark);
+    transform: translateY(-1px);
+    box-shadow: var(--hover-shadow);
+    color: white;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #6c757d;
+}
+
+.empty-state .empty-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    color: var(--primary-color);
+    opacity: 0.3;
+}
+
+.form-label {
+    color: #495057;
+    font-size: 0.875rem;
+}
+
+.input-group-text {
+    background: #f8f9fa;
+    border-color: #dee2e6;
+    color: #6c757d;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+.btn-outline-secondary {
+    border-color: #dee2e6;
+    color: #6c757d;
+}
+
+.btn-outline-secondary:hover {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+    color: #495057;
+}
+
+.fade-in {
+    animation: fadeIn 0.6s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.stat-card-accent {
+    border-left: 4px solid var(--primary-color);
+    background: var(--primary-light);
+}
+
+.stat-card-pending {
+    border-left: 4px solid #ffc107;
+    background: #fff3cd;
+}
+
+.stat-card-approved {
+    border-left: 4px solid #198754;
+    background: #d1e7dd;
+}
+
+.stat-card-rejected {
+    border-left: 4px solid #dc3545;
+    background: #f8d7da;
+}
+
+.filter-summary {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.filter-tag {
+    background: var(--primary-color);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    margin-right: 0.5rem;
+    display: inline-block;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% include 'partials/modal_messages.html' %}
+<div class="modern-container">
+<div class="container-fluid">
+    <div class="modern-header fade-in mt-4">
+        <div class="d-flex align-items-center justify-content-between">
+            <div>
+                <h1 class="h2 mb-2 fw-bold text-dark d-flex align-items-center gap-3">
+                    {% bs_icon 'clipboard-check-fill' color='var(--bs-danger-text-emphasis)' size='1.8em' %}
+                    My Staff Requests
+                </h1>
+                <p class="text-muted mb-0">Manage and track your staff account requests</p>
+            </div>
+            <div>
+                <a href="{% url 'lupon_pres:members_list' %}" class="btn btn-modern">
+                    {% bs_icon 'people-fill' %} Manage Staff Account
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-5 fade-in">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card stats-card h-100">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="text-xs font-weight-bold text-uppercase mb-2 opacity-75" style="color: white !important; letter-spacing: 1px;">Total Requests</div>
+                            <div class="h3 mb-0 font-weight-bold" style="color: white !important;">{{ stats.total_requests|default:"0" }}</div>
+                        </div>
+                        <div>
+                            <i class="fas fa-clipboard-list stats-icon"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card modern-card h-100 stat-card-pending">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="text-xs fw-bold text-uppercase mb-2" style="color: #856404; letter-spacing: 0.5px;">Pending</div>
+                            <div class="h3 mb-0 fw-bold text-dark">{{ stats.pending_requests|default:"0" }}</div>
+                        </div>
+                        <div>
+                            {% bs_icon 'clock-fill' color='#ffc107' size='2.5em' %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card modern-card h-100 stat-card-approved">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="text-xs fw-bold text-uppercase mb-2" style="color: #0f5132; letter-spacing: 0.5px;">Approved</div>
+                            <div class="h3 mb-0 fw-bold text-dark">{{ stats.approved_requests|default:"0" }}</div>
+                        </div>
+                        <div>
+                            {% bs_icon 'check-circle-fill' color='#198754' size='2.5em' %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card modern-card h-100 stat-card-rejected">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="text-xs fw-bold text-uppercase mb-2" style="color: #721c24; letter-spacing: 0.5px;">Rejected</div>
+                            <div class="h3 mb-0 fw-bold text-dark">{{ stats.rejected_requests|default:"0" }}</div>
+                        </div>
+                        <div>
+                            {% bs_icon 'x-circle-fill' color='#dc3545' size='2.5em' %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and Filters Toolbar -->
+    <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+        {% csrf_token %}
+        <div class="searchbox">
+            {% bs_icon 'search' extra_classes='bi' %}
+            <input type="text" class="form-control" name="q" value="{{ search_query }}" placeholder="Search by name...">
+        </div>
+        
+        <!-- Preserve selected filters when searching -->
+        <input type="hidden" name="role" value="{{ role_filter }}">
+        <input type="hidden" name="status" value="{{ status_filter }}">
+        <input type="hidden" name="date_submitted" value="{{ date_filter }}">
+        
+        <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
+            type="button" data-bs-toggle="offcanvas" data-bs-target="#filterPanel" aria-controls="filterPanel">
+            {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+            {% if search_query or status_filter or role_filter or date_filter %}
+                <span class="badge rounded-pill text-bg-light ms-2">1</span>
+            {% endif %}
+        </button>
+    </form>
+    
+    <!-- Active filter chips -->
+    <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
+        {% if search_query or status_filter or role_filter or date_filter %}
+            <span class="text-muted me-2 small">Active:</span>
+            {% if search_query %}
+                <a href="?role={{ role_filter }}&status={{ status_filter }}&date_submitted={{ date_filter }}" class="filter-chip">
+                    Search: "{{ search_query }}" <span class="x" aria-hidden="true">×</span>
+                </a>
+            {% endif %}
+            {% if role_filter %}
+                <a href="?q={{ search_query }}&status={{ status_filter }}&date_submitted={{ date_filter }}" class="filter-chip">
+                    Role: {% if role_filter == '7' %}Barangay Lupon President{% elif role_filter == '8' %}Barangay Lupon Member{% endif %} <span class="x" aria-hidden="true">×</span>
+                </a>
+            {% endif %}
+            {% if status_filter %}
+                <a href="?q={{ search_query }}&role={{ role_filter }}&date_submitted={{ date_filter }}" class="filter-chip">
+                    Status: {% if status_filter == '46' %}Waiting for ID Validation{% elif status_filter == '29' %}Waiting for Captain's Approval{% elif status_filter == '30' %}Waiting for Admin's Approval{% elif status_filter == '3' %}Approved{% elif status_filter == '4' %}Rejected{% endif %} <span class="x" aria-hidden="true">×</span>
+                </a>
+            {% endif %}
+            {% if date_filter %}
+                <a href="?q={{ search_query }}&role={{ role_filter }}&status={{ status_filter }}" class="filter-chip">
+                    Date: {{ date_filter }} <span class="x" aria-hidden="true">×</span>
+                </a>
+            {% endif %}
+            <a href="{% url 'lupon_pres:staff_requests_list' %}" class="btn btn-sm btn-outline-brand ms-2 d-inline-flex align-items-center">
+                <i class="bi bi-x-circle me-1"></i>Clear all
+            </a>
+        {% else %}
+            <span class="text-muted small">No active filters.</span>
+        {% endif %}
+    </div>
+
+    <!-- Requests List -->
+    <div class="card modern-card mb-4 fade-in">
+        <div class="card-header bg-white border-0 py-4">
+            <div class="d-flex align-items-center justify-content-between">
+                <h5 class="mb-0 fw-bold text-dark d-flex align-items-center gap-2">
+                    {% bs_icon 'list-check' color='var(--bs-danger-text-emphasis)' %}
+                    My Requests
+                    <span class="badge text-dark ms-2" style="background: var(--bs-danger-bg-subtle);">{% if page_obj %}{{ page_obj.paginator.count }}{% else %}{{ requests|length }}{% endif %}</span>
+                </h5>
+                {% if search_query or status_filter or role_filter or date_filter %}
+                <div class="d-flex align-items-center gap-2">
+                    <small class="text-muted">Filtered results</small>
+                    <a href="{% url 'lupon_pres:staff_requests_list' %}" class="btn btn-sm btn-outline-secondary">
+                        {% bs_icon 'x' %} Clear filters
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="card-body p-4">
+            {% if page_obj.object_list or requests %}
+                <div class="row">
+                    {% for request in page_obj.object_list|default:requests %}
+                    <div class="col-lg-6 col-xl-4 mb-4">
+                        <div class="card request-card h-100 fade-in">
+                            <div class="card-body p-4">
+                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                    <h6 class="card-title mb-0 fw-bold text-dark">{{ request.name }}</h6>
+                                    <span class="status-badge badge-{% if request.status_id == 46 %}pending{% elif request.status_id == 29 %}pending{% elif request.status_id == 30 %}pending{% elif request.status_id == 3 %}approved{% elif request.status_id == 4 %}rejected{% else %}pending{% endif %}">
+                                        {{ request.status_name|default:"Pending" }}
+                                    </span>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <div class="d-flex align-items-center mb-2">
+                                        {% bs_icon 'person-badge-fill' color='#6c757d' size='1em' %}
+                                        <span class="text-muted small ms-2">{{ request.role_name|default:"Unknown Role" }}</span>
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        {% bs_icon 'calendar3' color='#6c757d' size='1em' %}
+                                        <span class="text-muted small ms-2">{{ request.date_time_submitted_pretty }}</span>
+                                    </div>
+                                </div>
+
+                                <!-- Progress Bar -->
+                                <div class="mb-4">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="small fw-bold text-secondary">Progress</span>
+                                        <span class="small fw-bold" style="color: var(--bs-danger-text-emphasis);">{{ request.progress_percent|default:"0" }}%</span>
+                                    </div>
+                                    <div class="progress progress-modern">
+                                        <div class="progress-bar" style="width: {{ request.progress_percent|default:"0" }}%"></div>
+                                    </div>
+                                    <small class="text-muted mt-1 d-block">{{ request.current_stage|default:"Submitted" }}</small>
+                                </div>
+
+                                <a href="{% url 'lupon_pres:staff_request_detail' request.staff_acc_req_id %}" 
+                                   class="btn btn-modern w-100">
+                                    {% bs_icon 'eye-fill' %} View Details
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Pagination -->
+                {% if page_obj and page_obj.has_other_pages %}
+                <div class="d-flex justify-content-center mt-4">
+                    {% include 'paginator.html' with page_obj=page_obj %}
+                </div>
+                {% endif %}
+                
+                <!-- Results Summary -->
+                {% if page_obj %}
+                <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
+                    {% if search_query or status_filter or role_filter or date_filter %}
+                    <small class="text-muted">
+                        <span class="badge bg-light text-dark">Filtered</span>
+                    </small>
+                    {% endif %}
+                </div>
+                {% endif %}
+            {% else %}
+                <div class="empty-state">
+                    {% bs_icon 'inbox' extra_classes='empty-icon' %}
+                    <h5 class="mt-3 mb-2">No requests found</h5>
+                    {% if search_query or status_filter or role_filter or date_filter %}
+                        <p class="text-muted">No requests match your current filters. Try adjusting your search criteria.</p>
+                        <a href="{% url 'lupon_pres:staff_requests_list' %}" class="btn btn-outline-primary mt-2">
+                            {% bs_icon 'arrow-clockwise' %} Clear Filters
+                        </a>
+                    {% else %}
+                        <p class="text-muted">You haven't submitted any staff requests yet.</p>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- Offcanvas Filters -->
+<div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
+     aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150px;">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    
+    <div class="offcanvas-body">
+        <form method="get" id="filterForm">
+            <div class="mb-3">
+                <label class="form-label">Role</label>
+                <select class="form-select" name="role">
+                    <option value="">All Roles</option>
+                    <option value="7" {% if role_filter == '7' %}selected{% endif %}>Barangay Lupon President</option>
+                    <option value="8" {% if role_filter == '8' %}selected{% endif %}>Barangay Lupon Member</option>
+                </select>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Request Status</label>
+                <select class="form-select" name="status">
+                    <option value="">All Status</option>
+                    <option value="46" {% if status_filter == '46' %}selected{% endif %}>Waiting for ID Validation</option>
+                    <option value="29" {% if status_filter == '29' %}selected{% endif %}>Waiting for Captain's Approval</option>
+                    <option value="30" {% if status_filter == '30' %}selected{% endif %}>Waiting for Admin's Approval</option>
+                    <option value="3" {% if status_filter == '3' %}selected{% endif %}>Approved</option>
+                    <option value="4" {% if status_filter == '4' %}selected{% endif %}>Rejected</option>
+                </select>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Date Submitted</label>
+                <input type="date" class="form-control" name="date_submitted" value="{{ date_filter }}">
+            </div>
+            
+            <!-- Keep search term when applying filters -->
+            <input type="hidden" name="q" value="{{ search_query }}"/>
+            
+            <div class="offcanvas-footer">
+                <div class="d-flex justify-content-between">
+                    <a class="btn btn-outline-brand" href="{% url 'lupon_pres:staff_requests_list' %}">Clear</a>
+                    <button type="submit" class="btn btn-brand">Apply Filters</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

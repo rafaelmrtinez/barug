@@ -432,6 +432,9 @@ def apply_answers_and_prefills(
                 if code_lower in ("curr_date", "curr_month", "curr_year", "current_date", "current_month", "current_year", "date_created", "processed_on_date", "date_entered", "month_entered", "year_entered", "date_signed", "time_signed", "when"):
                     return None
             # For other forms, don't prefill date_entered, month_entered, year_entered, date_signed, time_signed, when
+            # BUT for MED1-SETTLED, don't block any fields
+            if form_code and form_code.upper() == "MED1-SETTLED":
+                return None  # Don't prefill for MED1-SETTLED
             if code_lower in ("date_created", "processed_on_date", "date_entered", "month_entered", "year_entered", "date_signed", "time_signed", "when") or label_lower in ("date created", "processed on (date)", "date signed", "time signed", "when"):
                 return None
         
@@ -473,24 +476,25 @@ def compute_ui_flags(form_code: str) -> Dict[str,bool]:
         "kp7_ui_minimal":  (u == "KP-7"),
         "kp9_ui_minimal":  (u == "KP-9"),
         "kp8_ui_minimal":  (u == "KP-8"),
-        "kp10_ui_minimal": False,  # Temporarily disabled
-        "kp11_ui_minimal": False,  # Temporarily disabled
-        "kp12_ui_minimal": False,  # Temporarily disabled
-        "kp13_ui_minimal": False,  # Temporarily disabled
-        "kp14_ui_minimal": False,  # Temporarily disabled
-        "kp15_ui_minimal": False,  # Temporarily disabled
+        "kp10_ui_minimal": False,
+        "kp11_ui_minimal": False,
+        "kp12_ui_minimal": False,
+        "kp13_ui_minimal": False,
+        "kp14_ui_minimal": False,
+        "kp15_ui_minimal": False,
         "kp16_ui_minimal": (u == "KP-16"),
-        "kp17_ui_minimal": False,  # Temporarily disabled
-        "kp18_ui_minimal": False,  # Temporarily disabled
-        "kp19_ui_minimal": False,  # Temporarily disabled
-        "kp20_ui_minimal": False,  # Temporarily disabled
-        "kp20a_ui_minimal": False,  # Temporarily disabled
-        "kp20b_ui_minimal": False,  # Temporarily disabled
-        "kp21_ui_minimal": False,  # Temporarily disabled
-        "kp22_ui_minimal": False,  # Temporarily disabled
-        "kp23_ui_minimal": False,  # Temporarily disabled
-        "kp24_ui_minimal": False,  # Temporarily disabled
-        "kp25_ui_minimal": False,  # Temporarily disabled
-        "kp26_ui_minimal": False,  # Temporarily disabled
+        "kp17_ui_minimal": False,
+        "kp18_ui_minimal": False,
+        "kp19_ui_minimal": False,
+        "kp20_ui_minimal": False,
+        "kp20a_ui_minimal": False,
+        "kp20b_ui_minimal": False,
+        "kp21_ui_minimal": False,
+        "kp22_ui_minimal": False,
+        "kp23_ui_minimal": False,
+        "kp24_ui_minimal": False,
+        "kp25_ui_minimal": False,
+        "kp26_ui_minimal": False,
         "minutes_ui_minimal": (u == "MINUTES"),
+        "med1_settled_show_all": (u == "MED1-SETTLED"),
     }

@@ -1,18 +1,18 @@
 {# templates/lupon_mem/summon_attendance.html #}
 {% extends "base.html" %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block content %}
 <div class="container-fluid pt-3">
 
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">
-      {% bs_icon 'envelope' extra_classes='me-2' %}
+      {% bs_icon_cached 'envelope' extra_classes='me-2' %}
       Summons (KP-9) — Attendance
     </h4>
     <div>
       <a href="{% url 'lupon_mem:case_detail' case_id %}" class="btn btn-outline-secondary btn-sm">
-        {% bs_icon 'arrow-left' extra_classes='me-1' %} Back to Case
+        {% bs_icon_cached 'arrow-left' extra_classes='me-1' %} Back to Case
       </a>
     </div>
   </div>
@@ -66,10 +66,10 @@
               <td class="text-truncate" style="max-width: 320px;">{{ it.officer_return|default:"—" }}</td>
               <td>
                 {% if it.status == 'ATTENDED' %}
-                  <span class="badge rounded-pill bg-success">{% bs_icon 'check-circle' extra_classes='me-1' %} ATTENDED</span>
+                  <span class="badge rounded-pill bg-success">{% bs_icon_cached 'check-circle' extra_classes='me-1' %} ATTENDED</span>
                   {% if it.marked_at %}<div class="small text-muted mt-1">{{ it.marked_at }}</div>{% endif %}
                 {% elif it.status == 'NO SHOW' %}
-                  <span class="badge rounded-pill bg-danger">{% bs_icon 'exclamation-octagon' extra_classes='me-1' %} NO SHOW</span>
+                  <span class="badge rounded-pill bg-danger">{% bs_icon_cached 'exclamation-octagon' extra_classes='me-1' %} NO SHOW</span>
                   {% if it.marked_at %}<div class="small text-muted mt-1">{{ it.marked_at }}</div>{% endif %}
                 {% else %}
                   <span class="text-muted">—</span>
@@ -113,7 +113,7 @@
                   </div>
                   <div class="col-auto">
                     <button class="btn btn-primary btn-sm">
-                      {% bs_icon 'check2-circle' extra_classes='me-1' %} Save
+                      {% bs_icon_cached 'check2-circle' extra_classes='me-1' %} Save
                     </button>
                   </div>
                 </form>

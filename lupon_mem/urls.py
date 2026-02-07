@@ -109,6 +109,7 @@ urlpatterns = [
     path("reports/<int:report_id>/review/",   views_reports.report_review,  name="report_review"), # added to views_reports
     path("reports/<int:report_id>/approve/",  views_reports.report_approve, name="report_approve"), # added to views_reports
     path("reports/<int:report_id>/decline/",  views_reports.report_decline, name="report_decline"), # added to views_reports
+    path("reports/<int:report_id>/delete/",  views_reports.report_delete, name="report_delete"),
     path("reports/<int:report_id>/mark-paid/", views_reports.report_mark_paid, name="report_mark_paid"),
     path("reports/<int:report_id>/update-respondents/", views_reports.report_update_respondents, name="report_update_respondents"), # added to views_reports 
     path("reports/<int:report_id>/pay-open/", views_reports.report_pay_and_open_case, name="report_pay_and_open_case"), # added to views_reports

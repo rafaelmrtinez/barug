@@ -1,0 +1,552 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<style>
+  :root{
+    --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932;
+    --brand-600:#7a323b; --brand-100:#f3eaeb; --brand-050:#fbf6f6;
+    --ring: rgba(109,41,50,.18);
+    --gold:#D4AF37;
+  }
+
+  /* ---------- Hero / Header ---------- */
+  .hero{
+    background:linear-gradient(180deg, var(--brand-700) 0%, var(--brand-800) 100%);
+    border-bottom:1px solid rgba(255,255,255,.12);
+    color: #fff;
+    padding: 1.5rem 0;
+  }
+  .hero-title{ font-weight:800; letter-spacing:.2px; margin-bottom: .5rem; }
+  .hero-subtitle{ opacity: .9; font-size: 1.1rem; }
+  .breadcrumb-item a{ color: rgba(255,255,255,.8); text-decoration: none; }
+  .breadcrumb-item.active{ color: #fff; }
+
+  /* ---------- Content Cards ---------- */
+  .content-card{ 
+    background:#fff; 
+    border:1px solid var(--bs-border-color); 
+    border-radius:12px; 
+    overflow:hidden;
+    margin-bottom: 1.5rem;
+  }
+  .card-header{
+    background: #f8f9fa;
+    border-bottom: 1px solid var(--bs-border-color);
+    padding: 1rem 1.25rem;
+    font-weight: 700;
+    color: var(--brand-700);
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+  .card-body{ padding: 1.25rem; }
+
+  /* ---------- Tables ---------- */
+  .table{ margin:0; }
+  .table thead th{
+    background:#f8f9fa; 
+    border-bottom:1px solid #eadfda;
+    font-size:.85rem; 
+    letter-spacing:.02em; 
+    white-space:nowrap;
+    font-weight: 700;
+    color: var(--brand-700);
+  }
+  .table tbody td{ vertical-align:middle; }
+  .table-hover>tbody>tr:hover{ background-color:#fff9f8; }
+
+  /* ---------- Pills & Badges ---------- */
+  .pill{ 
+    border-radius:999px; 
+    padding:.28rem .6rem; 
+    font-weight:800; 
+    font-size:.75rem; 
+    line-height:1; 
+    display:inline-flex; 
+    align-items:center; 
+    gap:.35rem; 
+    border:1px solid transparent; 
+  }
+  .pill-complainant{ background:#e7f6ec; color:#0f5132; border-color:#c7ebd3; }
+  .pill-respondent{ background:#fff7e6; color:#8a6d1d; border-color:#ffe0a6; }
+  .pill-reporter{ background:#e8f4ff; color:#0b4c77; border-color:#cde6fb; }
+  .pill-settled{ background:#e7f6ec; color:#0f5132; border-color:#c7ebd3; }
+  .pill-pending{ background:#fff7e6; color:#8a6d1d; border-color:#ffe0a6; }
+  .pill-not-settled{ background:#fde2e1; color:#842029; border-color:#f5c2c7; }
+  .pill-light{ background:#f2f2f2; color:#666; border-color:#e7e7e7; }
+
+  .code-badge{ 
+    font-family:ui-monospace, Menlo, Consolas, monospace; 
+    font-size:.82rem; 
+    padding:.15rem .45rem; 
+    border-radius:.45rem; 
+    background:#f5f2ee; 
+    border:1px solid rgba(0,0,0,.06); 
+    color:var(--brand-800); 
+  }
+
+  /* ---------- Summary Stats ---------- */
+  .stats-grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .stat-card{
+    background: #fff;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 12px;
+    padding: 1.25rem;
+    text-align: center;
+  }
+  .stat-number{
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--brand-700);
+    line-height: 1;
+  }
+  .stat-label{
+    font-size: .9rem;
+    color: #6c757d;
+    margin-top: .25rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+
+  /* ---------- Empty States ---------- */
+  .empty-state{
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #6c757d;
+  }
+  .empty-state .bi{
+    font-size: 3rem;
+    opacity: .5;
+    margin-bottom: 1rem;
+  }
+
+  /* ---------- Actions ---------- */
+  .btn-chip{ 
+    border-radius:999px; 
+    padding:.35rem .75rem; 
+    font-weight:800; 
+    border:1px solid var(--brand-700); 
+    color:var(--brand-700); 
+    background:#fff; 
+    text-decoration: none;
+  }
+  .btn-chip:hover{ background:var(--brand-700); color:#fff; }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 768px) {
+    .stats-grid{
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .table-responsive{
+      font-size: .9rem;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0" style="margin-top: 40px;">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="container-fluid">
+      <!-- <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-2">
+          <li class="breadcrumb-item">
+            <a href="{% url 'lupon_mem:resident_records_list' %}">
+              {% bs_icon 'people' %} Resident Records
+            </a>
+          </li>
+          <li class="breadcrumb-item active" aria-current="page">
+            {{ person.full_name|default:"Unknown Person" }}
+          </li>
+        </ol>
+      </nav> -->
+      
+      {% if person %}
+        <div class="d-flex align-items-center gap-3">
+          <div style="position:relative;cursor:pointer;" onclick="showPhotoModal()">
+            {% if person.person_img %}
+              <img id="personPhoto" src="{{ person.person_img }}" alt="{{ person.full_name }}" style="width:60px;height:60px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,.3);">
+            {% else %}
+              <div id="personPhoto" style="width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;border:3px solid rgba(255,255,255,.3);color:#fff;font-weight:700;font-size:24px;">{{ person.first_name.0 }}{{ person.last_name.0 }}</div>
+            {% endif %}
+            <div style="position:absolute;bottom:0;right:0;background:var(--brand-700);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;">
+              <span class="text-white" style="font-size:10px;">{% bs_icon 'eye' %}</span>
+            </div>
+          </div>
+          <input type="file" id="photoUpload" accept="image/*" style="display:none;" onchange="uploadPhoto(this)">
+          <div>
+            <h4 class="hero-title mb-1">{{ person.full_name }}</h4>
+            <div class="hero-subtitle">
+              {% if person.mobile_num %}{% bs_icon 'phone' %} {{ person.mobile_num }}{% endif %}
+              {% if person.email %}{% if person.mobile_num %} • {% endif %}{% bs_icon 'envelope' %} {{ person.email }}{% endif %}
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <h4 class="hero-title">Person Not Found</h4>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if not person %}
+    <div class="container-fluid pt-4">
+      <div class="alert alert-danger">
+        <div class="d-flex align-items-center">
+          {% bs_icon 'exclamation-triangle' extra_classes='me-2' %}
+          <div>
+            <strong>Person not found</strong><br>
+            <small>The requested person could not be found in the system.</small>
+          </div>
+        </div>
+      </div>
+      <a href="{% url 'lupon_mem:resident_records_list' %}" class="btn btn-chip">
+        {% bs_icon 'arrow-left' %} Back to Resident Records
+      </a>
+    </div>
+  {% else %}
+
+  <div class="container-fluid pt-3">
+    
+    <!-- SUMMARY STATISTICS -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-number">{{ report_history|length }}</div>
+        <div class="stat-label">Total Reports</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">{{ case_history|length }}</div>
+        <div class="stat-label">Total Cases</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">{{ complainant_reports_count|default:0 }}</div>
+        <div class="stat-label">As Complainant</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">{{ respondent_reports_count|default:0 }}</div>
+        <div class="stat-label">As Respondent</div>
+      </div>
+    </div>
+
+    <!-- BLOTTER REPORT HISTORY -->
+    <div class="content-card">
+      <div class="card-header">
+        {% bs_icon 'file-earmark-text' %}
+        Blotter Report History
+        {% if report_history %}
+          <span class="badge bg-secondary ms-auto">{{ report_history|length }}</span>
+        {% endif %}
+      </div>
+      <div class="card-body p-0">
+        {% if report_history %}
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Report ID</th>
+                  <th>Role</th>
+                  <th>Subject</th>
+                  <th>Incident Date</th>
+                  <th>Reported Date</th>
+                  <th>Status</th>
+                  <th>Evidence</th>
+                  <th>Linked Case</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for report in report_history %}
+                  <tr>
+                    <td>
+                      <span class="code-badge">#{{ report.blotter_report_id }}</span>
+                    </td>
+                    <td>
+                      {% if report.role_in_report == 'COMPLAINANT' %}
+                        <span class="pill pill-complainant">{% bs_icon 'person-check' %} Complainant</span>
+                      {% elif report.role_in_report == 'RESPONDENT' %}
+                        <span class="pill pill-respondent">{% bs_icon 'person-x' %} Respondent</span>
+                      {% elif report.role_in_report == 'REPORTER' %}
+                        <span class="pill pill-reporter">{% bs_icon 'person-plus' %} Reporter</span>
+                      {% else %}
+                        <span class="pill pill-light">{{ report.role_in_report|default:"Unknown" }}</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <div class="fw-semibold">{{ report.incident_subject|default:"No subject" }}</div>
+                      {% if report.incident_desc %}
+                        <small class="text-muted">{{ report.incident_desc|truncatechars:60 }}</small>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if report.incident_date %}
+                        {{ report.incident_date|date:"M d, Y" }}
+                        {% if report.incident_time %}
+                          <br><small class="text-muted">{{ report.incident_time }}</small>
+                        {% endif %}
+                      {% else %}
+                        <span class="text-muted">—</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if report.date_time_reported %}
+                        {{ report.date_time_reported|date:"M d, Y" }}
+                        <br><small class="text-muted">{{ report.date_time_reported|time:"g:i A" }}</small>
+                      {% else %}
+                        <span class="text-muted">—</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if report.status_name %}
+                        {% if "SETTLED" in report.status_name|upper %}
+                          <span class="pill pill-settled">{{ report.status_name }}</span>
+                        {% elif "PENDING" in report.status_name|upper %}
+                          <span class="pill pill-pending">{{ report.status_name }}</span>
+                        {% else %}
+                          <span class="pill pill-light">{{ report.status_name }}</span>
+                        {% endif %}
+                      {% else %}
+                        <span class="text-muted">—</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-center">
+                      {% if report.evidence_count > 0 %}
+                        <span class="badge bg-info">{{ report.evidence_count }}</span>
+                      {% else %}
+                        <span class="text-muted">—</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if report.linked_case_id %}
+                        <a href="{% url 'lupon_mem:case_detail' report.linked_case_id %}" class="btn-chip btn-sm">
+                          {{ report.linked_case_num|default:"View Case" }}
+                        </a>
+                      {% else %}
+                        <span class="text-muted">—</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="empty-state">
+            {% bs_icon 'file-earmark-text' %}
+            <h6>No Report History</h6>
+            <p class="mb-0">This person has no blotter report involvement on record.</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- CASE HISTORY -->
+    <div class="content-card">
+      <div class="card-header">
+        {% bs_icon 'briefcase' %}
+        Case History
+        {% if case_history %}
+          <span class="badge bg-secondary ms-auto">{{ case_history|length }}</span>
+        {% endif %}
+      </div>
+      <div class="card-body p-0">
+        {% if case_history %}
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Case</th>
+                  <th>Role</th>
+                  <th>Case Details</th>
+                  <th>Filed Date</th>
+                  <th>Settlement Status</th>
+                  <th>Last Progress</th>
+                  <th>Parties</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for case in case_history %}
+                  <tr>
+                    <td>
+                      <span class="code-badge">{{ case.blotter_case_num|default:"No Number" }}</span>
+                      {% if case.blotter_case_name %}
+                        <div class="fw-semibold mt-1">{{ case.blotter_case_name|truncatechars:30 }}</div>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if case.role_in_case == 'COMPLAINANT' %}
+                        <span class="pill pill-complainant">{% bs_icon 'person-check' %} Complainant</span>
+                      {% elif case.role_in_case == 'RESPONDENT' %}
+                        <span class="pill pill-respondent">{% bs_icon 'person-x' %} Respondent</span>
+                      {% else %}
+                        <span class="pill pill-light">{{ case.role_in_case|default:"Unknown" }}</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if case.complaint_title %}
+                        <div class="fw-semibold">{{ case.complaint_title }}</div>
+                      {% endif %}
+                      {% if case.case_nature %}
+                        <small class="text-muted">{{ case.case_nature }}</small>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if case.date_filed %}
+                        {{ case.date_filed|date:"M d, Y" }}
+                        {% if case.time_filed %}
+                          <br><small class="text-muted">{{ case.time_filed }}</small>
+                        {% endif %}
+                      {% else %}
+                        <span class="text-muted">—</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if case.settlement_status %}
+                        {% if "SETTLED" in case.settlement_status|upper %}
+                          <span class="pill pill-settled">{{ case.settlement_status }}</span>
+                        {% elif "NOT SETTLED" in case.settlement_status|upper %}
+                          <span class="pill pill-not-settled">{{ case.settlement_status }}</span>
+                        {% else %}
+                          <span class="pill pill-pending">{{ case.settlement_status }}</span>
+                        {% endif %}
+                      {% else %}
+                        <span class="pill pill-light">Pending</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if case.last_progress %}
+                        <div class="fw-semibold">{{ case.last_progress }}</div>
+                        {% if case.last_progress_date %}
+                          <small class="text-muted">{{ case.last_progress_date|date:"M d, Y g:i A" }}</small>
+                        {% endif %}
+                      {% else %}
+                        <span class="text-muted">—</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if case.complainant_names %}
+                        <div><strong>C:</strong> {{ case.complainant_names|truncatechars:30 }}</div>
+                      {% endif %}
+                      {% if case.respondent_names %}
+                        <div><strong>R:</strong> {{ case.respondent_names|truncatechars:30 }}</div>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <a href="{% url 'lupon_mem:case_detail' case.blotter_case_id %}" class="btn-chip btn-sm">
+                        {% bs_icon 'eye' %} View Case
+                      </a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="empty-state">
+            {% bs_icon 'briefcase' %}
+            <h6>No Case History</h6>
+            <p class="mb-0">This person has no case involvement on record.</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="d-flex gap-2 mb-4">
+      <a href="{% url 'lupon_mem:resident_records_list' %}" class="btn btn-chip">
+        {% bs_icon 'arrow-left' %} Back to Resident Records
+      </a>
+      {% if report_history or case_history %}
+        <!-- <button class="btn btn-chip" onclick="window.print()">
+          {% bs_icon 'printer' %} Print Records
+        </button> -->
+      {% endif %}
+    </div>
+
+  </div>
+
+  {% endif %}
+
+</div>
+
+<!-- Photo Modal -->
+<div class="modal fade" id="photoModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">{{ person.full_name }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center">
+        {% if person.person_img %}
+          <img id="modalPhoto" src="{{ person.person_img }}" alt="{{ person.full_name }}" style="max-width:100%;max-height:400px;border-radius:8px;">
+        {% else %}
+          <div style="width:300px;height:300px;margin:0 auto;border-radius:8px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:80px;font-weight:700;color:#999;">{{ person.first_name.0 }}{{ person.last_name.0 }}</div>
+        {% endif %}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn" style="background:var(--brand-700);color:#fff;" onclick="document.getElementById('photoUpload').click();">
+          {% bs_icon 'camera' %} Update Photo
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+function showPhotoModal() {
+  const modal = new bootstrap.Modal(document.getElementById('photoModal'));
+  modal.show();
+}
+
+function uploadPhoto(input) {
+  if (input.files && input.files[0]) {
+    const file = input.files[0];
+    const formData = new FormData();
+    formData.append('photo', file);
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    fetch(window.location.pathname + 'update-photo/', {
+      method: 'POST',
+      body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const photoEl = document.getElementById('personPhoto');
+          const modalPhoto = document.getElementById('modalPhoto');
+          if (photoEl.tagName === 'IMG') {
+            photoEl.src = e.target.result;
+          } else {
+            photoEl.outerHTML = `<img id="personPhoto" src="${e.target.result}" alt="Photo" style="width:60px;height:60px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,.3);">`;
+          }
+          if (modalPhoto) modalPhoto.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+        bootstrap.Modal.getInstance(document.getElementById('photoModal'))?.hide();
+        alert('Photo updated successfully!');
+      } else {
+        alert('Failed to update photo: ' + (data.error || 'Unknown error'));
+      }
+    })
+    .catch(error => {
+      alert('Error uploading photo: ' + error);
+    });
+  }
+}
+</script>
+{% endblock %}

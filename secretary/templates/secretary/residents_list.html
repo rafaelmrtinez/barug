@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'css/form.css' %}">
@@ -44,7 +44,7 @@
         <!-- Toolbar (Search) -->
         <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get" id="toolbarForm">
           <div class="searchbox flex-grow-1">
-            {% bs_icon 'search' extra_classes='bi' %}
+            {% bs_icon_cached 'search' extra_classes='bi' %}
             <input
               type="text"
               class="form-control"
@@ -56,11 +56,11 @@
           </div>
 
           <button type="submit" class="btn btn-brand d-flex align-items-center">
-            {% bs_icon 'search' extra_classes='me-2' %} Search
+            {% bs_icon_cached 'search' extra_classes='me-2' %} Search
           </button>
           {% if q %}
             <a href="{% url 'secretary:residents_list' %}" class="btn btn-outline-brand ms-2">
-              {% bs_icon 'x-circle' extra_classes='me-1' %} Clear
+              {% bs_icon_cached 'x-circle' extra_classes='me-1' %} Clear
             </a>
           {% endif %}
         </form>
@@ -83,7 +83,7 @@
                     <td>{{ r.address }}</td>
                     <td class="text-end">
                       <a class="btn btn-outline-brand btn-sm" href="{% url 'secretary:resident_profile' r.person_id %}">
-                        {% bs_icon 'person-lines-fill' extra_classes='me-1' %} View
+                        {% bs_icon_cached 'person-lines-fill' extra_classes='me-1' %} View
                       </a>
                     </td>
                   </tr>

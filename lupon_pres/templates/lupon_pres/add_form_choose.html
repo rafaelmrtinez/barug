@@ -45,7 +45,7 @@
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">Attach a KP Form</h4>
     <a href="{% url 'lupon_mem:case_detail' case_id %}" class="btn btn-outline-brand d-flex align-items-center">
-      {% bs_icon 'arrow-left' extra_classes='me-2' %} Back to Case
+      {% bs_icon_cached 'arrow-left' extra_classes='me-2' %} Back to Case
     </a>
   </div>
 
@@ -57,26 +57,26 @@
   {# Summary badges (visible, high contrast) #}
   {# {% if badge_flags %}
   <div class="mb-3 d-flex flex-wrap align-items-center gap-2">
-    <span class="hint-pill pill-muted">{% bs_icon 'envelope' %} Summons: ×{{ badge_flags.summons_count }}</span>
+    <span class="hint-pill pill-muted">{% bs_icon_cached 'envelope' %} Summons: ×{{ badge_flags.summons_count }}</span>
     {% if badge_flags.no_show_complainant %}
-      <span class="hint-pill pill-noshow-c">{% bs_icon 'exclamation-octagon' %} No-show (Complainant)</span>
+      <span class="hint-pill pill-noshow-c">{% bs_icon_cached 'exclamation-octagon' %} No-show (Complainant)</span>
     {% endif %}
     {% if badge_flags.no_show_respondent %}
-      <span class="hint-pill pill-noshow-r">{% bs_icon 'exclamation-triangle' %} No-show (Respondent)</span>
+      <span class="hint-pill pill-noshow-r">{% bs_icon_cached 'exclamation-triangle' %} No-show (Respondent)</span>
     {% endif %}
     {% if badge_flags.need_new_summons %}
-      <span class="hint-pill pill-summons">{% bs_icon 'envelope-plus' %} New Summons</span>
+      <span class="hint-pill pill-summons">{% bs_icon_cached 'envelope-plus' %} New Summons</span>
     {% endif %}
   </div>
   {% endif %} #}
 
   <form class="toolbar d-flex align-items-center flex-wrap mb-3" onsubmit="return false;">
     <div class="searchbox">
-      {% bs_icon 'search' extra_classes='bi' %}
+      {% bs_icon_cached 'search' extra_classes='bi' %}
       <input id="formSearch" type="text" class="form-control" placeholder="Search by code or form name…">
     </div>
     <button type="button" class="btn btn-outline-brand d-flex align-items-center" onclick="clearSearch()">
-      {% bs_icon 'x-circle' extra_classes='me-2' %} Clear
+      {% bs_icon_cached 'x-circle' extra_classes='me-2' %} Clear
     </button>
   </form>
 
@@ -84,13 +84,13 @@
     {% for code, name in forms %}
       <div class="form-card" data-code="{{ code|upper }}" data-name="{{ name|upper }}">
         <div class="form-meta">
-          <span class="form-code">{% bs_icon 'file-earmark-text' %} {{ code }}</span>
+          <span class="form-code">{% bs_icon_cached 'file-earmark-text' %} {{ code }}</span>
           <div class="form-name" title="{{ name }}">{{ name }}</div>
         </div>
         <div class="form-action">
           <a class="btn btn-brand btn-sm d-flex align-items-center use-form"
              href="{% url 'lupon_mem:form_builder_by_code' case_id code %}">
-            {% bs_icon 'plus' extra_classes='me-2' %} Use this form
+            {% bs_icon_cached 'plus' extra_classes='me-2' %} Use this form
           </a>
         </div>
       </div>

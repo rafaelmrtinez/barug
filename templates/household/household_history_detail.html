@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
   <link rel="stylesheet" href="{% static 'css/button.css' %}">
@@ -246,7 +246,7 @@
       <span class="history-badge">HISTORICAL</span>
     </div>
     <div class="household-head">
-      {% bs_icon 'person-fill' %} {{ household.household_head_name }}
+      {% bs_icon_cached 'person-fill' %} {{ household.household_head_name }}
     </div>
   </div>
 
@@ -254,7 +254,7 @@
   <div class="section-block">
     <div class="section-header">
       <div class="section-icon">
-        {% bs_icon 'house-fill' %}
+        {% bs_icon_cached 'house-fill' %}
       </div>
       <h2 class="section-title">Household Information</h2>
     </div>
@@ -291,7 +291,7 @@
   <div class="section-block">
     <div class="section-header">
       <div class="section-icon">
-        {% bs_icon 'people-fill' %}
+        {% bs_icon_cached 'people-fill' %}
       </div>
       <h2 class="section-title">Families ({{ families|length }})</h2>
     </div>
@@ -308,7 +308,7 @@
             </div>
             <button class="toggle-members-btn" onclick="toggleMembers({{ forloop.counter0 }})">
               <span class="toggle-text">Show Members ({{ family.members|length }})</span>
-              {% bs_icon 'chevron-down' extra_classes='toggle-icon' %}
+              {% bs_icon_cached 'chevron-down' extra_classes='toggle-icon' %}
             </button>
           </div>
 
@@ -356,7 +356,7 @@
           <!-- Members Container -->
           <div class="members-container" id="members-{{ forloop.counter0 }}">
             <div style="font-weight:700; font-size:1rem; margin-bottom:.75rem; color:#495057;">
-              {% bs_icon 'people' %} Family Members ({{ family.members|length }})
+              {% bs_icon_cached 'people' %} Family Members ({{ family.members|length }})
             </div>
             
             {% if family.members %}
@@ -399,7 +399,7 @@
     {% else %}
       <div class="no-families">
         <div>
-          <i>{% bs_icon 'inbox' %}</i>
+          <i>{% bs_icon_cached 'inbox' %}</i>
         </div>
         <div style="font-size:1.125rem; font-weight:600;">No Families Found</div>
         <div style="font-size:.9375rem;">This household has no family records in history.</div>

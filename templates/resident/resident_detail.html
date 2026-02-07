@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
   <link rel="stylesheet" href="{% static 'css/button.css' %}">
@@ -184,21 +184,21 @@
         </div>
         <div class="mt-2">
           {% if resident.is_email_verified %}
-            <span class="badge-custom badge-verified">{% bs_icon 'check-circle' %} Email Verified</span>
+            <span class="badge-custom badge-verified">{% bs_icon_cached 'check-circle' %} Email Verified</span>
           {% else %}
-            <span class="badge-custom badge-unverified">{% bs_icon 'exclamation-circle' %} Email Not Verified</span>
+            <span class="badge-custom badge-unverified">{% bs_icon_cached 'exclamation-circle' %} Email Not Verified</span>
           {% endif %}
           
           {% if resident.is_staff %}
-            <span class="badge-custom badge-staff">{% bs_icon 'shield-check' %} Staff - {{ resident.role_name }}</span>
+            <span class="badge-custom badge-staff">{% bs_icon_cached 'shield-check' %} Staff - {{ resident.role_name }}</span>
           {% endif %}
           
           {% if resident.is_student %}
-            <span class="badge-custom badge-student">{% bs_icon 'book' %} Student</span>
+            <span class="badge-custom badge-student">{% bs_icon_cached 'book' %} Student</span>
           {% endif %}
           
           {% if resident.is_business_owner %}
-            <span class="badge-custom badge-business">{% bs_icon 'briefcase' %} Business Owner</span>
+            <span class="badge-custom badge-business">{% bs_icon_cached 'briefcase' %} Business Owner</span>
           {% endif %}
         </div>
       </div>
@@ -208,7 +208,7 @@
   <!-- Personal Information -->
   <div class="section-block">
     <div class="section-header">
-      <div class="section-icon">{% bs_icon 'person-fill' %}</div>
+      <div class="section-icon">{% bs_icon_cached 'person-fill' %}</div>
       <h2 class="section-title">Personal Information</h2>
     </div>
     
@@ -248,7 +248,7 @@
   <!-- Contact Information -->
   <div class="section-block">
     <div class="section-header">
-      <div class="section-icon">{% bs_icon 'telephone-fill' %}</div>
+      <div class="section-icon">{% bs_icon_cached 'telephone-fill' %}</div>
       <h2 class="section-title">Contact Information</h2>
     </div>
     
@@ -279,7 +279,7 @@
   <!-- Employment & Education -->
   <div class="section-block">
     <div class="section-header">
-      <div class="section-icon">{% bs_icon 'briefcase-fill' %}</div>
+      <div class="section-icon">{% bs_icon_cached 'briefcase-fill' %}</div>
       <h2 class="section-title">Employment & Education</h2>
     </div>
     
@@ -309,7 +309,7 @@
   <!-- Residential Status -->
   <div class="section-block">
     <div class="section-header">
-      <div class="section-icon">{% bs_icon 'house-door-fill' %}</div>
+      <div class="section-icon">{% bs_icon_cached 'house-door-fill' %}</div>
       <h2 class="section-title">Residential Status</h2>
     </div>
     
@@ -340,7 +340,7 @@
   {% if resident.government_programs %}
   <div class="section-block">
     <div class="section-header">
-      <div class="section-icon">{% bs_icon 'award-fill' %}</div>
+      <div class="section-icon">{% bs_icon_cached 'award-fill' %}</div>
       <h2 class="section-title">Government Programs</h2>
     </div>
     
@@ -356,7 +356,7 @@
   {% if resident.household_num %}
   <div class="section-block">
     <div class="section-header">
-      <div class="section-icon">{% bs_icon 'house-fill' %}</div>
+      <div class="section-icon">{% bs_icon_cached 'house-fill' %}</div>
       <h2 class="section-title">Household Information</h2>
     </div>
     
@@ -393,7 +393,7 @@
   {% if resident.family_num %}
   <div class="section-block">
     <div class="section-header">
-      <div class="section-icon">{% bs_icon 'people-fill' %}</div>
+      <div class="section-icon">{% bs_icon_cached 'people-fill' %}</div>
       <h2 class="section-title">Family Information</h2>
     </div>
     
@@ -456,7 +456,7 @@
   {% if resident.mother_name or resident.father_name or resident.guardian_name or resident.children_names %}
   <div class="section-block">
     <div class="section-header">
-      <div class="section-icon">{% bs_icon 'diagram-3-fill' %}</div>
+      <div class="section-icon">{% bs_icon_cached 'diagram-3-fill' %}</div>
       <h2 class="section-title">Family Relations</h2>
     </div>
     
@@ -500,7 +500,7 @@
   {% if resident.valid_id_front_path or resident.valid_id_back_path or resident.selfie_with_id %}
   <div class="section-block">
     <div class="section-header">
-      <div class="section-icon">{% bs_icon 'file-earmark-text-fill' %}</div>
+      <div class="section-icon">{% bs_icon_cached 'file-earmark-text-fill' %}</div>
       <h2 class="section-title">Documents</h2>
     </div>
     

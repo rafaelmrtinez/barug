@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
@@ -16,7 +16,7 @@
         <h5 class="mb-0">Barangay Clearance</h5>
         <!-- Show only when status is ready -->
         <a href="#" class="btn btn-submit btn-sm">
-          {% bs_icon 'download' size='1em' %} Download
+          {% bs_icon_cached 'download' size='1em' %} Download
         </a>
       </div>
 

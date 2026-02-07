@@ -965,6 +965,47 @@ def report_update_respondents(request: HttpRequest, report_id: int):
 
 
 @session_login_required
+@role_required(*LUPON_ROLES)
+@require_POST
+def report_delete(request: HttpRequest, report_id: int):
+    staff_id = (request.session.get("auth") or {}).get("staff_id")
+    if not staff_id:
+        messages.error(request, "Session expired.")
+        return redirect("lupon_mem:report_list")
+    
+    try:
+        with connection.cursor() as cur:
+            cur.execute("SELECT blotter_case_id FROM blotter_case WHERE blotter_report_id = %s", [report_id])
+            if cur.fetchone():
+                messages.error(request, "Cannot delete report that has been escalated to a case.")
+                return redirect("lupon_mem:report_list")
+            
+            cur.execute("SELECT incident_subject FROM blotter_report WHERE blotter_report_id = %s", [report_id])
+            subject_row = cur.fetchone()
+            subject = subject_row[0] if subject_row else "Unknown"
+            
+            cur.execute("DELETE FROM complainant_report WHERE blotter_report_id = %s", [report_id])
+            cur.execute("DELETE FROM respondent_report WHERE blotter_report_id = %s", [report_id])
+            cur.execute("DELETE FROM report_status_detail WHERE blotter_report_id = %s", [report_id])
+            cur.execute("DELETE FROM blotter_report WHERE blotter_report_id = %s", [report_id])
+            cur.execute("SELECT setval('public.blotter_report_blotter_report_id_seq', (SELECT COALESCE(MAX(blotter_report_id), 0) FROM public.blotter_report), true)")
+            
+            blotter_log_event(
+                action="DELETE",
+                table_affected="blotter_report",
+                record_affected_id=report_id,
+                details=f"Deleted blotter report #{report_id}: {subject}",
+                performer_staff_id=staff_id
+            )
+        
+        messages.success(request, f"Blotter report #{report_id} deleted successfully.")
+    except Exception as e:
+        messages.error(request, f"Failed to delete report: {e}")
+    
+    return redirect("lupon_mem:report_list")
+
+
+@session_login_required
 @role_required(*LUPON_ROLES, "barangay treasurer")
 @require_POST
 def report_mark_paid(request: HttpRequest, report_id: int):
@@ -1058,7 +1099,7 @@ def report_mark_paid(request: HttpRequest, report_id: int):
             
             # Set case state to OPEN
             cur.execute(
-                "UPDATE blotter_case SET case_state_id = 1 WHERE blotter_case_id = %s",
+                "UPDATE blotter_case SET case_state_id = (SELECT case_state_id FROM case_state WHERE UPPER(case_state_name) = 'OPEN') WHERE blotter_case_id = %s",
                 [case_id]
             )
             
@@ -1515,9 +1556,9 @@ def report_pay_and_open_case(request: HttpRequest, report_id: int):
                 [payment_status, report_id]
             )
         
-        # Set case state to OPEN (case_state_id = 1)
+        # Set case state to OPEN
         cur.execute(
-            "UPDATE blotter_case SET case_state_id = 1 WHERE blotter_case_id = %s",
+            "UPDATE blotter_case SET case_state_id = (SELECT case_state_id FROM case_state WHERE UPPER(case_state_name) = 'OPEN') WHERE blotter_case_id = %s",
             [case_id]
         )
         

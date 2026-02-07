@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'css/table.css' %}">
@@ -158,50 +158,50 @@
 
         <div class="d-flex align-items-center gap-2 mt-2">
           <span class="pill pill-status" title="Settlement Status">
-            {% bs_icon 'hand-thumbs-up' %} {{ case.7|default:"—" }}
+            {% bs_icon_cached 'hand-thumbs-up' %} {{ case.7|default:"—" }}
           </span>
 
           {% with st=case_state_name|default:"—"|lower %}
             <span class="pill"
                   title="Case State"
                   style="{% if st == 'open' %}background:#eef7ff;color:#0b5cab;border:1px solid #cfe4ff;{% elif st == 'pending' %}background:#fffaf2;color:#995a00;border:1px solid #f2ddbd;{% elif st == 'closed' %}background:#f5f7f9;color:#334155;border:1px solid #e5e7eb;{% else %}background:#f6f7f9;color:#4b5563;border:1px solid #e5e7eb;{% endif %}">
-              {% if st == 'open' %}{% bs_icon 'unlock' %} OPEN
-              {% elif st == 'pending' %}{% bs_icon 'hourglass-split' %} PENDING
-              {% elif st == 'closed' %}{% bs_icon 'lock' %} CLOSED
+              {% if st == 'open' %}{% bs_icon_cached 'unlock' %} OPEN
+              {% elif st == 'pending' %}{% bs_icon_cached 'hourglass-split' %} PENDING
+              {% elif st == 'closed' %}{% bs_icon_cached 'lock' %} CLOSED
               {% else %}{{ case_state_name|default:"—" }}{% endif %}
             </span>
           {% endwith %}
 
           <span class="pill pill-kp9" title="Summons Issued">
-            {% bs_icon 'envelope-open' %} KP-9: {{ kp9_count|default:0 }}
+            {% bs_icon_cached 'envelope-open' %} KP-9: {{ kp9_count|default:0 }}
           </span>
         </div>
       </div>
 
       <div class="d-flex gap-2 flex-wrap">
         <a class="btn btn-outline-brand" href="{% url 'lupon_mem:case_timeline' case_id %}">
-          {% bs_icon 'clock-history' extra_classes='me-1' %} Timeline
+          {% bs_icon_cached 'clock-history' extra_classes='me-1' %} Timeline
         </a>
         <a class="btn btn-outline-brand" href="{% url 'lupon_mem:case_hearing_list' case_id %}">
-          {% bs_icon 'calendar-week' extra_classes='me-1' %} Hearings
+          {% bs_icon_cached 'calendar-week' extra_classes='me-1' %} Hearings
         </a>
         <a class="btn btn-brand" href="{% url 'lupon_mem:summon_attendance' case_id %}">
-          {% bs_icon 'envelope' extra_classes='me-1' %} Summons / Attendance
+          {% bs_icon_cached 'envelope' extra_classes='me-1' %} Summons / Attendance
         </a>
 
         <!-- NEW: Lupon Flow button -->
         <button class="btn btn-outline-brand" type="button" data-bs-toggle="offcanvas" data-bs-target="#luponFlowCanvas" aria-controls="luponFlowCanvas">
-          {% bs_icon 'diagram-3' extra_classes='me-1' %} Lupon Flow
+          {% bs_icon_cached 'diagram-3' extra_classes='me-1' %} Lupon Flow
         </button>
 
         {# Close / Reopen buttons #}
         {% if case_state_name|lower == "closed" %}
           <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#reopenCaseModal">
-            {% bs_icon 'arrow-counterclockwise' extra_classes='me-1' %} Reopen
+            {% bs_icon_cached 'arrow-counterclockwise' extra_classes='me-1' %} Reopen
           </button>
         {% else %}
           <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#closeCaseModal">
-            {% bs_icon 'lock' extra_classes='me-1' %} Close Case
+            {% bs_icon_cached 'lock' extra_classes='me-1' %} Close Case
           </button>
         {% endif %}
       </div>
@@ -212,7 +212,7 @@
   <div class="row g-3 mb-3 row-cols-1 row-cols-md-3">
     <div class="col">
       <div class="card-lite h-100">
-        <div class="card-head">{% bs_icon 'calendar2-check' %} Latest Hearing</div>
+        <div class="card-head">{% bs_icon_cached 'calendar2-check' %} Latest Hearing</div>
         <div class="card-body kpi">
           <div class="value">
             {% if case.7 and case.7|upper == 'SETTLED' %}—{% else %}{{ latest_hearing_dt|default:"—" }}{% endif %}
@@ -224,7 +224,7 @@
 
     <div class="col">
       <div class="card-lite h-100">
-        <div class="card-head">{% bs_icon 'calendar-week' %} Hearings Set</div>
+        <div class="card-head">{% bs_icon_cached 'calendar-week' %} Hearings Set</div>
         <div class="card-body kpi">
           <div class="value">{{ hearings_set_count|default:0 }}</div>
           <div class="hint">Total KP-8 / KP-12</div>
@@ -234,7 +234,7 @@
 
     <div class="col">
       <div class="card-lite h-100">
-        <div class="card-head">{% bs_icon 'calendar-week' %} Hearings Held</div>
+        <div class="card-head">{% bs_icon_cached 'calendar-week' %} Hearings Held</div>
         <div class="card-body kpi">
           <div class="value">{{ hearings_count|default:0 }}</div>
           <div class="hint">Total completed sessions</div>
@@ -245,24 +245,24 @@
 
   <!-- ======= CASE OVERVIEW ======= -->
   <div class="card-lite mb-3">
-    <div class="card-head">{% bs_icon 'journal-check' %} Case Overview</div>
+    <div class="card-head">{% bs_icon_cached 'journal-check' %} Case Overview</div>
     <div class="card-body">
       <div class="row g-3">
         <div class="col-12 col-lg-4">
           <div class="label d-flex align-items-center">
-            {% bs_icon 'calendar3' extra_classes='me-2' %} Date Filed
+            {% bs_icon_cached 'calendar3' extra_classes='me-2' %} Date Filed
           </div>
           <div class="value mt-1">{{ case.3 }}</div>
         </div>
         <div class="col-12 col-lg-4">
           <div class="label d-flex align-items-center">
-            {% bs_icon 'app' extra_classes='me-2' %} Type
+            {% bs_icon_cached 'app' extra_classes='me-2' %} Type
           </div>
           <div class="value mt-1">{{ case.5 }}</div>
         </div>
         <div class="col-12 col-lg-4">
           <div class="label d-flex align-items-center">
-            {% bs_icon 'tag' extra_classes='me-2' %} Case Nature
+            {% bs_icon_cached 'tag' extra_classes='me-2' %} Case Nature
           </div>
           <div class="value mt-1">{{ case_nature|default:case.6|default:"—" }}</div>
         </div>
@@ -272,7 +272,7 @@
 
       <div>
         <div class="label d-flex align-items-center mb-1">
-          {% bs_icon 'journal-text' extra_classes='me-2' %} Incident Description
+          {% bs_icon_cached 'journal-text' extra_classes='me-2' %} Incident Description
         </div>
         <div class="value" style="white-space:pre-wrap;">
           {{ incident_description|default:case.4|default:"—" }}
@@ -284,7 +284,7 @@
   <!-- ======= ATTACHED FORMS ======= -->
   <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
     <h6 class="text-uppercase text-muted fw-bold mb-0 d-flex align-items-center">
-      {% bs_icon 'files' extra_classes='me-1' %} Attached KP Forms
+      {% bs_icon_cached 'files' extra_classes='me-1' %} Attached KP Forms
     </h6>
     <div class="forms-count d-none d-md-block">
       {% if forms %}{{ forms|length }} form{{ forms|length|pluralize }}{% else %}0 forms{% endif %}
@@ -293,7 +293,7 @@
 
   <div class="toolbar d-flex align-items-center flex-wrap mb-2">
     <div class="searchbox">
-      {% bs_icon 'search' extra_classes='bi' %}
+      {% bs_icon_cached 'search' extra_classes='bi' %}
       <input id="formsSearch" type="search" class="form-control" placeholder="Search form name or code…">
       <button class="clear-btn" type="button" id="clearSearch" title="Clear search" aria-label="Clear">&times;</button>
     </div>
@@ -301,11 +301,11 @@
     <div class="ms-auto d-flex align-items-center gap-2">
       {% if block_due_to_summons or block_due_to_hearing %}
         <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#addFormBlockedModal">
-          {% bs_icon 'plus-circle' extra_classes='me-1' %} Add Form
+          {% bs_icon_cached 'plus-circle' extra_classes='me-1' %} Add Form
         </button>
       {% else %}
         <a class="btn btn-outline-brand" href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
-          {% bs_icon 'plus-circle' extra_classes='me-1' %} Add Form
+          {% bs_icon_cached 'plus-circle' extra_classes='me-1' %} Add Form
         </a>
       {% endif %}
 
@@ -313,11 +313,11 @@
         {% if has_med_summary or status_txt == 'SETTLED' %}
           {% if has_med_summary %}
             <a class="btn btn-outline-brand" href="{% url 'lupon_mem:submission_pdf' med_summary_sid %}">
-              {% bs_icon 'file-earmark-text' extra_classes='me-1' %} View Summary
+              {% bs_icon_cached 'file-earmark-text' extra_classes='me-1' %} View Summary
             </a>
           {% else %}
             <a class="btn btn-outline-brand" href="{% url 'lupon_mem:generate_settlement_summary' case_id %}">
-              {% bs_icon 'file-earmark-plus' extra_classes='me-1' %} Create Summary
+              {% bs_icon_cached 'file-earmark-plus' extra_classes='me-1' %} Create Summary
             </a>
           {% endif %}
         {% endif %}
@@ -327,10 +327,10 @@
 
   {% if block_due_to_hearing %}
     <div class="helper-note d-inline-flex align-items-center gap-2 mb-2">
-      {% bs_icon 'info-circle' %}
+      {% bs_icon_cached 'info-circle' %}
       A hearing is scheduled. You can still record <strong>Attendance</strong> for it:
       <a class="btn btn-link p-0 ms-1" href="{% url 'lupon_mem:add_form_choose_static' case_id %}?allow_med_att=1&from=hearing">
-        {% bs_icon 'calendar-check' %} Add Med/Pangkat Attendance
+        {% bs_icon_cached 'calendar-check' %} Add Med/Pangkat Attendance
       </a>
     </div>
   {% endif %}
@@ -340,18 +340,18 @@
       <table class="table mb-0 align-middle" id="formsTable">
         <thead>
           <tr>
-            <th style="width:120px;">{% bs_icon 'hash' extra_classes='me-1' %} Code</th>
-            <th>{% bs_icon 'file-earmark-text' extra_classes='me-1' %} Form</th>
-            <th style="width:260px;">{% bs_icon 'check2-circle' extra_classes='me-1' %} Status</th>
-            <th style="width:230px;">{% bs_icon 'clock' extra_classes='me-1' %} Submitted</th>
-            <th class="text-end" style="width:90px;">{% bs_icon 'file-earmark-pdf' extra_classes='me-1' %} PDF</th>
+            <th style="width:120px;">{% bs_icon_cached 'hash' extra_classes='me-1' %} Code</th>
+            <th>{% bs_icon_cached 'file-earmark-text' extra_classes='me-1' %} Form</th>
+            <th style="width:260px;">{% bs_icon_cached 'check2-circle' extra_classes='me-1' %} Status</th>
+            <th style="width:230px;">{% bs_icon_cached 'clock' extra_classes='me-1' %} Submitted</th>
+            <th class="text-end" style="width:90px;">{% bs_icon_cached 'file-earmark-pdf' extra_classes='me-1' %} PDF</th>
           </tr>
         </thead>
         <tbody>
         {% for f in forms %}
           <tr>
             <td class="text-nowrap">
-              <span class="code-chip">{% bs_icon 'file-earmark-text' %} {{ f.1 }}</span>
+              <span class="code-chip">{% bs_icon_cached 'file-earmark-text' %} {{ f.1 }}</span>
             </td>
             <td class="fw-semibold">
               {{ f.2 }}
@@ -368,22 +368,22 @@
             </td>
             <td>
               {% if f.3 and f.3|upper == 'SUBMITTED' %}
-                <span class="pill-submitted pill">{% bs_icon 'check-circle' extra_classes='me-1' %} SUBMITTED</span>
+                <span class="pill-submitted pill">{% bs_icon_cached 'check-circle' extra_classes='me-1' %} SUBMITTED</span>
               {% else %}
-                <span class="pill-pending pill">{% bs_icon 'hourglass-split' extra_classes='me-1' %} {{ f.3|upper|default:"PENDING" }}</span>
+                <span class="pill-pending pill">{% bs_icon_cached 'hourglass-split' extra_classes='me-1' %} {{ f.3|upper|default:"PENDING" }}</span>
               {% endif %}
             </td>
             <td class="text-muted">{{ f.4 }}</td>
             <td class="text-end">
               <a class="btn btn-outline-brand btn-sm" href="{% url 'lupon_mem:submission_pdf' f.0 %}">
-                {% bs_icon 'file-earmark-pdf' %}
+                {% bs_icon_cached 'file-earmark-pdf' %}
               </a>
             </td>
           </tr>
         {% empty %}
           <tr>
             <td colspan="5" class="text-center text-muted py-4">
-              {% bs_icon 'inboxes' extra_classes='me-2' %} No forms attached.
+              {% bs_icon_cached 'inboxes' extra_classes='me-2' %} No forms attached.
             </td>
           </tr>
         {% endfor %}
@@ -396,12 +396,12 @@
     {% if block_due_to_summons or block_due_to_hearing %}
       <button class="btn btn-outline-brand btn-lg rounded-pill"
               data-bs-toggle="modal" data-bs-target="#addFormBlockedModal">
-        {% bs_icon 'plus-circle' extra_classes='me-1' %} Add Form
+        {% bs_icon_cached 'plus-circle' extra_classes='me-1' %} Add Form
       </button>
     {% else %}
       <a class="btn btn-outline-brand btn-lg rounded-pill"
          href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
-        {% bs_icon 'plus-circle' extra_classes='me-1' %} Add Form
+        {% bs_icon_cached 'plus-circle' extra_classes='me-1' %} Add Form
       </a>
     {% endif %}
   </div>
@@ -412,7 +412,7 @@
 <div class="offcanvas offcanvas-end" tabindex="-1" id="luponFlowCanvas" aria-labelledby="luponFlowCanvasLabel" style="width:min(720px, 100vw);">
   <div class="offcanvas-header">
     <h5 class="offcanvas-title d-flex align-items-center gap-2" id="luponFlowCanvasLabel">
-      {% bs_icon 'diagram-3' %} Interactive Lupon Flow Guide
+      {% bs_icon_cached 'diagram-3' %} Interactive Lupon Flow Guide
     </h5>
     <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
   </div>
@@ -426,7 +426,7 @@
       Interactive guide for Barangay Justice process. Click choices to see next steps.
     </div>
     <div id="flowMount" class="card-lite">
-      <div class="card-head">{% bs_icon 'journal-text' %} <span id="flowTitle">Complaint Filed</span></div>
+      <div class="card-head">{% bs_icon_cached 'journal-text' %} <span id="flowTitle">Complaint Filed</span></div>
       <div class="card-body">
         <ul class="flow-list" id="flowList"></ul>
       </div>
@@ -675,21 +675,21 @@
     // Add form button if KP code
     if (step.code && step.code.startsWith('KP-')) {
       actionsHtml += `<a href="{% url 'lupon_mem:add_form_choose_static' case_id %}" class="btn btn-outline-brand btn-sm">
-        {% bs_icon 'plus-circle' %} Add ${step.code}
+        {% bs_icon_cached 'plus-circle' %} Add ${step.code}
       </a>`;
     }
     
     // Add hearing button if hearing-related
     if (/hearing/i.test(step.title)) {
       actionsHtml += `<a href="{% url 'lupon_mem:case_hearing_list' case_id %}" class="btn btn-brand-subtle btn-sm">
-        {% bs_icon 'calendar-week' %} Hearings
+        {% bs_icon_cached 'calendar-week' %} Hearings
       </a>`;
     }
     
     // Add summons button if summons-related
     if (/summons/i.test(step.title)) {
       actionsHtml += `<a href="{% url 'lupon_mem:summon_attendance' case_id %}" class="btn btn-brand-subtle btn-sm">
-        {% bs_icon 'envelope' %} Attendance
+        {% bs_icon_cached 'envelope' %} Attendance
       </a>`;
     }
     

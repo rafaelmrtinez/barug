@@ -1,134 +1,13 @@
 {% extends "base.html" %} 
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'css/table.css' %}">
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'lupon_mem/css/case_detail.css' %}">
 <style>
-  :root{
-    --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932; --brand-600:#7a3232;
-    --brand-100:#f3eaeb; --brand-050:#fbf6f6; --accent:#D4AF37; --ink:#0f172a; --muted:#64748b;
-    --line:#e5e7eb; --soft:#fbf6f6; --card:#ffffff;
-  }
-  .page-wrap{ margin-top:12px; font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
-
-  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); }
-  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); color:#fff; }
-  .btn-outline-brand{ color:var(--brand-700); border-color:var(--brand-700); background:#fff; }
-  .btn-outline-brand:hover{ background:var(--brand-700); color:#fff; }
-  .btn-brand-subtle{ background:var(--brand-100); color:var(--brand-700); border-color:var(--brand-100); }
-  .btn-brand-subtle:hover{ background:var(--brand-050); color:var(--brand-700); }
-
-  .form-control:focus,.form-select:focus,.form-check-input:focus{
-    border-color:var(--brand-700); box-shadow:0 0 0 .25rem rgba(109,41,50,.25); outline:none;
-  }
-  .form-check-input:checked{ background-color:var(--brand-700); border-color:var(--brand-700); }
-
-  .hero{ background:linear-gradient(180deg, var(--soft), #fff 70%); border:1px solid var(--line);
-         border-radius:16px; padding:18px 16px; }
-  .hero .case-no{font-size:.85rem;color:var(--muted);font-weight:700;letter-spacing:.02em}
-  .hero .title{margin:2px 0 0;font-weight:800;color:var(--ink)}
-  .pill{ display:inline-flex; align-items:center; gap:.45rem; padding:.35rem .7rem; border-radius:999px;
-         font-weight:800; font-size:.75rem; border:1px solid transparent; white-space:nowrap; }
-  .pill-status{ background:#fff; color:var(--brand-700); border-color:#eadfcd; box-shadow:0 1px 0 #f0e7d5 }
-
-  .card-lite{ background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden }
-  .card-head{ background:linear-gradient(180deg,#fffaf7, #fff); border-bottom:1px solid var(--line);
-              padding:.7rem .9rem; font-weight:700; color:var(--brand-800); display:flex; align-items:center; gap:.5rem }
-  .card-body{ padding:1rem }
-
-  .table-wrap{ border:1px solid var(--line); border-radius:12px; overflow:hidden }
-  .table thead th{ background:#fafafa; border-bottom:1px solid var(--line)!important; font-size:.78rem;
-                   text-transform:uppercase; letter-spacing:.03em; color:#334155 }
-  .table tbody tr:hover{ background:#fffafa }
-  .code-chip{ display:inline-flex; align-items:center; gap:.35rem; font-family:ui-monospace,Menlo,Consolas,monospace;
-              font-size:.78rem; padding:.22rem .46rem; border-radius:.5rem; background:#f7f5f2; border:1px solid #eee }
-  .pill-submitted{ background:#eaf7ee; color:#0f5132; border:1px solid #bfe6cc }
-  .pill-pending{ background:#eef2f7; color:#0f172a; border:1px solid #d5dce7 }
-
-  .toolbar{ background:#fff; border:1px solid var(--line); border-radius:1rem; padding:.75rem; gap:.5rem; }
-  .searchbox{ position:relative; flex:1; min-width:260px; }
-  .searchbox .bi{ position:absolute; left:.8rem; top:50%; transform:translateY(-50%); opacity:.7; color:var(--brand-700); }
-  .searchbox input{ padding-left:2.35rem!important; padding-right:2rem!important; }
-  .searchbox .clear-btn{ position:absolute; right:.35rem; top:50%; transform:translateY(-50%);
-    border:none; background:transparent; width:28px; height:28px; border-radius:50%; display:grid; place-items:center; color:#6b7280; }
-  .searchbox .clear-btn:hover{ background:#f3f4f6; color:#374151; }
-
-  .forms-count{ color:var(--muted); font-size:.85rem; }
-  .helper-note{ font-size:.85rem; color:#334155; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:.5rem .75rem; }
-  .helper-note strong{ color:#6d2932; }
-
-  .sticky-add{ position:sticky; bottom:10px; z-index:9; display:flex; justify-content:flex-end }
-
-  /* ===== Lupon Flow Viewer ===== */
-  .flow-toolbar{ display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin-bottom:.75rem; }
-  .flow-chip{ border:1px solid var(--line); background:#fff; color:#000; border-radius:999px; padding:.35rem .8rem; font-weight:700; font-size:.85rem; }
-  .flow-chip.active{ background:var(--brand-700); color:#fff; border-color:var(--brand-700); }
-  .flow-legend{ font-size:.8rem; color:#64748b; }
-
-  .flow-list{ list-style:none; margin:0; padding:0 0 0 .25rem; }
-  .flow-step{ display:flex; gap:.8rem; position:relative; padding:.4rem 0 .4rem .1rem; }
-  .flow-step::before{ content:""; position:absolute; left:6px; top:0; bottom:0; width:2px; background:#e5e7eb; z-index:1; }
-  .flow-dot{ width:14px; height:14px; border-radius:50%; flex:0 0 14px; margin-top:.2rem; border:2px solid #cbd5e1; background:#fff; position:relative; z-index:2; }
-  .flow-step .content{ flex:1; }
-  .flow-step .title{ font-weight:800; color:#0f172a; }
-  .flow-step .subtitle{ font-size:.85rem; color:#475569; }
-  .kp{ display:inline-flex; align-items:center; gap:.25rem; font-weight:800; font-size:.75rem; background:#fffaf0; color:#92400e; border:1px solid #f2ddbd; border-radius:6px; padding:.15rem .4rem; }
-  .branch{ display:inline-block; font-size:.75rem; font-weight:800; border:1px dashed #cbd5e1; color:#334155; border-radius:6px; padding:.1rem .4rem; margin-left:.35rem; }
-  .note{ font-size:.82rem; color:#6b7280; margin-top:.15rem; }
-  .step-actions{ margin-top:.35rem; display:flex; gap:.35rem; flex-wrap:wrap; }
-  .step-actions .btn{ --bs-btn-padding-y:.2rem; --bs-btn-padding-x:.5rem; --bs-btn-font-size:.8rem; }
-
-  .deadline-pill{ display:inline-flex; gap:.35rem; align-items:center; font-weight:800; font-size:.75rem; border-radius:999px; padding:.25rem .6rem; border:1px solid #e2e8f0; background:#f8fafc; color:#0f172a; }
-  .deadline-pill.danger{ background:#fff1f2; border-color:#fecdd3; color:#b91c1c; }
-  .deadline-pill.warn{ background:#fffbeb; border-color:#fde68a; color:#92400e; }
-
-  /* Hearing Window Bar */
-  .hw-bar{ display:flex; gap:.5rem; align-items:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:.5rem .75rem; }
-  .hw-phase{ font-weight:800; font-size:.8rem; padding:.25rem .6rem; border-radius:999px; background:#eef2ff; border:1px solid #c7d2fe; color:#1e3a8a; }
-  .hw-phase.conc{ background:#fffaf0; border-color:#fde68a; color:#92400e; }
-  .hw-dot{ width:6px; height:6px; border-radius:999px; background:#94a3b8; }
-  .hw-kv{ font-size:.85rem; color:#334155; }
-  .hw-kv strong{ color:#0f172a; }
-  .hw-stat{ margin-left:auto; font-size:.85rem; color:#475569; }
-  
-  /* Preload Critical Styles */
-  .modal-content{ contain:layout style; }
-  .form-select, .form-control{ contain:layout; }
-  .btn{ contain:layout; }
-  @media (max-width: 768px){ .sticky-add{ bottom:10px; } }
-
-  /* Modal Performance Optimizations */
-  .modal{ will-change:transform,opacity; }
-  .modal-dialog{ will-change:transform; }
-  .modal.fade .modal-dialog{ transition:transform 0.2s ease-out; }
-  .modal.show .modal-dialog{ transform:none; }
-  
-  /* Form Focus States */
-  .form-select:focus, .form-control:focus{
-    border-color:var(--brand-600)!important;
-    box-shadow:0 0 0 3px rgba(109,41,50,0.1)!important;
-    outline:none;
-  }
-  
-  /* Button Hover Effects */
-  .btn{ transition:all 0.15s ease; }
-  .btn:hover{ transform:translateY(-1px); }
-  .btn:active{ transform:translateY(0); }
-  
-  /* Card Hover Effects */
-  .card{ transition:box-shadow 0.15s ease; }
-  .card:hover{ box-shadow:0 4px 20px rgba(0,0,0,0.08); }
-  
-  /* Notification Bubble */
-  .btn-with-badge{ position:relative; }
-  .btn-badge{ position:absolute; top:-6px; right:-6px; background:#dc3545; color:#fff; border-radius:50%; width:18px; height:18px; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; border:2px solid #fff; }
-  
-  /* Pagination Styles */
-  .pagination .page-link{ transition:all 0.2s ease; }
-  .pagination .page-link:hover:not(.disabled):not([aria-disabled="true"]){ transform:translateY(-2px); box-shadow:0 4px 12px rgba(109,41,50,0.2); }
-  .pagination .page-item.active .page-link{ box-shadow:0 2px 8px rgba(109,41,50,0.3); }
+  /* Inline styles moved to case_detail.css */
 </style>
 {% endblock css %}
 
@@ -173,51 +52,22 @@
         </div>
       </div>
 
-      <style>
-      .case-no {
-        font-weight: 600;
-        font-size: 1rem;
-        color: var(--brand, #6d2932);
-        display: flex;
-        align-items: center;
-        gap: 0.35rem;
-      }
 
-      .info-icon {
-        color: var(--brand, #6d2932);
-        text-decoration: none;
-        cursor: pointer;
-        transition: color 0.2s ease;
-      }
-      .info-icon:hover {
-        color: var(--accent, #D4AF37);
-      }
-      </style>
-
-      <script>
-        // Enable Bootstrap tooltip
-        document.addEventListener('DOMContentLoaded', function () {
-          const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]')
-          tooltipTriggerList.forEach(function (tooltipTriggerEl) {
-            new bootstrap.Tooltip(tooltipTriggerEl)
-          })
-        })
-      </script>
 
         <h3 class="title">{{ case.2 }}</h3>
 
         <div class="d-flex align-items-center gap-2 mt-2">
           <span class="pill pill-status" title="Settlement Status">
-            {% bs_icon 'hand-thumbs-up' %} {{ case.7|default:"—" }}
+            {% bs_icon_cached 'hand-thumbs-up' %} {{ case.7|default:"—" }}
           </span>
 
           {% with st=case_state_name|default:"—"|lower %}
             <span class="pill"
                   title="Case State"
                   style="{% if st == 'open' %}background:#eef7ff;color:#0b5cab;border:1px solid #cfe4ff;{% elif st == 'pending' %}background:#fffaf2;color:#995a00;border:1px solid #f2ddbd;{% elif st == 'closed' %}background:#f5f7f9;color:#334155;border:1px solid #e5e7eb;{% else %}background:#f6f7f9;color:#4b5563;border:1px solid #e5e7eb;{% endif %}">
-              {% if st == 'open' %}{% bs_icon 'unlock' %} OPEN
-              {% elif st == 'pending' %}{% bs_icon 'hourglass-split' %} PENDING
-              {% elif st == 'closed' %}{% bs_icon 'lock' %} CLOSED
+              {% if st == 'open' %}{% bs_icon_cached 'unlock' %} OPEN
+              {% elif st == 'pending' %}{% bs_icon_cached 'hourglass-split' %} PENDING
+              {% elif st == 'closed' %}{% bs_icon_cached 'lock' %} CLOSED
               {% else %}{{ case_state_name|default:"—" }}{% endif %}
             </span>
           {% endwith %}
@@ -226,16 +76,16 @@
         <div class="mt-2 d-flex flex-wrap gap-2">
           {% if pb_first_meeting_at %}
             <span class="deadline-pill" id="pbWindowPill">
-              {% bs_icon 'calendar2-event' %} PB Window: <span id="pbDaysLeft">—</span>
+              {% bs_icon_cached 'calendar2-event' %} PB Window: <span id="pbDaysLeft">—</span>
             </span>
           {% endif %}
           {% if pangkat_constituted_at %}
             <span class="deadline-pill" id="pangkatWindowPill">
-              {% bs_icon 'calendar-range' %} Pangkat Window: <span id="pangkatDaysLeft">—</span>
+              {% bs_icon_cached 'calendar-range' %} Pangkat Window: <span id="pangkatDaysLeft">—</span>
             </span>
             {% if pangkat_extended_until %}
               <span class="deadline-pill warn">
-                {% bs_icon 'arrow-repeat' %} Extended until {{ pangkat_extended_until }}
+                {% bs_icon_cached 'arrow-repeat' %} Extended until {{ pangkat_extended_until }}
               </span>
             {% endif %}
           {% endif %}
@@ -245,22 +95,22 @@
       {% if request.session.auth.role_name|lower != 'barangay secretary' %}
       <div class="d-flex gap-2 flex-wrap">
         <a class="btn btn-outline-brand" href="{% url 'lupon_mem:case_timeline' case_id %}">
-          {% bs_icon 'clock-history' extra_classes='me-1' %} Timeline
+          {% bs_icon_cached 'clock-history' extra_classes='me-1' %} Timeline
         </a>
         <a class="btn btn-outline-brand btn-with-badge" href="{% url 'lupon_mem:case_hearing_list' case_id %}" id="hearingsBtn">
-          {% bs_icon 'calendar-week' extra_classes='me-1' %} Hearings
+          {% bs_icon_cached 'calendar-week' extra_classes='me-1' %} Hearings
           <span class="btn-badge" id="hearingsBadge" style="display: none;"></span>
         </a>
         <!-- <a class="btn btn-brand" href="{% url 'lupon_mem:summon_attendance' case_id %}">
-          {% bs_icon 'envelope' extra_classes='me-1' %} Summons / Attendance
+          {% bs_icon_cached 'envelope' extra_classes='me-1' %} Summons / Attendance
         </a> -->
 
         <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#updateCaseStatusModal">
-          {% bs_icon 'gear' extra_classes='me-1' %} Update Case Status
+          {% bs_icon_cached 'gear' extra_classes='me-1' %} Update Case Status
         </button>
 
         <button class="btn btn-outline-brand" type="button" data-bs-toggle="offcanvas" data-bs-target="#luponFlowCanvas" aria-controls="luponFlowCanvas">
-          {% bs_icon 'diagram-3' extra_classes='me-1' %} Lupon Flow
+          {% bs_icon_cached 'diagram-3' extra_classes='me-1' %} Lupon Flow
         </button>
       </div>
       {% endif %}
@@ -270,7 +120,7 @@
   <!-- ======= KP-7 COMPLAINT DETAILS ======= -->
   <div id="kp7ComplaintSection" class="card-lite mb-3" style="display: none;">
     <div class="card-head">
-      {% bs_icon 'file-earmark-text' %} Complaint Details
+      {% bs_icon_cached 'file-earmark-text' %} Complaint Details
     </div>
     <div class="card-body">
       <div class="row g-3">
@@ -311,7 +161,7 @@
   <!-- ======= ATTACHED FORMS ======= -->
   <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
     <h6 class="text-uppercase text-muted fw-bold mb-0 d-flex align-items-center">
-      {% bs_icon 'files' extra_classes='me-1' %} Attached KP Forms
+      {% bs_icon_cached 'files' extra_classes='me-1' %} Attached KP Forms
     </h6>
     <div class="forms-count d-none d-md-block">
       {% if forms %}{{ forms|length }} form{{ forms|length|pluralize }}{% else %}0 forms{% endif %}
@@ -320,15 +170,15 @@
 
   <div class="toolbar d-flex align-items-center flex-wrap mb-2">
     <div class="searchbox">
-      {% bs_icon 'search' extra_classes='bi' %}
+      {% bs_icon_cached 'search' extra_classes='bi' %}
       <input id="formsSearch" type="search" class="form-control" placeholder="Search form name or code…">
       <button class="clear-btn" type="button" id="clearSearch" title="Clear search" aria-label="Clear">&times;</button>
     </div>
 
     <div class="ms-auto d-flex align-items-center gap-2">
-      {% if case_state_name|lower != 'closed' and case_state_name|lower != 'dismissed' and request.session.auth.role_name|lower != 'barangay secretary' %}
+      {% if request.session.auth.role_name|lower != 'barangay secretary' %}
       <a class="btn btn-outline-brand" href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
-        {% bs_icon 'plus-circle' extra_classes='me-1' %} Add Form
+        {% bs_icon_cached 'plus-circle' extra_classes='me-1' %} Add Form
       </a>
       {% endif %}
     </div>
@@ -339,18 +189,18 @@
       <table class="table mb-0 align-middle" id="formsTable">
         <thead>
           <tr>
-            <th style="width:120px;">{% bs_icon 'hash' extra_classes='me-1' %} Code</th>
-            <th>{% bs_icon 'file-earmark-text' extra_classes='me-1' %} Form</th>
-            <th style="width:260px;">{% bs_icon 'check2-circle' extra_classes='me-1' %} Status</th>
-            <th style="width:220px;">{% bs_icon 'person-check' extra_classes='me-1' %} Processed By</th>
-            <th class="text-end" style="width:140px;">{% bs_icon 'gear' extra_classes='me-1' %} Actions</th>
+            <th style="width:120px;">{% bs_icon_cached 'hash' extra_classes='me-1' %} Code</th>
+            <th>{% bs_icon_cached 'file-earmark-text' extra_classes='me-1' %} Form</th>
+            <th style="width:260px;">{% bs_icon_cached 'check2-circle' extra_classes='me-1' %} Status</th>
+            <th style="width:220px;">{% bs_icon_cached 'person-check' extra_classes='me-1' %} Processed By</th>
+            <th class="text-end" style="width:140px;">{% bs_icon_cached 'gear' extra_classes='me-1' %} Actions</th>
           </tr>
         </thead>
         <tbody>
         {% for f in forms %}
           <tr>
             <td class="text-nowrap">
-              <span class="code-chip">{% bs_icon 'file-earmark-text' %} {{ f.1 }}</span>
+              <span class="code-chip">{% bs_icon_cached 'file-earmark-text' %} {{ f.1 }}</span>
             </td>
             <td class="fw-semibold">
               {{ f.2 }}
@@ -360,9 +210,9 @@
             </td>
             <td>
               {% if f.3 and f.3|upper == 'SUBMITTED' %}
-                <span class="pill-submitted pill">{% bs_icon 'check-circle' extra_classes='me-1' %} SUBMITTED</span>
+                <span class="pill-submitted pill">{% bs_icon_cached 'check-circle' extra_classes='me-1' %} SUBMITTED</span>
               {% else %}
-                <span class="pill-pending pill">{% bs_icon 'hourglass-split' extra_classes='me-1' %} {{ f.3|upper|default:"PENDING" }}</span>
+                <span class="pill-pending pill">{% bs_icon_cached 'hourglass-split' extra_classes='me-1' %} {{ f.3|upper|default:"PENDING" }}</span>
               {% endif %}
             </td>
             <td class="text-muted">
@@ -381,14 +231,14 @@
                    class="btn btn-outline-brand btn-sm" 
                    target="_blank"
                    title="View PDF">
-                  {% bs_icon 'file-earmark-pdf' %}
+                  {% bs_icon_cached 'file-earmark-pdf' %}
                 </a>
                 {% if request.session.auth.role_name|lower != 'barangay secretary' %}
                 <button type="button" 
                         class="btn btn-outline-danger btn-sm" 
                         onclick="confirmDelete({{ f.0 }}, '{{ f.2|escapejs }}')"
                         title="Delete Form">
-                  {% bs_icon 'trash' %}
+                  {% bs_icon_cached 'trash' %}
                 </button>
                 {% endif %}
               </div>
@@ -397,7 +247,7 @@
         {% empty %}
           <tr>
             <td colspan="5" class="text-center text-muted py-4">
-              {% bs_icon 'inboxes' extra_classes='me-2' %} No forms attached.
+              {% bs_icon_cached 'inboxes' extra_classes='me-2' %} No forms attached.
             </td>
           </tr>
         {% endfor %}
@@ -445,7 +295,7 @@
   <!-- ======= CASE PDF REPORTS =======
   <div class="card-lite mt-4">
     <div class="card-head">
-      {% bs_icon 'file-earmark-pdf' %} Case PDF Reports
+      {% bs_icon_cached 'file-earmark-pdf' %} Case PDF Reports
     </div>
     <div class="card-body">
       <div class="row g-2">
@@ -479,13 +329,11 @@
     </div>
   </div> -->
 
-  {% if case_state_name|lower != 'closed' and case_state_name|lower != 'dismissed' %}
   <div class="sticky-add d-md-none mt-3">
     <a class="btn btn-outline-brand btn-lg rounded-pill" href="{% url 'lupon_mem:add_form_choose_static' case_id %}">
-      {% bs_icon 'plus-circle' extra_classes='me-1' %} Add Form
+      {% bs_icon_cached 'plus-circle' extra_classes='me-1' %} Add Form
     </a>
   </div>
-  {% endif %}
 
 </div>
 
@@ -495,7 +343,7 @@
     <div class="modal-content" style="border-radius:14px;">
       <div class="modal-header" style="border-bottom:1px solid var(--line);">
         <h5 class="modal-title d-flex align-items-center gap-2" id="hearingOutcomeLabel">
-          {% bs_icon 'exclamation-triangle' %} Action Required
+          {% bs_icon_cached 'exclamation-triangle' %} Action Required
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
@@ -507,7 +355,7 @@
       </div>
       <div class="modal-footer" style="border-top:1px solid var(--line);">
         <a href="{% url 'lupon_mem:case_hearing_list' case_id %}" class="btn btn-brand">
-          {% bs_icon 'calendar-week' extra_classes='me-1' %} Go to Hearings
+          {% bs_icon_cached 'calendar-week' extra_classes='me-1' %} Go to Hearings
         </a>
         <button type="button" class="btn btn-brand-subtle" data-bs-dismiss="modal">Close</button>
       </div>
@@ -519,7 +367,7 @@
 <div class="offcanvas offcanvas-end" tabindex="-1" id="luponFlowCanvas" aria-labelledby="luponFlowCanvasLabel" style="width:min(720px, 100vw); margin-top:150px;">
   <div class="offcanvas-header">
     <h5 class="offcanvas-title d-flex align-items-center gap-2" id="luponFlowCanvasLabel">
-      {% bs_icon 'diagram-3' %} Interactive Lupon Flow Guide
+      {% bs_icon_cached 'diagram-3' %} Interactive Lupon Flow Guide
     </h5>
     <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
   </div>
@@ -568,12 +416,12 @@
       <div class="ms-auto d-flex align-items-center gap-2">
         {% if pb_first_meeting_at %}
           <span class="deadline-pill" id="pbChipPill" hidden>
-            {% bs_icon 'calendar2-event' %} PB: <span id="pbChipDays">—</span>
+            {% bs_icon_cached 'calendar2-event' %} PB: <span id="pbChipDays">—</span>
           </span>
         {% endif %}
         {% if pangkat_constituted_at or pangkat_extended_until %}
           <span class="deadline-pill" id="pangkatChipPill" hidden>
-            {% bs_icon 'calendar-range' %} Pangkat: <span id="pangkatChipDays">—</span>
+            {% bs_icon_cached 'calendar-range' %} Pangkat: <span id="pangkatChipDays">—</span>
           </span>
         {% endif %}
         <div class="dropdown">
@@ -602,7 +450,7 @@
     </div>  
 
     <div id="flowMount" class="card-lite">
-      <div class="card-head">{% bs_icon 'journal-text' %} <span id="flowTitle">Complaint Filed</span></div>
+      <div class="card-head">{% bs_icon_cached 'journal-text' %} <span id="flowTitle">Complaint Filed</span></div>
       <div class="card-body">
         <div class="mb-2" id="guardBanner" hidden></div>
         <ul class="flow-list" id="flowList"></ul>
@@ -617,7 +465,7 @@
     <div class="modal-content" style="border-radius:12px; border:none; box-shadow:0 10px 40px rgba(0,0,0,0.1);">
       <div class="modal-header" style="border-bottom:1px solid var(--line); background:var(--brand-050); padding:1rem 1.25rem;">
         <h5 class="modal-title d-flex align-items-center gap-2" id="updateCaseStatusLabel" style="font-weight:700; color:var(--brand-800);">
-          {% bs_icon 'gear' %} Update Case Status
+          {% bs_icon_cached 'gear' %} Update Case Status
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
@@ -625,7 +473,7 @@
         <!-- Settlement Status -->
         <div class="mb-3">
           <h6 class="mb-2 d-flex align-items-center gap-2" style="font-weight:600; color:var(--brand-700); font-size:0.9rem;">
-            {% bs_icon 'hand-thumbs-up' %} Settlement Status
+            {% bs_icon_cached 'hand-thumbs-up' %} Settlement Status
           </h6>
           <form method="post" action="{% url 'lupon_mem:case_settlement_update' case_id %}">
             {% csrf_token %}
@@ -642,7 +490,7 @@
               </div>
               <div class="col-12">
                 <button type="submit" class="btn btn-outline-brand btn-sm" onclick="return confirm('Are you sure you want to update the settlement status?')">
-                  {% bs_icon 'hand-thumbs-up' extra_classes='me-1' %} Update Settlement
+                  {% bs_icon_cached 'hand-thumbs-up' extra_classes='me-1' %} Update Settlement
                 </button>
               </div>
             </div>
@@ -654,7 +502,7 @@
         <!-- Case State -->
         <div>
           <h6 class="mb-2 d-flex align-items-center gap-2" style="font-weight:600; color:var(--brand-700); font-size:0.9rem;">
-            {% bs_icon 'toggle-on' %} Case State
+            {% bs_icon_cached 'toggle-on' %} Case State
           </h6>
           <form method="post" action="{% url 'lupon_mem:update_case_state' case_id %}">
             {% csrf_token %}
@@ -671,7 +519,7 @@
               </div>
               <div class="col-12">
                 <button type="submit" class="btn btn-outline-brand btn-sm" onclick="return confirm('Are you sure you want to update the case state?')">
-                  {% bs_icon 'toggle-on' extra_classes='me-1' %} Update Case State
+                  {% bs_icon_cached 'toggle-on' extra_classes='me-1' %} Update Case State
                 </button>
               </div>
             </div>
@@ -801,44 +649,35 @@
     return text.replace(/\b(WHAT|WHEN|WHERE):/gi, '<strong>$1:</strong>');
   }
   
-  async function loadKP7Details(){
+  function loadKP7Details(){
     if (!haveForm('KP-7')) return;
+    const kp7Data = {{ kp7_details|safe }};
+    if (!kp7Data || (!kp7Data.complaint_details && !kp7Data.solutions_seeked)) return;
     
-    try {
-      const response = await fetch(`/lupon_mem/api/case-kp7-details/{{ case_id }}/`, { credentials:'same-origin' });
-      if (!response.ok) throw new Error('Failed to fetch KP-7 details');
-      const data = await response.json();
-      
-      const section = document.getElementById('kp7ComplaintSection');
-      const detailsDiv = document.getElementById('kp7ComplaintDetails');
-      const solutionsDiv = document.getElementById('kp7SolutionsSought');
-      
-      if (data.complaint_details || data.solutions_seeked) {
-        const complaintText = detailsDiv.querySelector('.complaint-text');
-        const solutionsText = solutionsDiv.querySelector('.solutions-text');
-        const complaintFade = detailsDiv.querySelector('.complaint-fade');
-        const solutionsFade = solutionsDiv.querySelector('.solutions-fade');
-        const complaintToggle = document.getElementById('complaintToggle');
-        const solutionsToggle = document.getElementById('solutionsToggle');
-        
-        complaintText.innerHTML = formatComplaintDetails(data.complaint_details);
-        solutionsText.textContent = data.solutions_seeked || 'No solutions specified.';
-        
-        // Check if content overflows
-        if (detailsDiv.scrollHeight > 120) {
-          complaintFade.style.display = 'block';
-          complaintToggle.style.display = 'inline-block';
-        }
-        if (solutionsDiv.scrollHeight > 120) {
-          solutionsFade.style.display = 'block';
-          solutionsToggle.style.display = 'inline-block';
-        }
-        
-        section.style.display = 'block';
-      }
-    } catch (error) {
-      console.warn('Failed to load KP-7 details:', error);
+    const section = document.getElementById('kp7ComplaintSection');
+    const detailsDiv = document.getElementById('kp7ComplaintDetails');
+    const solutionsDiv = document.getElementById('kp7SolutionsSought');
+    
+    const complaintText = detailsDiv.querySelector('.complaint-text');
+    const solutionsText = solutionsDiv.querySelector('.solutions-text');
+    const complaintFade = detailsDiv.querySelector('.complaint-fade');
+    const solutionsFade = solutionsDiv.querySelector('.solutions-fade');
+    const complaintToggle = document.getElementById('complaintToggle');
+    const solutionsToggle = document.getElementById('solutionsToggle');
+    
+    complaintText.innerHTML = formatComplaintDetails(kp7Data.complaint_details || '');
+    solutionsText.textContent = kp7Data.solutions_seeked || 'No solutions specified.';
+    
+    if (detailsDiv.scrollHeight > 120) {
+      complaintFade.style.display = 'block';
+      complaintToggle.style.display = 'inline-block';
     }
+    if (solutionsDiv.scrollHeight > 120) {
+      solutionsFade.style.display = 'block';
+      solutionsToggle.style.display = 'inline-block';
+    }
+    
+    section.style.display = 'block';
   }
   
   function toggleComplaint(){
@@ -879,30 +718,12 @@
   document.addEventListener('DOMContentLoaded', loadKP7Details);
 
   /* ===== Check for upcoming hearings ===== */
-  async function checkUpcomingHearings(){
-    try {
-      const response = await fetch(`/lupon_mem/api/upcoming-hearings/{{ case_id }}/`, { credentials:'same-origin' });
-      console.log('API Response status:', response.status);
-      if (!response.ok) {
-        console.error('API failed with status:', response.status);
-        return;
-      }
-      const data = await response.json();
-      
-      console.log('Upcoming hearings check:', data); // Debug log
-      
-      const badge = document.getElementById('hearingsBadge');
-      console.log('Badge element found:', !!badge);
-      
-      if (data.count > 0) {
-        badge.textContent = data.count;
-        badge.style.display = 'flex';
-        console.log('Red badge shown with count:', data.count); // Debug log
-      } else {
-        console.log('No upcoming hearings found'); // Debug log
-      }
-    } catch (error) {
-      console.error('Failed to check upcoming hearings:', error);
+  function checkUpcomingHearings(){
+    const count = {{ upcoming_hearings_count|default:0 }};
+    const badge = document.getElementById('hearingsBadge');
+    if (count > 0 && badge) {
+      badge.textContent = count;
+      badge.style.display = 'flex';
     }
   }
   
@@ -975,7 +796,7 @@
     if(!msg){ banner.hidden = true; banner.innerHTML = ""; return; }
     banner.hidden = false;
     banner.className = "alert alert-warning";
-    banner.innerHTML = `{% bs_icon 'exclamation-triangle' %} <strong>Time Guard:</strong> ${msg}`;
+    banner.innerHTML = `{% bs_icon_cached 'exclamation-triangle' %} <strong>Time Guard:</strong> ${msg}`;
   }
 
   function hearingLabel(n){
@@ -1112,15 +933,15 @@
               let html = '';
               
               if (hasKp18) {
-                html += `<span class="badge bg-success me-2 mb-2">{% bs_icon 'check-circle' %} KP-18 Added</span>`;
+                html += `<span class="badge bg-success me-2 mb-2">{% bs_icon_cached 'check-circle' %} KP-18 Added</span>`;
               } else {
-                html += `<button class="btn btn-outline-brand btn-sm me-2 mb-2" onclick="openFormBuilder('KP-18')">{% bs_icon 'plus-circle' %} Add KP-18</button>`;
+                html += `<button class="btn btn-outline-brand btn-sm me-2 mb-2" onclick="openFormBuilder('KP-18')">{% bs_icon_cached 'plus-circle' %} Add KP-18</button>`;
               }
               
               if (hasKp19) {
-                html += `<span class="badge bg-success me-2 mb-2">{% bs_icon 'check-circle' %} KP-19 Added</span>`;
+                html += `<span class="badge bg-success me-2 mb-2">{% bs_icon_cached 'check-circle' %} KP-19 Added</span>`;
               } else {
-                html += `<button class="btn btn-outline-brand btn-sm me-2 mb-2" onclick="openFormBuilder('KP-19')">{% bs_icon 'plus-circle' %} Add KP-19</button>`;
+                html += `<button class="btn btn-outline-brand btn-sm me-2 mb-2" onclick="openFormBuilder('KP-19')">{% bs_icon_cached 'plus-circle' %} Add KP-19</button>`;
               }
               
               return html;
@@ -1143,8 +964,8 @@
               : `${step.code} Added`;
               
             return hasRequiredForm
-              ? `<span class="badge bg-success">{% bs_icon 'check-circle' %} ${displayText}</span>`
-              : `<button class="btn btn-outline-brand btn-sm" onclick="openFormBuilder('${step.code}')">{% bs_icon 'plus-circle' %} Add ${step.code}</button>`;
+              ? `<span class="badge bg-success">{% bs_icon_cached 'check-circle' %} ${displayText}</span>`
+              : `<button class="btn btn-outline-brand btn-sm" onclick="openFormBuilder('${step.code}')">{% bs_icon_cached 'plus-circle' %} Add ${step.code}</button>`;
           })()}
         </div>
       </div>
@@ -1248,7 +1069,7 @@
               <div class="fw-bold mb-2 text-muted">What happened?</div>
               <div class="mb-2">
                 <a href="{% url 'lupon_mem:case_hearing_list' case_id %}" class="btn btn-brand btn-sm">
-                  {% bs_icon 'calendar-week' %} Record Outcome
+                  {% bs_icon_cached 'calendar-week' %} Record Outcome
                 </a>
               </div>
               <div class="text-muted small">
@@ -1322,7 +1143,7 @@
               <div class="fw-bold mb-2 text-muted">What happened?</div>
               <div class="mb-2">
                 <a href="{% url 'lupon_mem:case_hearing_list' case_id %}" class="btn btn-brand btn-sm">
-                  {% bs_icon 'calendar-week' %} Record Outcome
+                  {% bs_icon_cached 'calendar-week' %} Record Outcome
                 </a>
               </div>
               <div class="text-muted small">
@@ -1345,8 +1166,8 @@
         const requireDiv = document.createElement('div');
         requireDiv.className = 'mt-3 alert alert-info';
         requireDiv.innerHTML = currentStep.includes('kp9')
-          ? `{% bs_icon 'info-circle' %} <strong>Required:</strong> For this attempt, attach both KP-8 and KP-9 (same attempt number) before recording the hearing outcome.`
-          : `{% bs_icon 'info-circle' %} <strong>Required:</strong> ${step.code} must be attached before proceeding.`;
+          ? `{% bs_icon_cached 'info-circle' %} <strong>Required:</strong> For this attempt, attach both KP-8 and KP-9 (same attempt number) before recording the hearing outcome.`
+          : `{% bs_icon_cached 'info-circle' %} <strong>Required:</strong> ${step.code} must be attached before proceeding.`;
         mount.appendChild(requireDiv);
       }
     } else if (step.next && !step.final) {
@@ -1408,13 +1229,13 @@
       } else {
         const requireDiv = document.createElement('div');
         requireDiv.className = 'mt-3 alert alert-info';
-        requireDiv.innerHTML = `{% bs_icon 'info-circle' %} <strong>Required:</strong> ${step.code} must be attached before proceeding to the next step.`;
+        requireDiv.innerHTML = `{% bs_icon_cached 'info-circle' %} <strong>Required:</strong> ${step.code} must be attached before proceeding to the next step.`;
         mount.appendChild(requireDiv);
       }
     } else if (step.final) {
       const finalDiv = document.createElement('div');
       finalDiv.className = 'mt-3 alert alert-success';
-      finalDiv.innerHTML = `{% bs_icon 'check-circle' %} <strong>Case Complete:</strong> This case has reached its conclusion through the Barangay Justice System.`;
+      finalDiv.innerHTML = `{% bs_icon_cached 'check-circle' %} <strong>Case Complete:</strong> This case has reached its conclusion through the Barangay Justice System.`;
       mount.appendChild(finalDiv);
     }
   }
@@ -1637,15 +1458,11 @@
     // Preload modal for instant opening
     const modal = document.getElementById('updateCaseStatusModal');
     if (modal && window.bootstrap?.Modal) {
-      // Pre-initialize modal instance
       const modalInstance = new bootstrap.Modal(modal, { backdrop: true, keyboard: true });
-      
-      // Preload form elements
       const forms = modal.querySelectorAll('form');
       forms.forEach(form => {
         const selects = form.querySelectorAll('select');
         const inputs = form.querySelectorAll('input');
-        // Touch elements to ensure they're ready
         selects.forEach(s => s.offsetHeight);
         inputs.forEach(i => i.offsetHeight);
       });
@@ -1655,6 +1472,7 @@
     if (canvasEl && window.bootstrap?.Offcanvas) {
       canvasEl.addEventListener('shown.bs.offcanvas', async () => {
         ATTACHED = {{ all_form_codes|safe }};
+        // ONLY load hearing status when offcanvas opens (not on page load)
         HEARING_STATUS = await checkHearingStatus();
         HEARING_HELD = HEARING_STATUS.hearing_held;
         if (HEARING_STATUS.current_step && HEARING_STATUS.current_step !== 'start') {
@@ -1678,7 +1496,7 @@
         renderCurrentStep();
       });
     }
-    renderCurrentStep();
+    // Don't call renderCurrentStep() on page load - only when offcanvas opens
   });
 </script>
 {% endblock js %}

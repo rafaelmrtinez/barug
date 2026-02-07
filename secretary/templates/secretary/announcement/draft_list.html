@@ -1,7 +1,7 @@
 {# business_list.html (hardcoded filters) #}
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 {% load choiceextras %}
 
 {% block css %}
@@ -99,12 +99,12 @@
       <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
         {% csrf_token %}
         <div class="searchbox">
-          {% bs_icon 'search' extra_classes='bi' %}
+          {% bs_icon_cached 'search' extra_classes='bi' %}
           {{ form.search }}
         </div>
 
         <a class="btn btn-outline-brand ms-2" href="{% url 'secretary:announcement_draft' %}">
-        {% bs_icon 'plus-lg' extra_classes='me-2' %} Create New Draft
+        {% bs_icon_cached 'plus-lg' extra_classes='me-2' %} Create New Draft
         </a>
       </form>
 

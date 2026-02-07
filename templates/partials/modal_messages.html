@@ -1,4 +1,4 @@
-{% load bootstrap_icons %}
+{% load cached_icons %}
 {% if messages %}
 {% comment %}Only show messages tagged with 'auth' on authentication pages{% endcomment %}
 
@@ -82,22 +82,22 @@
           <div class="modal-body">
             {% if tag == "success" %}
               <div class="modal-icon" style="background: linear-gradient(135deg, #48bb78, #38a169);">
-                {% bs_icon 'check' color='white' size='2.5em' %}
+                {% bs_icon_cached 'check' color='white' size='2.5em' %}
               </div>
               <h3 class="modal-title">Perfect!</h3>
             {% elif tag == "warning" %}
               <div class="modal-icon" style="background: linear-gradient(135deg, #ed8936, #dd6b20);">
-                {% bs_icon 'exclamation' color='white' size='2.5em' %}
+                {% bs_icon_cached 'exclamation' color='white' size='2.5em' %}
               </div>
               <h3 class="modal-title">Heads Up!</h3>
             {% elif tag == "error" %}
               <div class="modal-icon" style="background: linear-gradient(135deg, #f56565, #e53e3e);">
-                {% bs_icon 'x' color='white' size='2.5em' %}
+                {% bs_icon_cached 'x' color='white' size='2.5em' %}
               </div>
               <h3 class="modal-title">Oops!</h3>
             {% else %}
               <div class="modal-icon" style="background: linear-gradient(135deg, #4299e1, #3182ce);">
-                {% bs_icon 'info' color='white' size='2.5em' %}
+                {% bs_icon_cached 'info' color='white' size='2.5em' %}
               </div>
               <h3 class="modal-title">Hey!</h3>
             {% endif %}

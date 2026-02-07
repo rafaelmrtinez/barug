@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 {% load choiceextras %}
 
 {% block css %}
@@ -34,7 +34,7 @@
     <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
       {% csrf_token %}
       <div class="searchbox">
-        {% bs_icon 'search' extra_classes='bi' %}
+        {% bs_icon_cached 'search' extra_classes='bi' %}
         {{ form.search }}
       </div>
 
@@ -53,7 +53,7 @@
                 data-bs-toggle="offcanvas"
                 data-bs-target="#filterPanel"
                 aria-controls="filterPanel">
-          {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+          {% bs_icon_cached 'sliders' extra_classes='me-2' %} Filters
           {% if fc %}
             <span class="badge rounded-pill text-bg-light ms-2">{{ fc }}</span>
           {% endif %}
@@ -122,7 +122,7 @@
         {% endif %}
 
         <a class="btn btn-sm btn-outline-brand ms-1" href="?search={{ request.GET.search|urlencode }}">
-          {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
+          {% bs_icon_cached 'x-circle' extra_classes='me-1' %} Clear all
         </a>
       {% else %}
         <span class="text-muted small">No active filters.</span>

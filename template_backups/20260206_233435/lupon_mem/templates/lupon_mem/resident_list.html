@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<link rel="stylesheet" href="{% static 'css/filters.css' %}">
+<style>
+  .btn-outline-brand{ color:#7C2D3E; border-color:#7C2D3E; background:#fff; }
+  .btn-outline-brand:hover{ background:#7C2D3E; color:#fff; }
+  .table thead th{ font-size:.80rem; text-transform:capitalize; letter-spacing:.02em; vertical-align:middle; white-space:nowrap; text-align:left; }
+  .table tbody td{ font-size:.80rem; vertical-align:middle; text-align:left; font-weight:600; }
+  .id-pill{ display:inline-block; padding:.22rem .55rem; border-radius:999px; background:#f8f1f2; border:1px solid rgba(124,45,62,.18); color:#7C2D3E; font-weight:700; font-size:.78rem; line-height:1; font-variant-numeric: tabular-nums; letter-spacing:.03em; }
+  .filter-chip{ display:inline-flex; align-items:center; gap:.35rem; padding:.2rem .55rem; border-radius:999px; background:#f3eaeb; border:1px solid rgba(124,45,62,.18); color:#7C2D3E; font-size:.78rem; text-decoration:none; }
+  .filter-chip .x{ font-weight:700; }
+  .table tbody td .btn{ min-width:60px; height:31px; display:inline-flex; align-items:center; justify-content:center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap" style="margin-top: 40px;">
+  <div class="container-fluid pt-3 page-main">
+    <div class="row">
+      <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+        <div class="searchbox">
+          {% bs_icon 'search' extra_classes='bi' %}
+          <input type="text" class="form-control" name="q" placeholder="Search residents by name or code" value="{{ q }}">
+        </div>
+        <input type="hidden" name="purok" value="{{ purok }}">
+        <button class="btn btn-brand-subtle d-flex align-items-center ms-auto" type="button" data-bs-toggle="offcanvas" data-bs-target="#filterPanel">
+          {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+          {% if purok %}<span class="badge rounded-pill text-bg-light ms-2">1</span>{% endif %}
+        </button>
+      </form>
+
+      <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
+        {% if purok %}
+          <span class="text-muted me-1">Active:</span>
+          <a class="filter-chip" href="?q={{ q|urlencode }}">{{ purok|title }} <span class="x">×</span></a>
+          <a class="btn btn-sm btn-outline-brand ms-1" href="?q={{ q|urlencode }}">{% bs_icon 'x-circle' extra_classes='me-1' %} Clear all</a>
+        {% else %}
+          <span class="text-muted small">No active filters.</span>
+        {% endif %}
+      </div>
+
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th style="width:60px;">Photo</th>
+              <th>Resident Code</th>
+              <th>Full Name</th>
+              <th>Address</th>
+              <th>Mobile Number</th>
+              <th>Email Address</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in page_obj.object_list %}
+              <tr>
+                <td>
+                  {% if r.person_img %}
+                    <img src="{{ r.person_img }}" alt="{{ r.first_name }}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid #7C2D3E;">
+                  {% else %}
+                    <div style="width:40px;height:40px;border-radius:50%;background:#f3eaeb;display:flex;align-items:center;justify-content:center;border:2px solid #7C2D3E;color:#7C2D3E;font-weight:700;font-size:14px;">{{ r.first_name.0 }}{{ r.last_name.0 }}</div>
+                  {% endif %}
+                </td>
+                <td><span class="id-pill">{{ r.person_code|default:"—" }}</span></td>
+                <td>{{ r.first_name }} {{ r.middle_name|default:"" }} {{ r.last_name }} {{ r.suffix|default:"" }}</td>
+                <td>{{ r.address|default:"—" }}</td>
+                <td>{{ r.mobile_num|default:"—" }}</td>
+                <td>{{ r.email|default:"—" }}</td>
+                <td class="text-end">
+                  <a class="btn btn-outline-brand btn-sm" href="{% url 'lupon_mem:resident_records_detail' r.person_id %}">View</a>
+                  <button type="button" class="btn btn-outline-brand btn-sm" onclick="confirmDelete({{ r.person_id }}, '{{ r.first_name }} {{ r.last_name }}')" title="Remove Person">
+                    {% bs_icon 'person-x' %}
+                  </button>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="7" class="text-center py-3 text-muted">No residents found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div class="page-pagination">{% include 'paginator.html' %}</div>
+  {% endif %}
+
+  <div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150px;">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title">Filters</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body">
+      <form method="get">
+        <div class="mb-3">
+          <label class="form-label">Purok / Sitio</label>
+          <select class="form-select" name="purok">
+            <option value="">All</option>
+            {% for p in puroks_all %}
+              <option value="{{ p }}" {% if purok == p %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <input type="hidden" name="q" value="{{ q }}">
+        <div class="d-flex gap-2">
+          <a class="btn btn-outline-brand" href="?q={{ q|urlencode }}">Clear</a>
+          <button type="submit" class="btn btn-brand">Apply Filters</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" style="margin-top: 200px;">
+  <div class="modal-dialog">
+    <div class="modal-content" style="border-radius:12px; border:1px solid rgba(124,45,62,.15);">
+      <div class="modal-header" style="background:#f8f1f2; border-bottom:1px solid rgba(124,45,62,.15);">
+        <h5 class="modal-title" style="color:#7C2D3E; font-weight:600;">Remove Person</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:1.5rem;">
+        <p style="margin-bottom:1rem;">Are you sure you want to remove <strong id="residentName" style="color:#7C2D3E;"></strong> from the system?</p>
+        <p style="color:#dc3545; margin-bottom:1rem; font-size:.9rem;">⚠️ This action cannot be undone.</p>
+        <div class="mb-3">
+          <label class="form-label" style="font-weight:600; font-size:.9rem;">Type "<span id="lastNameConfirm" style="color:#7C2D3E;"></span>" to confirm:</label>
+          <input type="text" id="confirmInput" class="form-control" placeholder="Enter last name" style="border-color:rgba(124,45,62,.3);">
+          <small id="confirmError" class="text-danger" style="display:none;">Last name does not match</small>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid rgba(124,45,62,.15);">
+        <button type="button" class="btn" style="color:#6c757d; border:1px solid #dee2e6;" data-bs-dismiss="modal">Cancel</button>
+        <form id="deleteForm" method="post" style="display:inline;">
+          {% csrf_token %}
+          <button type="button" id="deleteBtn" class="btn" style="background:#7C2D3E; color:#fff; border:none;" onclick="validateAndSubmit()" disabled>Remove Person</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let expectedLastName = '';
+
+function confirmDelete(personId, personName) {
+  const names = personName.split(' ');
+  expectedLastName = names[names.length - 1];
+  
+  document.getElementById('residentName').textContent = personName;
+  document.getElementById('lastNameConfirm').textContent = expectedLastName;
+  document.getElementById('deleteForm').action = `/lupon_mem/resident-list/${personId}/delete/`;
+  document.getElementById('confirmInput').value = '';
+  document.getElementById('deleteBtn').disabled = true;
+  document.getElementById('confirmError').style.display = 'none';
+  
+  new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+
+document.getElementById('confirmInput').addEventListener('input', function(e) {
+  const input = e.target.value.trim();
+  const deleteBtn = document.getElementById('deleteBtn');
+  const errorMsg = document.getElementById('confirmError');
+  
+  if (input === expectedLastName) {
+    deleteBtn.disabled = false;
+    errorMsg.style.display = 'none';
+  } else {
+    deleteBtn.disabled = true;
+    if (input.length > 0) {
+      errorMsg.style.display = 'block';
+    } else {
+      errorMsg.style.display = 'none';
+    }
+  }
+});
+
+function validateAndSubmit() {
+  const input = document.getElementById('confirmInput').value.trim();
+  if (input === expectedLastName) {
+    document.getElementById('deleteForm').submit();
+  }
+}
+</script>
+{% endblock %}

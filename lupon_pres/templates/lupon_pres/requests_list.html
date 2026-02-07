@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block title %}{{ page_title }}{% endblock %}
 
@@ -301,14 +301,14 @@
         <div class="d-flex align-items-center justify-content-between">
             <div>
                 <h1 class="h2 mb-2 fw-bold text-dark d-flex align-items-center gap-3">
-                    {% bs_icon 'clipboard-check-fill' color='var(--bs-danger-text-emphasis)' size='1.8em' %}
+                    {% bs_icon_cached 'clipboard-check-fill' color='var(--bs-danger-text-emphasis)' size='1.8em' %}
                     My Staff Requests
                 </h1>
                 <p class="text-muted mb-0">Manage and track your staff account requests</p>
             </div>
             <div>
                 <a href="{% url 'lupon_pres:members_list' %}" class="btn btn-modern">
-                    {% bs_icon 'people-fill' %} Manage Staff Account
+                    {% bs_icon_cached 'people-fill' %} Manage Staff Account
                 </a>
             </div>
         </div>
@@ -341,7 +341,7 @@
                             <div class="h3 mb-0 fw-bold text-dark">{{ stats.pending_requests|default:"0" }}</div>
                         </div>
                         <div>
-                            {% bs_icon 'clock-fill' color='#ffc107' size='2.5em' %}
+                            {% bs_icon_cached 'clock-fill' color='#ffc107' size='2.5em' %}
                         </div>
                     </div>
                 </div>
@@ -357,7 +357,7 @@
                             <div class="h3 mb-0 fw-bold text-dark">{{ stats.approved_requests|default:"0" }}</div>
                         </div>
                         <div>
-                            {% bs_icon 'check-circle-fill' color='#198754' size='2.5em' %}
+                            {% bs_icon_cached 'check-circle-fill' color='#198754' size='2.5em' %}
                         </div>
                     </div>
                 </div>
@@ -373,7 +373,7 @@
                             <div class="h3 mb-0 fw-bold text-dark">{{ stats.rejected_requests|default:"0" }}</div>
                         </div>
                         <div>
-                            {% bs_icon 'x-circle-fill' color='#dc3545' size='2.5em' %}
+                            {% bs_icon_cached 'x-circle-fill' color='#dc3545' size='2.5em' %}
                         </div>
                     </div>
                 </div>
@@ -385,7 +385,7 @@
     <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
         {% csrf_token %}
         <div class="searchbox">
-            {% bs_icon 'search' extra_classes='bi' %}
+            {% bs_icon_cached 'search' extra_classes='bi' %}
             <input type="text" class="form-control" name="q" value="{{ search_query }}" placeholder="Search by name...">
         </div>
         
@@ -396,7 +396,7 @@
         
         <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
             type="button" data-bs-toggle="offcanvas" data-bs-target="#filterPanel" aria-controls="filterPanel">
-            {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+            {% bs_icon_cached 'sliders' extra_classes='me-2' %} Filters
             {% if search_query or status_filter or role_filter or date_filter %}
                 <span class="badge rounded-pill text-bg-light ms-2">1</span>
             {% endif %}
@@ -440,7 +440,7 @@
         <div class="card-header bg-white border-0 py-4">
             <div class="d-flex align-items-center justify-content-between">
                 <h5 class="mb-0 fw-bold text-dark d-flex align-items-center gap-2">
-                    {% bs_icon 'list-check' color='var(--bs-danger-text-emphasis)' %}
+                    {% bs_icon_cached 'list-check' color='var(--bs-danger-text-emphasis)' %}
                     My Requests
                     <span class="badge text-dark ms-2" style="background: var(--bs-danger-bg-subtle);">{% if page_obj %}{{ page_obj.paginator.count }}{% else %}{{ requests|length }}{% endif %}</span>
                 </h5>
@@ -448,7 +448,7 @@
                 <div class="d-flex align-items-center gap-2">
                     <small class="text-muted">Filtered results</small>
                     <a href="{% url 'lupon_pres:staff_requests_list' %}" class="btn btn-sm btn-outline-secondary">
-                        {% bs_icon 'x' %} Clear filters
+                        {% bs_icon_cached 'x' %} Clear filters
                     </a>
                 </div>
                 {% endif %}
@@ -470,11 +470,11 @@
                                 
                                 <div class="mb-3">
                                     <div class="d-flex align-items-center mb-2">
-                                        {% bs_icon 'person-badge-fill' color='#6c757d' size='1em' %}
+                                        {% bs_icon_cached 'person-badge-fill' color='#6c757d' size='1em' %}
                                         <span class="text-muted small ms-2">{{ request.role_name|default:"Unknown Role" }}</span>
                                     </div>
                                     <div class="d-flex align-items-center">
-                                        {% bs_icon 'calendar3' color='#6c757d' size='1em' %}
+                                        {% bs_icon_cached 'calendar3' color='#6c757d' size='1em' %}
                                         <span class="text-muted small ms-2">{{ request.date_time_submitted_pretty }}</span>
                                     </div>
                                 </div>
@@ -493,7 +493,7 @@
 
                                 <a href="{% url 'lupon_pres:staff_request_detail' request.staff_acc_req_id %}" 
                                    class="btn btn-modern w-100">
-                                    {% bs_icon 'eye-fill' %} View Details
+                                    {% bs_icon_cached 'eye-fill' %} View Details
                                 </a>
                             </div>
                         </div>
@@ -520,12 +520,12 @@
                 {% endif %}
             {% else %}
                 <div class="empty-state">
-                    {% bs_icon 'inbox' extra_classes='empty-icon' %}
+                    {% bs_icon_cached 'inbox' extra_classes='empty-icon' %}
                     <h5 class="mt-3 mb-2">No requests found</h5>
                     {% if search_query or status_filter or role_filter or date_filter %}
                         <p class="text-muted">No requests match your current filters. Try adjusting your search criteria.</p>
                         <a href="{% url 'lupon_pres:staff_requests_list' %}" class="btn btn-outline-primary mt-2">
-                            {% bs_icon 'arrow-clockwise' %} Clear Filters
+                            {% bs_icon_cached 'arrow-clockwise' %} Clear Filters
                         </a>
                     {% else %}
                         <p class="text-muted">You haven't submitted any staff requests yet.</p>

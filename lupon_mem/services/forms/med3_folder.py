@@ -47,8 +47,6 @@ class Med3FolderHandler:
                 if k in by_code:  return FS.normalize(by_code[k])
             return ""
         out={t:get(s) for t,s in _SOURCES.items()}
-        if not out.get("dt_filed"): out["dt_filed"]=_today()
-        if not out.get("monitoring_date"): out["monitoring_date"]=_today()
         for k,v in list(out.items()):
             if isinstance(v,str): out[k]=FS.sanitize_text(v)
         for k in _FIELDS: out.setdefault(k,"")

@@ -1,0 +1,261 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+{% load choiceextras %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/filters.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<link rel="stylesheet" href="{% static 'css/map.css' %}">
+
+<link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"/>
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="{% static 'js/household_map.js' %}?v=20" defer></script>
+<style>
+.visit-cards {display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;}
+.visit-card {flex: 1; min-width: 200px; padding: 1rem; border-radius: 8px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer;}
+.visit-card h4 {margin: 0 0 0.5rem 0; font-size: 0.875rem; color: #666; text-transform: uppercase;}
+.visit-card .count {font-size: 2rem; font-weight: bold; color: #333;}
+.visit-card.visited {border-left: 4px solid #16a34a;}
+.visit-card.not-visited {border-left: 4px solid #dc2626;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap" style="margin-top: 40px;">
+
+  <div style="margin-bottom:1rem; display:flex; gap:1rem; align-items:center">
+    {% if assigned_puroks %}
+    <button class="btn btn-brand" id="showMyAreaBtn" data-names="{{ assigned_purok_names|join:',' }}">
+      {% bs_icon 'geo-alt-fill' %} Show My Assigned Area{% if assigned_purok_names %}: {{ assigned_purok_names|join:', ' }}{% endif %}
+    </button>
+    {% endif %}
+    <select id="purokFilter" class="form-select" style="max-width:200px">
+      <option value="">All Puroks</option>
+      {% for p in all_puroks %}
+      <option value="{{ p.name }}">{{ p.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  {% if visit_counts %}
+  <div class="visit-cards">
+    <div class="visit-card visited" data-filter="households_visited">
+      <h4>Households Visited</h4>
+      <div class="count">{{ visit_counts.households_visited }}</div>
+      <small style="color:#16a34a">{% bs_icon 'eye' %} View on map</small>
+    </div>
+    <div class="visit-card not-visited" data-filter="households_not_visited">
+      <h4>Households Not Visited</h4>
+      <div class="count">{{ visit_counts.households_not_visited }}</div>
+      <small style="color:#dc2626">{% bs_icon 'eye' %} View on map</small>
+    </div>
+    <div class="visit-card visited" data-filter="families_visited">
+      <h4>Families Visited</h4>
+      <div class="count">{{ visit_counts.families_visited }}</div>
+      <small style="color:#16a34a">{% bs_icon 'eye' %} View on map</small>
+    </div>
+    <div class="visit-card not-visited" data-filter="families_not_visited">
+      <h4>Families Not Visited</h4>
+      <div class="count">{{ visit_counts.families_not_visited }}</div>
+      <small style="color:#dc2626">{% bs_icon 'eye' %} View on map</small>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- MAP -->
+  <div style="position:relative">
+    <div id="purokMap" data-pins-url="{{ pins_url }}"></div>
+    <div class="legend">
+      <h4>Purok / Sitio</h4>
+      <div class="item"><span class="swatch" style="background:#7B1E22"></span> KANIPAAN</div>
+      <div class="item"><span class="swatch" style="background:#D4AF37"></span> PAMPANGO</div>
+      <div class="item"><span class="swatch" style="background:#4f46e5"></span> LUTAW-LUTAW</div>
+      <div class="item"><span class="swatch" style="background:#16a34a"></span> MAUCO</div>
+    </div>
+  </div>
+
+  <!-- SEARCH & FILTERS -->
+  <div class="filters-card">
+    <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+      {% csrf_token %}
+      <div class="searchbox">
+        {% bs_icon 'search' extra_classes='bi' %}
+        {{ form.search }}
+      </div>
+
+      {# preserve selected filters when searching #}
+      <input type="hidden" name="house_type" value="{{ request.GET.house_type|default:'' }}">
+      <input type="hidden" name="house_ownership" value="{{ request.GET.house_ownership|default:'' }}">
+
+      {% with htype=request.GET.house_type|yesno:"1,0" hown=request.GET.house_ownership|yesno:"1,0" %}
+        {% with fc=0|add:htype|add:hown %}
+        <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
+                type="button"
+                data-bs-toggle="offcanvas"
+                data-bs-target="#filterPanel"
+                aria-controls="filterPanel">
+          {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+          {% if fc %}
+            <span class="badge rounded-pill text-bg-light ms-2">{{ fc }}</span>
+          {% endif %}
+        </button>
+        {% endwith %}
+      {% endwith %}
+    </form>
+
+    <!-- Active filter chips -->
+    <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
+      {% if request.GET.house_type or request.GET.house_ownership %}
+        <span class="text-muted me-1">Active:</span>
+
+        {% if request.GET.house_type %}
+          {% with label=form.house_type|choice_label:request.GET.house_type %}
+            <a class="filter-chip"
+               href="?search={{ request.GET.search|urlencode }}{% if request.GET.house_ownership %}&house_ownership={{ request.GET.house_ownership|urlencode }}{% endif %}">
+              {{ label }} <span class="x" aria-hidden="true">×</span>
+            </a>
+          {% endwith %}
+        {% endif %}
+
+        {% if request.GET.house_ownership %}
+          {% with label=form.house_ownership|choice_label:request.GET.house_ownership %}
+            <a class="filter-chip"
+               href="?search={{ request.GET.search|urlencode }}{% if request.GET.house_type %}&house_type={{ request.GET.house_type|urlencode }}{% endif %}">
+              {{ label }} <span class="x" aria-hidden="true">×</span>
+            </a>
+          {% endwith %}
+        {% endif %}
+
+        <a class="btn btn-sm btn-outline-brand ms-1" href="?search={{ request.GET.search|urlencode }}">
+          {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
+        </a>
+      {% else %}
+        <span class="text-muted small">No active filters.</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results-wrap">
+
+    <!-- cards container (AJAX target) -->
+    <div id="results-body" class="vstack gap-3">
+      {% include "household/_households.html" with cards=page_obj.object_list %}
+    </div>
+
+    {% if page_obj.has_other_pages %}
+      <div class="page-pagination">
+        {% include 'paginator.html' %}
+      </div>
+    {% endif %}
+
+    <!-- Offcanvas filters -->
+    <div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
+         aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150px;">
+      <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+      </div>
+
+      <div class="offcanvas-body">
+        <form method="get" id="filterForm">
+          <div class="mb-3">
+            <label class="form-label">House Type</label>
+            {{ form.house_type }}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">House Ownership</label>
+            {{ form.house_ownership }}
+          </div>
+
+          <input type="hidden" name="search" value="{{ request.GET.search|default:'' }}"/>
+
+          <div class="offcanvas-footer">
+            <div class="actions">
+              <a class="btn btn-outline-brand" href="?search={{ request.GET.search|urlencode }}">Clear</a>
+              <button type="submit" class="btn btn-brand">Apply Filters</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script> 
+window.__PINS_URL__ = "{{ pins_url }}"; 
+window.__pendingFilter = null;
+</script>
+
+<script>
+document.addEventListener('click', (e) => {
+  const card = e.target.closest('.visit-card');
+  if (card) {
+    const filter = card.getAttribute('data-filter');
+    if (window.showOnMap) {
+      window.showOnMap(filter);
+    }
+  }
+  
+  const btn = e.target.closest('#showMyAreaBtn');
+  if (btn) {
+    const names = btn.getAttribute('data-names').split(',');
+    if (window.showMyArea) {
+      window.showMyArea(names);
+    }
+  }
+});
+
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('purokFilter')?.addEventListener('change', (e) => {
+    const purok = e.target.value;
+    if (window.filterByPurok) {
+      window.filterByPurok(purok);
+    }
+  });
+});
+
+(function () {
+  const input = document.getElementById('search');
+  const container = document.getElementById('results-body');
+  const endpoint = "{% url search_url %}";
+
+  function currentParams() {
+    const params = new URLSearchParams();
+    params.set('tpl', 'cards');
+    params.set('q', (input?.value || '').trim());
+
+    const houseType = document.querySelector('input[name="house_type"]')?.value || '';
+    const houseOwnership = document.querySelector('input[name="house_ownership"]')?.value || '';
+
+    if (houseType) params.set('house_type', houseType);
+    if (houseOwnership) params.set('house_ownership', houseOwnership);
+    return params.toString();
+  }
+
+  let t = null;
+  const debounce = (fn, ms) => (...a) => { clearTimeout(t); t = setTimeout(()=>fn(...a), ms); };
+
+  async function fetchCards() {
+    try {
+      const url = endpoint + "?" + currentParams();
+      const res = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+      if (!res.ok) throw new Error("Network error");
+      const html = await res.text();
+      container.innerHTML = html;
+    } catch (err) {
+      container.innerHTML = `<div class="text-center text-danger py-3">Failed to load results</div>`;
+      console.error(err);
+    }
+  }
+
+  if (input && container) {
+    input.addEventListener('input', debounce(fetchCards, 300));
+  }
+})();
+</script>
+{% endblock %}

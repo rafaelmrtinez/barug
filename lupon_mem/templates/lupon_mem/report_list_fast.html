@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
 <style>
@@ -40,7 +40,7 @@
   <div class="hero">
     <div class="d-flex justify-content-between align-items-center">
       <div>
-        <h4>{% bs_icon 'file-earmark-text' %} Blotter Reports</h4>
+        <h4>{% bs_icon_cached 'file-earmark-text' %} Blotter Reports</h4>
         <div class="d-flex gap-2 flex-wrap mt-2">
           <span class="badge">{{ rows|length }} showing</span>
           <span class="badge">{{ stats.for_review }} for review</span>
@@ -50,7 +50,7 @@
         </div>
       </div>
       <a href="{% url 'lupon_mem:report_new' %}" class="btn btn-light">
-        {% bs_icon 'plus' %}New Report
+        {% bs_icon_cached 'plus' %}New Report
       </a>
     </div>
   </div>
@@ -62,7 +62,7 @@
         <form method="get" class="row g-3">
           <div class="col-md-5">
             <div class="search-box">
-              <span class="search-icon">{% bs_icon 'search' %}</span>
+              <span class="search-icon">{% bs_icon_cached 'search' %}</span>
               <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="Search report subject..." id="searchInput">
             </div>
           </div>
@@ -81,7 +81,7 @@
           </div>
           <div class="col-md-3">
             <button type="submit" class="btn btn-brand w-100">
-              {% bs_icon 'funnel' %} Apply Filter
+              {% bs_icon_cached 'funnel' %} Apply Filter
             </button>
           </div>
         </form>
@@ -89,7 +89,7 @@
         <form method="get" class="row g-2">
           <div class="col-md-3">
             <div class="search-box">
-              <span class="search-icon">{% bs_icon 'search' %}</span>
+              <span class="search-icon">{% bs_icon_cached 'search' %}</span>
               <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="Search subject" id="searchInput">
             </div>
           </div>
@@ -116,12 +116,12 @@
           </div>
           <div class="col-md-2">
             <button type="submit" class="btn btn-brand w-100">
-              {% bs_icon 'funnel' %} Apply Filter
+              {% bs_icon_cached 'funnel' %} Apply Filter
             </button>
           </div>
           <div class="col-md-2">
             <a href="{% url 'lupon_mem:report_list' %}" class="btn btn-outline-secondary w-100">
-              {% bs_icon 'arrow-counterclockwise' %} Reset
+              {% bs_icon_cached 'arrow-counterclockwise' %} Reset
             </a>
           </div>
         </form>
@@ -193,19 +193,19 @@
                 {% if user_role|lower == 'barangay treasurer' %}
                   {% if r.3|upper == 'PAID' %}
                     <a href="{% url 'lupon_mem:report_payment_details' r.0 %}" class="btn btn-sm btn-outline-brand" title="View Payment Details">
-                      {% bs_icon 'eye' %}
+                      {% bs_icon_cached 'eye' %}
                     </a>
                   {% else %}
                     <a href="{% url 'lupon_mem:report_pay_and_open_case' r.0 %}" class="btn btn-sm btn-brand" title="Accept Payment">
-                      {% bs_icon 'wallet2' %}
+                      {% bs_icon_cached 'wallet2' %}
                     </a>
                   {% endif %}
                 {% else %}
                   <a href="{% url 'lupon_mem:report_review' r.0 %}" class="btn btn-sm btn-outline-brand" title="View Report">
-                    {% bs_icon 'eye' %}
+                    {% bs_icon_cached 'eye' %}
                   </a>
                   <a href="{% url 'lupon_mem:generate_blotter_pdf' r.0 %}" class="btn btn-sm btn-outline-danger" title="Download Blotter PDF" target="_blank">
-                    {% bs_icon 'file-pdf' %}
+                    {% bs_icon_cached 'file-pdf' %}
                   </a>
                 {% endif %}
               </td>
@@ -213,7 +213,7 @@
           {% empty %}
             <tr>
               <td colspan="{% if user_role|lower == 'barangay treasurer' %}8{% else %}9{% endif %}" class="text-center text-muted py-4">
-                {% bs_icon 'inbox' %} No reports found.
+                {% bs_icon_cached 'inbox' %} No reports found.
               </td>
             </tr>
           {% endfor %}

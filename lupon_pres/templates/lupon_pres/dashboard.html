@@ -1,6 +1,6 @@
 {% extends "base.html" %} 
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
 <style>
@@ -149,13 +149,13 @@
           </div>
           <div class="d-flex flex-wrap gap-2">
             <a href="" class="btn btn-outline-brand">
-              {% bs_icon 'shield-check' %}<span class="ms-1">Blotter Reports</span>
+              {% bs_icon_cached 'shield-check' %}<span class="ms-1">Blotter Reports</span>
             </a>
             <a href="" class="btn btn-brand">
-              {% bs_icon 'file-earmark-text' %}<span class="ms-1">Barangay Cases</span>
+              {% bs_icon_cached 'file-earmark-text' %}<span class="ms-1">Barangay Cases</span>
             </a>
             <a href="" class="btn btn-brand-subtle">
-              {% bs_icon 'buildings' %}<span class="ms-1">Resident Records</span>
+              {% bs_icon_cached 'buildings' %}<span class="ms-1">Resident Records</span>
             </a>
           </div>
         </div>
@@ -168,7 +168,7 @@
     <div class="col">
       <div class="card kpi shadow-sm h-100 lift-on-hover">
         <div class="card-body d-flex align-items-center gap-3">
-          <div class="kpi-icon">{% bs_icon 'file-text' size='1.2em' %}</div>
+          <div class="kpi-icon">{% bs_icon_cached 'file-text' size='1.2em' %}</div>
           <div class="flex-grow-1">
             <div class="kpi-label">Barangay Cases</div>
             <div class="kpi-value" id="kpiOpenCases" title="Ongoing lupon cases.">{{ kpis.ongoing_cases|default_if_none:"-" }} <span class="kpi-sub">Ongoing Cases</span></div>
@@ -180,7 +180,7 @@
     <div class="col">
       <div class="card kpi shadow-sm h-100 lift-on-hover">
         <div class="card-body d-flex align-items-center gap-3">
-          <div class="kpi-icon">{% bs_icon 'file-earmark-medical' size='1.2em' %}</div>
+          <div class="kpi-icon">{% bs_icon_cached 'file-earmark-medical' size='1.2em' %}</div>
           <div class="flex-grow-1">
             <div class="kpi-label">Settled Cases</div>
             <div class="kpi-value">{{ kpis.total_case_settled|default_if_none:"-" }}</div>
@@ -191,7 +191,7 @@
     <div class="col">
       <div class="card kpi shadow-sm h-100 lift-on-hover">
         <div class="card-body d-flex align-items-center gap-3">
-          <div class="kpi-icon">{% bs_icon 'file-earmark-break' size='1.2em' %}</div>
+          <div class="kpi-icon">{% bs_icon_cached 'file-earmark-break' size='1.2em' %}</div>
           <div class="flex-grow-1">
             <div class="kpi-label">Unsettled Cases</div>
             <div class="kpi-value">{{ kpis.total_case_unsettled|default_if_none:"-" }}</div>
@@ -202,7 +202,7 @@
     <div class="col">
       <div class="card kpi shadow-sm h-100 lift-on-hover">
         <div class="card-body d-flex align-items-center gap-3">
-          <div class="kpi-icon">{% bs_icon 'percent' size='1.2em' %}</div>
+          <div class="kpi-icon">{% bs_icon_cached 'percent' size='1.2em' %}</div>
           <div class="flex-grow-1">
             <div class="kpi-label">Settlement Percentage</div>
             <div class="kpi-value">{{ kpis.settlement_rate|default_if_none:"-" }}<span class="kpi-sub">%</span></div>

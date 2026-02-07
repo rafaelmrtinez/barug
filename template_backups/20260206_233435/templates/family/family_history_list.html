@@ -1,0 +1,269 @@
+{# family_history_list.html #}
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+{% load choiceextras %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/paginator.css' %}">
+<link rel="stylesheet" href="{% static 'css/filters.css' %}">
+
+<style>
+  .btn-outline-brand{ color:#6d2932; border-color:#6d2932; background:#fff; }
+  .btn-outline-brand:hover{ background:#6d2932; color:#fff; }
+
+  .table thead th{
+    font-size:.80rem;
+    text-transform:capitalize;
+    letter-spacing:.02em;
+    vertical-align:middle;
+    white-space:nowrap;
+    text-align:left;
+  }
+  .table tbody td{
+    font-size:.80rem;
+    vertical-align:middle;
+    text-align:left;
+    font-weight:600;
+  }
+  .id-pill{
+    display:inline-block; padding:.22rem .55rem; border-radius:999px;
+    background:#f8f1f2; border:1px solid rgba(109,41,50,.18); color:#6d2932;
+    font-weight:700; font-size:.78rem; line-height:1; font-variant-numeric: tabular-nums; letter-spacing:.03em;
+  }
+  .cat-badge{
+    display:inline-block; font-size:.74rem; padding:.28rem .52rem; line-height:1;
+    border-radius:999px; background:#f3eaeb; color:#6d2932; border:1px solid rgba(109,41,50,.18); font-weight:600;
+  }
+  .filter-chip{
+    display:inline-flex; align-items-center; gap:.35rem;
+    padding:.2rem .55rem; border-radius:999px; background:#f3eaeb;
+    border:1px solid rgba(109,41,50,.18); color:#6d2932; font-size:.78rem; text-decoration:none;
+  }
+  .filter-chip .x{ font-weight:700; }
+  .offcanvas.filter-offcanvas .offcanvas-footer{
+    position: sticky; bottom:0; padding:1rem 0; background:linear-gradient(180deg, transparent, #fff 30%);
+    display:flex; justify-content:flex-end; gap:.5rem;
+  }
+  .quarter-badge{
+    display:inline-block; padding:.3rem .7rem; border-radius:4px;
+    background:#6d2932; color:#fff; font-weight:700; font-size:.85rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap" style="margin-top: 40px;">
+  <div class="container-fluid pt-3 page-main">
+    <div class="row">
+
+      <form class="toolbar d-flex align-items-center flex-wrap mb-3" method="get">
+        {% csrf_token %}
+        
+        <div class="d-flex align-items-center gap-2 me-3">
+          <label for="quarter" class="mb-0 text-nowrap" style="font-weight:600;">Quarter:</label>
+          {{ form.quarter }}
+        </div>
+        
+        <div class="d-flex align-items-center gap-2 me-3">
+          <label for="year" class="mb-0 text-nowrap" style="font-weight:600;">Year:</label>
+          {{ form.year }}
+        </div>
+        
+        <button type="submit" class="btn btn-brand-subtle me-3">
+          {% bs_icon 'arrow-clockwise' extra_classes='me-1' %} Load
+        </button>
+
+        <div class="searchbox">
+          {% bs_icon 'search' extra_classes='bi' %}
+          {{ form.search }}
+        </div>
+
+        {# persist selections in hidden inputs #}
+        <input type="hidden" name="household_type" value="{{ request.GET.household_type|default:'' }}">
+        <input type="hidden" name="nhts_status" value="{{ request.GET.nhts_status|default:'' }}">
+        <input type="hidden" name="indigent_status" value="{{ request.GET.indigent_status|default:'' }}">
+
+        {# Filters button with active-count badge #}
+        {% with ht=request.GET.household_type|yesno:"1,0" nh=request.GET.nhts_status|yesno:"1,0" ind=request.GET.indigent_status|yesno:"1,0" %}
+          {% with fc=0|add:ht|add:nh|add:ind %}
+            <button class="btn btn-brand-subtle d-flex align-items-center ms-auto"
+                    type="button"
+                    data-bs-toggle="offcanvas"
+                    data-bs-target="#filterPanel"
+                    aria-controls="filterPanel">
+              {% bs_icon 'sliders' extra_classes='me-2' %} Filters
+              {% if fc %}
+                <span class="badge rounded-pill text-bg-light ms-2">{{ fc }}</span>
+              {% endif %}
+            </button>
+          {% endwith %}
+        {% endwith %}
+
+        <button class="btn btn-brand-subtle d-flex align-items-center btn-generate-family-history-pdf" type="button">
+          {% bs_icon 'file-text' extra_classes='me-2' %} Generate PDF
+        </button>
+      </form>
+
+      {# Current Quarter/Year Display #}
+      <div class="mb-3">
+        <span class="quarter-badge">
+          Q{{ filters.quarter }} {{ filters.year }}
+        </span>
+        <span class="text-muted ms-2">({{ page_obj.paginator.count }} records)</span>
+      </div>
+
+      {# Active filter chips #}
+      <div class="filters-bar d-flex flex-wrap align-items-center mb-3">
+        {% if request.GET.household_type or request.GET.nhts_status or request.GET.indigent_status or request.GET.search %}
+          <span class="text-muted me-1">Active:</span>
+
+          {% if request.GET.search %}
+            <a class="filter-chip"
+               href="?quarter={{ filters.quarter }}&year={{ filters.year }}{% if request.GET.household_type %}&household_type={{ request.GET.household_type|urlencode }}{% endif %}{% if request.GET.nhts_status %}&nhts_status={{ request.GET.nhts_status|urlencode }}{% endif %}{% if request.GET.indigent_status %}&indigent_status={{ request.GET.indigent_status|urlencode }}{% endif %}">
+              Search: "{{ request.GET.search }}" <span class="x">×</span>
+            </a>
+          {% endif %}
+
+          {% if request.GET.household_type %}
+            {% with label=form.household_type|choice_label:request.GET.household_type %}
+              <a class="filter-chip"
+                 href="?quarter={{ filters.quarter }}&year={{ filters.year }}&search={{ request.GET.search|urlencode }}{% if request.GET.nhts_status %}&nhts_status={{ request.GET.nhts_status|urlencode }}{% endif %}{% if request.GET.indigent_status %}&indigent_status={{ request.GET.indigent_status|urlencode }}{% endif %}">
+                {{ label }} <span class="x">×</span>
+              </a>
+            {% endwith %}
+          {% endif %}
+
+          {% if request.GET.nhts_status %}
+            {% with label=form.nhts_status|choice_label:request.GET.nhts_status %}
+              <a class="filter-chip"
+                 href="?quarter={{ filters.quarter }}&year={{ filters.year }}&search={{ request.GET.search|urlencode }}{% if request.GET.household_type %}&household_type={{ request.GET.household_type|urlencode }}{% endif %}{% if request.GET.indigent_status %}&indigent_status={{ request.GET.indigent_status|urlencode }}{% endif %}">
+                {{ label }} <span class="x">×</span>
+              </a>
+            {% endwith %}
+          {% endif %}
+
+          {% if request.GET.indigent_status %}
+            {% with label=form.indigent_status|choice_label:request.GET.indigent_status %}
+              <a class="filter-chip"
+                 href="?quarter={{ filters.quarter }}&year={{ filters.year }}&search={{ request.GET.search|urlencode }}{% if request.GET.household_type %}&household_type={{ request.GET.household_type|urlencode }}{% endif %}{% if request.GET.nhts_status %}&nhts_status={{ request.GET.nhts_status|urlencode }}{% endif %}">
+                {{ label }} <span class="x">×</span>
+              </a>
+            {% endwith %}
+          {% endif %}
+
+          <a class="btn btn-sm btn-outline-brand ms-1" href="?quarter={{ filters.quarter }}&year={{ filters.year }}">
+            {% bs_icon 'x-circle' extra_classes='me-1' %} Clear all
+          </a>
+        {% else %}
+          <span class="text-muted small">No active filters.</span>
+        {% endif %}
+      </div>
+
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th scope="col">Family No</th>
+              <!-- <th scope="col">UFC No</th> -->
+              <th scope="col">Family Head</th>
+              <th scope="col">Household</th>
+              <th scope="col">Type</th>
+              <th scope="col">NHTS</th>
+              <th scope="col">Indigent</th>
+              <th scope="col">Created Date</th>
+              <th scope="col" class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if page_obj.object_list %}
+              {% for row in page_obj.object_list %}
+                <tr>
+                  <td><span class="id-pill">{{ row.family_num|default:"—" }}</span></td>
+                  <!-- <td><span class="id-pill">{{ row.ufc_num|default:"—" }}</span></td> -->
+                  <td>{{ row.family_head_name|default:"—" }}</td>
+                  <td>{{ row.household_num|default:"—" }}</td>
+                  <td>
+                    {% if row.household_type_name %}
+                      <span class="cat-badge">{{ row.household_type_name }}</span>
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                  <td>{{ row.nhts_status_name|default:"—" }}</td>
+                  <td>{{ row.indigent_status_name|default:"—" }}</td>
+                  <td>{{ row.created_date|date:"M d, Y" }}</td>
+                  <td class="text-end">
+                    <a href="{% url 'bhw:family_history_detail' row.family_id %}" 
+                       class="btn btn-sm btn-brand-subtle">
+                      {% bs_icon 'eye' %} View
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="8" class="text-center py-4">
+                  <div class="text-muted">
+                    {% bs_icon 'inbox' extra_classes='fs-1 mb-2' %}
+                    <p class="mb-0">No family history records found for Q{{ filters.quarter }} {{ filters.year }}</p>
+                  </div>
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div class="page-pagination">
+      {% include 'paginator.html' %}
+    </div>
+  {% endif %}
+
+  {# Offcanvas Filters #}
+  <div class="offcanvas offcanvas-end filter-offcanvas" id="filterPanel" tabindex="-1"
+      aria-labelledby="filterPanelLabel" data-bs-backdrop="false" data-bs-scroll="true" style="margin-top: 150px;">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="filterPanelLabel">Filters</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+
+    <div class="offcanvas-body">
+      <form method="get" id="filterForm">
+        <input type="hidden" name="quarter" value="{{ filters.quarter }}">
+        <input type="hidden" name="year" value="{{ filters.year }}">
+        <input type="hidden" name="search" value="{{ request.GET.search|default:'' }}"/>
+
+        <div class="mb-3">
+          <label class="form-label">Household Type</label>
+          {{ form.household_type }}
+        </div>
+        <div class="mb-3">
+          <label class="form-label">NHTS Status</label>
+          {{ form.nhts_status }}
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Indigent Status</label>
+          {{ form.indigent_status }}
+        </div>
+
+        <div class="offcanvas-footer">
+          <div class="actions">
+            <a class="btn btn-outline-brand"
+               href="?quarter={{ filters.quarter }}&year={{ filters.year }}&search={{ request.GET.search|urlencode }}">Clear</a>
+            <button type="submit" class="btn btn-brand">Apply Filters</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'js/generate_family_history_pdf.js' %}"></script>
+{% endblock %}

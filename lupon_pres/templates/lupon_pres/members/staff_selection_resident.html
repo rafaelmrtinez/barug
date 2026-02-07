@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
   <link rel="stylesheet" href="{% static 'css/button.css' %}">
@@ -147,10 +147,10 @@
 
                     {% if doc_images|length > 1 %}
                       <button class="carousel-control-prev doc-control" type="button" data-bs-target="#staffDocCarousel" data-bs-slide="prev" aria-label="Previous">
-                        <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
+                        <span class="control-icon" aria-hidden="true">{% bs_icon_cached 'chevron-left' size='2em' %}</span>
                       </button>
                       <button class="carousel-control-next doc-control" type="button" data-bs-target="#staffDocCarousel" data-bs-slide="next" aria-label="Next">
-                        <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
+                        <span class="control-icon" aria-hidden="true">{% bs_icon_cached 'chevron-right' size='2em' %}</span>
                       </button>
                     {% endif %}
                   </div>

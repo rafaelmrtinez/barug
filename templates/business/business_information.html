@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
   <link rel="stylesheet" href="{% static 'css/button.css' %}">
@@ -77,10 +77,10 @@
       <a href="{% url 'clerk:api_business_detail_pdf' b_id=business.business_id %}" 
          target="_blank" 
          class="btn btn-outline-brand btn-sm">
-        {% bs_icon 'file-earmark-pdf' %} Generate PDF
+        {% bs_icon_cached 'file-earmark-pdf' %} Generate PDF
       </a>
       <!-- <a href="{% url 'clerk:business_update' b_id=business.business_id %}" class="btn btn-outline-brand btn-sm">
-        {% bs_icon 'pencil-square' %} Update
+        {% bs_icon_cached 'pencil-square' %} Update
       </a> -->
     </div>
   {% endif %}
@@ -107,7 +107,7 @@
             <form method="post" action="{{ summary_cta_href }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to close this business? This action will update the business status to CLOSED.');">
               {% csrf_token %}
               <button type="submit" class="btn btn-outline-brand">
-                {% bs_icon 'x-circle' %} {{ summary_cta_label }}
+                {% bs_icon_cached 'x-circle' %} {{ summary_cta_label }}
               </button>
             </form>
           {% else %}

@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'css/button.css' %}">
@@ -79,7 +79,7 @@
             <div class="card border-0 shadow-sm h-100" style="border-radius: 14px;">
               <div class="card-body p-3">
                 <div class="d-flex align-items-center mb-3">
-                  {% bs_icon 'person-fill' color='var(--bs-danger-text-emphasis)' size='1.3em' %}
+                  {% bs_icon_cached 'person-fill' color='var(--bs-danger-text-emphasis)' size='1.3em' %}
                   <h6 class="mb-0 ms-2 fw-bold text-dark">Personal Information</h6>
                 </div>
                 
@@ -87,7 +87,7 @@
                 <div class="mb-3 p-3 rounded-3" style="background: #f8f9fa;">
                   <div class="d-flex align-items-start">
                     <div class="me-3 mt-1">
-                      {% bs_icon 'geo-alt-fill' color='#6c757d' %}
+                      {% bs_icon_cached 'geo-alt-fill' color='#6c757d' %}
                     </div>
                     <div class="flex-grow-1">
                       <div class="text-muted fw-medium mb-1" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Home Address</div>
@@ -105,7 +105,7 @@
                   <div class="col-md-6">
                     <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
                       <div class="d-flex align-items-center mb-2">
-                        {% bs_icon 'person-badge' color='#6c757d' size='1.1em' %}
+                        {% bs_icon_cached 'person-badge' color='#6c757d' size='1.1em' %}
                         <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Gender</span>
                       </div>
                       {% if profile.sex_name %}
@@ -118,7 +118,7 @@
                   <div class="col-md-6">
                     <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
                       <div class="d-flex align-items-center mb-2">
-                        {% bs_icon 'calendar-fill' color='#6c757d' size='1.1em' %}
+                        {% bs_icon_cached 'calendar-fill' color='#6c757d' size='1.1em' %}
                         <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Birth Date</span>
                       </div>
                       {% if profile.birthdate %}
@@ -131,7 +131,7 @@
                   <div class="col-md-6">
                     <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
                       <div class="d-flex align-items-center mb-2">
-                        {% bs_icon 'heart-fill' color='#6c757d' size='1.1em' %}
+                        {% bs_icon_cached 'heart-fill' color='#6c757d' size='1.1em' %}
                         <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Civil Status</span>
                       </div>
                       {% if profile.civil_status_name %}
@@ -144,7 +144,7 @@
                   <div class="col-md-6">
                     <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
                       <div class="d-flex align-items-center mb-2">
-                        {% bs_icon 'flag-fill' color='#6c757d' size='1.1em' %}
+                        {% bs_icon_cached 'flag-fill' color='#6c757d' size='1.1em' %}
                         <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Nationality</span>
                       </div>
                       {% if profile.nationality_name %}
@@ -161,7 +161,7 @@
                   <div class="col-md-6">
                     <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
                       <div class="d-flex align-items-center mb-2">
-                        {% bs_icon 'envelope-fill' color='#6c757d' size='1.1em' %}
+                        {% bs_icon_cached 'envelope-fill' color='#6c757d' size='1.1em' %}
                         <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Email</span>
                       </div>
                       {% if profile.email_address %}
@@ -178,7 +178,7 @@
                   <div class="col-md-6">
                     <div class="p-3 rounded-3 h-100" style="background: #f8f9fa;">
                       <div class="d-flex align-items-center mb-2">
-                        {% bs_icon 'telephone-fill' color='#6c757d' size='1.1em' %}
+                        {% bs_icon_cached 'telephone-fill' color='#6c757d' size='1.1em' %}
                         <span class="text-muted fw-medium ms-2" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Mobile</span>
                       </div>
                       {% if profile.mobile_number %}
@@ -202,7 +202,7 @@
             <div class="card border-0 shadow-sm h-100" style="border-radius: 14px;">
               <div class="card-body p-3">
                 <div class="d-flex align-items-center mb-3">
-                  {% bs_icon 'briefcase-fill' color='var(--bs-danger-text-emphasis)' size='1.3em' %}
+                  {% bs_icon_cached 'briefcase-fill' color='var(--bs-danger-text-emphasis)' size='1.3em' %}
                   <h6 class="mb-0 ms-2 fw-bold text-dark">Requested Staff Information</h6>
                 </div>
                 
@@ -210,7 +210,7 @@
                 <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
                   <div class="d-flex align-items-start">
                     <div class="me-2 mt-1">
-                      {% bs_icon 'briefcase' color='#6c757d' size='0.9em' %}
+                      {% bs_icon_cached 'briefcase' color='#6c757d' size='0.9em' %}
                     </div>
                     <div class="flex-grow-1">
                       <div class="text-muted fw-medium mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Role</div>
@@ -227,7 +227,7 @@
                   <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
                     <div class="d-flex align-items-start">
                       <div class="me-2 mt-1">
-                        {% bs_icon 'geo-fill' color='#6c757d' size='0.9em' %}
+                        {% bs_icon_cached 'geo-fill' color='#6c757d' size='0.9em' %}
                       </div>
                       <div class="flex-grow-1">
                         <div class="text-muted fw-medium mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Assigned Purok/Sitio</div>
@@ -241,7 +241,7 @@
                   <div class="mb-3 p-2 rounded-3" style="background: #f8f9fa;">
                     <div class="d-flex align-items-start">
                       <div class="me-2 mt-1">
-                        {% bs_icon 'clock-fill' color='#6c757d' size='0.9em' %}
+                        {% bs_icon_cached 'clock-fill' color='#6c757d' size='0.9em' %}
                       </div>
                       <div class="flex-grow-1">
                         <div class="text-muted fw-medium mb-1" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Schedule</div>
@@ -253,7 +253,7 @@
                 
                 <!-- Documents Section -->
                 <div class="d-flex align-items-center mb-3">
-                  {% bs_icon 'file-earmark-text-fill' color='var(--bs-danger-text-emphasis)' size='1.1em' %}
+                  {% bs_icon_cached 'file-earmark-text-fill' color='var(--bs-danger-text-emphasis)' size='1.1em' %}
                   <h6 class="mb-0 ms-2 fw-bold text-dark" style="font-size: 0.95rem;">Supporting Documents</h6>
                 </div>
                 
@@ -279,10 +279,10 @@
                       {% endfor %}
                     </div>
                     <button class="carousel-control-prev doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="prev" aria-label="Previous">
-                      <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-left' size='2em' %}</span>
+                      <span class="control-icon" aria-hidden="true">{% bs_icon_cached 'chevron-left' size='2em' %}</span>
                     </button>
                     <button class="carousel-control-next doc-control" type="button" data-bs-target="#docCarousel" data-bs-slide="next" aria-label="Next">
-                      <span class="control-icon" aria-hidden="true">{% bs_icon 'chevron-right' size='2em' %}</span>
+                      <span class="control-icon" aria-hidden="true">{% bs_icon_cached 'chevron-right' size='2em' %}</span>
                     </button>
                   </div>
                 {% endif %}
@@ -311,11 +311,11 @@
           <div class="card-body p-3">
             <div class="d-flex align-items-center justify-content-between">
               <div class="d-flex align-items-center">
-                {% bs_icon 'clock-history' color='var(--bs-danger-text-emphasis)' size='1.3em' %}
+                {% bs_icon_cached 'clock-history' color='var(--bs-danger-text-emphasis)' size='1.3em' %}
                 <h6 class="mb-0 ms-2 fw-bold text-dark">Status History</h6>
               </div>
               <button type="button" class="btn btn-sm modern-toggle-btn" id="toggleHistory" data-bs-toggle="collapse" data-bs-target="#statusHistory" aria-expanded="false" aria-controls="statusHistory">
-                <span class="toggle-icon">{% bs_icon 'chevron-down' size='1em' %}</span>
+                <span class="toggle-icon">{% bs_icon_cached 'chevron-down' size='1em' %}</span>
                 <span class="toggle-text">Show History</span>
               </button>
             </div>
@@ -328,7 +328,7 @@
                         <h6 class="mb-2 fw-bold text-dark">{{ entry.request_status_name|default:"Status Update" }}</h6>
                         {% if entry.approved_by_name %}
                         <div class="d-flex align-items-center mb-2">
-                          {% bs_icon 'person-check-fill' color='var(--bs-danger-text-emphasis)' size='0.9em' %}
+                          {% bs_icon_cached 'person-check-fill' color='var(--bs-danger-text-emphasis)' size='0.9em' %}
                           <small class="text-muted ms-2">
                             By: <strong>{{ entry.approved_by_name }}</strong>
                           </small>
@@ -336,7 +336,7 @@
                         {% endif %}
                         {% if entry.approval_date %}
                         <div class="d-flex align-items-center mb-2">
-                          {% bs_icon 'calendar3' color='var(--bs-danger-text-emphasis)' size='0.9em' %}
+                          {% bs_icon_cached 'calendar3' color='var(--bs-danger-text-emphasis)' size='0.9em' %}
                           <small class="text-muted ms-2">
                             {{ entry.approval_date|date:"M d, Y H:i" }}
                           </small>
@@ -370,15 +370,15 @@
                   <div class="col-md-6">
                     <div class="d-flex align-items-center gap-3">
                       <div class="d-flex align-items-center">
-                        {% bs_icon 'clipboard-check-fill' color='var(--bs-danger-text-emphasis)' size='1.2em' %}
+                        {% bs_icon_cached 'clipboard-check-fill' color='var(--bs-danger-text-emphasis)' size='1.2em' %}
                         <span class="fw-bold text-dark ms-2">Review Decision</span>
                       </div>
                       <div class="decision-toggle" role="group" aria-label="Choose decision">
                         <button type="button" class="btn-seg" id="seg-approve" data-choice="approve" aria-pressed="false" title="Approve (Alt+A)">
-                          {% bs_icon 'check-circle' %} Approve
+                          {% bs_icon_cached 'check-circle' %} Approve
                         </button>
                         <button type="button" class="btn-seg" id="seg-reject" data-choice="reject" aria-pressed="false" title="Reject (Alt+R)">
-                          {% bs_icon 'x-circle' %} Reject
+                          {% bs_icon_cached 'x-circle' %} Reject
                         </button>
                       </div>
                     </div>
@@ -389,7 +389,7 @@
                         Close
                       </a>
                       <button type="button" class="btn btn-submit px-3 py-2" id="submitBtn" disabled>
-                        {% bs_icon 'send' extra_classes='me-1' %}Submit
+                        {% bs_icon_cached 'send' extra_classes='me-1' %}Submit
                       </button>
                     </div>
                   </div>
@@ -398,14 +398,14 @@
                 <!-- Remarks Section -->
                 <div id="remarks-wrap" class="mt-3 d-none">
                   <div class="p-3 rounded-3" style="background: #fff3cd; border: 1px solid #ffeaa7;">
-                    <label class="form-label fw-medium text-dark mb-2">{% bs_icon 'chat-left-text' extra_classes='me-1' %}Rejection Remarks</label>
+                    <label class="form-label fw-medium text-dark mb-2">{% bs_icon_cached 'chat-left-text' extra_classes='me-1' %}Rejection Remarks</label>
                     <textarea name="remarks" class="form-control border-0 shadow-sm" rows="2" placeholder="Please provide a reason for rejection..." style="resize: none; background: white;"></textarea>
                   </div>
                 </div>
               {% elif profile.latest_request_status_name|upper == 'APPROVED' %}
                 <div class="text-center p-3">
                   <div class="alert alert-success border-0 mb-3" style="background: #d1e7dd;">
-                    {% bs_icon 'check-circle-fill' color='#0f5132' size='1.5em' %}
+                    {% bs_icon_cached 'check-circle-fill' color='#0f5132' size='1.5em' %}
                     <div class="mt-2">
                       <strong>No further action is allowed. This request has already been approved.</strong>
                     </div>
@@ -422,7 +422,7 @@
               {% elif profile.latest_request_status_id == 4 %}
                 <div class="text-center p-3">
                   <div class="alert alert-danger border-0 mb-3" style="background: #f8d7da;">
-                    {% bs_icon 'x-circle-fill' color='#842029' size='1.5em' %}
+                    {% bs_icon_cached 'x-circle-fill' color='#842029' size='1.5em' %}
                     <div class="mt-2">
                       <strong>No further action is allowed. This request has already been rejected.</strong>
                     </div>
@@ -444,7 +444,7 @@
               {% else %}
                 <div class="text-center p-3">
                   <div class="alert alert-warning border-0 mb-3" style="background: #fff3cd;">
-                    {% bs_icon 'exclamation-triangle-fill' color='#664d03' size='1.5em' %}
+                    {% bs_icon_cached 'exclamation-triangle-fill' color='#664d03' size='1.5em' %}
                     <div class="mt-2">
                       <strong>Action on this request is temporarily disabled while awaiting required approval from another authorized party.</strong>
                     </div>

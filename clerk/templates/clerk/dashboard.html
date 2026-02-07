@@ -1,6 +1,6 @@
 {% extends "base.html" %} 
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
 <style>
@@ -128,13 +128,13 @@
           </div>
           <div class="d-flex flex-wrap gap-2">
             <a href="{% url 'clerk:identity_verification' %}" class="btn btn-outline-brand">
-              {% bs_icon 'shield-check' %}<span class="ms-1">Verify IDs</span>
+              {% bs_icon_cached 'shield-check' %}<span class="ms-1">Verify IDs</span>
             </a>
             <a href="{% url 'clerk:walkin_new' %}" class="btn btn-brand">
-              {% bs_icon 'file-earmark-text' %}<span class="ms-1">Document Requests</span>
+              {% bs_icon_cached 'file-earmark-text' %}<span class="ms-1">Document Requests</span>
             </a>
             <a href="{% url 'clerk:business_owner' %}" class="btn btn-brand-subtle">
-              {% bs_icon 'buildings' %}<span class="ms-1">New Business</span>
+              {% bs_icon_cached 'buildings' %}<span class="ms-1">New Business</span>
             </a>
           </div>
         </div>
@@ -163,7 +163,7 @@
               <option>Indigency</option>
             </select>
           </div>
-          <button class="btn btn-sm btn-outline-brand ms-auto" title="Refresh">{% bs_icon 'arrow-clockwise' %}</button>
+          <button class="btn btn-sm btn-outline-brand ms-auto" title="Refresh">{% bs_icon_cached 'arrow-clockwise' %}</button>
         </div>
       </div>
     </div> -->
@@ -174,7 +174,7 @@
     <div class="col">
       <div class="card kpi shadow-sm h-100 lift-on-hover">
         <div class="card-body d-flex align-items-center gap-3">
-          <div class="kpi-icon">{% bs_icon 'file-earmark-text' size='1.2em' %}</div>
+          <div class="kpi-icon">{% bs_icon_cached 'file-earmark-text' size='1.2em' %}</div>
           <div class="flex-grow-1">
             <div class="kpi-label">Document Requests</div>
             <div class="kpi-value">{{ kpis.doc_requests|default_if_none:"-" }}</div>
@@ -186,7 +186,7 @@
     <div class="col">
       <div class="card kpi shadow-sm h-100 lift-on-hover">
         <div class="card-body d-flex align-items-center gap-3">
-          <div class="kpi-icon">{% bs_icon 'person-check' size='1.2em' %}</div>
+          <div class="kpi-icon">{% bs_icon_cached 'person-check' size='1.2em' %}</div>
           <div class="flex-grow-1">
             <div class="kpi-label">Pending Verifications</div>
             <div class="kpi-value">{{ kpis.pending_verifications|default_if_none:"-" }}</div>
@@ -198,7 +198,7 @@
     <div class="col">
       <div class="card kpi shadow-sm h-100 lift-on-hover">
         <div class="card-body d-flex align-items-center gap-3">
-          <div class="kpi-icon">{% bs_icon 'buildings' size='1.2em' %}</div>
+          <div class="kpi-icon">{% bs_icon_cached 'buildings' size='1.2em' %}</div>
           <div class="flex-grow-1">
             <div class="kpi-label">Active Businesses</div>
             <div class="kpi-value">{{ kpis.active_businesses|default_if_none:"-" }}</div>
@@ -210,7 +210,7 @@
     <div class="col">
       <div class="card kpi shadow-sm h-100 lift-on-hover">
         <div class="card-body d-flex align-items-center gap-3">
-          <div class="kpi-icon">{% bs_icon 'people' size='1.2em' %}</div>
+          <div class="kpi-icon">{% bs_icon_cached 'people' size='1.2em' %}</div>
           <div class="flex-grow-1">
             <div class="kpi-label">Registered Residents</div>
             <div class="kpi-value">{{ kpis.residents_total|default_if_none:"-" }}</div>

@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load bootstrap_icons %}
+{% load cached_icons %}
 
 {% block css %}
 <link rel="stylesheet" href="{% static 'css/table.css' %}">
@@ -119,7 +119,7 @@
     <div class="hero-inner container-fluid">
       <div class="hero-left">
         <h5 class="hero-title m-0">
-          {% bs_icon 'people' extra_classes='me-1' %}
+          {% bs_icon_cached 'people' extra_classes='me-1' %}
           Resident Records
         </h5>
         {% if residents %}
@@ -131,7 +131,7 @@
       </div>
       <div class="hero-right">
         <a href="{% url 'lupon_mem:report_list' %}" class="btn btn-hero d-none d-md-inline-flex">
-          {% bs_icon 'file-earmark-text' extra_classes='me-2' %} View Reports
+          {% bs_icon_cached 'file-earmark-text' extra_classes='me-2' %} View Reports
         </a>
       </div>
     </div>
@@ -142,16 +142,16 @@
     <form method="get" class="toolbar">
       <div class="toolbar-grid">
         <div class="searchbox">
-          {% bs_icon 'search' %}
+          {% bs_icon_cached 'search' %}
           <input type="text" class="form-control" name="q" value="{{ search_query }}" 
                  placeholder="Search by name (first, last, or full name)...">
         </div>
         <div class="d-flex gap-2">
           <button type="submit" class="btn btn-hero d-flex align-items-center justify-content-center">
-            {% bs_icon 'search' extra_classes='me-2' %} Search
+            {% bs_icon_cached 'search' extra_classes='me-2' %} Search
           </button>
           <a href="{% url 'lupon_mem:resident_records_list' %}" class="btn btn-outline-light d-flex align-items-center justify-content-center" style="border-color:var(--brand-700); color:var(--brand-700);">
-            {% bs_icon 'arrow-counterclockwise' extra_classes='me-2' %} Clear
+            {% bs_icon_cached 'arrow-counterclockwise' extra_classes='me-2' %} Clear
           </a>
         </div>
       </div>
@@ -160,7 +160,7 @@
     {% if search_query and not residents %}
       <div class="alert alert-info">
         <div class="d-flex align-items-center">
-          {% bs_icon 'info-circle' extra_classes='me-2' %}
+          {% bs_icon_cached 'info-circle' extra_classes='me-2' %}
           <div>
             <strong>No residents found</strong><br>
             <small>Try searching with a different name or check the spelling.</small>
@@ -229,7 +229,7 @@
                 <td>
                   <div class="actions">
                     <a class="btn btn-chip btn-sm" href="{% url 'lupon_mem:resident_records_detail' resident.0 %}">
-                      {% bs_icon 'eye' %} View Records
+                      {% bs_icon_cached 'eye' %} View Records
                     </a>
                   </div>
                 </td>
@@ -284,7 +284,7 @@
             </div>
             <div class="ms-3">
               <a class="btn btn-chip btn-sm" href="{% url 'lupon_mem:resident_records_detail' resident.0 %}">
-                {% bs_icon 'eye' %} View
+                {% bs_icon_cached 'eye' %} View
               </a>
             </div>
           </div>

@@ -1,0 +1,1022 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid px-3 px-md-4 my-3 my-md-4">
+
+  <style>
+    :root{
+      --brand:#6d2932; 
+      --brand-700:#561c24; 
+      --accent:#d4af37;
+      --ink:#111827; 
+      --muted:#6b7280; 
+      --line:#e5e7eb; 
+      --bg:#f3f4f6; 
+      --card:#ffffff;
+      --ok:#16a34a; 
+      --warn:#b45309; 
+      --info:#2563eb;
+    }
+
+    /* ---------- Base / Shell ---------- */
+    .page-title{
+      color:var(--brand);
+      font-weight:800;
+      letter-spacing:.03em;
+      margin:0 0 .25rem 0;
+      line-height:1.15;
+      font-size:1.35rem;
+    }
+    .page-subtitle{
+      color:var(--muted);
+      font-size:.9rem;
+      margin-bottom:1.25rem;
+    }
+    h1,h2,h3,h4,h5,h6{
+      text-decoration:none;
+      border:0;
+    }
+    .soft{ color:var(--muted); }
+    .thin{ font-weight:600; }
+
+    body{
+      background:radial-gradient(circle at top left,#fdf2f2,#f9fafb);
+    }
+
+    .wrap{
+      background:var(--card);
+      border:1px solid rgba(148,163,184,.35);
+      border-radius:16px;
+      padding:1.1rem 1.25rem;
+      box-shadow:0 18px 45px -28px rgba(15,23,42,.65);
+    }
+    .wrap.mb-3{
+      margin-bottom:1.25rem!important;
+    }
+    .wrap--quiet{
+      padding:0;
+      border-radius:16px;
+      overflow:hidden;
+      box-shadow:0 16px 40px -30px rgba(15,23,42,.45);
+    }
+
+    .section-h{
+      padding:.9rem 1.1rem;
+      border-bottom:1px solid rgba(209,213,219,.7);
+      background:linear-gradient(135deg,rgba(109,41,50,.035),rgba(212,175,55,.04));
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .section-h .title{
+      font-weight:750;
+      color:var(--brand);
+      margin:0;
+      font-size:.95rem;
+      display:flex;
+      align-items:center;
+      gap:.4rem;
+    }
+    .section-h .title::before{
+      content:'';
+      width:6px;
+      height:18px;
+      border-radius:999px;
+      background:linear-gradient(180deg,var(--brand),var(--accent));
+      display:inline-block;
+    }
+    .section-b{
+      padding:1rem 1.1rem 1.1rem;
+      background:linear-gradient(180deg,#ffffff,rgba(249,250,251,.75));
+    }
+
+    /* ---------- Buttons ---------- */
+    .btn{
+      transition:transform .09s ease, box-shadow .12s ease, background-color .12s ease, border-color .12s ease;
+      border-radius:999px;
+    }
+    .btn-sm{
+      padding:.32rem .7rem;
+      font-size:.8rem;
+    }
+    .btn:hover{
+      transform:translateY(-1px);
+      box-shadow:0 10px 25px -16px rgba(15,23,42,.6);
+    }
+    .btn:active{
+      transform:translateY(0);
+      box-shadow:none;
+    }
+    .btn-brand{
+      background:linear-gradient(135deg,var(--brand),var(--brand-700));
+      color:#fff;
+      border:1px solid var(--brand-700);
+    }
+    .btn-brand:hover{
+      background:linear-gradient(135deg,var(--brand-700),#320f15);
+      border-color:#320f15;
+      color:#fff;
+    }
+    .btn-outline-brand{
+      color:var(--brand);
+      border-color:rgba(109,41,50,.85);
+      background:#fff;
+      background-image:linear-gradient(135deg,rgba(212,175,55,.03),rgba(255,255,255,1));
+    }
+    .btn-outline-brand:hover{
+      background:linear-gradient(135deg,rgba(109,41,50,.1),rgba(109,41,50,.03));
+      color:var(--brand-700);
+      border-color:var(--brand-700);
+    }
+
+    .form-select:focus, 
+    .form-control:focus{
+      border-color:var(--brand)!important;
+      box-shadow:0 0 0 .17rem rgba(109,41,50,.20)!important;
+    }
+    .form-check-input:checked{
+      background-color:var(--brand);
+      border-color:var(--brand);
+      box-shadow:0 0 0 .08rem rgba(109,41,50,.25);
+    }
+
+    /* ---------- Compact Summary Grid ---------- */
+    .summary{
+      display:grid;
+      gap:10px;
+      grid-template-columns:repeat(12,1fr);
+    }
+    .cell{
+      grid-column:span 12;
+      background:radial-gradient(circle at top left,rgba(249,250,251,1),rgba(243,244,246,.9));
+      border:1px solid rgba(226,232,240,.9);
+      border-radius:14px;
+      padding:.85rem .95rem;
+      position:relative;
+      overflow:hidden;
+    }
+    .cell::after{
+      content:'';
+      position:absolute;
+      inset:auto -40px -40px auto;
+      width:80px;
+      height:80px;
+      opacity:.08;
+      background:radial-gradient(circle,var(--accent),transparent 70%);
+      pointer-events:none;
+    }
+    .cell--full{
+      grid-column:span 12;
+    }
+    @media (min-width:768px){
+      .cell--quarter{ grid-column:span 3; }
+      .cell--third{ grid-column:span 4; }
+      .cell--half{ grid-column:span 6; }
+      .cell--full{ grid-column:span 12; }
+    }
+
+    .k-label{
+      font-size:.7rem;
+      color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:.12em;
+      margin-bottom:.25rem;
+      display:flex;
+      align-items:center;
+      gap:.4rem;
+    }
+    .k-label i{
+      font-size:.8rem;
+      color:var(--brand-700);
+    }
+    .k-value{
+      font-weight:800;
+      color:var(--ink);
+      line-height:1.25;
+      font-size:.92rem;
+    }
+    .k-note{
+      font-size:.8rem;
+      color:var(--muted);
+    }
+
+    /* ---------- Pills / Chips ---------- */
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:.35rem;
+      padding:.32rem .65rem;
+      border-radius:999px;
+      font-weight:750;
+      font-size:.78rem;
+      border:1px solid rgba(209,213,219,.9);
+      background:#fff;
+      color:var(--ink);
+      white-space:nowrap;
+      box-shadow:0 8px 20px -16px rgba(15,23,42,.55);
+    }
+    .pill i{
+      font-size:.85rem;
+    }
+    .pill-brand{
+      border-color:rgba(234,223,205,1);
+      color:var(--brand);
+      background:linear-gradient(135deg,#fff7ed,#fffbeb);
+    }
+    .pill-ok{
+      background:#ecfdf5;
+      border-color:#bbf7d0;
+      color:#166534;
+    }
+    .pill-warn{
+      background:#fffbeb;
+      border-color:#fde68a;
+      color:#92400e;
+    }
+    .pill-info{
+      background:#eff6ff;
+      border-color:#bfdbfe;
+      color:#1e40af;
+    }
+
+    /* ---------- Gallery ---------- */
+    .grid{
+      --gap:.7rem;
+      display:grid;
+      gap:var(--gap);
+      grid-template-columns:repeat(2,1fr);
+    }
+    @media (min-width:576px){
+      .grid{ grid-template-columns:repeat(3,1fr); }
+    }
+    @media (min-width:992px){
+      .grid{ grid-template-columns:repeat(6,1fr); }
+    }
+    .tile{
+      border:1px solid rgba(226,232,240,.95);
+      border-radius:14px;
+      background:radial-gradient(circle at top left,#ffffff,#f9fafb);
+      padding:.5rem;
+      transition:transform .09s ease, box-shadow .12s ease, border-color .12s ease;
+    }
+    .tile:hover{
+      transform:translateY(-2px);
+      border-color:rgba(148,163,184,1);
+      box-shadow:0 16px 38px -26px rgba(15,23,42,.8);
+    }
+    .tile:hover .btn-danger{
+      opacity:1!important;
+    }
+    .caption{
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    /* ---------- Helpers ---------- */
+    .divider{
+      height:1px;
+      background:var(--line);
+      margin:1rem 0;
+    }
+    .disabled-soft{
+      pointer-events:none;
+      opacity:.55;
+    }
+
+    .alert-success{
+      border-radius:12px;
+      border-color:#bbf7d0;
+    }
+    .alert-light.border{
+      border-radius:12px;
+    }
+
+    /* Modals */
+    .modal-content{
+      border-radius:18px;
+      border:1px solid rgba(148,163,184,.4);
+      box-shadow:0 30px 80px -45px rgba(15,23,42,.9);
+    }
+    .modal-header{
+      border-bottom:1px solid rgba(229,231,235,.85);
+      background:linear-gradient(135deg,#fefce8,#f9fafb);
+    }
+    .modal-title{
+      font-weight:700;
+      letter-spacing:.03em;
+    }
+
+    /* Print Styles */
+    @media print{
+      .btn, .alert, .badge, .no-print{ display:none!important; }
+      .wrap, .cell{ box-shadow:none!important; background:#fff; border:1px solid #ddd; }
+      body{ background:#fff; }
+      .print-only{ display:block!important; }
+      .documentation-grid{
+        display:grid!important;
+        grid-template-columns:repeat(2,1fr)!important;
+        gap:15px!important;
+        page-break-inside:avoid;
+      }
+      .documentation-item{
+        border:1px solid #ddd;
+        padding:10px;
+        border-radius:8px;
+        page-break-inside:avoid;
+        margin-bottom:15px;
+      }
+      .documentation-item img{
+        width:100%!important;
+        height:auto!important;
+        max-height:300px!important;
+        object-fit:contain!important;
+      }
+      .documentation-caption{
+        font-size:12px;
+        color:#666;
+        margin-top:8px;
+        text-align:center;
+      }
+      .print-header{
+        text-align:center;
+        margin-bottom:20px;
+        border-bottom:2px solid #6d2932;
+        padding-bottom:10px;
+      }
+      .print-case-info{
+        margin-bottom:20px;
+        padding:10px;
+        border:1px solid #ddd;
+        border-radius:5px;
+      }
+    }
+    
+    /* Print-only elements */
+    .print-only{
+      display:none;
+    }
+  </style>
+
+  <!-- Optional page heading (purely visual, no JS dependencies) -->
+  <div class="mb-2 d-flex justify-content-between align-items-center" style="margin-top:70px;">
+    <div>
+      <!-- <h1 class="page-title">Hearing Overview</h1>
+      <div class="page-subtitle">
+        Quick snapshot of the mediation/conciliation schedule, parties, outcome, and documentation.
+      </div> -->
+    </div>
+    <a href="{% url 'lupon_mem:case_detail' case_id %}" class="btn btn-outline-brand btn-sm">
+      <i class="bi bi-arrow-left me-1"></i> Back to Case
+    </a>
+  </div>
+
+  <!-- flags -->
+  <div id="caseFlags" data-has-kp16="{{ has_kp16|yesno:'1,0' }}" hidden></div>
+  <div id="hearingOutcome"
+       data-outcome="{{ settlement_outcome|default_if_none:'' }}"
+       data-compl-att="{{ compl_attended_last|yesno:'1,0' }}"
+       data-resp-att="{{ resp_attended_last|yesno:'1,0' }}"
+       data-kp14-url="{{ kp14_url|default_if_none:'' }}"
+       hidden></div>
+
+  <!-- ===== Summary ===== -->
+  <div class="wrap mb-3" style="margin-top:12px;">
+    <div class="row g-3">
+      <!-- Left: Source & Schedule -->
+      <div class="col-md-6">
+        <div class="d-flex align-items-start gap-3">
+          <div class="flex-shrink-0">
+            {% if hearing_source == "KP-8" %}
+              <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:56px;height:56px;background:linear-gradient(135deg,#6d2932,#561c24);">
+                <i class="bi bi-people text-white" style="font-size:1.5rem;"></i>
+              </div>
+            {% elif hearing_source == "KP-12" %}
+              <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:56px;height:56px;background:linear-gradient(135deg,#6d2932,#561c24);">
+                <i class="bi bi-people text-white" style="font-size:1.5rem;"></i>
+              </div>
+            {% endif %}
+          </div>
+          <div class="flex-grow-1">
+            <div class="text-muted small text-uppercase" style="letter-spacing:.08em;font-weight:600;">{{ hearing_source|default:"—" }}</div>
+            <h5 class="mb-1 fw-bold" style="color:#6d2932;">{% if hearing_source == "KP-8" %}Mediation Hearing{% elif hearing_source == "KP-12" %}Conciliation Hearing{% else %}Hearing{% endif %}</h5>
+            <div class="d-flex align-items-center gap-2 text-muted small">
+              <i class="bi bi-calendar3"></i>
+              <span id="hearing-dt" data-date="{{ hearing_date|default_if_none:'' }}" data-time="{{ hearing_time|default_if_none:'' }}">
+                {% if hearing_date or hearing_time %}{{ hearing_date|default:"—" }} {{ hearing_time|default:"" }}{% else %}—{% endif %}
+              </span>
+            </div>
+            {% if hearing_label %}<div class="badge bg-light text-dark border mt-2">{{ hearing_label }}</div>{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Status -->
+      <div class="col-md-6">
+        <div class="h-100 d-flex flex-column justify-content-center">
+          <div class="text-muted small text-uppercase mb-2" style="letter-spacing:.08em;font-weight:600;">Status</div>
+          {% if hearing_held %}
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="badge" style="background:#16a34a;font-size:.9rem;padding:.4rem .75rem;"><i class="bi bi-check-circle me-1"></i>Held</span>
+              <span id="heldOutcomePill" class="badge d-none" style="font-size:.85rem;padding:.35rem .65rem;"></span>
+            </div>
+            {% if held_at_fmt %}<div class="text-muted small"><i class="bi bi-clock"></i> {{ held_at_fmt }}</div>{% endif %}
+          {% else %}
+            <span class="badge bg-warning text-dark" style="font-size:.9rem;padding:.4rem .75rem;width:fit-content;"><i class="bi bi-hourglass-split me-1"></i>Not Held</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Parties Section -->
+    <div class="mt-3 pt-3 border-top">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="text-muted small text-uppercase mb-1" style="letter-spacing:.08em;font-weight:600;"><i class="bi bi-person-fill me-1"></i>Complainant</div>
+          <div class="fw-semibold" style="color:#111827;">{{ complainants|join:", "|default:"—" }}</div>
+        </div>
+        <div class="col-md-6">
+          <div class="text-muted small text-uppercase mb-1" style="letter-spacing:.08em;font-weight:600;"><i class="bi bi-person me-1"></i>Respondent</div>
+          <div class="fw-semibold" style="color:#111827;">{{ respondents|join:", "|default:"—" }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Outcome details -->
+    <div id="outcomeDetailRow" class="mt-3 pt-3 border-top d-none">
+      <div class="text-muted small mb-2">
+        <span id="attNote"></span>
+        <span id="arbNote" class="ms-2"></span>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <div id="attSummaryPill"></div>
+        <div id="kp16Pill"></div>
+      </div>
+    </div>
+
+    <div id="attData" data-att-count="{{ med_attendance_count|default_if_none:'0' }}" hidden></div>
+  </div>
+
+  <!-- ===== Hearing Actions (Mediation/Conciliation) ===== -->
+  {% if hearing_source in "KP-8,KP-12" %}
+  <div class="wrap wrap--quiet mb-3">
+    <div class="section-h">
+      <h6 class="title">Actions</h6>
+      <div class="d-none d-sm-flex align-items-center gap-2">
+        <!-- badges kept intentionally minimal for now -->
+      </div>
+    </div>
+    <div class="section-b">
+
+      {% if med_attendance_count|default:0 > 0 and not hearing_held %}
+        <div id="attSuccessBanner" class="alert alert-success py-2 px-3 mb-3">
+          <i class="bi bi-check2-circle me-1"></i><strong>Attendance recorded:</strong> {{ med_attendance_ord_label }}
+        </div>
+      {% endif %}
+
+      <div class="mb-3 d-flex flex-wrap gap-2">
+        <button class="btn btn-outline-brand btn-sm" data-bs-toggle="modal" data-bs-target="#uploadDocsModal">
+          <i class="bi bi-images me-1"></i> Add Documentation Photos
+        </button>
+        <button class="btn btn-outline-brand btn-sm" data-bs-toggle="modal" data-bs-target="#rescheduleModal">
+          <i class="bi bi-calendar-event me-1"></i> Reschedule Hearing
+        </button>
+      </div>
+
+      {% if not hearing_held %}
+
+      <div class="wrap" style="padding:.9rem 1rem;">
+        <form id="medHeldForm" class="d-flex flex-wrap align-items-center gap-2"
+              method="post" action="{% if hearing_source == 'KP-8' %}{% url 'lupon_mem:mediation_complete' case_id %}{% else %}{% url 'lupon_mem:conciliation_complete' case_id %}{% endif %}">
+          {% csrf_token %}
+          {% if picked_submission_id %}
+            <input type="hidden" name="submission_id" value="{{ picked_submission_id }}">
+          {% endif %}
+
+          <input type="hidden" id="cmpAtt" name="compl_attended" value="1">
+          <input type="hidden" id="rspAtt" name="resp_attended" value="1">
+
+          <select id="medOutcome" name="settlement" required class="form-select form-select-sm w-auto">
+            <option value="">What happened?</option>
+            <option value="SETTLED">Both Attended → Settled</option>
+            <option value="NOT_SETTLED">Both Attended → Not Settled</option>
+            <option value="ARBITRATION">Both Attended → Agree to Arbitration</option>
+            <option value="COMPLAINANT_NO_SHOW">Complainant No Show</option>
+            <option value="RESPONDENT_NO_SHOW">Respondent No Show</option>
+            <option value="BOTH_NO_SHOW">Both No Show</option>
+          </select>
+
+          <input type="text" name="remarks" class="form-control form-control-sm w-auto" placeholder="Remarks (optional)">
+          <button class="btn btn-brand btn-sm">
+            <i class="bi bi-check2-circle me-1"></i> Record {% if hearing_source == 'KP-8' %}Mediation{% else %}Conciliation{% endif %} Outcome
+          </button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Image preview modal -->
+  <div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true" style="margin-top: 80px;">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Image Preview</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body text-center">
+          <img id="previewImage" src="" class="img-fluid" style="max-height:70vh;">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload modal -->
+  <div class="modal fade" id="uploadDocsModal" tabindex="-1" aria-hidden="true" style="margin-top:150px;">
+    <div class="modal-dialog">
+      <form class="modal-content" id="uploadForm" method="post"
+            action="{% url 'lupon_mem:hearing_media_upload' case_id %}"
+            enctype="multipart/form-data">
+        <div class="modal-header">
+          <h5 class="modal-title" style="color:var(--brand)"><i class="bi bi-images me-1"></i> Add Documentation Photos</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          {% csrf_token %}
+          <input type="hidden" name="submission_id" value="{{ picked_submission_id }}">
+          <input type="file" id="photoInput" name="photos[]" accept="image/*" multiple class="form-control">
+          <div class="form-text mt-2">You can select multiple images.</div>
+          <div id="photoPreview" class="mt-3" style="display:none;">
+            <h6 class="mb-2">Preview:</h6>
+            <div id="previewGrid" class="d-flex flex-wrap gap-2"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" id="uploadBtn" class="btn btn-brand" disabled>Upload</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Reschedule modal -->
+  <div class="modal fade" id="rescheduleModal" tabindex="-1" aria-hidden="true" style="margin-top:150px;">
+    <div class="modal-dialog">
+      <form class="modal-content" id="rescheduleForm" method="post" action="{% url 'lupon_mem:reschedule_hearing' case_id %}">
+        <div class="modal-header">
+          <h5 class="modal-title" style="color:var(--brand)"><i class="bi bi-calendar-event me-1"></i> Reschedule Hearing</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          {% csrf_token %}
+          <input type="hidden" name="submission_id" value="{{ picked_submission_id }}">
+          <div class="mb-3">
+            <label for="newDate" class="form-label">New Date</label>
+            <input type="date" id="newDate" name="new_date" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label for="newTime" class="form-label">New Time</label>
+            <input type="time" id="newTime" name="new_time" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label for="remarks" class="form-label">Remarks</label>
+            <textarea id="remarks" name="remarks" class="form-control" rows="3" placeholder="Reason for rescheduling..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-brand">Reschedule</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ===== Gallery ===== -->
+  {% if mediation_photos %}
+  <div class="wrap wrap--quiet mb-3">
+    <div class="section-h">
+      <h6 class="title">Documentation Photos</h6>
+      <div class="d-flex gap-2">
+        {% if hearing_held %}<span class="badge text-bg-success">HELD</span>{% endif %}
+        <button class="btn btn-outline-brand btn-sm no-print" onclick="printDocumentation()" title="Print Documentation">
+          <i class="bi bi-printer me-1"></i> Print
+        </button>
+        <a href="{% url 'lupon_mem:hearing_documentation_pdf' case_id %}" class="btn btn-outline-brand btn-sm no-print" title="Download as PDF">
+          <i class="bi bi-download me-1"></i> Download PDF
+        </a>
+      </div>
+    </div>
+    <div class="section-b">
+      <!-- Print Header (only visible when printing) -->
+      <div class="print-only print-header">
+        <h2 style="color:#6d2932;margin:0;">BARANGAY LUPON HEARING DOCUMENTATION</h2>
+        <div class="print-case-info mt-3">
+          <div class="row">
+            <div class="col-6">
+              <strong>Case ID:</strong> {{ case_id }}<br>
+              <strong>Hearing Type:</strong> {% if hearing_source == "KP-8" %}Mediation Hearing{% elif hearing_source == "KP-12" %}Conciliation Hearing{% else %}Hearing{% endif %}
+            </div>
+            <div class="col-6">
+              <strong>Date:</strong> {{ hearing_date|default:"—" }}<br>
+              <strong>Time:</strong> {{ hearing_time|default:"—" }}<br>
+              <strong>Status:</strong> {% if hearing_held %}HELD{% else %}NOT HELD{% endif %}
+            </div>
+          </div>
+          <div class="mt-2">
+            <strong>Complainant(s):</strong> {{ complainants|join:", "|default:"—" }}<br>
+            <strong>Respondent(s):</strong> {{ respondents|join:", "|default:"—" }}
+          </div>
+        </div>
+      </div>
+      
+      <!-- Screen View -->
+      <div class="grid no-print">
+        {% for p in mediation_photos %}
+          <div class="tile position-relative">
+            <a href="{{ p.display_url }}" target="_blank" rel="noopener" class="text-decoration-none">
+              <div class="ratio ratio-4x3">
+                <img src="{{ p.display_url }}" alt="documentation" class="w-100 h-100 rounded" style="object-fit:cover;" loading="lazy" decoding="async">
+              </div>
+            </a>
+            <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1" 
+                    style="padding:.25rem .5rem;font-size:.75rem;opacity:.9;" 
+                    onclick="deletePhoto('{{ p.file_path }}', this)" 
+                    title="Delete photo">
+              <i class="bi bi-trash"></i>
+            </button>
+            <div class="small soft mt-1 caption">{{ p.caption|default:" " }}</div>
+          </div>
+        {% endfor %}
+      </div>
+      
+      <!-- Print View -->
+      <div class="documentation-grid print-only">
+        {% for p in mediation_photos %}
+          <div class="documentation-item">
+            <img src="{{ p.display_url }}" alt="Documentation Photo {{ forloop.counter }}">
+            <div class="documentation-caption">
+              Photo {{ forloop.counter }}{% if p.caption and p.caption != " " %}: {{ p.caption }}{% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% elif hearing_held %}
+    <div class="alert alert-light border soft">No documentation photos were uploaded for this hearing.</div>
+  {% endif %}
+
+  {% if not hearing_source %}
+    <div class="wrap p-3">
+      <div class="soft">
+        <i class="bi bi-info-circle me-1"></i>
+        No KP-8/KP-12 notice found yet. Issue a notice before marking a hearing held.
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+(function(){
+  // Date/time pretty
+  const node = document.getElementById('hearing-dt');
+  if (node){
+    const ds = (node.getAttribute('data-date') || '').trim();
+    const ts = (node.getAttribute('data-time') || '').trim();
+    if (ds){
+      try{
+        let dateStr = ds;
+        let timeStr = ts;
+        
+        // Try to format date if it's YYYY-MM-DD
+        if (/^\d{4}-\d{2}-\d{2}$/.test(ds)) {
+          const [Y,M,D] = ds.split('-').map(Number);
+          const dt = new Date(Y, M-1, D);
+          if (!isNaN(dt.getTime())) {
+            dateStr = dt.toLocaleDateString(undefined, { month:'long', day:'numeric', year:'numeric' });
+          }
+        }
+        
+        node.textContent = timeStr ? `${dateStr} ${timeStr}` : dateStr;
+      }catch(e){
+        // Keep original values if formatting fails
+        node.textContent = ts ? `${ds} ${ts}` : ds;
+      }
+    }
+  }
+
+  function ordinal(n){ n = Number(n)||0; const s=["th","st","nd","rd"], v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
+  const attCount = parseInt((document.getElementById('attData')?.dataset.attCount||'0').trim(),10) || 0;
+
+  // Attendance summary pill
+  const hasKP16 = (document.getElementById('caseFlags')?.dataset.hasKp16 === '1');
+  const kp16PillHost = document.getElementById('kp16Pill');
+  if (kp16PillHost && hasKP16){
+    kp16PillHost.innerHTML = `<span class="badge" style="background:#16a34a;"><i class="bi bi-file-earmark-check me-1"></i>KP-16 Filed</span>`;
+  }
+
+  // Enable/disable settlement
+  const settleBtn = document.getElementById('settleBtn');
+  const settleGuardNote = document.getElementById('settleGuardNote');
+  if (settleBtn){
+    const hasKP16 = (document.getElementById('caseFlags')?.dataset.hasKp16 === '1');
+    if (hasKP16) {
+      settleBtn.classList.add('disabled-soft');
+      settleBtn.textContent = 'KP-16 Already Created';
+      settleBtn.addEventListener('click', function(ev){
+        ev.preventDefault(); alert('KP-16 Settlement Agreement already exists for this case.');
+      });
+    } else if (attCount > 0){ 
+      settleBtn.classList.remove('disabled-soft'); 
+      settleGuardNote?.classList.add('d-none'); 
+    } else{
+      settleBtn.classList.add('disabled-soft');
+      settleGuardNote?.classList.remove('d-none');
+      settleBtn.addEventListener('click', function(ev){
+        ev.preventDefault(); alert('Please add at least one Mediation Attendance before proceeding to settlement.');
+      }, { once:true });
+    }
+  }
+
+  // Outcome → auto-tick attendance
+  const form = document.getElementById('medHeldForm');
+  const outcomeSel = document.getElementById('medOutcome');
+  const cmpAttBox = document.getElementById('cmpAtt');
+  const rspAttBox = document.getElementById('rspAtt');
+  
+  console.log('[FORM] Elements found:', {form, outcomeSel, cmpAttBox, rspAttBox});
+  
+  if (outcomeSel && cmpAttBox && rspAttBox) {
+    outcomeSel.addEventListener('change', function() {
+      const o = this.value;
+      if (o==='SETTLED' || o==='NOT_SETTLED' || o==='ARBITRATION'){ 
+        cmpAttBox.value = '1'; rspAttBox.value = '1';
+      }
+      else if (o==='COMPLAINANT_NO_SHOW'){ 
+        cmpAttBox.value = '0'; rspAttBox.value = '1';
+      }
+      else if (o==='RESPONDENT_NO_SHOW'){ 
+        cmpAttBox.value = '1'; rspAttBox.value = '0';
+      }
+      else if (o==='BOTH_NO_SHOW'){ 
+        cmpAttBox.value = '0'; rspAttBox.value = '0';
+      }
+    });
+  }
+
+  // Submit → suggest next
+  if (form) {
+    form.addEventListener('submit', function(ev){
+      const o = outcomeSel?.value || '';
+      console.log('[SUBMIT] Outcome:', o, 'Compl:', cmpAttBox?.checked, 'Resp:', rspAttBox?.checked);
+      if (!o) { 
+        ev.preventDefault();
+        showAlertModal('Required', 'Please select what happened in the hearing.');
+        return false; 
+      }
+      
+      ev.preventDefault();
+      const outcomeText = outcomeSel.options[outcomeSel.selectedIndex].text;
+      showConfirmModal('Confirm Hearing Outcome', `Record this hearing outcome as "${outcomeText}"?`, () => form.submit());
+      return false;
+
+    }, false);
+  }
+
+  // Photo preview functionality
+  const photoInput = document.getElementById('photoInput');
+  const photoPreview = document.getElementById('photoPreview');
+  const previewGrid = document.getElementById('previewGrid');
+  const uploadBtn = document.getElementById('uploadBtn');
+  let selectedFiles = [];
+
+  if (photoInput) {
+    photoInput.addEventListener('change', function(e) {
+      selectedFiles = Array.from(e.target.files);
+      updatePreview();
+    });
+  }
+
+  function updatePreview() {
+    if (selectedFiles.length === 0) {
+      photoPreview.style.display = 'none';
+      uploadBtn.disabled = true;
+      return;
+    }
+
+    photoPreview.style.display = 'block';
+    uploadBtn.disabled = false;
+    previewGrid.innerHTML = '';
+
+    selectedFiles.forEach((file, index) => {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const div = document.createElement('div');
+        div.className = 'position-relative';
+        div.style.width = '80px';
+        div.innerHTML = `
+          <img src="${e.target.result}" class="img-thumbnail" style="width:80px;height:80px;object-fit:cover;cursor:pointer;" 
+               onclick="showImagePreview('${e.target.result}')">
+          <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0" 
+                  style="padding:2px 6px;font-size:10px;" onclick="removePhoto(${index})">
+            <i class="bi bi-x"></i>
+          </button>
+        `;
+        previewGrid.appendChild(div);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  window.removePhoto = function(index) {
+    selectedFiles.splice(index, 1);
+    updateFileInput();
+    updatePreview();
+  };
+
+  function updateFileInput() {
+    const dt = new DataTransfer();
+    selectedFiles.forEach(file => dt.items.add(file));
+    photoInput.files = dt.files;
+  }
+
+  window.showImagePreview = function(src) {
+    document.getElementById('previewImage').src = src;
+    new bootstrap.Modal(document.getElementById('imagePreviewModal')).show();
+  };
+
+  window.deletePhoto = function(filePath, btn) {
+    showConfirmModal('Delete Photo', 'Delete this photo? This cannot be undone.', () => {
+      fetch('{% url "lupon_mem:hearing_media_delete" case_id %}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}'
+      },
+      body: JSON.stringify({ file_path: filePath })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        btn.closest('.tile').remove();
+      } else {
+        showAlertModal('Error', 'Failed to delete photo: ' + (data.error || 'Unknown error'));
+      }
+    })
+    .catch(e => showAlertModal('Error', 'Error: ' + e.message));
+    });
+  };
+
+  const uploadForm = document.getElementById('uploadForm');
+  if (uploadForm) {
+    uploadForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const count = selectedFiles.length;
+      if (count > 0) {
+        showConfirmModal('Upload Photos', `Upload ${count} photo${count > 1 ? 's' : ''}?`, () => uploadForm.submit());
+      }
+    });
+  }
+
+  // Reschedule form confirmation
+  const rescheduleForm = document.getElementById('rescheduleForm');
+  if (rescheduleForm) {
+    rescheduleForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const newDate = document.getElementById('newDate').value;
+      const newTime = document.getElementById('newTime').value;
+      if (newDate && newTime) {
+        const dateObj = new Date(newDate + 'T' + newTime);
+        const formattedDate = dateObj.toLocaleDateString(undefined, { month:'long', day:'numeric', year:'numeric' });
+        const formattedTime = dateObj.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit', hour12:true });
+        showConfirmModal('Reschedule Hearing', `Do you really want to reschedule this hearing to ${formattedDate} at ${formattedTime}?`, () => {
+          const formData = new FormData(rescheduleForm);
+          fetch(rescheduleForm.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'X-CSRFToken': '{{ csrf_token }}'
+            }
+          })
+          .then(r => r.json())
+          .then(data => {
+            if (data.success) {
+              showAlertModal('Success', data.message);
+              bootstrap.Modal.getInstance(document.getElementById('rescheduleModal')).hide();
+              setTimeout(() => location.reload(), 2000);
+            } else {
+              showAlertModal('Error', data.error || 'Failed to reschedule hearing.');
+            }
+          })
+          .catch(e => showAlertModal('Error', 'Error: ' + e.message));
+        });
+      }
+    });
+  }
+  
+  function showConfirmModal(title, message, onConfirm) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:14px;">
+          <div class="modal-header">
+            <h5 class="modal-title">${title}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">${message}</div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-brand" id="confirmBtn">Confirm</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    modal.querySelector('#confirmBtn').onclick = () => { bsModal.hide(); onConfirm(); };
+    modal.addEventListener('hidden.bs.modal', () => modal.remove());
+    bsModal.show();
+  }
+  
+  function showAlertModal(title, message) {
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:14px;">
+          <div class="modal-header">
+            <h5 class="modal-title">${title}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">${message}</div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-brand" data-bs-dismiss="modal">OK</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+    modal.addEventListener('hidden.bs.modal', () => modal.remove());
+    bsModal.show();
+  }
+  
+  // Print Documentation Function
+  window.printDocumentation = function() {
+    // Show loading message
+    showAlertModal('Preparing Print', 'Preparing documentation for printing. Please wait...');
+    
+    // Wait a moment for images to load, then print
+    setTimeout(() => {
+      window.print();
+    }, 1000);
+  };
+
+  // If already held → concise summary chips
+  const outcomeHost = document.getElementById('hearingOutcome');
+  const heldOutcomePill = document.getElementById('heldOutcomePill');
+  const outcomeDetailRow = document.getElementById('outcomeDetailRow');
+
+  if (outcomeHost && "{{ hearing_held|yesno:'1,0' }}" === "1") {
+    const outcome = (outcomeHost.dataset.outcome || "").toUpperCase().replace(/\s+/g, '_');
+    const cAtt = outcomeHost.dataset.complAtt === "1";
+    const rAtt = outcomeHost.dataset.respAtt === "1";
+
+    if (outcome && heldOutcomePill) {
+      heldOutcomePill.classList.remove('d-none');
+      if (outcome==='ARBITRATION'|| outcome==='ARBITRATED'){ 
+        heldOutcomePill.innerHTML = `<i class="bi bi-handshake me-1"></i>Arbitration`; 
+        heldOutcomePill.style.background = '#2563eb';
+      }
+      else if (outcome==='SETTLED'){ 
+        heldOutcomePill.innerHTML = `<i class="bi bi-check-circle me-1"></i>Settled`; 
+        heldOutcomePill.style.background = '#16a34a';
+      }
+      else if (outcome==='NOT_SETTLED'){ 
+        heldOutcomePill.innerHTML = `<i class="bi bi-x-circle me-1"></i>Not Settled`; 
+        heldOutcomePill.style.background = '#dc2626';
+      }
+      else { 
+        heldOutcomePill.innerHTML = `<i class="bi bi-info-circle me-1"></i>${outcome.replaceAll('_',' ')}`; 
+        heldOutcomePill.style.background = '#6b7280';
+      }
+    }
+
+    if (outcomeDetailRow){
+      outcomeDetailRow.classList.remove('d-none');
+      const attNote = document.getElementById('attNote');
+      const arbNote = document.getElementById('arbNote');
+      if (attNote){
+        if (cAtt && rAtt) attNote.innerHTML = '<i class="bi bi-people-fill me-1"></i>Both parties attended';
+        else if (cAtt && !rAtt) attNote.innerHTML = '<i class="bi bi-person-fill me-1"></i>Only complainant attended';
+        else if (!cAtt && rAtt) attNote.innerHTML = '<i class="bi bi-person me-1"></i>Only respondent attended';
+        else attNote.innerHTML = '<i class="bi bi-x-circle me-1"></i>No parties attended';
+      }
+      if (arbNote && (outcome==='ARBITRATION'||outcome==='ARBITRATED')){
+        arbNote.style.display = 'none';
+      }
+    }
+  }
+})();
+</script>
+{% endblock %}

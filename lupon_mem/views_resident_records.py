@@ -1,5 +1,5 @@
 # lupon_mem/views_resident_records.py
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpRequest, JsonResponse
 from django.db import connection
 from django.core.paginator import Paginator
@@ -152,6 +152,35 @@ def resident_records_detail(request: HttpRequest, person_id: int):
     """
     Display detailed blotter report and case history for a specific resident.
     """
+    if request.method == 'POST':
+        # Handle update
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        middle_name = request.POST.get('middle_name', '').strip() or None
+        suffix = request.POST.get('suffix', '').strip() or None
+        mobile_num = request.POST.get('mobile_num', '').strip() or None
+        email = request.POST.get('email', '').strip() or None
+        
+        print(f"[UPDATE PERSON] person_id={person_id}")
+        print(f"[UPDATE PERSON] first_name={first_name}, last_name={last_name}, middle_name={middle_name}")
+        print(f"[UPDATE PERSON] suffix={suffix}, mobile_num={mobile_num}, email={email}")
+        
+        try:
+            with connection.cursor() as cur:
+                cur.execute("""
+                    UPDATE person 
+                    SET first_name = %s, last_name = %s, middle_name = %s, 
+                        suffix = %s, mobile_num = %s, email = %s
+                    WHERE person_id = %s
+                """, [first_name, last_name, middle_name, suffix, mobile_num, email, person_id])
+            print(f"[UPDATE PERSON] Successfully updated person_id={person_id}")
+            messages.success(request, "Person details updated successfully.")
+        except Exception as e:
+            print(f"[UPDATE PERSON] Error: {str(e)}")
+            messages.error(request, f"Failed to update: {str(e)}")
+        
+        return redirect('lupon_mem:resident_records_detail', person_id=person_id)
+    
     with connection.cursor() as cur:
         # Get person details
         cur.execute("""

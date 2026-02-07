@@ -435,6 +435,11 @@ CACHES = {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
         "LOCATION": "barug-local",
         "TIMEOUT": 300,  # 5 minutes default
+    },
+    "template_fragments": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "template-cache",
+        "TIMEOUT": 3600,  # 1 hour - cache icons longer
     }
 }
 
@@ -450,7 +455,6 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
     os.path.join(BASE_DIR, "authentication/static/authentication"),
-    # os.path.join(BASE_DIR, "event_logs/static/event_logs"),
     os.path.join(BASE_DIR, "resident/static/resident"),
     os.path.join(BASE_DIR, "bhw/static/bhw"),
     os.path.join(BASE_DIR, "clerk/static/clerk"),
@@ -459,6 +463,7 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "child_health/static/child_health"),
     os.path.join(BASE_DIR, "captain/static/captain"),
     os.path.join(BASE_DIR, "doc_ingest/static/doc_ingest"),
+    os.path.join(BASE_DIR, "lupon_mem/static/lupon_mem"),
 ]
 
 # STATICFILES_DIRS = [

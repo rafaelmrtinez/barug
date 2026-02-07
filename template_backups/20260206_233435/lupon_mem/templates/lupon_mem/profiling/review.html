@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/form.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<link rel="stylesheet" href="{% static 'css/progress_bar.css' %}">
+<style>
+.review-section{background:#f8f9fa;padding:20px;border-radius:8px;margin-bottom:20px}
+.review-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #dee2e6}
+.review-row:last-child{border-bottom:none}
+.review-label{font-weight:600;color:#495057}
+.review-value{color:#212529}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-3" style="margin-top: 40px;">
+    <div class="step-progress mb-2">
+        <div class="step completed"><div class="circle">1</div><div class="label">Personal Info</div></div>
+        <div class="step active"><div class="circle">2</div><div class="label">Review</div></div>
+    </div>
+
+    {% if messages %}
+    <div class="alert-container mb-3">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    <h5>Review Details</h5>
+
+    <div class="review-section">
+        <h6>Personal Information</h6>
+        <div class="review-row"><span class="review-label">Residency Status:</span><span class="review-value">{% if data.is_resident %}Resident{% else %}Non-Resident{% endif %}</span></div>
+        <div class="review-row"><span class="review-label">Name:</span><span class="review-value">{{ data.first_name }} {{ data.middle_name }} {{ data.last_name }} {{ data.suffix }}</span></div>
+        <div class="review-row"><span class="review-label">Sex:</span><span class="review-value">{{ data.sex_display }}</span></div>
+        <div class="review-row"><span class="review-label">Date of Birth:</span><span class="review-value">{{ data.dob }}</span></div>
+        <div class="review-row"><span class="review-label">Civil Status:</span><span class="review-value">{{ data.civil_status_display }}</span></div>
+        <div class="review-row"><span class="review-label">Nationality:</span><span class="review-value">{{ data.nationality_display }}</span></div>
+        <div class="review-row"><span class="review-label">Religion:</span><span class="review-value">{{ data.religion_display }}</span></div>
+        <div class="review-row"><span class="review-label">Mobile:</span><span class="review-value">{{ data.mobile_num|default:"—" }}</span></div>
+        <div class="review-row"><span class="review-label">Email:</span><span class="review-value">{{ data.email|default:"—" }}</span></div>
+    </div>
+
+    <form method="post" id="profileForm">
+        {% csrf_token %}
+        <div class="button-container">
+            <a href="{% url 'lupon_mem:profile_personal_info' %}" class="btn btn-reset">Back</a>
+            <button type="button" class="btn btn-submit" data-bs-toggle="modal" data-bs-target="#confirmModal">Submit Profile</button>
+        </div>
+    </form>
+</div>
+
+<div class="modal fade" id="confirmModal" tabindex="-1" style="margin-top:150px;">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Submission</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to submit this person's profile?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="document.getElementById('profileForm').submit()">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="successModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" style="margin-top:150px;">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Success</h5>
+            </div>
+            <div class="modal-body">
+                Person successfully added!
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="window.location.href='{% url 'lupon_mem:dashboard' %}'">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+{% if success %}
+window.addEventListener('DOMContentLoaded', function() {
+    const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+    successModal.show();
+});
+{% endif %}
+</script>
+{% endblock %}

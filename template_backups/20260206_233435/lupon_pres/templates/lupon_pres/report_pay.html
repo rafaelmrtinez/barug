@@ -1,0 +1,508 @@
+{# templates/lupon/confirm_payment_open_case.html #}
+{% extends 'base.html' %}
+{% load static %}
+{% load bootstrap_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<style>
+  :root{
+    --brand-950:#2b0d11; --brand-900:#3a1217; --brand-800:#561c24; --brand-700:#6d2932;
+    --brand-100:#f3eaeb; --brand-050:#fbf6f6; --ring: rgba(109,41,50,.18);
+    --accent:#D4AF37; --ink:#1f2937; --muted:#6b7280; --card:#ffffff; --line:#e5e7eb;
+  }
+  body{ background:
+    radial-gradient(1800px 900px at -10% -10%, var(--brand-050), #fff 40%),
+    radial-gradient(1200px 600px at 110% -20%, #fff, var(--brand-050) 70%)
+  }
+  .title{ color:var(--brand-800); font-weight:800; letter-spacing:.2px }
+  .subtle{ color:var(--muted); }
+  .cardx{
+    background:var(--card);
+    border:1px solid rgba(109,41,50,.12);
+    border-radius:16px;
+    box-shadow:0 12px 28px rgba(2,6,23,.06);
+  }
+  .header-card{ border-left:4px solid var(--accent); }
+  .label{ font-weight:700; color:#222; font-size:.92rem; margin-bottom:.35rem; letter-spacing:.2px; }
+  .readonly{
+    width:100%; padding:.65rem .85rem; border-radius:12px;
+    background:#f9fafb; border:1px dashed rgba(109,41,50,.25);
+    color:#111827; font-weight:600;
+  }
+  .pill{
+    display:inline-flex; align-items:center; gap:.5rem; padding:.35rem .7rem; border-radius:999px;
+    background:var(--brand-100); border:1px solid rgba(109,41,50,.18); color:var(--brand-800); font-weight:700; font-size:.88rem;
+  }
+  .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+  .kbd{ display:inline-flex; align-items:center; justify-content:center; padding:.1rem .4rem; border:1px solid #d0d5dd; border-bottom-width:2px; border-radius:6px; font-size:.75rem; background:#fff; color:#444 }
+  .divider{ height:1px; background:var(--line); margin:1rem 0 }
+  .grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:14px }
+  @media (max-width: 991px){ .grid-2{ grid-template-columns:1fr } }
+
+  /* Typeahead */
+  .results-viewport{ max-height:280px; overflow:auto; border:1px solid rgba(0,0,0,.08); border-radius:10px; background:#fff; }
+  .result-item{ cursor:pointer; }
+  .result-item:hover{ background:#f3efe9; }
+  .chip{ display:inline-flex; align-items:center; gap:.35rem; padding:.25rem .5rem; border-radius:999px;
+         border:1px solid var(--bs-border-color); background:#fff; margin:.15rem .25rem 0 0; font-size:.875rem; }
+  .chip .rm{ border:none; background:transparent; padding:0; line-height:1; cursor:pointer; }
+  .form-control{
+    border:1px solid rgba(109,41,50,.18)!important; border-radius:12px!important; padding:.6rem .75rem!important;
+  }
+  .form-control:focus{ box-shadow:0 0 0 .2rem var(--ring)!important; border-color:var(--brand-700)!important; }
+  .btn-brand{ color:#fff; background:var(--brand-700); border-color:var(--brand-700); border-radius:12px; font-weight:700; }
+  .btn-brand:hover{ background:var(--brand-800); border-color:var(--brand-800); }
+  .btn-soft{ background:var(--brand-100); color:var(--brand-800); border:1px solid rgba(109,41,50,.2); border-radius:12px; font-weight:700; }
+  .ghost{ opacity:.6 }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <div>
+      <h2 class="title m-0">Confirm Payment & Open Case</h2>
+      <div class="subtle">Everything is locked for review—only <b>Paid by</b> can be changed.</div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <span class="pill"><i class="bi bi-shield-check"></i> Read-only Review</span>
+      <span class="pill"><i class="bi bi-receipt-cutoff"></i> Treasurer Flow</span>
+    </div>
+  </div>
+
+  <!-- Report Header -->
+  <div class="cardx header-card p-3 mb-3">
+    <div class="d-flex align-items-start justify-content-between gap-3">
+      <div>
+        <div class="label">Report</div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="fw-bold" style="font-size:1.05rem">
+            #{{ report.0|default:"—" }} • {{ report.1|default:"(no subject)" }}
+          </div>
+          {% if report.2 %}
+          <div class="text-muted">
+            <i class="bi bi-calendar-event"></i> {{ report.2 }}
+          </div>
+          {% endif %}
+        </div>
+        {% if report.3 %}<div class="text-muted mt-1">{{ report.3 }}</div>{% endif %}
+      </div>
+      <div class="text-end">
+        <div class="text-muted small">Keyboard: <span class="kbd">Tab</span> move • <span class="kbd">Enter</span> submit</div>
+      </div>
+    </div>
+  </div>
+
+  <form method="post" class="mb-5" id="payForm" novalidate
+        data-report-id="{{ report.0|default:'0' }}">
+    {% csrf_token %}
+
+    <div class="row g-3">
+      <!-- Left: Case summary (read-only) -->
+      <div class="col-lg-7">
+        <div class="cardx p-3">
+          {# CASE NAME (read-only input so it still submits) #}
+          <div class="mb-3">
+            <div class="label">Case Name</div>
+            <input type="text" class="readonly" name="case_name" id="case_name"
+                   value="{{ initial_case_name|default:case_name|default:'' }}" readonly>
+          </div>
+
+          <div class="grid-2">
+            <div>
+              <div class="label">Complaint Title</div>
+              <div class="readonly">
+                {% with sel=complaint_title_id %}
+                  {% for id,name in complaint_titles %}
+                    {% if id == sel %}{{ name }}{% endif %}
+                  {% endfor %}
+                {% endwith %}
+              </div>
+              <input type="hidden" name="complaint_title_id" id="complaint_title_id" value="{{ complaint_title_id }}">
+            </div>
+
+            <div>
+              <div class="label">Case Nature</div>
+              <div class="readonly">
+                {% with sel=case_nature_id %}
+                  {% for id,name in case_natures %}
+                    {% if id == sel %}{{ name }}{% endif %}
+                  {% endfor %}
+                {% endwith %}
+              </div>
+              <input type="hidden" name="case_nature_id" id="case_nature_id" value="{{ case_nature_id }}">
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <div class="label">Initial Settlement Status</div>
+            <div class="readonly">
+              {% with sel=settlement_status_id %}
+                {% for id,name in settlement_statuses %}
+                  {% if id == sel %}{{ name }}{% endif %}
+                {% endfor %}
+              {% endwith %}
+            </div>
+            <input type="hidden" name="settlement_status_id" id="settlement_status_id" value="{{ settlement_status_id }}">
+          </div>
+
+          {% if parties %}
+          <div class="divider"></div>
+          <div>
+            <div class="label mb-1">Parties</div>
+            <div class="small text-muted">
+              {% for p in parties %}
+                <div><span class="badge bg-light text-dark border me-2">{{ p.2 }}</span><span>{{ p.1 }}</span></div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Right: Payment -->
+      <div class="col-lg-5">
+        <div class="cardx p-3">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="label m-0">Payment <span class="text-danger">*</span></div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="with_payment" name="with_payment" checked>
+              <label class="form-check-label" for="with_payment">Record payment</label>
+            </div>
+          </div>
+
+          <div id="payFields" class="mt-3" aria-disabled="false">
+            <div class="mb-2" hidden>
+              <div class="label">Official Receipt No.</div>
+              <input type="text" class="readonly mono" id="payment_receipt_display" value="" readonly>
+              <input type="hidden" name="payment_receipt" id="payment_receipt" value="">
+            </div>
+
+            <div class="grid-4">
+              <div>
+                <div class="label">Amount</div>
+                <input type="text" class="readonly mono" id="payment_amount_display"
+                       value="{{ default_amount|default:'0.00' }}" readonly>
+                <input type="hidden" name="payment_amount" id="payment_amount" value="{{ default_amount|default:'0.00' }}">
+              </div>
+              <!-- <div>
+                <div class="label">Status</div>
+                <div class="readonly"><span class="pill"><i class="bi bi-cash-coin"></i> {% firstof payment_status 'PAID' %}</span></div>
+                <input type="hidden" name="payment_status" id="payment_status" value="{% firstof payment_status 'PAID' %}">
+              </div> -->
+            </div>
+
+            <!-- PAID BY — ONLY EDITABLE PART -->
+            <div class="mt-2">
+              <div class="label">Paid by <span class="text-danger">*</span></div>
+              <input type="text" class="form-control" id="paid_by_search" placeholder="Start typing name…" disabled>
+              <input type="hidden" name="paid_by_person_id" id="paid_by_person_id" value="">
+              <div id="payerDropdown" class="results-viewport mt-2" style="display:none;"></div>
+              <div id="payerDisplay" class="form-control bg-body-tertiary mt-2" style="min-height:38px; display:flex; align-items:center;">
+                <span class="text-muted">No payer selected</span>
+              </div>
+              <div id="payerHelp" class="small subtle mt-1">Type at least 2 letters to search residents.</div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="d-grid gap-2">
+            <button type="button" class="btn btn-brand btn-lg" id="createCaseBtn" disabled>
+              <i class="bi bi-check2-circle"></i> Create Case
+            </button>
+            <a href="{% url 'lupon_mem:report_list' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-left"></i> Back to Reports
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Confirm Case Creation</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>This will officially open the case and cannot be undone. The case will be created with the following details:</p>
+        <ul>
+          <li><strong>Case Name:</strong> <span id="modalCaseName"></span></li>
+          <li><strong>Payment Status:</strong> <span id="modalPaymentStatus"></span></li>
+          <li><strong>Paid By:</strong> <span id="modalPaidBy"></span></li>
+        </ul>
+        <p class="text-muted">Are you sure you want to proceed?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-brand" id="confirmCreateBtn">
+          <i class="bi bi-check2-circle"></i> Yes, Create Case
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+(function(){
+  const $ = (sel, root=document)=> root.querySelector(sel);
+
+  const form = $('#payForm');
+  const withPay = $('#with_payment');
+  const payFields = $('#payFields');
+  const createBtn = $('#createCaseBtn');
+  const confirmModal = new bootstrap.Modal($('#confirmModal'));
+
+  // Display + hidden mirrors for OR/Amount (read-only to user)
+  const orDisp   = $('#payment_receipt_display');
+  const orHidden = $('#payment_receipt');
+  const amtDisp  = $('#payment_amount_display');
+  const amtHidden= $('#payment_amount');
+
+  // Status is fixed (hidden)
+  const statusHidden = $('#payment_status');
+
+  // Typeahead elems (only editable area)
+  const paidById   = $('#paid_by_person_id');
+  const payerInput = $('#paid_by_search');
+  const payerDrop  = $('#payerDropdown');
+  const payerDisp  = $('#payerDisplay');
+  const payerHelp  = $('#payerHelp');
+
+  // Read-only case fields (still submitted via hidden/readonly)
+  const caseName = $('#case_name');
+  const ctId     = $('#complaint_title_id');
+  const cnId     = $('#case_nature_id');
+  const ssId     = $('#settlement_status_id');
+
+  const rptId = Number(form?.dataset?.reportId || '0');
+
+  function setPaymentEnabled(enabled){
+    payFields.setAttribute('aria-disabled', String(!enabled));
+    payFields.classList.toggle('ghost', !enabled);
+    payerInput.disabled = !enabled;
+    if (!enabled){
+      hideDrop();
+      paidById.value=''; 
+      payerInput.value=''; 
+      resetDisplay();
+    }
+  }
+
+  withPay.addEventListener('change', ()=>{
+    setPaymentEnabled(withPay.checked);
+    if(withPay.checked){
+      // Auto-generate OR if blank, normalize amount to 2dp
+      if(!orHidden.value.trim()){ const v=genOR(); orHidden.value=v; orDisp.value=v; }
+      amtHidden.value = normalizeAmount(amtHidden.value || amtDisp.value || '0.00');
+      amtDisp.value   = amtHidden.value;
+      if(!statusHidden.value){ statusHidden.value='PAID'; }
+    }
+    updateCreateButton();
+  });
+
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function genOR(){
+    const d = new Date();
+    return `OR-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}-${String(rptId||0).padStart(5,'0')}`;
+  }
+  function normalizeAmount(v){
+    const num = Number(String(v).replace(/[^0-9.]/g,'') || '0');
+    return isNaN(num) ? '0.00' : num.toFixed(2);
+  }
+
+  // ==== Typeahead logic ====
+  let debounceTimer=null;
+  let pendingController=null;
+
+  function cancelPending(){ if (pendingController){ try{ pendingController.abort(); }catch(e){} } pendingController=null; }
+  function showDrop(){ payerDrop.style.display = 'block'; }
+  function hideDrop(){ payerDrop.style.display = 'none'; payerDrop.innerHTML = ''; }
+  function setDropMsg(msg, muted){
+    payerDrop.innerHTML = `<div class="list-group-item ${muted?'text-muted':''}">${escapeHtml(msg)}</div>`;
+    showDrop();
+  }
+
+  payerInput.addEventListener('input', function(){
+    const q = this.value.trim();
+    if (q.length === 0){ hideDrop(); paidById.value=''; resetDisplay(); return; }
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(()=> doSearch(q), 220);
+  });
+  payerInput.addEventListener('focus', ()=>{ if (payerDrop.innerHTML) showDrop(); });
+  document.addEventListener('click', (e)=>{ if (!payerDrop.contains(e.target) && e.target !== payerInput) hideDrop(); });
+
+  async function doSearch(q){
+    if (q.length < 2){ setDropMsg('Type at least 2 letters…', true); return; }
+    setDropMsg('Searching…', true);
+    cancelPending(); pendingController = new AbortController();
+
+    try{
+      const url = `{% url 'lupon_mem:person_suggest' %}?q=` + encodeURIComponent(q);
+      const res = await fetch(url, {
+        headers:{ 'Accept':'application/json', 'X-Requested-With':'XMLHttpRequest' },
+        credentials:'same-origin',
+        signal: pendingController.signal
+      });
+
+      if (!res.ok){
+        const txt = await res.text();
+        console.error('person_suggest failed:', res.status, txt);
+        setDropMsg(`Search failed (${res.status}).`, false);
+        return;
+      }
+
+      const data = await res.json().catch(e=>{ console.error('JSON parse error', e); setDropMsg('Invalid response.', false); return null; });
+      if (!data) return;
+
+      const arr = Array.isArray(data.results) ? data.results : [];
+      if (!arr.length){ setDropMsg('No matches', true); return; }
+
+      payerDrop.innerHTML = '';
+      const frag = document.createDocumentFragment();
+      arr.forEach(item=>{
+        const btn = document.createElement('button');
+        btn.type='button';
+        btn.className='list-group-item list-group-item-action d-flex justify-content-between align-items-center result-item';
+        btn.innerHTML = `<span>${escapeHtml(item.name || '(no name)')}</span><span class="badge text-bg-light border">ID ${item.id}</span>`;
+        btn.addEventListener('click', ()=> choosePayer(item.id, item.name));
+        frag.appendChild(btn);
+      });
+      payerDrop.appendChild(frag);
+      showDrop();
+
+    }catch(e){
+      if (e.name === 'AbortError') return;
+      console.error(e);
+      setDropMsg('Search error — see console.', false);
+    }
+  }
+
+  function choosePayer(id, name){
+    paidById.value = id;
+    payerInput.value = name;
+    hideDrop();
+    payerDisp.innerHTML =
+      `<span class="chip">
+         ${escapeHtml(name)} <small class="text-muted">(#${id})</small>
+         <button type="button" class="rm" title="Remove payer" aria-label="Remove payer">
+           <i class="bi bi-x-lg"></i>
+         </button>
+       </span>`;
+    payerDisp.querySelector('.rm').addEventListener('click', ()=>{
+      paidById.value = '';
+      payerInput.value = '';
+      resetDisplay();
+      payerInput.focus();
+      updateCreateButton();
+    });
+    payerHelp.textContent = 'Payer selected from registry.';
+    updateCreateButton();
+  }
+
+  function resetDisplay(){
+    payerDisp.innerHTML = `<span class="text-muted">No payer selected</span>`;
+    payerHelp.textContent = 'Type at least 2 letters to search residents.';
+    updateCreateButton();
+  }
+
+  function escapeHtml(s){
+    return String(s ?? '')
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;')
+      .replaceAll("'","&#39;");
+  }
+  // ==========================
+
+  function updateCreateButton(){
+    // Payment is now required, so both payment checkbox and payer must be filled
+    const isValid = withPay.checked && paidById.value.trim() !== '';
+    createBtn.disabled = !isValid;
+  }
+
+  createBtn.addEventListener('click', ()=>{
+    if(!String(caseName.value||'').trim() || !ctId.value || !cnId.value || !ssId.value){
+      flash('Required case fields are missing.');
+      return;
+    }
+    if(!withPay.checked){
+      flash('Payment is required. Please enable payment recording.');
+      return;
+    }
+    if(!paidById.value.trim()){
+      flash('Please select who paid from the registry.');
+      return;
+    }
+    
+    // Update modal content
+    $('#modalCaseName').textContent = caseName.value || '(no name)';
+    $('#modalPaymentStatus').textContent = 'With Payment';
+    $('#modalPaidBy').textContent = payerInput.value || 'Not selected';
+    
+    confirmModal.show();
+  });
+
+  $('#confirmCreateBtn').addEventListener('click', async ()=>{
+    if(withPay.checked){
+      if(!orHidden.value.trim()){ const v=genOR(); orHidden.value=v; orDisp.value=v; }
+      amtHidden.value = normalizeAmount(amtHidden.value || amtDisp.value || '0.00');
+    }
+    
+    const formData = new FormData(form);
+    try{
+      const response = await fetch(form.action || window.location.href, {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      
+      if(response.ok){
+        confirmModal.hide();
+        flash('Case created successfully!');
+        setTimeout(() => window.location.href = '{% url "lupon_mem:report_list" %}', 1500);
+      } else {
+        throw new Error('Server error');
+      }
+    } catch(e){
+      flash('Error creating case. Please try again.');
+    }
+  });
+
+  function flash(text){
+    const el = document.createElement('div');
+    el.textContent = text;
+    el.style.position = 'fixed';
+    el.style.bottom = '16px';
+    el.style.right = '16px';
+    el.style.background = '#111';
+    el.style.color = '#fff';
+    el.style.padding = '.6rem .85rem';
+    el.style.borderRadius = '10px';
+    el.style.opacity = '0';
+    el.style.transition = 'opacity .2s, transform .2s';
+    el.style.transform = 'translateY(6px)';
+    el.style.zIndex = '9999';
+    document.body.appendChild(el);
+    requestAnimationFrame(()=>{
+      el.style.opacity = '1'; el.style.transform = 'translateY(0)';
+      setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateY(6px)'; setTimeout(()=>el.remove(),200)}, 1100);
+    });
+  }
+
+  // init
+  setPaymentEnabled(true); // Start with payment enabled since it's required
+  updateCreateButton();
+})();
+</script>
+{% endblock %}

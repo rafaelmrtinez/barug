@@ -1,0 +1,17 @@
+{% load choiceextras %}
+{% for r in rows %}
+<tr>
+  <td>
+    <span class="id-pill">{{ r.or_number|default_if_none:"" }}</span>
+  </td>
+  <td>{{ r.payment_method|default_if_none:"" }}</td>
+  <td>{{ r.amount_paid|default_if_none:"" }}</td>
+  <td>{{ r.purpose|format_mobile|default_if_none:"" }}</td>
+  <td>{{ r.issued_by|default_if_none:"" }}</td>
+  <td>{{ r.issued_at|default_if_none:"" }}</td>
+</tr>
+{% empty %}
+<tr>
+  <td colspan="6" class="text-center py-3 text-muted">No official receipts found.</td>
+</tr>
+{% endfor %}
