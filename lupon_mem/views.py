@@ -1757,6 +1757,8 @@ def add_form_choose_static(request, case_id: int):
         ('KP-10', 'NOTICE FOR CONSTITUTION OF PANGKAT'),
         ('KP-11', 'NOTICE TO CHOSEN PANGKAT MEMBER'),
         ('KP-13', 'SUBPOENA LETTER'),
+        ('KP-18', 'NOTICE OF HEARING FOR COMPLAINANT'),
+        ('KP-19', 'NOTICE OF HEARING FOR RESPONDENT'),
         ('MINUTES', 'MINUTES OF HEARING'),
         ('MON-COMPL', 'MONITORING (COMPLAINANT)'),
         ('MON-RESP', 'MONITORING (RESPONDENT)'),
@@ -1842,7 +1844,7 @@ def case_detail(request: HttpRequest, case_id: int):
             WHERE s.blotter_case_id = %s
             ORDER BY s.submitted_at DESC NULLS LAST, s.submission_id DESC
         """, [case_id])
-        forms = cur.fetchall()
+        all_forms = cur.fetchall()
         
         # Get settlement statuses for modal
         cur.execute("SELECT settlement_status_id, settlement_status_name FROM settlement_status ORDER BY settlement_status_name")
@@ -1852,11 +1854,18 @@ def case_detail(request: HttpRequest, case_id: int):
         cur.execute("SELECT case_state_id, case_state_name FROM case_state ORDER BY case_state_name")
         case_states = cur.fetchall()
     
+    # Pagination
+    from django.core.paginator import Paginator
+    paginator = Paginator(all_forms, 30)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+    
     user_role = _auth_role_name(request)
     return render(request, "lupon_mem/case_detail.html", {
         "case_id": case_id,
         "case": case,
-        "forms": forms,
+        "forms": page_obj.object_list,
+        "page_obj": page_obj,
         "settlement_statuses": settlement_statuses,
         "case_states": case_states,
         "case_state_name": case[8] if len(case) > 8 else "OPEN",
