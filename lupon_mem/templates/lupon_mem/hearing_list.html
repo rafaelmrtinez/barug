@@ -199,7 +199,7 @@
   <div class="table-responsive d-none d-lg-block">
     <table class="table table-eq align-middle">
       <colgroup>
-        <col style="width:12%"><col style="width:36%"><col style="width:18%"><col style="width:10%"><col style="width:18%"><col style="width:6%">
+        <col style="width:12%"><col style="width:40%"><col style="width:20%"><col style="width:18%"><col style="width:10%">
       </colgroup>
       <thead class="table-light">
         <tr>
@@ -207,7 +207,7 @@
           <th>Case</th>
           <th>Schedule</th>
           <th>Status</th>
-          <th>Held On</th>
+          <th style="display:none;">Held On</th>
           <th class="text-end">Action</th>
         </tr>
       </thead>
@@ -232,7 +232,7 @@
               <span class="status-pill status-upcoming js-status-pill">{% bs_icon_cached 'hourglass-split' extra_classes='me-1' %} To be held</span>
             {% endif %}
           </td>
-          <td class="text-nowrap">
+          <td class="text-nowrap" style="display:none;">
             {% if it.hearing_held %}
               <div class="date-brand js-held-date" data-dt="{{ it.held_at_fmt|default:it.held_at|default:'' }}"></div>
               <div class="time-muted js-held-time" data-dt="{{ it.held_at_fmt|default:it.held_at|default:'' }}"></div>
@@ -247,7 +247,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="6" class="text-center py-5 text-muted">No hearings found.</td></tr>
+        <tr><td colspan="5" class="text-center py-5 text-muted">No hearings found.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -283,7 +283,7 @@
           <div class="date-brand js-date" data-date="{{ it.hearing_date|default:'' }}">{{ it.hearing_date|default:"—" }}</div>
           <div class="time-muted js-time" data-time="{{ it.hearing_time|default:'' }}">{{ it.hearing_time|default:"—" }}</div>
         </div>
-        <div class="col-12">
+        <div class="col-12" style="display:none;">
           <div class="hc-meta">Held On</div>
           {% if it.hearing_held %}
             <div class="date-brand js-held-date" data-dt="{{ it.held_at_fmt|default:it.held_at|default:'' }}"></div>

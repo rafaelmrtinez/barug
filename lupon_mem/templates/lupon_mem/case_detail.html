@@ -256,42 +256,6 @@
     </div>
   </div>
 
-  {% if total_pages > 1 %}
-  <nav aria-label="KP forms pagination" class="mt-3">
-    <ul class="pagination justify-content-center mb-0" style="gap:0.35rem;">
-      <li class="page-item{% if not has_prev %} disabled{% endif %}">
-        {% if has_prev %}
-          <a class="page-link" href="?page={{ prev_page }}" style="border-radius:8px;border:1px solid var(--brand-700);color:var(--brand-700);padding:0.5rem 0.85rem;font-weight:600;" aria-label="Previous">
-            <i class="bi bi-chevron-left"></i> Previous
-          </a>
-        {% else %}
-          <span class="page-link" style="border-radius:8px;border:1px solid #e5e7eb;color:#9ca3af;padding:0.5rem 0.85rem;font-weight:600;background:#f9fafb;" aria-disabled="true">
-            <i class="bi bi-chevron-left"></i> Previous
-          </span>
-        {% endif %}
-      </li>
-      {% for num in page_numbers %}
-        <li class="page-item{% if num == page %} active{% endif %}">
-          <a class="page-link" href="?page={{ num }}" style="border-radius:8px;{% if num == page %}background:var(--brand-700);border-color:var(--brand-700);color:#fff;{% else %}border:1px solid var(--brand-700);color:var(--brand-700);{% endif %}padding:0.5rem 0.75rem;font-weight:600;min-width:42px;text-align:center;">
-            {{ num }}
-          </a>
-        </li>
-      {% endfor %}
-      <li class="page-item{% if not has_next %} disabled{% endif %}">
-        {% if has_next %}
-          <a class="page-link" href="?page={{ next_page }}" style="border-radius:8px;border:1px solid var(--brand-700);color:var(--brand-700);padding:0.5rem 0.85rem;font-weight:600;" aria-label="Next">
-            Next <i class="bi bi-chevron-right"></i>
-          </a>
-        {% else %}
-          <span class="page-link" style="border-radius:8px;border:1px solid #e5e7eb;color:#9ca3af;padding:0.5rem 0.85rem;font-weight:600;background:#f9fafb;" aria-disabled="true">
-            Next <i class="bi bi-chevron-right"></i>
-          </span>
-        {% endif %}
-      </li>
-    </ul>
-  </nav>
-  {% endif %}
-
   <!-- ======= CASE PDF REPORTS =======
   <div class="card-lite mt-4">
     <div class="card-head">

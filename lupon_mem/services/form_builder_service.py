@@ -406,10 +406,18 @@ def apply_answers_and_prefills(
         
         # PRIORITY 1: UI/Frontend data (saved answers) - NEVER override user input
         # If there's a saved answer from the UI, ALWAYS use it - this is the most important data
-        if v not in (None, "", "null"):
+        # Check for ANY value including empty strings that were explicitly saved
+        if v is not None:
+            # User has interacted with this field, return whatever they entered (even if empty)
             return v
         
-        # Check handler values first for KP-24
+        # PRIORITY 2: Only apply prefills if this is a NEW form (no submission_id)
+        # If editing an existing submission, don't apply any prefills
+        if submission_id:
+            # This is an edit - don't prefill anything
+            return None
+        
+        # PRIORITY 3: For NEW forms only, check handler values first for KP-24
         if handler_values:
             code_lower = (code or "").strip().lower()
             label_lower = (label or "").strip().lower()
@@ -423,21 +431,24 @@ def apply_answers_and_prefills(
             elif code_lower == "purpose":
                 return handler_values.get("purpose", "")
         
-        # Don't prefill date fields for KP-9 to avoid confusion
-        if submission_id:
-            code_lower = (code or "").strip().lower()
-            label_lower = (label or "").strip().lower()
-            # For KP-9, don't prefill curr_date, curr_month, curr_year, date_created, etc.
-            if form_code and form_code.upper() == "KP-9":
-                if code_lower in ("curr_date", "curr_month", "curr_year", "current_date", "current_month", "current_year", "date_created", "processed_on_date", "date_entered", "month_entered", "year_entered", "date_signed", "time_signed", "when"):
-                    return None
-            # For other forms, don't prefill date_entered, month_entered, year_entered, date_signed, time_signed, when
-            # BUT for MED1-SETTLED, don't block any fields
-            if form_code and form_code.upper() == "MED1-SETTLED":
-                return None  # Don't prefill for MED1-SETTLED
-            if code_lower in ("date_created", "processed_on_date", "date_entered", "month_entered", "year_entered", "date_signed", "time_signed", "when") or label_lower in ("date created", "processed on (date)", "date signed", "time signed", "when"):
+        # PRIORITY 4: For NEW forms only, apply prefills based on form type
+        code_lower = (code or "").strip().lower()
+        label_lower = (label or "").strip().lower()
+        
+        # For KP-9, don't prefill date fields
+        if form_code and form_code.upper() == "KP-9":
+            if code_lower in ("curr_date", "curr_month", "curr_year", "current_date", "current_month", "current_year", "date_created", "processed_on_date", "date_entered", "month_entered", "year_entered", "date_signed", "time_signed", "when"):
                 return None
         
+        # For MED1-SETTLED, don't prefill
+        if form_code and form_code.upper() == "MED1-SETTLED":
+            return None
+        
+        # Don't prefill certain date fields for any form
+        if code_lower in ("date_created", "processed_on_date", "date_entered", "month_entered", "year_entered", "date_signed", "time_signed", "when") or label_lower in ("date created", "processed on (date)", "date signed", "time signed", "when"):
+            return None
+        
+        # Apply standard prefills for NEW forms only
         key = (label or "").strip().lower()
         if key in prefill_by_label:
             return prefill_by_label[key]
@@ -484,8 +495,8 @@ def compute_ui_flags(form_code: str) -> Dict[str,bool]:
         "kp15_ui_minimal": False,
         "kp16_ui_minimal": (u == "KP-16"),
         "kp17_ui_minimal": False,
-        "kp18_ui_minimal": False,
-        "kp19_ui_minimal": False,
+        "kp18_ui_minimal": (u == "KP-18"),
+        "kp19_ui_minimal": (u == "KP-19"),
         "kp20_ui_minimal": False,
         "kp20a_ui_minimal": False,
         "kp20b_ui_minimal": False,

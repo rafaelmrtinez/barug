@@ -354,9 +354,6 @@ from datetime import datetime, timedelta
 @role_required(*LUPON_ROLES, "barangay treasurer", "barangay secretary")
 def case_detail(request: HttpRequest, case_id: int):
     """OPTIMIZED: Minimal queries, no JSON aggregation"""
-    page = max(int(request.GET.get("page", "1") or "1"), 1)
-    per_page, offset = 10, (page - 1) * 10
-
     with connection.cursor() as cur:
         cur.execute("""
             SELECT bc.blotter_case_id, bc.blotter_case_num, bc.blotter_case_name,
@@ -378,25 +375,19 @@ def case_detail(request: HttpRequest, case_id: int):
         """, [case_id, case_id, case_id, case_id])
         case_row = cur.fetchone()
         if not case_row: return HttpResponseNotFound("Case not found")
-        total_forms = case_row[11]
 
         cur.execute("""
-            WITH forms AS (
-                SELECT s.submission_id, s.form_id, s.status, UPPER(kf.form_code) AS code, kf.form_name,
-                    ROW_NUMBER() OVER (ORDER BY s.submission_id DESC) as rn
-                FROM blotter_kp_submission s JOIN kp_form kf ON kf.form_id = s.form_id
-                WHERE s.blotter_case_id = %s
-            )
-            SELECT f.submission_id, f.code, f.form_name, f.status,
+            SELECT s.submission_id, UPPER(kf.form_code) AS code, kf.form_name, s.status,
                 MAX(CASE WHEN a.field_id = 1120 THEN a.value_json #>> '{}' END),
                 MAX(CASE WHEN a.field_id = 1121 THEN a.value_json #>> '{}' END),
                 MAX(CASE WHEN a.field_id = 1122 THEN a.value_json #>> '{}' END)
-            FROM forms f
-            LEFT JOIN blotter_kp_answer a ON a.submission_id = f.submission_id AND a.field_id IN (1120,1121,1122)
-            WHERE f.rn > %s AND f.rn <= %s
-            GROUP BY f.submission_id, f.code, f.form_name, f.status, f.rn
-            ORDER BY f.rn
-        """, [case_id, offset, offset + per_page])
+            FROM blotter_kp_submission s 
+            JOIN kp_form kf ON kf.form_id = s.form_id
+            LEFT JOIN blotter_kp_answer a ON a.submission_id = s.submission_id AND a.field_id IN (1120,1121,1122)
+            WHERE s.blotter_case_id = %s
+            GROUP BY s.submission_id, kf.form_code, kf.form_name, s.status
+            ORDER BY s.submission_id DESC
+        """, [case_id])
         forms = [(r[0], r[1], r[2], r[3], r[4], r[5], r[6]) for r in cur.fetchall()]
 
         cur.execute("""
@@ -416,8 +407,6 @@ def case_detail(request: HttpRequest, case_id: int):
 
     flow_steps = ['KP-7', 'KP-8', 'KP-9', 'KP-10', 'KP-11', 'KP-12', 'KP-16']
     progress_percentage = int((sum(1 for s in flow_steps if s in submitted_form_codes) / len(flow_steps)) * 100)
-    total_pages = max((total_forms + per_page - 1) // per_page, 1)
-    page_numbers = list(range(max(1, page - 2), min(total_pages, page + 2) + 1))
     auth = request.session.get("auth") or {}
     user_role = (auth.get("role_name") or auth.get("role") or "").strip().title()
     
@@ -433,9 +422,6 @@ def case_detail(request: HttpRequest, case_id: int):
         "submitted_form_codes": list(submitted_form_codes),
         "progress_percentage": progress_percentage,
         'page_path': f'{user_role} / Case Detail', 'page_title': f'Case #{case_row[1]}',
-        "page": page, "per_page": per_page, "total_forms": total_forms,
-        "total_pages": total_pages, "has_prev": page > 1, "has_next": page < total_pages,
-        "prev_page": page - 1, "next_page": page + 1, "page_numbers": page_numbers,
         "all_form_codes": all_form_codes, "repudiation_window": None,
         "pangkat_members": [], "kp7_details": {}, "upcoming_hearings_count": 0,
     })

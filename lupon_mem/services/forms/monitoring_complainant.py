@@ -1,6 +1,6 @@
 # lupon_mem/services/forms/monitoring_complainant.py
 from __future__ import annotations
-from typing import Dict, Set
+from typing import Dict
 import json, logging
 from django.db import connection
 from .. import form_shared as FS
@@ -12,10 +12,23 @@ _FIELDS = [
  "respondent_name","respondent_addr","respondent_contact",
  "remarks","complainant_printed_name","lupon_tagapamayap","brgy_capt","brgy_sec"
 ]
-_SOURCES: Dict[str, Set[str]] = {k:{k} for k in _FIELDS}
-_SOURCES.update({
- "lupon_tagapamayap":{"lupon_tagapamayap","lupon_tagapamayapa"},
-})
+
+# Map PDF field names to database field IDs
+_FIELD_ID_MAP = {
+    "brgy_case_num": 23,
+    "date_time_monitoring": 190,
+    "complainant_name": 1,
+    "complainant_addr": 139,
+    "complainant_contact": 35,
+    "respondent_name": 2,
+    "respondent_addr": 85,
+    "respondent_contact": 178,
+    "remarks": 110,
+    "complainant_printed_name": 10,
+    "lupon_tagapamayap": 177,
+    "brgy_capt": 104,
+    "brgy_sec": 208,
+}
 
 class MonitoringComplainantHandler:
     def _log(self,out:Dict[str,str]):
@@ -24,27 +37,24 @@ class MonitoringComplainantHandler:
 
     def build_name_value_map(self, form_id:int, submission_id:int)->dict:
         answers=FS.load_answers(submission_id)
-        with connection.cursor() as cur:
-            cur.execute("""
-              SELECT f.field_id, LOWER(COALESCE(kff.label_override,f.base_label)), LOWER(f.field_code)
-              FROM kp_form_field kff JOIN kp_field f ON f.field_id=kff.field_id
-              WHERE kff.form_id=%s
-            """,[form_id]); rows=cur.fetchall()
-        by_label,by_code={},{}
-        for fid,label,code in rows:
-            val=answers.get(str(fid))
-            if isinstance(val,str): val=FS.sanitize_text(val)
+        print(f"[MON-COMPL] Raw answers from DB: {answers}")
+        out={}
+        for pdf_field, field_id in _FIELD_ID_MAP.items():
+            val = answers.get(str(field_id))
+            if isinstance(val,str): 
+                val=FS.sanitize_text(val)
+                # Filter out values that look like field labels
+                if val and any(x in val.lower() for x in ['complainant', 'respondent', 'monitoring', 'address', 'contact', 'printed name', 'lupon', 'barangay', 'remarks', 'punong']):
+                    if val.count(' ') >= 2:  # Labels usually have multiple words
+                        val = ""
             if val not in (None,"","null"):
-                if label: by_label[label.strip().lower()]=val
-                if code:  by_code[code.strip().lower()]=val
-        def get(keys:Set[str])->str:
-            for k in keys:
-                if k in by_label: return FS.normalize(by_label[k])
-                if k in by_code:  return FS.normalize(by_code[k])
-            return ""
-        out={t:get(s) for t,s in _SOURCES.items()}
-        for k,v in list(out.items()):
-            if isinstance(v,str): out[k]=FS.sanitize_text(v)
+                out[pdf_field] = FS.normalize(val)
+            else:
+                out[pdf_field] = ""
+        
+        # Defaults
         for k in _FIELDS: out.setdefault(k,"")
         if not out.get("brgy_sec"): out["brgy_sec"]="JUDE FRENCILLO"
-        self._log(out); return out
+        
+        self._log(out)
+        return out

@@ -1404,6 +1404,22 @@ def form_builder(request, case_id: int, form_id: int = None, submission_id: int 
         fields_with_values = slice_until_code(fields_with_values, "award_description")
         page2_index = None
 
+    # KP-18 minimal filter (show only essential fields)
+    if flags["kp18_ui_minimal"]:
+        allowed_codes = {"complainants", "respondents", "brgy_case_num", "brgy_case_number", "purpose", 
+                        "notice_date", "notice_time", "this_date", "date_notified"}
+        fields_with_values = [item for item in fields_with_values if ((item[6] or "").strip().lower() in allowed_codes)]
+        page2_index = None
+
+    # KP-19 minimal filter (show only essential fields)
+    if flags["kp19_ui_minimal"]:
+        allowed_codes = {"complainants", "respondents", "brgy_case_num", "brgy_case_number", "purpose", 
+                        "appearance_date", "appearance_month", "appearance_year", "appearance_time", 
+                        "this_date", "this_month", "this_year", 
+                        "date_notified", "month_notified", "year_notified"}
+        fields_with_values = [item for item in fields_with_values if ((item[6] or "").strip().lower() in allowed_codes)]
+        page2_index = None
+
     user_role = _auth_role_name(request)
     return render(
         request,
@@ -4404,10 +4420,29 @@ def hearing_documentation_pdf(request, case_id: int):
     
     if hearing_info:
         hearing_type = 'Mediation Hearing' if hearing_info.get('source') == 'KP-8' else 'Conciliation Hearing' if hearing_info.get('source') == 'KP-12' else 'Hearing'
+        
+        # Safely format hearing_date
+        hearing_date_str = 'N/A'
+        if hearing_info.get('hearing_date'):
+            hd = hearing_info.get('hearing_date')
+            if hasattr(hd, 'strftime'):
+                hearing_date_str = hd.strftime('%B %d, %Y')
+            else:
+                hearing_date_str = str(hd)
+        
+        # Safely format hearing_time
+        hearing_time_str = 'N/A'
+        if hearing_info.get('hearing_time'):
+            ht = hearing_info.get('hearing_time')
+            if hasattr(ht, 'strftime'):
+                hearing_time_str = ht.strftime('%I:%M %p')
+            else:
+                hearing_time_str = str(ht)
+        
         case_data.extend([
             ['Hearing Type:', hearing_type],
-            ['Hearing Date:', hearing_info.get('hearing_date').strftime('%B %d, %Y') if hearing_info.get('hearing_date') else 'N/A'],
-            ['Hearing Time:', hearing_info.get('hearing_time').strftime('%I:%M %p') if hearing_info.get('hearing_time') else 'N/A'],
+            ['Hearing Date:', hearing_date_str],
+            ['Hearing Time:', hearing_time_str],
             ['Status:', 'HELD' if hearing_info.get('hearing_held') else 'NOT HELD']
         ])
     

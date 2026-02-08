@@ -423,12 +423,21 @@ class KP19Handler:
         if (not case_num) and case_num_from_sub:
             out["brgy_case_number"] = str(case_num_from_sub)
 
-        # -------- date_filed/time_filed MUST come from KP-7 --------
-        kp7_date = get_this_case_kp7_date_filed(case_id or 0)
-        kp7_time = get_this_case_kp7_time_filed(case_id or 0)
+        # -------- date_filed/time_filed: use blotter_case directly like KP-18 --------
+        final_date = date_by_num or date_by_sub
+        final_time = time_by_num or time_by_sub
         
-        out["date_filed"] = kp7_date or ""
-        out["time_filed"] = kp7_time or ""
+        if final_date:
+            out["date_filed"] = self._fmt_full_date(final_date)
+            logger.info("[KP19] Using blotter_case date_filed=%s time_filed=%s", final_date, final_time)
+        else:
+            out["date_filed"] = self._fmt_full_date(ph_today)
+            logger.info("[KP19] No DB date, using today=%s", ph_today)
+        
+        if final_time:
+            out["time_filed"] = self._fmt_time_12h(final_time)
+        else:
+            out["time_filed"] = ""
 
         # -------- Process appearance fields from form UI --------
         # Parse appearance_date if it's a full date string
@@ -462,34 +471,44 @@ class KP19Handler:
             if appearance_year:
                 out["year_scheduled"] = appearance_year
 
-        # appearance_time already processed above
-
-        # THIS date trio defaults today
+        # THIS date trio - parse from single date input
         ph_today = _dt.now(ZoneInfo("Asia/Manila")).date()
-        if not (out.get("this_date") or "").strip():
+        
+        this_date_input = out.get("this_date", "").strip()
+        if this_date_input:
+            parsed = _try_parse_date(this_date_input)
+            if parsed:
+                out["this_date"] = str(parsed.day)
+                out["this_month"] = parsed.strftime("%B")
+                out["this_year"] = str(parsed.year)
+            else:
+                out["this_date"] = str(ph_today.day)
+                out["this_month"] = ph_today.strftime("%B")
+                out["this_year"] = str(ph_today.year)
+        else:
             out["this_date"] = str(ph_today.day)
-        else:
-            maybe = _try_parse_date(out["this_date"])
-            if maybe: out["this_date"] = str(maybe.day)
-        if not (out.get("this_month") or "").strip():
             out["this_month"] = ph_today.strftime("%B")
-        if not (out.get("this_year") or "").strip():
-            out["this_year"]  = str(ph_today.year)
+            out["this_year"] = str(ph_today.year)
 
-        # Notified trio defaults today
-        if not (out.get("date_notified") or "").strip():
-            out["date_notified"] = str(ph_today.day)
+        # Date Notified trio - parse from single date input
+        date_notified_input = out.get("date_notified", "").strip()
+        if date_notified_input:
+            parsed = _try_parse_date(date_notified_input)
+            if parsed:
+                out["date_notified"] = str(parsed.day)
+                out["month_notified"] = parsed.strftime("%B")
+                out["year_notified"] = str(parsed.year)
+            else:
+                out["date_notified"] = str(ph_today.day)
+                out["month_notified"] = ph_today.strftime("%B")
+                out["year_notified"] = str(ph_today.year)
         else:
-            maybe = _try_parse_date(out["date_notified"])
-            if maybe: out["date_notified"] = str(maybe.day)
-        if not (out.get("month_notified") or "").strip():
+            out["date_notified"] = str(ph_today.day)
             out["month_notified"] = ph_today.strftime("%B")
-        if not (out.get("year_notified") or "").strip():
             out["year_notified"] = str(ph_today.year)
 
-        # Pangkat Chairman (auto-fill like KP-13/KP-18)
-        if not (out.get("chairman") or "").strip():
-            out["chairman"] = get_lupon_chair_name(default=out.get("chairman",""))
+        # -------- Pangkat Chairman (hardcoded to LOURDES RAMIREZ) --------
+        out["chairman"] = "LOURDES RAMIREZ"
 
         # sanitize + ensure fields exist
         for k,v in list(out.items()):

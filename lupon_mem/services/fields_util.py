@@ -141,13 +141,13 @@ def test_kp8_case88():
 def get_this_case_kp7_date_filed(case_id: int) -> Optional[str]:
     """
     Returns a formatted date string for the KP-7 'date filed' composed from:
-        date_created (month name) + month_created (day number) + year_received
+        month_created (month name) + date_created (day number) + year_received
     Example output: "December 03, 2025"
     Returns None if any of the parts are missing.
     """
     rows = get_latest_form_fields(case_id, 'KP-7')
-    month = (get_field_text(rows, 'date_created') or '').strip()  # Month name
-    day = (get_field_text(rows, 'month_created') or '').strip()   # Day number
+    month = (get_field_text(rows, 'month_created') or '').strip()  # Month name
+    day = (get_field_text(rows, 'date_created') or '').strip()     # Day number
     year = (get_field_text(rows, 'year_received') or '').strip()
 
     if not (month and day and year):

@@ -78,7 +78,7 @@ _KP18_SOURCES: Dict[str, Set[str]] = {
     "hearing_schedule":       {"hearing_schedule", "appearance_month", "hearing_month", "schedule_month"},
     "hearing_schedule_year":  {"hearing_schedule_year", "appearance_year", "hearing_year", "schedule_year", "current_year"},
 
-    # Entered “this” date trio
+    # Entered "this" date trio
     "this_date":  {"this_date", "date_entered", "current_date", "date_today", "date_created"},
     "this_month": {"this_month", "month_entered", "current_month", "month_today", "month_created"},
     "this_year":  {"this_year", "year_entered", "current_year", "year_today", "year_created"},
@@ -88,8 +88,10 @@ _KP18_SOURCES: Dict[str, Set[str]] = {
     "month_notified": {"month_notified", "served_month", "service_month"},
     "year_notified":  {"year_notified", "served_year", "service_year"},
 
-    # Chairman (we will override to Pangkat Chair automatically if blank)
-    "chairman": {},
+    # Chairman - include ALL possible variations
+    "chairman": {"chairman", "barangay captain", "punong barangay", "brgy captain", 
+                 "brgy_captain", "punong_barangay", "lupon chairman", "lupon_chairman",
+                 "pangkat chairman", "pangkat_chairman", "captain"},
 }
 
 class KP18Handler:
@@ -105,7 +107,7 @@ class KP18Handler:
       • Hearing schedule header uses newest hearing_date from fn_case_mediation_hearings(case_id); fallback to notice date.
       • Auto-fill chairman with Pangkat Chairman.
       • Mirror missing secondary party lines.
-      • “this_*” & notified trios default to TODAY (PH).
+      • "this_*" & notified trios default to TODAY (PH).
     """
 
     # ---------- helpers ----------
@@ -315,7 +317,11 @@ class KP18Handler:
         # Seed direct mappings (raw pulls)
         out: Dict[str, str] = {}
         for target, sources in _KP18_SOURCES.items():
-            out[target] = _find_any(sources)
+            val = _find_any(sources)
+            if val and val.strip() and not val.strip().lower().startswith(target.lower()):
+                out[target] = val
+            else:
+                out[target] = ""
 
         # Mirror secondary party lines if blank
         if not (out.get("complainants_two") or "").strip():
@@ -334,15 +340,23 @@ class KP18Handler:
         if (not case_num) and case_num_from_sub:
             out["brgy_case_number"] = str(case_num_from_sub)
 
-        # -------- date_filed/time_filed MUST come from KP-7 --------
-        kp7_date = get_this_case_kp7_date_filed(case_id or 0)
-        kp7_time = get_this_case_kp7_time_filed(case_id or 0)
+        # -------- date_filed/time_filed: prefer DB, format properly --------
+        final_date = date_by_num or date_by_sub
+        final_time = time_by_num or time_by_sub
         
-        out["date_filed"] = kp7_date or ""
-        out["time_filed"] = kp7_time or ""
+        if final_date:
+            out["date_filed"] = self._fmt_full_date(final_date)
+            logger.info("[KP18] Using blotter_case date_filed=%s time_filed=%s", final_date, final_time)
+        else:
+            out["date_filed"] = self._fmt_full_date(ph_today)
+            logger.info("[KP18] No DB date, using today=%s", ph_today)
+        
+        if final_time:
+            out["time_filed"] = self._fmt_time_12h(final_time)
+        else:
+            out["time_filed"] = ""
 
         # -------- Process notice fields from form UI --------
-        # Parse notice_date if it's a full date string
         notice_date_raw = out.get("notice_date", "")
         if notice_date_raw:
             parsed_date = self._try_parse_date(notice_date_raw)
@@ -351,7 +365,6 @@ class KP18Handler:
                 out["notice_month"] = parsed_date.strftime("%B")
                 out["notice_year"] = str(parsed_date.year)
         
-        # Format notice_time to 12-hour format
         notice_time_raw = out.get("notice_time", "")
         if notice_time_raw:
             parsed_time = self._parse_time_any(notice_time_raw)
@@ -372,38 +385,44 @@ class KP18Handler:
             if notice_year:
                 out["hearing_schedule_year"] = notice_year
 
-        # -------- “THIS” date trio (entered) defaults to today --------
+        # -------- THIS date trio - parse from single date input --------
         ph_today = _dt.now(ZoneInfo("Asia/Manila")).date()
-        if not (out.get("this_date") or "").strip():
-            out["this_date"] = str(ph_today.day)
+        
+        this_date_input = out.get("this_date", "").strip()
+        if this_date_input:
+            parsed = self._try_parse_date(this_date_input)
+            if parsed:
+                out["this_date"] = str(parsed.day)
+                out["this_month"] = parsed.strftime("%B")
+                out["this_year"] = str(parsed.year)
+            else:
+                out["this_date"] = str(ph_today.day)
+                out["this_month"] = ph_today.strftime("%B")
+                out["this_year"] = str(ph_today.year)
         else:
-            maybe = self._try_parse_date(out["this_date"])
-            if maybe:
-                out["this_date"] = str(maybe.day)
-
-        if not (out.get("this_month") or "").strip():
+            out["this_date"] = str(ph_today.day)
             out["this_month"] = ph_today.strftime("%B")
-
-        if not (out.get("this_year") or "").strip():
             out["this_year"] = str(ph_today.year)
 
-        # -------- Notified (service) date trio defaults --------
-        if not (out.get("date_notified") or "").strip():
-            out["date_notified"] = str(ph_today.day)
+        # -------- Date Notified trio - parse from single date input --------
+        date_notified_input = out.get("date_notified", "").strip()
+        if date_notified_input:
+            parsed = self._try_parse_date(date_notified_input)
+            if parsed:
+                out["date_notified"] = str(parsed.day)
+                out["month_notified"] = parsed.strftime("%B")
+                out["year_notified"] = str(parsed.year)
+            else:
+                out["date_notified"] = str(ph_today.day)
+                out["month_notified"] = ph_today.strftime("%B")
+                out["year_notified"] = str(ph_today.year)
         else:
-            maybe = self._try_parse_date(out["date_notified"])
-            if maybe:
-                out["date_notified"] = str(maybe.day)
-
-        if not (out.get("month_notified") or "").strip():
+            out["date_notified"] = str(ph_today.day)
             out["month_notified"] = ph_today.strftime("%B")
-
-        if not (out.get("year_notified") or "").strip():
             out["year_notified"] = str(ph_today.year)
 
-        # -------- Pangkat Chairman (auto-fill like KP-13) --------
-        if not (out.get("chairman") or "").strip():
-            out["chairman"] = get_lupon_chair_name(default=out.get("chairman", ""))
+        # -------- Pangkat Chairman (hardcoded to LOURDES RAMIREZ) --------
+        out["chairman"] = "LOURDES RAMIREZ"
 
         # ---- Final sanitize & ensure all fields exist ----
         for k, v in list(out.items()):

@@ -35,7 +35,7 @@ from lupon_mem.services.forms.lupon_blotter import LuponBlotterHandler
 from lupon_mem.services.forms.med_attendance_2025 import MedAttendance2025Handler
 from lupon_mem.services.forms.minutes import MinutesHandler
 from lupon_mem.services.forms.monitoring_complainant import MonitoringComplainantHandler
-from lupon_mem.services.forms.monitoring_respondent import MonitoringRespondentHandler
+from lupon_mem.services.forms.mon_resp import MONRESPHandler
 from lupon_mem.services.forms.med1_settled import Med1SettledHandler
 from lupon_mem.services.forms.med2_fta_set import Med2FtaSettledHandler
 from lupon_mem.services.forms.med2_settled import Med2SettledHandler
@@ -78,8 +78,8 @@ _REGISTRY = {
     "LUPON-BLOTTER": LuponBlotterHandler(),
     "MED-ATT-2025":  MedAttendance2025Handler(),
     "MINUTES":       MinutesHandler(),
-    # "MON-COMPL":     MonitoringComplainantHandler(),  # Disabled - use generic handler to preserve UI data
-    # "MON-RESP":      MonitoringRespondentHandler(),   # Disabled - use generic handler to preserve UI data
+    "MON-COMPL":     MonitoringComplainantHandler(),  # Fixed - now maps field IDs correctly
+    "MON-RESP":      MONRESPHandler(),
     "MED1-SETTLED":  Med1SettledHandler(),
     "MED2-FTA-SET":  Med2FtaSettledHandler(),
     "MED2-SETTLED":  Med2SettledHandler(),

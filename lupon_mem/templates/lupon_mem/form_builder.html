@@ -97,7 +97,8 @@
     .redirect-spinner{ color:#7B1E22!important; width:3rem; height:3rem; }
     .redirect-title{ color:#7B1E22; font-weight:700; }
     .redirect-text{ color:#FC9700; }
-    [data-code="brgy_sec"],[data-code="processed_by"],[data-code="processed_on_time"],[data-code="recipient_addr"],[data-code="punong_barangay"],[data-code="brgy_capt"],[data-code="processed_by_staff"],[data-code="processed_by_staff_id"],[data-code="brgy_captain"],[data-code="barangay_captain"],[data-code="brgy_chairman"],[data-code="respondents_2"]{display:none!important;}
+    [data-code="brgy_sec"],[data-code="processed_by"],[data-code="processed_on_time"],[data-code="recipient_addr"],[data-code="punong_barangay"],[data-code="brgy_capt"],[data-code="processed_by_staff"],[data-code="processed_by_staff_id"],[data-code="brgy_captain"],[data-code="barangay_captain"],[data-code="brgy_chairman"],[data-code="respondents_2"],[data-code="complainant_printed_name"],[data-field-id="10"]{display:none!important;}
+    .col-12:has([data-field-id="1121"]),.col-md-6:has([data-field-id="1121"]),.col-12:has([data-field-id="1134"]),.col-md-6:has([data-field-id="1134"]),.col-12:has([data-field-id="1135"]),.col-md-6:has([data-field-id="1135"]),.col-12:has([data-field-id="1136"]),.col-md-6:has([data-field-id="1136"]){display:none!important;}
   </style>
 </head>
 
@@ -462,8 +463,8 @@
                   {% if kp14_ui_minimal %} kp-offscreen{% endif %}
                   {% if kp16_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_num' and code != 'purpose' and code != 'settlement_statement' and code != 'processed_on_date' %} kp-offscreen{% endif %}
                   {% if kp17_ui_minimal and field_id != 665 and field_id != 839 and field_id != 903 and field_id != 685 and field_id != 766 and field_id != 757 %} kp-offscreen{% endif %}
-                  {% if kp18_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_number' and code != 'purpose' and code != 'notice_date' and code != 'notice_time' %} kp-offscreen{% endif %}
-                  {% if kp19_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_number' and code != 'purpose' and code != 'appearance_date' and code != 'appearance_time' %} kp-offscreen{% endif %}
+                  {% if kp18_ui_minimal and field_id != 1 and field_id != 2 and field_id != 259 and field_id != 169 and field_id != 852 and field_id != 774 and field_id != 296 and field_id != 230 %} kp-offscreen{% endif %}
+                  {% if kp19_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_number' and code != 'purpose' and code != 'appearance_date' and code != 'appearance_time' and code != 'this_date' and code != 'date_notified' %} kp-offscreen{% endif %}
                   {% if kp20_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_number' and code != 'purpose' %} kp-offscreen{% endif %}
                   {% if kp20a_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_number' and code != 'purpose' %} kp-offscreen{% endif %}
                   {% if kp20b_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
@@ -499,8 +500,8 @@
                   {% if kp14_ui_minimal %} kp-offscreen{% endif %}
                   {% if kp16_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_num' and code != 'purpose' and code != 'settlement_statement' and code != 'processed_on_date' %} kp-offscreen{% endif %}
                   {% if kp17_ui_minimal and field_id != 665 and field_id != 839 and field_id != 903 and field_id != 685 and field_id != 766 and field_id != 757 %} kp-offscreen{% endif %}
-                  {% if kp18_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_number' and code != 'purpose' and code != 'notice_date' and code != 'notice_time' %} kp-offscreen{% endif %}
-                  {% if kp19_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_number' and code != 'purpose' and code != 'appearance_date' and code != 'appearance_time' %} kp-offscreen{% endif %}
+                  {% if kp18_ui_minimal and field_id != 1 and field_id != 2 and field_id != 259 and field_id != 169 and field_id != 852 and field_id != 774 and field_id != 296 and field_id != 230 %} kp-offscreen{% endif %}
+                  {% if kp19_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_number' and code != 'purpose' and code != 'appearance_date' and code != 'appearance_time' and code != 'this_date' and code != 'date_notified' %} kp-offscreen{% endif %}
                   {% if kp20_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_number' and code != 'purpose' %} kp-offscreen{% endif %}
                   {% if kp20a_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_number' and code != 'purpose' %} kp-offscreen{% endif %}
                   {% if kp20b_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
@@ -780,6 +781,88 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <!-- Your existing JS file; untouched -->
 <script src="{% static 'js/form_builder.js' %}"></script>
+
+<!-- Staff autocomplete for Lupon Tagapamayapa field -->
+<script>
+(function(){
+  const codes = ['lupon_tagapamayap','lupon_tagapamayapa'];
+  codes.forEach(code=>{
+    const wrap = document.querySelector(`[data-code="${code}"]`);
+    const input = document.querySelector(`[data-code="${code}"] input, input[data-code="${code}"]`);
+    if(!wrap || !input) return;
+    
+    wrap.classList.add('typeahead-wrap');
+    const dd = document.createElement('div');
+    dd.className = 'typeahead-dropdown';
+    wrap.appendChild(dd);
+    
+    let t=null, items=[];
+    function open(){ dd.style.display='block'; }
+    function close(){ dd.style.display='none'; dd.innerHTML=''; items=[]; }
+    function render(list){
+      if(!list.length){ dd.innerHTML='<div class="typeahead-empty">No matches</div>'; open(); return; }
+      dd.innerHTML = list.map((r,i)=>`<button type="button" class="typeahead-item" data-i="${i}">${r.name}</button>`).join('');
+      open();
+    }
+    function fetchQ(q){
+      fetch('/lupon_mem/api/staff-suggest/?q=' + encodeURIComponent(q), {headers:{'X-Requested-With':'fetch'}})
+        .then(r=>r.json()).then(j=>{items=j.results||[]; render(items);}).catch(()=>close());
+    }
+    function choose(i){ const row=items[i]; if(!row) return; input.value=row.name; close(); input.dispatchEvent(new Event('change',{bubbles:true})); }
+    
+    input.addEventListener('input', ()=>{
+      const q=input.value.trim(); if(q.length<2){ close(); return; }
+      clearTimeout(t); t=setTimeout(()=>fetchQ(q),180);
+    });
+    dd.addEventListener('click', e=>{
+      const b=e.target.closest('.typeahead-item'); if(!b) return; choose(parseInt(b.dataset.i,10));
+    });
+    document.addEventListener('click', e=>{ if(!dd.contains(e.target) && e.target!==input) close(); });
+  });
+})();
+
+// Auto-fill Printed Name from Complainant Name
+(function(){
+  const complName = document.querySelector('[data-field-id="1"]');
+  const printedName = document.querySelector('[data-field-id="10"]');
+  if(complName && printedName){
+    function sync(){
+      if(!printedName.value || printedName.value.trim() === '') printedName.value = complName.value;
+    }
+    complName.addEventListener('input', sync);
+    complName.addEventListener('change', sync);
+    complName.addEventListener('blur', sync);
+    // Initial sync on page load
+    if(complName.value) sync();
+    
+    // Hide Printed Name field for form 35 (MON-COMPL)
+    const formId = {{ form_id|default:"0" }};
+    if(formId === 35){
+      const printedWrapper = printedName.closest('.col-12, .col-md-6');
+      if(printedWrapper) printedWrapper.style.display = 'none';
+    }
+  }
+  
+  // Hide Processed On (Date) for form 35
+  const formId = {{ form_id|default:"0" }};
+  if(formId === 35){
+    const processedDate = document.querySelector('[data-field-id="1121"]');
+    if(processedDate){
+      const wrapper = processedDate.closest('.col-12, .col-md-6');
+      if(wrapper) wrapper.style.display = 'none';
+    }
+  }
+  
+  // Hide Date & Time Filed for form 7 (KP-7)
+  if(formId === 7){
+    const dateTimeFiled = document.querySelector('[data-field-id="1129"]');
+    if(dateTimeFiled){
+      const wrapper = dateTimeFiled.closest('.col-12, .col-md-6');
+      if(wrapper) wrapper.style.display = 'none';
+    }
+  }
+})();
+</script>
 </body>
 </html>
 

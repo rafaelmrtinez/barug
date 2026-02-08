@@ -419,7 +419,7 @@
               <span class="badge" style="background:#16a34a;font-size:.9rem;padding:.4rem .75rem;"><i class="bi bi-check-circle me-1"></i>Held</span>
               <span id="heldOutcomePill" class="badge d-none" style="font-size:.85rem;padding:.35rem .65rem;"></span>
             </div>
-            {% if held_at_fmt %}<div class="text-muted small"><i class="bi bi-clock"></i> {{ held_at_fmt }}</div>{% endif %}
+            {% if held_at_fmt %}<div class="text-muted small" style="display:none;"><i class="bi bi-clock"></i> {{ held_at_fmt }}</div>{% endif %}
           {% else %}
             <span class="badge bg-warning text-dark" style="font-size:.9rem;padding:.4rem .75rem;width:fit-content;"><i class="bi bi-hourglass-split me-1"></i>Not Held</span>
           {% endif %}
@@ -596,13 +596,13 @@
     <div class="section-h">
       <h6 class="title">Documentation Photos</h6>
       <div class="d-flex gap-2">
-        {% if hearing_held %}<span class="badge text-bg-success">HELD</span>{% endif %}
-        <button class="btn btn-outline-brand btn-sm no-print" onclick="printDocumentation()" title="Print Documentation">
+        {% if hearing_held %}{% endif %}
+        <button class="btn btn-outline-brand btn-sm no-print" style="display:none;" onclick="printDocumentation()" title="Print Documentation">
           <i class="bi bi-printer me-1"></i> Print
         </button>
-        <a href="{% url 'lupon_mem:hearing_documentation_pdf' case_id %}" class="btn btn-outline-brand btn-sm no-print" title="Download as PDF">
+        <button class="btn btn-outline-brand btn-sm no-print" onclick="downloadAllPhotos()" title="Download Documentation Photos">
           <i class="bi bi-download me-1"></i> Download PDF
-        </a>
+        </button>
       </div>
     </div>
     <div class="section-b">
@@ -970,6 +970,12 @@
     setTimeout(() => {
       window.print();
     }, 1000);
+  };
+
+  // Download All Photos Function
+  window.downloadAllPhotos = function() {
+    // Redirect to the PDF generation endpoint
+    window.location.href = '/lupon_mem/cases/{{ case_id }}/hearing/documentation-pdf/';
   };
 
   // If already held → concise summary chips

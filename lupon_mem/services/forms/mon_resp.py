@@ -1,0 +1,64 @@
+# lupon_mem/services/forms/mon_resp.py
+from __future__ import annotations
+from typing import Dict, Set
+import json, logging
+from django.db import connection
+from .. import form_shared as FS
+logger=logging.getLogger(__name__)
+
+_FIELDS = [
+ "brgy_case_monitoring","date_time_monitoring",
+ "complainant_name","complainant_addr","complainant_contact",
+ "respondent_name","respondent_addr","respondent_contact",
+ "remarks","complainant_printed_name","lupon_tagapamayapa","brgy_captain","brgy_sec"
+]
+_SOURCES: Dict[str, Set[str]] = {
+    "brgy_case_monitoring": {"brgy_case_monitoring", "barangay case no.", "brgy_case_number"},
+    "date_time_monitoring": {"date_time_monitoring", "monitoring date & time"},
+    "complainant_name": {"complainant_name", "complainant name", "complainants"},
+    "complainant_addr": {"complainant_addr", "complainant address"},
+    "complainant_contact": {"complainant_contact", "complainant contact no."},
+    "respondent_name": {"respondent_name", "respondent name", "respondents"},
+    "respondent_addr": {"respondent_addr", "respondent address"},
+    "respondent_contact": {"respondent_contact", "respondent contact no."},
+    "remarks": {"remarks"},
+    "complainant_printed_name": {"complainant_printed_name", "respondent name", "respondents"},
+    "lupon_tagapamayapa": {"lupon_tagapamayapa"},
+    "brgy_captain": {"brgy_captain", "punong barangay"},
+    "brgy_sec": {"brgy_sec", "barangay secretary"},
+}
+
+class MONRESPHandler:
+    def _log(self,out:Dict[str,str]):
+        try: print("[MON-RESP] fill map:\n", json.dumps({k:out.get(k,'') for k in _FIELDS}, ensure_ascii=False, indent=2))
+        except Exception: pass
+
+    def build_name_value_map(self, form_id:int, submission_id:int)->dict:
+        answers=FS.load_answers(submission_id)
+        with connection.cursor() as cur:
+            cur.execute("""
+              SELECT f.field_id, LOWER(COALESCE(kff.label_override,f.base_label)), LOWER(f.field_code)
+              FROM kp_form_field kff JOIN kp_field f ON f.field_id=kff.field_id
+              WHERE kff.form_id=%s
+            """,[form_id]); rows=cur.fetchall()
+        by_label,by_code={},{}
+        for fid,label,code in rows:
+            val=answers.get(str(fid))
+            if isinstance(val,str):
+                val=FS.sanitize_text(val)
+            if val not in (None,"","null"):
+                if label: by_label[label.strip().lower()]=val
+                if code:  by_code[code.strip().lower()]=val
+        def get(keys:Set[str])->str:
+            for k in keys:
+                if k in by_label: return FS.normalize(by_label[k])
+                if k in by_code:  return FS.normalize(by_code[k])
+            return ""
+        out={t:get(s) for t,s in _SOURCES.items()}
+        for k,v in list(out.items()):
+            if isinstance(v,str): out[k]=FS.sanitize_text(v)
+        for k in _FIELDS: out.setdefault(k,"")
+        if not out.get("brgy_sec"): out["brgy_sec"]="JUDE FRENCILLO"
+        if not out.get("complainant_printed_name") and out.get("complainant_name"):
+            out["complainant_printed_name"] = out["complainant_name"]
+        self._log(out); return out
