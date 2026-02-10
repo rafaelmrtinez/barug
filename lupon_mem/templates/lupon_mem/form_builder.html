@@ -100,6 +100,16 @@
     [data-code="brgy_sec"],[data-code="processed_by"],[data-code="punong_barangay"],[data-code="brgy_capt"],[data-code="processed_by_staff"],[data-code="processed_by_staff_id"],[data-code="brgy_captain"],[data-code="barangay_captain"],[data-code="brgy_chairman"],[data-code="respondents_2"],[data-code="complainant_printed_name"],[data-field-id="10"]{display:none!important;}
     .col-12:has([data-field-id="1121"]),.col-md-6:has([data-field-id="1121"]),.col-12:has([data-field-id="1134"]),.col-md-6:has([data-field-id="1134"]),.col-12:has([data-field-id="1135"]),.col-md-6:has([data-field-id="1135"]),.col-12:has([data-field-id="1136"]),.col-md-6:has([data-field-id="1136"]){display:none!important;}
   </style>
+  {% if form_id == 7 %}
+  <style>
+    .col-12:has([data-field-id="1121"]),.col-md-6:has([data-field-id="1121"]){display:block!important;}
+  </style>
+  {% endif %}
+  {% if form_id == 8 %}
+  <style>
+    .col-12:has([data-field-id="1121"]),.col-md-6:has([data-field-id="1121"]){display:block!important;}
+  </style>
+  {% endif %}
   {% if form_id == 41 %}
   <style>
     [data-field-id="1133"],[data-field-id="1132"],[data-code="processed_on_time"]{display:none!important;}
@@ -460,7 +470,7 @@
                   {% if header.0 == 'KP-9-P2' and 'officer_return_narrative' in code %} kp-offscreen{% endif %}
                   {% if header.0 == 'KP-9-P2' and 'narrative' in code %} kp-offscreen{% endif %}
                   {% if header.0 == 'KP-9-P2' and 'Officer' in label and 'Return' in label and 'Narrative' in label %} kp-offscreen{% endif %}
-                  {% if kp8_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'hearing_date' and code != 'hearing_time' and code != 'date_created' and code != 'processed_on_date' and code != 'notified_date' %} kp-offscreen{% endif %}
+                  {% if kp8_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'hearing_date' and code != 'hearing_time' and code != 'date_created' and code != 'processed_on_date' and code != 'notified_date' and field_id != 1142 and field_id != 1121 %} kp-offscreen{% endif %}
                   {% if kp9_ui_minimal and code != 'curr_date' and code != 'recipient_address' %} kp-offscreen{% endif %}
                   {% if kp10_ui_minimal and code != 'appearance_date' and code != 'appearance_time' and code != 'addr_to' %} kp-offscreen{% endif %}
                   {% if kp11_ui_minimal and code != 'pangkat_member_name' %} kp-offscreen{% endif %}
@@ -497,7 +507,7 @@
                   {% if header.0 == 'KP-9-P2' and 'Processed' in label %} kp-offscreen{% endif %}
                   {% if header.0 == 'KP-9-P2' and 'Date' in label and 'Time' in label %} kp-offscreen{% endif %}
                   {% if header.0 == 'KP-9-P2' and 'Recipient Address' in label %} kp-offscreen{% endif %}
-                  {% if kp8_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'hearing_date' and code != 'hearing_time' and code != 'date_created' and code != 'processed_on_date' and code != 'notified_date' %} kp-offscreen{% endif %}
+                  {% if kp8_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'hearing_date' and code != 'hearing_time' and code != 'date_created' and code != 'processed_on_date' and code != 'notified_date' and field_id != 1142 and field_id != 1121 %} kp-offscreen{% endif %}
                   {% if kp9_ui_minimal and code != 'curr_date' and code != 'recipient_address' %} kp-offscreen{% endif %}
                   {% if kp10_ui_minimal and code != 'appearance_date' and code != 'appearance_time' and code != 'addr_to' %} kp-offscreen{% endif %}
                   {% if kp11_ui_minimal and code != 'pangkat_member_name' %} kp-offscreen{% endif %}

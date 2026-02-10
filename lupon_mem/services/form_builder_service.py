@@ -142,6 +142,30 @@ def fetch_party_names(cur, case_id: int) -> Tuple[List[str], List[str]]:
     resps = ["%s %s" % (fn or "", ln or "") for fn, ln in cur.fetchall()]
     return cmps, resps
 
+def fetch_complainant_address(cur, case_id: int) -> str:
+    cur.execute(
+        """
+        SELECT trim(
+                 concat_ws(', ',
+                   NULLIF(ps.purok_sitio_name,''),
+                   NULLIF(a.street,''),
+                   CASE WHEN a.barangay IS NOT NULL AND a.barangay <> '' THEN 'Brgy. '||a.barangay ELSE NULL END,
+                   NULLIF(a.city,'')
+                 )
+               ) AS full_addr
+          FROM complainant_case cc
+          JOIN person p ON p.person_id = cc.person_id
+          LEFT JOIN addresss a ON a.address_id = p.address_id
+          LEFT JOIN purok_sitio ps ON ps.purok_sitio_id = a.purok_sitio_id
+         WHERE cc.blotter_case_id=%s
+         ORDER BY cc.complainant_case_id
+         LIMIT 1
+        """,
+        [case_id],
+    )
+    r = cur.fetchone()
+    return (r and r[0]) or ""
+
 def fetch_party_json(cur, case_id: int) -> Tuple[str, str]:
     cur.execute(
         """
@@ -403,6 +427,13 @@ def apply_answers_and_prefills(
             print(f"[apply_answers_and_prefills] Handler error for {form_code}: {e}")
             pass
     
+    # Filter out specific fields for MED3-FOLDER form BEFORE processing
+    if form_code and form_code.upper() == "MED3-FOLDER":
+        fields = [
+            row for row in fields
+            if row[1] not in (1132, 1133)  # Hide date_time_field and recipient_address
+        ]
+    
     def _ans_or_prefill(field_id, label, code):
         v = answers.get(str(field_id))
         
@@ -470,13 +501,6 @@ def apply_answers_and_prefills(
         )
         for (kff_id, field_id, label, type_name, is_required, field_code) in fields
     ]
-    
-    # Filter out specific fields for MED3-FOLDER form
-    if form_code and form_code.upper() == "MED3-FOLDER":
-        fields_with_values = [
-            row for row in fields_with_values
-            if row[1] not in (1132, 1133)  # Hide date_time_field and recipient_address
-        ]
     
     return fields_with_values
 

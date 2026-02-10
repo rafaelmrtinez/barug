@@ -71,6 +71,7 @@
 
   <div id="formList" class="d-flex flex-column gap-2">
     {% for code, name in forms %}
+      {% if code not in 'MED1-SETTLED,MED2-FTA-SET,MED2-SETTLED,MED3-FOLDER' %}
       <div class="form-card" data-code="{{ code|upper }}" data-name="{{ name|upper }}">
         <div class="form-meta">
           <span class="form-code">{% bs_icon_cached 'file-earmark-text' %} {{ code }}</span>
@@ -111,50 +112,13 @@
           </a>
         </div>
       </div>
+      {% endif %}
     {% empty %}
       <div class="text-muted py-5 text-center">No forms in catalog.</div>
     {% endfor %}
   </div>
 
-  {% if page_obj.has_other_pages %}
-    <nav aria-label="Form pagination" class="mt-4">
-      <ul class="pagination justify-content-center">
-        {% if page_obj.has_previous %}
-          <li class="page-item">
-            <a class="page-link" href="?page=1">First</a>
-          </li>
-          <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
-          </li>
-        {% endif %}
-        
-        {% for num in page_obj.paginator.page_range %}
-          {% if page_obj.number == num %}
-            <li class="page-item active">
-              <span class="page-link">{{ num }}</span>
-            </li>
-          {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-            <li class="page-item">
-              <a class="page-link" href="?page={{ num }}">{{ num }}</a>
-            </li>
-          {% endif %}
-        {% endfor %}
-        
-        {% if page_obj.has_next %}
-          <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
-          </li>
-          <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Last</a>
-          </li>
-        {% endif %}
-      </ul>
-    </nav>
-    
-    <div class="text-center text-muted small mt-2">
-      Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} forms
-    </div>
-  {% endif %}
+
 </div>
 
 <div id="pageLoadingSmall">

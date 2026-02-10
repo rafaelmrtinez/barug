@@ -1,0 +1,251 @@
+﻿def add_form_choose_static(request, case_id: int):
+    """
+    Attach-a-form chooser with gates:
+      â€¢ Block when latest KP-9 attendance not marked (unless MED-ATT-2025 intent)
+      â€¢ Block when there is an outstanding hearing notice (unless MED-ATT-2025 intent)
+
+    Shows only forms valid for the case's current stage, covering KP-7..KP-25.
+    """
+    from django.db import connection
+    from django.utils import timezone
+    from datetime import timedelta
+    from django.contrib import messages
+
+    # ---- read intent flags from query ----
+    requested_code = (request.GET.get("code") or "").upper().strip()
+    allow_med_att  = (
+        requested_code == "MED-ATT-2025"
+        or (request.GET.get("allow_med_att") == "1")
+        or (request.GET.get("from") == "hearing")
+    )
+
+    # ---- helpers ----
+    def _one_val(sql, params=None):
+        with connection.cursor() as c:
+            c.execute(sql, params or [])
+            r = c.fetchone()
+            return r[0] if r else None
+
+    def _row(sql, params=None):
+        with connection.cursor() as c:
+            c.execute(sql, params or [])
+            return c.fetchone()
+
+    def _rows(sql, params=None):
+        with connection.cursor() as c:
+            c.execute(sql, params or [])
+            return c.fetchall()
+
+    # ---- hearing gate (your existing util) ----
+    gate = hearing_gate(case_id)
+    latest_notice_outstanding = bool(gate.get("latest_notice_outstanding"))
+
+    # ---- case snapshot (settlement text) ----
+    case_row = _row("""
+        SELECT bc.settlement_status_id, COALESCE(UPPER(ss.settlement_status_name), '')
+        FROM blotter_case bc
+        LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+        WHERE bc.blotter_case_id=%s
+    """, [case_id])
+    settlement_status_name = (case_row[1] or '') if case_row else ''
+
+    # ---- submitted codes map (your existing util) ----
+    submitted = _submitted_codes(case_id)
+
+    def _has(code: str) -> bool:
+        return bool(submitted.get(code.upper()))
+
+    # ---- latest KP-9 attendance & NO SHOW counters ----
+    latest_kp9 = _row("""
+        WITH f AS (SELECT form_id FROM kp_form WHERE UPPER(form_code)='KP-9' LIMIT 1)
+        SELECT a.status, COALESCE(UPPER(a.no_show_party), '')
+        FROM kp9_attendance a
+        JOIN blotter_kp_submission s ON s.submission_id = a.submission_id
+        WHERE s.blotter_case_id = %s AND s.form_id = (SELECT form_id FROM f)
+        ORDER BY a.marked_at DESC NULLS LAST, s.submission_id DESC
+        LIMIT 1
+    """, [case_id])
+    latest_att_status = (latest_kp9[0] or '').upper() if latest_kp9 else None
+    latest_att_party  = (latest_kp9[1] or '') if latest_kp9 else ''
+
+    no_show_counts = dict(_rows("""
+        WITH f AS (SELECT form_id FROM kp_form WHERE UPPER(form_code)='KP-9' LIMIT 1)
+        SELECT COALESCE(UPPER(a.no_show_party), 'UNKNOWN') AS party, COUNT(*)
+        FROM kp9_attendance a
+        JOIN blotter_kp_submission s ON s.submission_id = a.submission_id
+        WHERE s.blotter_case_id=%s AND a.status ILIKE 'NO SHOW'
+        GROUP BY COALESCE(UPPER(a.no_show_party), 'UNKNOWN')
+    """, [case_id]) or [])
+    repeated_ns_compl = (no_show_counts.get('COMPLAINANT', 0) >= 2) or (no_show_counts.get('BOTH', 0) >= 2)
+    repeated_ns_resp  = (no_show_counts.get('RESPONDENT', 0)  >= 2) or (no_show_counts.get('BOTH', 0) >= 2)
+
+    # ---- KP-9 counts & pending attendance ----
+    summons_count = int(_one_val("""
+        WITH f AS (SELECT form_id FROM kp_form WHERE UPPER(form_code)='KP-9' LIMIT 1)
+        SELECT COUNT(*) FROM blotter_kp_submission
+        WHERE blotter_case_id=%s AND form_id=(SELECT form_id FROM f)
+    """, [case_id]) or 0)
+
+    kp9_pending_count = int(_one_val("""
+        WITH f AS (SELECT form_id FROM kp_form WHERE UPPER(form_code)='KP-9' LIMIT 1)
+        SELECT COUNT(*)
+        FROM blotter_kp_submission s
+        WHERE s.blotter_case_id=%s
+          AND s.form_id=(SELECT form_id FROM f)
+          AND NOT EXISTS (SELECT 1 FROM kp9_attendance a WHERE a.submission_id = s.submission_id)
+    """, [case_id]) or 0)
+    pending_summons = (summons_count > 0) and (kp9_pending_count > 0)
+
+    # ---- hearings held (from your gate) ----
+    hearings_held = int(gate.get("hearings_held") or 0)
+    notice_outstanding = latest_notice_outstanding
+
+    # ---- KP-16 / KP-17 window & execution gates ----
+    kp16_row = _row("""
+        SELECT s.submission_id, s.submitted_at
+        FROM blotter_kp_submission s
+        JOIN kp_form kf ON kf.form_id = s.form_id
+        WHERE s.blotter_case_id=%s AND UPPER(kf.form_code)='KP-16'
+        ORDER BY s.submitted_at DESC NULLS LAST, s.submission_id DESC
+        LIMIT 1
+    """, [case_id])
+    has_kp16 = bool(kp16_row)
+    kp16_signed_at = kp16_row[1] if kp16_row else None
+
+    kp17_exists = bool(_one_val("""
+        SELECT 1
+        FROM blotter_kp_submission s
+        JOIN kp_form kf ON kf.form_id = s.form_id
+        WHERE s.blotter_case_id=%s AND UPPER(kf.form_code)='KP-17'
+        LIMIT 1
+    """, [case_id]))
+
+    today = timezone.now()
+    within_repudiation_window = False
+    final_and_executory = False
+    if has_kp16 and kp16_signed_at:
+        try:
+            dt_local = timezone.localtime(kp16_signed_at)
+        except Exception:
+            dt_local = kp16_signed_at
+        days_since = (today - dt_local).days
+        within_repudiation_window = (days_since <= 10) and not kp17_exists
+        final_and_executory = (days_since > 10) and not kp17_exists
+
+    # Expose KP-23 when final & executory; handler should still verify NON-COMPLIANCE.
+    can_kp23 = final_and_executory
+
+    # ---- HARD GATES (bypass allowed for MED-ATT-2025) ----
+    # COMMENTED OUT FOR NOW - DISPLAY ALL FORMS
+    # if pending_summons and not allow_med_att:
+    #     messages.warning(
+    #         request,
+    #         "Please mark the latest summons attendance (ATTENDED / NO SHOW) before adding a new form."
+    #     )
+    #     return redirect("lupon_mem:case_detail", case_id=case_id)
+
+    # if notice_outstanding and not allow_med_att:
+    #     messages.warning(
+    #         request,
+    #         "There is a scheduled mediation/conciliation hearing. Please record the outcome (HELD â†’ Settled / Not Settled) first."
+    #     )
+    #     return redirect("lupon_mem:case_detail", case_id=case_id)
+
+    # ---- DISPLAY ALL FORMS (guards commented out) ----
+    from django.core.paginator import Paginator
+    
+    # Get all forms from KP-7 to KP-25 plus MED-ATT-2025
+    wanted_order = [
+        'KP-7','KP-8','KP-9','KP-10','KP-11','KP-12','KP-13',
+        'MED-ATT-2025','KP-16','KP-17',
+        'KP-18','KP-19',
+        'KP-20','KP-20A','KP-20B',
+        'KP-21','KP-22',
+        'KP-23','KP-24','KP-25'
+    ]
+    
+    # ---- return only the specific forms ----
+    all_forms = [
+        ('KP-9-P2', 'SUMMON FOR THE RESPONDENT - PAGE 2'),
+        ('KP-10', 'NOTICE FOR CONSTITUTION OF PANGKAT'),
+        ('KP-11', 'NOTICE TO CHOSEN PANGKAT MEMBER'),
+        ('KP-13', 'SUBPOENA LETTER'),
+        ('KP-18', 'NOTICE OF HEARING FOR COMPLAINANT'),
+        ('KP-19', 'NOTICE OF HEARING FOR RESPONDENT'),
+        ('MINUTES', 'MINUTES OF HEARING'),
+        ('MON-COMPL', 'MONITORING (COMPLAINANT)'),
+        ('MON-RESP', 'MONITORING (RESPONDENT)'),
+        ('MED-ATT-2025', 'MEDIATION ATTENDANCE'),
+        ('MED1-SETTLED', '1ST MEDIATION SETTLED SUMMARY'),
+        ('MED2-FTA-SET', '2ND MEDIATION FTA SETTLED'),
+        ('MED2-SETTLED', '2ND MEDIATION SETTLED SUMMARY'),
+        ('MED3-FOLDER', '3RD MEDIATION CASE FOLDER'),
+        ('MED3-SETTLED', '3RD MEDIATION SETTLED SUMMARY')
+    ]
+    
+    # ---- pagination ----
+    paginator = Paginator(all_forms, 10)  # 10 forms per page
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+    
+    gate_msg = "All forms are displayed (guards temporarily disabled)"
+
+    # ---- badges for template ----
+    badge_flags = {
+        "summons_count": summons_count,
+        "no_show_complainant": latest_att_status == 'NO SHOW' and (latest_att_party in ('COMPLAINANT','BOTH')),
+        "no_show_respondent":  latest_att_status == 'NO SHOW' and (latest_att_party in ('RESPONDENT','BOTH')),
+        "need_new_summons": True,
+        "repeated_ns_complainant": repeated_ns_compl,
+        "repeated_ns_respondent":  repeated_ns_resp,
+        "has_kp16": has_kp16,
+        "within_repudiation_window": within_repudiation_window,
+        "kp17_exists": kp17_exists,
+        "final_and_executory": final_and_executory,
+    }
+
+    print(f"[add_form_choose_static] case_id={case_id} allow_med_att={allow_med_att} requested_code={requested_code} "
+          f"pending_summons={pending_summons} latest_notice_outstanding={notice_outstanding} "
+          f"total_forms={len(all_forms)} badge_flags={badge_flags}")
+
+    user_role = _auth_role_name(request)
+    return render(request, "lupon_mem/add_form_choose_static.html", {
+        "case_id": case_id,
+        "forms": page_obj.object_list,
+        "page_obj": page_obj,
+        "gate_msg": gate_msg,
+        "badge_flags": badge_flags,
+        'page_path': f'{user_role} / Add Form',
+        'page_title': 'Add Form',
+    })
+
+
+
+@session_login_required
+@role_required(*LUPON_ROLES, "barangay treasurer")
+def case_detail(request: HttpRequest, case_id: int):
+    """
+    Display case details with forms and timeline.
+    """
+    with connection.cursor() as cur:
+        # Get case basic info
+        cur.execute("""
+            SELECT bc.blotter_case_id, bc.blotter_case_num, bc.blotter_case_name,
+                   bc.date_filed, bc.time_filed, bc.incident_desc,
+                   COALESCE(ct.complaint_title_name, '') AS complaint_title,
+                   COALESCE(ss.settlement_status_name, 'PENDING') AS settlement_status,
+                   COALESCE(cs.case_state_name, 'OPEN') AS case_state
+            FROM blotter_case bc
+            LEFT JOIN complaint_title ct ON ct.complaint_title_id = bc.complaint_title_id
+            LEFT JOIN settlement_status ss ON ss.settlement_status_id = bc.settlement_status_id
+            LEFT JOIN case_state cs ON cs.case_state_id = bc.case_state_id
+            WHERE bc.blotter_case_id = %s
+        """, [case_id])
+        case_row = cur.fetchone()
+        if not case_row:
+            return HttpResponseNotFound("Case not found")
+        
+        case = case_row
+        
+        # Get forms for this case
+        cur.execute("""
