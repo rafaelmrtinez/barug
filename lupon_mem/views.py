@@ -1378,7 +1378,7 @@ def form_builder(request, case_id: int, form_id: int = None, submission_id: int 
         # Apply values
         fields_with_values = apply_answers_and_prefills(
             fields, answers, prefill_by_label, prefill_by_code,
-            form_id=fid, submission_id=submission_id, form_code=form_code
+            form_id=fid, submission_id=submission_id, form_code=form_code, case_id=case_id
         )
 
     # Page 2 split marker

@@ -390,15 +390,17 @@ def apply_answers_and_prefills(
     form_id: int = None,
     submission_id: int = None,
     form_code: str = None,
+    case_id: int = None,
 ):
-    # For KP-24, use handler to populate fields
+    # For KP-24, Case Folder, and MED3-FOLDER, use handler to populate fields
     handler_values = {}
-    if form_code == "KP-24" and submission_id:
+    if form_code in ("KP-24", "CASE-FOLDER", "MED3-FOLDER", "MED3-SETTLED"):
         try:
             from lupon_mem.services.forms import get_handler
             handler = get_handler(form_code)
-            handler_values = handler.build_name_value_map(form_id, submission_id)
-        except Exception:
+            handler_values = handler.build_name_value_map(form_id, submission_id, case_id)
+        except Exception as e:
+            print(f"[apply_answers_and_prefills] Handler error for {form_code}: {e}")
             pass
     
     def _ans_or_prefill(field_id, label, code):
@@ -417,19 +419,24 @@ def apply_answers_and_prefills(
             # This is an edit - don't prefill anything
             return None
         
-        # PRIORITY 3: For NEW forms only, check handler values first for KP-24
+        # PRIORITY 3: For NEW forms only, check handler values first
         if handler_values:
             code_lower = (code or "").strip().lower()
             label_lower = (label or "").strip().lower()
+            
+            # Direct code match
+            if code_lower in handler_values:
+                return handler_values[code_lower]
+            
             # Map common field codes to handler keys
             if code_lower == "complainants" or label_lower == "complainant(s)":
-                return handler_values.get("complaints", "")
+                return handler_values.get("complainant_name", handler_values.get("complaints", ""))
             elif code_lower == "respondents" or label_lower == "respondent(s)":
-                return handler_values.get("respondents", "")
+                return handler_values.get("respondent_name", handler_values.get("respondents", ""))
             elif code_lower in ("case_num", "brgy_case_num", "case_number"):
-                return handler_values.get("case_num", "")
+                return handler_values.get("case_number", handler_values.get("case_num", ""))
             elif code_lower == "purpose":
-                return handler_values.get("purpose", "")
+                return handler_values.get("complaint_title", handler_values.get("purpose", ""))
         
         # PRIORITY 4: For NEW forms only, apply prefills based on form type
         code_lower = (code or "").strip().lower()
@@ -463,6 +470,14 @@ def apply_answers_and_prefills(
         )
         for (kff_id, field_id, label, type_name, is_required, field_code) in fields
     ]
+    
+    # Filter out specific fields for MED3-FOLDER form
+    if form_code and form_code.upper() == "MED3-FOLDER":
+        fields_with_values = [
+            row for row in fields_with_values
+            if row[1] not in (1132, 1133)  # Hide date_time_field and recipient_address
+        ]
+    
     return fields_with_values
 
 def find_page2_index(fields_with_values) -> Optional[int]:
