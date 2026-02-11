@@ -1378,7 +1378,7 @@ def form_builder(request, case_id: int, form_id: int = None, submission_id: int 
         # Apply values
         fields_with_values = apply_answers_and_prefills(
             fields, answers, prefill_by_label, prefill_by_code,
-            form_id=fid, submission_id=submission_id, form_code=form_code
+            form_id=fid, submission_id=submission_id, form_code=form_code, case_id=case_id
         )
 
     # Page 2 split marker
@@ -1769,7 +1769,7 @@ def add_form_choose_static(request, case_id: int):
     
     # ---- return only the specific forms ----
     all_forms = [
-        ('KP-9-P2', 'SUMMON FOR THE RESPONDENT - PAGE 2'),
+        ('KP-9-P2', 'OFFICER\'S RETURN'),
         ('KP-10', 'NOTICE FOR CONSTITUTION OF PANGKAT'),
         ('KP-11', 'NOTICE TO CHOSEN PANGKAT MEMBER'),
         ('KP-13', 'SUBPOENA LETTER'),
@@ -1783,13 +1783,8 @@ def add_form_choose_static(request, case_id: int):
         ('MED2-FTA-SET', '2ND MEDIATION FTA SETTLED'),
         ('MED2-SETTLED', '2ND MEDIATION SETTLED SUMMARY'),
         ('MED3-FOLDER', '3RD MEDIATION CASE FOLDER'),
-        ('MED3-SETTLED', '3RD MEDIATION SETTLED SUMMARY')
+        ('MED3-SETTLED', 'BARANGAY CASE SUMMARY')
     ]
-    
-    # ---- pagination ----
-    paginator = Paginator(all_forms, 10)  # 10 forms per page
-    page_number = request.GET.get('page', 1)
-    page_obj = paginator.get_page(page_number)
     
     gate_msg = "All forms are displayed (guards temporarily disabled)"
 
@@ -1814,8 +1809,7 @@ def add_form_choose_static(request, case_id: int):
     user_role = _auth_role_name(request)
     return render(request, "lupon_mem/add_form_choose_static.html", {
         "case_id": case_id,
-        "forms": page_obj.object_list,
-        "page_obj": page_obj,
+        "forms": all_forms,
         "gate_msg": gate_msg,
         "badge_flags": badge_flags,
         'page_path': f'{user_role} / Add Form',
@@ -1880,8 +1874,7 @@ def case_detail(request: HttpRequest, case_id: int):
     return render(request, "lupon_mem/case_detail.html", {
         "case_id": case_id,
         "case": case,
-        "forms": page_obj.object_list,
-        "page_obj": page_obj,
+        "forms": all_forms,
         "settlement_statuses": settlement_statuses,
         "case_states": case_states,
         "case_state_name": case[8] if len(case) > 8 else "OPEN",
@@ -4584,3 +4577,4 @@ def _maybe_upsert_hearing_attendance(case_id: int, source_code: str, notice_sid:
                 compl_attended, resp_attended,
                 settlement or "", remarks or ""
             ])
+

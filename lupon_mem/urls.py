@@ -20,6 +20,7 @@ from lupon_mem.views_sql import (
 )
 from lupon_mem.views_mobile import residents_search
 from lupon_mem.views_delete_submission import delete_submission
+from lupon_mem.test_case_data import test_case_22_data
 
 app_name = "lupon_mem"
 
@@ -170,5 +171,6 @@ urlpatterns = [
     path("dashboard/", views.dashboard, name="dashboard"),
     path("incident-heatmap/", views.incident_heatmap, name="incident_heatmap"),
     path("mobile/residents/search/", residents_search, name="residents_search"),
+    path("test/case-22-data/", test_case_22_data, name="test_case_22_data"),
     
 ]

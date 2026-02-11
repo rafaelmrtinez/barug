@@ -13,12 +13,12 @@ logger = logging.getLogger(__name__)
 # Exact AcroForm field names in kp_form_no_8_notice_of_hearing.pdf
 _KP8_FIELDS = [
     # parties / addressing
-    "recipient", "recipient_2", "complainants", "complainants_2",
+    "recipient", "recipient_2", "complainants", "complainants_2", "address",
     # hearing schedule (triplet + time, shown as: ... the __ day of ____, 20__)
     "appearance_date", "appearance_month", "appearance_year", "appearance_time",
-    # “This __ day of ____, ____” line (we fill day → month → year)
+    # "This __ day of ____, ____" line (we fill day → month → year)
     "date_created", "month_created", "year_created",
-    # “Notified this ____ day of ____, ____” (month → day → year; CURRENT DATE)
+    # "Notified this ____ day of ____, ____" (month → day → year; CURRENT DATE)
     "date_notified", "month_notified", "year_notified",
     # signature
     "brgy_capt",
@@ -30,7 +30,8 @@ _KP8_SOURCES: Dict[str, Set[str]] = {
     "recipient_2":       {"recipient_2"},
     "complainants":      {"complainants", "complainant(s)"},
     "complainants_2":    {"complainants_2", "complainants", "complainant(s)"},
-    # Use the Hearing* fields from the form as inputs for the “appearance_*” PDF fields
+    "address":           {"address"},
+    # Use the Hearing* fields from the form as inputs for the "appearance_*" PDF fields
     "appearance_date":   {"appearance_date", "hearing_date", "hearing date"},
     "appearance_month":  {"appearance_month", "hearing_month", "hearing month"},
     "appearance_year":   {"appearance_year", "hearing_year", "hearing year"},
@@ -53,9 +54,9 @@ class KP8Handler:
     KP-8: NOTICE OF HEARING (MEDIATION PROCEEDINGS)
 
     Rules implemented:
-      • “Notified this ____ day of ____, ____” → TODAY (Month, Day, Year).
-      • “This __ day of ____, ____” line → day → month → year.
-      • Hearing “at ____ o’clock” → normalized to HH:MM.
+      • "Notified this ____ day of ____, ____" → TODAY (Month, Day, Year).
+      • "This __ day of ____, ____" line → day → month → year.
+      • Hearing "at ____ o'clock" → normalized to HH:MM.
         Fallback chain: appearance_time (answer) → case.time_filed → case.incident_time.
       • If recipient is blank, default to first respondent (when available in answers).
       • brgy_capt mirrors the current Punong Barangay from DB (fallback to default).
@@ -299,7 +300,7 @@ class KP8Handler:
         if not (out.get("recipient") or "").strip() and respondents_val:
             out["recipient"] = respondents_val.split(",")[0].strip()
 
-        # --- CURRENT date for “Notified this … day of …, …”
+        # --- CURRENT date for "Notified this … day of …, …"
         # --- Use processed_on_date for "Notified this … day of …, …" instead of current date
         processed_date = None
         processed_date_raw = _find_any({"processed_on_date", "processed on date", "processed_date", "date_processed"})
@@ -314,7 +315,7 @@ class KP8Handler:
         out["month_notified"]  = processed_date.strftime("%B")   # Month name
         out["year_notified"]  = str(processed_date.year)        # Year
 
-        # --- “This __ day of ____, ____” (we fill DAY → MONTH → YEAR)
+        # --- "This __ day of ____, ____" (we fill DAY → MONTH → YEAR)
         # Prefer any provided date parts; else fall back to Date Filed (case) → today.
         # Pull case info for a better default + time fallback
         case_id = None
@@ -344,7 +345,7 @@ class KP8Handler:
                 if r:
                     filed_date, time_filed, incident_time = r[0], r[1], r[2]
 
-        # compute “This …” parts
+        # compute "This …" parts
         dd, mm, yy = self._parts_from_value(out.get("date_created"))
         md, mm2, yy2 = self._parts_from_value(out.get("month_created"))
         yd, ym, yy3 = self._parts_from_value(out.get("year_created"))
@@ -391,6 +392,31 @@ class KP8Handler:
                 ""
             )
 
+        # Fetch complainant address from DB if not provided
+        if not (out.get("address") or "").strip() and case_id:
+            with FS.connection.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT trim(
+                             concat_ws(', ',
+                               NULLIF(ps.purok_sitio_name,''),
+                               NULLIF(a.street,''),
+                               CASE WHEN a.barangay IS NOT NULL AND a.barangay <> '' THEN 'Brgy. '||a.barangay ELSE NULL END,
+                               NULLIF(a.city,'')
+                             )
+                           ) AS full_addr
+                      FROM complainant_case cc
+                      JOIN person p ON p.person_id = cc.person_id
+                      LEFT JOIN addresss a ON a.address_id = p.address_id
+                      LEFT JOIN purok_sitio ps ON ps.purok_sitio_id = a.purok_sitio_id
+                     WHERE cc.blotter_case_id=%s
+                     ORDER BY cc.complainant_case_id
+                     LIMIT 1
+                    """,
+                    [case_id],
+                )
+                r = cur.fetchone()
+                out["address"] = (r and r[0]) or ""
 
         # --- Barangay Captain / Punong Barangay
         if not (out.get("brgy_capt") or "").strip():

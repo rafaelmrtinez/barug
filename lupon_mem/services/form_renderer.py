@@ -133,10 +133,10 @@ def render_final_pdf(submission_id: int):
                             pass
                     page.insert_text(fitz.Point(x, top), text, fontsize=fz, fontname="helv")
 
-    # Rotate to landscape for MED summary forms
-    if form_code and form_code.upper() in ('MED1-SETTLED', 'MED2-SETTLED', 'MED3-SETTLED'):
+    # Set to portrait (0 degree rotation) for MED summary forms
+    if form_code and form_code.upper() in ('MED1-SETTLED', 'MED2-SETTLED', 'MED3-SETTLED', 'MED3-FOLDER'):
         for page in src:
-            page.set_rotation(90)
+            page.set_rotation(0)
     
     # Save / return
     out = io.BytesIO()
