@@ -380,15 +380,16 @@ def case_detail(request: HttpRequest, case_id: int):
             SELECT s.submission_id, UPPER(kf.form_code) AS code, kf.form_name, s.status,
                 MAX(CASE WHEN a.field_id = 1120 THEN a.value_json #>> '{}' END),
                 MAX(CASE WHEN a.field_id = 1121 THEN a.value_json #>> '{}' END),
-                MAX(CASE WHEN a.field_id = 1122 THEN a.value_json #>> '{}' END)
+                MAX(CASE WHEN a.field_id = 1122 THEN a.value_json #>> '{}' END),
+                s.form_id
             FROM blotter_kp_submission s 
             JOIN kp_form kf ON kf.form_id = s.form_id
             LEFT JOIN blotter_kp_answer a ON a.submission_id = s.submission_id AND a.field_id IN (1120,1121,1122)
             WHERE s.blotter_case_id = %s
-            GROUP BY s.submission_id, kf.form_code, kf.form_name, s.status
+            GROUP BY s.submission_id, kf.form_code, kf.form_name, s.status, s.form_id
             ORDER BY s.submission_id DESC
         """, [case_id])
-        forms = [(r[0], r[1], r[2], r[3], r[4], r[5], r[6]) for r in cur.fetchall()]
+        forms = [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]) for r in cur.fetchall()]
 
         cur.execute("""
             SELECT UPPER(kf.form_code) FROM blotter_kp_submission s

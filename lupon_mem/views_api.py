@@ -90,11 +90,16 @@ LUPON_ROLES = {"BARANGAY LUPON MEMBER", "BARANGAY LUPON PRESIDENT"}
 @session_login_required
 @role_required(*LUPON_ROLES)
 def submission_pdf(request: HttpRequest, submission_id: int):
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
         pdf_bytes, filename = render_final_pdf(submission_id=submission_id)
     except ValidationError as e:
+        logger.error(f"[PDF] ValidationError for submission {submission_id}: {e}")
         return HttpResponse(str(e), status=400)
-    except Exception:
+    except Exception as e:
+        logger.exception(f"[PDF] Failed to generate PDF for submission {submission_id}")
         return HttpResponse("Failed to generate PDF.", status=500)
 
     resp = HttpResponse(pdf_bytes, content_type="application/pdf")
@@ -350,7 +355,7 @@ def submit_form(request: HttpRequest):
         with connection.cursor() as cur:
             cur.execute(
                 "UPDATE blotter_kp_submission "
-                "SET status='SUBMITTED', submitted_at=now() "
+                "SET status='SUBMITTED', submitted_at=COALESCE(submitted_at, now()) "
                 "WHERE submission_id=%s",
                 [submission_id]
             )

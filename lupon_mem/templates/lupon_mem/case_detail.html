@@ -204,8 +204,8 @@
             </td>
             <td class="fw-semibold">
               {{ f.2 }}
-              {% if f.7 %}
-                <span class="badge rounded-pill bg-light text-dark border ms-2">{{ f.7 }}</span>
+              {% if f.7 and f.7 != f.1 %}
+                <span class="badge rounded-pill bg-light text-dark border ms-2" style="display:none;">{{ f.7 }}</span>
               {% endif %}
             </td>
             <td>
@@ -232,6 +232,12 @@
                    target="_blank"
                    title="View PDF">
                   {% bs_icon_cached 'file-earmark-pdf' %}
+                </a>
+                <a href="{% url 'lupon_mem:form_builder' case_id=case.0 form_id=f.7 %}?submission_id={{ f.0 }}"
+                   class="btn btn-outline-secondary btn-sm"
+                   title="Edit Form"
+                   style="display:none;">
+                  {% bs_icon_cached 'pencil-square' %}
                 </a>
                 {% if request.session.auth.role_name|lower != 'barangay secretary' %}
                 <button type="button" 

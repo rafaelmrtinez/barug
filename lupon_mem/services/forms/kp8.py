@@ -354,12 +354,13 @@ class KP8Handler:
         made_year  = yy or yy2 or yy3
 
         if not (made_day or made_month or made_year):
-            src = filed_date or today
+            src = filed_date or _date.today()
             if isinstance(src, _date):
                 made_day   = f"{src.day:02d}"
                 made_month = src.strftime("%B")
                 made_year  = str(src.year)
             else:
+                today = _date.today()
                 made_day, made_month, made_year = f"{today.day:02d}", today.strftime("%B"), str(today.year)
 
         # --- Use date_created from form for "This __ day of ____, ____" instead of current date
@@ -410,7 +411,6 @@ class KP8Handler:
                       LEFT JOIN addresss a ON a.address_id = p.address_id
                       LEFT JOIN purok_sitio ps ON ps.purok_sitio_id = a.purok_sitio_id
                      WHERE cc.blotter_case_id=%s
-                     ORDER BY cc.complainant_case_id
                      LIMIT 1
                     """,
                     [case_id],

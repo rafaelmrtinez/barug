@@ -652,8 +652,11 @@
           <span class="when-busy d-none"><span class="spinner-border spinner-border-sm me-1"></span> Saving…</span>
         </button> -->
         <button id="submitBtn" class="btn btn-brand">
-          <span class="when-idle"><i class="bi bi-check2-square me-1"></i> Submit &amp; Generate PDF</span>
-          <span class="when-busy d-none"><span class="spinner-border spinner-border-sm me-1"></span> Submitting…</span>
+          <span class="when-idle">
+            <i class="bi bi-check2-square me-1"></i> 
+            {% if submission_id %}Save Changes &amp; Regenerate PDF{% else %}Submit &amp; Generate PDF{% endif %}
+          </span>
+          <span class="when-busy d-none"><span class="spinner-border spinner-border-sm me-1"></span> {% if submission_id %}Saving…{% else %}Submitting…{% endif %}</span>
         </button>
       </div>
     </div>
@@ -681,7 +684,7 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header border-0">
-        <h5 class="modal-title d-flex align-items-center"><i class="bi bi-file-check me-2 text-warning"></i> Confirm Submit &amp; Generate PDF</h5>
+        <h5 class="modal-title d-flex align-items-center"><i class="bi bi-file-check me-2 text-warning"></i> {% if submission_id %}Confirm Save Changes{% else %}Confirm Submit &amp; Generate PDF{% endif %}</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
