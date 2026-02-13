@@ -434,6 +434,13 @@ def apply_answers_and_prefills(
             if row[1] not in (1132, 1133)  # Hide date_time_field and recipient_address
         ]
     
+    # Filter out Monitoring Date and Monitoring Remarks for form 41
+    if form_id == 41:
+        fields = [
+            row for row in fields
+            if row[1] not in (69, 238)  # Hide Monitoring Date (field_id 69) and Monitoring Remarks (field_id 238)
+        ]
+    
     def _ans_or_prefill(field_id, label, code):
         v = answers.get(str(field_id))
         
