@@ -106,8 +106,8 @@
       <div class="search">
         🔎 <input id="q" type="text" placeholder="Search title, remarks, OR…" />
       </div>
-      <div class="sort" id="sortBtn" data-order="asc" title="Toggle sort order">
-        ⏱️ <span id="sortLabel">Oldest → Newest</span>
+      <div class="sort" id="sortBtn" data-order="desc" title="Toggle sort order">
+        ⏱️ <span id="sortLabel">Newest → Oldest</span>
       </div>
     </div>
 
@@ -169,7 +169,7 @@
                       <div class="left">
                         <span class="kind-pill">{{ e.kind|title }}</span>
                         <span class="e-title">{{ e.title }}</span>
-                        {% if e.subtitle %}<div class="subtitle">{{ e.subtitle }}</div>{% endif %}
+                        {% if e.subtitle %}<div class="subtitle" style="white-space: pre-line;">{{ e.subtitle }}</div>{% endif %}
 
                         {% if e.kind == 'form' and e.meta.submission_id %}
                           <div class="meta">
@@ -266,10 +266,10 @@
       search.addEventListener('input', applyFilters);
 
       sortBtn.addEventListener('click', () => {
-        const curr = sortBtn.getAttribute('data-order') || 'asc';
-        const next = (curr === 'asc') ? 'desc' : 'asc';
+        const curr = sortBtn.getAttribute('data-order') || 'desc';
+        const next = (curr === 'desc') ? 'asc' : 'desc';
         sortBtn.setAttribute('data-order', next);
-        sortLabel.textContent = next === 'asc' ? 'Oldest → Newest' : 'Newest → Oldest';
+        sortLabel.textContent = next === 'desc' ? 'Newest → Oldest' : 'Oldest → Newest';
         reverseOrder();
       });
 

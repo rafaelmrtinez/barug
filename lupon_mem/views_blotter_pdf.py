@@ -95,24 +95,28 @@ def generate_blotter_pdf(request, report_id: int):
     
     # Fill form fields
     writer.append(reader)
-    writer.update_page_form_field_values(
-        writer.pages[0],
-        {
-            'brgy_blotter_case_number': str(report_id),
-            'date_time': date_time_reported or '',
-            'complainant_name': complainant_names or '',
-            'complainant_addr': complainant_addresses or '',
-            'complainant_contact_num': complainant_contacts or '',
-            'respondent_name': respondent_names or '',
-            'respondent_addr': respondent_addresses or '',
-            'respondent_contact_num': respondent_contacts or '',
-            'date_time_of_incident': incident_datetime,
-            'incident_information': incident_desc or incident_subject or '',
-            'complainant_printed_name': complainant_names or '',
-            'brgy_captain': officials.get('BARANGAY CAPTAIN', ''),
-            'brgy_sec': officials.get('BARANGAY SECRETARY', ''),
-        }
-    )
+    try:
+        writer.update_page_form_field_values(
+            writer.pages[0],
+            {
+                'brgy_blotter_case_number': str(report_id),
+                'date_time': date_time_reported or '',
+                'complainant_name': complainant_names or '',
+                'complainant_addr': complainant_addresses or '',
+                'complainant_contact_num': complainant_contacts or '',
+                'respondent_name': respondent_names or '',
+                'respondent_addr': respondent_addresses or '',
+                'respondent_contact_num': respondent_contacts or '',
+                'date_time_of_incident': incident_datetime,
+                'incident_information': incident_desc or incident_subject or '',
+                'complainant_printed_name': complainant_names or '',
+                'brgy_captain': officials.get('BARANGAY CAPTAIN', ''),
+                'brgy_sec': officials.get('BARANGAY SECRETARY', ''),
+            }
+        )
+    except KeyError:
+        # PDF form fields missing appearance dictionary - flatten and continue
+        pass
     
     # Save to BytesIO
     output = BytesIO()

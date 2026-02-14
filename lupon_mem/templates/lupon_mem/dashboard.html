@@ -90,19 +90,19 @@
 }
 
 /* Legend for Barangay Cases Status Breakdown */
-#statusLegend.legend-vertical {
+#statusLegend.legend-vertical, #natureLegend.legend-vertical {
   display: flex;
   flex-direction: column;
   gap: 0.25em;
 }
 
-#statusLegend .legend-item {
+#statusLegend .legend-item, #natureLegend .legend-item {
   display: flex;
   align-items: center;
   gap: 0.5em;
 }
 
-#statusLegend .legend-dot {
+#statusLegend .legend-dot, #natureLegend .legend-dot {
   width: .9rem;
   height: .9rem;
   border-radius: 50%;
@@ -110,7 +110,7 @@
   flex-shrink: 0;
 }
 
-#statusLegend .legend-label {
+#statusLegend .legend-label, #natureLegend .legend-label {
   font-size: .625rem;
   color: var(--neutral-600);
   white-space: nowrap;
@@ -262,8 +262,9 @@
         <div class="card-header d-flex align-items-center justify-content-between">
           <h5 class="mb-0">Case Nature Distribution</h5>
         </div>
-        <div class="card-body">
-          <div class="chart-wrap">
+        <div class="card-body d-flex align-items-center" style="gap:1.5rem;">
+          <div id="natureLegend" class="legend-vertical me-2"></div>
+          <div class="chart-wrap flex-grow-1">
             <canvas id="casesNature"></canvas>
             <div class="skeleton chart-skel-cases"></div>
           </div>

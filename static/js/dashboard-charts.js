@@ -378,7 +378,7 @@
       canvas.width = W*dpr; canvas.height = H*dpr;
       const ctx = canvas.getContext('2d'); ctx.scale(dpr,dpr);
 
-      const m = { l:44, r:18, t:28, b:44 };
+      const m = { l:44, r:18, t:28, b:64 }; // increased bottom margin for wrapped labels
       const x0 = m.l, x1 = W - m.r, y0 = H - m.b;
       let y1 = m.t; // <-- changed to let
 
@@ -416,6 +416,7 @@
 
       // --- x-axis labels ---
       // --- x-axis labels with wrapping ---
+      if (opts.showXLabels !== false) {
         const labelFontSize = opts.labelFontSize || 12;
         ctx.font = `${labelFontSize}px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif`;
         ctx.textAlign = 'center';
@@ -423,12 +424,11 @@
 
         const barSpace = (x1 - x0) / n;
         const barWidth = Math.max(12, barSpace * 0.6);
-        const maxLabelWidth = barSpace * 0.9; // max width per bar
+        const maxLabelWidth = barSpace * 0.9;
 
         labels.forEach((lbl, i) => {
         const cx = x0 + barSpace * (i + 0.5);
 
-        // split label into multiple lines if too long
         const words = lbl.split(' ');
         const lines = [];
         let currentLine = words[0];
@@ -443,11 +443,14 @@
         }
         lines.push(currentLine);
 
-        // draw each line
         lines.forEach((line, idx) => {
-            ctx.fillText(line, cx, y0 + 4 + idx * (labelFontSize + 2)); // 2px line spacing
+            ctx.fillText(line, cx, y0 + 4 + idx * (labelFontSize + 2));
         });
         });
+      }
+
+      const barSpace = (x1 - x0) / n;
+      const barWidth = Math.max(12, barSpace * 0.6);
 
 
       // --- bars ---
@@ -482,12 +485,13 @@
       const ctx = state.ctx;
       if(hoveredIndex!==-1){
         const v = state.data[hoveredIndex]||0;
+        const label = state.labels[hoveredIndex]||'';
         const cx = state.x0 + state.barSpace*(hoveredIndex+0.5);
         const h = (v/state.scale.niceMax)*(state.y0 - state.y1);
-        ctx.font='10px sans-serif';
-        ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.fillStyle='black';
+        ctx.font='bold 11px sans-serif';
+        ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.fillStyle='#111';
         const nfOpts = opts.numberFormat||{};
-        ctx.fillText(formatNumber(v,nfOpts), cx, state.y0-h-4);
+        ctx.fillText(`${label}: ${formatNumber(v,nfOpts)}`, cx, state.y0-h-4);
       }
     };
     canvas.onmouseleave = ()=>{ state = draw(); };
@@ -528,9 +532,28 @@
     }
 
     if(document.getElementById('casesNature') && dash.casesNature){
-      const pal = config.palette || [DEFAULTS.BRAND700,DEFAULTS.BRAND500,DEFAULTS.BRAND300,DEFAULTS.NEU300];
-      ChartUtils.renderBar('casesNature', dash.casesNature.labels||[], dash.casesNature.data||[], { palette:pal, labelFontSize: 11, });
+      const distinctPalette = ['#6d2932','#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22','#34495e','#16a085','#c0392b','#8e44ad','#27ae60','#d35400','#2c3e50'];
+      ChartUtils.renderBar('casesNature', dash.casesNature.labels||[], dash.casesNature.data||[], { palette:distinctPalette, showXLabels: false });
       document.querySelector('.chart-skel-cases')?.classList?.add('hidden');
+      
+      const natureLegend = document.getElementById('natureLegend');
+      if (natureLegend && dash.casesNature) {
+        const labels = dash.casesNature.labels || [];
+        natureLegend.innerHTML = '';
+        labels.forEach((label, idx) => {
+          const div = document.createElement('div');
+          div.className = 'legend-item';
+          const dot = document.createElement('span');
+          dot.className = 'legend-dot';
+          dot.style.backgroundColor = distinctPalette[idx % distinctPalette.length];
+          const labelSpan = document.createElement('span');
+          labelSpan.className = 'legend-label';
+          labelSpan.textContent = label;
+          div.appendChild(dot);
+          div.appendChild(labelSpan);
+          natureLegend.appendChild(div);
+        });
+      }
     }
 
     if(document.getElementById('childvaxPerMonth') && dash.childvaxPerMonth){
