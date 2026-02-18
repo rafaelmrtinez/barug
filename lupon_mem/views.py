@@ -2112,12 +2112,6 @@ def incident_heatmap(request: HttpRequest):
                   AND a.longitude IS NOT NULL
                   AND bc.date_filed >= CURRENT_DATE - INTERVAL '1 year'
                 GROUP BY a.street, a.barangay
-            ),
-            stats AS (
-                SELECT 
-                    AVG(incident_count) as mean_incidents,
-                    STDDEV(incident_count) as stddev_incidents
-                FROM street_incidents
             )
             SELECT 
                 si.street_name,
@@ -2125,19 +2119,9 @@ def incident_heatmap(request: HttpRequest):
                 si.incident_count,
                 si.settled_count,
                 si.recent_count,
-                si.last_incident_date,
-                -- Z-score: how many standard deviations above mean
-                CASE 
-                    WHEN s.stddev_incidents > 0 THEN 
-                        (si.incident_count - s.mean_incidents) / s.stddev_incidents
-                    ELSE 0
-                END as z_score
+                si.last_incident_date
             FROM street_incidents si
-            CROSS JOIN stats s
-            WHERE si.incident_count >= GREATEST(3, s.mean_incidents)  -- At least 3 incidents OR above average
-               OR si.recent_count >= 2  -- OR 2+ incidents in last 30 days
             ORDER BY si.incident_count DESC, si.recent_count DESC
-            LIMIT 25
         """
         cur.execute(sql_streets)
         street_stats = cur.fetchall()
@@ -2254,15 +2238,6 @@ def incident_heatmap(request: HttpRequest):
     street_data = []
     for street in street_stats:
         settlement_rate = round((street[3] / street[2] * 100) if street[2] > 0 else 0, 1)
-        z_score = float(street[6]) if len(street) > 6 and street[6] is not None else 0
-        
-        # Risk level based on z-score and recent activity
-        if z_score >= 1.5 or street[4] >= 3:
-            risk_level = 'High'
-        elif z_score >= 0.5 or street[4] >= 2:
-            risk_level = 'Medium'
-        else:
-            risk_level = 'Low'
         
         street_data.append({
             'street': street[0],
@@ -2271,9 +2246,7 @@ def incident_heatmap(request: HttpRequest):
             'settled_count': street[3],
             'recent_count': street[4],
             'settlement_rate': settlement_rate,
-            'last_incident': street[5].strftime('%Y-%m-%d') if street[5] else 'N/A',
-            'risk_level': risk_level,
-            'z_score': round(z_score, 2)
+            'last_incident': street[5].strftime('%Y-%m-%d') if street[5] else 'N/A'
         })
 
     user_role = _auth_role_name(request)
