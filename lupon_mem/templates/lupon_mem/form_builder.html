@@ -116,6 +116,12 @@
     .col-12:has([data-field-id="1133"]),.col-md-6:has([data-field-id="1133"]),.col-12:has([data-field-id="1132"]),.col-md-6:has([data-field-id="1132"]),.col-12:has([data-code="processed_on_time"]),.col-md-6:has([data-code="processed_on_time"]){display:none!important;}
   </style>
   {% endif %}
+  {% if form_id == 33 %}
+  <style>
+    /* Ensure Mediation Hearing Date & Time field (1135) is visible for form 33 */
+    [data-field-id="1135"],.col-12:has([data-field-id="1135"]),.col-md-6:has([data-field-id="1135"]){display:block!important;}
+  </style>
+  {% endif %}
 </head>
 
 <body>
