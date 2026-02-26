@@ -1,7 +1,7 @@
 # services/timeline.py
 from __future__ import annotations
 from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime, date, time as dtime
+from datetime import datetime, date, time as dtime, timezone as dt_timezone
 from django.db import connection
 from django.utils import timezone
 
@@ -22,8 +22,11 @@ def _to_sort_ts(dt: Optional[datetime]) -> float:
     if dt is None:
         return float("inf")
     try:
-        aware = dt if timezone.is_aware(dt) else timezone.make_aware(dt, timezone.get_current_timezone(), is_dst=None)
-        return aware.astimezone(timezone.utc).timestamp()
+        if timezone.is_aware(dt):
+            return dt.astimezone(dt_timezone.utc).timestamp()
+        else:
+            aware = timezone.make_aware(dt, timezone.get_current_timezone())
+            return aware.astimezone(dt_timezone.utc).timestamp()
     except Exception:
         return float("inf")
 
@@ -34,11 +37,10 @@ def _row_to_event(
     subtitle: str = "",
     meta: Optional[Dict[str, Any]] = None,
 ):
-    disp = _to_display_naive(dt)
     return {
-        "dt": disp,                 # timezone-naive for template
-        "ts": _to_sort_ts(dt),      # numeric sort key
-        "kind": kind,               # report|case|form|progress|hearing|conciliation|payment|or|status|media|state
+        "dt": _to_display_naive(dt),  # timezone-naive for template
+        "ts": _to_sort_ts(dt),          # numeric sort key from ORIGINAL dt
+        "kind": kind,
         "title": title.strip(),
         "subtitle": (subtitle or "").strip(),
         "meta": meta or {},
@@ -383,7 +385,26 @@ def _fetch_progress(case_id: int) -> List[Dict[str, Any]]:
         subtitle = (remarks or "").strip()
         kind = "progress"
         title = tname.title()
-        if "SCHEDULED HEARING" in tname:
+        
+        # Handle reschedule formatting
+        if "RESCHEDULED" in tname or "RESCHEDULE" in tname:
+            kind, title = "hearing", "Hearing rescheduled"
+            # Parse and reformat subtitle for consistency
+            if subtitle:
+                # Check if it already has the "from X to Y" format
+                if "rescheduled from" in subtitle.lower():
+                    # Already formatted correctly, just ensure single "Reason:"
+                    if subtitle.count("Reason:") > 1:
+                        # Remove duplicate "Reason:" prefix
+                        parts = subtitle.split("\n", 1)
+                        if len(parts) > 1 and parts[1].startswith("Reason: Reason:"):
+                            subtitle = parts[0] + "\n" + parts[1].replace("Reason: Reason:", "Reason:", 1)
+                else:
+                    # Just a reason provided, no schedule info
+                    subtitle = f"Reason: {subtitle}"
+            else:
+                subtitle = "Reason: Rescheduled"
+        elif "SCHEDULED HEARING" in tname:
             kind, title = "hearing", "Hearing scheduled"
         elif "HEARING HELD" in tname:
             kind, title = "hearing", "Hearing held"
@@ -649,29 +670,29 @@ def get_case_timeline(case_id: int) -> Dict[str, Any]:
     # state and settlement changes
     events += _fetch_state_changes(case_id)
 
-    # sort (stable)
-    def _stable_key(e: Dict[str, Any]) -> Tuple[float, str, int]:
+    # sort chronologically
+    def _stable_key(e: Dict[str, Any]) -> Tuple[float, int]:
         meta = e.get("meta", {}) or {}
         any_id = (
-            meta.get("submission_id")
-            or meta.get("progress_id")
+            meta.get("progress_id")
+            or meta.get("submission_id")
             or meta.get("case_payment_id")
             or meta.get("report_payment_id")
             or meta.get("history_id")
             or meta.get("media_id")
-            or meta.get("or_number")
+            or meta.get("event_seq")
             or 0
         )
-        return (e["ts"], e["kind"], int(any_id) if isinstance(any_id, int) else 0)
+        return (e["ts"], int(any_id) if isinstance(any_id, int) else 0)
 
-    events.sort(key=_stable_key)
+    events.sort(key=_stable_key, reverse=True)
 
     # group by calendar day (YYYY-MM-DD) for the template
     groups: List[Dict[str, Any]] = []
     current_key: Optional[str] = None
     for ev in events:
         if ev["dt"] is not None:
-            day_obj = ev["dt"].date()           # <-- a real date
+            day_obj = ev["dt"].date()
             day_key = day_obj.isoformat()
         else:
             day_obj = None

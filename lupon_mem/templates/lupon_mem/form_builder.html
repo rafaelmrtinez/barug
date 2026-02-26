@@ -122,6 +122,11 @@
     [data-field-id="1135"],.col-12:has([data-field-id="1135"]),.col-md-6:has([data-field-id="1135"]){display:block!important;}
   </style>
   {% endif %}
+  {% if form_id == 37 %}
+  <style>
+    /* MED3-SETTLED: Make complainant and respondent editable */
+  </style>
+  {% endif %}
 </head>
 
 <body>
@@ -569,16 +574,16 @@
                     <input id="f_{{ field_id }}" type="text" class="form-control"
                            data-field-id="{{ field_id }}" data-code="{{ field_code }}"
                            value="{{ value|default:'' }}"
-                           {% if kp18_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'brgy_case_number' or code == 'purpose' %}readonly{% endif %}
-                           {% if kp19_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'brgy_case_number' or code == 'purpose' %}readonly{% endif %}
-                           {% if kp20_ui_minimal %}readonly{% endif %}
-                           {% if kp20a_ui_minimal %}readonly{% endif %}
-                           {% if kp20b_ui_minimal %}readonly{% endif %}
-                           {% if kp21_ui_minimal %}readonly{% endif %}
-                           {% if kp22_ui_minimal %}readonly{% endif %}
-                           {% if kp23_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'case_num' or code == 'purpose' %}readonly{% endif %}
-                           {% if kp24_ui_minimal and code == 'case_num' or code == 'purpose' %}readonly{% endif %}
-                           {% if minutes_ui_minimal and code != 'what' %}readonly{% endif %}
+                           {% if form_id != 37 %}{% if kp18_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'brgy_case_number' or code == 'purpose' %}readonly{% endif %}{% endif %}
+                           {% if form_id != 37 %}{% if kp19_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'brgy_case_number' or code == 'purpose' %}readonly{% endif %}{% endif %}
+                           {% if form_id != 37 %}{% if kp20_ui_minimal %}readonly{% endif %}{% endif %}
+                           {% if form_id != 37 %}{% if kp20a_ui_minimal %}readonly{% endif %}{% endif %}
+                           {% if form_id != 37 %}{% if kp20b_ui_minimal %}readonly{% endif %}{% endif %}
+                           {% if form_id != 37 %}{% if kp21_ui_minimal %}readonly{% endif %}{% endif %}
+                           {% if form_id != 37 %}{% if kp22_ui_minimal %}readonly{% endif %}{% endif %}
+                           {% if form_id != 37 %}{% if kp23_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'case_num' or code == 'purpose' %}readonly{% endif %}{% endif %}
+                           {% if form_id != 37 %}{% if kp24_ui_minimal and code == 'case_num' or code == 'purpose' %}readonly{% endif %}{% endif %}
+                           {% if form_id != 37 %}{% if minutes_ui_minimal and code != 'what' %}readonly{% endif %}{% endif %}
                            {% if is_required %}required{% endif %}>
                   {% elif type_name == "EMAIL" %}
                     <input id="f_{{ field_id }}" type="email" class="form-control"
@@ -621,16 +626,16 @@
                   {% elif type_name == "TEXTAREA" %}
                     <textarea id="f_{{ field_id }}" class="form-control" rows="4"
                               data-field-id="{{ field_id }}" data-code="{{ field_code }}"
-                              {% if kp18_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'brgy_case_number' or code == 'purpose' %}readonly{% endif %}
-                              {% if kp19_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'brgy_case_number' or code == 'purpose' %}readonly{% endif %}
-                              {% if kp20_ui_minimal %}readonly{% endif %}
-                              {% if kp20a_ui_minimal %}readonly{% endif %}
-                              {% if kp20b_ui_minimal %}readonly{% endif %}
-                              {% if kp21_ui_minimal %}readonly{% endif %}
-                              {% if kp22_ui_minimal %}readonly{% endif %}
-                              {% if kp23_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'case_num' or code == 'purpose' %}readonly{% endif %}
-                              {% if kp24_ui_minimal and code == 'case_num' or code == 'purpose' %}readonly{% endif %}
-                              {% if minutes_ui_minimal and code != 'what' %}readonly{% endif %}
+                              {% if form_id != 37 %}{% if kp18_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'brgy_case_number' or code == 'purpose' %}readonly{% endif %}{% endif %}
+                              {% if form_id != 37 %}{% if kp19_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'brgy_case_number' or code == 'purpose' %}readonly{% endif %}{% endif %}
+                              {% if form_id != 37 %}{% if kp20_ui_minimal %}readonly{% endif %}{% endif %}
+                              {% if form_id != 37 %}{% if kp20a_ui_minimal %}readonly{% endif %}{% endif %}
+                              {% if form_id != 37 %}{% if kp20b_ui_minimal %}readonly{% endif %}{% endif %}
+                              {% if form_id != 37 %}{% if kp21_ui_minimal %}readonly{% endif %}{% endif %}
+                              {% if form_id != 37 %}{% if kp22_ui_minimal %}readonly{% endif %}{% endif %}
+                              {% if form_id != 37 %}{% if kp23_ui_minimal and code == 'complainants' or code == 'respondents' or code == 'case_num' or code == 'purpose' %}readonly{% endif %}{% endif %}
+                              {% if form_id != 37 %}{% if kp24_ui_minimal and code == 'case_num' or code == 'purpose' %}readonly{% endif %}{% endif %}
+                              {% if form_id != 37 %}{% if minutes_ui_minimal and code != 'what' %}readonly{% endif %}{% endif %}
                               {% if is_required %}required{% endif %}>{{ value|default:'' }}</textarea>
                   {% else %}
                     <input id="f_{{ field_id }}" type="text" class="form-control"
