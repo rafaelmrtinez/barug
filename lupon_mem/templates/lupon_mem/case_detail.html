@@ -797,7 +797,8 @@
     kp18_second:{code:"KP-18",title:"Failure to Appear (2nd Mediation)",note:"Complainant failed to appear for 2nd mediation.",next:"mediation_choice_2"},
     kp18_third:{code:"KP-18",title:"Failure to Appear (3rd Mediation)",note:"Complainant failed to appear for final mediation. Must constitute Pangkat.",next:"kp10"},
     kp18_pangkat_1:{code:"KP-18",title:"Failure to Appear (1st Pangkat)",note:"Complainant failed to appear for 1st Pangkat hearing.",next:"pangkat_choice_1"},
-    kp18_pangkat_2:{code:"KP-18",title:"Failure to Appear (2nd Pangkat)",note:"Complainant failed to appear for 2nd Pangkat hearing. Issue Certificate to File Action.",next:"kp20"},
+    kp18_pangkat_2:{code:"KP-18",title:"Failure to Appear (2nd Pangkat)",note:"Complainant failed to appear for 2nd Pangkat hearing.",next:"pangkat_choice_2"},
+    kp18_pangkat_3:{code:"KP-18",title:"Failure to Appear (3rd Pangkat)",note:"Complainant failed to appear for 3rd Pangkat hearing. Issue Certificate to File Action.",next:"kp20_choice"},
     kp18_kp19_first:{code:"KP-18 & KP-19",title:"Both Parties Failed to Appear (1st Mediation)",note:"Both complainant and respondent failed to appear. Issue KP-18 (complainant) and KP-19 (respondent) notices.",next:"mediation_choice"},
     kp18_kp19_second:{code:"KP-18 & KP-19",title:"Both Parties Failed to Appear (2nd Mediation)",note:"Both parties failed to appear for 2nd mediation. Issue both failure notices.",next:"mediation_choice_2"},
     kp18_kp19_third:{code:"KP-18 & KP-19",title:"Both Parties Failed to Appear (3rd Mediation)",note:"Both parties failed to appear for final mediation. Issue both notices.",next:"bar_action_choice"},
@@ -805,32 +806,32 @@
     kp21:{code:"KP-21",title:"Certification to Bar Action (Complainant)",note:"Issue certification to bar complainant from filing action in court due to repeated failure to appear.",next:"close_case"},
     kp22:{code:"KP-22",title:"Certification to Bar Counterclaim (Respondent)",note:"Issue certification to bar respondent from filing counterclaim due to repeated failure to appear.",next:"close_case"},
     kp18_kp19_pangkat_1:{code:"KP-18 & KP-19",title:"Both Parties Failed to Appear (1st Pangkat)",note:"Both parties failed to appear for 1st Pangkat hearing. Issue both failure notices.",next:"pangkat_choice_1"},
-    kp18_kp19_pangkat_2:{code:"KP-18 & KP-19",title:"Both Parties Failed to Appear (2nd Pangkat)",note:"Both parties failed to appear for final Pangkat hearing. Issue both notices, then CFA.",next:"kp20"},
+    kp18_kp19_pangkat_2:{code:"KP-18 & KP-19",title:"Both Parties Failed to Appear (2nd Pangkat)",note:"Both parties failed to appear for 2nd Pangkat hearing. Issue both failure notices.",next:"pangkat_choice_2"},
+    kp18_kp19_pangkat_3:{code:"KP-18 & KP-19",title:"Both Parties Failed to Appear (3rd Pangkat)",note:"Both parties failed to appear for final Pangkat hearing. Issue both notices, then CFA.",next:"kp20_choice"},
     kp10:{code:"KP-10",title:"Notice for Constitution of Pangkat",note:"PB mediation failed or window expired. Constitute Pangkat within 3 days. Select 3 members.",next:"kp11",enter:()=>{hearingNo=2;}},
     kp11:{code:"KP-11",title:"Notice to Chosen Pangkat Member",note:"If you wish to add more Pangkat members, just click “Add Form”.",next:"kp12_first"},
     kp12_first:{code:"KP-12",title:"Notice of Hearing (1st Pangkat Conciliation)",note:"Schedule 1st Pangkat conciliation hearing within 15-day window.",next:"pangkat_hearing_1"},
     pangkat_hearing_1:{code:"—",title:"1st Pangkat Conciliation Hearing",note:"Conduct 1st Pangkat conciliation. Record outcome in Hearings page.",branches:[{label:"SETTLED",next:"kp16_settled"},{label:"NOT SETTLED",next:"pangkat_choice_1"},{label:"NO SHOW",next:"kp19_pangkat_1"},{label:"BOTH NO SHOW",next:"kp18_kp19_pangkat_1"},{label:"AGREE TO ARBITRATION",next:"kp14"}]},
-    pangkat_choice_1:{code:"—",title:"Pangkat Options (After 1st Hearing)",note:"1st Pangkat hearing unsuccessful. Choose next action within 15-day window.",branches:[{label:"Schedule 2nd Conciliation",next:"kp12_second"},{label:"Issue Certificate to File Action",next:"kp20"}]},
+    pangkat_choice_1:{code:"—",title:"Pangkat Options (After 1st Hearing)",note:"1st Pangkat hearing unsuccessful. Choose next action within 15-day window.",branches:[{label:"Schedule 2nd Conciliation",next:"kp12_second"},{label:"Issue Certificate to File Action",next:"kp20_choice"}]},
     kp12_second:{code:"KP-12",title:"Notice of Hearing (2nd Pangkat Conciliation)",note:"Schedule 2nd Pangkat conciliation within remaining window.",next:"pangkat_hearing_2",enter:()=>{hearingNo=3;}},
-    pangkat_hearing_2:{code:"—",title:"2nd Pangkat Conciliation Hearing",note:"Final Pangkat conciliation attempt. Record outcome.",branches:[{label:"SETTLED",next:"kp16_settled"},{label:"NOT SETTLED",next:"kp20"},{label:"NO SHOW",next:"kp19_pangkat_2"},{label:"BOTH NO SHOW",next:"kp18_kp19_pangkat_2"},{label:"AGREE TO ARBITRATION",next:"kp14"}]},
+    pangkat_hearing_2:{code:"—",title:"2nd Pangkat Conciliation Hearing",note:"2nd Pangkat conciliation attempt. Record outcome.",branches:[{label:"SETTLED",next:"kp16_settled"},{label:"NOT SETTLED",next:"pangkat_choice_2"},{label:"NO SHOW",next:"kp19_pangkat_2"},{label:"BOTH NO SHOW",next:"kp18_kp19_pangkat_2"},{label:"AGREE TO ARBITRATION",next:"kp14"}]},
+    pangkat_choice_2:{code:"—",title:"Pangkat Options (After 2nd Hearing)",note:"2nd Pangkat hearing unsuccessful. Choose next action within 15-day window.",branches:[{label:"Schedule 3rd Conciliation",next:"kp12_third"},{label:"Issue Certificate to File Action",next:"kp20_choice"}]},
+    kp12_third:{code:"KP-12",title:"Notice of Hearing (3rd Pangkat Conciliation)",note:"Schedule 3rd Pangkat conciliation within remaining window.",next:"pangkat_hearing_3",enter:()=>{hearingNo=4;}},
+    pangkat_hearing_3:{code:"—",title:"3rd Pangkat Conciliation Hearing",note:"Final Pangkat conciliation attempt. Record outcome.",branches:[{label:"SETTLED",next:"kp16_settled"},{label:"NOT SETTLED",next:"kp20"},{label:"NO SHOW",next:"kp19_pangkat_3"},{label:"BOTH NO SHOW",next:"kp18_kp19_pangkat_3"},{label:"AGREE TO ARBITRATION",next:"kp14"}]},
     kp19_pangkat_1:{code:"KP-19",title:"Failure to Appear (1st Pangkat)",note:"Party failed to appear for 1st Pangkat hearing.",next:"pangkat_choice_1"},
-    kp19_pangkat_2:{code:"KP-19",title:"Failure to Appear (2nd Pangkat)",note:"Respondent failed to appear for 2nd Pangkat hearing. Issue Certificate to File Action.",next:"kp20"},
-    kp14:{code:"KP-14",title:"Arbitration Agreement",note:"Parties agreed to arbitration. Proceed with arbitration process.",next:"kp15"},
+    kp19_pangkat_2:{code:"KP-19",title:"Failure to Appear (2nd Pangkat)",note:"Respondent failed to appear for 2nd Pangkat hearing.",next:"pangkat_choice_2"},
+    kp19_pangkat_3:{code:"KP-19",title:"Failure to Appear (3rd Pangkat)",note:"Respondent failed to appear for 3rd Pangkat hearing. Issue Certificate to File Action.",next:"kp20_choice"},
     kp15:{code:"KP-15",title:"Arbitration Award",note:"Arbitration award issued. Record the outcome.",branches:[{label:"Award Honored",next:"close_case"},{label:"Award Not Complied",next:"kp23"},{label:"Award Repudiated",next:"kp17"}]},
     kp16_settled:{code:"KP-16",title:"Amicable Settlement",note:"Case settled through mediation/conciliation. Record settlement details.",branches:[{label:"Settlement Complied",next:"close_case"},{label:"Settlement Not Complied",next:"kp23"},{label:"Settlement Repudiated",next:"kp17"}]},
-    kp17:{code:"KP-17",title:"Repudiation of Settlement/Award",note:"Settlement or award was repudiated. Issue notice of repudiation.",next:"kp20"},
-    kp20:{code:"KP-20",title:"Certificate to File Action (CFA)",note:"Issue Certificate to File Action. Case can proceed to court.",next:"close_case"},
+    kp17:{code:"KP-17",title:"Repudiation of Settlement/Award",note:"Settlement or award was repudiated. Issue notice of repudiation.",next:"kp20_choice"},
+    kp20_choice:{code:"—",title:"Certificate to File Action (CFA)",note:"Choose which CFA form to issue.",branches:[{label:"Repudiated",next:"kp20_lupon"},{label:"Not Settled",next:"kp20a_pangkat"},{label:"Non Appearance",next:"kp20b_standard"}]},
+    kp20_lupon:{code:"KP-20",title:"CFA from Lupon Secretary",note:"Issue CFA from Lupon Secretary.",next:"close_case"},
+    kp20a_pangkat:{code:"KP-20A",title:"CFA from Pangkat Secretary",note:"Issue CFA from Pangkat Secretary.",next:"close_case"},
+    kp20b_standard:{code:"KP-20B",title:"Standard CFA",note:"Issue standard CFA.",next:"close_case"},
     kp23:{code:"KP-23",title:"Notice of Non-Compliance",note:"Issue notice for non-compliance with settlement/award.",next:"kp24"},
     kp24:{code:"KP-24",title:"Motion for Execution",note:"File motion for execution of settlement/award.",next:"kp25"},
     kp25:{code:"KP-25",title:"Writ of Execution",note:"Issue writ of execution to enforce settlement/award.",next:"close_case"},
     kp14:{code:"KP-14",title:"Arbitration Agreement",note:"Parties agreed to arbitration. Proceed with arbitration process.",next:"kp15"},
-    kp15:{code:"KP-15",title:"Arbitration Award",note:"Arbitration award issued. Record the outcome.",branches:[{label:"Award Honored",next:"close_case"},{label:"Award Not Complied",next:"kp23"},{label:"Award Repudiated",next:"kp17"}]},
-    kp16_settled:{code:"KP-16",title:"Amicable Settlement",note:"Case settled through mediation/conciliation. Record settlement details.",branches:[{label:"Settlement Complied",next:"close_case"},{label:"Settlement Not Complied",next:"kp23"},{label:"Settlement Repudiated",next:"kp17"}]},
-    kp17:{code:"KP-17",title:"Repudiation of Settlement/Award",note:"Settlement or award was repudiated. Issue notice of repudiation.",next:"kp20"},
-    kp20:{code:"KP-20",title:"Certificate to File Action (CFA)",note:"Issue Certificate to File Action. Case can proceed to court.",next:"close_case"},
-    kp23:{code:"KP-23",title:"Notice of Non-Compliance",note:"Issue notice for non-compliance with settlement/award.",next:"kp24"},
-    kp24:{code:"KP-24",title:"Motion for Execution",note:"File motion for execution of settlement/award.",next:"kp25"},
-    kp25:{code:"KP-25",title:"Writ of Execution",note:"Issue writ of execution to enforce settlement/award.",next:"close_case"},
     close_case:{code:"—",title:"Case Closed",note:"Case has been resolved and closed. No further action required.",actions:["Update Case Status","Generate Final Report"]}
   };
 
@@ -926,6 +927,9 @@
             else if (currentStep === 'kp9_first') { hasRequiredForm = countForms('KP-9') >= 1; requiredCount = 1; }
             else if (currentStep === 'kp9_second') { hasRequiredForm = countForms('KP-9') >= 2; requiredCount = 2; }
             else if (currentStep === 'kp9_third') { hasRequiredForm = countForms('KP-9') >= 3; requiredCount = 3; }
+            else if (currentStep === 'kp12_first') { hasRequiredForm = countForms('KP-12') >= 1; requiredCount = 1; }
+            else if (currentStep === 'kp12_second') { hasRequiredForm = countForms('KP-12') >= 2; requiredCount = 2; }
+            else if (currentStep === 'kp12_third') { hasRequiredForm = countForms('KP-12') >= 3; requiredCount = 3; }
             else if (currentStep.startsWith('kp19_') || currentStep.startsWith('kp18_')) { hasRequiredForm = haveForm(step.code); requiredCount = 1; }
             else hasRequiredForm = haveForm(step.code);
             
@@ -1050,7 +1054,7 @@
         } else if (currentStep.includes('pangkat_hearing')) {
           // Handle Pangkat hearings similarly to KP-9
           const mediationHearings = await getMediationHearingDetails();
-          const currentHearing = mediationHearings.find(h => h.hearing_no === (currentStep.includes('_2') ? 3 : 2));
+          const currentHearing = mediationHearings.find(h => h.hearing_no === (currentStep.includes('_3') ? 4 : currentStep.includes('_2') ? 3 : 2));
           const outcomeDisplay = document.getElementById(`hearingOutcomeDisplay-${currentStep}`);
           if (outcomeDisplay && currentHearing) {
             const isHeld = currentHearing.hearing_held;
@@ -1089,22 +1093,26 @@
               branchDiv.appendChild(mkBtn('Issue KP-18 & KP-19', () => {
                 if (currentStep === 'pangkat_hearing_1') goToStep('kp18_kp19_pangkat_1');
                 else if (currentStep === 'pangkat_hearing_2') goToStep('kp18_kp19_pangkat_2');
+                else if (currentStep === 'pangkat_hearing_3') goToStep('kp18_kp19_pangkat_3');
               }));
             } else if (currentHearing.settlement_outcome === 'COMPLAINANT_NO_SHOW') {
               branchDiv.appendChild(mkBtn('Issue KP-18', () => {
                 if (currentStep === 'pangkat_hearing_1') goToStep('kp18_pangkat_1');
                 else if (currentStep === 'pangkat_hearing_2') goToStep('kp18_pangkat_2');
+                else if (currentStep === 'pangkat_hearing_3') goToStep('kp18_pangkat_3');
               }));
             } else if (currentHearing.settlement_outcome === 'RESPONDENT_NO_SHOW') {
               branchDiv.appendChild(mkBtn('Issue KP-19', () => {
                 if (currentStep === 'pangkat_hearing_1') goToStep('kp19_pangkat_1');
                 else if (currentStep === 'pangkat_hearing_2') goToStep('kp19_pangkat_2');
+                else if (currentStep === 'pangkat_hearing_3') goToStep('kp19_pangkat_3');
               }));
             } else {
               branchDiv.appendChild(mkBtn('SETTLED', () => goToStep('kp16_settled')));
               branchDiv.appendChild(mkBtn('NOT SETTLED', () => {
                 if (currentStep === 'pangkat_hearing_1') goToStep('pangkat_choice_1');
-                else goToStep('kp20');
+                else if (currentStep === 'pangkat_hearing_2') goToStep('pangkat_choice_2');
+                else goToStep('kp20_choice');
               }));
               branchDiv.appendChild(mkBtn('ARBITRATION', () => goToStep('kp14')));
             }
@@ -1185,7 +1193,10 @@
             nextDiv.appendChild(mkBtn('Schedule 2nd Conciliation', () => goToStep('kp12_second')));
             nextDiv.appendChild(mkBtn('Issue Certificate to File Action', () => goToStep('kp20')));
           } else if (currentStep === 'kp18_kp19_pangkat_2') {
-            nextDiv.appendChild(mkBtn('Issue Certificate to File Action', () => goToStep('kp20')));
+            nextDiv.appendChild(mkBtn('Schedule 3rd Conciliation', () => goToStep('kp12_third')));
+            nextDiv.appendChild(mkBtn('Issue Certificate to File Action', () => goToStep('kp20_choice')));
+          } else if (currentStep === 'kp18_kp19_pangkat_3') {
+            nextDiv.appendChild(mkBtn('Issue Certificate to File Action', () => goToStep('kp20_choice')));
           }
         } else {
           const nextBtn = document.createElement('button');
@@ -1250,7 +1261,7 @@
   
   function jumpToMediation(attempt){ hearingAttempt=attempt; mediationCount=attempt; if(attempt===1) goToStep('kp8_first'); else if(attempt===2) goToStep('kp8_second'); else if(attempt===3) goToStep('kp8_third'); }
   function jumpToPangkat(){ hearingNo=2; goToStep('kp10'); }
-  function jumpToResolution(){ goToStep('kp20'); }
+  function jumpToResolution(){ goToStep('kp20_choice'); }
 
   const FORM_MAP = {
     'KP-1':1,'KP-2':2,'KP-3':3,'KP-4':4,'KP-5':5,'KP-6':6,

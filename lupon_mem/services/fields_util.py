@@ -153,12 +153,23 @@ def get_this_case_kp7_date_filed(case_id: int) -> Optional[str]:
     if not (month and day and year):
         return None
 
-    # Normalize day: "29th" -> "29", ensure 2 digits
-    if not day.isdigit():
-        digits = ''.join(ch for ch in day if ch.isdigit())
-        day = digits or day
-    if day.isdigit():
-        day = f"{int(day):02d}"
+    # Handle if date_created contains full date like "20260128"
+    if len(day) == 8 and day.isdigit():
+        # Format: YYYYMMDD
+        try:
+            parsed_date = datetime.strptime(day, '%Y%m%d').date()
+            month = parsed_date.strftime('%B')
+            day = f"{parsed_date.day:02d}"
+            year = str(parsed_date.year)
+        except ValueError:
+            pass
+    else:
+        # Normalize day: "29th" -> "29", ensure 2 digits
+        if not day.isdigit():
+            digits = ''.join(ch for ch in day if ch.isdigit())
+            day = digits or day
+        if day.isdigit():
+            day = f"{int(day):02d}"
 
     return f"{month} {day}, {year}"
 

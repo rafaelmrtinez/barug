@@ -31,7 +31,7 @@ _KP20_SOURCES: Dict[str, Set[str]] = {
     "respondents_2":{"respondents","respondent(s)","party-respondents","parties_respondents"},
     "brgy_case_number":{"case_number","brgy_case_number","brgy_case_num","case number","case_no","case_num","blotter_case_num","barangay_case_number","barangay case number","barangay case no","brgy case no"},
     "purpose":{"purpose","for","case_purpose"},
-    "date_filed":{"date_filed","filed_date","date_of_filing","date_created","date today","date_today"},
+    "date_filed":{"date_filed","filed_date","date_of_filing","date_created","date today","date_today","med_att_date_time_filed","date & time filed","date and time filed"},
     "time_filed":{"time_filed","filed_time","time_of_filing","time_created"},
     "complaint_date_month":{"complaint_date_month","month_of_complaint","current_month","month_today"},
     "complaint_year":{"complaint_year","year_of_complaint","current_year","year_today"},
@@ -275,9 +275,26 @@ class KP20Handler:
         kp7_date_str = None
         kp7_time_obj = None
         
-        if case_id:
+        # First check if date_filed already has the combined format "Jan 28, 2026 @03:09 PM"
+        date_filed_raw = out.get("date_filed", "").strip()
+        if date_filed_raw and "@" in date_filed_raw:
+            # Split "Jan 28, 2026 @03:09 PM" into date and time parts
+            parts = date_filed_raw.split("@")
+            if len(parts) == 2:
+                date_part = parts[0].strip()
+                time_part = parts[1].strip()
+                
+                # Parse and reformat date to "January 28, 2026"
+                date_obj = _try_parse_date(date_part)
+                if date_obj:
+                    kp7_date_str = _fmt_full(date_obj)
+                
+                # Parse time
+                kp7_time_obj = _parse_time(time_part)
+        
+        # If not found in saved answers, try KP-7 form
+        if not kp7_date_str and case_id:
             try:
-                # Use the dedicated function for KP-7 date
                 kp7_date_str = get_this_case_kp7_date_filed(case_id)
                 
                 # Get time from KP-7
@@ -286,10 +303,10 @@ class KP20Handler:
                     time_text = get_field_text(kp7_rows, "case_time_filed") or get_field_text(kp7_rows, "time_filed")
                     if time_text:
                         kp7_time_obj = _parse_time(time_text)
-            except Exception:
+            except Exception as e:
                 pass
         
-        # -------- date_filed/time_filed MUST come from KP-7 --------
+        # -------- date_filed/time_filed MUST come from KP-7 or saved answers --------
         if kp7_date_str:
             out["date_filed"] = kp7_date_str
         if kp7_time_obj:
