@@ -151,13 +151,11 @@ class KP11Handler:
         parsed = self._try_parse_date(out.get("date_today", "")) or today
         out["date_today"] = self._to_long_date(parsed)
 
-        # Derive rcvd_date / rcvd_month / rcvd_month_2(YEAR) from parsed date if blank
-        if not (out.get("rcvd_date") or "").strip():
-            out["rcvd_date"] = str(parsed.day)
-        if not (out.get("rcvd_month") or "").strip():
-            out["rcvd_month"] = parsed.strftime("%B")
-        if not (out.get("rcvd_month_2") or "").strip():
-            out["rcvd_month_2"] = str(parsed.year)
+        # Parse rcvd_date if it's a full date string, extract day/month/year
+        rcvd_parsed = self._try_parse_date(out.get("rcvd_date", "")) or parsed
+        out["rcvd_date"] = str(rcvd_parsed.day)
+        out["rcvd_month"] = rcvd_parsed.strftime("%B").upper()
+        out["rcvd_month_2"] = str(rcvd_parsed.year)
 
         # --- Auto-fill officials if missing ---
         if not (out.get("brgy_capt") or "").strip():

@@ -18,6 +18,7 @@ _KP12_FIELDS = [
     "repondents_one",      # (typo in PDF) — keep as-is
     "date_created",        # DAY number (e.g., "7")
     "month_created",       # Month name (e.g., "October")
+    "year",                # Year from date_created (e.g., "2026")
     "time_created",        # "h:MM AM/PM"
     "current_date",        # DAY number
     "current_month",       # Month name
@@ -200,8 +201,8 @@ class KP12Handler:
         # --- Created stamps ---
         day_c, month_c, year_c = _coerce_to_day_month_year(out.get("date_created", ""), today)
         out["date_created"] = day_c
-        if not (out.get("month_created") or "").strip():
-            out["month_created"] = month_c
+        out["month_created"] = month_c
+        out["year"] = year_c
 
         # --- Current stamps (TODAY) ---
         day_cur, month_cur, year_cur = _coerce_to_day_month_year(out.get("current_date", ""), today)
@@ -222,9 +223,8 @@ class KP12Handler:
         # Time → 12h AM/PM (Windows-safe)
         out["time_created"] = self._to_12h(out.get("time_created", ""), now_ph)
 
-        # Pangkat Chairman (Lupon Chair/President)
-        if not (out.get("brgy_captain") or "").strip():
-            out["brgy_captain"] = get_lupon_chair_name(default=out.get("brgy_captain", ""))
+        # Pangkat Chairman - always use LOURDES RAMIREZ
+        out["brgy_captain"] = "LOURDES RAMIREZ"
 
         # Final sanitize & ensure all known fields exist
         for k, v in list(out.items()):
