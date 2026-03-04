@@ -405,6 +405,14 @@ def case_detail(request: HttpRequest, case_id: int):
               AND UPPER(kf.form_code) IN ('KP-7','KP-8','KP-9','KP-10','KP-11','KP-12','KP-16')
         """, [case_id])
         submitted_form_codes = {r[0] for r in cur.fetchall()}
+        
+        cur.execute("""
+            SELECT file_name, document_type, uploaded_at, file_path
+            FROM case_document
+            WHERE blotter_case_id = %s AND is_deleted = FALSE
+            ORDER BY uploaded_at DESC
+        """, [case_id])
+        case_documents = cur.fetchall() or []
 
     flow_steps = ['KP-7', 'KP-8', 'KP-9', 'KP-10', 'KP-11', 'KP-12', 'KP-16']
     progress_percentage = int((sum(1 for s in flow_steps if s in submitted_form_codes) / len(flow_steps)) * 100)
@@ -413,7 +421,7 @@ def case_detail(request: HttpRequest, case_id: int):
     
     return render(request, "lupon_mem/case_detail.html", {
         "case": case_row, "forms": forms, "case_id": case_id,
-        "hearing_window": None, "settlement_choices": ["Settled", "Not Settled", "Pending"],
+        "case_documents": case_documents, "hearing_window": None, "settlement_choices": ["Settled", "Not Settled", "Pending"],
         "incident_description": case_row[4], "case_nature": case_row[6],
         "case_state_name": case_row[9], "case_closed_at": case_row[10],
         "settlement_statuses": _fetch_lookups()["settlement_statuses"],

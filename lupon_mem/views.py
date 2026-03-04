@@ -1863,6 +1863,15 @@ def case_detail(request: HttpRequest, case_id: int):
         # Get case states for modal
         cur.execute("SELECT case_state_id, case_state_name FROM case_state ORDER BY case_state_name")
         case_states = cur.fetchall()
+        
+        # Get uploaded documents for this case
+        cur.execute("""
+            SELECT file_name, document_type, uploaded_at, file_path
+            FROM case_document
+            WHERE blotter_case_id = %s AND is_deleted = FALSE
+            ORDER BY uploaded_at DESC
+        """, [case_id])
+        case_documents = cur.fetchall()
     
     # Pagination
     from django.core.paginator import Paginator
@@ -1878,6 +1887,7 @@ def case_detail(request: HttpRequest, case_id: int):
         "settlement_statuses": settlement_statuses,
         "case_states": case_states,
         "case_state_name": case[8] if len(case) > 8 else "OPEN",
+        "case_documents": case_documents,
         'page_path': f'{user_role} / Case Details',
         'page_title': f'Case #{case[1]}' if case else 'Case Details',
     })
@@ -4551,3 +4561,284 @@ def _maybe_upsert_hearing_attendance(case_id: int, source_code: str, notice_sid:
                 settlement or "", remarks or ""
             ])
 
+
+
+# ============================================
+# CASE DOCUMENT UPLOAD (Final Copy, etc.)
+# ============================================
+
+@session_login_required
+@role_required(*LUPON_ROLES, "barangay treasurer")
+@require_POST
+def case_document_upload(request: HttpRequest, case_id: int):
+    """
+    Upload a case document (final copy, settlement copy, etc.) to Supabase Storage.
+    """
+    files = request.FILES.getlist('documents[]') or request.FILES.getlist('documents')
+    document_type = request.POST.get('document_type', 'FINAL_COPY').strip().upper()
+    description = request.POST.get('description', '').strip()
+    
+    if not files:
+        messages.error(request, "Please select at least one file to upload.")
+        return redirect('lupon_mem:case_detail', case_id=case_id)
+    
+    staff_id = (request.session.get("auth") or {}).get("staff_id")
+    bucket = getattr(settings, "SUPABASE_BUCKET", "documents")
+    
+    saved = 0
+    for f in files:
+        if not isinstance(f, UploadedFile):
+            continue
+        
+        # Sanitize filename
+        safe_name = f.name.replace("..", "").replace("/", "_")
+        ext = os.path.splitext(safe_name)[1].lower()
+        
+        # Generate unique filename
+        unique_name = f"{uuid.uuid4().hex}{ext}"
+        path = f"blotter/{case_id}/documents/{unique_name}"
+        
+        try:
+            # Upload to Supabase
+            supabase.storage.from_(bucket).upload(
+                path, 
+                f.read(),
+                {"contentType": f.content_type or "application/pdf", "upsert": "true"}
+            )
+            
+            # Get public URL
+            storage_url = None
+            try:
+                pub = supabase.storage.from_(bucket).get_public_url(path)
+                storage_url = pub.get("publicUrl") if isinstance(pub, dict) else (pub if isinstance(pub, str) else None)
+            except Exception:
+                pass
+            
+            if not storage_url:
+                try:
+                    signed = supabase.storage.from_(bucket).create_signed_url(path, 60*60*24*365)  # 1 year
+                    storage_url = signed.get("signedURL") or signed.get("signedUrl") or signed.get("signed_url")
+                except Exception:
+                    pass
+            
+            # Store in database
+            with connection.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO case_document 
+                        (blotter_case_id, document_type, file_name, file_path, mime_type, 
+                         file_size_bytes, uploaded_by_id, description)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING case_document_id
+                """, [
+                    case_id, 
+                    document_type, 
+                    safe_name, 
+                    storage_url or path,
+                    f.content_type,
+                    f.size,
+                    staff_id,
+                    description
+                ])
+                doc_id = cur.fetchone()[0]
+                
+                # Log the upload
+                blotter_log_event(
+                    action="UPLOAD",
+                    table_affected="case_document",
+                    record_affected_id=doc_id,
+                    details={
+                        "case_id": case_id,
+                        "document_type": document_type,
+                        "file_name": safe_name,
+                        "file_size": f.size
+                    },
+                    performer_staff_id=staff_id
+                )
+            
+            saved += 1
+            
+        except Exception as e:
+            print(f"[case_document_upload] Error uploading {safe_name}: {e}")
+            continue
+    
+    if saved > 0:
+        messages.success(request, f"Successfully uploaded {saved} document(s).")
+    else:
+        messages.error(request, "Failed to upload documents. Please try again.")
+    
+    return redirect('lupon_mem:case_detail', case_id=case_id)
+
+
+@session_login_required
+@role_required(*LUPON_ROLES, "barangay treasurer")
+def case_document_download(request: HttpRequest, document_id: int):
+    """
+    Download a case document by ID.
+    """
+    with connection.cursor() as cur:
+        cur.execute("""
+            SELECT file_path, file_name, mime_type
+            FROM case_document
+            WHERE case_document_id = %s AND is_deleted = FALSE
+        """, [document_id])
+        row = cur.fetchone()
+    
+    if not row:
+        return HttpResponseNotFound("Document not found")
+    
+    file_path, file_name, mime_type = row
+    
+    # If it's a URL, redirect to it
+    if file_path.startswith('http://') or file_path.startswith('https://'):
+        return redirect(file_path)
+    
+    # Otherwise, serve from local storage (if applicable)
+    return HttpResponseNotFound("Document not accessible")
+
+
+@session_login_required
+@role_required(*LUPON_ROLES)
+@require_POST
+def case_document_delete(request: HttpRequest, document_id: int):
+    """
+    Soft delete a case document.
+    """
+    staff_id = (request.session.get("auth") or {}).get("staff_id")
+    
+    with connection.cursor() as cur:
+        cur.execute("""
+            UPDATE case_document
+            SET is_deleted = TRUE, deleted_at = NOW(), deleted_by_id = %s
+            WHERE case_document_id = %s
+            RETURNING blotter_case_id
+        """, [staff_id, document_id])
+        row = cur.fetchone()
+    
+    if row:
+        case_id = row[0]
+        
+        # Log the deletion
+        blotter_log_event(
+            action="DELETE",
+            table_affected="case_document",
+            record_affected_id=document_id,
+            details={"case_id": case_id, "soft_delete": True},
+            performer_staff_id=staff_id
+        )
+        
+        return JsonResponse({"success": True, "case_id": case_id})
+    
+    return JsonResponse({"success": False, "error": "Document not found"}, status=404)
+
+
+@session_login_required
+@role_required(*LUPON_ROLES, "barangay treasurer")
+@require_POST
+def upload_scanned_copy(request: HttpRequest, case_id: int):
+    """
+    Upload scanned copies (images/PDFs) for a case.
+    Stores them in case_document table with document_type='SCANNED_COPY'.
+    """
+    staff_id = (request.session.get("auth") or {}).get("staff_id")
+    files = request.FILES.getlist("file_0") or request.FILES.getlist("file")
+    
+    if not files:
+        return JsonResponse({"success": False, "error": "No files selected"})
+    
+    bucket = getattr(settings, "SUPABASE_BUCKET", "documents")
+    print(f"[upload_scanned_copy] Using bucket: {bucket}")
+    saved_count = 0
+    
+    try:
+        supabase.storage.get_bucket(bucket)
+        print(f"[upload_scanned_copy] Bucket '{bucket}' exists")
+    except Exception as e:
+        print(f"[upload_scanned_copy] Bucket not found, creating: {e}")
+        try:
+            supabase.storage.create_bucket(bucket, {"public": True})
+            print(f"[upload_scanned_copy] Created bucket '{bucket}'")
+        except Exception as create_err:
+            print(f"[upload_scanned_copy] Failed to create bucket: {create_err}")
+    
+    try:
+        for idx, file in enumerate(files):
+            if not file:
+                continue
+            
+            if file.size > 10 * 1024 * 1024:
+                continue
+            
+            safe_name = file.name.replace("..", "").replace("/", "_")
+            path = f"blotter/{case_id}/scanned_copies/{safe_name}"
+            
+            storage_url = None
+            try:
+                print(f"[upload_scanned_copy] Attempting upload to bucket '{bucket}' at path '{path}'")
+                supabase.storage.from_(bucket).upload(
+                    path, 
+                    file.read(),
+                    {"contentType": file.content_type or "application/octet-stream", "upsert": "true"}
+                )
+                print(f"[upload_scanned_copy] Upload successful for {safe_name}")
+                
+                # Try to get public URL
+                try:
+                    pub = supabase.storage.from_(bucket).get_public_url(path)
+                    storage_url = pub.get("publicUrl") if isinstance(pub, dict) else (pub if isinstance(pub, str) else None)
+                except Exception:
+                    pass
+                
+                # Fallback to signed URL
+                if not storage_url:
+                    try:
+                        signed = supabase.storage.from_(bucket).create_signed_url(path, 60*60*24*7)
+                        storage_url = signed.get("signedURL") or signed.get("signedUrl") or signed.get("signed_url")
+                    except Exception:
+                        pass
+            except Exception as e:
+                print(f"[upload_scanned_copy] Supabase upload failed: {e}")
+                continue
+            
+            # Store in database
+            try:
+                with connection.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO case_document
+                            (blotter_case_id, document_type, file_name, file_path, mime_type, file_size_bytes, uploaded_by_id)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, [
+                        case_id,
+                        "SCANNED_COPY",
+                        safe_name,
+                        storage_url or path,
+                        file.content_type or "application/octet-stream",
+                        file.size,
+                        staff_id
+                    ])
+                    
+                    # Log the document upload
+                    blotter_log_event(
+                        action="CREATE",
+                        table_affected="case_document",
+                        record_affected_id=case_id,
+                        details={
+                            "document_type": "SCANNED_COPY",
+                            "file_name": safe_name,
+                            "file_size": file.size
+                        },
+                        performer_staff_id=staff_id
+                    )
+                
+                saved_count += 1
+            except Exception as e:
+                print(f"[upload_scanned_copy] Database insert failed: {e}")
+                continue
+        
+        if saved_count > 0:
+            return JsonResponse({"success": True, "message": f"Uploaded {saved_count} file(s)"})
+        else:
+            return JsonResponse({"success": False, "error": "No files were successfully uploaded"})
+    
+    except Exception as e:
+        print(f"[upload_scanned_copy] Error: {e}")
+        return JsonResponse({"success": False, "error": str(e)})

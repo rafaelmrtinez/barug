@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+{% load static %}
+{% load cached_icons %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'css/table.css' %}">
+<link rel="stylesheet" href="{% static 'css/button.css' %}">
+<style>
+  .document-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+  }
+  .document-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #ffffff;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .document-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transform: translateY(-2px);
+  }
+  .delete-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 10;
+    background: rgba(220, 38, 38, 0.9);
+    border: none;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .delete-btn:hover {
+    background: rgba(185, 28, 28, 1);
+    transform: scale(1.1);
+  }
+  .document-image {
+    width: 100%;
+    height: 400px;
+    object-fit: contain;
+    background: #f9fafb;
+    cursor: pointer;
+  }
+  .document-info {
+    padding: 1rem;
+  }
+  .doc-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .doc-type-final {
+    background: #dcfce7;
+    color: #166534;
+  }
+  .doc-type-settlement {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+  .doc-type-other {
+    background: #f3f4f6;
+    color: #374151;
+  }
+</style>
+{% endblock css %}
+
+{% block content %}
+<div class="container-fluid page-wrap" style="margin-top:60px;">
+  
+  <!-- Header -->
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+      <h4 class="mb-1">{% bs_icon_cached 'file-earmark-pdf' %} Scanned Copies</h4>
+      <p class="text-muted mb-0">Case #{{ case_num }} - {{ case_name }}</p>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#uploadScannedCopyModal">
+        {% bs_icon_cached 'cloud-upload' extra_classes='me-1' %} Upload Scanned Copy
+      </button>
+      <a href="{% url 'lupon_mem:case_detail' case_id %}" class="btn btn-outline-brand">
+        {% bs_icon_cached 'arrow-left' extra_classes='me-1' %} Back to Case
+      </a>
+    </div>
+  </div>
+
+  <!-- Documents Grid -->
+  {% if documents %}
+  <div class="document-grid">
+    {% for doc in documents %}
+    <div class="document-card">
+      <button class="delete-btn" onclick="deleteDocument({{ doc.4 }}, '{{ doc.0|escapejs }}')" title="Delete">
+        <i class="bi bi-trash"></i>
+      </button>
+      <img src="{{ doc.3 }}" alt="{{ doc.0 }}" class="document-image" onclick="window.open('{{ doc.3 }}', '_blank')">
+      <div class="document-info">
+        <div class="d-flex align-items-start justify-content-between mb-2">
+          <span class="doc-type-badge {% if doc.1 == 'FINAL_COPY' %}doc-type-final{% elif doc.1 == 'SETTLEMENT_COPY' %}doc-type-settlement{% else %}doc-type-other{% endif %}">
+            {% if doc.1 == 'FINAL_COPY' %}
+              {% bs_icon_cached 'file-earmark-check' %}
+              Final Copy
+            {% elif doc.1 == 'SETTLEMENT_COPY' %}
+              {% bs_icon_cached 'file-earmark-text' %}
+              Settlement
+            {% else %}
+              {% bs_icon_cached 'file-earmark' %}
+              {{ doc.1 }}
+            {% endif %}
+          </span>
+          <small class="text-muted">{{ doc.2|date:"M d, Y" }}</small>
+        </div>
+        <h6 class="mb-2" style="font-weight:600; word-break:break-word; font-size:0.9rem;">{{ doc.0 }}</h6>
+        <a href="{{ doc.3 }}" class="btn btn-sm btn-outline-brand w-100" download>
+          {% bs_icon_cached 'download' extra_classes='me-1' %} Download
+        </a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-5">
+    <i class="bi bi-inbox" style="font-size: 3rem; color: #9ca3af; display: block; margin-bottom: 1rem;"></i>
+    <h5 class="text-muted">No scanned copies uploaded yet</h5>
+    <p class="text-muted">Click the button above to upload scanned copies</p>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Upload Scanned Copy Modal -->
+<div class="modal fade" id="uploadScannedCopyModal" tabindex="-1" aria-labelledby="uploadScannedCopyLabel" aria-hidden="true" style="margin-top:150px;">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" style="border-radius:12px; border:none; box-shadow:0 10px 40px rgba(0,0,0,0.1);">
+      <div class="modal-header" style="border-bottom:1px solid var(--line); background:var(--brand-050); padding:1rem 1.25rem;">
+        <h5 class="modal-title d-flex align-items-center gap-2" id="uploadScannedCopyLabel" style="font-weight:700; color:var(--brand-800);">
+          {% bs_icon_cached 'cloud-upload' %} Upload Scanned Copy
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" style="padding:1.25rem;">
+        <!-- Upload Area -->
+        <div class="mb-3">
+          <label class="form-label fw-600" style="color:var(--brand-700);">Upload Images</label>
+          <div class="upload-area" id="uploadArea" style="border:2px dashed var(--brand-300); border-radius:10px; padding:2rem; text-align:center; cursor:pointer; background:var(--brand-050); transition:all 0.3s;">
+            <i class="bi bi-cloud-upload" style="font-size:2.5rem; color:var(--brand-600); margin-bottom:0.5rem; display:block;"></i>
+            <p class="mb-1" style="font-weight:600; color:var(--brand-700);">Click to upload or drag and drop</p>
+            <p class="text-muted" style="font-size:0.9rem;">PNG, JPG, PDF up to 10MB each</p>
+            <input type="file" id="fileInput" multiple accept="image/*,.pdf" style="display:none;">
+          </div>
+        </div>
+
+        <!-- Uploaded Images Preview -->
+        <div class="mb-3">
+          <label class="form-label fw-600" style="color:var(--brand-700);">Uploaded Images</label>
+          <div id="uploadedImagesContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:1rem;">
+            <!-- Images will be added here dynamically -->
+          </div>
+          <div id="noImagesMessage" class="text-center text-muted py-4" style="border:1px solid var(--line); border-radius:8px;">
+            <i class="bi bi-inbox" style="font-size:2rem; display:block; margin-bottom:0.5rem;"></i>
+            <p>No images uploaded yet</p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid var(--line); padding:0.75rem 1.25rem;">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-brand btn-sm" id="saveScannedCopyBtn" onclick="saveScannedCopies()">
+          {% bs_icon_cached 'check-circle' extra_classes='me-1' %} Save
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block js %}
+<script>
+  let uploadedFiles = [];
+  const uploadArea = document.getElementById('uploadArea');
+  const fileInput = document.getElementById('fileInput');
+  const uploadedImagesContainer = document.getElementById('uploadedImagesContainer');
+  const noImagesMessage = document.getElementById('noImagesMessage');
+
+  if (uploadArea && fileInput) {
+    uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadArea.style.background = 'var(--brand-100)';
+      uploadArea.style.borderColor = 'var(--brand-600)';
+    });
+    uploadArea.addEventListener('dragleave', () => {
+      uploadArea.style.background = 'var(--brand-050)';
+      uploadArea.style.borderColor = 'var(--brand-300)';
+    });
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.style.background = 'var(--brand-050)';
+      uploadArea.style.borderColor = 'var(--brand-300)';
+      handleFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+  }
+
+  function handleFiles(files) {
+    Array.from(files).forEach(file => {
+      if (file.size > 10 * 1024 * 1024) {
+        alert(`File ${file.name} is too large (max 10MB)`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        uploadedFiles.push({ name: file.name, data: e.target.result, type: file.type });
+        renderUploadedImages();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function renderUploadedImages() {
+    uploadedImagesContainer.innerHTML = '';
+    if (uploadedFiles.length === 0) {
+      noImagesMessage.style.display = 'block';
+      return;
+    }
+    noImagesMessage.style.display = 'none';
+    uploadedFiles.forEach((file, index) => {
+      const div = document.createElement('div');
+      div.style.cssText = 'position:relative; border-radius:8px; overflow:hidden; background:#f0f0f0; aspect-ratio:1;';
+      const isImage = file.type.startsWith('image/');
+      div.innerHTML = `
+        ${isImage ? `<img src="${file.data}" style="width:100%; height:100%; object-fit:cover;">` : `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#e0e0e0;"><i class="bi bi-file-pdf" style="font-size:2rem; color:#999;"></i></div>`}
+        <button type="button" class="btn btn-sm btn-danger" style="position:absolute; top:4px; right:4px; padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="removeUploadedFile(${index})">
+          <i class="bi bi-trash"></i>
+        </button>
+        <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.7); color:white; padding:0.5rem; font-size:0.75rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${file.name}</div>
+      `;
+      uploadedImagesContainer.appendChild(div);
+    });
+  }
+
+  function removeUploadedFile(index) {
+    uploadedFiles.splice(index, 1);
+    renderUploadedImages();
+  }
+
+  async function saveScannedCopies() {
+    if (uploadedFiles.length === 0) {
+      alert('Please upload at least one image');
+      return;
+    }
+    const btn = document.getElementById('saveScannedCopyBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+    try {
+      const formData = new FormData();
+      uploadedFiles.forEach((file, index) => {
+        const blob = dataURLtoBlob(file.data);
+        formData.append(`file_${index}`, blob, file.name);
+      });
+      const response = await fetch(`/lupon_mem/cases/{{ case_id }}/upload-scanned-copy/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        body: formData,
+        credentials: 'same-origin'
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert('Scanned copies uploaded successfully!');
+        uploadedFiles = [];
+        renderUploadedImages();
+        fileInput.value = '';
+        const modal = bootstrap.Modal.getInstance(document.getElementById('uploadScannedCopyModal'));
+        modal.hide();
+        setTimeout(() => window.location.reload(), 500);
+      } else {
+        alert(`Error: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error uploading:', error);
+      alert('An error occurred while uploading. Please try again.');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-check-circle me-1"></i> Save';
+    }
+  }
+
+  function dataURLtoBlob(dataURL) {
+    const arr = dataURL.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    const n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    for (let i = 0; i < n; i++) u8arr[i] = bstr.charCodeAt(i);
+    return new Blob([u8arr], { type: mime });
+  }
+
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
+  async function deleteDocument(documentId, fileName) {
+    if (!confirm(`Are you sure you want to delete "${fileName}"?\n\nThis action cannot be undone.`)) {
+      return;
+    }
+    try {
+      const response = await fetch(`/lupon_mem/documents/${documentId}/delete/`, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': getCookie('csrftoken'),
+          'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin'
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert('Document deleted successfully!');
+        window.location.reload();
+      } else {
+        alert(`Error: ${data.error || 'Failed to delete document'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      alert('An error occurred while deleting. Please try again.');
+    }
+  }
+</script>
+{% endblock js %}

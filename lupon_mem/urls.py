@@ -12,6 +12,8 @@ from .views_case_state import update_case_state
 from . import views_profiling
 from . import views_residents
 from . import views_blotter_pdf
+from . import views_scanned_copy
+from . import views_scanned_copies
 
 from lupon_mem.views_sql import (
     SubmissionViewSQL,
@@ -102,6 +104,13 @@ urlpatterns = [
 
     # timeline
     path("cases/<int:case_id>/timeline/", views.case_timeline, name="case_timeline"),
+
+    # case documents (final copy, etc.)
+    path("cases/<int:case_id>/documents/upload/", views.case_document_upload, name="case_document_upload"),
+    path("documents/<int:document_id>/download/", views.case_document_download, name="case_document_download"),
+    path("documents/<int:document_id>/delete/", views.case_document_delete, name="case_document_delete"),
+    path("cases/<int:case_id>/upload-scanned-copy/", views_scanned_copy.upload_scanned_copy, name="upload_scanned_copy"),
+    path("cases/<int:case_id>/scanned-copies/", views_scanned_copies.view_scanned_copies, name="view_scanned_copies"),
 
     # reports
     path("reports/", views_reports.report_list, name="report_list"), # added to views_reports
