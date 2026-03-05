@@ -124,8 +124,8 @@
   {% endif %}
   {% if form_id == 8 or form_id == 9 or form_id == 12 or form_id == 42 or form_id == 33 or form_id == 34 %}
   <style>
-    /* Show number field (1142) for forms 8, 9, 12, 42, 33, 34 */
-    [data-field-id="1142"],.col-12:has([data-field-id="1142"]),.col-md-6:has([data-field-id="1142"]){display:block!important;}
+    /* Show number field (1143) for forms 8, 9, 12, 42, 33, 34 */
+    [data-field-id="1143"],.col-12:has([data-field-id="1143"]),.col-md-6:has([data-field-id="1143"]){display:block!important;}
   </style>
   {% endif %}
   {% if form_id == 37 %}
@@ -487,11 +487,11 @@
                   {% if header.0 == 'KP-9-P2' and 'officer_return_narrative' in code %} kp-offscreen{% endif %}
                   {% if header.0 == 'KP-9-P2' and 'narrative' in code %} kp-offscreen{% endif %}
                   {% if header.0 == 'KP-9-P2' and 'Officer' in label and 'Return' in label and 'Narrative' in label %} kp-offscreen{% endif %}
-                  {% if kp8_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'hearing_date' and code != 'hearing_time' and code != 'date_created' and code != 'processed_on_date' and code != 'notified_date' and field_id != 1142 and field_id != 1121 %} kp-offscreen{% endif %}
-                  {% if kp9_ui_minimal and code != 'curr_date' and code != 'recipient_address' %} kp-offscreen{% endif %}
+                  {% if kp8_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'hearing_date' and code != 'hearing_time' and code != 'date_created' and code != 'processed_on_date' and code != 'notified_date' and field_id != 1142 and field_id != 1121 and field_id != 1143 %} kp-offscreen{% endif %}
+                  {% if kp9_ui_minimal and code != 'curr_date' and code != 'recipient_address' and field_id != 1143 %} kp-offscreen{% endif %}
                   {% if kp10_ui_minimal and code != 'appearance_date' and code != 'appearance_time' and code != 'addr_to' %} kp-offscreen{% endif %}
                   {% if kp11_ui_minimal and code != 'pangkat_member_name' %} kp-offscreen{% endif %}
-                  {% if kp12_ui_minimal and code != 'date_created' and code != 'time_created' %} kp-offscreen{% endif %}
+                  {% if kp12_ui_minimal and code != 'date_created' and code != 'time_created' and field_id != 1143 %} kp-offscreen{% endif %}
                   {% if kp13_ui_minimal and code != 'subpoena_to' and code != 'subpoena_witness' and code != 'appearance_date' and code != 'appearance_time' %} kp-offscreen{% endif %}
                   {% if kp14_ui_minimal %} kp-offscreen{% endif %}
                   {% if kp16_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_num' and code != 'purpose' and code != 'settlement_statement' and code != 'processed_on_date' and field_id != 33 %} kp-offscreen{% endif %}
@@ -505,7 +505,7 @@
                   {% if kp22_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
                   {% if kp23_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
                   {% if kp24_ui_minimal and code != 'case_num' and code != 'purpose' and code != 'motion_date' and code != 'motion_time' %} kp-offscreen{% endif %}
-                  {% if minutes_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_num' and code != 'purpose' and code != 'when' and code != 'what' and code != 'date_signed' and code != 'time_signed' %} kp-offscreen{% endif %}
+                  {% if minutes_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_num' and code != 'purpose' and code != 'when' and code != 'what' and code != 'date_signed' and code != 'time_signed' and field_id != 1143 %} kp-offscreen{% endif %}
                   {% if kp7_ui_minimal and field_id != 1 and field_id != 2 and field_id != 222 and field_id != 169 and field_id != 3 and field_id != 280 and field_id != 42 and field_id != 1129 and field_id != 1121 %} kp-offscreen{% endif %}">
               {% else %}
                 <div class="col-12 col-md-6
@@ -524,11 +524,11 @@
                   {% if header.0 == 'KP-9-P2' and 'Processed' in label %} kp-offscreen{% endif %}
                   {% if header.0 == 'KP-9-P2' and 'Date' in label and 'Time' in label %} kp-offscreen{% endif %}
                   {% if header.0 == 'KP-9-P2' and 'Recipient Address' in label %} kp-offscreen{% endif %}
-                  {% if kp8_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'hearing_date' and code != 'hearing_time' and code != 'date_created' and code != 'processed_on_date' and code != 'notified_date' and field_id != 1142 and field_id != 1121 %} kp-offscreen{% endif %}
-                  {% if kp9_ui_minimal and code != 'curr_date' and code != 'recipient_address' %} kp-offscreen{% endif %}
+                  {% if kp8_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'hearing_date' and code != 'hearing_time' and code != 'date_created' and code != 'processed_on_date' and code != 'notified_date' and field_id != 1142 and field_id != 1121 and field_id != 1143 %} kp-offscreen{% endif %}
+                  {% if kp9_ui_minimal and code != 'curr_date' and code != 'recipient_address' and field_id != 1143 %} kp-offscreen{% endif %}
                   {% if kp10_ui_minimal and code != 'appearance_date' and code != 'appearance_time' and code != 'addr_to' %} kp-offscreen{% endif %}
                   {% if kp11_ui_minimal and code != 'pangkat_member_name' %} kp-offscreen{% endif %}
-                  {% if kp12_ui_minimal and code != 'date_created' and code != 'time_created' %} kp-offscreen{% endif %}
+                  {% if kp12_ui_minimal and code != 'date_created' and code != 'time_created' and field_id != 1143 %} kp-offscreen{% endif %}
                   {% if kp13_ui_minimal and code != 'subpoena_to' and code != 'subpoena_witness' and code != 'appearance_date' and code != 'appearance_time' %} kp-offscreen{% endif %}
                   {% if kp14_ui_minimal %} kp-offscreen{% endif %}
                   {% if kp16_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_num' and code != 'purpose' and code != 'settlement_statement' and code != 'processed_on_date' and field_id != 33 %} kp-offscreen{% endif %}
@@ -542,7 +542,7 @@
                   {% if kp22_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
                   {% if kp23_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'case_num' and code != 'purpose' %} kp-offscreen{% endif %}
                   {% if kp24_ui_minimal and code != 'case_num' and code != 'purpose' and code != 'motion_date' and code != 'motion_time' %} kp-offscreen{% endif %}
-                  {% if minutes_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_num' and code != 'purpose' and code != 'when' and code != 'what' and code != 'date_signed' and code != 'time_signed' %} kp-offscreen{% endif %}
+                  {% if minutes_ui_minimal and code != 'complainants' and code != 'respondents' and code != 'brgy_case_num' and code != 'purpose' and code != 'when' and code != 'what' and code != 'date_signed' and code != 'time_signed' and field_id != 1143 %} kp-offscreen{% endif %}
                   {% if kp7_ui_minimal and field_id != 1 and field_id != 2 and field_id != 222 and field_id != 169 and field_id != 3 and field_id != 280 and field_id != 42 and field_id != 1129 and field_id != 1121 %} kp-offscreen{% endif %}">
               {% endif %}
                 <div class="kp-field" data-code="{{ code }}">

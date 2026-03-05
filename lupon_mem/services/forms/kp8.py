@@ -22,6 +22,7 @@ _KP8_FIELDS = [
     "date_notified", "month_notified", "year_notified",
     # signature
     "brgy_capt",
+    "number",
 ]
 
 # Accepted sources to fill targets (read from either field label or code)
@@ -43,6 +44,7 @@ _KP8_SOURCES: Dict[str, Set[str]] = {
     "month_notified":    {"month_notified", "notified_month", "processed_on_date", "processed on date", "processed_date", "date_processed"}, # Use processed_on_date from form
     "year_notified":     {"year_notified", "notified_year", "processed_on_date", "processed on date", "processed_date", "date_processed"},  # Use processed_on_date from form
     "brgy_capt":         {"brgy_capt", "brgy_captain", "chairman", "punong barangay", "punong_barangay"},
+    "number":            {"number"},
 }
 
 

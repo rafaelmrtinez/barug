@@ -1395,7 +1395,7 @@ def form_builder(request, case_id: int, form_id: int = None, submission_id: int 
 
     # KP-9 minimal filter (exactly same as before)
     if flags["kp9_ui_minimal"]:
-        allowed_codes = {"curr_date", "recipient_address"}
+        allowed_codes = {"curr_date", "recipient_address", "number"}
         fields_with_values = [item for item in fields_with_values if ((item[6] or "").strip().lower() in allowed_codes)]
         page2_index = None
 

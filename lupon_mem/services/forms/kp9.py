@@ -22,7 +22,7 @@ _KP9_FIELDS = [
     "respondent_names_one","respondent_names_two","respondent_names_three",
     "proxy_name_one","served_to_2","proxy_name_two","offcr_name",
     "served_to_3","date_signed_one","date_signed_two","served_to_4",
-    "recipient_address","date_time_field",
+    "recipient_address","date_time_field","number",
 ]
 
 # Accept both label text and field_code from the builder
@@ -62,6 +62,7 @@ _KP9_SOURCES: Dict[str, Set[str]] = {
     "served_to_4": {"served_to_4"},
     "recipient_address": {"recipient_address", "address", "respondent_address"},
     "date_time_field": {"date_time_field", "datetime", "date_time", "kp7_date_time_filed"},
+    "number": {"number"},
 }
 
 _DEFAULT_PUNONG_BARANGAY = "Lourdes Ramirez"

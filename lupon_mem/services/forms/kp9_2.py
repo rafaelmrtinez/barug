@@ -20,6 +20,7 @@ _KP9P2_FIELDS = [
     "respondent_names_one","respondent_names_two","respondent_names_three",
     "proxy_name_one","served_to_2","proxy_name_two","offcr_name",
     "served_to_3","date_signed_one","date_signed_two","served_to_4",
+    "number",
 ]
 
 # Accept both label text and field_code from the builder
@@ -44,6 +45,7 @@ _KP9P2_SOURCES: Dict[str, Set[str]] = {
     "date_signed_one": {"date_signed_one"},
     "date_signed_two": {"date_signed_two"},
     "served_to_4": {"served_to_4"},
+    "number": {"number"},
 }
 
 class KP9_2Handler:

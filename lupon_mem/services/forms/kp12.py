@@ -29,6 +29,7 @@ _KP12_FIELDS = [
     "complainants_two",
     "respondents_two",
     "notified_year",       # "2025"
+    "number",
 ]
 
 # Accept both label text and field_code from the builder (robust to common variants)
@@ -52,6 +53,7 @@ _KP12_SOURCES: Dict[str, Set[str]] = {
     "notified_year":  {"notified_year", "year notified"},
     "complainants_two": {"complainants_two", "complainants – alternate", "complainants - alternate"},
     "respondents_two":  {"respondents_two", "respondents – alternate", "respondents - alternate"},
+    "number":           {"number"},
 }
 
 class KP12Handler:
